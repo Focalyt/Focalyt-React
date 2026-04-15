@@ -407,6 +407,7 @@ const B2BSales = () => {
   const [approvalCounts, setApprovalCounts] = useState({ total: 0, approved: 0, pending: 0, rejected: 0 });
   const [approvalCountsLoading, setApprovalCountsLoading] = useState(false);
   const [approvalLeadTarget, setApprovalLeadTarget] = useState(null);
+  const [approvalEditLeadId, setApprovalEditLeadId] = useState(null);
 
   // Lead Documents (backend: /college/b2b/leads/:id/documents)
   const [showLeadDocumentsModal, setShowLeadDocumentsModal] = useState(false);
@@ -4054,17 +4055,45 @@ const B2BSales = () => {
                                 </div>
 
                                 <div className="lhm__pills">
-                                  <button type="button" className="lhm__pill lhm__pill--refer"
-                                    onClick={() => openRefferPanel(lead, 'Reffer')}>
-                                    <i className="fas fa-share-alt" aria-hidden="true"></i> Refer
+                                <button
+                                    type="button"
+                                    className="lead-meta-v2__pill"
+                                    onClick={() => openRefferPanel(lead, 'Reffer')}
+                                    title="Refer"
+                                  >
+                                    <i className="fas fa-share-alt" aria-hidden="true"></i>
+                                    
                                   </button>
-                                  <button type="button" className="lhm__pill lhm__pill--history"
-                                    onClick={() => openleadHistoryPanel(lead)}>
-                                    <i className="fas fa-history" aria-hidden="true"></i> History
+                                  <button
+                                    type="button"
+                                    className="lead-meta-v2__pill"
+                                    onClick={() => openRefferPanel(lead, 'Reffer')}
+                                    title="Add Lead Report"
+                                  >
+                                    <i className="fas fa-plus" aria-hidden="true"></i>
+                                    
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="lead-meta-v2__pill"
+                                    onClick={() => openRefferPanel(lead, 'Reffer')}
+                                    title="View lead Report"
+                                  >
+                                    <i className="fas fa-eye" aria-hidden="true"></i>
+                                    
                                   </button>
                                 </div>
 
                                 <div className="lhm__status-block" onClick={() => openEditPanel(lead, 'StatusChange')}>
+                                  <button
+                                    type="button"
+                                    className="lhm__editbtn"
+                                    title="Edit Status"
+                                    aria-label="Edit Status"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(lead, 'StatusChange'); }}
+                                  >
+                                    <i className="fas fa-edit" aria-hidden="true"></i>
+                                  </button>
                                   <div className="lhm__status-row">
                                     <span className="lhm__status-label">Status</span>
                                     <span className="lhm__status-val">
@@ -4135,6 +4164,15 @@ const B2BSales = () => {
                                 {/* Followup Calling */}
                                 <div className="lhm__followup-box">
                                   <span className="lhm__followup-title">Followup Calling</span>
+                                  <button
+                                    type="button"
+                                    className="lhm__editbtn"
+                                    title="Set Followup"
+                                    aria-label="Set Followup"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(lead, 'SetFollowup'); }}
+                                  >
+                                    <i className="fas fa-edit" aria-hidden="true"></i>
+                                  </button>
                                   <div className="lhm__followup-cards">
                                     {[
                                       { label: 'Done',    value: 0, bg: '#12b3ff' },
@@ -4149,13 +4187,22 @@ const B2BSales = () => {
                                     ))}
                                   </div>
                                   <div className="lhm__followup-date">
-                                    <span>Next Follow-up Date:-</span><span>10-04-2026</span>
+                                    <span>Next Follow-up Date:</span><span>10-04-2026</span>
                                   </div>
                                 </div>
 
                                 {/* Followup Visit */}
                                 <div className="lhm__followup-box">
                                   <span className="lhm__followup-title">Followup Visit</span>
+                                  <button
+                                    type="button"
+                                    className="lhm__editbtn"
+                                    title="Set Followup"
+                                    aria-label="Set Followup"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(lead, 'SetFollowup'); }}
+                                  >
+                                    <i className="fas fa-edit" aria-hidden="true"></i>
+                                  </button>
                                   <div className="lhm__followup-cards">
                                     {[
                                       { label: 'Done',    value: 0, bg: '#4b5563' },
@@ -4170,7 +4217,32 @@ const B2BSales = () => {
                                     ))}
                                   </div>
                                   <div className="lhm__followup-date">
-                                    <span>Next Follow-up Date:-</span><span>10-04-2026</span>
+                                    <span>Next Follow-up Date:</span><span>10-04-2026</span>
+                                  </div>
+                                </div>
+                                {/* Documents */}
+                                <div className="lhm__followup-box">
+                                  <span className="lhm__followup-title">Documents</span>
+                                  <button
+                                    type="button"
+                                    className="lhm__editbtn"
+                                    title="Open Documents"
+                                    aria-label="Open Documents"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); openLeadDocuments(lead); }}
+                                  >
+                                    <i className="fas fa-edit" aria-hidden="true"></i>
+                                  </button>
+                                  <div className="lhm__followup-cards">
+                                    {[
+                                      { label: 'Done',    value: 0, bg: '#4b5563' },
+                                      { label: 'Pending', value: 0, bg: '#4b5563' },
+                                    ].map((s) => (
+                                      <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
+                                        <span className="lhm__stat-label">{s.label}</span>
+                                        <span className="lhm__stat-divider" />
+                                        <span className="lhm__stat-val">{String(s.value).padStart(2, '0')}</span>
+                                      </div>
+                                    ))}
                                   </div>
                                 </div>
                               </div>
@@ -4222,44 +4294,78 @@ const B2BSales = () => {
                               </div>
 
                               <div className="lead-header-v2__right">
-                                {/* Lead Approval */}
+                                {/* Lead Approval (PENDING / APPROVED / REJECTED) */}
                                 <div className="lead-header-v2__approval">
-                                  <button
-                                    type="button"
-                                    className="lead-header-v2__approval-btn"
-                                    title={`Approval: ${lead?.approval?.status || 'PENDING'}`}
-                                    onClick={() => {
-                                      // quick filter by this approval status
-                                      const st = (lead?.approval?.status || 'PENDING').toUpperCase();
-                                      handleApprovalCardClick(['PENDING', 'APPROVED', 'REJECTED'].includes(st) ? st : null);
-                                    }}
+                                  <span
+                                    className="lead-header-v2__approval-label"
                                   >
-                                    {String(lead?.approval?.status || 'PENDING')}
-                                  </button>
+                                    Lead Approval
+                                  </span>
+                                  <div className="d-flex align-items-center gap-2 flex-column">
+                                    <button
+                                      type="button"
+                                      className="lead-header-v2__approval-btn"
+                                      title={`Approval: ${lead?.approval?.status || 'PENDING'}`}
+                                      onClick={() => {
+                                        const st = (lead?.approval?.status || 'PENDING').toUpperCase();
+                                        handleApprovalCardClick(['PENDING', 'APPROVED', 'REJECTED'].includes(st) ? st : null);
+                                      }}
+                                    >
+                                      {String(lead?.approval?.status || 'PENDING')}
+                                    </button>
 
-                                  {isAdmin() && String(lead?.approval?.status || 'PENDING').toUpperCase() === 'PENDING' && (
-                                    <>
+                                    {isAdmin() && (
                                       <button
                                         type="button"
                                         className="lead-header-v2__approval-btn"
-                                        style={{ background: 'rgba(16, 185, 129, 0.75)' }}
-                                        onClick={() => approveLead(lead)}
+                                        title="Edit Lead Approval"
+                                        onClick={() =>
+                                          setApprovalEditLeadId((prev) => (prev === lead._id ? null : lead._id))
+                                        }
+                                        aria-label="Edit lead approval"
                                       >
-                                        Approve
+                                        <i className="fas fa-edit" aria-hidden="true"></i>
                                       </button>
-                                      <button
-                                        type="button"
-                                        className="lead-header-v2__approval-btn"
-                                        style={{ background: 'rgba(239, 68, 68, 0.75)' }}
-                                        onClick={() => {
-                                          setApprovalLeadTarget(lead);
-                                          setRejectionReason('');
-                                          setShowRejectionForm(true);
+                                    )}
+                                  </div>
+
+                                  {/* Dropdown editor (only when icon clicked) */}
+                                  {isAdmin() && approvalEditLeadId === lead._id && (
+                                    <div className="lead-header-v2__approval-editor">
+                                      <select
+                                        className="form-select form-select-sm lead-header-v2__approval-select"
+                                        defaultValue=""
+                                        onChange={async (e) => {
+                                          const value = e.target.value;
+                                          e.target.value = "";
+                                          setApprovalEditLeadId(null);
+                                          if (value === 'approve') {
+                                            await approveLead(lead);
+                                          }
+                                          if (value === 'reject') {
+                                            setApprovalLeadTarget(lead);
+                                            setRejectionReason('');
+                                            setShowRejectionForm(true);
+                                          }
                                         }}
                                       >
-                                        Reject
-                                      </button>
-                                    </>
+                                        <option value="" disabled>
+                                          Change approval...
+                                        </option>
+                                        {String(lead?.approval?.status || 'PENDING').toUpperCase() === 'PENDING' ? (
+                                          <>
+                                            <option value="approve">Approve</option>
+                                            <option value="reject">Reject</option>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <option value="" disabled>
+                                              Already {String(lead?.approval?.status || '').toUpperCase()}
+                                            </option>
+                                          </>
+                                        )}
+                                      </select>
+                                    </div>
                                   )}
                                 </div>
 
@@ -4269,17 +4375,28 @@ const B2BSales = () => {
                                     type="button"
                                     className="lead-meta-v2__pill"
                                     onClick={() => openRefferPanel(lead, 'Reffer')}
+                                    title="Refer"
                                   >
                                     <i className="fas fa-share-alt" aria-hidden="true"></i>
-                                    Refer
+                                    
                                   </button>
                                   <button
                                     type="button"
                                     className="lead-meta-v2__pill"
-                                    onClick={() => openleadHistoryPanel(lead)}
+                                    onClick={() => openRefferPanel(lead, 'Reffer')}
+                                    title="Add Lead Report"
                                   >
-                                    <i className="fas fa-history" aria-hidden="true"></i>
-                                    History
+                                    <i className="fas fa-plus" aria-hidden="true"></i>
+                                    
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="lead-meta-v2__pill"
+                                    onClick={() => openRefferPanel(lead, 'Reffer')}
+                                    title="View lead Report"
+                                  >
+                                    <i className="fas fa-eye" aria-hidden="true"></i>
+                                    
                                   </button>
                                 </div>
 
@@ -4287,6 +4404,15 @@ const B2BSales = () => {
                                 <div className="lead-header-v2__perf-block" style={{width:'20%'
                                 }}>
                                   <span className="lead-header-v2__perf-title">Performance</span>
+                                  <button
+                                    type="button"
+                                    className="lead-header-v2__editbtn"
+                                    title="Edit Performance"
+                                    aria-label="Edit Performance"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(lead, 'StatusChange'); }}
+                                  >
+                                    <i className="fas fa-edit" aria-hidden="true"></i>
+                                  </button>
                                   <div className="lead-header-v2__perf-row">
                                     <span className="lead-header-v2__perf-label">Status</span>
                                     <input
@@ -4339,6 +4465,15 @@ const B2BSales = () => {
                                   <div className="lead-header-v2__dash-col">
                                     <div className="b2b-dash-section h-100">
                                       <span className="b2b-dash-section__label">Followup Calling</span>
+                                      <button
+                                        type="button"
+                                        className="lead-header-v2__editbtn"
+                                        title="Edit Followup Calling"
+                                        aria-label="Edit Followup Calling"
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(lead, 'SetFollowup'); }}
+                                      >
+                                        <i className="fas fa-edit" aria-hidden="true"></i>
+                                      </button>
                                       <div className="d-flex flex-wrap gap-2 pt-1">
                                         {[
                                           { key: 'fc-done',    label: 'Done',    value: 0, bg: '#12b3ff' },
@@ -4359,13 +4494,22 @@ const B2BSales = () => {
                                         ))}
                                       </div>
                                       <div className="ActionsDates">
-                                        <span>Next Follow-up Date:-</span> <span>10-04-2026</span>
+                                        <span>Next Follow-up Date:</span> <span>10-04-2026</span>
                                       </div>
                                     </div>
                                   </div>
                                   <div className="lead-header-v2__dash-col">
                                     <div className="b2b-dash-section h-100">
                                       <span className="b2b-dash-section__label">Followup Visit</span>
+                                      <button
+                                        type="button"
+                                        className="lead-header-v2__editbtn"
+                                        title="Edit Followup Visit"
+                                        aria-label="Edit Followup Visit"
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(lead, 'SetFollowup'); }}
+                                      >
+                                        <i className="fas fa-edit" aria-hidden="true"></i>
+                                      </button>
                                       <div className="d-flex flex-wrap gap-2 pt-1">
                                         {[
                                           { key: 'fv-done',    label: 'Done',    value: 0, bg: '#4b5563' },
@@ -4386,8 +4530,41 @@ const B2BSales = () => {
                                         ))}
                                       </div>
                                       <div className="ActionsDates">
-                                        <span>Next Follow-up Date:-</span> <span>10-04-2026</span>
+                                        <span>Next Follow-up Date:</span> <span>10-04-2026</span>
                                       </div>
+                                    </div>
+                                  </div>
+                                  <div className="lead-header-v2__dash-col">
+                                    <div className="b2b-dash-section h-100">
+                                      <span className="b2b-dash-section__label">Documents</span>
+                                      <button
+                                        type="button"
+                                        className="lead-header-v2__editbtn"
+                                        title="Open Documents"
+                                        aria-label="Open Documents"
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); openLeadDocuments(lead); }}
+                                      >
+                                        <i className="fas fa-edit" aria-hidden="true"></i>
+                                      </button>
+                                      <div className="d-flex flex-wrap gap-2 pt-1">
+                                        {[
+                                          { key: 'doc-done',    label: 'Done',    value: 0, bg: '#4b5563' },
+                                          { key: 'doc-pending', label: 'Pending', value: 0, bg: '#4b5563' },
+                                        ].map((row) => (
+                                          <div
+                                            key={row.key}
+                                            className="b2b-dash-stat-card text-center text-white flex-grow-1"
+                                            style={{ background: row.bg }}
+                                          >
+                                            <div className="b2b-dash-stat-card__label">{row.label}</div>
+                                            <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                                            <div className="b2b-dash-stat-card__value text-white">
+                                              {String(row.value).padStart(2, '0')}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                      
                                     </div>
                                   </div>
                                 </div>
@@ -4431,64 +4608,19 @@ const B2BSales = () => {
                               </div>
                             
                             </div>
-                          </div>
-
-
-                          <div className="lead-meta-v2__panel lead-meta-v2__panel--actions">
-                            <div className="lead-meta-v2__panel-title">Action Button</div>
-                            <div className="lead-meta-v2__action-grid">
+                            <div className="d-flex justify-content-end mt-2">
                               <button
                                 type="button"
-                                className="lead-meta-v2__icon-action"
-                                onClick={() => openEditPanel(lead, 'StatusChange')}
-                                disabled={!canUpdateLead(lead)}
-                                title={canUpdateLead(lead) ? 'Change Status' : "You don't have permission to change status"}
+                                className="btn btn-sm btn-outline-secondary"
+                                onClick={() => openleadHistoryPanel(lead)}
+                                title="History"
                               >
-                                <div className="lead-meta-v2__icon-action-label">Change Status</div>
-                                <div className="lead-meta-v2__icon-action-btn" aria-hidden="true">
-                                  <i className="fas fa-edit"></i>
-                                </div>
+                                <i className="fas fa-history me-1" aria-hidden="true"></i>
+                                History
                               </button>
-
-                              <button
-                                type="button"
-                                className="lead-meta-v2__icon-action"
-                                onClick={() => openEditPanel(lead, 'SetFollowup')}
-                                disabled={!canUpdateLead(lead)}
-                                title={canUpdateLead(lead) ? 'Set Follow-up' : "You don't have permission to set follow-up"}
-                              >
-                                <div className="lead-meta-v2__icon-action-label">Set Followup</div>
-                                <div className="lead-meta-v2__icon-action-btn" aria-hidden="true">
-                                  <i className="fas fa-calendar-plus"></i>
-                                </div>
-                              </button>
-
-                              <button
-                                type="button"
-                                className="lead-meta-v2__icon-action"
-                                onClick={() => openLeadDocuments(lead)}
-                                title="Documents"
-                              >
-                                <div className="lead-meta-v2__icon-action-label">Documents</div>
-                                <div className="lead-meta-v2__icon-action-btn" aria-hidden="true">
-                                  <i className="fas fa-file-alt"></i>
-                                </div>
-                              </button>
-
-                              <Link
-                                to="/institute/lrp"
-                                className="lead-meta-v2__icon-action"
-                                style={{ textDecoration: 'none' }}
-                                title="Add Report"
-                                aria-label="Add Report"
-                              >
-                                <div className="lead-meta-v2__icon-action-label">Add Report</div>
-                                <div className="lead-meta-v2__icon-action-btn" aria-hidden="true">
-                                  <i className="fas fa-clipboard-list"></i>
-                                </div>
-                              </Link>
                             </div>
                           </div>
+
                         </div>
 
 
@@ -5735,28 +5867,29 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
 
   .lead-header-v2{
     background: linear-gradient(90deg, #0b5ed7 0%, #1aa3ff 55%, #2dd4ff 100%);
-    padding: 10px 14px;
+    padding: 8px 10px;
     position: relative;
+    --lead-header-v2-block-h: 92px;
   }
 
   .lead-header-v2__row{
     display:flex;
     align-items:center;
     justify-content:space-between;
-    gap:12px;
+    gap:8px;
     flex-wrap: nowrap;
   }
 
   .lead-header-v2__left{
     display:flex;
     align-items:center;
-    gap:10px;
-    min-width: 150px;
-    flex: 0 0 150px;
+    gap:8px;
+    min-width: 132px;
+    flex: 0 0 132px;
         position: relative;
     border: 1px solid rgba(255, 255, 255, 0.35);
     border-radius: 10px;
-    padding: 10px 10px 8px;
+    padding: 8px 8px 6px;
     background: rgba(255, 255, 255, 0.14);
     backdrop-filter: blur(6px);
   }
@@ -5784,7 +5917,7 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     background: rgba(255,255,255,0.18);
     border: 1px solid rgba(255,255,255,0.35);
     border-radius: 10px;
-    padding: 6px 10px;
+    padding: 5px 8px;
     // flex: 1 1 0;
     // min-width: 150px;
     // width: 250px;
@@ -5803,7 +5936,7 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     background: transparent;
     color: #fff;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 13px;
     line-height: 1.1;
     padding: 0;
     min-width: 0;
@@ -5815,10 +5948,31 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
   }
 
   .lead-header-v2__approval{
+    position: relative;
     display:flex;
-    gap:6px;
+    gap:8px;
     flex-shrink:0;
     flex-direction: column;
+    padding: 12px 8px 8px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255,255,255,0.28);
+    backdrop-filter: blur(6px);
+  }
+
+  .lead-header-v2__approval-label{
+    position: absolute;
+    top: -10px;
+    left: -15px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: rgba(11, 94, 215, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 18px;
+    white-space: nowrap;
   }
 
   .lead-header-v2__approval-btn{
@@ -5826,11 +5980,54 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     border: 1px solid rgba(255,255,255,0.35);
     color:#fff;
     border-radius: 8px;
-    padding: 5px 8px;
+    padding: 5px 7px;
     font-size: 11px;
     font-weight: 700;
     line-height: 1;
     height: 32px;
+  }
+
+
+  .lead-header-v2__editbtn{
+    position: absolute;
+    right: 0px;
+    bottom: 0px;
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.18);
+    color: #fff;
+    padding: 0;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 120ms ease, background 120ms ease, box-shadow 120ms ease;
+    z-index: 2;
+  }
+
+  .lead-header-v2__editbtn:hover{
+    transform: translateY(-1px);
+    background: rgba(255,255,255,0.24);
+    box-shadow: 0 6px 14px rgba(0,0,0,0.18);
+  }
+
+  .lead-header-v2__editbtn i{
+    font-size: 10px;
+  }
+
+  .lead-header-v2__approval-editor{
+    width: 230px;
+  }
+
+  .lead-header-v2__approval-select{
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.22);
+    color:#111;
+    font-weight: 800;
   }
 
   .lead-header-v2__kv{
@@ -5884,8 +6081,8 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
 
   .lead-header-v2__right{
     display:flex;
-    align-items:center;
-    gap:10px;
+    align-items:stretch;
+    gap:8px;
     flex-wrap: nowrap;
     justify-content:flex-end;
     flex: 1 1 auto;
@@ -5896,18 +6093,19 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
   }
 
   .lead-header-v2__dash{
-    display:flex;
-    align-items:stretch;
-    gap:10px;
-    flex: 0 1 auto;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    width: clamp(480px, 48vw, 700px);
     min-width: 0;
+    flex: 1 1 auto;
   }
 
   .lead-header-v2__dash-col{
-    width: clamp(220px, 18vw, 270px);
-    min-width: 200px;
-    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
     display: flex;
+    align-items: stretch;
   }
 
   /* Header followup mini-cards (match fig-1 look) */
@@ -5915,9 +6113,29 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     position: relative;
     border: 1px solid rgba(255,255,255,0.35);
     border-radius: 10px;
-    padding: 10px 10px 8px;
+    padding: 8px 8px 6px;
     background: rgba(255,255,255,0.14);
     backdrop-filter: blur(6px);
+    width: 100%;
+    min-height: var(--lead-header-v2-block-h);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Make stats row use remaining height so all blocks match */
+  .lead-header-v2 .b2b-dash-section > .d-flex{
+    flex: 1 1 auto;
+    min-height: 0;
+    align-items: center;
+  }
+
+  .lead-header-v2 .b2b-dash-section > .ActionsDates{
+    margin-top: auto;
+  }
+
+  .lead-header-v2__approval,
+  .lead-header-v2__perf-block{
+    min-height: var(--lead-header-v2-block-h);
   }
 
   .lead-header-v2 .b2b-dash-section__label{
@@ -5929,7 +6147,7 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     background: rgba(11, 94, 215, 0.95);
     border: 1px solid rgba(255,255,255,0.35);
     color: #fff;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 900;
     line-height: 18px;
     white-space: nowrap;
@@ -5937,17 +6155,18 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
 
   .lead-header-v2 .b2b-dash-stat-card{
     border-radius: 8px;
-    padding: 6px 6px 5px;
-    min-height: 44px;
+    padding: 5px 5px 4px;
+    min-height: 48px;
     display:flex;
     flex-direction:column;
     align-items:center;
     justify-content:center;
     box-shadow: 0 6px 14px rgba(0,0,0,0.14);
+    min-width: 0;
   }
 
   .lead-header-v2 .b2b-dash-stat-card__label{
-    font-size: 11px;
+    font-size: 9px;
     font-weight: 800;
     line-height: 1.05;
     opacity: 0.98;
@@ -5957,21 +6176,47 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     width: 72%;
     max-width: 56px;
     height: 1px;
-    margin: 6px 0;
+    margin: 4px 0;
     background: rgba(255,255,255,0.95);
     flex-shrink: 0;
   }
 
   .lead-header-v2 .b2b-dash-stat-card__value{
-    font-size: 16px;
+    font-size: 13px;
     font-weight: 900;
     line-height: 1.05;
     letter-spacing: 0.3px;
   }
 
+  /* Keep dashboard compact on one line (desktop) */
+  @media (max-width: 1360px){
+    .lead-header-v2__dash{ width: clamp(480px, 48vw, 680px); gap: 8px; }
+    .lead-header-v2 .b2b-dash-section{ padding: 7px 7px 6px; }
+  }
+
+  @media (max-width: 1200px){
+    .lead-header-v2__dash{ width: clamp(420px, 46vw, 620px); gap: 8px; }
+    .lead-header-v2 .b2b-dash-stat-card{ min-height: 44px; }
+    .lead-header-v2 .b2b-dash-stat-card__label{ font-size: 8.5px; }
+    .lead-header-v2 .b2b-dash-stat-card__value{ font-size: 12px; }
+    .lead-header-v2 .ActionsDates{ font-size: 10px; }
+  }
+
+  @media (max-width: 1100px){
+    .lead-header-v2__dash{
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 820px){
+    .lead-header-v2__dash{
+      grid-template-columns: 1fr;
+    }
+  }
+
   .lead-header-v2 .ActionsDates{
     display:flex;
-    justify-content:space-between;
+    justify-content:left;
     gap:10px;
     margin-top: 6px;
     padding-top: 6px;
@@ -5979,11 +6224,26 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     color: rgba(255,255,255,0.95);
     font-size: 11px;
     font-weight: 800;
-    white-space: nowrap;
+    // flex-wrap: wrap;
+    white-space: normal;
+    min-width: 0;
   }
 
   .lead-header-v2 .ActionsDates span:last-child{
     color: #fff;
+  }
+
+  /* Prevent Next Follow-up Date from overflowing */
+  .lead-header-v2 .ActionsDates span:first-child{
+    // flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .lead-header-v2 .ActionsDates span:last-child{
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
 
   /* Pills wrapper in card header (Refer / History) — no white background */
@@ -6093,7 +6353,8 @@ position: absolute;
     display: flex;
     align-items: center;
     gap: 6px;
-    flex: 1 1 auto;
+    flex: 0 1 clamp(150px, 40vw, 220px);
+    max-width: clamp(150px, 40vw, 220px);
     min-width: 0;
     background: rgba(255,255,255,0.15);
     border: 1px solid rgba(255,255,255,0.3);
@@ -6116,6 +6377,7 @@ position: absolute;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    min-width: 0;
   }
 
   /* Refer + History — stacked, compact */
@@ -6160,7 +6422,8 @@ position: absolute;
     border-radius: 10px;
     padding: 5px 8px;
     cursor: pointer;
-    min-width: 88px;
+    min-width: 145px;
+    position: relative;
   }
 
   .lhm__status-row{
@@ -6250,16 +6513,52 @@ position: absolute;
   .lhm__row3{
     display: flex;
     gap: 8px;
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .lhm__row3::-webkit-scrollbar{
+    display:none;
   }
 
   .lhm__followup-box{
-    flex: 1 1 0;
+    flex: 1 1 calc(33.333% - 8px);
     min-width: 0;
     background: rgba(255,255,255,0.13);
     border: 1px solid rgba(255,255,255,0.3);
     border-radius: 10px;
     padding: 10px 8px 7px;
     position: relative;
+    overflow: visible;
+  }
+
+  /* Bottom-right edit button (mobile header boxes) */
+  .lhm__editbtn{
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.18);
+    color: #fff;
+    padding: 0;
+    line-height: 1;
+    z-index: 2;
+  }
+
+  .lhm__editbtn i{
+    font-size: 11px;
+  }
+
+  @media (max-width: 520px){
+    .lhm__followup-box{
+      flex: 1 1 100%;
+    }
   }
 
   .lhm__followup-title{
@@ -6318,8 +6617,8 @@ position: absolute;
 
   .lhm__followup-date{
     display: flex;
-    justify-content: space-between;
-    gap: 4px;
+    justify-content: flex-start;
+    gap: 8px;
     margin-top: 6px;
     padding-top: 5px;
     border-top: 1px solid rgba(255,255,255,0.2);
@@ -6769,6 +7068,8 @@ position: absolute;
     box-shadow: 0 6px 14px rgba(255, 59, 48, 0.22);
     line-height: 1;
     white-space: nowrap;
+    text-align: center;
+    justify-content:center;
   }
 
   .lead-meta-v2__pill i{
@@ -6930,12 +7231,13 @@ position: absolute;
     flex: 1 1 100%;
     display: flex;
     flex-direction: row;
-    flex-wrap: nowrap;
-    align-items: center;
+    flex-wrap: wrap;
+    align-items: flex-start;
     gap: 8px;
     overflow: visible;
     white-space: normal;
     justify-content: flex-start;
+    min-width: 0;
   }
 
   /* Pills: stay vertical, smaller */
@@ -6980,17 +7282,24 @@ position: absolute;
 
   /* Dash: side-by-side, narrower columns */
   .b2b-panel-open .lead-header-v2__dash{
-    display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
+    width: 100%;
+    flex: 1 1 100%;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
-    flex-shrink: 0;
   }
 
   .b2b-panel-open .lead-header-v2__dash-col{
-    width: clamp(160px, 14vw, 195px);
-    min-width: 155px;
-    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  @media (max-width: 1180px){
+    .b2b-panel-open .lead-header-v2__dash{
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
 
   .b2b-panel-open .lead-header-v2 .b2b-dash-section{
