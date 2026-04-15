@@ -402,6 +402,23 @@ const B2BSales = () => {
   const [uploadingDoc, setUploadingDoc] = useState(null);
   const fileInputRef = useRef(null);
 
+  // Lead Approval (backend: lead.approval.status)
+  const [selectedApprovalStatus, setSelectedApprovalStatus] = useState(null); // null | 'PENDING' | 'APPROVED' | 'REJECTED'
+  const [approvalCounts, setApprovalCounts] = useState({ total: 0, approved: 0, pending: 0, rejected: 0 });
+  const [approvalCountsLoading, setApprovalCountsLoading] = useState(false);
+  const [approvalLeadTarget, setApprovalLeadTarget] = useState(null);
+
+  // Lead Documents (backend: /college/b2b/leads/:id/documents)
+  const [showLeadDocumentsModal, setShowLeadDocumentsModal] = useState(false);
+  const [documentsLead, setDocumentsLead] = useState(null);
+  const [leadDocuments, setLeadDocuments] = useState([]);
+  const [leadDocumentsLoading, setLeadDocumentsLoading] = useState(false);
+  const [leadDocumentUploading, setLeadDocumentUploading] = useState(false);
+  const [leadDocType, setLeadDocType] = useState('');
+  const [leadDocName, setLeadDocName] = useState('');
+  const [leadDocRemarks, setLeadDocRemarks] = useState('');
+  const leadDocFileRef = useRef(null);
+
 
   // open model for upload documents 
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -801,6 +818,7 @@ const B2BSales = () => {
     fetchB2BDropdownOptions();
     fetchUsers(); // Fetch users for Lead Owner dropdown
     fetchStatusCounts(); // Fetch status counts
+    fetchApprovalCounts(); // Fetch lead approval counts
   }, []);
 
 
@@ -1186,6 +1204,7 @@ const B2BSales = () => {
     setCurrentPage(1);
     fetchLeads(selectedStatusFilter, 1, filterOverrides);
     fetchStatusCounts(filterOverrides); // Update status counts with current filters
+    fetchApprovalCounts(filterOverrides);
   };
 
   const clearFilters = () => {
@@ -1204,6 +1223,7 @@ const B2BSales = () => {
     setCurrentPage(1);
     fetchLeads(selectedStatusFilter, 1);
     fetchStatusCounts(); // Update status counts after clearing filters
+    fetchApprovalCounts();
   };
 
   const fetchLeads = async (statusFilter = null, page = 1, filterOverrides = {}) => {
@@ -1247,6 +1267,11 @@ const B2BSales = () => {
       }
       if (eff.subStatus) {
         params.subStatus = eff.subStatus;
+      }
+      // Lead Approval filter
+      const approval = eff.approvalStatus ?? selectedApprovalStatus;
+      if (approval) {
+        params.approvalStatus = approval;
       }
 
       // console.log('🔍 [FRONTEND] fetchLeads called:', {
@@ -1331,6 +1356,8 @@ const B2BSales = () => {
       if (eff.subStatus) params.subStatus = eff.subStatus;
       if (eff.dateRange?.start) params.startDate = eff.dateRange.start;
       if (eff.dateRange?.end) params.endDate = eff.dateRange.end;
+      const approval = eff.approvalStatus ?? selectedApprovalStatus;
+      if (approval) params.approvalStatus = approval;
 
       const response = await axios.get(`${backendUrl}/college/b2b/leads/status-count`, {
         headers: { 'x-auth': token },
@@ -1350,8 +1377,177 @@ const B2BSales = () => {
     }
   };
 
+  const isAdmin = () => {
+    const permissionType = permissions?.permission_type || userData?.permissions?.permission_type;
+    return permissionType === 'Admin';
+  };
 
+  // Lead Approval counts (Total/Approved/Pending/Rejected) - respects current filters
+  const fetchApprovalCounts = async (filterOverrides = {}) => {
+    try {
+      setApprovalCountsLoading(true);
+      const eff = { ...filters, ...filterOverrides };
+      const baseParams = {};
+      if (eff.leadCategory) baseParams.leadCategory = eff.leadCategory;
+      if (eff.typeOfB2B) baseParams.typeOfB2B = eff.typeOfB2B;
+      if (eff.leadOwner) baseParams.leadOwner = eff.leadOwner;
+      if (eff.search) baseParams.search = eff.search;
+      if (eff.subStatus) baseParams.subStatus = eff.subStatus;
+      if (eff.dateRange?.start) baseParams.startDate = eff.dateRange.start;
+      if (eff.dateRange?.end) baseParams.endDate = eff.dateRange.end;
 
+      const [allRes, approvedRes, pendingRes, rejectedRes] = await Promise.all([
+        axios.get(`${backendUrl}/college/b2b/leads/status-count`, { headers: { 'x-auth': token }, params: baseParams }),
+        axios.get(`${backendUrl}/college/b2b/leads/status-count`, { headers: { 'x-auth': token }, params: { ...baseParams, approvalStatus: 'APPROVED' } }),
+        axios.get(`${backendUrl}/college/b2b/leads/status-count`, { headers: { 'x-auth': token }, params: { ...baseParams, approvalStatus: 'PENDING' } }),
+        axios.get(`${backendUrl}/college/b2b/leads/status-count`, { headers: { 'x-auth': token }, params: { ...baseParams, approvalStatus: 'REJECTED' } }),
+      ]);
+
+      const safeTotal = allRes?.data?.status ? (allRes.data.data?.totalLeads || 0) : 0;
+      const safeApproved = approvedRes?.data?.status ? (approvedRes.data.data?.totalLeads || 0) : 0;
+      const safePending = pendingRes?.data?.status ? (pendingRes.data.data?.totalLeads || 0) : 0;
+      const safeRejected = rejectedRes?.data?.status ? (rejectedRes.data.data?.totalLeads || 0) : 0;
+
+      setApprovalCounts({ total: safeTotal, approved: safeApproved, pending: safePending, rejected: safeRejected });
+    } catch (error) {
+      console.error('Error fetching approval counts:', error);
+    } finally {
+      setApprovalCountsLoading(false);
+    }
+  };
+
+  const handleApprovalCardClick = (nextStatus) => {
+    setSelectedApprovalStatus(nextStatus);
+    setCurrentPage(1);
+    fetchLeads(selectedStatusFilter, 1, { approvalStatus: nextStatus });
+    fetchStatusCounts({ approvalStatus: nextStatus });
+  };
+
+  const approveLead = async (lead) => {
+    try {
+      const res = await axios.put(
+        `${backendUrl}/college/b2b/leads/${lead._id}/approval`,
+        { status: 'APPROVED', moveToProspect: true },
+        { headers: { 'x-auth': token } }
+      );
+      if (res?.data?.status) {
+        await fetchLeads(selectedStatusFilter, currentPage);
+        await fetchStatusCounts();
+        await fetchApprovalCounts();
+        alert('Lead approved successfully');
+      } else {
+        alert(res?.data?.message || 'Failed to approve lead');
+      }
+    } catch (error) {
+      console.error('Error approving lead:', error);
+      alert(error.response?.data?.message || 'Failed to approve lead');
+    }
+  };
+
+  const rejectLead = async (lead, reason) => {
+    try {
+      const res = await axios.put(
+        `${backendUrl}/college/b2b/leads/${lead._id}/approval`,
+        { status: 'REJECTED', rejectionReason: reason || '' },
+        { headers: { 'x-auth': token } }
+      );
+      if (res?.data?.status) {
+        await fetchLeads(selectedStatusFilter, currentPage);
+        await fetchStatusCounts();
+        await fetchApprovalCounts();
+        alert('Lead rejected successfully');
+      } else {
+        alert(res?.data?.message || 'Failed to reject lead');
+      }
+    } catch (error) {
+      console.error('Error rejecting lead:', error);
+      alert(error.response?.data?.message || 'Failed to reject lead');
+    }
+  };
+
+  const openLeadDocuments = async (lead) => {
+    setDocumentsLead(lead);
+    setShowLeadDocumentsModal(true);
+    setLeadDocuments([]);
+    setLeadDocType('');
+    setLeadDocName('');
+    setLeadDocRemarks('');
+    if (leadDocFileRef.current) leadDocFileRef.current.value = '';
+
+    try {
+      setLeadDocumentsLoading(true);
+      const res = await axios.get(`${backendUrl}/college/b2b/leads/${lead._id}/documents`, {
+        headers: { 'x-auth': token }
+      });
+      if (res?.data?.status) {
+        setLeadDocuments(res.data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching lead documents:', error);
+    } finally {
+      setLeadDocumentsLoading(false);
+    }
+  };
+
+  const uploadLeadDocument = async () => {
+    if (!documentsLead?._id) return;
+    const file = leadDocFileRef.current?.files?.[0];
+    if (!file) {
+      alert('Please select a file');
+      return;
+    }
+    try {
+      setLeadDocumentUploading(true);
+      const form = new FormData();
+      form.append('file', file);
+      if (leadDocType) form.append('docType', leadDocType);
+      if (leadDocName) form.append('name', leadDocName);
+      if (leadDocRemarks) form.append('remarks', leadDocRemarks);
+
+      const res = await axios.post(`${backendUrl}/college/b2b/leads/${documentsLead._id}/documents`, form, {
+        headers: { 'x-auth': token }
+      });
+      if (res?.data?.status) {
+        const listRes = await axios.get(`${backendUrl}/college/b2b/leads/${documentsLead._id}/documents`, {
+          headers: { 'x-auth': token }
+        });
+        if (listRes?.data?.status) setLeadDocuments(listRes.data.data || []);
+        setLeadDocType('');
+        setLeadDocName('');
+        setLeadDocRemarks('');
+        if (leadDocFileRef.current) leadDocFileRef.current.value = '';
+      } else {
+        alert(res?.data?.message || 'Failed to upload document');
+      }
+    } catch (error) {
+      console.error('Error uploading lead document:', error);
+      alert(error.response?.data?.message || 'Failed to upload document');
+    } finally {
+      setLeadDocumentUploading(false);
+    }
+  };
+
+  const updateLeadDocumentStatus = async (docId, nextStatus) => {
+    if (!documentsLead?._id || !docId) return;
+    try {
+      const res = await axios.put(
+        `${backendUrl}/college/b2b/leads/${documentsLead._id}/documents/${docId}/status`,
+        { status: nextStatus },
+        { headers: { 'x-auth': token } }
+      );
+      if (res?.data?.status) {
+        const listRes = await axios.get(`${backendUrl}/college/b2b/leads/${documentsLead._id}/documents`, {
+          headers: { 'x-auth': token }
+        });
+        if (listRes?.data?.status) setLeadDocuments(listRes.data.data || []);
+      } else {
+        alert(res?.data?.message || 'Failed to update document status');
+      }
+    } catch (error) {
+      console.error('Error updating document status:', error);
+      alert(error.response?.data?.message || 'Failed to update document status');
+    }
+  };
 
   // Check if user can update a lead
   const canUpdateLead = (lead) => {
@@ -3471,14 +3667,29 @@ const B2BSales = () => {
                       <span className="b2b-dash-section__label">Lead Approval</span>
                       <div className="d-flex flex-wrap gap-2 align-items-stretch pt-1">
                         {[
-                          { key: 'total', label: 'Total', value: 0, bg: '#5b4fc9' },
-                          { key: 'approved', label: 'Approved', value: 0, bg: '#5b4fc9' },
-                          { key: 'pending', label: 'Pending', value: 0, bg: '#5b4fc9' }
-                        ].map((row) => (
+                          { key: 'total', label: 'Total', value: approvalCounts.total, bg: '#5b4fc9', approval: null },
+                          { key: 'approved', label: 'Approved', value: approvalCounts.approved, bg: '#10b981', approval: 'APPROVED' },
+                          { key: 'pending', label: 'Pending', value: approvalCounts.pending, bg: '#f59e0b', approval: 'PENDING' },
+                          { key: 'rejected', label: 'Rejected', value: approvalCounts.rejected, bg: '#ef4444', approval: 'REJECTED' },
+                        ].map((row) => {
+                          const isSelected = (selectedApprovalStatus || null) === row.approval;
+                          return (
                           <div
                             key={row.key}
+                            role="button"
+                            tabIndex={0}
                             className="b2b-dash-stat-card b2b-dash-stat-card--lead text-center text-white"
-                            style={{ background: row.bg }}
+                            style={{
+                              background: row.bg,
+                              cursor: 'pointer',
+                              outline: isSelected ? '3px solid rgba(255,255,255,0.55)' : 'none',
+                              transform: isSelected ? 'translateY(-1px)' : 'none',
+                              opacity: approvalCountsLoading ? 0.7 : 1
+                            }}
+                            onClick={() => handleApprovalCardClick(row.approval)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') handleApprovalCardClick(row.approval);
+                            }}
                           >
                             <div className="b2b-dash-stat-card__label">{row.label}</div>
                             <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
@@ -3486,7 +3697,7 @@ const B2BSales = () => {
                               {String(row.value).padStart(2, '0')}
                             </div>
                           </div>
-                        ))}
+                        )})}
                       </div>
                     </div>
 
@@ -3982,6 +4193,47 @@ const B2BSales = () => {
                               </div>
 
                               <div className="lead-header-v2__right">
+                                {/* Lead Approval */}
+                                <div className="lead-header-v2__approval">
+                                  <button
+                                    type="button"
+                                    className="lead-header-v2__approval-btn"
+                                    title={`Approval: ${lead?.approval?.status || 'PENDING'}`}
+                                    onClick={() => {
+                                      // quick filter by this approval status
+                                      const st = (lead?.approval?.status || 'PENDING').toUpperCase();
+                                      handleApprovalCardClick(['PENDING', 'APPROVED', 'REJECTED'].includes(st) ? st : null);
+                                    }}
+                                  >
+                                    {String(lead?.approval?.status || 'PENDING')}
+                                  </button>
+
+                                  {isAdmin() && String(lead?.approval?.status || 'PENDING').toUpperCase() === 'PENDING' && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="lead-header-v2__approval-btn"
+                                        style={{ background: 'rgba(16, 185, 129, 0.75)' }}
+                                        onClick={() => approveLead(lead)}
+                                      >
+                                        Approve
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="lead-header-v2__approval-btn"
+                                        style={{ background: 'rgba(239, 68, 68, 0.75)' }}
+                                        onClick={() => {
+                                          setApprovalLeadTarget(lead);
+                                          setRejectionReason('');
+                                          setShowRejectionForm(true);
+                                        }}
+                                      >
+                                        Reject
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+
                                 {/* Refer / History pills — stacked vertically, no white box */}
                                 <div className="lead-header-v2__pills">
                                   <button
@@ -4179,6 +4431,18 @@ const B2BSales = () => {
                                 <div className="lead-meta-v2__icon-action-label">Set Followup</div>
                                 <div className="lead-meta-v2__icon-action-btn" aria-hidden="true">
                                   <i className="fas fa-calendar-plus"></i>
+                                </div>
+                              </button>
+
+                              <button
+                                type="button"
+                                className="lead-meta-v2__icon-action"
+                                onClick={() => openLeadDocuments(lead)}
+                                title="Documents"
+                              >
+                                <div className="lead-meta-v2__icon-action-label">Documents</div>
+                                <div className="lead-meta-v2__icon-action-btn" aria-hidden="true">
+                                  <i className="fas fa-file-alt"></i>
                                 </div>
                               </button>
 
@@ -4610,6 +4874,243 @@ const B2BSales = () => {
                 >
                   <i className="fas fa-check me-1"></i>
                   Apply Filters
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Lead Modal */}
+      {showRejectionForm && (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1065 }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowRejectionForm(false);
+              setApprovalLeadTarget(null);
+            }
+          }}
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h6 className="modal-title">Reject Lead</h6>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    setShowRejectionForm(false);
+                    setApprovalLeadTarget(null);
+                  }}
+                />
+              </div>
+              <div className="modal-body">
+                <label className="form-label fw-medium">Reason (optional)</label>
+                <textarea
+                  className="form-control"
+                  rows={3}
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  placeholder="Enter rejection reason"
+                />
+                <small className="text-muted d-block mt-2">
+                  Lead: {approvalLeadTarget?.businessName || approvalLeadTarget?.concernPersonName || '—'}
+                </small>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setShowRejectionForm(false);
+                    setApprovalLeadTarget(null);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={async () => {
+                    if (!approvalLeadTarget) return;
+                    const lead = approvalLeadTarget;
+                    setShowRejectionForm(false);
+                    setApprovalLeadTarget(null);
+                    await rejectLead(lead, rejectionReason);
+                  }}
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lead Documents Modal */}
+      {showLeadDocumentsModal && (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1065 }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowLeadDocumentsModal(false);
+              setDocumentsLead(null);
+            }
+          }}
+        >
+          <div className="modal-dialog modal-lg modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h6 className="modal-title">
+                  Documents — {documentsLead?.businessName || documentsLead?.concernPersonName || 'Lead'}
+                </h6>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    setShowLeadDocumentsModal(false);
+                    setDocumentsLead(null);
+                  }}
+                />
+              </div>
+
+              <div className="modal-body">
+                <div className="row g-2">
+                  <div className="col-md-4">
+                    <label className="form-label small fw-medium">Doc Type</label>
+                    <input
+                      className="form-control"
+                      value={leadDocType}
+                      onChange={(e) => setLeadDocType(e.target.value)}
+                      placeholder="e.g. PAN, GST"
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label small fw-medium">Name (optional)</label>
+                    <input
+                      className="form-control"
+                      value={leadDocName}
+                      onChange={(e) => setLeadDocName(e.target.value)}
+                      placeholder="Display name"
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label small fw-medium">Remarks (optional)</label>
+                    <input
+                      className="form-control"
+                      value={leadDocRemarks}
+                      onChange={(e) => setLeadDocRemarks(e.target.value)}
+                      placeholder="Remarks"
+                    />
+                  </div>
+                  <div className="col-12">
+                    <label className="form-label small fw-medium">File</label>
+                    <input ref={leadDocFileRef} type="file" className="form-control" />
+                  </div>
+                  <div className="col-12 d-flex justify-content-end">
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={leadDocumentUploading}
+                      onClick={uploadLeadDocument}
+                    >
+                      {leadDocumentUploading ? 'Uploading...' : 'Upload'}
+                    </button>
+                  </div>
+                </div>
+
+                <hr />
+
+                {leadDocumentsLoading ? (
+                  <div className="text-center py-4">
+                    <div className="spinner-border text-secondary" role="status" />
+                  </div>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table table-sm align-middle">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Type</th>
+                          <th>Status</th>
+                          <th className="text-end">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(leadDocuments || []).length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="text-center text-muted py-4">
+                              No documents
+                            </td>
+                          </tr>
+                        ) : (
+                          (leadDocuments || []).map((doc) => (
+                            <tr key={doc._id || doc.id || doc.url}>
+                              <td style={{ maxWidth: 260 }}>
+                                <div className="fw-medium text-truncate" title={doc.name || doc.url}>
+                                  {doc.name || 'Document'}
+                                </div>
+                                {doc.url && (
+                                  <a href={doc.url} target="_blank" rel="noreferrer" className="small">
+                                    View
+                                  </a>
+                                )}
+                              </td>
+                              <td>{doc.docType || '—'}</td>
+                              <td>
+                                <span
+                                  className={`badge ${String(doc.status).toUpperCase() === 'APPROVED'
+                                    ? 'bg-success'
+                                    : String(doc.status).toUpperCase() === 'REJECTED'
+                                      ? 'bg-danger'
+                                      : 'bg-warning text-dark'
+                                    }`}
+                                >
+                                  {String(doc.status || 'PENDING')}
+                                </span>
+                              </td>
+                              <td className="text-end">
+                                {isAdmin() && (
+                                  <div className="btn-group btn-group-sm" role="group">
+                                    <button
+                                      type="button"
+                                      className="btn btn-outline-success"
+                                      onClick={() => updateLeadDocumentStatus(doc._id, 'APPROVED')}
+                                    >
+                                      Approve
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-outline-danger"
+                                      onClick={() => updateLeadDocumentStatus(doc._id, 'REJECTED')}
+                                    >
+                                      Reject
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setShowLeadDocumentsModal(false);
+                    setDocumentsLead(null);
+                  }}
+                >
+                  Close
                 </button>
               </div>
             </div>
@@ -5288,6 +5789,7 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     display:flex;
     gap:6px;
     flex-shrink:0;
+    flex-direction: column;
   }
 
   .lead-header-v2__approval-btn{

@@ -73,9 +73,27 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 	const Lead = LeadModel;
 	const router = express.Router();
 
+	const isAdminUser = (req) => req.user?.permissions?.permission_type === 'Admin';
 
+	const getCollegeForUser = async (userId) => {
+		return College.findOne({ '_concernPerson._id': userId });
+	};
 
-// ==================== TYPE OF B2B ROUTES ====================
+	const tryFindStatusByTitleOrMilestone = async ({ collegeId, title, milestone }) => {
+		const query = {
+			$or: [
+				{ college: collegeId },
+				{ college: null },
+				{ college: { $exists: false } }
+			]
+		};
+		const statuses = await StatusB2b.find(query).sort({ index: 1 }).lean();
+		const t = (title || '').trim().toLowerCase();
+		const m = (milestone || '').trim().toLowerCase();
+		return statuses.find((s) => (t && String(s.title || '').toLowerCase() === t) || (m && String(s.milestone || '').toLowerCase() === m)) || null;
+	};
+
+	// ==================== TYPE OF B2B ROUTES ====================
 
 // Get all Type of B2B
 router.get('/type-of-b2b', isCollege, async (req, res) => {
@@ -523,7 +541,8 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 			subStatus,
 			startDate,
 			endDate,
-			leadOwner
+			leadOwner,
+			approvalStatus
 		} = req.query;
 
 		// Check if user is Admin - only Admin can view all B2B leads
@@ -591,6 +610,11 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 					{ leadAddedBy: convertToObjectId(leadOwner) }
 				]
 			});
+		}
+
+		// Approval filter (PENDING / APPROVED / REJECTED)
+		if (approvalStatus) {
+			filterConditions.push({ 'approval.status': String(approvalStatus).toUpperCase() });
 		}
 
 		// Base query with ownership conditions and filters
@@ -691,7 +715,8 @@ router.get('/leads', isCollege, async (req, res) => {
 			subStatus,
 			startDate,
 			endDate,
-			leadOwner
+			leadOwner,
+			approvalStatus
 		} = req.query;
 
 		// Check if user is Admin - only Admin can view all B2B leads
@@ -768,7 +793,9 @@ router.get('/leads', isCollege, async (req, res) => {
 					{ leadOwner: convertToObjectId(leadOwner) },
 					{ leadAddedBy: convertToObjectId(leadOwner) }
 				]
-			}] : [])
+			}] : []),
+			// Approval status filter
+			...(approvalStatus ? [{ 'approval.status': String(approvalStatus).toUpperCase() }] : [])
 		]
 	};
 
@@ -1198,7 +1225,8 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			whatsapp,
 			leadAddedBy: req.user._id,
 			remark,
-			landlineNumber
+			landlineNumber,
+			approval: { status: 'PENDING' }
 		};
 
 		// Set default status to "Untouch Leads" if found
@@ -1225,7 +1253,7 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			savedLead.logs.push({
 				user: req.user._id,
 				timestamp: new Date(),
-				action: `Lead added with ${statusMessage}`,
+				action: `Lead added with ${statusMessage} (Approval: PENDING)`,
 				remarks: remark || `Lead created with ${statusMessage}`
 			});
 
@@ -1252,6 +1280,196 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			message: 'Failed to create lead',
 			error: error.message
 		});
+	}
+});
+
+// Lead Approval (Approve / Reject)
+// Body: { status: "APPROVED"|"REJECTED", rejectionReason?, moveToProspect?: boolean }
+router.put('/leads/:id/approval', isCollege, async (req, res) => {
+	try {
+		if (!isAdminUser(req)) {
+			return res.status(403).json({ status: false, message: 'Only Admin can approve/reject leads' });
+		}
+
+		const { status, rejectionReason, moveToProspect = true } = req.body || {};
+		const normalized = String(status || '').toUpperCase();
+		if (!['APPROVED', 'REJECTED'].includes(normalized)) {
+			return res.status(400).json({ status: false, message: 'status must be APPROVED or REJECTED' });
+		}
+
+		const lead = await Lead.findById(req.params.id);
+		if (!lead) return res.status(404).json({ status: false, message: 'Lead not found' });
+
+		const now = new Date();
+
+		if (normalized === 'APPROVED') {
+			lead.approval = {
+				...(lead.approval || {}),
+				status: 'APPROVED',
+				approvedBy: req.user._id,
+				approvedAt: now,
+				rejectedBy: undefined,
+				rejectedAt: undefined,
+				rejectionReason: undefined,
+			};
+		} else {
+			lead.approval = {
+				...(lead.approval || {}),
+				status: 'REJECTED',
+				rejectedBy: req.user._id,
+				rejectedAt: now,
+				rejectionReason: rejectionReason ? String(rejectionReason).trim() : '',
+				approvedBy: undefined,
+				approvedAt: undefined,
+			};
+		}
+
+		// Optional: auto move approved leads into Performance/Prospect status
+		if (normalized === 'APPROVED' && moveToProspect) {
+			const college = await getCollegeForUser(req.user._id);
+			if (college?._id) {
+				const statusDoc =
+					(await tryFindStatusByTitleOrMilestone({ collegeId: college._id, title: 'Prospect' })) ||
+					(await tryFindStatusByTitleOrMilestone({ collegeId: college._id, milestone: 'Performance' })) ||
+					null;
+
+				if (statusDoc?._id) {
+					lead.status = statusDoc._id;
+					const sub = Array.isArray(statusDoc.substatuses)
+						? statusDoc.substatuses.find((s) => String(s.title || '').toLowerCase() === 'prospect')
+						: null;
+					if (sub?._id) lead.subStatus = sub._id;
+				}
+			}
+		}
+
+		lead.updatedBy = req.user._id;
+		lead.logs.push({
+			user: req.user._id,
+			timestamp: now,
+			action: `Lead approval set to ${lead.approval.status}`,
+			remarks: normalized === 'REJECTED' ? (lead.approval.rejectionReason || '') : '',
+		});
+
+		await lead.save();
+
+		const updatedLead = await Lead.findById(lead._id)
+			.populate('leadCategory', 'name')
+			.populate('typeOfB2B', 'name')
+			.populate('status', 'name title substatuses')
+			.populate('leadAddedBy', 'name email')
+			.populate('leadOwner', 'name email');
+
+		return res.json({ status: true, data: updatedLead, message: 'Lead approval updated successfully' });
+	} catch (error) {
+		console.error('Error updating lead approval:', error);
+		return res.status(500).json({ status: false, message: 'Failed to update lead approval', error: error.message });
+	}
+});
+
+// Upload a lead document (S3)
+// Form-data: file, optional: docType, name, remarks
+router.post('/leads/:id/documents', isCollege, async (req, res) => {
+	try {
+		const lead = await Lead.findById(req.params.id);
+		if (!lead) return res.status(404).json({ status: false, message: 'Lead not found' });
+
+		if (!req.files?.file) {
+			return res.status(400).json({ status: false, message: 'file is required' });
+		}
+
+		const file = req.files.file;
+		const originalName = String(file.name || 'document');
+		const ext = originalName.split('.').pop().toLowerCase();
+		if (ext && Array.isArray(mimetypes) && !mimetypes.includes(ext)) {
+			return res.status(400).json({ status: false, message: 'File type not supported' });
+		}
+
+		const ContentType = file.mimetype;
+		const key = `uploads/b2b/${lead._id}/${uuid()}.${ext || 'bin'}`;
+		const params = { Bucket: bucketName, Body: file.data, Key: key, ContentType };
+		const uploaded = await s3.upload(params).promise();
+
+		const doc = {
+			name: req.body?.name ? String(req.body.name).trim() : originalName,
+			docType: req.body?.docType ? String(req.body.docType).trim() : '',
+			url: uploaded.Location,
+			key,
+			status: 'PENDING',
+			remarks: req.body?.remarks ? String(req.body.remarks).trim() : '',
+			uploadedBy: req.user._id,
+			uploadedAt: new Date(),
+		};
+
+		lead.documents = Array.isArray(lead.documents) ? lead.documents : [];
+		lead.documents.push(doc);
+		lead.updatedBy = req.user._id;
+		lead.logs.push({
+			user: req.user._id,
+			timestamp: new Date(),
+			action: `Document uploaded${doc.docType ? ` (${doc.docType})` : ''}`,
+			remarks: doc.name,
+		});
+
+		await lead.save();
+
+		return res.status(201).json({
+			status: true,
+			data: lead.documents[lead.documents.length - 1],
+			message: 'Document uploaded successfully',
+		});
+	} catch (error) {
+		console.error('Error uploading B2B lead document:', error);
+		return res.status(500).json({ status: false, message: 'Failed to upload document', error: error.message });
+	}
+});
+
+// List lead documents
+router.get('/leads/:id/documents', isCollege, async (req, res) => {
+	try {
+		const lead = await Lead.findById(req.params.id).select('documents').lean();
+		if (!lead) return res.status(404).json({ status: false, message: 'Lead not found' });
+		return res.json({ status: true, data: lead.documents || [], message: 'Documents fetched successfully' });
+	} catch (error) {
+		console.error('Error fetching B2B lead documents:', error);
+		return res.status(500).json({ status: false, message: 'Failed to fetch documents', error: error.message });
+	}
+});
+
+// Update document status (approve/reject)
+router.put('/leads/:id/documents/:docId/status', isCollege, async (req, res) => {
+	try {
+		if (!isAdminUser(req)) {
+			return res.status(403).json({ status: false, message: 'Only Admin can update document status' });
+		}
+		const { status, remarks } = req.body || {};
+		const normalized = String(status || '').toUpperCase();
+		if (!['APPROVED', 'REJECTED', 'PENDING'].includes(normalized)) {
+			return res.status(400).json({ status: false, message: 'Invalid status' });
+		}
+
+		const lead = await Lead.findById(req.params.id);
+		if (!lead) return res.status(404).json({ status: false, message: 'Lead not found' });
+
+		const doc = (lead.documents || []).id(req.params.docId);
+		if (!doc) return res.status(404).json({ status: false, message: 'Document not found' });
+
+		doc.status = normalized;
+		if (remarks !== undefined) doc.remarks = String(remarks || '').trim();
+
+		lead.updatedBy = req.user._id;
+		lead.logs.push({
+			user: req.user._id,
+			timestamp: new Date(),
+			action: `Document status set to ${normalized}${doc.docType ? ` (${doc.docType})` : ''}`,
+			remarks: doc.name || '',
+		});
+
+		await lead.save();
+		return res.json({ status: true, data: doc, message: 'Document status updated successfully' });
+	} catch (error) {
+		console.error('Error updating document status:', error);
+		return res.status(500).json({ status: false, message: 'Failed to update document status', error: error.message });
 	}
 });
 

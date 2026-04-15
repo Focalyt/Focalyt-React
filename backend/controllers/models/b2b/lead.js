@@ -1,6 +1,37 @@
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Schema.Types;
 
+const B2BDocumentSchema = new mongoose.Schema(
+  {
+    name: { type: String, trim: true },
+    docType: { type: String, trim: true }, 
+    url: { type: String, trim: true, required: true }, 
+    key: { type: String, trim: true }, 
+    status: { type: String, enum: ['PENDING', 'APPROVED', 'REJECTED'], default: 'PENDING' },
+    remarks: { type: String, trim: true },
+    uploadedBy: { type: ObjectId, ref: 'User' },
+    uploadedAt: { type: Date, default: Date.now },
+  },
+  { _id: true }
+);
+
+const ApprovalSchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: ['PENDING', 'APPROVED', 'REJECTED'],
+      default: 'PENDING',
+      index: true,
+    },
+    approvedBy: { type: ObjectId, ref: 'User' },
+    approvedAt: { type: Date },
+    rejectedBy: { type: ObjectId, ref: 'User' },
+    rejectedAt: { type: Date },
+    rejectionReason: { type: String, trim: true },
+  },
+  { _id: false }
+);
+
 const B2BLeadSchema = new mongoose.Schema({
   leadCategory: { type: ObjectId, ref: 'LeadCategory', required: true },
   typeOfB2B: { type: ObjectId, ref: 'TypeOfB2B', required: true },
@@ -22,6 +53,8 @@ const B2BLeadSchema = new mongoose.Schema({
   previousLeadOwners: { type: [ObjectId], ref: 'User' },
   leadAddedBy: { type: ObjectId, ref: 'User' },
   remark: { type: String },
+  approval: { type: ApprovalSchema, default: () => ({ status: 'PENDING' }) },
+  documents: { type: [B2BDocumentSchema], default: [] },
   logs: [
     {
       user: {
