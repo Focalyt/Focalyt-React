@@ -4089,6 +4089,35 @@ const B2BSales = () => {
                                 </div>
 
                                 <div className="lhm__actions">
+                                  {/* Approval dropdown (Mobile) */}
+                                  {isAdmin() && String(lead?.approval?.status || 'PENDING').toUpperCase() === 'PENDING' && (
+                                    <div className="lead-header-mob__approval" style={{ height: '34px' }}>
+                                      <select
+                                        className="form-select form-select-sm lead-header-mob__approval-select"
+                                        defaultValue=""
+                                        onChange={async (e) => {
+                                          const value = e.target.value;
+                                          // reset immediately so user can pick again next time
+                                          e.target.value = "";
+                                          if (value === 'approve') {
+                                            await approveLead(lead);
+                                          }
+                                          if (value === 'reject') {
+                                            setApprovalLeadTarget(lead);
+                                            setRejectionReason('');
+                                            setShowRejectionForm(true);
+                                          }
+                                        }}
+                                      >
+                                        <option value="" disabled>
+                                          Approval: PENDING
+                                        </option>
+                                        <option value="approve">Approve</option>
+                                        <option value="reject">Reject</option>
+                                      </select>
+                                    </div>
+                                  )}
+
                                   <button type="button" className="lhm__action-btn lhm__action-btn--more"
                                     onClick={() => setMobileMoreLead(lead)} aria-label="More">
                                     More
@@ -6477,6 +6506,22 @@ position: absolute;
     height: 34px;
   }
 
+  .lead-header-mob__approval-select{
+    height: 34px;
+    min-width: 160px;
+    border-radius: 12px;
+    font-weight: 900;
+    font-size: 12px;
+    border: 1px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.18);
+    color: #fff;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.18);
+  }
+
+  .lead-header-mob__approval-select option{
+    color: #111; /* dropdown list text */
+  }
+
   .lead-header-mob__approval-btn{
     border:none;
     border-radius: 12px;
@@ -6501,7 +6546,7 @@ position: absolute;
   }
 
   .lead-header-mob__approval-btn--reject{
-    display: none;
+    display: flex;
   }
 
   /* Mobile horizontal scroll rows (actions + performance chips) */
