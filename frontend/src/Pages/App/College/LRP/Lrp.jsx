@@ -241,10 +241,12 @@ function Lrp() {
   const location = useLocation();
   const searchParams = useMemo(() => new URLSearchParams(location?.search || ""), [location?.search]);
   const isEmbedded = searchParams.get("embedded") === "1";
+  const mode = (searchParams.get("mode") || "add").toLowerCase(); // add | view
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(() => createInitialForm());
   const [touched, setTouched] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [loadingExisting, setLoadingExisting] = useState(false);
   const [leadCategoryOptions, setLeadCategoryOptions] = useState([]);
   const [typeOfB2BOptions, setTypeOfB2BOptions] = useState([]);
 
@@ -323,6 +325,75 @@ function Lrp() {
       // ignore
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    const b2bLeadId = searchParams.get("b2bLeadId") || searchParams.get("leadId") || "";
+    if (!b2bLeadId) return;
+    if (mode !== "view") return;
+
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+    const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+    const token = userData.token;
+    if (!backendUrl || !token) return;
+
+    const loadExisting = async () => {
+      setLoadingExisting(true);
+      try {
+        const res = await fetch(`${backendUrl}/college/lrp/by-b2b-lead/${b2bLeadId}`, {
+          headers: { "x-auth": token },
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json?.success) return;
+        if (!json?.data) return;
+
+        const d = json.data;
+        // Populate form (file cannot be rehydrated, keep geoTaggedPhoto string as placeholder)
+        setForm((prev) => ({
+          ...prev,
+          b2bLeadId,
+          leadCategory: d.leadCategory || prev.leadCategory,
+          typeOfB2B: d.typeOfB2B || prev.typeOfB2B,
+          partnerType: d.partnerType || "",
+          implementationPartnerName: d.implementationPartnerName || "",
+          visitDate: d.visitDate ? String(d.visitDate).slice(0, 10) : "",
+          geoTaggedPhoto: null,
+          state: d.state || prev.state,
+          district: d.district || "",
+          schoolNameAddress: d.schoolNameAddress || "",
+          schoolType: d.schoolType || "",
+          schoolTypeOther: d.schoolTypeOther || "",
+          schoolEmail: d.schoolEmail || "",
+          coordinatorNameContact: d.coordinatorNameContact || "",
+          b2bMobile: d.b2bMobile || "",
+          decisionMaker: d.decisionMaker || "",
+          studentsClass2to12: d.studentsClass2to12 ?? "",
+          hasLabs: d.hasLabs || "",
+          interestedWorkshop: d.interestedWorkshop || "",
+          avgStudentsPerClass: d.avgStudentsPerClass ?? "",
+          preferredPlan: d.preferredPlan || "",
+          managementReadyApprove: d.managementReadyApprove || "",
+          meetingWithSeniorStaff: d.meetingWithSeniorStaff || "",
+          nextMeetingDate: d.nextMeetingDate ? String(d.nextMeetingDate).slice(0, 10) : "",
+          hasComputerLab: d.hasComputerLab || "",
+          computersAvailable: d.computersAvailable ?? "",
+          fftlClasses: d.fftlClasses || "",
+          openForPartnership: d.openForPartnership || "",
+          teachersAvailable: d.teachersAvailable || "",
+          proposalExplainedSubmitted: d.proposalExplainedSubmitted || "",
+          poExpectedTimeline: d.poExpectedTimeline || "",
+          leadStatus: d.leadStatus || "",
+          lockLead: d.lockLead || "",
+          otherRemarks: d.otherRemarks || "",
+        }));
+        setTouched({});
+        setStep(1);
+      } finally {
+        setLoadingExisting(false);
+      }
+    };
+
+    loadExisting();
+  }, [searchParams, mode]);
 
   const fldStyle = {
     width: "100%",
@@ -541,6 +612,12 @@ function Lrp() {
               Step {step} of 4 {hasStepErrors && <span style={{ marginLeft: 8, opacity: 0.9 }}>(Fix required fields)</span>}
             </p>
           </div>
+        </div>
+      )}
+
+      {loadingExisting && (
+        <div style={{ marginBottom: 14, fontSize: 13, fontWeight: 700, color: "#475569" }}>
+          Loading existing report...
         </div>
       )}
 

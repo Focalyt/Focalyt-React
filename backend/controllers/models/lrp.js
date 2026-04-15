@@ -3,6 +3,7 @@ const { Schema, model } = require("mongoose");
 const lrpSchema = new Schema(
   {
     college: { type: Schema.Types.ObjectId, ref: "College" },
+    b2bLeadId: { type: Schema.Types.ObjectId, ref: "Lead" },
     partnerType: { type: String, required: true, trim: true }, 
     implementationPartnerName: { type: String, required: true, trim: true },
     visitDate: { type: Date, required: true },

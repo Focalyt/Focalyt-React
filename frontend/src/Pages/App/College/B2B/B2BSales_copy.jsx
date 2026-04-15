@@ -4,7 +4,7 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/googleOAuth';
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
@@ -318,6 +318,7 @@ const useScrollBlur = (navbarHeight = 140) => {
 const B2BSales = () => {
 
   const candidateRef = useRef();
+  const navigate = useNavigate();
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const [userData, setUserData] = useState(JSON.parse(sessionStorage.getItem("user") || "{}"));
   const token = userData.token;
@@ -4067,20 +4068,18 @@ const B2BSales = () => {
                                   <button
                                     type="button"
                                     className="lead-meta-v2__pill"
-                                    onClick={() => openRefferPanel(lead, 'Reffer')}
+                                    onClick={() => navigate(`/institute/lrp?b2bLeadId=${lead._id}&mode=add`)}
                                     title="Add Lead Report"
                                   >
                                     <i className="fas fa-plus" aria-hidden="true"></i>
-                                    
                                   </button>
                                   <button
                                     type="button"
                                     className="lead-meta-v2__pill"
-                                    onClick={() => openRefferPanel(lead, 'Reffer')}
+                                    onClick={() => navigate(`/institute/lrp?b2bLeadId=${lead._id}&mode=view`)}
                                     title="View lead Report"
                                   >
                                     <i className="fas fa-eye" aria-hidden="true"></i>
-                                    
                                   </button>
                                 </div>
 
@@ -4383,7 +4382,7 @@ const B2BSales = () => {
                                   <button
                                     type="button"
                                     className="lead-meta-v2__pill"
-                                    onClick={() => openRefferPanel(lead, 'Reffer')}
+                                    onClick={() => navigate(`/institute/lrp?b2bLeadId=${lead._id}&mode=add`)}
                                     title="Add Lead Report"
                                   >
                                     <i className="fas fa-plus" aria-hidden="true"></i>
@@ -4392,7 +4391,7 @@ const B2BSales = () => {
                                   <button
                                     type="button"
                                     className="lead-meta-v2__pill"
-                                    onClick={() => openRefferPanel(lead, 'Reffer')}
+                                    onClick={() => navigate(`/institute/lrp?b2bLeadId=${lead._id}&mode=view`)}
                                     title="View lead Report"
                                   >
                                     <i className="fas fa-eye" aria-hidden="true"></i>

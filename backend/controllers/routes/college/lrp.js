@@ -26,6 +26,15 @@ const isValidIndianMobile = (m) => /^[6-9]\d{9}$/.test(m);
 
 async function createLinkedB2BLead(req, body) {
   try {
+    const explicitLeadId = body.b2bLeadId && String(body.b2bLeadId).trim();
+    if (explicitLeadId && mongoose.Types.ObjectId.isValid(explicitLeadId)) {
+      const existing = await Lead.findById(explicitLeadId).lean();
+      if (existing) {
+        return { created: false, leadId: explicitLeadId, linked: true, message: "Linked to existing B2B lead." };
+      }
+      return { created: false, linked: false, message: "Invalid b2bLeadId (lead not found)." };
+    }
+
     let leadCategoryId = body.leadCategory && mongoose.Types.ObjectId.isValid(body.leadCategory)
       ? body.leadCategory
       : null;
@@ -161,6 +170,23 @@ async function createLinkedB2BLead(req, body) {
   }
 }
 
+router.get("/by-b2b-lead/:leadId", async (req, res) => {
+  try {
+    const leadId = String(req.params.leadId || "").trim();
+    if (!mongoose.Types.ObjectId.isValid(leadId)) {
+      return res.status(400).json({ success: false, message: "Invalid leadId" });
+    }
+
+    const query = { b2bLeadId: leadId };
+    if (req.college?._id) query.college = req.college._id;
+
+    const item = await LRP.findOne(query).sort({ createdAt: -1 }).lean();
+    return res.json({ success: true, data: item || null });
+  } catch (err) {
+    return res.status(400).json({ success: false, message: err?.message || "Unable to fetch LRP record" });
+  }
+});
+
 router.get("/", async (req, res) => {
   try {
     const page = Math.max(1, parseInt(String(req.query.page || "1"), 10) || 1);
@@ -217,6 +243,7 @@ router.post("/", async (req, res) => {
     const doc = {
       college: req.college?._id,
       createdBy: req.user?._id,
+      b2bLeadId: body.b2bLeadId && mongoose.Types.ObjectId.isValid(body.b2bLeadId) ? body.b2bLeadId : undefined,
 
       partnerType: body.partnerType,
       implementationPartnerName: body.implementationPartnerName,
@@ -256,6 +283,16 @@ router.post("/", async (req, res) => {
     const created = await LRP.create(doc);
 
     const b2b = await createLinkedB2BLead(req, body);
+
+    // If a new B2B lead was created, link this LRP record to it
+    try {
+      const createdLeadId = b2b?.lead?._id || b2b?.leadId;
+      if (createdLeadId && mongoose.Types.ObjectId.isValid(String(createdLeadId))) {
+        await LRP.updateOne({ _id: created._id }, { $set: { b2bLeadId: createdLeadId } });
+      }
+    } catch (e) {
+      // ignore link errors
+    }
 
     return res.status(201).json({
       success: true,
