@@ -1,42 +1,30 @@
 const { Schema, model } = require("mongoose");
 
+const leadSourceQAItemSchema = new Schema(
+  {
+    metaKey: { type: String, trim: true },
+    question: { type: String, trim: true },
+    type: { type: String, enum: ["text", "number", "radio", "date"], default: "text" },
+    options: [{ type: String, trim: true }],
+    required: { type: Boolean, default: true },
+    value: { type: String, trim: true, default: "" },
+  },
+  { _id: false }
+);
+
+const leadSourceQASchema = new Schema(
+  {
+    categoryId: { type: Schema.Types.ObjectId, ref: "LeadCategory" },
+    items: { type: [leadSourceQAItemSchema], default: [] },
+  },
+  { _id: false }
+);
+
 const lrpSchema = new Schema(
   {
     college: { type: Schema.Types.ObjectId, ref: "College" },
     b2bLeadId: { type: Schema.Types.ObjectId, ref: "Lead" },
-    partnerType: { type: String, required: true, trim: true }, 
-    implementationPartnerName: { type: String, required: true, trim: true },
-    visitDate: { type: Date, required: true },
-    geoTaggedPhoto: { type: String, required: true, trim: true }, 
-
-    state: { type: String, required: true, trim: true }, 
-    district: { type: String, required: true, trim: true },
-
-    schoolNameAddress: { type: String, required: true, trim: true },
-    schoolType: { type: String, required: true, trim: true }, // CBSE/ICSE/HBSE/PSEB/Other
-    schoolTypeOther: { type: String, trim: true }, 
-    schoolEmail: { type: String, required: true, trim: true, lowercase: true },
-    coordinatorNameContact: { type: String, required: true, trim: true },
-    decisionMaker: { type: String, required: true, trim: true },
-    studentsClass2to12: { type: Number, required: true },
-    hasLabs: { type: String, required: true, trim: true }, 
-    interestedWorkshop: { type: String, required: true, trim: true }, 
-    avgStudentsPerClass: { type: Number, required: true },
-    preferredPlan: { type: String, required: true, trim: true }, 
-    managementReadyApprove: { type: String, required: true, trim: true }, 
-    meetingWithSeniorStaff: { type: String, required: true, trim: true }, 
-    nextMeetingDate: { type: Date, required: true },
-    hasComputerLab: { type: String, required: true, trim: true }, 
-    computersAvailable: { type: Number }, 
-
-    fftlClasses: { type: String, required: true, trim: true },
-    openForPartnership: { type: String, required: true, trim: true }, 
-    teachersAvailable: { type: String, required: true, trim: true }, 
-    proposalExplainedSubmitted: { type: String, required: true, trim: true }, 
-    poExpectedTimeline: { type: String, required: true, trim: true },
-    leadStatus: { type: String, required: true, trim: true }, 
-    lockLead: { type: String, required: true, trim: true }, 
-    otherRemarks: { type: String, trim: true },
+    leadSourceQA: { type: leadSourceQASchema },
     createdBy: { type: Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true }

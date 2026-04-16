@@ -21,7 +21,7 @@ function TypeCategory() {
 
     /** Payload shape matches backend `leadCategory` schema: documents[], questions[{ question, type, required, options }] */
     const buildQuestionsPayload = (list) => {
-        const allowedTypes = ['text', 'number', 'radio'];
+        const allowedTypes = ['text', 'number', 'radio', 'date'];
         return (list || [])
             .map((q) => {
                 const type = allowedTypes.includes(q?.type) ? q.type : 'text';
@@ -250,7 +250,7 @@ function TypeCategory() {
         setQuestions(
             Array.isArray(category?.questions) && category.questions.length > 0
                 ? category.questions.map((q) => {
-                    const type = ['text', 'number', 'radio'].includes(q?.type) ? q.type : 'text';
+                    const type = ['text', 'number', 'radio', 'date'].includes(q?.type) ? q.type : 'text';
                     const rawOpts = Array.isArray(q?.options) ? q.options : [];
                     return {
                         question: q?.question || '',
@@ -650,6 +650,7 @@ function TypeCategory() {
                                                                             >
                                                                                 <option value="text">Text</option>
                                                                                 <option value="number">Number</option>
+                                                                                <option value="date">Date</option>
                                                                                 <option value="radio">Radio</option>
                                                                             </select>
                                                                         </div>

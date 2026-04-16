@@ -67,6 +67,8 @@ const B2BLeadCopySchema = new mongoose.Schema({
     type: ObjectId,
   },
   followUp: { type: ObjectId, ref: 'FollowUp' },
+  followUpCall: { type: ObjectId, ref: 'FollowUp' },
+  followUpVisit: { type: ObjectId, ref: 'FollowUp' },
   updatedBy: { type: ObjectId, ref: 'User' },
 
   /** Sales copy: files attached to lead with institute review status */

@@ -3,7 +3,7 @@ import axios from 'axios';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Calendar, TrendingUp, Users, Building, Clock, Target, CheckCircle, XCircle, DollarSign, AlertCircle, UserCheck, FileCheck, AlertTriangle, ChevronLeft, ChevronRight, CalendarDays, Phone, Mail, MapPin, User, Briefcase, Eye, Edit, History, Plus } from 'lucide-react';
 
-/** LRP model fields (order matches backend/controllers/models/lrp.js) */
+/** LRP display: visit meta from leadSourceQA (metaKey) + lead-source answers */
 const LRP_TABLE_COLUMNS = [
   { key: 'partnerType', label: 'Partner type' },
   { key: 'implementationPartnerName', label: 'Implementation partner' },
@@ -11,35 +11,34 @@ const LRP_TABLE_COLUMNS = [
   { key: 'geoTaggedPhoto', label: 'Geo-tagged photo' },
   { key: 'state', label: 'State' },
   { key: 'district', label: 'District' },
-  { key: 'schoolNameAddress', label: 'School name & address' },
-  { key: 'schoolType', label: 'School type' },
-  { key: 'schoolTypeOther', label: 'School type (other)' },
-  { key: 'schoolEmail', label: 'School email' },
-  { key: 'coordinatorNameContact', label: 'Coordinator name & contact' },
-  { key: 'decisionMaker', label: 'Decision maker' },
-  { key: 'studentsClass2to12', label: 'Students (class 2–12)' },
-  { key: 'hasLabs', label: 'Has labs' },
-  { key: 'interestedWorkshop', label: 'Interested in workshop' },
-  { key: 'avgStudentsPerClass', label: 'Avg students / class' },
-  { key: 'preferredPlan', label: 'Preferred plan' },
-  { key: 'managementReadyApprove', label: 'Management ready to approve' },
-  { key: 'meetingWithSeniorStaff', label: 'Meeting with senior staff' },
-  { key: 'nextMeetingDate', label: 'Next meeting date' },
-  { key: 'hasComputerLab', label: 'Has computer lab' },
-  { key: 'computersAvailable', label: 'Computers available' },
-  { key: 'fftlClasses', label: 'FFTL classes' },
-  { key: 'openForPartnership', label: 'Open for partnership' },
-  { key: 'teachersAvailable', label: 'Teachers available' },
-  { key: 'proposalExplainedSubmitted', label: 'Proposal explained / submitted' },
-  { key: 'poExpectedTimeline', label: 'PO expected timeline' },
-  { key: 'leadStatus', label: 'Lead status' },
-  { key: 'lockLead', label: 'Lock lead' },
-  { key: 'otherRemarks', label: 'Other remarks' },
+  { key: 'leadSourceResponses', label: 'Lead source (Q&A)' },
 ];
+
+const lrpMetaValue = (items, metaKey) => {
+  const it = (items || []).find((x) => x && x.metaKey === metaKey);
+  return it ? String(it.value ?? '').trim() : '';
+};
+
+const flattenLrpRecordForTable = (row) => {
+  const items = row?.leadSourceQA?.items || [];
+  const legacy = (k) => (row && row[k] !== undefined && row[k] !== null ? String(row[k]) : '');
+  return {
+    partnerType: lrpMetaValue(items, 'lrp_partnerType') || legacy('partnerType'),
+    implementationPartnerName: lrpMetaValue(items, 'lrp_implementationPartnerName') || legacy('implementationPartnerName'),
+    visitDate: lrpMetaValue(items, 'lrp_visitDate') || legacy('visitDate'),
+    geoTaggedPhoto: lrpMetaValue(items, 'lrp_geoTaggedPhoto') || legacy('geoTaggedPhoto'),
+    state: lrpMetaValue(items, 'lrp_state') || legacy('state'),
+    district: lrpMetaValue(items, 'lrp_district') || legacy('district'),
+    leadSourceResponses: items
+      .filter((it) => it && !it.metaKey && String(it.question || '').trim())
+      .map((it) => `${String(it.question).trim()}: ${String(it.value ?? '').trim()}`)
+      .join(' | '),
+  };
+};
 
 const formatLrpCell = (key, value) => {
   if (value === undefined || value === null || value === '') return '—';
-  if (key === 'visitDate' || key === 'nextMeetingDate') {
+  if (key === 'visitDate') {
     const d = new Date(value);
     return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString();
   }
@@ -400,15 +399,18 @@ const B2BDashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {lrpRecords.map((row) => (
+                      {lrpRecords.map((row) => {
+                        const flat = flattenLrpRecordForTable(row);
+                        return (
                         <tr key={row._id}>
                           {LRP_TABLE_COLUMNS.map((col) => (
                             <td key={col.key} className="px-2 py-1" style={{ maxWidth: 200, whiteSpace: col.key === 'geoTaggedPhoto' ? 'nowrap' : 'normal', wordBreak: 'break-word' }}>
-                              {formatLrpCell(col.key, row[col.key])}
+                              {formatLrpCell(col.key, flat[col.key])}
                             </td>
                           ))}
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

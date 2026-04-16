@@ -12,7 +12,7 @@ const documentItemSchema = new mongoose.Schema(
 const questionItemSchema = new mongoose.Schema(
   {
     question: { type: String, trim: true },
-    type: { type: String, enum: ['text', 'number', 'radio'], default: 'text' },
+    type: { type: String, enum: ['text', 'number', 'radio', 'date'], default: 'text' },
     required: { type: Boolean, default: true },
     options: [{ type: String, trim: true }]
   },

@@ -417,9 +417,50 @@ const B2BSales = () => {
   const [leadDocumentsLoading, setLeadDocumentsLoading] = useState(false);
   const [leadDocumentUploading, setLeadDocumentUploading] = useState(false);
   const [leadDocType, setLeadDocType] = useState('');
-  const [leadDocName, setLeadDocName] = useState('');
-  const [leadDocRemarks, setLeadDocRemarks] = useState('');
   const leadDocFileRef = useRef(null);
+  const [leadCategoryDocuments, setLeadCategoryDocuments] = useState([]); // from LeadCategory.documents (required docs)
+
+  const mergedLeadDocuments = useMemo(() => {
+    const uploaded = Array.isArray(leadDocuments) ? leadDocuments : [];
+    const required = Array.isArray(leadCategoryDocuments) ? leadCategoryDocuments : [];
+
+    if (!required.length) return uploaded;
+
+    const norm = (s) => String(s || '').trim().toLowerCase();
+    const byType = new Map();
+    for (const doc of uploaded) {
+      const key = norm(doc?.docType) || norm(doc?.name);
+      if (!key) continue;
+      // keep first match; multiple uploads can still show via "extra" below
+      if (!byType.has(key)) byType.set(key, doc);
+    }
+
+    const merged = required.map((r) => {
+      const typeKey = norm(r?.name);
+      const hit = typeKey ? byType.get(typeKey) : null;
+      if (hit) {
+        return { ...hit, isRequired: true, isMandatory: Boolean(r?.isMandatory) };
+      }
+      return {
+        id: `required:${String(r?.name || '').trim()}`,
+        name: String(r?.name || '').trim() || 'Document',
+        docType: String(r?.name || '').trim(),
+        status: 'MISSING',
+        url: '',
+        isPlaceholder: true,
+        isRequired: true,
+        isMandatory: Boolean(r?.isMandatory),
+      };
+    });
+
+    // show uploads that don't belong to required list at the end
+    const requiredKeys = new Set(required.map((r) => norm(r?.name)).filter(Boolean));
+    const extras = uploaded
+      .filter((d) => !requiredKeys.has(norm(d?.docType) || norm(d?.name)))
+      .map((d) => ({ ...d, isExtra: true }));
+
+    return [...merged, ...extras];
+  }, [leadDocuments, leadCategoryDocuments]);
 
 
   // open model for upload documents 
@@ -580,6 +621,8 @@ const B2BSales = () => {
   // Function to clear all follow-up form data
   const clearFollowupFormData = () => {
     setFollowupFormData({
+      followUpType: 'Call',
+      description: '',
       followupDate: '',
       followupTime: '',
       remarks: '',
@@ -610,10 +653,15 @@ const B2BSales = () => {
       const hasFollowupData =
         hasFollowup && followupFormData.followupDate && followupFormData.followupTime;
 
-      // Normalise date value for API (string or Date instance)
-      const followupDateValue = followupFormData.followupDate instanceof Date
-        ? followupFormData.followupDate.toISOString()
-        : followupFormData.followupDate;
+      const toYmdLocal = (d) => {
+        const dt = d instanceof Date ? d : new Date(d);
+        if (Number.isNaN(dt.getTime())) return '';
+        const yyyy = dt.getFullYear();
+        const mm = String(dt.getMonth() + 1).padStart(2, '0');
+        const dd = String(dt.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+      };
+      const followupDateValue = toYmdLocal(followupFormData.followupDate);
 
       // 1) Edit panel: change status (and optionally set follow-up + Google Calendar) via B2B status API
       if (showPanel === 'editPanel' && selectedProfile && seletectedStatus) {
@@ -643,6 +691,10 @@ const B2BSales = () => {
         await axios.post(
           `${backendUrl}/college/b2b/leads/${selectedProfile._id}/followup`,
           {
+            followUpType: followupFormData.followUpType || 'Call',
+            description:
+              followupFormData.description ||
+              ((followupFormData.followUpType || 'Call') === 'Visit' ? 'Follow-up visit' : 'Follow-up call'),
             scheduledDate: followupDateValue,
             scheduledTime: followupFormData.followupTime,
             remarks: followupFormData.remarks || '',
@@ -653,7 +705,9 @@ const B2BSales = () => {
           }
         );
 
-        alert('✅ Follow-up saved and scheduled successfully!');
+        alert(`✅ ${followupFormData.followUpType === 'Visit' ? 'Visit' : 'Call'} follow-up saved and scheduled successfully!`);
+        // ensure UI updates immediately (even if custom event listener misses)
+        await fetchLeads(selectedStatusFilter, currentPage);
       }
 
       window.dispatchEvent(new CustomEvent('b2b-followup-updated'));
@@ -663,6 +717,28 @@ const B2BSales = () => {
     } finally {
       closePanel();
     }
+  };
+
+  const formatFollowupDate = (dateLike) => {
+    if (!dateLike) return '—';
+    const dt = new Date(dateLike);
+    if (Number.isNaN(dt.getTime())) return '—';
+    return dt.toLocaleDateString('en-GB'); // dd/mm/yyyy
+  };
+
+  const getLeadFollowupDateLabel = (lead, type) => {
+    const t = String(type || '').toLowerCase();
+    const bySlot = t === 'visit'
+      ? (lead?.followUpVisit || null)
+      : (lead?.followUpCall || null);
+    if (bySlot?.scheduledDate) return formatFollowupDate(bySlot.scheduledDate);
+
+    // fallback to legacy followUp if it matches type
+    const legacy = lead?.followUp || null;
+    if (legacy?.scheduledDate && String(legacy?.followUpType || '').toLowerCase() === t) {
+      return formatFollowupDate(legacy.scheduledDate);
+    }
+    return '—';
   };
 
   const initializeBusinessNameAutocomplete = () => {
@@ -1090,6 +1166,16 @@ const B2BSales = () => {
     fetchLeads(null, 1);
   }, []);
 
+  // When a follow-up is saved, refresh the list so dates update per-lead
+  useEffect(() => {
+    const handler = () => {
+      fetchLeads(selectedStatusFilter, currentPage);
+    };
+    window.addEventListener('b2b-followup-updated', handler);
+    return () => window.removeEventListener('b2b-followup-updated', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStatusFilter, currentPage]);
+
   // Auto-select leads based on Input 1 value for bulk refer
   useEffect(() => {
     if (bulkMode !== 'bulkrefer') {
@@ -1471,13 +1557,31 @@ const B2BSales = () => {
     setDocumentsLead(lead);
     setShowLeadDocumentsModal(true);
     setLeadDocuments([]);
+    setLeadCategoryDocuments([]);
     setLeadDocType('');
-    setLeadDocName('');
-    setLeadDocRemarks('');
     if (leadDocFileRef.current) leadDocFileRef.current.value = '';
 
     try {
       setLeadDocumentsLoading(true);
+
+      try {
+        const catId =
+          lead?.leadCategory?._id ||
+          lead?.leadCategory ||
+          lead?.leadCategoryId ||
+          '';
+        if (catId) {
+          const catRes = await axios.get(`${backendUrl}/college/b2b/lead-categories/${catId}`, {
+            headers: { 'x-auth': token }
+          });
+          if (catRes?.data?.status && catRes?.data?.data) {
+            setLeadCategoryDocuments(catRes.data.data.documents || []);
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching lead category documents:', e);
+      }
+
       const res = await axios.get(`${backendUrl}/college/b2b/leads/${lead._id}/documents`, {
         headers: { 'x-auth': token }
       });
@@ -1498,13 +1602,18 @@ const B2BSales = () => {
       alert('Please select a file');
       return;
     }
+    if ((leadCategoryDocuments || []).length) {
+      const allowed = new Set((leadCategoryDocuments || []).map((d) => String(d?.name || '').trim()).filter(Boolean));
+      if (!allowed.has(String(leadDocType || '').trim())) {
+        alert('Please select a valid Doc Type from Lead Source documents');
+        return;
+      }
+    }
     try {
       setLeadDocumentUploading(true);
       const form = new FormData();
       form.append('file', file);
       if (leadDocType) form.append('docType', leadDocType);
-      if (leadDocName) form.append('name', leadDocName);
-      if (leadDocRemarks) form.append('remarks', leadDocRemarks);
 
       const res = await axios.post(`${backendUrl}/college/b2b/leads/${documentsLead._id}/documents`, form, {
         headers: { 'x-auth': token }
@@ -1515,8 +1624,6 @@ const B2BSales = () => {
         });
         if (listRes?.data?.status) setLeadDocuments(listRes.data.data || []);
         setLeadDocType('');
-        setLeadDocName('');
-        setLeadDocRemarks('');
         if (leadDocFileRef.current) leadDocFileRef.current.value = '';
       } else {
         alert(res?.data?.message || 'Failed to upload document');
@@ -1653,6 +1760,7 @@ const B2BSales = () => {
         // Refresh the leads list and status counts
         fetchLeads(null, 1);
         fetchStatusCounts();
+        fetchApprovalCounts();
 
         // Reset form
         setLeadFormData({
@@ -1908,6 +2016,8 @@ const B2BSales = () => {
   const [seletectedSubStatus, setSelectedSubStatus] = useState(null);
   // Single state for all follow-up form data
   const [followupFormData, setFollowupFormData] = useState({
+    followUpType: 'Call', // 'Call' | 'Visit' (backend default is 'Call')
+    description: '',
     followupDate: '',
     followupTime: '',
     remarks: '',
@@ -2080,7 +2190,7 @@ const B2BSales = () => {
 
 
 
-  const openEditPanel = async (profile = null, panel) => {
+  const openEditPanel = async (profile = null, panel, followUpType = null) => {
     // Check permission before opening panel
     if (profile && (panel === 'StatusChange' || panel === 'SetFollowup')) {
       if (!canUpdateLead(profile)) {
@@ -2122,6 +2232,11 @@ const B2BSales = () => {
     }
     else if (panel === 'SetFollowup') {
       setShowPopup(null)
+      setFollowupFormData(prev => ({
+        ...prev,
+        followUpType: followUpType || prev.followUpType || 'Call',
+        description: (followUpType || prev.followUpType) === 'Visit' ? 'Follow-up visit' : 'Follow-up call',
+      }));
       setShowPanel('followUp')
     }
     else if (panel === 'bulkstatuschange') {
@@ -3667,7 +3782,7 @@ const B2BSales = () => {
                   <div className="col-12 mt-1 b2b-crm-dashboard">
                     <div className="b2b-dash-section mt-2">
                       <span className="b2b-dash-section__label">Lead Approval</span>
-                      <div className="d-flex flex-wrap gap-2 align-items-stretch pt-1">
+                      <div className="b2b-mobile-hscroll b2b-mobile-hscroll--approval d-flex gap-2 align-items-stretch pt-1">
                         {[
                           { key: 'total', label: 'Total', value: approvalCounts.total, bg: '#5b4fc9', approval: null },
                           { key: 'approved', label: 'Approved', value: approvalCounts.approved, bg: '#10b981', approval: 'APPROVED' },
@@ -3898,6 +4013,21 @@ const B2BSales = () => {
                           line-height: 1.2;
                           min-width: 1.5em;
                         }
+
+                        /* Mobile: horizontal scroll for Lead Approval cards */
+                        @media (max-width: 768px){
+                          .b2b-crm-dashboard .b2b-mobile-hscroll--approval{
+                            overflow-x: auto;
+                            overflow-y: hidden;
+                            flex-wrap: nowrap;
+                            -webkit-overflow-scrolling: touch;
+                            padding-bottom: 4px;
+                          }
+
+                          .b2b-crm-dashboard .b2b-mobile-hscroll--approval > *{
+                            flex: 0 0 auto;
+                          }
+                        }
                       `}
                     </style>
                   </div>
@@ -4117,34 +4247,77 @@ const B2BSales = () => {
                                 </div>
 
                                 <div className="lhm__actions">
-                                  {/* Approval dropdown (Mobile) */}
-                                  {isAdmin() && String(lead?.approval?.status || 'PENDING').toUpperCase() === 'PENDING' && (
-                                    <div className="lead-header-mob__approval" style={{ height: '34px' }}>
-                                      <select
-                                        className="form-select form-select-sm lead-header-mob__approval-select"
-                                        defaultValue=""
-                                        onChange={async (e) => {
-                                          const value = e.target.value;
-                                          // reset immediately so user can pick again next time
-                                          e.target.value = "";
-                                          if (value === 'approve') {
-                                            await approveLead(lead);
-                                          }
-                                          if (value === 'reject') {
-                                            setApprovalLeadTarget(lead);
-                                            setRejectionReason('');
-                                            setShowRejectionForm(true);
-                                          }
-                                        }}
-                                      >
-                                        <option value="" disabled>
-                                          Approval: PENDING
-                                        </option>
-                                        <option value="approve">Approve</option>
-                                        <option value="reject">Reject</option>
-                                      </select>
-                                    </div>
-                                  )}
+                                  {/* Lead Approval (Mobile) — match desktop pill + pen, no "Approval:" prefix */}
+                                  <div className="lead-header-mob__approval-v2">
+                                    {(() => {
+                                      const st = String(lead?.approval?.status || 'PENDING').toUpperCase();
+                                      const safe = ['PENDING', 'APPROVED', 'REJECTED'].includes(st) ? st : 'PENDING';
+                                      return (
+                                        <>
+                                          <button
+                                            type="button"
+                                            className={`lead-approval-v2__pill lead-approval-v2__pill--${safe.toLowerCase()}`}
+                                            title={`Approval: ${safe}`}
+                                            onClick={() => handleApprovalCardClick(safe)}
+                                          >
+                                            {safe}
+                                          </button>
+
+                                          {isAdmin() && (
+                                            <button
+                                              type="button"
+                                              className="lead-approval-v2__iconbtn"
+                                              title="Change approval"
+                                              onClick={() => setApprovalEditLeadId((prev) => (prev === lead._id ? null : lead._id))}
+                                              aria-label="Change approval"
+                                            >
+                                              <i className="fas fa-pen" aria-hidden="true"></i>
+                                            </button>
+                                          )}
+
+                                          {isAdmin() && (
+                                            <div
+                                              className={`lead-header-v2__approval-editor ${approvalEditLeadId === lead._id ? 'is-open' : ''}`}
+                                              aria-hidden={approvalEditLeadId === lead._id ? 'false' : 'true'}
+                                            >
+                                              {safe === 'PENDING' ? (
+                                                <div className="lead-approval-v2__menu">
+                                                  <button
+                                                    type="button"
+                                                    className="lead-approval-v2__action lead-approval-v2__action--approve"
+                                                    onClick={async () => {
+                                                      setApprovalEditLeadId(null);
+                                                      await approveLead(lead);
+                                                    }}
+                                                  >
+                                                    <i className="fas fa-check" aria-hidden="true"></i>
+                                                    Approve
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    className="lead-approval-v2__action lead-approval-v2__action--reject"
+                                                    onClick={() => {
+                                                      setApprovalEditLeadId(null);
+                                                      setApprovalLeadTarget(lead);
+                                                      setRejectionReason('');
+                                                      setShowRejectionForm(true);
+                                                    }}
+                                                  >
+                                                    <i className="fas fa-times" aria-hidden="true"></i>
+                                                    Reject
+                                                  </button>
+                                                </div>
+                                              ) : (
+                                                <div className="lead-approval-v2__menu lead-approval-v2__menu--readonly">
+                                                  {safe}
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
+                                        </>
+                                      );
+                                    })()}
+                                  </div>
 
                                   <button type="button" className="lhm__action-btn lhm__action-btn--more"
                                     onClick={() => setMobileMoreLead(lead)} aria-label="More">
@@ -4168,7 +4341,7 @@ const B2BSales = () => {
                                     className="lhm__editbtn"
                                     title="Set Followup"
                                     aria-label="Set Followup"
-                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(lead, 'SetFollowup'); }}
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(lead, 'SetFollowup', 'Call'); }}
                                   >
                                     <i className="fas fa-edit" aria-hidden="true"></i>
                                   </button>
@@ -4186,7 +4359,7 @@ const B2BSales = () => {
                                     ))}
                                   </div>
                                   <div className="lhm__followup-date">
-                                    <span>Next Follow-up Date:</span><span>10-04-2026</span>
+                                    <span>Next Follow-up Date:</span><span>{getLeadFollowupDateLabel(lead, 'Call')}</span>
                                   </div>
                                 </div>
 
@@ -4198,7 +4371,7 @@ const B2BSales = () => {
                                     className="lhm__editbtn"
                                     title="Set Followup"
                                     aria-label="Set Followup"
-                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(lead, 'SetFollowup'); }}
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(lead, 'SetFollowup', 'Visit'); }}
                                   >
                                     <i className="fas fa-edit" aria-hidden="true"></i>
                                   </button>
@@ -4216,7 +4389,7 @@ const B2BSales = () => {
                                     ))}
                                   </div>
                                   <div className="lhm__followup-date">
-                                    <span>Next Follow-up Date:</span><span>10-04-2026</span>
+                                    <span>Next Follow-up Date:</span><span>{getLeadFollowupDateLabel(lead, 'Visit')}</span>
                                   </div>
                                 </div>
                                 {/* Documents */}
@@ -4300,70 +4473,72 @@ const B2BSales = () => {
                                   >
                                     Lead Approval
                                   </span>
-                                  <div className="d-flex align-items-center gap-2 flex-column">
-                                    <button
-                                      type="button"
-                                      className="lead-header-v2__approval-btn"
-                                      title={`Approval: ${lead?.approval?.status || 'PENDING'}`}
-                                      onClick={() => {
-                                        const st = (lead?.approval?.status || 'PENDING').toUpperCase();
-                                        handleApprovalCardClick(['PENDING', 'APPROVED', 'REJECTED'].includes(st) ? st : null);
-                                      }}
-                                    >
-                                      {String(lead?.approval?.status || 'PENDING')}
-                                    </button>
+                                  {(() => {
+                                    const st = String(lead?.approval?.status || 'PENDING').toUpperCase();
+                                    const safe = ['PENDING', 'APPROVED', 'REJECTED'].includes(st) ? st : 'PENDING';
+                                    return (
+                                      <div className="lead-approval-v2__row">
+                                        <button
+                                          type="button"
+                                          className={`lead-approval-v2__pill lead-approval-v2__pill--${safe.toLowerCase()}`}
+                                          title={`Approval: ${safe}`}
+                                          onClick={() => handleApprovalCardClick(safe)}
+                                        >
+                                          {safe}
+                                        </button>
 
-                                    {isAdmin() && (
-                                      <button
-                                        type="button"
-                                        className="lead-header-v2__approval-btn"
-                                        title="Edit Lead Approval"
-                                        onClick={() =>
-                                          setApprovalEditLeadId((prev) => (prev === lead._id ? null : lead._id))
-                                        }
-                                        aria-label="Edit lead approval"
-                                      >
-                                        <i className="fas fa-edit" aria-hidden="true"></i>
-                                      </button>
-                                    )}
-                                  </div>
-
-                                  {/* Dropdown editor (only when icon clicked) */}
-                                  {isAdmin() && approvalEditLeadId === lead._id && (
-                                    <div className="lead-header-v2__approval-editor">
-                                      <select
-                                        className="form-select form-select-sm lead-header-v2__approval-select"
-                                        defaultValue=""
-                                        onChange={async (e) => {
-                                          const value = e.target.value;
-                                          e.target.value = "";
-                                          setApprovalEditLeadId(null);
-                                          if (value === 'approve') {
-                                            await approveLead(lead);
-                                          }
-                                          if (value === 'reject') {
-                                            setApprovalLeadTarget(lead);
-                                            setRejectionReason('');
-                                            setShowRejectionForm(true);
-                                          }
-                                        }}
-                                      >
-                                        <option value="" disabled>
-                                          Change approval...
-                                        </option>
-                                        {String(lead?.approval?.status || 'PENDING').toUpperCase() === 'PENDING' ? (
-                                          <>
-                                            <option value="approve">Approve</option>
-                                            <option value="reject">Reject</option>
-                                          </>
-                                        ) : (
-                                          <>
-                                            <option value="" disabled>
-                                              Already {String(lead?.approval?.status || '').toUpperCase()}
-                                            </option>
-                                          </>
+                                        {isAdmin() && (
+                                          <button
+                                            type="button"
+                                            className="lead-approval-v2__iconbtn"
+                                            title="Change approval"
+                                            onClick={() => setApprovalEditLeadId((prev) => (prev === lead._id ? null : lead._id))}
+                                            aria-label="Change approval"
+                                          >
+                                            <i className="fas fa-pen" aria-hidden="true"></i>
+                                          </button>
                                         )}
-                                      </select>
+                                      </div>
+                                    );
+                                  })()}
+
+                                  {isAdmin() && (
+                                    <div
+                                      className={`lead-header-v2__approval-editor ${approvalEditLeadId === lead._id ? 'is-open' : ''}`}
+                                      aria-hidden={approvalEditLeadId === lead._id ? 'false' : 'true'}
+                                    >
+                                      {String(lead?.approval?.status || 'PENDING').toUpperCase() === 'PENDING' ? (
+                                        <div className="lead-approval-v2__menu">
+                                          <button
+                                            type="button"
+                                            className="lead-approval-v2__action lead-approval-v2__action--approve"
+                                            onClick={async () => {
+                                              setApprovalEditLeadId(null);
+                                              await approveLead(lead);
+                                            }}
+                                          >
+                                            <i className="fas fa-check" aria-hidden="true"></i>
+                                            Approve
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="lead-approval-v2__action lead-approval-v2__action--reject"
+                                            onClick={() => {
+                                              setApprovalEditLeadId(null);
+                                              setApprovalLeadTarget(lead);
+                                              setRejectionReason('');
+                                              setShowRejectionForm(true);
+                                            }}
+                                          >
+                                            <i className="fas fa-times" aria-hidden="true"></i>
+                                            Reject
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <div className="lead-approval-v2__menu lead-approval-v2__menu--readonly">
+                                          {String(lead?.approval?.status || '').toUpperCase()}
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -4469,7 +4644,7 @@ const B2BSales = () => {
                                         className="lead-header-v2__editbtn"
                                         title="Edit Followup Calling"
                                         aria-label="Edit Followup Calling"
-                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(lead, 'SetFollowup'); }}
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(lead, 'SetFollowup', 'Call'); }}
                                       >
                                         <i className="fas fa-edit" aria-hidden="true"></i>
                                       </button>
@@ -4493,7 +4668,7 @@ const B2BSales = () => {
                                         ))}
                                       </div>
                                       <div className="ActionsDates">
-                                        <span>Next Follow-up Date:</span> <span>10-04-2026</span>
+                                        <span>Next Follow-up Date:</span> <span>{getLeadFollowupDateLabel(lead, 'Call')}</span>
                                       </div>
                                     </div>
                                   </div>
@@ -4505,7 +4680,7 @@ const B2BSales = () => {
                                         className="lead-header-v2__editbtn"
                                         title="Edit Followup Visit"
                                         aria-label="Edit Followup Visit"
-                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(lead, 'SetFollowup'); }}
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(lead, 'SetFollowup', 'Visit'); }}
                                       >
                                         <i className="fas fa-edit" aria-hidden="true"></i>
                                       </button>
@@ -4529,7 +4704,7 @@ const B2BSales = () => {
                                         ))}
                                       </div>
                                       <div className="ActionsDates">
-                                        <span>Next Follow-up Date:</span> <span>10-04-2026</span>
+                                        <span>Next Follow-up Date:</span> <span>{getLeadFollowupDateLabel(lead, 'Visit')}</span>
                                       </div>
                                     </div>
                                   </div>
@@ -5122,9 +5297,9 @@ const B2BSales = () => {
           }}
         >
           <div className="modal-dialog modal-lg modal-dialog-centered">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h6 className="modal-title">
+            <div className="modal-content b2b-docs-modal">
+              <div className="modal-header b2b-docs-modal__header">
+                <h6 className="modal-title b2b-docs-modal__title">
                   Documents — {documentsLead?.businessName || documentsLead?.concernPersonName || 'Lead'}
                 </h6>
                 <button
@@ -5138,42 +5313,39 @@ const B2BSales = () => {
               </div>
 
               <div className="modal-body">
-                <div className="row g-2">
-                  <div className="col-md-4">
-                    <label className="form-label small fw-medium">Doc Type</label>
-                    <input
-                      className="form-control"
-                      value={leadDocType}
-                      onChange={(e) => setLeadDocType(e.target.value)}
-                      placeholder="e.g. PAN, GST"
-                    />
+                <div className="row g-2 align-items-end">
+                  <div className="col-md-5">
+                    <label className="form-label small fw-semibold mb-1">Doc Type</label>
+                    {(leadCategoryDocuments || []).length ? (
+                      <select
+                        className="form-select b2b-docs-modal__select"
+                        value={leadDocType}
+                        onChange={(e) => setLeadDocType(e.target.value)}
+                      >
+                        <option value="">Select</option>
+                        {(leadCategoryDocuments || []).map((d) => (
+                          <option key={String(d?.name || '')} value={String(d?.name || '')}>
+                            {String(d?.name || '')}{d?.isMandatory ? ' *' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        className="form-control b2b-docs-modal__select"
+                        value={leadDocType}
+                        onChange={(e) => setLeadDocType(e.target.value)}
+                        placeholder="e.g. PAN, GST"
+                      />
+                    )}
                   </div>
-                  <div className="col-md-4">
-                    <label className="form-label small fw-medium">Name (optional)</label>
-                    <input
-                      className="form-control"
-                      value={leadDocName}
-                      onChange={(e) => setLeadDocName(e.target.value)}
-                      placeholder="Display name"
-                    />
+                  <div className="col-md-5">
+                    <label className="form-label small fw-semibold mb-1">File</label>
+                    <input ref={leadDocFileRef} type="file" className="form-control b2b-docs-modal__file" />
                   </div>
-                  <div className="col-md-4">
-                    <label className="form-label small fw-medium">Remarks (optional)</label>
-                    <input
-                      className="form-control"
-                      value={leadDocRemarks}
-                      onChange={(e) => setLeadDocRemarks(e.target.value)}
-                      placeholder="Remarks"
-                    />
-                  </div>
-                  <div className="col-12">
-                    <label className="form-label small fw-medium">File</label>
-                    <input ref={leadDocFileRef} type="file" className="form-control" />
-                  </div>
-                  <div className="col-12 d-flex justify-content-end">
+                  <div className="col-md-2 d-flex justify-content-end">
                     <button
                       type="button"
-                      className="btn btn-primary"
+                      className="btn btn-primary w-100 b2b-docs-modal__uploadbtn"
                       disabled={leadDocumentUploading}
                       onClick={uploadLeadDocument}
                     >
@@ -5190,7 +5362,7 @@ const B2BSales = () => {
                   </div>
                 ) : (
                   <div className="table-responsive">
-                    <table className="table table-sm align-middle">
+                    <table className="table table-sm align-middle b2b-docs-modal__table">
                       <thead>
                         <tr>
                           <th>Name</th>
@@ -5200,23 +5372,29 @@ const B2BSales = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {(leadDocuments || []).length === 0 ? (
+                        {(mergedLeadDocuments || []).length === 0 ? (
                           <tr>
                             <td colSpan={4} className="text-center text-muted py-4">
                               No documents
                             </td>
                           </tr>
                         ) : (
-                          (leadDocuments || []).map((doc) => (
+                          (mergedLeadDocuments || []).map((doc) => (
                             <tr key={doc._id || doc.id || doc.url}>
                               <td style={{ maxWidth: 260 }}>
                                 <div className="fw-medium text-truncate" title={doc.name || doc.url}>
                                   {doc.name || 'Document'}
                                 </div>
-                                {doc.url && (
+                                {doc.isMandatory && <span className="b2b-docs-modal__req">Required</span>}
+                                {doc.url ? (
                                   <a href={doc.url} target="_blank" rel="noreferrer" className="small">
                                     View
                                   </a>
+                                ) : doc.isPlaceholder ? (
+                                  <div className="small text-muted">Not uploaded yet</div>
+                                ) : null}
+                                {doc.isExtra && (
+                                  <div className="small text-muted">Extra</div>
                                 )}
                               </td>
                               <td>{doc.docType || '—'}</td>
@@ -5226,14 +5404,27 @@ const B2BSales = () => {
                                     ? 'bg-success'
                                     : String(doc.status).toUpperCase() === 'REJECTED'
                                       ? 'bg-danger'
-                                      : 'bg-warning text-dark'
+                                      : String(doc.status).toUpperCase() === 'MISSING'
+                                        ? 'bg-secondary'
+                                        : 'bg-warning text-dark'
                                     }`}
                                 >
                                   {String(doc.status || 'PENDING')}
                                 </span>
                               </td>
                               <td className="text-end">
-                                {isAdmin() && (
+                                {doc.isPlaceholder ? (
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline-primary btn-sm"
+                                    onClick={() => {
+                                      setLeadDocType(doc.docType || doc.name || '');
+                                      if (leadDocFileRef.current) leadDocFileRef.current.focus();
+                                    }}
+                                  >
+                                    Upload
+                                  </button>
+                                ) : isAdmin() && (
                                   <div className="btn-group btn-group-sm" role="group">
                                     <button
                                       type="button"
@@ -5819,6 +6010,58 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     z-index: 99999 !important;
     position: fixed !important;
   }
+
+  .b2b-docs-modal{
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .b2b-docs-modal__header{
+    background: linear-gradient(90deg, #0b5ed7 0%, #1aa3ff 55%, #2dd4ff 100%);
+    color: #fff;
+    border-bottom: 0;
+    padding: 10px 14px;
+  }
+  .b2b-docs-modal__title{
+    font-weight: 800;
+  }
+  .b2b-docs-modal__header .btn-close{
+    filter: invert(1) grayscale(1);
+    opacity: 0.9;
+  }
+
+  .b2b-docs-modal__select,
+  .b2b-docs-modal__file{
+    border-radius: 12px;
+  }
+
+  .b2b-docs-modal__uploadbtn{
+    border-radius: 12px;
+    font-weight: 800;
+  }
+
+  .b2b-docs-modal__table thead th{
+    font-size: 12px;
+    font-weight: 800;
+    color: #334155;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .b2b-docs-modal__table tbody td{
+    border-top: 1px solid #f1f5f9;
+  }
+
+  .b2b-docs-modal__req{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #b91c1c;
+    background: rgba(239,68,68,0.10);
+    border: 1px solid rgba(239,68,68,0.22);
+  }
   
   .modal .pac-item {
     cursor: pointer;
@@ -5841,9 +6084,10 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     border-radius: 16px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     border: 1px solid #f0f0f0;
-    overflow: hidden;
+    overflow: visible;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     margin-bottom: 0.5rem;
+    position: relative;
   }
 
   .lead-card:hover {
@@ -5869,6 +6113,8 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     padding: 8px 10px;
     position: relative;
     --lead-header-v2-block-h: 92px;
+    overflow: visible;
+    z-index: 2;
   }
 
   .lead-header-v2__row{
@@ -5962,7 +6208,7 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
   .lead-header-v2__approval-label{
     position: absolute;
     top: -10px;
-    left: -15px;
+    left: 10px;
     padding: 0 8px;
     border-radius: 999px;
     background: rgba(11, 94, 215, 0.95);
@@ -5984,6 +6230,102 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
     font-weight: 700;
     line-height: 1;
     height: 32px;
+  }
+
+
+  .lead-approval-v2__row{
+    display:flex;
+    align-items:center;
+    gap: 8px;
+    width: 100%;
+    justify-content: center;
+    flex-direction: column
+  }
+
+  .lead-approval-v2__pill{
+    border: 1px solid rgba(255,255,255,0.35);
+    color: #fff;
+    border-radius: 999px;
+    padding: 6px 12px;
+    height: 32px;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    background: rgba(255,255,255,0.18);
+    text-transform: uppercase;
+    min-width: 110px;
+  }
+
+  .lead-approval-v2__pill--pending{
+    background: rgba(245, 158, 11, 0.28);
+    border-color: rgba(245, 158, 11, 0.55);
+  }
+  .lead-approval-v2__pill--approved{
+    background: rgba(16, 185, 129, 0.28);
+    border-color: rgba(16, 185, 129, 0.55);
+  }
+  .lead-approval-v2__pill--rejected{
+    background: rgba(239, 68, 68, 0.26);
+    border-color: rgba(239, 68, 68, 0.55);
+  }
+
+  .lead-approval-v2__iconbtn{
+    width: 32px;
+    height: 32px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.16);
+    color: #fff;
+    transition: transform 120ms ease, background 120ms ease, box-shadow 120ms ease;
+  }
+  .lead-approval-v2__iconbtn:hover{
+    transform: translateY(-1px);
+    background: rgba(255,255,255,0.24);
+    box-shadow: 0 6px 14px rgba(0,0,0,0.18);
+  }
+  .lead-approval-v2__iconbtn i{ font-size: 12px; }
+
+  .lead-approval-v2__menu{
+    display:flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.85);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+  }
+
+  .lead-approval-v2__menu--readonly{
+    font-size: 12px;
+    font-weight: 800;
+    color: #0f172a;
+    text-align: center;
+  }
+
+  .lead-approval-v2__action{
+    width: 100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap: 8px;
+    border-radius: 10px;
+    border: none;
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 900;
+    cursor: pointer;
+  }
+  .lead-approval-v2__action--approve{
+    background: #10b981;
+    color: #fff;
+  }
+  .lead-approval-v2__action--reject{
+    background: #ef4444;
+    color: #fff;
   }
 
 
@@ -6018,7 +6360,24 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
   }
 
   .lead-header-v2__approval-editor{
-    width: 230px;
+    position:absolute;
+    top: calc(100% + 8px);
+    width: 100%;
+    max-width: 100%;
+    z-index: 999;
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+    pointer-events: none;
+    visibility: hidden;
+    transition: opacity 160ms ease, transform 160ms ease, visibility 0s linear 160ms;
+  }
+
+  .lead-header-v2__approval-editor.is-open{
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+    visibility: visible;
+    transition: opacity 180ms ease, transform 180ms ease;
   }
 
   .lead-header-v2__approval-select{
@@ -6385,6 +6744,24 @@ position: absolute;
     flex-direction: column;
     gap: 4px;
     flex-shrink: 0;
+  }
+
+  /* Mobile: make icon pills match header glass style (not red) */
+  @media (max-width: 768px){
+    .lhm__pills .lead-meta-v2__pill{
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.16);
+      border: 1px solid rgba(255,255,255,0.35);
+      box-shadow: 0 8px 18px rgba(0,0,0,0.18);
+      color: #fff;
+    }
+
+    .lhm__pills .lead-meta-v2__pill i{
+      font-size: 14px;
+    }
   }
 
   .lhm__pill{
@@ -6818,6 +7195,33 @@ position: absolute;
 
   .lead-header-mob__approval-select option{
     color: #111; /* dropdown list text */
+  }
+
+  .lead-header-mob__approval-v2{
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .lead-header-mob__approval-v2 .lead-approval-v2__pill{
+    min-width: 0;
+    padding: 6px 10px;
+    height: 30px;
+    font-size: 11px;
+  }
+
+  .lead-header-mob__approval-v2 .lead-approval-v2__iconbtn{
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+  }
+
+  .lead-header-mob__approval-v2 .lead-header-v2__approval-editor{
+    width: 190px;
+    right: 0;
+    left: auto;
   }
 
   .lead-header-mob__approval-btn{

@@ -85,6 +85,8 @@ const B2BLeadSchema = new mongoose.Schema({
     type: ObjectId
   },
   followUp: { type: ObjectId, ref: 'FollowUp' },
+  followUpCall: { type: ObjectId, ref: 'FollowUp' },
+  followUpVisit: { type: ObjectId, ref: 'FollowUp' },
   updatedBy: { type: ObjectId, ref: 'User' },
 }, {
   timestamps: true // adds createdAt and updatedAt

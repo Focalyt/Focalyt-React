@@ -363,7 +363,7 @@ router.post('/lead-categories', isCollege, async (req, res) => {
 		const safeQuestions = Array.isArray(questions)
 			? questions.map((q) => {
 				const t = q?.type;
-				const type = ['text', 'number', 'radio'].includes(t) ? t : 'text';
+				const type = ['text', 'number', 'radio', 'date'].includes(t) ? t : 'text';
 				const options = Array.isArray(q?.options)
 					? q.options.map((o) => String(o || '').trim()).filter(Boolean)
 					: [];
@@ -448,7 +448,7 @@ router.put('/lead-categories/:id', isCollege, async (req, res) => {
 			updatePayload.questions = Array.isArray(questions)
 				? questions.map((q) => {
 					const t = q?.type;
-					const type = ['text', 'number', 'radio'].includes(t) ? t : 'text';
+					const type = ['text', 'number', 'radio', 'date'].includes(t) ? t : 'text';
 					const options = Array.isArray(q?.options)
 						? q.options.map((o) => String(o || '').trim()).filter(Boolean)
 						: [];
@@ -945,7 +945,9 @@ router.get('/leads', isCollege, async (req, res) => {
 			.populate('leadCategory', 'name')
 			.populate('typeOfB2B', 'name')
 			.populate('status', 'name title substatuses')
-			.populate('followUp', 'scheduledDate status')
+			.populate('followUp', 'followUpType scheduledDate status')
+			.populate('followUpCall', 'followUpType description status scheduledDate completedDate')
+			.populate('followUpVisit', 'followUpType description status scheduledDate completedDate')
 			.populate('leadAddedBy', 'name email')
 			.populate('leadOwner', 'name email')
 			.sort(sortOptions)
@@ -1011,10 +1013,12 @@ router.get('/leads/:id', isCollege, async (req, res) => {
 			_id: req.params.id,
 			leadAddedBy: req.user._id
 		})
-			.populate('leadCategory', 'name')
+			.populate('leadCategory', 'name questions isActive')
 			.populate('typeOfB2B', 'name')
 			.populate('status', 'name')
 			.populate('followUp', 'followUpType description status scheduledDate completedDate')
+			.populate('followUpCall', 'followUpType description status scheduledDate completedDate')
+			.populate('followUpVisit', 'followUpType description status scheduledDate completedDate')
 			.populate('leadAddedBy', 'name email')
 			.populate('remark.addedBy', 'name email');
 
@@ -1821,7 +1825,10 @@ router.post('/leads/:id/followup', isCollege, async (req, res) => {
 
 		// Combine date and time
 		const [hours, minutes] = scheduledTime.split(':');
-		const scheduledDateTime = new Date(scheduledDate);
+		// If scheduledDate is yyyy-mm-dd, treat it as local date (avoid UTC shift)
+		const scheduledDateTime = /^\d{4}-\d{2}-\d{2}$/.test(String(scheduledDate))
+			? new Date(`${scheduledDate}T00:00:00`)
+			: new Date(scheduledDate);
 		scheduledDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
 
 		// Create new follow-up
@@ -1837,11 +1844,17 @@ router.post('/leads/:id/followup', isCollege, async (req, res) => {
 		const savedFollowUp = await newFollowUp.save();
 
 		// Update lead with follow-up reference and add to logs
-		lead.followUp = savedFollowUp._id;
+		const normalizedType = String(followUpType || 'Call').trim();
+		lead.followUp = savedFollowUp._id; // keep legacy "last follow-up"
+		if (normalizedType.toLowerCase() === 'visit') {
+			lead.followUpVisit = savedFollowUp._id;
+		} else {
+			lead.followUpCall = savedFollowUp._id;
+		}
 		lead.logs.push({
 			user: req.user._id,
 			timestamp: new Date(),
-			action: `Follow-up scheduled for ${scheduledDateTime.toLocaleDateString()} at ${scheduledTime}`,
+			action: `${normalizedType} follow-up scheduled for ${scheduledDateTime.toLocaleDateString()} at ${scheduledTime}`,
 			remarks: remarks
 		});
 		await lead.save();

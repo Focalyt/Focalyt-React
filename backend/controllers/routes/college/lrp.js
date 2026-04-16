@@ -6,19 +6,224 @@ const { uploadSinglefile } = require("../functions/images");
 
 const router = express.Router();
 
-const toNumberOrUndefined = (v) => {
-  if (v === undefined || v === null || v === "") return undefined;
-  const n = Number(v);
-  if (Number.isNaN(n)) return undefined;
-  return n;
+const LRP_PARTNER_TYPES = ["LRP", "Channel Partner"];
+
+const parseLeadSourceQA = (raw) => {
+  if (!raw) return null;
+  if (typeof raw === "object" && raw !== null && Array.isArray(raw.items)) return raw;
+  try {
+    const o = typeof raw === "string" ? JSON.parse(raw) : null;
+    if (o && Array.isArray(o.items)) return o;
+  } catch (_) {
+    /* ignore */
+  }
+  return null;
 };
 
-/** Extract last 10 digits for Indian mobile (optional leading 91) */
+const valueByMetaKey = (items, key) => {
+  const it = (items || []).find((x) => x && x.metaKey === key);
+  return it ? String(it.value || "").trim() : "";
+};
+
+const buildLrpMetaItems = (body, geoTaggedPhotoUrl) => {
+  const v = (k) => String(body[k] ?? "").trim();
+  return [
+    {
+      metaKey: "lrp_partnerType",
+      question: "Type of partner",
+      type: "radio",
+      options: [...LRP_PARTNER_TYPES],
+      required: true,
+      value: v("partnerType"),
+    },
+    {
+      metaKey: "lrp_implementationPartnerName",
+      question: "Field implementation partner name",
+      type: "text",
+      options: [],
+      required: true,
+      value: v("implementationPartnerName"),
+    },
+    {
+      metaKey: "lrp_visitDate",
+      question: "Visit date",
+      type: "text",
+      options: [],
+      required: true,
+      value: v("visitDate").slice(0, 10),
+    },
+    {
+      metaKey: "lrp_geoTaggedPhoto",
+      question: "Geo-tagged photograph",
+      type: "text",
+      options: [],
+      required: true,
+      value: String(geoTaggedPhotoUrl || "").trim(),
+    },
+    {
+      metaKey: "lrp_state",
+      question: "State",
+      type: "text",
+      options: [],
+      required: true,
+      value: v("state"),
+    },
+    {
+      metaKey: "lrp_district",
+      question: "District",
+      type: "text",
+      options: [],
+      required: true,
+      value: v("district"),
+    },
+  ];
+};
+
+const normalizeQaItem = (it) => {
+  const row = {
+    question: String(it?.question || "").trim(),
+    type: ["text", "number", "radio", "date"].includes(it?.type) ? it.type : "text",
+    options: Array.isArray(it?.options) ? it.options.map((o) => String(o || "").trim()).filter(Boolean) : [],
+    required: Boolean(it?.required),
+    value: String(it?.value ?? "").trim(),
+  };
+  if (it?.metaKey) row.metaKey = String(it.metaKey).trim();
+  return row;
+};
+
+const validateLeadSourceQA = (qa) => {
+  if (!qa || !Array.isArray(qa.items) || qa.items.length === 0) {
+    return "leadSourceQA with at least one question is required for this save mode";
+  }
+  for (let i = 0; i < qa.items.length; i += 1) {
+    const it = qa.items[i] || {};
+    const label = it.question || `Question ${i + 1}`;
+    const val = String(it.value ?? "").trim();
+    if (it.required && !val) {
+      return `Missing answer: ${label}`;
+    }
+    if (!val) continue;
+    const t =
+      it.type === "number"
+        ? "number"
+        : it.type === "radio"
+          ? "radio"
+          : it.type === "date"
+            ? "date"
+            : "text";
+    if (t === "number" && Number.isNaN(Number(val))) {
+      return `Invalid number for: ${label}`;
+    }
+    if (t === "date") {
+      // Expect yyyy-mm-dd (from <input type="date">)
+      const ok = /^\\d{4}-\\d{2}-\\d{2}$/.test(val);
+      if (!ok) return `Invalid date for: ${label}`;
+    }
+    if (t === "radio" && Array.isArray(it.options) && it.options.length) {
+      const ok = it.options.some((o) => String(o).trim() === val);
+      if (!ok) return `Invalid option for: ${label}`;
+    }
+  }
+  return null;
+};
+
 const extractMobile10 = (body) => {
   const explicit = (body.b2bMobile || "").replace(/\D/g, "");
   if (explicit.length >= 10) return explicit.slice(-10);
   const fromCoord = String(body.coordinatorNameContact || "").replace(/\D/g, "");
   if (fromCoord.length >= 10) return fromCoord.slice(-10);
+  const qa = parseLeadSourceQA(body.leadSourceQA);
+  if (qa?.items) {
+    for (const it of qa.items) {
+      if (it.metaKey === "lrp_visitDate" || it.metaKey === "lrp_geoTaggedPhoto") continue;
+      const digits = String(it.value || "").replace(/\D/g, "");
+      if (digits.length >= 10) return digits.slice(-10);
+    }
+  }
+  return "";
+};
+
+const extractEmailFromBody = (body) => {
+  const direct = String(body.schoolEmail || "").trim().toLowerCase();
+  if (direct && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(direct)) return direct;
+  const qa = parseLeadSourceQA(body.leadSourceQA);
+  if (qa?.items) {
+    for (const it of qa.items) {
+      if (it.metaKey) continue;
+      const v = String(it.value || "").trim().toLowerCase();
+      if (v && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return v;
+    }
+  }
+  return "";
+};
+
+const businessNameFromBody = (body) => {
+  const qa = parseLeadSourceQA(body.leadSourceQA);
+  if (qa?.items) {
+    for (const it of qa.items) {
+      if (it.metaKey) continue;
+      const v = String(it.value || "").trim();
+      if (v.length >= 2) return v.slice(0, 200);
+    }
+  }
+  return "School";
+};
+
+const concernPersonFromBody = (body) => {
+  const qa = parseLeadSourceQA(body.leadSourceQA);
+  const qLower = (s) => String(s || "").toLowerCase();
+  if (qa?.items) {
+    for (const it of qa.items) {
+      if (it.metaKey) continue;
+      if (/name|person|contact|coordinator|principal|concern/.test(qLower(it.question))) {
+        const v = String(it.value || "").trim();
+        if (v) return v.slice(0, 200);
+      }
+    }
+    const nonMeta = qa.items.filter((it) => !it.metaKey);
+    if (nonMeta.length >= 2) {
+      const v = String(nonMeta[1].value || "").trim();
+      if (v) return v.slice(0, 200);
+    }
+    if (nonMeta.length >= 1) {
+      const v0 = String(nonMeta[0].value || "").trim();
+      if (v0) return v0.slice(0, 200);
+    }
+  }
+  return "Contact";
+};
+
+const addressFromBody = (body) => {
+  const qa = parseLeadSourceQA(body.leadSourceQA);
+  const items = qa?.items || [];
+  const parts = [];
+  if (items.length) {
+    for (const it of items) {
+      if (it.metaKey && String(it.metaKey).startsWith("lrp_")) continue;
+      const ql = String(it.question || "").toLowerCase();
+      if (/address|school|institute|organization|location/.test(ql)) {
+        const val = String(it.value || "").trim();
+        if (val) parts.push(val);
+      }
+    }
+  }
+  const joined = parts.join(", ").trim();
+  if (joined) return joined.slice(0, 500);
+  return valueByMetaKey(items, "lrp_district") || String(body.district || "").trim();
+};
+
+const remarkFromBody = (body) => {
+  const direct = String(body.otherRemarks || "").trim();
+  if (direct) return direct;
+  const qa = parseLeadSourceQA(body.leadSourceQA);
+  if (qa?.items) {
+    for (const it of [...qa.items].reverse()) {
+      if (it.metaKey) continue;
+      if (/remark|note|comment|feedback/.test(String(it.question || "").toLowerCase())) {
+        return String(it.value || "").trim();
+      }
+    }
+  }
   return "";
 };
 
@@ -67,7 +272,7 @@ async function createLinkedB2BLead(req, body) {
       };
     }
 
-    const email = (body.schoolEmail || "").trim().toLowerCase();
+    const email = extractEmailFromBody(body);
     if (email) {
       const existingLead = await Lead.findOne({
         email,
@@ -120,18 +325,19 @@ async function createLinkedB2BLead(req, body) {
       }
     }
 
-    const businessName = String(body.schoolNameAddress || "School").trim().slice(0, 200);
-    const concernPersonName = String(body.decisionMaker || body.coordinatorNameContact || "Contact").trim().slice(0, 200);
+    const businessName = businessNameFromBody(body);
+    const concernPersonName = concernPersonFromBody(body);
 
-    const userRemark = String(body.otherRemarks || "").trim();
+    const userRemark = remarkFromBody(body);
 
+    const qaItems = parseLeadSourceQA(body.leadSourceQA)?.items || [];
     const leadData = {
       leadCategory: leadCategoryId,
       typeOfB2B: typeOfB2BId,
       businessName,
-      address: String(body.schoolNameAddress || "").trim(),
-      city: String(body.district || "").trim(),
-      state: String(body.state || "").trim(),
+      address: addressFromBody(body),
+      city: valueByMetaKey(qaItems, "lrp_district") || String(body.district || "").trim(),
+      state: valueByMetaKey(qaItems, "lrp_state") || String(body.state || "").trim(),
       concernPersonName,
       designation: "",
       email: email || undefined,
@@ -184,6 +390,33 @@ router.get("/by-b2b-lead/:leadId", async (req, res) => {
     return res.json({ success: true, data: item || null });
   } catch (err) {
     return res.status(400).json({ success: false, message: err?.message || "Unable to fetch LRP record" });
+  }
+});
+
+/**
+ * Load B2B lead context for the LRP wizard.
+ * We intentionally don't apply the strict `leadAddedBy` filter used in B2B CRM,
+ * because LRP can be opened from shared/assigned leads too.
+ */
+router.get("/b2b-lead/:leadId", async (req, res) => {
+  try {
+    const leadId = String(req.params.leadId || "").trim();
+    if (!mongoose.Types.ObjectId.isValid(leadId)) {
+      return res.status(400).json({ success: false, message: "Invalid leadId" });
+    }
+
+    const lead = await Lead.findById(leadId)
+      .populate("leadCategory", "name questions isActive")
+      .populate("typeOfB2B", "name")
+      .lean();
+
+    if (!lead) {
+      return res.status(404).json({ success: false, message: "Lead not found" });
+    }
+
+    return res.json({ success: true, data: lead });
+  } catch (err) {
+    return res.status(400).json({ success: false, message: err?.message || "Unable to fetch lead" });
   }
 });
 
@@ -240,49 +473,36 @@ router.post("/", async (req, res) => {
       });
     }
 
+    const categoryQA = parseLeadSourceQA(body.leadSourceQA) || {
+      items: [],
+      categoryId: body.leadCategory,
+    };
+
+    const metaItems = buildLrpMetaItems(body, geoTaggedPhoto);
+    const categoryItems = (categoryQA.items || []).map(normalizeQaItem);
+    const cidRaw = categoryQA.categoryId || body.leadCategory;
+    const cid = cidRaw && mongoose.Types.ObjectId.isValid(String(cidRaw)) ? cidRaw : undefined;
+
+    const mergedLeadSourceQA = {
+      categoryId: cid,
+      items: [...metaItems.map(normalizeQaItem), ...categoryItems],
+    };
+
+    const qaErr = validateLeadSourceQA(mergedLeadSourceQA);
+    if (qaErr) {
+      return res.status(400).json({ success: false, message: qaErr });
+    }
+
     const doc = {
       college: req.college?._id,
       createdBy: req.user?._id,
       b2bLeadId: body.b2bLeadId && mongoose.Types.ObjectId.isValid(body.b2bLeadId) ? body.b2bLeadId : undefined,
-
-      partnerType: body.partnerType,
-      implementationPartnerName: body.implementationPartnerName,
-      visitDate: body.visitDate ? new Date(body.visitDate) : body.visitDate,
-      geoTaggedPhoto,
-
-      state: body.state,
-      district: body.district,
-
-      schoolNameAddress: body.schoolNameAddress,
-      schoolType: body.schoolType,
-      schoolTypeOther: body.schoolTypeOther,
-      schoolEmail: body.schoolEmail,
-      coordinatorNameContact: body.coordinatorNameContact,
-      decisionMaker: body.decisionMaker,
-      studentsClass2to12: toNumberOrUndefined(body.studentsClass2to12),
-      hasLabs: body.hasLabs,
-      interestedWorkshop: body.interestedWorkshop,
-      avgStudentsPerClass: toNumberOrUndefined(body.avgStudentsPerClass),
-      preferredPlan: body.preferredPlan,
-      managementReadyApprove: body.managementReadyApprove,
-      meetingWithSeniorStaff: body.meetingWithSeniorStaff,
-      nextMeetingDate: body.nextMeetingDate ? new Date(body.nextMeetingDate) : body.nextMeetingDate,
-      hasComputerLab: body.hasComputerLab,
-      computersAvailable: toNumberOrUndefined(body.computersAvailable),
-
-      fftlClasses: body.fftlClasses,
-      openForPartnership: body.openForPartnership,
-      teachersAvailable: body.teachersAvailable,
-      proposalExplainedSubmitted: body.proposalExplainedSubmitted,
-      poExpectedTimeline: body.poExpectedTimeline,
-      leadStatus: body.leadStatus,
-      lockLead: body.lockLead,
-      otherRemarks: body.otherRemarks,
+      leadSourceQA: mergedLeadSourceQA,
     };
 
     const created = await LRP.create(doc);
 
-    const b2b = await createLinkedB2BLead(req, body);
+    const b2b = await createLinkedB2BLead(req, { ...body, leadSourceQA: mergedLeadSourceQA });
 
     // If a new B2B lead was created, link this LRP record to it
     try {

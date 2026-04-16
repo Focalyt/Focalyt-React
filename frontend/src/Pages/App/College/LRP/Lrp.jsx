@@ -1,123 +1,25 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 
 const PARTNER_TYPES = ["LRP", "Channel Partner"];
-const STATES = ["Punjab", "Haryana"];
 
-const DISTRICTS_BY_STATE = {
-  Punjab: [
-    "Amritsar",
-    "Barnala",
-    "Bathinda",
-    "Faridkot",
-    "Fatehgarh Sahib",
-    "Fazilka",
-    "Ferozepur",
-    "Gurdaspur",
-    "Hoshiarpur",
-    "Jalandhar",
-    "Kapurthala",
-    "Ludhiana",
-    "Mansa",
-    "Moga",
-    "Muktsar",
-    "Pathankot",
-    "Patiala",
-    "Rupnagar",
-    "S.A.S. Nagar (Mohali)",
-    "Sangrur",
-    "Shahid Bhagat Singh Nagar (Nawanshahr)",
-    "Tarn Taran",
-  ],
-  Haryana: [
-    "Ambala",
-    "Bhiwani",
-    "Charkhi Dadri",
-    "Faridabad",
-    "Fatehabad",
-    "Gurugram",
-    "Hisar",
-    "Jhajjar",
-    "Jind",
-    "Kaithal",
-    "Karnal",
-    "Kurukshetra",
-    "Mahendragarh",
-    "Nuh",
-    "Palwal",
-    "Panchkula",
-    "Panipat",
-    "Rewari",
-    "Rohtak",
-    "Sirsa",
-    "Sonipat",
-    "Yamunanagar",
-  ],
+const MAX_STEPS = 3;
+
+const readLrpMeta = (items, metaKey) => {
+  const it = (items || []).find((x) => x && x.metaKey === metaKey);
+  return it ? String(it.value || "").trim() : "";
 };
-
-const YES_NO = ["Yes", "No"];
-const SCHOOL_TYPES = ["CBSE", "ICSE", "HBSE", "PSEB", "Other"];
-const SUBSCRIPTION_PLANS = [
-  "Basic (1 years)",
-  "Growth (1 year)",
-  "Premium (1 year)",
-];
-const FFTL_CLASSES = ["2.5th", "6th-9th", "10th-12th", "2th - 12th"];
-const PO_TIMELINE = ["within 7 Days", "witin15 days", "within21 days", "within 30 days"];
-const LEAD_STATUS = ["hot", "cold", "warm"];
-const LOCK_LEAD = ["15 days", "30 days", "45 days", "60 days"];
-
-const extractB2bMobileDigits = (form) => {
-  const explicit = String(form.b2bMobile || "").replace(/\D/g, "");
-  if (explicit.length >= 10) return explicit.slice(-10);
-  const fromCoord = String(form.coordinatorNameContact || "").replace(/\D/g, "");
-  if (fromCoord.length >= 10) return fromCoord.slice(-10);
-  return "";
-};
-
-const isValidB2bMobile = (m) => /^[6-9]\d{9}$/.test(m);
 
 const createInitialForm = () => ({
-  // Stage 1 — also used for linked B2B lead
+  b2bLeadId: "",
   leadCategory: "",
   typeOfB2B: "",
   partnerType: "",
   implementationPartnerName: "",
   visitDate: "",
   geoTaggedPhoto: null,
-
-  // Stage 2
-  state: "Punjab",
+  state: "",
   district: "",
-
-  // Stage 3
-  schoolNameAddress: "",
-  schoolType: "",
-  schoolTypeOther: "",
-  schoolEmail: "",
-  coordinatorNameContact: "",
-  b2bMobile: "",
-  decisionMaker: "",
-  studentsClass2to12: "",
-  hasLabs: "",
-  interestedWorkshop: "",
-  avgStudentsPerClass: "",
-  preferredPlan: "",
-  managementReadyApprove: "",
-  meetingWithSeniorStaff: "",
-  nextMeetingDate: "",
-  hasComputerLab: "",
-  computersAvailable: "",
-
-  // Stage 4
-  fftlClasses: "",
-  openForPartnership: "",
-  teachersAvailable: "",
-  proposalExplainedSubmitted: "",
-  poExpectedTimeline: "",
-  leadStatus: "",
-  lockLead: "",
-  otherRemarks: "",
 });
 
 const Card = ({ number, title, children }) => (
@@ -242,6 +144,10 @@ function Lrp() {
   const searchParams = useMemo(() => new URLSearchParams(location?.search || ""), [location?.search]);
   const isEmbedded = searchParams.get("embedded") === "1";
   const mode = (searchParams.get("mode") || "add").toLowerCase(); // add | view
+  const linkedB2bLeadId = useMemo(() => {
+    const raw = searchParams.get("b2bLeadId") || searchParams.get("leadId") || "";
+    return String(raw).trim();
+  }, [searchParams]);
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(() => createInitialForm());
   const [touched, setTouched] = useState({});
@@ -249,31 +155,87 @@ function Lrp() {
   const [loadingExisting, setLoadingExisting] = useState(false);
   const [leadCategoryOptions, setLeadCategoryOptions] = useState([]);
   const [typeOfB2BOptions, setTypeOfB2BOptions] = useState([]);
+  const [categoryQuestions, setCategoryQuestions] = useState([]);
+  const [leadSourceAnswers, setLeadSourceAnswers] = useState({});
+  const [loadingB2bLeadContext, setLoadingB2bLeadContext] = useState(false);
+  const [b2bLeadLoadError, setB2bLeadLoadError] = useState("");
+  const [viewLeadSourceQA, setViewLeadSourceQA] = useState(null);
+  const stateInputRef = useRef(null);
+  const districtInputRef = useRef(null);
+  const stateAutoRef = useRef(null);
+  const districtAutoRef = useRef(null);
+  const [googleReady, setGoogleReady] = useState(Boolean(window.google && window.google.maps && window.google.maps.places));
 
-  const districts = useMemo(() => {
-    return DISTRICTS_BY_STATE[form.state] || [];
-  }, [form.state]);
-
+  // Load Google Maps Places library (India-only autocomplete for state/district)
   useEffect(() => {
-    // Keep district in sync with state selection
-    if (!districts.includes(form.district)) {
-      setForm((prev) => ({ ...prev, district: "" }));
-    }
-  }, [districts, form.district]);
+    if (googleReady) return;
 
-  useEffect(() => {
-    // Clear dependent fields when "Other" is not selected
-    if (form.schoolType !== "Other" && form.schoolTypeOther) {
-      setForm((prev) => ({ ...prev, schoolTypeOther: "" }));
-    }
-  }, [form.schoolType, form.schoolTypeOther]);
+    const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) return;
 
+    if (document.querySelector('script[src*="maps.googleapis.com/maps/api"]')) return;
+
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => setGoogleReady(true);
+    document.head.appendChild(script);
+  }, [googleReady]);
+
+  // Init Places Autocomplete for State + District (step 2)
   useEffect(() => {
-    // Computers available only meaningful when hasComputerLab == Yes
-    if (form.hasComputerLab !== "Yes" && form.computersAvailable) {
-      setForm((prev) => ({ ...prev, computersAvailable: "" }));
+    if (!googleReady) return;
+    if (step !== 2) return;
+    if (!window.google?.maps?.places) return;
+
+    const getFromComponents = (components, type) => {
+      const c = (components || []).find((x) => Array.isArray(x?.types) && x.types.includes(type));
+      return c ? String(c.long_name || c.short_name || "").trim() : "";
+    };
+
+    // State autocomplete
+    if (stateInputRef.current && !stateAutoRef.current) {
+      const ac = new window.google.maps.places.Autocomplete(stateInputRef.current, {
+        types: ["(regions)"],
+        componentRestrictions: { country: "IN" },
+        fields: ["address_components"],
+      });
+      ac.addListener("place_changed", () => {
+        const place = ac.getPlace();
+        const comps = place?.address_components || [];
+        const state = getFromComponents(comps, "administrative_area_level_1");
+        if (state) {
+          setForm((prev) => ({ ...prev, state, district: "" }));
+        }
+      });
+      stateAutoRef.current = ac;
     }
-  }, [form.hasComputerLab, form.computersAvailable]);
+
+    // District autocomplete
+    if (districtInputRef.current && !districtAutoRef.current) {
+      const ac = new window.google.maps.places.Autocomplete(districtInputRef.current, {
+        types: ["(regions)"],
+        componentRestrictions: { country: "IN" },
+        fields: ["address_components"],
+      });
+      ac.addListener("place_changed", () => {
+        const place = ac.getPlace();
+        const comps = place?.address_components || [];
+        const state = getFromComponents(comps, "administrative_area_level_1");
+        const district =
+          getFromComponents(comps, "administrative_area_level_2") ||
+          getFromComponents(comps, "locality") ||
+          getFromComponents(comps, "sublocality");
+        setForm((prev) => ({
+          ...prev,
+          state: state || prev.state,
+          district: district || prev.district,
+        }));
+      });
+      districtAutoRef.current = ac;
+    }
+  }, [googleReady, step]);
 
   useEffect(() => {
     const loadB2BOptions = async () => {
@@ -327,6 +289,105 @@ function Lrp() {
   }, [searchParams]);
 
   useEffect(() => {
+    setViewLeadSourceQA(null);
+    setCategoryQuestions([]);
+    setLeadSourceAnswers({});
+    setB2bLeadLoadError("");
+  }, [mode, linkedB2bLeadId]);
+
+  useEffect(() => {
+    if (mode !== "add" || !linkedB2bLeadId) return;
+
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+    const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+    const token = userData.token;
+    if (!backendUrl || !token) return;
+
+    const run = async () => {
+      setLoadingB2bLeadContext(true);
+      setB2bLeadLoadError("");
+      try {
+        const res = await fetch(`${backendUrl}/college/lrp/b2b-lead/${linkedB2bLeadId}`, {
+          headers: { "x-auth": token },
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json?.success || !json?.data) {
+          setB2bLeadLoadError(json?.message || "Could not load lead for this report.");
+          setCategoryQuestions([]);
+          return;
+        }
+        const lead = json.data;
+        const cat = lead.leadCategory;
+        const catId = cat && typeof cat === "object" ? cat._id : cat;
+        const typeId = lead.typeOfB2B && typeof lead.typeOfB2B === "object" ? lead.typeOfB2B._id : lead.typeOfB2B;
+        const qs = cat && typeof cat === "object" && Array.isArray(cat.questions) ? cat.questions : [];
+        setCategoryQuestions(qs.filter((q) => q && String(q.question || "").trim()));
+        setLeadSourceAnswers({});
+
+        setForm((prev) => {
+          const st = String(lead.state || prev.state || "Punjab");
+          const city = String(lead.city || "").trim();
+          const dist = city || prev.district;
+          return {
+            ...prev,
+            b2bLeadId: linkedB2bLeadId,
+            leadCategory: catId ? String(catId) : prev.leadCategory,
+            typeOfB2B: typeId ? String(typeId) : prev.typeOfB2B,
+            state: st,
+            district: dist,
+          };
+        });
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error("[LRP] B2B lead load failed", e);
+        setB2bLeadLoadError("Could not load B2B lead for this report.");
+        setCategoryQuestions([]);
+      } finally {
+        setLoadingB2bLeadContext(false);
+      }
+    };
+
+    run();
+  }, [mode, linkedB2bLeadId]);
+
+  useEffect(() => {
+    if (mode !== "add" || linkedB2bLeadId) return;
+    const catId = form.leadCategory;
+    if (!catId) {
+      setCategoryQuestions([]);
+      setLeadSourceAnswers({});
+      return;
+    }
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+    const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+    const token = userData.token;
+    if (!backendUrl || !token) return;
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const res = await fetch(`${backendUrl}/college/b2b/lead-categories/${catId}`, {
+          headers: { "x-auth": token },
+        });
+        const json = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!res.ok || !json?.status || !json?.data) {
+          setCategoryQuestions([]);
+          return;
+        }
+        const qs = Array.isArray(json.data.questions) ? json.data.questions : [];
+        setCategoryQuestions(qs.filter((q) => q && String(q.question || "").trim()));
+        setLeadSourceAnswers({});
+      } catch {
+        if (!cancelled) setCategoryQuestions([]);
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, linkedB2bLeadId, form.leadCategory]);
+
+  useEffect(() => {
     const b2bLeadId = searchParams.get("b2bLeadId") || searchParams.get("leadId") || "";
     if (!b2bLeadId) return;
     if (mode !== "view") return;
@@ -347,43 +408,26 @@ function Lrp() {
         if (!json?.data) return;
 
         const d = json.data;
-        // Populate form (file cannot be rehydrated, keep geoTaggedPhoto string as placeholder)
+        if (d?.leadSourceQA?.items?.length) {
+          setViewLeadSourceQA(d.leadSourceQA);
+        } else {
+          setViewLeadSourceQA(null);
+        }
+        const catIdFromQa =
+          d.leadSourceQA?.categoryId && typeof d.leadSourceQA.categoryId === "object"
+            ? d.leadSourceQA.categoryId._id
+            : d.leadSourceQA?.categoryId;
+        const qaItems = d.leadSourceQA?.items || [];
         setForm((prev) => ({
           ...prev,
           b2bLeadId,
-          leadCategory: d.leadCategory || prev.leadCategory,
-          typeOfB2B: d.typeOfB2B || prev.typeOfB2B,
-          partnerType: d.partnerType || "",
-          implementationPartnerName: d.implementationPartnerName || "",
-          visitDate: d.visitDate ? String(d.visitDate).slice(0, 10) : "",
+          leadCategory: catIdFromQa ? String(catIdFromQa) : prev.leadCategory,
+          partnerType: readLrpMeta(qaItems, "lrp_partnerType"),
+          implementationPartnerName: readLrpMeta(qaItems, "lrp_implementationPartnerName"),
+          visitDate: readLrpMeta(qaItems, "lrp_visitDate"),
           geoTaggedPhoto: null,
-          state: d.state || prev.state,
-          district: d.district || "",
-          schoolNameAddress: d.schoolNameAddress || "",
-          schoolType: d.schoolType || "",
-          schoolTypeOther: d.schoolTypeOther || "",
-          schoolEmail: d.schoolEmail || "",
-          coordinatorNameContact: d.coordinatorNameContact || "",
-          b2bMobile: d.b2bMobile || "",
-          decisionMaker: d.decisionMaker || "",
-          studentsClass2to12: d.studentsClass2to12 ?? "",
-          hasLabs: d.hasLabs || "",
-          interestedWorkshop: d.interestedWorkshop || "",
-          avgStudentsPerClass: d.avgStudentsPerClass ?? "",
-          preferredPlan: d.preferredPlan || "",
-          managementReadyApprove: d.managementReadyApprove || "",
-          meetingWithSeniorStaff: d.meetingWithSeniorStaff || "",
-          nextMeetingDate: d.nextMeetingDate ? String(d.nextMeetingDate).slice(0, 10) : "",
-          hasComputerLab: d.hasComputerLab || "",
-          computersAvailable: d.computersAvailable ?? "",
-          fftlClasses: d.fftlClasses || "",
-          openForPartnership: d.openForPartnership || "",
-          teachersAvailable: d.teachersAvailable || "",
-          proposalExplainedSubmitted: d.proposalExplainedSubmitted || "",
-          poExpectedTimeline: d.poExpectedTimeline || "",
-          leadStatus: d.leadStatus || "",
-          lockLead: d.lockLead || "",
-          otherRemarks: d.otherRemarks || "",
+          state: readLrpMeta(qaItems, "lrp_state") || prev.state,
+          district: readLrpMeta(qaItems, "lrp_district"),
         }));
         setTouched({});
         setStep(1);
@@ -424,19 +468,7 @@ function Lrp() {
     setTouched((prev) => ({ ...prev, [key]: true }));
   };
 
-  const isEmailValid = (email) => {
-    const v = (email || "").trim();
-    if (!v) return false;
-    // Simple check good enough for UI validation
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-  };
-
   const isNonEmpty = (v) => String(v || "").trim().length > 0;
-  const isPositiveInt = (v) => {
-    if (v === "" || v === null || v === undefined) return false;
-    const n = Number(v);
-    return Number.isInteger(n) && n >= 0;
-  };
 
   const getErrorsForStep = (s) => {
     const e = {};
@@ -456,43 +488,39 @@ function Lrp() {
     }
 
     if (s === 3) {
-      if (!isNonEmpty(form.schoolNameAddress)) e.schoolNameAddress = "Required";
-      if (!isNonEmpty(form.schoolType)) e.schoolType = "Required";
-      if (form.schoolType === "Other" && !isNonEmpty(form.schoolTypeOther)) e.schoolTypeOther = "Required";
-      if (!isEmailValid(form.schoolEmail)) e.schoolEmail = "Valid email required";
-      if (!isNonEmpty(form.coordinatorNameContact)) e.coordinatorNameContact = "Required";
-      const b2bM = extractB2bMobileDigits(form);
-      if (!isValidB2bMobile(b2bM)) {
-        e.b2bMobile =
-          "Enter 10-digit mobile (or include 10 digits in coordinator contact) for B2B lead";
+      if (mode !== "add") return e;
+      if (!categoryQuestions.length) {
+        e._leadSourceEmpty =
+          "No questions are configured for this lead source. Add questions under B2B Lead Source settings.";
       }
-      if (!isNonEmpty(form.decisionMaker)) e.decisionMaker = "Required";
-      if (!isPositiveInt(form.studentsClass2to12)) e.studentsClass2to12 = "Number required";
-      if (!isNonEmpty(form.hasLabs)) e.hasLabs = "Required";
-      if (!isNonEmpty(form.interestedWorkshop)) e.interestedWorkshop = "Required";
-      if (!isPositiveInt(form.avgStudentsPerClass)) e.avgStudentsPerClass = "Number required";
-      if (!isNonEmpty(form.preferredPlan)) e.preferredPlan = "Required";
-      if (!isNonEmpty(form.managementReadyApprove)) e.managementReadyApprove = "Required";
-      if (!isNonEmpty(form.meetingWithSeniorStaff)) e.meetingWithSeniorStaff = "Required";
-      if (!isNonEmpty(form.nextMeetingDate)) e.nextMeetingDate = "Required";
-      if (!isNonEmpty(form.hasComputerLab)) e.hasComputerLab = "Required";
-      if (form.hasComputerLab === "Yes" && !isPositiveInt(form.computersAvailable)) e.computersAvailable = "Number required";
-    }
-
-    if (s === 4) {
-      if (!isNonEmpty(form.fftlClasses)) e.fftlClasses = "Required";
-      if (!isNonEmpty(form.openForPartnership)) e.openForPartnership = "Required";
-      if (!isNonEmpty(form.teachersAvailable)) e.teachersAvailable = "Required";
-      if (!isNonEmpty(form.proposalExplainedSubmitted)) e.proposalExplainedSubmitted = "Required";
-      if (!isNonEmpty(form.poExpectedTimeline)) e.poExpectedTimeline = "Required";
-      if (!isNonEmpty(form.leadStatus)) e.leadStatus = "Required";
-      if (!isNonEmpty(form.lockLead)) e.lockLead = "Required";
+      categoryQuestions.forEach((q, i) => {
+        if (!q?.required) return;
+        if (!String(leadSourceAnswers[i] ?? "").trim()) {
+          e[`ls_${i}`] = "Required";
+        }
+      });
+      categoryQuestions.forEach((q, i) => {
+        const v = String(leadSourceAnswers[i] ?? "").trim();
+        if (!v || q?.type !== "number") return;
+        if (Number.isNaN(Number(v))) {
+          e[`ls_${i}`] = "Enter a valid number";
+        }
+      });
+      categoryQuestions.forEach((q, i) => {
+        const v = String(leadSourceAnswers[i] ?? "").trim();
+        if (!v || q?.type !== "radio" || !Array.isArray(q.options) || !q.options.length) return;
+        const ok = q.options.some((o) => String(o).trim() === v);
+        if (!ok) e[`ls_${i}`] = "Choose one of the listed options";
+      });
     }
 
     return e;
   };
 
-  const errors = useMemo(() => getErrorsForStep(step), [step, form]);
+  const errors = useMemo(
+    () => getErrorsForStep(step),
+    [step, form, mode, categoryQuestions, leadSourceAnswers]
+  );
   const hasStepErrors = Object.keys(errors).length > 0;
 
   const touchAllForStep = (s) => {
@@ -510,15 +538,17 @@ function Lrp() {
   const onNext = () => {
     touchAllForStep(step);
     if (Object.keys(getErrorsForStep(step)).length > 0) return;
-    setStep((prev) => Math.min(4, prev + 1));
+    setStep((prev) => Math.min(MAX_STEPS, prev + 1));
   };
 
   const onBack = () => setStep((prev) => Math.max(1, prev - 1));
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    [1, 2, 3, 4].forEach((s) => touchAllForStep(s));
-    const hasErrors = [1, 2, 3, 4].some((s) => Object.keys(getErrorsForStep(s)).length > 0);
+    if (mode !== "add") return;
+    const stepsToValidate = [1, 2, 3];
+    stepsToValidate.forEach((s) => touchAllForStep(s));
+    const hasErrors = stepsToValidate.some((s) => Object.keys(getErrorsForStep(s)).length > 0);
     if (hasErrors) return;
 
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -544,6 +574,20 @@ function Lrp() {
         fd.append("file", form.geoTaggedPhoto);
       }
 
+      if (mode === "add" && categoryQuestions.length) {
+        const payload = {
+          categoryId: form.leadCategory,
+          items: categoryQuestions.map((q, i) => ({
+            question: q.question || "",
+            type: ["text", "number", "radio", "date"].includes(q.type) ? q.type : "text",
+            options: Array.isArray(q.options) ? q.options : [],
+            required: !!q.required,
+            value: String(leadSourceAnswers[i] ?? "").trim(),
+          })),
+        };
+        fd.append("leadSourceQA", JSON.stringify(payload));
+      }
+
       const res = await fetch(`${backendUrl}/college/lrp`, {
         method: "POST",
         headers: { "x-auth": token },
@@ -566,6 +610,7 @@ function Lrp() {
         ...createInitialForm(),
         b2bLeadId: prev.b2bLeadId || searchParams.get("b2bLeadId") || searchParams.get("leadId") || "",
       }));
+      setLeadSourceAnswers({});
       setTouched({});
       setStep(1);
     } catch (err) {
@@ -608,9 +653,7 @@ function Lrp() {
           </div>
           <div style={{ flex: "1 1 auto" }}>
             <h2 style={{ margin: 0, fontWeight: 800, fontSize: "22px" }}>Lead Report</h2>
-            <p style={{ margin: "4px 0 0", opacity: 0.85, fontSize: "13px" }}>
-              Step {step} of 4 {hasStepErrors && <span style={{ marginLeft: 8, opacity: 0.9 }}>(Fix required fields)</span>}
-            </p>
+           
           </div>
         </div>
       )}
@@ -618,6 +661,23 @@ function Lrp() {
       {loadingExisting && (
         <div style={{ marginBottom: 14, fontSize: 13, fontWeight: 700, color: "#475569" }}>
           Loading existing report...
+        </div>
+      )}
+
+      {b2bLeadLoadError && mode === "add" && linkedB2bLeadId && (
+        <div
+          style={{
+            marginBottom: 14,
+            padding: "12px 14px",
+            borderRadius: 10,
+            background: "#fef2f2",
+            border: "1px solid #fecaca",
+            color: "#b91c1c",
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          {b2bLeadLoadError}
         </div>
       )}
 
@@ -636,7 +696,7 @@ function Lrp() {
           <div>
             <h2 style={{ margin: 0, fontWeight: 800, fontSize: "20px", color: "#881337" }}>Lead Report</h2>
             <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: "13px" }}>
-              Step {step} of 4 {hasStepErrors && <span style={{ marginLeft: 8 }}>(Fix required fields)</span>}
+              Step {step} of {MAX_STEPS} {hasStepErrors && <span style={{ marginLeft: 8 }}>(Fix required fields)</span>}
             </p>
           </div>
           {form.b2bLeadId && (
@@ -650,14 +710,19 @@ function Lrp() {
       <form onSubmit={onSubmit}>
         {step === 1 && (
           <Card number={1} title="Partner & Visit Details">
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" , alignItems: "flex-end"}}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "flex-end" }}>
               <div style={{ flex: "1 1 240px", minWidth: 220 }}>
                 <label style={lblStyle}>B2B lead category {reqStar}</label>
                 <select
                   value={form.leadCategory}
                   onChange={(e) => setValue("leadCategory", e.target.value)}
                   onBlur={() => markTouched("leadCategory")}
-                  style={fldStyle}
+                  disabled={mode === "add" && !!linkedB2bLeadId}
+                  style={{
+                    ...fldStyle,
+                    opacity: mode === "add" && linkedB2bLeadId ? 0.75 : 1,
+                    cursor: mode === "add" && linkedB2bLeadId ? "not-allowed" : "default",
+                  }}
                 >
                   <option value="">Select category</option>
                   {leadCategoryOptions.map((o) => (
@@ -668,13 +733,19 @@ function Lrp() {
                 </select>
                 <FieldError name="leadCategory" />
               </div>
+
               <div style={{ flex: "1 1 240px", minWidth: 220 }}>
                 <label style={lblStyle}>B2B type {reqStar}</label>
                 <select
                   value={form.typeOfB2B}
                   onChange={(e) => setValue("typeOfB2B", e.target.value)}
                   onBlur={() => markTouched("typeOfB2B")}
-                  style={fldStyle}
+                  disabled={mode === "add" && !!linkedB2bLeadId}
+                  style={{
+                    ...fldStyle,
+                    opacity: mode === "add" && linkedB2bLeadId ? 0.75 : 1,
+                    cursor: mode === "add" && linkedB2bLeadId ? "not-allowed" : "default",
+                  }}
                 >
                   <option value="">Select type</option>
                   {typeOfB2BOptions.map((o) => (
@@ -685,11 +756,7 @@ function Lrp() {
                 </select>
                 <FieldError name="typeOfB2B" />
               </div>
-              <div style={{ flex: "1 1 100%", minWidth: 220 }}>
-                <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>
-                  These map to the same B2B lead as <strong>Add Lead</strong> in Sales B2B. School mobile can be entered in step 3 (coordinator or B2B mobile field).
-                </p>
-              </div>
+
               <div style={{ flex: "1 1 240px", minWidth: 220 }}>
                 <label style={lblStyle}>Type of partner {reqStar}</label>
                 <select
@@ -709,7 +776,7 @@ function Lrp() {
               </div>
 
               <div style={{ flex: "1 1 360px", minWidth: 260 }}>
-                <label style={lblStyle}>Field Implementation Partner Name {reqStar}</label>
+                <label style={lblStyle}>Field implementation partner name {reqStar}</label>
                 <input
                   type="text"
                   value={form.implementationPartnerName}
@@ -723,7 +790,7 @@ function Lrp() {
               </div>
 
               <div style={{ flex: "1 1 220px", minWidth: 200 }}>
-                <label style={lblStyle}>Visit Date {reqStar}</label>
+                <label style={lblStyle}>Visit date {reqStar}</label>
                 <input
                   type="date"
                   value={form.visitDate}
@@ -735,7 +802,7 @@ function Lrp() {
               </div>
 
               <div style={{ flex: "1 1 320px", minWidth: 260 }}>
-                <label style={lblStyle}>Upload Geo-Tagged Photograph (During Visit) {reqStar}</label>
+                <label style={lblStyle}>Upload geo-tagged photograph (during visit) {reqStar}</label>
                 <input
                   type="file"
                   accept="image/*"
@@ -759,39 +826,32 @@ function Lrp() {
 
         {step === 2 && (
           <Card number={2} title="State & District">
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" , alignItems: "flex-end" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "flex-end" }}>
               <div style={{ flex: "1 1 240px", minWidth: 220 }}>
                 <label style={lblStyle}>State {reqStar}</label>
-                <select
+                <input
+                  ref={stateInputRef}
                   value={form.state}
                   onChange={(e) => setValue("state", e.target.value)}
                   onBlur={() => markTouched("state")}
+                  placeholder={googleReady ? "Start typing state…" : "Loading Google…"}
+                  autoComplete="off"
                   style={fldStyle}
-                >
-                  {STATES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
+                />
                 <FieldError name="state" />
               </div>
 
               <div style={{ flex: "1 1 280px", minWidth: 240 }}>
                 <label style={lblStyle}>District {reqStar}</label>
-                <select
+                <input
+                  ref={districtInputRef}
                   value={form.district}
                   onChange={(e) => setValue("district", e.target.value)}
                   onBlur={() => markTouched("district")}
+                  placeholder={googleReady ? "Start typing district…" : "Loading Google…"}
+                  autoComplete="off"
                   style={fldStyle}
-                >
-                  <option value="">Choose</option>
-                  {districts.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
+                />
                 <FieldError name="district" />
               </div>
             </div>
@@ -801,416 +861,96 @@ function Lrp() {
         )}
 
         {step === 3 && (
-          <Card number={3} title="School Details">
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "16px"  , alignItems: "flex-end"}}>
-              <div style={{ flex: "1 1 420px", minWidth: 260 }}>
-                <label style={lblStyle}>School Name & Address? {reqStar}</label>
-                <input
-                  value={form.schoolNameAddress}
-                  onChange={(e) => setValue("schoolNameAddress", e.target.value)}
-                  onBlur={() => markTouched("schoolNameAddress")}
-                  placeholder="Enter school name and address"
-                  style={fldStyle}
-                />
-                <FieldError name="schoolNameAddress" />
-              </div>
-
-              <div style={{ flex: "1 1 220px", minWidth: 200 }}>
-                <label style={lblStyle}>Type of School {reqStar}</label>
-                <select
-                  value={form.schoolType}
-                  onChange={(e) => setValue("schoolType", e.target.value)}
-                  onBlur={() => markTouched("schoolType")}
-                  style={fldStyle}
-                >
-                  <option value="">Choose</option>
-                  {SCHOOL_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-                <FieldError name="schoolType" />
-              </div>
-
-              {form.schoolType === "Other" && (
-                <div style={{ flex: "1 1 220px", minWidth: 200 }}>
-                  <label style={lblStyle}>Other school type {reqStar}</label>
-                  <input
-                    value={form.schoolTypeOther}
-                    onChange={(e) => setValue("schoolTypeOther", e.target.value)}
-                    onBlur={() => markTouched("schoolTypeOther")}
-                    placeholder="Enter school board/type"
-                    style={fldStyle}
-                  />
-                  <FieldError name="schoolTypeOther" />
+          <Card number={3} title="Lead source details">
+            {mode === "view" ? (
+              viewLeadSourceQA?.items?.length ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  {viewLeadSourceQA.items
+                    .filter((it) => it && !it.metaKey)
+                    .map((item, i) => (
+                      <div
+                        key={`${i}-${item.question}`}
+                        style={{
+                          paddingBottom: 12,
+                          borderBottom: i < viewLeadSourceQA.items.length - 1 ? "1px solid #f1f5f9" : "none",
+                        }}
+                      >
+                        <div style={lblStyle}>{item.question}</div>
+                        <div style={{ fontSize: 14, color: "#0f172a", fontWeight: 600 }}>
+                          {String(item.value || "").trim() ? item.value : "—"}
+                        </div>
+                      </div>
+                    ))}
                 </div>
-              )}
+              ) : (
+                <p style={{ margin: 0, fontSize: 14, color: "#64748b", fontWeight: 600 }}>
+                  No questionnaire on file for this report.
+                </p>
+              )
+            ) : (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "flex-end" }}>
+                {linkedB2bLeadId && loadingB2bLeadContext && (
+                  <div style={{ flex: "1 1 100%", fontSize: 13, color: "#64748b", fontWeight: 600 }}>
+                    Loading lead source questionnaire…
+                  </div>
+                )}
+                {(!linkedB2bLeadId || !loadingB2bLeadContext) &&
+                  categoryQuestions.map((q, i) => (
+                    <div key={`${i}-${q.question}`} style={{ flex: "1 1 360px", minWidth: 240 }}>
+                      <label style={lblStyle}>
+                        {q.question} {q.required ? reqStar : null}
+                      </label>
 
-              <div style={{ flex: "1 1 260px", minWidth: 220 }}>
-                <label style={lblStyle}>School Email id {reqStar}</label>
-                <input
-                  type="email"
-                  value={form.schoolEmail}
-                  onChange={(e) => setValue("schoolEmail", e.target.value)}
-                  onBlur={() => markTouched("schoolEmail")}
-                  placeholder="school@example.com"
-                  style={fldStyle}
-                />
-                <FieldError name="schoolEmail" />
-              </div>
+                      {q.type === "radio" ? (
+                        <select
+                          value={leadSourceAnswers[i] ?? ""}
+                          onChange={(e) => setLeadSourceAnswers((prev) => ({ ...prev, [i]: e.target.value }))}
+                          onBlur={() => markTouched(`ls_${i}`)}
+                          style={fldStyle}
+                        >
+                          <option value="">Choose</option>
+                          {(q.options || []).map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                      ) : q.type === "number" ? (
+                        <input
+                          inputMode="decimal"
+                          value={leadSourceAnswers[i] ?? ""}
+                          onChange={(e) =>
+                            setLeadSourceAnswers((prev) => ({
+                              ...prev,
+                              [i]: e.target.value.replace(/[^\d.-]/g, ""),
+                            }))
+                          }
+                          onBlur={() => markTouched(`ls_${i}`)}
+                          style={fldStyle}
+                        />
+                      ) : q.type === "date" ? (
+                        <input
+                          type="date"
+                          value={leadSourceAnswers[i] ?? ""}
+                          onChange={(e) => setLeadSourceAnswers((prev) => ({ ...prev, [i]: e.target.value }))}
+                          onBlur={() => markTouched(`ls_${i}`)}
+                          style={fldStyle}
+                        />
+                      ) : (
+                        <input
+                          value={leadSourceAnswers[i] ?? ""}
+                          onChange={(e) => setLeadSourceAnswers((prev) => ({ ...prev, [i]: e.target.value }))}
+                          onBlur={() => markTouched(`ls_${i}`)}
+                          style={fldStyle}
+                        />
+                      )}
 
-              <div style={{ flex: "1 1 360px", minWidth: 260 }}>
-                <label style={lblStyle}>Name and Contact number of the coordinator? {reqStar}</label>
-                <input
-                  value={form.coordinatorNameContact}
-                  onChange={(e) => setValue("coordinatorNameContact", e.target.value)}
-                  onBlur={() => markTouched("coordinatorNameContact")}
-                  placeholder="Name - 10 digit number"
-                  style={fldStyle}
-                />
-                <FieldError name="coordinatorNameContact" />
-              </div>
-
-              <div style={{ flex: "1 1 220px", minWidth: 200 }}>
-                <label style={lblStyle}>B2B mobile (optional if in coordinator)</label>
-                <input
-                  type="tel"
-                  maxLength={10}
-                  inputMode="numeric"
-                  value={form.b2bMobile}
-                  onChange={(e) => setValue("b2bMobile", e.target.value.replace(/[^\d]/g, "").slice(0, 10))}
-                  onBlur={() => markTouched("b2bMobile")}
-                  placeholder="10-digit (if not in coordinator)"
-                  style={fldStyle}
-                />
-                {/* <div style={{ marginTop: 4, fontSize: 11, color: "#64748b" }}>
-                  Required for linked B2B lead if coordinator line has no mobile.
-                </div> */}
-                <FieldError name="b2bMobile" />
-              </div>
-
-              <div style={{ flex: "1 1 280px", minWidth: 240 }}>
-                <label style={lblStyle}>Who is the decision maker in the school {reqStar}</label>
-                <input
-                  value={form.decisionMaker}
-                  onChange={(e) => setValue("decisionMaker", e.target.value)}
-                  onBlur={() => markTouched("decisionMaker")}
-                  placeholder="Principal / Owner / Director ..."
-                  style={fldStyle}
-                />
-                <FieldError name="decisionMaker" />
-              </div>
-
-              <div style={{ flex: "1 1 240px", minWidth: 220 }}>
-                <label style={lblStyle}>Number of Students (Class 2–12) {reqStar}</label>
-                <input
-                  inputMode="numeric"
-                  value={form.studentsClass2to12}
-                  onChange={(e) => setValue("studentsClass2to12", e.target.value.replace(/[^\d]/g, ""))}
-                  onBlur={() => markTouched("studentsClass2to12")}
-                  placeholder="e.g. 850"
-                  style={fldStyle}
-                />
-                <FieldError name="studentsClass2to12" />
-              </div>
-
-              <div style={{ flex: "1 1 320px", minWidth: 260 }}>
-                <label style={lblStyle}>Does the school have any AI, Robotics, or Technology Labs? {reqStar}</label>
-                <select
-                  value={form.hasLabs}
-                  onChange={(e) => setValue("hasLabs", e.target.value)}
-                  onBlur={() => markTouched("hasLabs")}
-                  style={fldStyle}
-                >
-                  <option value="">Choose</option>
-                  {YES_NO.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
+                      <FieldError name={`ls_${i}`} />
+                    </div>
                   ))}
-                </select>
-                <FieldError name="hasLabs" />
+                <FieldError name="_leadSourceEmpty" />
               </div>
-
-              <div style={{ flex: "1 1 320px", minWidth: 260 }}>
-                <label style={lblStyle}>School’s interest in AI, Robotics & IoT Workshop/Demo session? {reqStar}</label>
-                <select
-                  value={form.interestedWorkshop}
-                  onChange={(e) => setValue("interestedWorkshop", e.target.value)}
-                  onBlur={() => markTouched("interestedWorkshop")}
-                  style={fldStyle}
-                >
-                  <option value="">Choose</option>
-                  {YES_NO.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-                <FieldError name="interestedWorkshop" />
-              </div>
-
-              <div style={{ flex: "1 1 260px", minWidth: 220 }}>
-                <label style={lblStyle}>Average number of students per class {reqStar}</label>
-                <input
-                  inputMode="numeric"
-                  value={form.avgStudentsPerClass}
-                  onChange={(e) => setValue("avgStudentsPerClass", e.target.value.replace(/[^\d]/g, ""))}
-                  onBlur={() => markTouched("avgStudentsPerClass")}
-                  placeholder="e.g. 35"
-                  style={fldStyle}
-                />
-                <FieldError name="avgStudentsPerClass" />
-              </div>
-
-              <div style={{ flex: "1 1 320px", minWidth: 260 }}>
-                <label style={lblStyle}>Preferred Subscription Plan for the School? {reqStar}</label>
-                <select
-                  value={form.preferredPlan}
-                  onChange={(e) => setValue("preferredPlan", e.target.value)}
-                  onBlur={() => markTouched("preferredPlan")}
-                  style={fldStyle}
-                >
-                  <option value="">Choose</option>
-                  {SUBSCRIPTION_PLANS.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-                <FieldError name="preferredPlan" />
-              </div>
-
-              <div style={{ flex: "1 1 320px", minWidth: 260 }}>
-                <label style={lblStyle}>The school management ready to approve this initiative? {reqStar}</label>
-                <select
-                  value={form.managementReadyApprove}
-                  onChange={(e) => setValue("managementReadyApprove", e.target.value)}
-                  onBlur={() => markTouched("managementReadyApprove")}
-                  style={fldStyle}
-                >
-                  <option value="">Choose</option>
-                  {YES_NO.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-                <FieldError name="managementReadyApprove" />
-              </div>
-
-              <div style={{ flex: "1 1 320px", minWidth: 260 }}>
-                <label style={lblStyle}>Interest in a meeting with senior staff to discuss the proposal? {reqStar}</label>
-                <select
-                  value={form.meetingWithSeniorStaff}
-                  onChange={(e) => setValue("meetingWithSeniorStaff", e.target.value)}
-                  onBlur={() => markTouched("meetingWithSeniorStaff")}
-                  style={fldStyle}
-                >
-                  <option value="">Choose</option>
-                  {YES_NO.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-                <FieldError name="meetingWithSeniorStaff" />
-              </div>
-
-              <div style={{ flex: "1 1 260px", minWidth: 220 }}>
-                <label style={lblStyle}>Next Meeting Date aligned for the senior Management {reqStar}</label>
-                <input
-                  type="date"
-                  value={form.nextMeetingDate}
-                  onChange={(e) => setValue("nextMeetingDate", e.target.value)}
-                  onBlur={() => markTouched("nextMeetingDate")}
-                  style={fldStyle}
-                />
-                <FieldError name="nextMeetingDate" />
-              </div>
-
-              <div style={{ flex: "1 1 320px", minWidth: 260 }}>
-                <label style={lblStyle}>Does your school currently have computer/lab facilities? {reqStar}</label>
-                <select
-                  value={form.hasComputerLab}
-                  onChange={(e) => setValue("hasComputerLab", e.target.value)}
-                  onBlur={() => markTouched("hasComputerLab")}
-                  style={fldStyle}
-                >
-                  <option value="">Choose</option>
-                  {YES_NO.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-                <FieldError name="hasComputerLab" />
-              </div>
-
-              <div style={{ flex: "1 1 240px", minWidth: 220 }}>
-                <label style={lblStyle}>How many computers are available ? {form.hasComputerLab === "Yes" ? reqStar : null}</label>
-                <input
-                  inputMode="numeric"
-                  value={form.computersAvailable}
-                  onChange={(e) => setValue("computersAvailable", e.target.value.replace(/[^\d]/g, ""))}
-                  onBlur={() => markTouched("computersAvailable")}
-                  placeholder={form.hasComputerLab === "Yes" ? "e.g. 25" : "Select Yes above to enable"}
-                  disabled={form.hasComputerLab !== "Yes"}
-                  style={{
-                    ...fldStyle,
-                    background: form.hasComputerLab === "Yes" ? "#f8fafc" : "#f1f5f9",
-                    cursor: form.hasComputerLab === "Yes" ? "text" : "not-allowed",
-                  }}
-                />
-                <FieldError name="computersAvailable" />
-              </div>
-            </div>
-
-            <WizardFooter step={step} submitting={submitting} onBack={onBack} onNext={onNext} />
-          </Card>
-        )}
-
-        {step === 4 && (
-          <Card number={4} title="Program & Lead Status">
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "16px"  , alignItems: "flex-end"}}>
-              <div style={{ flex: "1 1 360px", minWidth: 260 }}>
-                <label style={lblStyle}>For which classes is the school interested in implementing the FFTL training program? {reqStar}</label>
-                <select
-                  value={form.fftlClasses}
-                  onChange={(e) => setValue("fftlClasses", e.target.value)}
-                  onBlur={() => markTouched("fftlClasses")}
-                  style={fldStyle}
-                >
-                  <option value="">Choose</option>
-                  {FFTL_CLASSES.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-                <FieldError name="fftlClasses" />
-              </div>
-
-              <div style={{ flex: "1 1 320px", minWidth: 240 }}>
-                <label style={lblStyle}>Is your school open for partnership/collaboration? {reqStar}</label>
-                <select
-                  value={form.openForPartnership}
-                  onChange={(e) => setValue("openForPartnership", e.target.value)}
-                  onBlur={() => markTouched("openForPartnership")}
-                  style={fldStyle}
-                >
-                  <option value="">Choose</option>
-                  {YES_NO.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-                <FieldError name="openForPartnership" />
-              </div>
-
-              <div style={{ flex: "1 1 320px", minWidth: 240 }}>
-                <label style={lblStyle}>Are teachers available for future technology training? {reqStar}</label>
-                <select
-                  value={form.teachersAvailable}
-                  onChange={(e) => setValue("teachersAvailable", e.target.value)}
-                  onBlur={() => markTouched("teachersAvailable")}
-                  style={fldStyle}
-                >
-                  <option value="">Choose</option>
-                  {YES_NO.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-                <FieldError name="teachersAvailable" />
-              </div>
-
-              <div style={{ flex: "1 1 320px", minWidth: 240 }}>
-                <label style={lblStyle}>Have you explained and submitted the proposal ? {reqStar}</label>
-                <select
-                  value={form.proposalExplainedSubmitted}
-                  onChange={(e) => setValue("proposalExplainedSubmitted", e.target.value)}
-                  onBlur={() => markTouched("proposalExplainedSubmitted")}
-                  style={fldStyle}
-                >
-                  <option value="">Choose</option>
-                  {YES_NO.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-                <FieldError name="proposalExplainedSubmitted" />
-              </div>
-
-              <div style={{ flex: "1 1 320px", minWidth: 240 }}>
-                <label style={lblStyle}>How soon you expect purchase order be signed ? {reqStar}</label>
-                <select
-                  value={form.poExpectedTimeline}
-                  onChange={(e) => setValue("poExpectedTimeline", e.target.value)}
-                  onBlur={() => markTouched("poExpectedTimeline")}
-                  style={fldStyle}
-                >
-                  <option value="">Choose</option>
-                  {PO_TIMELINE.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-                <FieldError name="poExpectedTimeline" />
-              </div>
-
-              <div style={{ flex: "1 1 240px", minWidth: 220 }}>
-                <label style={lblStyle}>Lead Status {reqStar}</label>
-                <select
-                  value={form.leadStatus}
-                  onChange={(e) => setValue("leadStatus", e.target.value)}
-                  onBlur={() => markTouched("leadStatus")}
-                  style={fldStyle}
-                >
-                  <option value="">Choose</option>
-                  {LEAD_STATUS.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-                <FieldError name="leadStatus" />
-              </div>
-
-              <div style={{ flex: "1 1 260px", minWidth: 220 }}>
-                <label style={lblStyle}>Lock my Lead {reqStar}</label>
-                <select
-                  value={form.lockLead}
-                  onChange={(e) => setValue("lockLead", e.target.value)}
-                  onBlur={() => markTouched("lockLead")}
-                  style={fldStyle}
-                >
-                  <option value="">Choose</option>
-                  {LOCK_LEAD.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-                <FieldError name="lockLead" />
-              </div>
-
-              <div style={{ flex: "1 1 100%", minWidth: 260 }}>
-                <label style={lblStyle}>other remarls</label>
-                <textarea
-                  value={form.otherRemarks}
-                  onChange={(e) => setValue("otherRemarks", e.target.value)}
-                  placeholder="Write notes / remarks..."
-                  rows={4}
-                  style={{ ...fldStyle, resize: "vertical" }}
-                />
-              </div>
-            </div>
+            )}
 
             <WizardFooter isLast step={step} submitting={submitting} onBack={onBack} onNext={onNext} />
           </Card>
