@@ -536,12 +536,17 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 		// Extract filter parameters from query
 		const {
 			leadCategory,
+			leadCategoryIn,
 			typeOfB2B,
+			typeOfB2BIn,
 			search,
 			subStatus,
+			subStatusIn,
 			startDate,
 			endDate,
 			leadOwner,
+			leadOwnerIn,
+			statusIn,
 			approvalStatus
 		} = req.query;
 
@@ -572,6 +577,14 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 			return id;
 		};
 
+		const parseIdList = (csv) =>
+			String(csv || '')
+				.split(',')
+				.map((s) => s.trim())
+				.filter(Boolean)
+				.map((id) => convertToObjectId(id))
+				.filter(Boolean);
+
 		// Search functionality conditions
 		const searchConditions = search
 			? {
@@ -588,9 +601,26 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 		const filterConditions = [];
 		
 		// Other filters - Convert to ObjectId if valid
-		if (leadCategory) filterConditions.push({ leadCategory: convertToObjectId(leadCategory) });
-		if (typeOfB2B) filterConditions.push({ typeOfB2B: convertToObjectId(typeOfB2B) });
-		if (subStatus) filterConditions.push({ subStatus: convertToObjectId(subStatus) });
+		if (leadCategoryIn) {
+			const ids = parseIdList(leadCategoryIn);
+			if (ids.length) filterConditions.push({ leadCategory: { $in: ids } });
+		} else if (leadCategory) {
+			filterConditions.push({ leadCategory: convertToObjectId(leadCategory) });
+		}
+
+		if (typeOfB2BIn) {
+			const ids = parseIdList(typeOfB2BIn);
+			if (ids.length) filterConditions.push({ typeOfB2B: { $in: ids } });
+		} else if (typeOfB2B) {
+			filterConditions.push({ typeOfB2B: convertToObjectId(typeOfB2B) });
+		}
+
+		if (subStatusIn) {
+			const ids = parseIdList(subStatusIn);
+			if (ids.length) filterConditions.push({ subStatus: { $in: ids } });
+		} else if (subStatus) {
+			filterConditions.push({ subStatus: convertToObjectId(subStatus) });
+		}
 		
 		// Date range filters
 		if (startDate || endDate) {
@@ -603,7 +633,17 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 		}
 		
 		// Lead owner filter - check both leadOwner and leadAddedBy
-		if (leadOwner) {
+		if (leadOwnerIn) {
+			const ids = parseIdList(leadOwnerIn);
+			if (ids.length) {
+				filterConditions.push({
+					$or: [
+						{ leadOwner: { $in: ids } },
+						{ leadAddedBy: { $in: ids } }
+					]
+				});
+			}
+		} else if (leadOwner) {
 			filterConditions.push({
 				$or: [
 					{ leadOwner: convertToObjectId(leadOwner) },
@@ -615,6 +655,12 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 		// Approval filter (PENDING / APPROVED / REJECTED)
 		if (approvalStatus) {
 			filterConditions.push({ 'approval.status': String(approvalStatus).toUpperCase() });
+		}
+
+		// Status multi-filter (used by frontend filter modal "Status")
+		if (statusIn) {
+			const ids = parseIdList(statusIn);
+			if (ids.length) filterConditions.push({ status: { $in: ids } });
 		}
 
 		// Base query with ownership conditions and filters
@@ -707,15 +753,20 @@ router.get('/leads', isCollege, async (req, res) => {
 			page = 1,
 			limit = 10,
 			status,
+			statusIn,
 			leadCategory,
+			leadCategoryIn,
 			typeOfB2B,
+			typeOfB2BIn,
 			search,
 			sortBy = 'createdAt',
 			sortOrder = 'desc',
 			subStatus,
+			subStatusIn,
 			startDate,
 			endDate,
 			leadOwner,
+			leadOwnerIn,
 			approvalStatus
 		} = req.query;
 
@@ -766,6 +817,14 @@ router.get('/leads', isCollege, async (req, res) => {
 			return id;
 		};
 
+		const parseIdList = (csv) =>
+			String(csv || '')
+				.split(',')
+				.map((s) => s.trim())
+				.filter(Boolean)
+				.map((id) => convertToObjectId(id))
+				.filter(Boolean);
+
 		// Build the final query
 		const finalQuery = {
 			$and: [
@@ -774,10 +833,17 @@ router.get('/leads', isCollege, async (req, res) => {
 				// Search condition (if search is provided)
 				...(search ? [searchConditions] : []),
 				// Other filters - Convert to ObjectId if valid
-				...(status ? [{ status: convertToObjectId(status) }] : []),
-				...(leadCategory ? [{ leadCategory: convertToObjectId(leadCategory) }] : []),
-				...(typeOfB2B ? [{ typeOfB2B: convertToObjectId(typeOfB2B) }] : []),
-				...(subStatus ? [{ subStatus: convertToObjectId(subStatus) }] : []),
+				...(statusIn ? [{ status: { $in: parseIdList(statusIn) } }] : []),
+				...(!statusIn && status ? [{ status: convertToObjectId(status) }] : []),
+
+				...(leadCategoryIn ? [{ leadCategory: { $in: parseIdList(leadCategoryIn) } }] : []),
+				...(!leadCategoryIn && leadCategory ? [{ leadCategory: convertToObjectId(leadCategory) }] : []),
+
+				...(typeOfB2BIn ? [{ typeOfB2B: { $in: parseIdList(typeOfB2BIn) } }] : []),
+				...(!typeOfB2BIn && typeOfB2B ? [{ typeOfB2B: convertToObjectId(typeOfB2B) }] : []),
+
+				...(subStatusIn ? [{ subStatus: { $in: parseIdList(subStatusIn) } }] : []),
+				...(!subStatusIn && subStatus ? [{ subStatus: convertToObjectId(subStatus) }] : []),
 			// Date range filters
 			...(startDate || endDate ? [{
 				createdAt: {
@@ -788,7 +854,13 @@ router.get('/leads', isCollege, async (req, res) => {
 			// Lead owner filter - Convert to ObjectId
 			// If leadOwner filter is applied, check both leadOwner field AND leadAddedBy field
 			// (because many existing leads have leadOwner set to a different user but leadAddedBy is the actual owner)
-			...(leadOwner ? [{
+			...(leadOwnerIn ? [{
+				$or: [
+					{ leadOwner: { $in: parseIdList(leadOwnerIn) } },
+					{ leadAddedBy: { $in: parseIdList(leadOwnerIn) } }
+				]
+			}] : []),
+			...(!leadOwnerIn && leadOwner ? [{
 				$or: [
 					{ leadOwner: convertToObjectId(leadOwner) },
 					{ leadAddedBy: convertToObjectId(leadOwner) }
@@ -942,7 +1014,7 @@ router.get('/leads', isCollege, async (req, res) => {
 
 		// Fetch leads based on the query, sorted and paginated
 		const leads = await Lead.find(finalQuery)
-			.populate('leadCategory', 'name')
+			.populate('leadCategory', 'name documents')
 			.populate('typeOfB2B', 'name')
 			.populate('status', 'name title substatuses')
 			.populate('followUp', 'followUpType scheduledDate status')

@@ -603,7 +603,7 @@ function mountCopyLeadRoutes(router, LeadCopy, isCollege) {
       const totalPages = Math.ceil(totalLeads / limit) || 1;
 
       const leads = await LeadCopy.find(finalQuery)
-        .populate('leadCategory', 'name')
+        .populate('leadCategory', 'name documents')
         .populate('typeOfB2B', 'name')
         .populate('status', 'name title substatuses')
         .populate('followUp', 'followUpType scheduledDate status')
@@ -697,7 +697,7 @@ function mountCopyLeadRoutes(router, LeadCopy, isCollege) {
 
   const populateLeadCopyForResponse = (query) =>
     query
-      .populate('leadCategory', 'name')
+      .populate('leadCategory', 'name documents')
       .populate('typeOfB2B', 'name')
       .populate('status', 'name title substatuses')
       .populate('followUp', 'followUpType scheduledDate status')

@@ -57,8 +57,55 @@ const MultiSelectCheckbox = ({
   onChange,
   icon = "fas fa-list",
   isOpen,
-  onToggle
+  onToggle,
+  onClose
 }) => {
+  const [query, setQuery] = useState('');
+  const containerRef = useRef(null);
+  const [placement, setPlacement] = useState('down'); // 'down' | 'up'
+
+  useEffect(() => {
+    if (!isOpen) setQuery('');
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const el = containerRef.current;
+    if (!el) return;
+
+    const rect = el.getBoundingClientRect();
+    const viewportH = window.innerHeight || document.documentElement.clientHeight || 0;
+    const spaceBelow = Math.max(0, viewportH - rect.bottom);
+    const spaceAbove = Math.max(0, rect.top);
+    // dropdown height ~ 360px (search + list + footer). open up if space below is tight.
+    setPlacement(spaceBelow < 280 && spaceAbove > spaceBelow ? 'up' : 'down');
+  }, [isOpen, options?.length]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event) => {
+      const el = containerRef.current;
+      if (!el) return;
+      if (!el.contains(event.target)) {
+        if (typeof onClose === 'function') onClose();
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        if (typeof onClose === 'function') onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside, true);
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside, true);
+      document.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [isOpen, onClose]);
+
   const handleCheckboxChange = (value) => {
     const newValues = selectedValues.includes(value)
       ? selectedValues.filter(v => v !== value)
@@ -84,8 +131,15 @@ const MultiSelectCheckbox = ({
     }
   };
 
+  const filteredOptions = useMemo(() => {
+    const list = Array.isArray(options) ? options : [];
+    const q = String(query || '').trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((o) => String(o?.label || '').toLowerCase().includes(q));
+  }, [options, query]);
+
   return (
-    <div className="multi-select-container-new">
+    <div className="multi-select-container-new" ref={containerRef}>
       <label className="form-label small fw-bold text-dark d-flex align-items-center mb-2">
         <i className={`${icon} me-1 text-primary`}></i>
         {title}
@@ -107,8 +161,7 @@ const MultiSelectCheckbox = ({
           <i className={`fas fa-chevron-${isOpen ? 'up' : 'down'} dropdown-arrow`}></i>
         </button>
 
-        {isOpen && (
-          <div className="multi-select-options-new">
+        <div className={`multi-select-options-new ${isOpen ? 'open' : ''} ${placement === 'up' ? 'up' : ''}`}>
             {/* Search functionality (optional) */}
             <div className="options-search">
               <div className="input-group input-group-sm">
@@ -119,6 +172,8 @@ const MultiSelectCheckbox = ({
                   type="text"
                   className="form-control"
                   placeholder={`Search ${title.toLowerCase()}...`}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
@@ -126,7 +181,7 @@ const MultiSelectCheckbox = ({
 
             {/* Options List */}
             <div className="options-list-new">
-              {options.map((option) => (
+              {filteredOptions.map((option) => (
                 <label key={option.value} className="option-item-new">
                   <input
                     type="checkbox"
@@ -142,10 +197,10 @@ const MultiSelectCheckbox = ({
                 </label>
               ))}
 
-              {options.length === 0 && (
+              {filteredOptions.length === 0 && (
                 <div className="no-options">
                   <i className="fas fa-info-circle me-2"></i>
-                  No {title.toLowerCase()} available
+                  No results
                 </div>
               )}
             </div>
@@ -154,12 +209,11 @@ const MultiSelectCheckbox = ({
             {selectedValues.length > 0 && (
               <div className="options-footer">
                 <small className="text-muted">
-                  {selectedValues.length} of {options.length} selected
+                  {selectedValues.length} of {(options || []).length} selected
                 </small>
               </div>
             )}
           </div>
-        )}
       </div>
     </div>
   );
@@ -315,6 +369,7 @@ const useScrollBlur = (navbarHeight = 140) => {
 
   return { isScrolled, scrollY, contentRef };
 };
+
 const B2BSales = () => {
 
   const candidateRef = useRef();
@@ -417,6 +472,7 @@ const B2BSales = () => {
   const [leadDocumentsLoading, setLeadDocumentsLoading] = useState(false);
   const [leadDocumentUploading, setLeadDocumentUploading] = useState(false);
   const [leadDocType, setLeadDocType] = useState('');
+  const [leadDocFileSelected, setLeadDocFileSelected] = useState(false);
   const leadDocFileRef = useRef(null);
   const [leadCategoryDocuments, setLeadCategoryDocuments] = useState([]); // from LeadCategory.documents (required docs)
 
@@ -739,6 +795,44 @@ const B2BSales = () => {
       return formatFollowupDate(legacy.scheduledDate);
     }
     return '—';
+  };
+
+  const getFollowupBucket = (followUpLike) => {
+    if (!followUpLike) return null;
+    const status = String(followUpLike?.status || '').toLowerCase();
+    if (status === 'completed') return 'done';
+
+    const dt = followUpLike?.scheduledDate ? new Date(followUpLike.scheduledDate) : null;
+    if (!dt || Number.isNaN(dt.getTime())) return null;
+
+    const now = Date.now();
+    if (dt.getTime() < now) return 'missed';
+    return 'planned';
+  };
+
+  const getLeadFollowupBucket = (lead, type) => {
+    const t = String(type || '').toLowerCase();
+    const slot = t === 'visit' ? (lead?.followUpVisit || null) : (lead?.followUpCall || null);
+    const slotBucket = getFollowupBucket(slot);
+    if (slotBucket) return slotBucket;
+
+    const legacy = lead?.followUp || null;
+    if (legacy && String(legacy?.followUpType || '').toLowerCase() === t) {
+      return getFollowupBucket(legacy);
+    }
+    return null;
+  };
+
+  const getLeadDocumentsBucket = (lead) => {
+    const required = Array.isArray(lead?.leadCategory?.documents) ? lead.leadCategory.documents : [];
+    // Only count documents for lead sources where documents are configured/required
+    if (required.length === 0) return null;
+
+    const docs = Array.isArray(lead?.documents) ? lead.documents : [];
+    if (docs.length === 0) return 'pending';
+
+    const anyPending = docs.some((d) => String(d?.status || 'PENDING').toUpperCase() !== 'APPROVED');
+    return anyPending ? 'pending' : 'done';
   };
 
   const initializeBusinessNameAutocomplete = () => {
@@ -1147,18 +1241,39 @@ const B2BSales = () => {
     return list;
   }, [statusCounts]);
 
+  const dashboardB2BCounts = useMemo(() => {
+    const list = Array.isArray(leads) ? leads : [];
+    const counts = {
+      call: { done: 0, planned: 0, missed: 0 },
+      visit: { done: 0, planned: 0, missed: 0 },
+      docs: { done: 0, pending: 0 },
+    };
+
+    for (const lead of list) {
+      const cb = getLeadFollowupBucket(lead, 'Call');
+      if (cb) counts.call[cb] += 1;
+
+      const vb = getLeadFollowupBucket(lead, 'Visit');
+      if (vb) counts.visit[vb] += 1;
+
+      const db = getLeadDocumentsBucket(lead);
+      if (db) counts.docs[db] += 1;
+    }
+    return counts;
+  }, [leads]);
+
   // Filter states
   const [filters, setFilters] = useState({
     search: '',
-    leadCategory: '',
-    typeOfB2B: '',
-    leadOwner: '',
+    leadCategory: [],
+    typeOfB2B: [],
+    leadOwner: [],
     dateRange: {
       start: null,
       end: null
     },
-    status: null,
-    subStatus: null
+    status: [],
+    subStatus: []
   });
   const [showFilters, setShowFilters] = useState(false);
 
@@ -1209,13 +1324,13 @@ const B2BSales = () => {
             limit: validNumValue.toString(),
             ...(selectedStatusFilter && { status: selectedStatusFilter }),
             ...(eff.search && { search: eff.search }),
-            ...(eff.leadCategory && { leadCategory: eff.leadCategory }),
-            ...(eff.typeOfB2B && { typeOfB2B: eff.typeOfB2B }),
-            ...(eff.leadOwner && { leadOwner: eff.leadOwner }),
+            ...(Array.isArray(eff.leadCategory) && eff.leadCategory.length && { leadCategoryIn: toCsv(eff.leadCategory) }),
+            ...(Array.isArray(eff.typeOfB2B) && eff.typeOfB2B.length && { typeOfB2BIn: toCsv(eff.typeOfB2B) }),
+            ...(Array.isArray(eff.leadOwner) && eff.leadOwner.length && { leadOwnerIn: toCsv(eff.leadOwner) }),
             ...(eff.dateRange?.start && { startDate: eff.dateRange.start }),
             ...(eff.dateRange?.end && { endDate: eff.dateRange.end }),
-            ...(eff.status && { status: eff.status }),
-            ...(eff.subStatus && { subStatus: eff.subStatus })
+            ...(Array.isArray(eff.status) && eff.status.length && { statusIn: toCsv(eff.status) }),
+            ...(Array.isArray(eff.subStatus) && eff.subStatus.length && { subStatusIn: toCsv(eff.subStatus) })
           };
 
           const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
@@ -1278,6 +1393,8 @@ const B2BSales = () => {
     }));
   };
 
+  const toCsv = (arr) => (Array.isArray(arr) ? arr.filter(Boolean).join(',') : '');
+
   const handleDateRangeChange = (type, value) => {
     setFilters(prev => ({
       ...prev,
@@ -1298,15 +1415,15 @@ const B2BSales = () => {
   const clearFilters = () => {
     setFilters({
       search: '',
-      leadCategory: '',
-      typeOfB2B: '',
-      leadOwner: '',
+      leadCategory: [],
+      typeOfB2B: [],
+      leadOwner: [],
       dateRange: {
         start: null,
         end: null
       },
-      status: null,
-      subStatus: null
+      status: [],
+      subStatus: []
     });
     setCurrentPage(1);
     fetchLeads(selectedStatusFilter, 1);
@@ -1335,14 +1452,14 @@ const B2BSales = () => {
       if (eff.search) {
         params.search = eff.search;
       }
-      if (eff.leadCategory) {
-        params.leadCategory = eff.leadCategory;
+      if (Array.isArray(eff.leadCategory) && eff.leadCategory.length) {
+        params.leadCategoryIn = toCsv(eff.leadCategory);
       }
-      if (eff.typeOfB2B) {
-        params.typeOfB2B = eff.typeOfB2B;
+      if (Array.isArray(eff.typeOfB2B) && eff.typeOfB2B.length) {
+        params.typeOfB2BIn = toCsv(eff.typeOfB2B);
       }
-      if (eff.leadOwner) {
-        params.leadOwner = eff.leadOwner;
+      if (Array.isArray(eff.leadOwner) && eff.leadOwner.length) {
+        params.leadOwnerIn = toCsv(eff.leadOwner);
       }
       if (eff.dateRange?.start) {
         params.startDate = eff.dateRange.start;
@@ -1350,11 +1467,11 @@ const B2BSales = () => {
       if (eff.dateRange?.end) {
         params.endDate = eff.dateRange.end;
       }
-      if (eff.status) {
-        params.status = eff.status;
+      if (Array.isArray(eff.status) && eff.status.length) {
+        params.statusIn = toCsv(eff.status);
       }
-      if (eff.subStatus) {
-        params.subStatus = eff.subStatus;
+      if (Array.isArray(eff.subStatus) && eff.subStatus.length) {
+        params.subStatusIn = toCsv(eff.subStatus);
       }
       // Lead Approval filter
       const approval = eff.approvalStatus ?? selectedApprovalStatus;
@@ -1437,13 +1554,14 @@ const B2BSales = () => {
       const eff = { ...filters, ...filterOverrides };
       // Build params with current filters (except status filter, as we're counting by status)
       const params = {};
-      if (eff.leadCategory) params.leadCategory = eff.leadCategory;
-      if (eff.typeOfB2B) params.typeOfB2B = eff.typeOfB2B;
-      if (eff.leadOwner) params.leadOwner = eff.leadOwner;
+      if (Array.isArray(eff.leadCategory) && eff.leadCategory.length) params.leadCategoryIn = toCsv(eff.leadCategory);
+      if (Array.isArray(eff.typeOfB2B) && eff.typeOfB2B.length) params.typeOfB2BIn = toCsv(eff.typeOfB2B);
+      if (Array.isArray(eff.leadOwner) && eff.leadOwner.length) params.leadOwnerIn = toCsv(eff.leadOwner);
       if (eff.search) params.search = eff.search;
-      if (eff.subStatus) params.subStatus = eff.subStatus;
+      if (Array.isArray(eff.subStatus) && eff.subStatus.length) params.subStatusIn = toCsv(eff.subStatus);
       if (eff.dateRange?.start) params.startDate = eff.dateRange.start;
       if (eff.dateRange?.end) params.endDate = eff.dateRange.end;
+      if (Array.isArray(eff.status) && eff.status.length) params.statusIn = toCsv(eff.status);
       const approval = eff.approvalStatus ?? selectedApprovalStatus;
       if (approval) params.approvalStatus = approval;
 
@@ -1476,13 +1594,14 @@ const B2BSales = () => {
       setApprovalCountsLoading(true);
       const eff = { ...filters, ...filterOverrides };
       const baseParams = {};
-      if (eff.leadCategory) baseParams.leadCategory = eff.leadCategory;
-      if (eff.typeOfB2B) baseParams.typeOfB2B = eff.typeOfB2B;
-      if (eff.leadOwner) baseParams.leadOwner = eff.leadOwner;
+      if (Array.isArray(eff.leadCategory) && eff.leadCategory.length) baseParams.leadCategoryIn = toCsv(eff.leadCategory);
+      if (Array.isArray(eff.typeOfB2B) && eff.typeOfB2B.length) baseParams.typeOfB2BIn = toCsv(eff.typeOfB2B);
+      if (Array.isArray(eff.leadOwner) && eff.leadOwner.length) baseParams.leadOwnerIn = toCsv(eff.leadOwner);
       if (eff.search) baseParams.search = eff.search;
-      if (eff.subStatus) baseParams.subStatus = eff.subStatus;
+      if (Array.isArray(eff.subStatus) && eff.subStatus.length) baseParams.subStatusIn = toCsv(eff.subStatus);
       if (eff.dateRange?.start) baseParams.startDate = eff.dateRange.start;
       if (eff.dateRange?.end) baseParams.endDate = eff.dateRange.end;
+      if (Array.isArray(eff.status) && eff.status.length) baseParams.statusIn = toCsv(eff.status);
 
       const [allRes, approvedRes, pendingRes, rejectedRes] = await Promise.all([
         axios.get(`${backendUrl}/college/b2b/leads/status-count`, { headers: { 'x-auth': token }, params: baseParams }),
@@ -1559,6 +1678,7 @@ const B2BSales = () => {
     setLeadDocuments([]);
     setLeadCategoryDocuments([]);
     setLeadDocType('');
+    setLeadDocFileSelected(false);
     if (leadDocFileRef.current) leadDocFileRef.current.value = '';
 
     try {
@@ -1602,6 +1722,10 @@ const B2BSales = () => {
       alert('Please select a file');
       return;
     }
+    if (!String(leadDocType || '').trim()) {
+      alert('Please select a Doc Type');
+      return;
+    }
     if ((leadCategoryDocuments || []).length) {
       const allowed = new Set((leadCategoryDocuments || []).map((d) => String(d?.name || '').trim()).filter(Boolean));
       if (!allowed.has(String(leadDocType || '').trim())) {
@@ -1624,6 +1748,7 @@ const B2BSales = () => {
         });
         if (listRes?.data?.status) setLeadDocuments(listRes.data.data || []);
         setLeadDocType('');
+        setLeadDocFileSelected(false);
         if (leadDocFileRef.current) leadDocFileRef.current.value = '';
       } else {
         alert(res?.data?.message || 'Failed to upload document');
@@ -3884,9 +4009,9 @@ const B2BSales = () => {
                           <span className="b2b-dash-section__label">Followup Calling</span>
                           <div className="d-flex flex-wrap gap-2 pt-1">
                             {[
-                              { key: 'fc-done', label: 'Done', value: 0, bg: '#e8a317' },
-                              { key: 'fc-planned', label: 'Planned', value: 0, bg: '#e8a317' },
-                              { key: 'fc-missed', label: 'Missed', value: 0, bg: '#e8a317' }
+                              { key: 'fc-done', label: 'Done', value: dashboardB2BCounts.call.done, bg: '#e8a317' },
+                              { key: 'fc-planned', label: 'Planned', value: dashboardB2BCounts.call.planned, bg: '#e8a317' },
+                              { key: 'fc-missed', label: 'Missed', value: dashboardB2BCounts.call.missed, bg: '#e8a317' }
                             ].map((row) => (
                               <div
                                 key={row.key}
@@ -3908,9 +4033,9 @@ const B2BSales = () => {
                           <span className="b2b-dash-section__label">Followup Visit</span>
                           <div className="d-flex flex-wrap gap-2 pt-1">
                             {[
-                              { key: 'fv-done', label: 'Done', value: 0, bg: '#4b5563' },
-                              { key: 'fv-planned', label: 'Planned', value: 0, bg: '#4b5563' },
-                              { key: 'fv-missed', label: 'Missed', value: 0, bg: '#4b5563' }
+                              { key: 'fv-done', label: 'Done', value: dashboardB2BCounts.visit.done, bg: '#4b5563' },
+                              { key: 'fv-planned', label: 'Planned', value: dashboardB2BCounts.visit.planned, bg: '#4b5563' },
+                              { key: 'fv-missed', label: 'Missed', value: dashboardB2BCounts.visit.missed, bg: '#4b5563' }
                             ].map((row) => (
                               <div
                                 key={row.key}
@@ -3932,8 +4057,8 @@ const B2BSales = () => {
                           <span className="b2b-dash-section__label">Documents</span>
                           <div className="d-flex flex-wrap gap-2 pt-1">
                             {[
-                              { key: 'doc-done', label: 'Done', value: 0, bg: '#4b5563' },
-                              { key: 'doc-pending', label: 'Pending', value: 0, bg: '#4b5563' }
+                              { key: 'doc-done', label: 'Done', value: dashboardB2BCounts.docs.done, bg: '#4b5563' },
+                              { key: 'doc-pending', label: 'Pending', value: dashboardB2BCounts.docs.pending, bg: '#4b5563' }
                             ].map((row) => (
                               <div
                                 key={row.key}
@@ -4206,7 +4331,7 @@ const B2BSales = () => {
                                   <button
                                     type="button"
                                     className="lead-meta-v2__pill"
-                                    onClick={() => navigate(`/institute/lrp?b2bLeadId=${lead._id}&mode=view`)}
+                                    onClick={() => navigate(`/institute/lrp-view?b2bLeadId=${lead._id}`)}
                                     title="View lead Report"
                                   >
                                     <i className="fas fa-eye" aria-hidden="true"></i>
@@ -4346,11 +4471,14 @@ const B2BSales = () => {
                                     <i className="fas fa-edit" aria-hidden="true"></i>
                                   </button>
                                   <div className="lhm__followup-cards">
-                                    {[
-                                      { label: 'Done',    value: 0, bg: '#12b3ff' },
-                                      { label: 'Planned', value: 0, bg: '#f59e0b' },
-                                      { label: 'Missed',  value: 0, bg: '#7c3d14' },
-                                    ].map((s) => (
+                                    {(() => {
+                                      const b = getLeadFollowupBucket(lead, 'Call');
+                                      return [
+                                        { label: 'Done', value: b === 'done' ? 1 : 0, bg: '#12b3ff' },
+                                        { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#f59e0b' },
+                                        { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#7c3d14' },
+                                      ];
+                                    })().map((s) => (
                                       <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
                                         <span className="lhm__stat-label">{s.label}</span>
                                         <span className="lhm__stat-divider" />
@@ -4376,11 +4504,14 @@ const B2BSales = () => {
                                     <i className="fas fa-edit" aria-hidden="true"></i>
                                   </button>
                                   <div className="lhm__followup-cards">
-                                    {[
-                                      { label: 'Done',    value: 0, bg: '#4b5563' },
-                                      { label: 'Planned', value: 0, bg: '#4b5563' },
-                                      { label: 'Missed',  value: 0, bg: '#7c3d14' },
-                                    ].map((s) => (
+                                    {(() => {
+                                      const b = getLeadFollowupBucket(lead, 'Visit');
+                                      return [
+                                        { label: 'Done', value: b === 'done' ? 1 : 0, bg: '#4b5563' },
+                                        { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#4b5563' },
+                                        { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#7c3d14' },
+                                      ];
+                                    })().map((s) => (
                                       <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
                                         <span className="lhm__stat-label">{s.label}</span>
                                         <span className="lhm__stat-divider" />
@@ -4405,16 +4536,22 @@ const B2BSales = () => {
                                     <i className="fas fa-edit" aria-hidden="true"></i>
                                   </button>
                                   <div className="lhm__followup-cards">
-                                    {[
-                                      { label: 'Done',    value: 0, bg: '#4b5563' },
-                                      { label: 'Pending', value: 0, bg: '#4b5563' },
-                                    ].map((s) => (
+                                    {(() => {
+                                      const b = getLeadDocumentsBucket(lead); // done | pending | null (not required)
+                                      return [
+                                        { label: 'Done', value: b === 'done' ? 1 : 0, bg: '#4b5563' },
+                                        { label: 'Pending', value: b === 'pending' ? 1 : 0, bg: '#4b5563' },
+                                      ];
+                                    })().map((s) => (
                                       <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
                                         <span className="lhm__stat-label">{s.label}</span>
                                         <span className="lhm__stat-divider" />
                                         <span className="lhm__stat-val">{String(s.value).padStart(2, '0')}</span>
                                       </div>
                                     ))}
+                                  </div>
+                                  <div className="lhm__followup-date">
+                                    <span></span><span></span>
                                   </div>
                                 </div>
                               </div>
@@ -4566,7 +4703,7 @@ const B2BSales = () => {
                                   <button
                                     type="button"
                                     className="lead-meta-v2__pill"
-                                    onClick={() => navigate(`/institute/lrp?b2bLeadId=${lead._id}&mode=view`)}
+                                    onClick={() => navigate(`/institute/lrp-view?b2bLeadId=${lead._id}`)}
                                     title="View lead Report"
                                   >
                                     <i className="fas fa-eye" aria-hidden="true"></i>
@@ -4649,11 +4786,14 @@ const B2BSales = () => {
                                         <i className="fas fa-edit" aria-hidden="true"></i>
                                       </button>
                                       <div className="d-flex flex-wrap gap-2 pt-1">
-                                        {[
-                                          { key: 'fc-done',    label: 'Done',    value: 0, bg: '#12b3ff' },
-                                          { key: 'fc-planned', label: 'Planned', value: 0, bg: '#f59e0b' },
-                                          { key: 'fc-missed',  label: 'Missed',  value: 0, bg: '#7c3d14' }
-                                        ].map((row) => (
+                                        {(() => {
+                                          const b = getLeadFollowupBucket(lead, 'Call');
+                                          return [
+                                            { key: 'fc-done', label: 'Done', value: b === 'done' ? 1 : 0, bg: '#12b3ff' },
+                                            { key: 'fc-planned', label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#f59e0b' },
+                                            { key: 'fc-missed', label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#7c3d14' },
+                                          ];
+                                        })().map((row) => (
                                           <div
                                             key={row.key}
                                             className="b2b-dash-stat-card text-center text-white flex-grow-1"
@@ -4685,11 +4825,14 @@ const B2BSales = () => {
                                         <i className="fas fa-edit" aria-hidden="true"></i>
                                       </button>
                                       <div className="d-flex flex-wrap gap-2 pt-1">
-                                        {[
-                                          { key: 'fv-done',    label: 'Done',    value: 0, bg: '#4b5563' },
-                                          { key: 'fv-planned', label: 'Planned', value: 0, bg: '#4b5563' },
-                                          { key: 'fv-missed',  label: 'Missed',  value: 0, bg: '#7c3d14' }
-                                        ].map((row) => (
+                                        {(() => {
+                                          const b = getLeadFollowupBucket(lead, 'Visit');
+                                          return [
+                                            { key: 'fv-done', label: 'Done', value: b === 'done' ? 1 : 0, bg: '#4b5563' },
+                                            { key: 'fv-planned', label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#4b5563' },
+                                            { key: 'fv-missed', label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#7c3d14' },
+                                          ];
+                                        })().map((row) => (
                                           <div
                                             key={row.key}
                                             className="b2b-dash-stat-card text-center text-white flex-grow-1"
@@ -4721,10 +4864,13 @@ const B2BSales = () => {
                                         <i className="fas fa-edit" aria-hidden="true"></i>
                                       </button>
                                       <div className="d-flex flex-wrap gap-2 pt-1">
-                                        {[
-                                          { key: 'doc-done',    label: 'Done',    value: 0, bg: '#4b5563' },
-                                          { key: 'doc-pending', label: 'Pending', value: 0, bg: '#4b5563' },
-                                        ].map((row) => (
+                                        {(() => {
+                                          const b = getLeadDocumentsBucket(lead);
+                                          return [
+                                            { key: 'doc-done', label: 'Done', value: b === 'done' ? 1 : 0, bg: '#4b5563' },
+                                            { key: 'doc-pending', label: 'Pending', value: b === 'pending' ? 1 : 0, bg: '#4b5563' },
+                                          ];
+                                        })().map((row) => (
                                           <div
                                             key={row.key}
                                             className="b2b-dash-stat-card text-center text-white flex-grow-1"
@@ -5032,13 +5178,12 @@ const B2BSales = () => {
           style={{
             backgroundColor: 'rgba(0,0,0,0.5)',
             zIndex: 1060,
-            // Ensure modal overlay can scroll on smaller screens
             overflowY: 'auto',
             maxHeight: '100vh'
           }}
         >
-          <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable" style={{ maxHeight: '90vh' }}>
-            <div className="modal-content border-0 shadow" style={{ maxHeight: '90vh' }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg b2b-filter-dialog" style={{ maxHeight: '90vh' }}>
+            <div className="modal-content border-0 shadow b2b-filter-modal" style={{ maxHeight: '90vh' }}>
               <div className="modal-header bg-header text-white">
                 <h5 className="modal-title">
                   <i className="fas fa-filter me-2"></i>
@@ -5050,64 +5195,43 @@ const B2BSales = () => {
                   onClick={() => setShowFilters(false)}
                 ></button>
               </div>
-              <div className="modal-body p-4" style={{ overflowY: 'auto' }}>
+              <div className="modal-body p-4">
                 <div className="row g-3">
                   <div className="col-md-4">
-                    <label className="form-label fw-medium text-dark mb-2">
-                      <i className="fas fa-tag text-success me-2"></i>
-                      Lead Source
-                    </label>
-                    <select
-                      className="form-select border-0 bg-light"
-                      value={filters.leadCategory}
-                      onChange={(e) => handleFilterChange('leadCategory', e.target.value)}
-                      style={{ backgroundColor: '#f8f9fa' }}
-                    >
-                      <option value="">All Categories</option>
-                      {leadCategoryOptions && leadCategoryOptions.map(category => (
-                        <option key={category.value} value={category.value}>
-                          {category.label}
-                        </option>
-                      ))}
-                    </select>
+                    <MultiSelectCheckbox
+                      title="Lead Source"
+                      icon="fas fa-tag"
+                      options={leadCategoryOptions || []}
+                      selectedValues={filters.leadCategory || []}
+                      onChange={(vals) => handleFilterChange('leadCategory', vals)}
+                      isOpen={openModalId === 'leadCategory'}
+                      onToggle={() => setOpenModalId((prev) => (prev === 'leadCategory' ? null : 'leadCategory'))}
+                      onClose={() => setOpenModalId(null)}
+                    />
                   </div>
                   <div className="col-md-4">
-                    <label className="form-label fw-medium text-dark mb-2">
-                      <i className="fas fa-building text-info me-2"></i>
-                      Type of B2B
-                    </label>
-                    <select
-                      className="form-select border-0 bg-light"
-                      value={filters.typeOfB2B}
-                      onChange={(e) => handleFilterChange('typeOfB2B', e.target.value)}
-                      style={{ backgroundColor: '#f8f9fa' }}
-                    >
-                      <option value="">All Types</option>
-                      {typeOfB2BOptions && typeOfB2BOptions.map(type => (
-                        <option key={type.value} value={type.value}>
-                          {type.label}
-                        </option>
-                      ))}
-                    </select>
+                    <MultiSelectCheckbox
+                      title="Type of B2B"
+                      icon="fas fa-building"
+                      options={typeOfB2BOptions || []}
+                      selectedValues={filters.typeOfB2B || []}
+                      onChange={(vals) => handleFilterChange('typeOfB2B', vals)}
+                      isOpen={openModalId === 'typeOfB2B'}
+                      onToggle={() => setOpenModalId((prev) => (prev === 'typeOfB2B' ? null : 'typeOfB2B'))}
+                      onClose={() => setOpenModalId(null)}
+                    />
                   </div>
                   <div className="col-md-4">
-                    <label className="form-label fw-medium text-dark mb-2">
-                      <i className="fas fa-user text-warning me-2"></i>
-                      Lead Owner
-                    </label>
-                    <select
-                      className="form-select border-0 bg-light"
-                      value={filters.leadOwner}
-                      onChange={(e) => handleFilterChange('leadOwner', e.target.value)}
-                      style={{ backgroundColor: '#f8f9fa' }}
-                    >
-                      <option value="">All Owners</option>
-                      {users && users.map(user => (
-                        <option key={user._id} value={user._id}>
-                          {user.name}
-                        </option>
-                      ))}
-                    </select>
+                    <MultiSelectCheckbox
+                      title="Lead Owner"
+                      icon="fas fa-user"
+                      options={(users || []).map((u) => ({ value: u._id, label: u.name || u.email || 'User' }))}
+                      selectedValues={filters.leadOwner || []}
+                      onChange={(vals) => handleFilterChange('leadOwner', vals)}
+                      isOpen={openModalId === 'leadOwner'}
+                      onToggle={() => setOpenModalId((prev) => (prev === 'leadOwner' ? null : 'leadOwner'))}
+                      onClose={() => setOpenModalId(null)}
+                    />
                   </div>
                   <div className="col-md-6">
                     <label className="form-label fw-medium text-dark mb-2">
@@ -5136,49 +5260,29 @@ const B2BSales = () => {
                     />
                   </div>
                   <div className="col-md-6">
-                    <label className="form-label fw-medium text-dark mb-2">
-                      <i className="fas fa-calendar text-danger me-2"></i>
-                      Status
-                    </label>
-                    <select
-                      className="form-select border-0 bg-light"
-                      value={filters.status}
-                      onChange={(e) => handleFilterChange('status', e.target.value)}
-                      style={{ backgroundColor: '#f8f9fa' }}
-                    >
-                      <option value="">All Statuses</option>
-                      {statuses.map(status => (
-                        <option key={status._id} value={status._id}>
-                          {status.name}
-                        </option>
-                      ))}
-                    </select>
+                    <MultiSelectCheckbox
+                      title="Status"
+                      icon="fas fa-calendar"
+                      options={(statuses || []).map((s) => ({ value: s._id, label: s.name || s.title || 'Status' }))}
+                      selectedValues={filters.status || []}
+                      onChange={(vals) => handleFilterChange('status', vals)}
+                      isOpen={openModalId === 'status'}
+                      onToggle={() => setOpenModalId((prev) => (prev === 'status' ? null : 'status'))}
+                      onClose={() => setOpenModalId(null)}
+                    />
 
                   </div>
                   <div className="col-md-6">
-                    <label className="form-label fw-medium text-dark mb-2">
-                      <i className="fas fa-calendar text-danger me-2"></i>
-                      Sub Status
-                    </label>
-                    <select
-                      className="form-select border-0  bgcolor"
-                      name="subStatus"
-                      id="subStatus"
-                      value={filters.subStatus}
-                      style={{
-                        height: '42px',
-                        paddingTop: '8px',
-                        backgroundColor: '#f1f2f6',
-                        paddingInline: '10px',
-                        width: '100%'
-                      }}
-                      onChange={(e) => handleFilterChange('subStatus', e.target.value)}
-
-                    >
-                      <option value="">Select Sub-Status</option>
-                      {subStatuses.map((filter, index) => (
-                        <option value={filter._id}>{filter.title}</option>))}
-                    </select>
+                    <MultiSelectCheckbox
+                      title="Sub Status"
+                      icon="fas fa-calendar"
+                      options={(subStatuses || []).map((ss) => ({ value: ss._id, label: ss.title || 'Sub Status' }))}
+                      selectedValues={filters.subStatus || []}
+                      onChange={(vals) => handleFilterChange('subStatus', vals)}
+                      isOpen={openModalId === 'subStatus'}
+                      onToggle={() => setOpenModalId((prev) => (prev === 'subStatus' ? null : 'subStatus'))}
+                      onClose={() => setOpenModalId(null)}
+                    />
                   </div>
                 </div>
               </div>
@@ -5340,13 +5444,22 @@ const B2BSales = () => {
                   </div>
                   <div className="col-md-5">
                     <label className="form-label small fw-semibold mb-1">File</label>
-                    <input ref={leadDocFileRef} type="file" className="form-control b2b-docs-modal__file" />
+                    <input
+                      ref={leadDocFileRef}
+                      type="file"
+                      className="form-control b2b-docs-modal__file"
+                      onChange={(e) => setLeadDocFileSelected(Boolean(e.target?.files?.[0]))}
+                    />
                   </div>
                   <div className="col-md-2 d-flex justify-content-end">
                     <button
                       type="button"
                       className="btn btn-primary w-100 b2b-docs-modal__uploadbtn"
-                      disabled={leadDocumentUploading}
+                      disabled={
+                        leadDocumentUploading ||
+                        !String(leadDocType || '').trim() ||
+                        !leadDocFileSelected
+                      }
                       onClick={uploadLeadDocument}
                     >
                       {leadDocumentUploading ? 'Uploading...' : 'Upload'}
@@ -6076,6 +6189,192 @@ Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park
   .modal .pac-item-selected {
     background-color: #007bff;
     color: white;
+  }
+
+  /* MultiSelectCheckbox (Filter Modal) */
+  .multi-select-container-new{
+    position: relative;
+  }
+  .multi-select-dropdown-new{
+    position: relative;
+  }
+  .multi-select-trigger{
+    border-radius: 12px !important;
+    border: 1px solid #e5e7eb !important;
+    background: #fff !important;
+    height: 44px;
+    padding: 10px 40px 10px 12px !important;
+    font-weight: 600;
+    color: #111827;
+    transition: box-shadow 160ms ease, border-color 160ms ease, transform 160ms ease;
+  }
+  .multi-select-trigger:hover{
+    border-color: #d1d5db !important;
+    box-shadow: 0 6px 18px rgba(17, 24, 39, 0.08);
+    transform: translateY(-1px);
+  }
+  .multi-select-trigger.open{
+    border-color: rgba(252, 86, 123, 0.75) !important;
+    box-shadow: 0 10px 26px rgba(252, 86, 123, 0.18);
+    transform: translateY(-1px);
+  }
+  .multi-select-trigger .dropdown-arrow{
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0.7;
+    transition: transform 160ms ease, opacity 160ms ease;
+  }
+  .multi-select-trigger.open .dropdown-arrow{
+    opacity: 0.95;
+  }
+  .multi-select-trigger .select-display-text{
+    display: inline-block;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 18px;
+  }
+
+  .multi-select-options-new{
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    z-index: 1066;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    box-shadow: 0 18px 46px rgba(17, 24, 39, 0.12);
+    overflow: hidden;
+
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+    pointer-events: none;
+    transition: opacity 160ms ease, transform 160ms ease;
+  }
+  .multi-select-options-new.up{
+    top: auto;
+    bottom: calc(100% + 8px);
+  }
+  .multi-select-options-new.open{
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+  .multi-select-options-new.open.up{
+    transform: translateY(0) scale(1);
+  }
+  .multi-select-options-new .options-search{
+    padding: 10px 10px 8px;
+    border-bottom: 1px solid #f1f5f9;
+    background: #fff;
+  }
+  .multi-select-options-new .options-search .input-group-text{
+    border-radius: 12px 0 0 12px !important;
+    border: 1px solid #e5e7eb !important;
+    background: #f8fafc !important;
+    color: #6b7280;
+  }
+  .multi-select-options-new .options-search input.form-control{
+    border-radius: 0 12px 12px 0 !important;
+    border: 1px solid #e5e7eb !important;
+    border-left: 0 !important;
+    height: 40px;
+    box-shadow: none !important;
+  }
+  .multi-select-options-new .options-search input.form-control:focus{
+    border-color: rgba(252, 86, 123, 0.65) !important;
+  }
+  .options-list-new{
+    max-height: 260px;
+    overflow: auto;
+    padding: 8px;
+  }
+  .option-item-new{
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 140ms ease, transform 140ms ease;
+  }
+  .option-item-new:hover{
+    background: rgba(252, 86, 123, 0.08);
+    transform: translateY(-1px);
+  }
+  .option-label-new{
+    font-weight: 600;
+    font-size: 13px;
+    color: #111827;
+  }
+  .option-item-new .form-check-input{
+    cursor: pointer;
+    margin-top: 0 !important;
+  }
+  .options-footer{
+    padding: 8px 10px;
+    border-top: 1px solid #f1f5f9;
+    background: #fff;
+  }
+  .no-options{
+    padding: 12px 10px;
+    color: #6b7280;
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  /* Filter modal spacing: keep dropdown above footer (scoped) */
+  .b2b-filter-modal .modal-body{
+    overflow: visible !important;
+  }
+
+  /* Filter modal: mobile layout + scrolling */
+  @media (max-width: 576px){
+    .b2b-filter-dialog{
+      width: calc(100vw - 16px);
+      margin: 8px auto;
+      max-width: calc(100vw - 16px);
+    }
+    .b2b-filter-modal{
+      border-radius: 14px;
+      overflow: hidden;
+      max-height: 92vh !important;
+      display: flex;
+      flex-direction: column;
+    }
+    .b2b-filter-modal .modal-header{
+      padding: 10px 12px;
+      flex: 0 0 auto;
+    }
+    .b2b-filter-modal .modal-body{
+      padding: 12px !important;
+      overflow-y: auto !important;
+      overflow-x: visible !important;
+      -webkit-overflow-scrolling: touch;
+      flex: 1 1 auto;
+      min-height: 0; /* allow flex child to scroll */
+    }
+    .b2b-filter-modal .modal-footer{
+      gap: 8px;
+      padding: 10px 12px;
+      flex: 0 0 auto;
+    }
+    .b2b-filter-modal .modal-footer .btn{
+      flex: 1;
+      white-space: nowrap;
+    }
+    .options-list-new{
+      max-height: 210px;
+    }
+    .multi-select-options-new{
+      border-radius: 12px;
+    }
   }
 
   /* Modern Lead Card Styles */

@@ -102,6 +102,7 @@ import TypeB2b from './Pages/App/College/Settings/TypeOfB2B/TypeB2b';
 import TypeCategory from './Pages/App/College/Settings/TypeOfCategory/TypeCategory';
 import Target from './Pages/App/College/Target/Target';
 import Lrp from './Pages/App/College/LRP/Lrp';
+import LrpView from './Pages/App/College/LRP/LrpView';
 
 
 import CompanyLayout from './Component/Layouts/App/Company';
@@ -317,6 +318,7 @@ const Layout = () => {
           <Route path='emailTemplate' element={<EmailTemplate/>}/>
           <Route path='target' element={<Target/>}/>
           <Route path='lrp' element={<Lrp/>}/>
+          <Route path='lrp-view' element={<LrpView/>}/>
         </Route>
 
         {/* company  */}

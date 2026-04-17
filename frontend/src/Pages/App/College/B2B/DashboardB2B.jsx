@@ -3,7 +3,7 @@ import axios from 'axios';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Calendar, TrendingUp, Users, Building, Clock, Target, CheckCircle, XCircle, DollarSign, AlertCircle, UserCheck, FileCheck, AlertTriangle, ChevronLeft, ChevronRight, CalendarDays, Phone, Mail, MapPin, User, Briefcase, Eye, Edit, History, Plus } from 'lucide-react';
 
-/** LRP display: visit meta from leadSourceQA (metaKey) + lead-source answers */
+
 const LRP_TABLE_COLUMNS = [
   { key: 'partnerType', label: 'Partner type' },
   { key: 'implementationPartnerName', label: 'Implementation partner' },
