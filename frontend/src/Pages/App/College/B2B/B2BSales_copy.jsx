@@ -4,6 +4,7 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
+import * as XLSX from 'xlsx';
 import { Link, useNavigate } from 'react-router-dom';
 import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/googleOAuth';
 
@@ -49,6 +50,16 @@ const mapStyles = `
     font-size: 0.875rem;
   }
 `;
+
+/** Days since lead creation (from API `createdAt`). */
+function getLeadAgeDays(lead) {
+  const raw = lead?.createdAt;
+  if (!raw) return null;
+  const created = new Date(raw);
+  if (Number.isNaN(created.getTime())) return null;
+  const diffMs = Date.now() - created.getTime();
+  return Math.max(0, Math.floor(diffMs / 86400000));
+}
 
 const MultiSelectCheckbox = ({
   title,
@@ -1268,6 +1279,9 @@ const B2BSales = () => {
     leadCategory: [],
     typeOfB2B: [],
     leadOwner: [],
+    hasFollowUpCall: false,
+    hasFollowUpVisit: false,
+    documentsStatus: [], // ['done','pending']
     dateRange: {
       start: null,
       end: null
@@ -1418,6 +1432,9 @@ const B2BSales = () => {
       leadCategory: [],
       typeOfB2B: [],
       leadOwner: [],
+      hasFollowUpCall: false,
+      hasFollowUpVisit: false,
+      documentsStatus: [],
       dateRange: {
         start: null,
         end: null
@@ -1472,6 +1489,11 @@ const B2BSales = () => {
       }
       if (Array.isArray(eff.subStatus) && eff.subStatus.length) {
         params.subStatusIn = toCsv(eff.subStatus);
+      }
+      if (eff.hasFollowUpCall) params.hasFollowUpCall = true;
+      if (eff.hasFollowUpVisit) params.hasFollowUpVisit = true;
+      if (Array.isArray(eff.documentsStatus) && eff.documentsStatus.length) {
+        params.documentsStatusIn = toCsv(eff.documentsStatus);
       }
       // Lead Approval filter
       const approval = eff.approvalStatus ?? selectedApprovalStatus;
@@ -1562,6 +1584,9 @@ const B2BSales = () => {
       if (eff.dateRange?.start) params.startDate = eff.dateRange.start;
       if (eff.dateRange?.end) params.endDate = eff.dateRange.end;
       if (Array.isArray(eff.status) && eff.status.length) params.statusIn = toCsv(eff.status);
+      if (eff.hasFollowUpCall) params.hasFollowUpCall = true;
+      if (eff.hasFollowUpVisit) params.hasFollowUpVisit = true;
+      if (Array.isArray(eff.documentsStatus) && eff.documentsStatus.length) params.documentsStatusIn = toCsv(eff.documentsStatus);
       const approval = eff.approvalStatus ?? selectedApprovalStatus;
       if (approval) params.approvalStatus = approval;
 
@@ -1602,6 +1627,9 @@ const B2BSales = () => {
       if (eff.dateRange?.start) baseParams.startDate = eff.dateRange.start;
       if (eff.dateRange?.end) baseParams.endDate = eff.dateRange.end;
       if (Array.isArray(eff.status) && eff.status.length) baseParams.statusIn = toCsv(eff.status);
+      if (eff.hasFollowUpCall) baseParams.hasFollowUpCall = true;
+      if (eff.hasFollowUpVisit) baseParams.hasFollowUpVisit = true;
+      if (Array.isArray(eff.documentsStatus) && eff.documentsStatus.length) baseParams.documentsStatusIn = toCsv(eff.documentsStatus);
 
       const [allRes, approvedRes, pendingRes, rejectedRes] = await Promise.all([
         axios.get(`${backendUrl}/college/b2b/leads/status-count`, { headers: { 'x-auth': token }, params: baseParams }),
@@ -1956,24 +1984,60 @@ const B2BSales = () => {
 
   // Open lead modal and initialize autocomplete
   const handleOpenLeadModal = () => {
+    const uid = userData?._id != null ? String(userData._id) : '';
+    setLeadFormData({
+      leadCategory: '',
+      typeOfB2B: '',
+      businessName: '',
+      businessAddress: '',
+      concernPersonName: '',
+      address: '',
+      city: '',
+      state: '',
+      latitude: '',
+      longitude: '',
+      designation: '',
+      email: '',
+      mobile: '',
+      whatsapp: '',
+      landlineNumber: '',
+      leadOwner: uid,
+      remark: ''
+    });
+    setFormErrors({});
+    setExtractedNumbers([]);
+    setSelectedLocation(null);
+    setShowMap(false);
     setShowAddLeadModal(true);
   };
 
-  // Bulk Upload Functions
+  // Bulk Upload Functions (Excel only — same columns as backend import)
+  const downloadB2bLeadsSampleExcel = () => {
+    const rows = [
+      ['Business Name', 'Concern Person Name', 'Mobile', 'Email', 'Lead Source', 'Type of B2B', 'Address', 'City', 'State', 'Designation', 'WhatsApp', 'Landline Number', 'Lead Owner', 'Remark'],
+      ['ABC Company', 'John Doe', '9876543210', 'john@abc.com', 'Corporate', 'Partner', '123 Main Street', 'Mumbai', 'Maharashtra', 'Manager', '9876543210', '0221234567', 'Owner Name', 'Sample remark'],
+      ['XYZ Corp', 'Jane Smith', '9876543211', 'jane@xyz.com', 'Individual', 'Client', '456 Park Avenue', 'Delhi', 'Delhi', 'Director', '9876543211', '0111234567', 'Owner Name', 'Another remark'],
+      ['Tech Solutions', 'Raj Kumar', '9876543212', 'raj@tech.com', 'Corporate', 'Partner', '789 Tech Park', 'Bangalore', 'Karnataka', 'CEO', '9876543212', '0801234567', 'Owner Name', 'Technology company']
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Leads');
+    XLSX.writeFile(wb, 'b2b_leads_sample.xlsx');
+  };
+
   const handleBulkFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
       // Validate file type
       const validTypes = [
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-        'application/vnd.ms-excel', // .xls
-        'text/csv' // .csv
+        'application/vnd.ms-excel' // .xls
       ];
-      const validExtensions = ['.xlsx', '.xls', '.csv'];
+      const validExtensions = ['.xlsx', '.xls'];
       const fileExtension = selectedFile.name.substring(selectedFile.name.lastIndexOf('.')).toLowerCase();
 
       if (!validTypes.includes(selectedFile.type) && !validExtensions.includes(fileExtension)) {
-        setBulkUploadMessage('Please select a valid Excel file (.xlsx, .xls) or CSV file');
+        setBulkUploadMessage('Please select an Excel file (.xlsx or .xls)');
         e.target.value = '';
         return;
       }
@@ -2006,6 +2070,12 @@ const B2BSales = () => {
     // Validate file object
     if (!(selectedFile instanceof File)) {
       setBulkUploadMessage('Invalid file object. Please select the file again.');
+      return;
+    }
+
+    const ext = selectedFile.name.substring(selectedFile.name.lastIndexOf('.')).toLowerCase();
+    if (ext !== '.xlsx' && ext !== '.xls') {
+      setBulkUploadMessage('Please upload an Excel file (.xlsx or .xls)');
       return;
     }
 
@@ -4908,7 +4978,17 @@ const B2BSales = () => {
                             <div className="lead-meta-v2__grid">
                               <div className="lead-meta-v2__item">
                                 <div className="lead-meta-v2__label">Lead Age</div>
-                                <div className="lead-meta-v2__value">—</div>
+                                {(() => {
+                                  const days = getLeadAgeDays(lead);
+                                  return (
+                                    <div
+                                      className="lead-meta-v2__value"
+                                      title={days != null ? `${days} days since created` : undefined}
+                                    >
+                                      {days === null ? '—' : `${days} ${days === 1 ? 'day' : 'days'}`}
+                                    </div>
+                                  );
+                                })()}
                               </div>
                               <div className="lead-meta-v2__item">
                                 <div className="lead-meta-v2__label">Lead Owner</div>
@@ -5234,6 +5314,80 @@ const B2BSales = () => {
                     />
                   </div>
                   <div className="col-md-6">
+                    <MultiSelectCheckbox
+                      title="Status"
+                      icon="fas fa-calendar"
+                      options={(statuses || []).map((s) => ({ value: s._id, label: s.name || s.title || 'Status' }))}
+                      selectedValues={filters.status || []}
+                      onChange={(vals) => handleFilterChange('status', vals)}
+                      isOpen={openModalId === 'status'}
+                      onToggle={() => setOpenModalId((prev) => (prev === 'status' ? null : 'status'))}
+                      onClose={() => setOpenModalId(null)}
+                    />
+
+                  </div>
+                  <div className="col-md-6">
+                    <MultiSelectCheckbox
+                      title="Sub Status"
+                      icon="fas fa-calendar"
+                      options={(subStatuses || []).map((ss) => ({ value: ss._id, label: ss.title || 'Sub Status' }))}
+                      selectedValues={filters.subStatus || []}
+                      onChange={(vals) => handleFilterChange('subStatus', vals)}
+                      isOpen={openModalId === 'subStatus'}
+                      onToggle={() => setOpenModalId((prev) => (prev === 'subStatus' ? null : 'subStatus'))}
+                      onClose={() => setOpenModalId(null)}
+                    />
+                  </div>
+
+                  <div className="col-md-3">
+                    <label className="form-label fw-medium text-dark mb-2">
+                      <i className="fas fa-phone text-primary me-2"></i>
+                      Followup Calling
+                    </label>
+                    <div className="form-check form-switch m-0">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        role="switch"
+                        checked={Boolean(filters.hasFollowUpCall)}
+                        onChange={(e) => handleFilterChange('hasFollowUpCall', e.target.checked)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-3">
+                    <label className="form-label fw-medium text-dark mb-2">
+                      <i className="fas fa-map-marker-alt text-primary me-2"></i>
+                      Followup Visit
+                    </label>
+                    <div className="form-check form-switch m-0">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        role="switch"
+                        checked={Boolean(filters.hasFollowUpVisit)}
+                        onChange={(e) => handleFilterChange('hasFollowUpVisit', e.target.checked)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <MultiSelectCheckbox
+                      title="Documents"
+                      icon="fas fa-file"
+                      options={[
+                        { value: 'pending', label: 'Pending' },
+                        { value: 'done', label: 'Done' },
+                      ]}
+                      selectedValues={filters.documentsStatus || []}
+                      onChange={(vals) => handleFilterChange('documentsStatus', vals)}
+                      isOpen={openModalId === 'documentsStatus'}
+                      onToggle={() => setOpenModalId((prev) => (prev === 'documentsStatus' ? null : 'documentsStatus'))}
+                      onClose={() => setOpenModalId(null)}
+                    />
+                  </div>
+
+                  <div className="col-md-6">
                     <label className="form-label fw-medium text-dark mb-2">
                       <i className="fas fa-calendar text-danger me-2"></i>
                       Start Date
@@ -5257,31 +5411,6 @@ const B2BSales = () => {
                       value={filters.dateRange.end || ''}
                       onChange={(e) => handleDateRangeChange('end', e.target.value)}
                       style={{ backgroundColor: '#f8f9fa' }}
-                    />
-                  </div>
-                  <div className="col-md-6">
-                    <MultiSelectCheckbox
-                      title="Status"
-                      icon="fas fa-calendar"
-                      options={(statuses || []).map((s) => ({ value: s._id, label: s.name || s.title || 'Status' }))}
-                      selectedValues={filters.status || []}
-                      onChange={(vals) => handleFilterChange('status', vals)}
-                      isOpen={openModalId === 'status'}
-                      onToggle={() => setOpenModalId((prev) => (prev === 'status' ? null : 'status'))}
-                      onClose={() => setOpenModalId(null)}
-                    />
-
-                  </div>
-                  <div className="col-md-6">
-                    <MultiSelectCheckbox
-                      title="Sub Status"
-                      icon="fas fa-calendar"
-                      options={(subStatuses || []).map((ss) => ({ value: ss._id, label: ss.title || 'Sub Status' }))}
-                      selectedValues={filters.subStatus || []}
-                      onChange={(vals) => handleFilterChange('subStatus', vals)}
-                      isOpen={openModalId === 'subStatus'}
-                      onToggle={() => setOpenModalId((prev) => (prev === 'subStatus' ? null : 'subStatus'))}
-                      onClose={() => setOpenModalId(null)}
                     />
                   </div>
                 </div>
@@ -5873,6 +6002,12 @@ const B2BSales = () => {
                         onChange={handleLeadInputChange}
                       >
                         <option value="">Select Lead Owner</option>
+                        {userData?._id &&
+                          !users?.some((u) => String(u?._id) === String(userData._id)) && (
+                            <option key={`me-${userData._id}`} value={String(userData._id)}>
+                              {userData.name || 'Me'}
+                            </option>
+                          )}
                         {users?.map(user => (
                           <option key={user?._id} value={user?._id}>
                             {user?.name}
@@ -5959,7 +6094,7 @@ const B2BSales = () => {
                     Instructions:
                   </h6>
                   <ul className="mb-0 small">
-                    <li>Upload CSV or Excel file (.xlsx, .xls, .csv)</li>
+                    <li>Upload an Excel file only (.xlsx or .xls)</li>
                     <li>Maximum file size: 10MB</li>
                     <li><strong>Required fields:</strong> Business Name, Concern Person Name, Mobile, Lead Source, Type of B2B</li>
 
@@ -5978,7 +6113,7 @@ const B2BSales = () => {
                       id="bulkUploadFile"
                       ref={bulkUploadFileInputRef}
                       className="form-control"
-                      accept=".csv,.xlsx,.xls"
+                      accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                       onChange={handleBulkFileChange}
                       disabled={bulkUploadLoading}
                     />
@@ -6007,26 +6142,10 @@ const B2BSales = () => {
                   <button
                     type="button"
                     className="btn sampledownload btn-sm"
-                    onClick={() => {
-
-                      const sampleCSV = `Business Name,Concern Person Name,Mobile,Email,Lead Source,Type of B2B,Address,City,State,Designation,WhatsApp,Landline Number,Lead Owner,Remark
-ABC Company,John Doe,9876543210,john@abc.com,Corporate,Partner,123 Main Street,Mumbai,Maharashtra,Manager,9876543210,0221234567,Owner Name,Sample remark
-XYZ Corp,Jane Smith,9876543211,jane@xyz.com,Individual,Client,456 Park Avenue,Delhi,Delhi,Director,9876543211,0111234567,Owner Name,Another remark
-Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park,Bangalore,Karnataka,CEO,9876543212,0801234567,Owner Name,Technology company`;
-
-                      const blob = new Blob([sampleCSV], { type: 'text/csv;charset=utf-8;' });
-                      const url = window.URL.createObjectURL(blob);
-                      const link = document.createElement('a');
-                      link.href = url;
-                      link.setAttribute('download', 'b2b_leads_sample.csv');
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                      window.URL.revokeObjectURL(url);
-                    }}
+                    onClick={downloadB2bLeadsSampleExcel}
                   >
                     <i className="fas fa-download me-1"></i>
-                    Download Sample CSV
+                    Download Sample
                   </button>
                 </div>
 

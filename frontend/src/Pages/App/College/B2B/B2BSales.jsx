@@ -4,6 +4,7 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
+import * as XLSX from 'xlsx';
 import { Link } from 'react-router-dom';
 import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/googleOAuth';
 
@@ -1505,21 +1506,33 @@ const B2BSales = () => {
     setShowAddLeadModal(true);
   };
 
-  // Bulk Upload Functions
+  // Bulk Upload Functions (Excel only — same columns as backend import)
+  const downloadB2bLeadsSampleExcel = () => {
+    const rows = [
+      ['Business Name', 'Concern Person Name', 'Mobile', 'Email', 'Lead Source', 'Type of B2B', 'Address', 'City', 'State', 'Designation', 'WhatsApp', 'Landline Number', 'Lead Owner', 'Remark'],
+      ['ABC Company', 'John Doe', '9876543210', 'john@abc.com', 'Corporate', 'Partner', '123 Main Street', 'Mumbai', 'Maharashtra', 'Manager', '9876543210', '0221234567', 'Owner Name', 'Sample remark'],
+      ['XYZ Corp', 'Jane Smith', '9876543211', 'jane@xyz.com', 'Individual', 'Client', '456 Park Avenue', 'Delhi', 'Delhi', 'Director', '9876543211', '0111234567', 'Owner Name', 'Another remark'],
+      ['Tech Solutions', 'Raj Kumar', '9876543212', 'raj@tech.com', 'Corporate', 'Partner', '789 Tech Park', 'Bangalore', 'Karnataka', 'CEO', '9876543212', '0801234567', 'Owner Name', 'Technology company']
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Leads');
+    XLSX.writeFile(wb, 'b2b_leads_sample.xlsx');
+  };
+
   const handleBulkFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
       // Validate file type
       const validTypes = [
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-        'application/vnd.ms-excel', // .xls
-        'text/csv' // .csv
+        'application/vnd.ms-excel' // .xls
       ];
-      const validExtensions = ['.xlsx', '.xls', '.csv'];
+      const validExtensions = ['.xlsx', '.xls'];
       const fileExtension = selectedFile.name.substring(selectedFile.name.lastIndexOf('.')).toLowerCase();
       
       if (!validTypes.includes(selectedFile.type) && !validExtensions.includes(fileExtension)) {
-        setBulkUploadMessage('Please select a valid Excel file (.xlsx, .xls) or CSV file');
+        setBulkUploadMessage('Please select an Excel file (.xlsx or .xls)');
         e.target.value = '';
         return;
       }
@@ -1552,6 +1565,12 @@ const B2BSales = () => {
     // Validate file object
     if (!(selectedFile instanceof File)) {
       setBulkUploadMessage('Invalid file object. Please select the file again.');
+      return;
+    }
+
+    const ext = selectedFile.name.substring(selectedFile.name.lastIndexOf('.')).toLowerCase();
+    if (ext !== '.xlsx' && ext !== '.xls') {
+      setBulkUploadMessage('Please upload an Excel file (.xlsx or .xls)');
       return;
     }
 
@@ -4602,7 +4621,7 @@ const B2BSales = () => {
                     Instructions:
                   </h6>
                   <ul className="mb-0 small">
-                    <li>Upload CSV or Excel file (.xlsx, .xls, .csv)</li>
+                    <li>Upload an Excel file only (.xlsx or .xls)</li>
                     <li>Maximum file size: 10MB</li>
                     <li><strong>Required fields:</strong> Business Name, Concern Person Name, Mobile, Lead Source, Type of B2B</li>
                    
@@ -4621,7 +4640,7 @@ const B2BSales = () => {
                       id="bulkUploadFile"
                       ref={bulkUploadFileInputRef}
                       className="form-control"
-                      accept=".csv,.xlsx,.xls"
+                      accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                       onChange={handleBulkFileChange}
                       disabled={bulkUploadLoading}
                     />
@@ -4650,26 +4669,10 @@ const B2BSales = () => {
                   <button
                     type="button"
                     className="btn sampledownload btn-sm"
-                    onClick={() => {
-                      
-                      const sampleCSV = `Business Name,Concern Person Name,Mobile,Email,Lead Source,Type of B2B,Address,City,State,Designation,WhatsApp,Landline Number,Lead Owner,Remark
-ABC Company,John Doe,9876543210,john@abc.com,Corporate,Partner,123 Main Street,Mumbai,Maharashtra,Manager,9876543210,0221234567,Owner Name,Sample remark
-XYZ Corp,Jane Smith,9876543211,jane@xyz.com,Individual,Client,456 Park Avenue,Delhi,Delhi,Director,9876543211,0111234567,Owner Name,Another remark
-Tech Solutions,Raj Kumar,9876543212,raj@tech.com,Corporate,Partner,789 Tech Park,Bangalore,Karnataka,CEO,9876543212,0801234567,Owner Name,Technology company`;
-                      
-                      const blob = new Blob([sampleCSV], { type: 'text/csv;charset=utf-8;' });
-                      const url = window.URL.createObjectURL(blob);
-                      const link = document.createElement('a');
-                      link.href = url;
-                      link.setAttribute('download', 'b2b_leads_sample.csv');
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                      window.URL.revokeObjectURL(url);
-                    }}
+                    onClick={downloadB2bLeadsSampleExcel}
                   >
                     <i className="fas fa-download me-1"></i>
-                    Download Sample CSV
+                    Download Sample
                   </button>
                 </div>
 

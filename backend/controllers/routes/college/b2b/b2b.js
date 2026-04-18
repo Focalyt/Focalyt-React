@@ -7,8 +7,6 @@ const { isCollege, getAllTeamMembers } = require("../../../../helpers");
 const fileupload = require("express-fileupload");
 const readXlsxFile = require("read-excel-file/node");
 const mongoose = require("mongoose");
-// const csv = require("csv-parser");
-const csv = require("fast-csv");
 const uuid = require('uuid/v1');
 const multer = require('multer');
 const AWS = require('aws-sdk');
@@ -547,6 +545,9 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 			leadOwner,
 			leadOwnerIn,
 			statusIn,
+			hasFollowUpCall,
+			hasFollowUpVisit,
+			documentsStatusIn,
 			approvalStatus
 		} = req.query;
 
@@ -663,6 +664,38 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 			if (ids.length) filterConditions.push({ status: { $in: ids } });
 		}
 
+		// Follow-up existence filters
+		if (String(hasFollowUpCall).toLowerCase() === 'true') {
+			filterConditions.push({ followUpCall: { $exists: true, $ne: null } });
+		}
+		if (String(hasFollowUpVisit).toLowerCase() === 'true') {
+			filterConditions.push({ followUpVisit: { $exists: true, $ne: null } });
+		}
+
+		// Documents status filter (done/pending)
+		if (documentsStatusIn) {
+			const list = String(documentsStatusIn).split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+			const wantsDone = list.includes('done');
+			const wantsPending = list.includes('pending');
+			const doneCond = {
+				'documents.0': { $exists: true },
+				documents: { $not: { $elemMatch: { status: { $ne: 'APPROVED' } } } }
+			};
+			const pendingCond = {
+				$or: [
+					{ 'documents.0': { $exists: false } },
+					{ documents: { $elemMatch: { status: { $ne: 'APPROVED' } } } }
+				]
+			};
+			if (wantsDone && wantsPending) {
+				// no-op (both selected means all)
+			} else if (wantsDone) {
+				filterConditions.push(doneCond);
+			} else if (wantsPending) {
+				filterConditions.push(pendingCond);
+			}
+		}
+
 		// Base query with ownership conditions and filters
 		const baseQuery = {
 			$and: [
@@ -767,6 +800,9 @@ router.get('/leads', isCollege, async (req, res) => {
 			endDate,
 			leadOwner,
 			leadOwnerIn,
+			hasFollowUpCall,
+			hasFollowUpVisit,
+			documentsStatusIn,
 			approvalStatus
 		} = req.query;
 
@@ -867,9 +903,41 @@ router.get('/leads', isCollege, async (req, res) => {
 				]
 			}] : []),
 			// Approval status filter
-			...(approvalStatus ? [{ 'approval.status': String(approvalStatus).toUpperCase() }] : [])
+			...(approvalStatus ? [{ 'approval.status': String(approvalStatus).toUpperCase() }] : []),
+
+			// Follow-up existence filters
+			...(String(hasFollowUpCall).toLowerCase() === 'true'
+				? [{ followUpCall: { $exists: true, $ne: null } }]
+				: []),
+			...(String(hasFollowUpVisit).toLowerCase() === 'true'
+				? [{ followUpVisit: { $exists: true, $ne: null } }]
+				: []),
 		]
 	};
+
+		// Documents status filter (done/pending)
+		if (documentsStatusIn) {
+			const list = String(documentsStatusIn).split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+			const wantsDone = list.includes('done');
+			const wantsPending = list.includes('pending');
+			const doneCond = {
+				'documents.0': { $exists: true },
+				documents: { $not: { $elemMatch: { status: { $ne: 'APPROVED' } } } }
+			};
+			const pendingCond = {
+				$or: [
+					{ 'documents.0': { $exists: false } },
+					{ documents: { $elemMatch: { status: { $ne: 'APPROVED' } } } }
+				]
+			};
+			if (wantsDone && wantsPending) {
+				// no-op
+			} else if (wantsDone) {
+				finalQuery.$and.push(doneCond);
+			} else if (wantsPending) {
+				finalQuery.$and.push(pendingCond);
+			}
+		}
 
 		// Remove empty $and array if no conditions
 		if (finalQuery.$and.length === 0) {
@@ -2372,93 +2440,7 @@ router.post('/leads/import', isCollege, async (req, res) => {
 			'lon': 'longitude'
 		};
 
-		if (fileExtension === '.csv') {
-			// Parse CSV
-			const csvData = fs.readFileSync(filePath, 'utf8');
-			const rawLeads = [];
-			
-			await new Promise((resolve, reject) => {
-				csv.parseString(csvData, { headers: true })
-					.on('data', (row) => {
-						rawLeads.push(row);
-					})
-					.on('end', () => {
-						resolve();
-					})
-					.on('error', reject);
-			});
-			
-			// console.log('CSV parsing - First raw row:', JSON.stringify(rawLeads[0], null, 2));
-			// console.log('CSV parsing - Available headers:', Object.keys(rawLeads[0] || {}));
-			
-			// Map CSV headers to standard field names
-			leads = rawLeads.map((row, rowIndex) => {
-				const obj = {};
-				
-				// Process each field in the row
-				Object.keys(row).forEach(originalKey => {
-					// Normalize header: lowercase, remove spaces, remove special chars
-					const normalizedKey = originalKey.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
-					
-					// Try exact match first
-					let mappedKey = headerMap[normalizedKey];
-					
-					// If no exact match, try partial matching
-					if (!mappedKey) {
-						for (const [key, value] of Object.entries(headerMap)) {
-							if (normalizedKey.startsWith(key) || key.startsWith(normalizedKey)) {
-								mappedKey = value;
-								break;
-							}
-						}
-					}
-					
-					// If still no match, use original key
-					if (!mappedKey) {
-						mappedKey = originalKey.trim();
-					}
-					
-					let value = row[originalKey];
-					
-					// Skip if value is null or undefined
-					if (value === null || value === undefined) {
-						return;
-					}
-					
-					// Handle scientific notation for numbers (mobile, whatsapp, landline)
-					if (mappedKey === 'mobile' || mappedKey === 'whatsapp' || mappedKey === 'landlineNumber') {
-						if (typeof value === 'number') {
-							if (value >= 1e9 || value < -1e9) {
-								value = value.toFixed(0);
-							} else {
-								value = value.toString();
-							}
-							value = value.replace(/\.0+$/, '').replace('.', '');
-						} else if (typeof value === 'string') {
-							if (value.includes('E+') || value.includes('e+') || value.includes('E-') || value.includes('e-')) {
-								const numValue = parseFloat(value);
-								if (!isNaN(numValue)) {
-									value = numValue.toFixed(0);
-								}
-							}
-						}
-					}
-					
-					// Convert all values to string and trim
-					const stringValue = String(value).trim();
-					
-					// Set value even if empty (validation will handle empty check)
-					if (stringValue !== 'undefined' && stringValue !== 'null') {
-						obj[mappedKey] = stringValue;
-					}
-				});
-				
-				return obj;
-			});
-			
-			// console.log('Total CSV leads parsed:', leads.length);
-			// console.log('First 2 CSV leads:', JSON.stringify(leads.slice(0, 2), null, 2));
-		} else if (fileExtension === '.xlsx' || fileExtension === '.xls') {
+		if (fileExtension === '.xlsx' || fileExtension === '.xls') {
 			// Parse Excel
 			const excelData = await readXlsxFile(filePath);
 			const headers = excelData[0];
@@ -2535,7 +2517,7 @@ router.post('/leads/import', isCollege, async (req, res) => {
 		} else {
 			return res.status(400).json({
 				status: false,
-				message: 'Unsupported file format. Please upload CSV or Excel file'
+				message: 'Unsupported file format. Please upload an Excel file (.xlsx or .xls)'
 			});
 		}
 
