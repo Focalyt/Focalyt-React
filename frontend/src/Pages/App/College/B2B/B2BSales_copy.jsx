@@ -61,6 +61,70 @@ function getLeadAgeDays(lead) {
   return Math.max(0, Math.floor(diffMs / 86400000));
 }
 
+function safeStr(v) {
+  return String(v ?? '').trim();
+}
+
+function pickFirstNonEmpty(...values) {
+  for (const v of values) {
+    const s = safeStr(v);
+    if (s) return s;
+  }
+  return '';
+}
+
+function buildLeadRemarkSuggestion({ leadFormData, leadCategoryOptions, typeOfB2BOptions }) {
+  const business = safeStr(leadFormData?.businessName);
+  const city = safeStr(leadFormData?.city);
+  const state = safeStr(leadFormData?.state);
+  const person = safeStr(leadFormData?.concernPersonName);
+  const designation = safeStr(leadFormData?.designation);
+
+  const leadCatLabel = (() => {
+    const id = leadFormData?.leadCategory;
+    return pickFirstNonEmpty(leadCategoryOptions?.find?.((o) => o.value === id)?.label, id);
+  })();
+  const b2bTypeLabel = (() => {
+    const id = leadFormData?.typeOfB2B;
+    return pickFirstNonEmpty(typeOfB2BOptions?.find?.((o) => o.value === id)?.label, id);
+  })();
+
+  const who = [person, designation].filter(Boolean).join(' - ');
+  const where = [city, state].filter(Boolean).join(', ');
+
+  const lines = [
+    business ? `Initial connect planned with ${business}.` : 'Initial connect planned.',
+    who ? `POC: ${who}.` : '',
+    where ? `Location: ${where}.` : '',
+    leadCatLabel ? `Lead category: ${leadCatLabel}.` : '',
+    b2bTypeLabel ? `B2B type: ${b2bTypeLabel}.` : '',
+    'Next step: Call and share program overview + partnership model; confirm requirements and decision timeline.'
+  ].filter(Boolean);
+
+  return lines.join('\n');
+}
+
+function buildFollowupNotesSuggestion({ followupFormData, selectedProfile, seletectedStatus, seletectedSubStatus, statuses }) {
+  const leadName = pickFirstNonEmpty(selectedProfile?.businessName, selectedProfile?.name);
+  const followType = pickFirstNonEmpty(followupFormData?.followUpType, 'Call');
+  const statusLabel = pickFirstNonEmpty(statuses?.find?.((s) => s._id === seletectedStatus)?.name, seletectedStatus);
+  const subLabel = pickFirstNonEmpty(seletectedSubStatus?.title, seletectedSubStatus?.name);
+
+  const dateLike = followupFormData?.followupDate;
+  const dt = dateLike ? new Date(dateLike) : null;
+  const dateLabel = dt && !Number.isNaN(dt.getTime()) ? dt.toLocaleDateString('en-GB') : '';
+  const timeLabel = safeStr(followupFormData?.followupTime);
+
+  const lines = [
+    leadName ? `${followType} follow-up for ${leadName}.` : `${followType} follow-up.`,
+    statusLabel ? `Status: ${statusLabel}${subLabel ? ` / ${subLabel}` : ''}.` : (subLabel ? `Sub-status: ${subLabel}.` : ''),
+    (dateLabel || timeLabel) ? `Scheduled: ${[dateLabel, timeLabel].filter(Boolean).join(' ')}.` : '',
+    'Agenda: confirm interest, capture requirements, share brochure/pricing, and agree on next milestone.'
+  ].filter(Boolean);
+
+  return lines.join('\n');
+}
+
 const MultiSelectCheckbox = ({
   title,
   options,
@@ -1231,6 +1295,10 @@ const B2BSales = () => {
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState(null);
 
+  const [aiLeadIntelById, setAiLeadIntelById] = useState({});
+  const [aiLeadIntelLoading, setAiLeadIntelLoading] = useState(false);
+  const [aiLeadIntelError, setAiLeadIntelError] = useState('');
+
   // Add state for status counts
   const [statusCounts, setStatusCounts] = useState([]);
   const [totalLeads, setTotalLeads] = useState(0);
@@ -1452,6 +1520,7 @@ const B2BSales = () => {
     try {
       closePanel();
       setLoadingLeads(true);
+      setAiLeadIntelError('');
 
       const eff = { ...filters, ...filterOverrides };
 
@@ -1551,6 +1620,24 @@ const B2BSales = () => {
         // });
 
         setLeads(fetchedLeads);
+
+        try {
+          if (Array.isArray(fetchedLeads) && fetchedLeads.length > 0) {
+            setAiLeadIntelLoading(true);
+            const aiRes = await axios.post(
+              `${backendUrl}/api/ai/lead-intel/bulk`,
+              { leads: fetchedLeads },
+              { headers: { 'x-auth': token } }
+            );
+            if (aiRes?.data?.success && aiRes?.data?.data) {
+              setAiLeadIntelById((prev) => ({ ...prev, ...(aiRes.data.data || {}) }));
+            }
+          }
+        } catch (aiErr) {
+          setAiLeadIntelError(aiErr?.response?.data?.message || 'AI lead supervision unavailable.');
+        } finally {
+          setAiLeadIntelLoading(false);
+        }
         // ✅ Extract pagination data from backend response
         if (response.data.data.pagination) {
           setTotalPages(response.data.data.pagination.totalPages || 1);
@@ -2222,6 +2309,53 @@ const B2BSales = () => {
     selectedCounselor: null,
     selectedDocument: null
   });
+
+  // AI Summary for Follow-up Notes (summarize existing notes text)
+  const [notesAI, setNotesAI] = useState({
+    loading: false,
+    error: '',
+    data: null
+  });
+
+  const summarizeFollowupNotes = async () => {
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+    const text = String(followupFormData.remarks || '').trim();
+    if (!text) {
+      setNotesAI((prev) => ({ ...prev, error: 'Please enter Follow-up Notes first.' }));
+      return;
+    }
+    try {
+      setNotesAI({ loading: true, error: '', data: null });
+      const leadContext = {
+        leadId: selectedProfile?._id || null,
+        businessName: selectedProfile?.businessName || '',
+        concernPersonName: selectedProfile?.concernPersonName || '',
+        mobile: selectedProfile?.mobile || '',
+        whatsapp: selectedProfile?.whatsapp || '',
+        email: selectedProfile?.email || '',
+        status: selectedProfile?.status?.title || selectedProfile?.status?.name || '',
+        subStatus: selectedProfile?.subStatus?.title || ''
+      };
+
+      const resp = await axios.post(
+        `${backendUrl}/api/ai/conversation-summary`,
+        { channel: 'Notes', leadContext, text },
+        { headers: token ? { 'x-auth': token } : undefined }
+      );
+
+      if (resp?.data?.success) {
+        setNotesAI({ loading: false, error: '', data: resp.data.data || null });
+      } else {
+        setNotesAI({ loading: false, error: resp?.data?.message || 'AI summarization failed.', data: null });
+      }
+    } catch (err) {
+      setNotesAI({
+        loading: false,
+        error: err?.response?.data?.message || err?.message || 'AI summarization failed.',
+        data: null
+      });
+    }
+  };
 
 
   const [subStatuses, setSubStatuses] = useState([
@@ -2961,9 +3095,41 @@ const B2BSales = () => {
 
               {/* Remarks */}
               <div className="mb-4">
-                <label htmlFor="followupRemarks" className="form-label small fw-medium text-dark" style={{ fontSize: '13px', marginBottom: '8px' }}>
-                  Follow-up Notes
-                </label>
+                <div className="d-flex align-items-center justify-content-between">
+                  <label htmlFor="followupRemarks" className="form-label small fw-medium text-dark" style={{ fontSize: '13px', marginBottom: '8px' }}>
+                    Follow-up Notes
+                  </label>
+                  <div className="d-flex align-items-center gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-primary"
+                      onClick={() => {
+                        const suggestion = buildFollowupNotesSuggestion({
+                          followupFormData,
+                          selectedProfile,
+                          seletectedStatus,
+                          seletectedSubStatus,
+                          statuses
+                        });
+                        setFollowupFormData((prev) => ({
+                          ...prev,
+                          remarks: prev.remarks ? `${prev.remarks}\n\n${suggestion}` : suggestion
+                        }));
+                      }}
+                    >
+                      AI Suggest
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      onClick={summarizeFollowupNotes}
+                      disabled={notesAI.loading}
+                      title="Summarize the current Follow-up Notes with AI"
+                    >
+                      {notesAI.loading ? 'Summarizing...' : 'AI Summarize'}
+                    </button>
+                  </div>
+                </div>
                 <textarea
                   className="form-control border-0 bgcolor"
                   id="followupRemarks"
@@ -2982,6 +3148,60 @@ const B2BSales = () => {
                     minHeight: '100px'
                   }}
                 />
+                {notesAI.error ? (
+                  <div className="text-danger small mt-2">{notesAI.error}</div>
+                ) : null}
+                {notesAI.data ? (
+                  <div className="mt-3 p-3" style={{ border: '1px solid #e9ecef', borderRadius: '10px', background: '#f8fafc' }}>
+                    <div className="d-flex align-items-center justify-content-between mb-2">
+                      <div className="fw-semibold">AI Summary (from Notes)</div>
+                      <div className="d-flex gap-2">
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-success"
+                          onClick={() => {
+                            const block = [
+                              notesAI.data?.summary ? `Summary:\n${notesAI.data.summary}` : '',
+                              Array.isArray(notesAI.data?.nextActions) && notesAI.data.nextActions.length
+                                ? `Next actions:\n- ${notesAI.data.nextActions.join('\n- ')}`
+                                : '',
+                              notesAI.data?.entities?.requirements?.length
+                                ? `Requirements:\n- ${notesAI.data.entities.requirements.join('\n- ')}`
+                                : '',
+                              notesAI.data?.entities?.budget ? `Budget: ${notesAI.data.entities.budget}` : '',
+                              notesAI.data?.entities?.timeline ? `Timeline: ${notesAI.data.entities.timeline}` : '',
+                              notesAI.data?.entities?.decisionMaker ? `Decision maker: ${notesAI.data.entities.decisionMaker}` : '',
+                              notesAI.data?.entities?.location ? `Location: ${notesAI.data.entities.location}` : '',
+                              Array.isArray(notesAI.data?.objections) && notesAI.data.objections.length
+                                ? `Objections:\n- ${notesAI.data.objections.join('\n- ')}`
+                                : '',
+                              String(notesAI.data?.suggestedReply || '').trim()
+                                ? `Suggested reply:\n${String(notesAI.data.suggestedReply || '').trim()}`
+                                : ''
+                            ].filter(Boolean).join('\n\n');
+
+                            setFollowupFormData((prev) => ({
+                              ...prev,
+                              remarks: block
+                            }));
+                          }}
+                        >
+                          Add to Notes
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={() => setNotesAI((prev) => ({ ...prev, data: null, error: '' }))}
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                    {notesAI.data?.summary ? (
+                      <div className="small" style={{ whiteSpace: 'pre-wrap' }}>{notesAI.data.summary}</div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
 
               {/* Action Buttons */}
@@ -4350,6 +4570,10 @@ const B2BSales = () => {
                   </div>
                   <p className="mt-3 text-muted">Loading B2B leads...</p>
                 </div>
+              ) : aiLeadIntelError ? (
+                <div className="alert alert-warning py-2" style={{ fontSize: '13px' }}>
+                  {aiLeadIntelError}
+                </div>
               ) : leads.length === 0 ? (
                 <div className="text-center py-5">
                   <i className="fas fa-inbox text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
@@ -4367,6 +4591,28 @@ const B2BSales = () => {
                       <div className={`lead-card ${(bulkMode === 'bulkrefer' && (selectedProfiles || []).includes(lead._id)) ? 'bulk-selected' : ''}`}>
                         {/* Card Header */}
                         <div className="lead-header lead-header-v2">
+                          <button
+                            type="button"
+                            className="lead-header-v2__float-icon"
+                            aria-label={leadDetailsVisible === leadIndex ? 'Collapse lead' : 'Expand lead'}
+                            title={leadDetailsVisible === leadIndex ? 'Collapse' : 'Expand'}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              toggleLeadDetails(leadIndex);
+                            }}
+                          >
+                            <i className={leadDetailsVisible === leadIndex ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
+                          </button>
+
+                          {/* {aiLeadIntelById?.[lead._id] && (
+                            <div
+                              className="lead-header-v2__float-ai d-none d-md-inline-flex"
+                              title={`AI score: ${aiLeadIntelById[lead._id]?.score ?? 0}${aiLeadIntelById[lead._id]?.suggestedAction ? ` • ${aiLeadIntelById[lead._id].suggestedAction}` : ''}`}
+                            >
+                              AI
+                            </div>
+                          )} */}
                           {isMobile ? (
                             <div className="lhm">
 
@@ -4379,6 +4625,32 @@ const B2BSales = () => {
                                     {lead.concernPersonName || lead.businessName || '—'}
                                   </span>
                                 </div>
+
+                                {/* {aiLeadIntelById?.[lead._id] && (
+                                  <div
+                                    className="lhm__pills"
+                                    style={{ gap: '6px' }}
+                                    title={aiLeadIntelById[lead._id]?.suggestedAction || ''}
+                                  >
+                                    <span
+                                      className="badge"
+                                      style={{
+                                        background: aiLeadIntelById[lead._id]?.priority === 'High'
+                                          ? '#dc2626'
+                                          : aiLeadIntelById[lead._id]?.priority === 'Medium'
+                                            ? '#f59e0b'
+                                            : '#64748b',
+                                        color: 'white',
+                                        borderRadius: '999px',
+                                        padding: '6px 10px',
+                                        fontSize: '11px',
+                                        fontWeight: 700
+                                      }}
+                                    >
+                                      AI
+                                    </span>
+                                  </div>
+                                )} */}
 
                                 <div className="lhm__pills">
                                 <button
@@ -4961,69 +5233,63 @@ const B2BSales = () => {
                                   </div>
                                 </div>
 
-                                <button
-                                  type="button"
-                                  className="lead-header-v2__chev d-none d-md-inline-flex"
-                                  aria-label="Expand"
-                                  onClick={() => toggleLeadDetails(leadIndex)}
-                                >
-                                  <i className={leadDetailsVisible === leadIndex ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}></i>
-                                </button>
+                                {/* expand/collapse is handled by the single floating button */}
                               </div>
                             </div>
                           )}
                         </div>
 
-                        <div className="lead-meta-v2">
-                          <div className="lead-meta-v2__panel lead-meta-v2__panel--detail">
-                            <div className="lead-meta-v2__panel-title">Lead Detail</div>
-                            <div className="lead-meta-v2__grid">
-                              <div className="lead-meta-v2__item">
-                                <div className="lead-meta-v2__label">Lead Age</div>
-                                {(() => {
-                                  const days = getLeadAgeDays(lead);
-                                  return (
-                                    <div
-                                      className="lead-meta-v2__value"
-                                      title={days != null ? `${days} days since created` : undefined}
-                                    >
-                                      {days === null ? '—' : `${days} ${days === 1 ? 'day' : 'days'}`}
-                                    </div>
-                                  );
-                                })()}
+                        {leadDetailsVisible === leadIndex && (
+                          <div className="lead-meta-v2">
+                            <div className="lead-meta-v2__panel lead-meta-v2__panel--detail">
+                              <div className="lead-meta-v2__panel-title">Lead Detail</div>
+                              <div className="lead-meta-v2__grid">
+                                <div className="lead-meta-v2__item">
+                                  <div className="lead-meta-v2__label">Lead Age</div>
+                                  {(() => {
+                                    const days = getLeadAgeDays(lead);
+                                    return (
+                                      <div
+                                        className="lead-meta-v2__value"
+                                        title={days != null ? `${days} days since created` : undefined}
+                                      >
+                                        {days === null ? '—' : `${days} ${days === 1 ? 'day' : 'days'}`}
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                                <div className="lead-meta-v2__item">
+                                  <div className="lead-meta-v2__label">Lead Owner</div>
+                                  <div className="lead-meta-v2__value text-capitalize" title={lead.leadOwner?.name || '—'}>{lead.leadOwner?.name || '—'}</div>
+                                </div>
+                                <div className="lead-meta-v2__item">
+                                  <div className="lead-meta-v2__label">Added by</div>
+                                  <div className="lead-meta-v2__value text-capitalize" title={lead.leadAddedBy?.name || '—'}>{lead.leadAddedBy?.name || '—'}</div>
+                                </div>
+                                <div className="lead-meta-v2__item">
+                                  <div className="lead-meta-v2__label">Lead Source</div>
+                                  <div className="lead-meta-v2__value text-capitalize" title={lead.leadCategory?.name || '—'}>{lead.leadCategory?.name || '—'}</div>
+                                </div>
+                                <div className="lead-meta-v2__item">
+                                  <div className="lead-meta-v2__label">B2B Type</div>
+                                  <div className="lead-meta-v2__value text-capitalize" title={lead.typeOfB2B?.name || '—'}>{lead.typeOfB2B?.name || '—'}</div>
+                                </div>
                               </div>
-                              <div className="lead-meta-v2__item">
-                                <div className="lead-meta-v2__label">Lead Owner</div>
-                                <div className="lead-meta-v2__value text-capitalize" title={lead.leadOwner?.name || '—'}>{lead.leadOwner?.name || '—'}</div>
+                              <div className="d-flex justify-content-end mt-2">
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-outline-secondary"
+                                  onClick={() => openleadHistoryPanel(lead)}
+                                  title="History"
+                                >
+                                  <i className="fas fa-history me-1" aria-hidden="true"></i>
+                                  History
+                                </button>
                               </div>
-                              <div className="lead-meta-v2__item">
-                                <div className="lead-meta-v2__label">Added by</div>
-                                <div className="lead-meta-v2__value text-capitalize" title={lead.leadAddedBy?.name || '—'}>{lead.leadAddedBy?.name || '—'}</div>
-                              </div>
-                              <div className="lead-meta-v2__item">
-                                <div className="lead-meta-v2__label">Lead Source</div>
-                                <div className="lead-meta-v2__value text-capitalize"  title={lead.leadCategory?.name || '—'}>{lead.leadCategory?.name || '—'}</div>
-                              </div>
-                              <div className="lead-meta-v2__item">
-                                <div className="lead-meta-v2__label">B2B Type</div>
-                                <div className="lead-meta-v2__value text-capitalize" title={lead.typeOfB2B?.name || '—'}>{lead.typeOfB2B?.name || '—'}</div>
-                              </div>
-                            
                             </div>
-                            <div className="d-flex justify-content-end mt-2">
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-secondary"
-                                onClick={() => openleadHistoryPanel(lead)}
-                                title="History"
-                              >
-                                <i className="fas fa-history me-1" aria-hidden="true"></i>
-                                History
-                              </button>
-                            </div>
-                          </div>
 
-                        </div>
+                          </div>
+                        )}
 
 
                       </div>
@@ -6019,19 +6285,42 @@ const B2BSales = () => {
                     </div>
 
                     {/* Remark */}
-                    {/* <div className="col-12">
-                      <label className="form-label fw-bold">
-                        <i className="fas fa-comment text-primary me-1"></i>
-                        Remark
-                      </label>
+                    <div className="col-12">
+                      <div className="d-flex align-items-center justify-content-between">
+                        <label className="form-label fw-bold mb-1">
+                          <i className="fas fa-comment text-primary me-1"></i>
+                          Remark
+                        </label>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-primary"
+                          onClick={() => {
+                            const suggestion = buildLeadRemarkSuggestion({
+                              leadFormData,
+                              leadCategoryOptions,
+                              typeOfB2BOptions
+                            });
+                            setLeadFormData((prev) => ({
+                              ...prev,
+                              remark: prev.remark ? `${prev.remark}\n\n${suggestion}` : suggestion
+                            }));
+                          }}
+                        >
+                          AI Suggest
+                        </button>
+                      </div>
                       <textarea
                         className="form-control"
                         name="remark"
                         value={leadFormData.remark}
                         onChange={handleLeadInputChange}
                         placeholder="Enter remark"
+                        rows={4}
                       />
-                    </div> */}
+                      <div className="form-text">
+                        Use AI Suggest
+                      </div>
+                    </div>
 
 
 
@@ -6535,6 +6824,48 @@ const B2BSales = () => {
     --lead-header-v2-block-h: 92px;
     overflow: visible;
     z-index: 2;
+  }
+
+  .lead-header-v2__float-icon{
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    transform: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.85);
+    background: rgba(255,255,255,0.92);
+    color: #0b5ed7;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+  }
+
+  .lead-header-v2__float-icon:hover{
+    background: rgba(255,255,255,0.98);
+  }
+
+  .lead-header-v2__float-ai{
+    position: absolute;
+    top: 10px;
+    right: 54px; /* leave space for expand button */
+    transform: none;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(220, 38, 38, 0.95);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+    border: 1px solid rgba(255,255,255,0.35);
+    z-index: 998;
+    white-space: nowrap;
+    cursor: default;
   }
 
   .lead-header-v2__row{

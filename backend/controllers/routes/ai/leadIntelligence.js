@@ -20,6 +20,125 @@ function getModel() {
   return "claude-3-haiku-20240307";
 }
 
+router.post("/conversation-summary", async (req, res) => {
+  try {
+    const anthropic = getAnthropicClient();
+    if (!anthropic) {
+      return res.status(500).json({
+        success: false,
+        message: "ANTHROPIC_API_KEY is not configured on server",
+      });
+    }
+
+    const { channel = "Call", leadContext = {}, text = "" } = req.body || {};
+    const cleanedText = String(text || "").trim();
+    const cleanedChannel = String(channel || "Call").trim();
+
+    if (!cleanedText) {
+      return res.status(400).json({
+        success: false,
+        message: "text is required",
+      });
+    }
+
+    const systemPrompt = `
+You are an AI assistant helping counsellors in a B2B CRM.
+You will be given a pasted conversation (Call notes / WhatsApp chat / Email thread).
+Return ONLY valid JSON with:
+- "summary": 3–6 short bullet-style lines as a single string (\\n separated is ok)
+- "entities": { "requirements": string[], "budget": string, "timeline": string, "decisionMaker": string, "location": string }
+- "objections": string[] (fees, timing, parents, eligibility, comparison, etc.)
+- "nextActions": string[] (1–4 concrete actions, short)
+- "suggestedReply": string (if channel is WhatsApp/Email, craft a ready-to-send reply; else a short call follow-up message)
+
+Rules:
+- Keep it concise and counsellor-friendly.
+- Do not include any extra text outside JSON.
+- If something is not present, return empty strings/arrays.
+`;
+
+    const userPrompt = `
+Channel: ${cleanedChannel}
+Lead context (optional JSON):
+${JSON.stringify(leadContext || {}, null, 2)}
+
+Conversation text (pasted as-is):
+${cleanedText}
+
+Return JSON in exactly this shape:
+{
+  "summary": string,
+  "entities": {
+    "requirements": string[],
+    "budget": string,
+    "timeline": string,
+    "decisionMaker": string,
+    "location": string
+  },
+  "objections": string[],
+  "nextActions": string[],
+  "suggestedReply": string
+}
+`;
+
+    const message = await anthropic.messages.create({
+      model: getModel(),
+      max_tokens: 650,
+      temperature: 0.2,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    });
+
+    const raw = message?.content?.[0]?.text || "";
+    let parsed;
+    try {
+      let jsonStr = raw;
+      const firstBrace = raw.indexOf("{");
+      const lastBrace = raw.lastIndexOf("}");
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        jsonStr = raw.slice(firstBrace, lastBrace + 1);
+      }
+      parsed = JSON.parse(jsonStr);
+    } catch (e) {
+      console.warn("[AI conversation-summary] Failed to parse JSON:", e.message);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to parse AI response",
+        raw,
+      });
+    }
+
+    const entities = parsed?.entities || {};
+    const data = {
+      summary: String(parsed.summary || "").trim(),
+      entities: {
+        requirements: Array.isArray(entities.requirements)
+          ? entities.requirements.map((r) => String(r).trim()).filter(Boolean)
+          : [],
+        budget: String(entities.budget || "").trim(),
+        timeline: String(entities.timeline || "").trim(),
+        decisionMaker: String(entities.decisionMaker || "").trim(),
+        location: String(entities.location || "").trim(),
+      },
+      objections: Array.isArray(parsed.objections)
+        ? parsed.objections.map((o) => String(o).trim()).filter(Boolean)
+        : [],
+      nextActions: Array.isArray(parsed.nextActions)
+        ? parsed.nextActions.map((a) => String(a).trim()).filter(Boolean).slice(0, 4)
+        : [],
+      suggestedReply: String(parsed.suggestedReply || "").trim(),
+    };
+
+    return res.status(200).json({ success: true, data });
+  } catch (err) {
+    console.error("[AI conversation-summary] Error:", err.message);
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while generating conversation summary",
+    });
+  }
+});
+
 router.post("/lead-summary", async (req, res) => {
   try {
     const anthropic = getAnthropicClient();

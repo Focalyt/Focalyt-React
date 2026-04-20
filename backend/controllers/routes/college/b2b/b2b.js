@@ -1,6 +1,7 @@
 const express = require("express");
 const axios = require("axios");
 const moment = require("moment");
+const Anthropic = require("@anthropic-ai/sdk");
 let fs = require("fs");
 let path = require("path");
 const { isCollege, getAllTeamMembers } = require("../../../../helpers");
@@ -72,6 +73,30 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 	const router = express.Router();
 
 	const isAdminUser = (req) => req.user?.permissions?.permission_type === 'Admin';
+
+	// AI client (optional): used for supervision report narrative
+	const getAnthropicClient = () => {
+		const apiKey = process.env.ANTHROPIC_API_KEY;
+		if (!apiKey || !apiKey.startsWith("sk-ant-")) return null;
+		return new Anthropic({ apiKey });
+	};
+
+	const getAnthropicModel = () => {
+		if (process.env.ANTHROPIC_MODEL) {
+			return process.env.ANTHROPIC_MODEL.split(",").map((m) => m.trim())[0];
+		}
+		return "claude-3-haiku-20240307";
+	};
+
+	const parseJsonResponse = (rawText = "") => {
+		let jsonText = rawText;
+		const firstBrace = rawText.indexOf("{");
+		const lastBrace = rawText.lastIndexOf("}");
+		if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+			jsonText = rawText.slice(firstBrace, lastBrace + 1);
+		}
+		return JSON.parse(jsonText);
+	};
 
 	const getCollegeForUser = async (userId) => {
 		return College.findOne({ '_concernPerson._id': userId });
@@ -775,6 +800,541 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 		res.status(500).json({
 			status: false,
 			message: 'Failed to retrieve lead status counts',
+			error: error.message
+		});
+	}
+});
+
+const generateSupervisionReportData = async (req) => {
+	const {
+		startDate,
+		endDate,
+		status,
+		statusIn,
+		typeOfB2B,
+		typeOfB2BIn,
+		leadCategory,
+		leadCategoryIn,
+		leadOwner,
+		leadOwnerIn,
+		approvalStatus,
+		search,
+		subStatus,
+		subStatusIn
+	} = req.query;
+
+	// Admin can view all, others limited to team members
+	const isAdmin = () => req.user.permissions?.permission_type === 'Admin';
+
+	const convertToObjectId = (id) => {
+		if (!id) return null;
+		if (mongoose.Types.ObjectId.isValid(id)) return new mongoose.Types.ObjectId(id);
+		return id;
+	};
+
+	const parseIdList = (csv) =>
+		String(csv || '')
+			.split(',')
+			.map((s) => s.trim())
+			.filter(Boolean)
+			.map((id) => convertToObjectId(id))
+			.filter(Boolean);
+
+	const filterAnd = [];
+
+	// Date range filters (createdAt)
+	if (startDate || endDate) {
+		const created = {};
+		if (startDate) created.$gte = new Date(startDate);
+		if (endDate) created.$lte = new Date(endDate);
+		filterAnd.push({ createdAt: created });
+	}
+
+	// Search (basic)
+	if (search) {
+		filterAnd.push({
+			$or: [
+				{ concernPersonName: { $regex: search, $options: 'i' } },
+				{ businessName: { $regex: search, $options: 'i' } },
+				{ email: { $regex: search, $options: 'i' } },
+				{ mobile: { $regex: search, $options: 'i' } }
+			]
+		});
+	}
+
+	// ID filters
+	if (leadCategoryIn) {
+		const ids = parseIdList(leadCategoryIn);
+		if (ids.length) filterAnd.push({ leadCategory: { $in: ids } });
+	} else if (leadCategory) {
+		filterAnd.push({ leadCategory: convertToObjectId(leadCategory) });
+	}
+
+	if (typeOfB2BIn) {
+		const ids = parseIdList(typeOfB2BIn);
+		if (ids.length) filterAnd.push({ typeOfB2B: { $in: ids } });
+	} else if (typeOfB2B) {
+		filterAnd.push({ typeOfB2B: convertToObjectId(typeOfB2B) });
+	}
+
+	if (statusIn) {
+		const ids = parseIdList(statusIn);
+		if (ids.length) filterAnd.push({ status: { $in: ids } });
+	} else if (status) {
+		filterAnd.push({ status: convertToObjectId(status) });
+	}
+
+	if (subStatusIn) {
+		const ids = parseIdList(subStatusIn);
+		if (ids.length) filterAnd.push({ subStatus: { $in: ids } });
+	} else if (subStatus) {
+		filterAnd.push({ subStatus: convertToObjectId(subStatus) });
+	}
+
+	if (leadOwnerIn) {
+		const ids = parseIdList(leadOwnerIn);
+		if (ids.length) filterAnd.push({ leadOwner: { $in: ids } });
+	} else if (leadOwner) {
+		filterAnd.push({ leadOwner: convertToObjectId(leadOwner) });
+	}
+
+	if (approvalStatus) {
+		filterAnd.push({ 'approval.status': String(approvalStatus).toUpperCase() });
+	}
+
+	// Ownership restriction for non-admin
+	if (!isAdmin()) {
+		const teamMembers = await getAllTeamMembers(req.user._id);
+		const team = (teamMembers || []).filter(Boolean);
+		filterAnd.push({
+			$or: [
+				{ leadAddedBy: { $in: team } },
+				{ leadOwner: { $in: team } }
+			]
+		});
+	}
+
+	const matchStage = filterAnd.length ? { $and: filterAnd } : {};
+	const now = new Date();
+
+	const pipeline = [
+		{ $match: matchStage },
+		{
+			$lookup: {
+				from: 'followups',
+				localField: 'followUpCall',
+				foreignField: '_id',
+				as: 'followUpCallObj'
+			}
+		},
+		{ $unwind: { path: '$followUpCallObj', preserveNullAndEmptyArrays: true } },
+		{
+			$lookup: {
+				from: 'followups',
+				localField: 'followUpVisit',
+				foreignField: '_id',
+				as: 'followUpVisitObj'
+			}
+		},
+		{ $unwind: { path: '$followUpVisitObj', preserveNullAndEmptyArrays: true } },
+		{
+			$addFields: {
+				_counsellor: { $ifNull: ['$leadOwner', '$leadAddedBy'] },
+				callStatus: { $ifNull: ['$followUpCallObj.status', null] },
+				visitStatus: { $ifNull: ['$followUpVisitObj.status', null] },
+				callScheduledDate: { $ifNull: ['$followUpCallObj.scheduledDate', null] },
+				visitScheduledDate: { $ifNull: ['$followUpVisitObj.scheduledDate', null] },
+				docsPendingCount: {
+					$size: {
+						$filter: {
+							input: { $ifNull: ['$documents', []] },
+							as: 'd',
+							cond: { $in: ['$$d.status', ['PENDING', 'REJECTED']] }
+						}
+					}
+				},
+				docsApprovedCount: {
+					$size: {
+						$filter: {
+							input: { $ifNull: ['$documents', []] },
+							as: 'd',
+							cond: { $eq: ['$$d.status', 'APPROVED'] }
+						}
+					}
+				}
+			}
+		},
+		{
+			$facet: {
+				overall: [
+					{
+						$group: {
+							_id: null,
+							totalLeads: { $sum: 1 },
+							approvalPending: { $sum: { $cond: [{ $eq: ['$approval.status', 'PENDING'] }, 1, 0] } },
+							approvalApproved: { $sum: { $cond: [{ $eq: ['$approval.status', 'APPROVED'] }, 1, 0] } },
+							approvalRejected: { $sum: { $cond: [{ $eq: ['$approval.status', 'REJECTED'] }, 1, 0] } },
+							callDone: { $sum: { $cond: [{ $eq: ['$callStatus', 'Completed'] }, 1, 0] } },
+							callPending: { $sum: { $cond: [{ $eq: ['$callStatus', 'Pending'] }, 1, 0] } },
+							visitDone: { $sum: { $cond: [{ $eq: ['$visitStatus', 'Completed'] }, 1, 0] } },
+							visitPending: { $sum: { $cond: [{ $eq: ['$visitStatus', 'Pending'] }, 1, 0] } },
+							overdueCall: {
+								$sum: {
+									$cond: [
+										{
+											$and: [
+												{ $eq: ['$callStatus', 'Pending'] },
+												{ $ne: ['$callScheduledDate', null] },
+												{ $lt: ['$callScheduledDate', now] }
+											]
+										},
+										1,
+										0
+									]
+								}
+							},
+							overdueVisit: {
+								$sum: {
+									$cond: [
+										{
+											$and: [
+												{ $eq: ['$visitStatus', 'Pending'] },
+												{ $ne: ['$visitScheduledDate', null] },
+												{ $lt: ['$visitScheduledDate', now] }
+											]
+										},
+										1,
+										0
+									]
+								}
+							},
+							docsPendingTotal: { $sum: '$docsPendingCount' },
+							docsApprovedTotal: { $sum: '$docsApprovedCount' }
+						}
+					}
+				],
+				byCounsellor: [
+					{
+						$group: {
+							_id: '$_counsellor',
+							totalLeads: { $sum: 1 },
+							addedByMe: { $sum: { $cond: [{ $eq: ['$leadAddedBy', '$_counsellor'] }, 1, 0] } },
+							ownedByMe: { $sum: { $cond: [{ $eq: ['$leadOwner', '$_counsellor'] }, 1, 0] } },
+							approvalPending: { $sum: { $cond: [{ $eq: ['$approval.status', 'PENDING'] }, 1, 0] } },
+							approvalApproved: { $sum: { $cond: [{ $eq: ['$approval.status', 'APPROVED'] }, 1, 0] } },
+							approvalRejected: { $sum: { $cond: [{ $eq: ['$approval.status', 'REJECTED'] }, 1, 0] } },
+							callDone: { $sum: { $cond: [{ $eq: ['$callStatus', 'Completed'] }, 1, 0] } },
+							callPending: { $sum: { $cond: [{ $eq: ['$callStatus', 'Pending'] }, 1, 0] } },
+							visitDone: { $sum: { $cond: [{ $eq: ['$visitStatus', 'Completed'] }, 1, 0] } },
+							visitPending: { $sum: { $cond: [{ $eq: ['$visitStatus', 'Pending'] }, 1, 0] } },
+							overdueCall: {
+								$sum: {
+									$cond: [
+										{
+											$and: [
+												{ $eq: ['$callStatus', 'Pending'] },
+												{ $ne: ['$callScheduledDate', null] },
+												{ $lt: ['$callScheduledDate', now] }
+											]
+										},
+										1,
+										0
+									]
+								}
+							},
+							overdueVisit: {
+								$sum: {
+									$cond: [
+										{
+											$and: [
+												{ $eq: ['$visitStatus', 'Pending'] },
+												{ $ne: ['$visitScheduledDate', null] },
+												{ $lt: ['$visitScheduledDate', now] }
+											]
+										},
+										1,
+										0
+									]
+								}
+							},
+							docsPendingTotal: { $sum: '$docsPendingCount' },
+							docsApprovedTotal: { $sum: '$docsApprovedCount' }
+						}
+					},
+					{
+						$lookup: {
+							from: 'users',
+							localField: '_id',
+							foreignField: '_id',
+							as: 'user'
+						}
+					},
+					{ $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+					{
+						$project: {
+							_id: 0,
+							counsellorId: '$_id',
+							counsellorName: { $ifNull: ['$user.name', 'Unassigned'] },
+							counsellorEmail: { $ifNull: ['$user.email', ''] },
+							totalLeads: 1,
+							addedByMe: 1,
+							ownedByMe: 1,
+							approvalPending: 1,
+							approvalApproved: 1,
+							approvalRejected: 1,
+							callDone: 1,
+							callPending: 1,
+							visitDone: 1,
+							visitPending: 1,
+							overdueCall: 1,
+							overdueVisit: 1,
+							docsPendingTotal: 1,
+							docsApprovedTotal: 1
+						}
+					},
+					{ $sort: { totalLeads: -1 } }
+				],
+				byStatus: [
+					{
+						$group: {
+							_id: '$status',
+							totalLeads: { $sum: 1 },
+							approvalPending: { $sum: { $cond: [{ $eq: ['$approval.status', 'PENDING'] }, 1, 0] } },
+							overdueCall: {
+								$sum: {
+									$cond: [
+										{
+											$and: [
+												{ $eq: ['$callStatus', 'Pending'] },
+												{ $ne: ['$callScheduledDate', null] },
+												{ $lt: ['$callScheduledDate', now] }
+											]
+										},
+										1,
+										0
+									]
+								}
+							}
+						}
+					},
+					{
+						$lookup: {
+							from: 'statusb2bs',
+							localField: '_id',
+							foreignField: '_id',
+							as: 'st'
+						}
+					},
+					{ $unwind: { path: '$st', preserveNullAndEmptyArrays: true } },
+					{
+						$project: {
+							_id: 0,
+							statusId: '$_id',
+							statusName: { $ifNull: ['$st.title', 'Unknown'] },
+							totalLeads: 1,
+							approvalPending: 1,
+							overdueCall: 1
+						}
+					},
+					{ $sort: { totalLeads: -1 } }
+				],
+				byType: [
+					{
+						$group: {
+							_id: '$typeOfB2B',
+							totalLeads: { $sum: 1 },
+							overdueCall: {
+								$sum: {
+									$cond: [
+										{
+											$and: [
+												{ $eq: ['$callStatus', 'Pending'] },
+												{ $ne: ['$callScheduledDate', null] },
+												{ $lt: ['$callScheduledDate', now] }
+											]
+										},
+										1,
+										0
+									]
+								}
+							}
+						}
+					},
+					{
+						$lookup: {
+							from: 'typeofb2bs',
+							localField: '_id',
+							foreignField: '_id',
+							as: 'tp'
+						}
+					},
+					{ $unwind: { path: '$tp', preserveNullAndEmptyArrays: true } },
+					{
+						$project: {
+							_id: 0,
+							typeId: '$_id',
+							typeName: { $ifNull: ['$tp.name', 'Unknown'] },
+							totalLeads: 1,
+							overdueCall: 1
+						}
+					},
+					{ $sort: { totalLeads: -1 } }
+				]
+			}
+		}
+	];
+
+	const [result] = await Lead.aggregate(pipeline);
+	const overall = (result?.overall || [])[0] || {
+		totalLeads: 0,
+		approvalPending: 0,
+		approvalApproved: 0,
+		approvalRejected: 0,
+		callDone: 0,
+		callPending: 0,
+		visitDone: 0,
+		visitPending: 0,
+		overdueCall: 0,
+		overdueVisit: 0,
+		docsPendingTotal: 0,
+		docsApprovedTotal: 0
+	};
+
+	return {
+		filtersApplied: {
+			startDate: startDate || null,
+			endDate: endDate || null,
+			status: status || null,
+			statusIn: statusIn || null,
+			typeOfB2B: typeOfB2B || null,
+			typeOfB2BIn: typeOfB2BIn || null,
+			leadCategory: leadCategory || null,
+			leadCategoryIn: leadCategoryIn || null,
+			leadOwner: leadOwner || null,
+			leadOwnerIn: leadOwnerIn || null,
+			approvalStatus: approvalStatus || null
+		},
+		overall,
+		byCounsellor: result?.byCounsellor || [],
+		byStatus: result?.byStatus || [],
+		byType: result?.byType || []
+	};
+};
+
+// Supervision report: counsellor/team performance + pipeline gaps (filters supported)
+router.get('/leads/supervision-report', isCollege, async (req, res) => {
+	try {
+		const data = await generateSupervisionReportData(req);
+		return res.json({
+			status: true,
+			data,
+			message: 'Supervision report generated successfully'
+		});
+	} catch (error) {
+		console.error('Error generating supervision report:', error);
+		return res.status(500).json({
+			status: false,
+			message: 'Failed to generate supervision report',
+			error: error.message
+		});
+	}
+});
+
+// AI Supervision report (full detailed narrative + coaching actions)
+router.get('/leads/supervision-report-ai', isCollege, async (req, res) => {
+	try {
+		const anthropic = getAnthropicClient();
+		if (!anthropic) {
+			return res.status(500).json({
+				status: false,
+				message: "AI service not configured. Please set ANTHROPIC_API_KEY on server."
+			});
+		}
+
+		const metrics = await generateSupervisionReportData(req);
+
+		const systemPrompt = `
+You are an AI supervisor for a B2B sales CRM team.
+You will receive supervision metrics for leads (approvals, follow-ups, overdue, documents) grouped by counsellor/status/type.
+Your job is to generate a detailed management report that highlights:
+- where counsellors are lacking
+- where pipeline is stuck
+- what improvements are needed
+- an action plan for the next 7 days
+
+Return ONLY valid JSON. No extra text.`;
+
+		const userPrompt = `
+Supervision metrics JSON:
+${JSON.stringify(metrics, null, 2)}
+
+Return JSON in exactly this shape:
+{
+  "title": string,
+  "dateRange": string,
+  "executiveSummary": string,            // 6-12 bullets as ONE string (\\n separated)
+  "topRisks": string[],                  // 3-8
+  "wins": string[],                      // 2-8
+  "kpiSnapshot": {
+    "totalLeads": number,
+    "approvalPending": number,
+    "overdueCall": number,
+    "overdueVisit": number,
+    "docsPendingTotal": number
+  },
+  "counsellorInsights": [
+    {
+      "counsellorName": string,
+      "summary": string,                 // 3-6 bullets as ONE string
+      "gaps": string[],                  // 2-6
+      "recommendedActions": string[],    // 3-8
+      "focusKpis": {
+        "approvalPending": number,
+        "overdueCall": number,
+        "overdueVisit": number,
+        "docsPendingTotal": number
+      }
+    }
+  ],
+  "statusInsights": string[],            // bullets
+  "typeInsights": string[],              // bullets
+  "next7DaysPlan": string[]              // 6-12 concrete actions
+}`;
+
+		const message = await anthropic.messages.create({
+			model: getAnthropicModel(),
+			max_tokens: 900,
+			temperature: 0.2,
+			system: systemPrompt,
+			messages: [{ role: "user", content: userPrompt }]
+		});
+
+		const raw = message?.content?.[0]?.text || "";
+		let parsed;
+		try {
+			parsed = parseJsonResponse(raw);
+		} catch (e) {
+			console.warn("[AI supervision-report-ai] Failed to parse JSON:", e.message);
+			return res.status(500).json({
+				status: false,
+				message: "Failed to parse AI response",
+				raw
+			});
+		}
+
+		return res.json({
+			status: true,
+			data: {
+				metrics,
+				aiReport: parsed
+			},
+			message: "AI supervision report generated successfully"
+		});
+	} catch (error) {
+		console.error('Error generating AI supervision report:', error);
+		return res.status(500).json({
+			status: false,
+			message: 'Failed to generate AI supervision report',
 			error: error.message
 		});
 	}
