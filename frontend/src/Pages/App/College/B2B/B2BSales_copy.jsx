@@ -4954,7 +4954,9 @@ const B2BSales = () => {
                                           </div>
                                         ))}
                                       </div>
-                                      
+                                      <div className="ActionsDates">
+                                        <span></span> <span></span>
+                                      </div>  
                                     </div>
                                   </div>
                                 </div>
