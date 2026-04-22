@@ -5,7 +5,7 @@ import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
 import * as XLSX from 'xlsx';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/googleOAuth';
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
@@ -51,6 +51,80 @@ const mapStyles = `
   }
 `;
 
+/** Days since lead creation (from API `createdAt`). */
+function getLeadAgeDays(lead) {
+  const raw = lead?.createdAt;
+  if (!raw) return null;
+  const created = new Date(raw);
+  if (Number.isNaN(created.getTime())) return null;
+  const diffMs = Date.now() - created.getTime();
+  return Math.max(0, Math.floor(diffMs / 86400000));
+}
+
+function safeStr(v) {
+  return String(v ?? '').trim();
+}
+
+function pickFirstNonEmpty(...values) {
+  for (const v of values) {
+    const s = safeStr(v);
+    if (s) return s;
+  }
+  return '';
+}
+
+function buildLeadRemarkSuggestion({ leadFormData, leadCategoryOptions, typeOfB2BOptions }) {
+  const business = safeStr(leadFormData?.businessName);
+  const city = safeStr(leadFormData?.city);
+  const state = safeStr(leadFormData?.state);
+  const person = safeStr(leadFormData?.concernPersonName);
+  const designation = safeStr(leadFormData?.designation);
+
+  const leadCatLabel = (() => {
+    const id = leadFormData?.leadCategory;
+    return pickFirstNonEmpty(leadCategoryOptions?.find?.((o) => o.value === id)?.label, id);
+  })();
+  const b2bTypeLabel = (() => {
+    const id = leadFormData?.typeOfB2B;
+    return pickFirstNonEmpty(typeOfB2BOptions?.find?.((o) => o.value === id)?.label, id);
+  })();
+
+  const who = [person, designation].filter(Boolean).join(' - ');
+  const where = [city, state].filter(Boolean).join(', ');
+
+  const lines = [
+    business ? `Initial connect planned with ${business}.` : 'Initial connect planned.',
+    who ? `POC: ${who}.` : '',
+    where ? `Location: ${where}.` : '',
+    leadCatLabel ? `Lead category: ${leadCatLabel}.` : '',
+    b2bTypeLabel ? `B2B type: ${b2bTypeLabel}.` : '',
+    'Next step: Call and share program overview + partnership model; confirm requirements and decision timeline.'
+  ].filter(Boolean);
+
+  return lines.join('\n');
+}
+
+function buildFollowupNotesSuggestion({ followupFormData, selectedProfile, seletectedStatus, seletectedSubStatus, statuses }) {
+  const leadName = pickFirstNonEmpty(selectedProfile?.businessName, selectedProfile?.name);
+  const followType = pickFirstNonEmpty(followupFormData?.followUpType, 'Call');
+  const statusLabel = pickFirstNonEmpty(statuses?.find?.((s) => s._id === seletectedStatus)?.name, seletectedStatus);
+  const subLabel = pickFirstNonEmpty(seletectedSubStatus?.title, seletectedSubStatus?.name);
+
+  const dateLike = followupFormData?.followupDate;
+  const dt = dateLike ? new Date(dateLike) : null;
+  const dateLabel = dt && !Number.isNaN(dt.getTime()) ? dt.toLocaleDateString('en-GB') : '';
+  const timeLabel = safeStr(followupFormData?.followupTime);
+
+  const lines = [
+    leadName ? `${followType} follow-up for ${leadName}.` : `${followType} follow-up.`,
+    statusLabel ? `Status: ${statusLabel}${subLabel ? ` / ${subLabel}` : ''}.` : (subLabel ? `Sub-status: ${subLabel}.` : ''),
+    (dateLabel || timeLabel) ? `Scheduled: ${[dateLabel, timeLabel].filter(Boolean).join(' ')}.` : '',
+    'Agenda: confirm interest, capture requirements, share brochure/pricing, and agree on next milestone.'
+  ].filter(Boolean);
+
+  return lines.join('\n');
+}
+
 const MultiSelectCheckbox = ({
   title,
   options,
@@ -58,8 +132,55 @@ const MultiSelectCheckbox = ({
   onChange,
   icon = "fas fa-list",
   isOpen,
-  onToggle
+  onToggle,
+  onClose
 }) => {
+  const [query, setQuery] = useState('');
+  const containerRef = useRef(null);
+  const [placement, setPlacement] = useState('down'); // 'down' | 'up'
+
+  useEffect(() => {
+    if (!isOpen) setQuery('');
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const el = containerRef.current;
+    if (!el) return;
+
+    const rect = el.getBoundingClientRect();
+    const viewportH = window.innerHeight || document.documentElement.clientHeight || 0;
+    const spaceBelow = Math.max(0, viewportH - rect.bottom);
+    const spaceAbove = Math.max(0, rect.top);
+    // dropdown height ~ 360px (search + list + footer). open up if space below is tight.
+    setPlacement(spaceBelow < 280 && spaceAbove > spaceBelow ? 'up' : 'down');
+  }, [isOpen, options?.length]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event) => {
+      const el = containerRef.current;
+      if (!el) return;
+      if (!el.contains(event.target)) {
+        if (typeof onClose === 'function') onClose();
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        if (typeof onClose === 'function') onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside, true);
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside, true);
+      document.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [isOpen, onClose]);
+
   const handleCheckboxChange = (value) => {
     const newValues = selectedValues.includes(value)
       ? selectedValues.filter(v => v !== value)
@@ -85,8 +206,15 @@ const MultiSelectCheckbox = ({
     }
   };
 
+  const filteredOptions = useMemo(() => {
+    const list = Array.isArray(options) ? options : [];
+    const q = String(query || '').trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((o) => String(o?.label || '').toLowerCase().includes(q));
+  }, [options, query]);
+
   return (
-    <div className="multi-select-container-new">
+    <div className="multi-select-container-new" ref={containerRef}>
       <label className="form-label small fw-bold text-dark d-flex align-items-center mb-2">
         <i className={`${icon} me-1 text-primary`}></i>
         {title}
@@ -108,8 +236,7 @@ const MultiSelectCheckbox = ({
           <i className={`fas fa-chevron-${isOpen ? 'up' : 'down'} dropdown-arrow`}></i>
         </button>
 
-        {isOpen && (
-          <div className="multi-select-options-new">
+        <div className={`multi-select-options-new ${isOpen ? 'open' : ''} ${placement === 'up' ? 'up' : ''}`}>
             {/* Search functionality (optional) */}
             <div className="options-search">
               <div className="input-group input-group-sm">
@@ -120,6 +247,8 @@ const MultiSelectCheckbox = ({
                   type="text"
                   className="form-control"
                   placeholder={`Search ${title.toLowerCase()}...`}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
@@ -127,7 +256,7 @@ const MultiSelectCheckbox = ({
 
             {/* Options List */}
             <div className="options-list-new">
-              {options.map((option) => (
+              {filteredOptions.map((option) => (
                 <label key={option.value} className="option-item-new">
                   <input
                     type="checkbox"
@@ -143,10 +272,10 @@ const MultiSelectCheckbox = ({
                 </label>
               ))}
 
-              {options.length === 0 && (
+              {filteredOptions.length === 0 && (
                 <div className="no-options">
                   <i className="fas fa-info-circle me-2"></i>
-                  No {title.toLowerCase()} available
+                  No results
                 </div>
               )}
             </div>
@@ -155,12 +284,11 @@ const MultiSelectCheckbox = ({
             {selectedValues.length > 0 && (
               <div className="options-footer">
                 <small className="text-muted">
-                  {selectedValues.length} of {options.length} selected
+                  {selectedValues.length} of {(options || []).length} selected
                 </small>
               </div>
             )}
           </div>
-        )}
       </div>
     </div>
   );
@@ -316,9 +444,11 @@ const useScrollBlur = (navbarHeight = 140) => {
 
   return { isScrolled, scrollY, contentRef };
 };
+
 const B2BSales = () => {
 
   const candidateRef = useRef();
+  const navigate = useNavigate();
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const [userData, setUserData] = useState(JSON.parse(sessionStorage.getItem("user") || "{}"));
   const token = userData.token;
@@ -376,6 +506,9 @@ const B2BSales = () => {
 
   const [viewMode, setViewMode] = useState('grid');
   const [isMobile, setIsMobile] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState(
+    typeof window !== 'undefined' ? window.innerWidth : 1200
+  );
   const [allProfiles, setAllProfiles] = useState([]);
   const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
@@ -400,6 +533,66 @@ const B2BSales = () => {
   const [uploadingDoc, setUploadingDoc] = useState(null);
   const fileInputRef = useRef(null);
 
+  // Lead Approval (backend: lead.approval.status)
+  const [selectedApprovalStatus, setSelectedApprovalStatus] = useState(null); // null | 'PENDING' | 'APPROVED' | 'REJECTED'
+  const [approvalCounts, setApprovalCounts] = useState({ total: 0, approved: 0, pending: 0, rejected: 0 });
+  const [approvalCountsLoading, setApprovalCountsLoading] = useState(false);
+  const [approvalLeadTarget, setApprovalLeadTarget] = useState(null);
+  const [approvalEditLeadId, setApprovalEditLeadId] = useState(null);
+
+  // Lead Documents (backend: /college/b2b/leads/:id/documents)
+  const [showLeadDocumentsModal, setShowLeadDocumentsModal] = useState(false);
+  const [documentsLead, setDocumentsLead] = useState(null);
+  const [leadDocuments, setLeadDocuments] = useState([]);
+  const [leadDocumentsLoading, setLeadDocumentsLoading] = useState(false);
+  const [leadDocumentUploading, setLeadDocumentUploading] = useState(false);
+  const [leadDocType, setLeadDocType] = useState('');
+  const [leadDocFileSelected, setLeadDocFileSelected] = useState(false);
+  const leadDocFileRef = useRef(null);
+  const [leadCategoryDocuments, setLeadCategoryDocuments] = useState([]); // from LeadCategory.documents (required docs)
+
+  const mergedLeadDocuments = useMemo(() => {
+    const uploaded = Array.isArray(leadDocuments) ? leadDocuments : [];
+    const required = Array.isArray(leadCategoryDocuments) ? leadCategoryDocuments : [];
+
+    if (!required.length) return uploaded;
+
+    const norm = (s) => String(s || '').trim().toLowerCase();
+    const byType = new Map();
+    for (const doc of uploaded) {
+      const key = norm(doc?.docType) || norm(doc?.name);
+      if (!key) continue;
+      // keep first match; multiple uploads can still show via "extra" below
+      if (!byType.has(key)) byType.set(key, doc);
+    }
+
+    const merged = required.map((r) => {
+      const typeKey = norm(r?.name);
+      const hit = typeKey ? byType.get(typeKey) : null;
+      if (hit) {
+        return { ...hit, isRequired: true, isMandatory: Boolean(r?.isMandatory) };
+      }
+      return {
+        id: `required:${String(r?.name || '').trim()}`,
+        name: String(r?.name || '').trim() || 'Document',
+        docType: String(r?.name || '').trim(),
+        status: 'MISSING',
+        url: '',
+        isPlaceholder: true,
+        isRequired: true,
+        isMandatory: Boolean(r?.isMandatory),
+      };
+    });
+
+    // show uploads that don't belong to required list at the end
+    const requiredKeys = new Set(required.map((r) => norm(r?.name)).filter(Boolean));
+    const extras = uploaded
+      .filter((d) => !requiredKeys.has(norm(d?.docType) || norm(d?.name)))
+      .map((d) => ({ ...d, isExtra: true }));
+
+    return [...merged, ...extras];
+  }, [leadDocuments, leadCategoryDocuments]);
+
 
   // open model for upload documents 
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -416,7 +609,7 @@ const B2BSales = () => {
   const [bulkUploadMessage, setBulkUploadMessage] = useState('');
   const [bulkUploadErrors, setBulkUploadErrors] = useState([]);
   const [bulkUploadSuccess, setBulkUploadSuccess] = useState(false);
-  
+
   // Bulk inputs state
   const [showBulkInputs, setShowBulkInputs] = useState(false);
   const [bulkMode, setBulkMode] = useState('');
@@ -462,6 +655,10 @@ const B2BSales = () => {
 
   //side pannel stats
   const [showPanel, setShowPanel] = useState('')
+
+  // Mobile "More actions" modal (per lead)
+  const [mobileMoreLead, setMobileMoreLead] = useState(null);
+
 
   // Loading state for fetchProfileData
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
@@ -555,6 +752,8 @@ const B2BSales = () => {
   // Function to clear all follow-up form data
   const clearFollowupFormData = () => {
     setFollowupFormData({
+      followUpType: 'Call',
+      description: '',
       followupDate: '',
       followupTime: '',
       remarks: '',
@@ -585,10 +784,15 @@ const B2BSales = () => {
       const hasFollowupData =
         hasFollowup && followupFormData.followupDate && followupFormData.followupTime;
 
-      // Normalise date value for API (string or Date instance)
-      const followupDateValue = followupFormData.followupDate instanceof Date
-        ? followupFormData.followupDate.toISOString()
-        : followupFormData.followupDate;
+      const toYmdLocal = (d) => {
+        const dt = d instanceof Date ? d : new Date(d);
+        if (Number.isNaN(dt.getTime())) return '';
+        const yyyy = dt.getFullYear();
+        const mm = String(dt.getMonth() + 1).padStart(2, '0');
+        const dd = String(dt.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+      };
+      const followupDateValue = toYmdLocal(followupFormData.followupDate);
 
       // 1) Edit panel: change status (and optionally set follow-up + Google Calendar) via B2B status API
       if (showPanel === 'editPanel' && selectedProfile && seletectedStatus) {
@@ -618,6 +822,10 @@ const B2BSales = () => {
         await axios.post(
           `${backendUrl}/college/b2b/leads/${selectedProfile._id}/followup`,
           {
+            followUpType: followupFormData.followUpType || 'Call',
+            description:
+              followupFormData.description ||
+              ((followupFormData.followUpType || 'Call') === 'Visit' ? 'Follow-up visit' : 'Follow-up call'),
             scheduledDate: followupDateValue,
             scheduledTime: followupFormData.followupTime,
             remarks: followupFormData.remarks || '',
@@ -628,7 +836,9 @@ const B2BSales = () => {
           }
         );
 
-        alert('✅ Follow-up saved and scheduled successfully!');
+        alert(`✅ ${followupFormData.followUpType === 'Visit' ? 'Visit' : 'Call'} follow-up saved and scheduled successfully!`);
+        // ensure UI updates immediately (even if custom event listener misses)
+        await fetchLeads(selectedStatusFilter, currentPage);
       }
 
       window.dispatchEvent(new CustomEvent('b2b-followup-updated'));
@@ -638,6 +848,66 @@ const B2BSales = () => {
     } finally {
       closePanel();
     }
+  };
+
+  const formatFollowupDate = (dateLike) => {
+    if (!dateLike) return '—';
+    const dt = new Date(dateLike);
+    if (Number.isNaN(dt.getTime())) return '—';
+    return dt.toLocaleDateString('en-GB'); // dd/mm/yyyy
+  };
+
+  const getLeadFollowupDateLabel = (lead, type) => {
+    const t = String(type || '').toLowerCase();
+    const bySlot = t === 'visit'
+      ? (lead?.followUpVisit || null)
+      : (lead?.followUpCall || null);
+    if (bySlot?.scheduledDate) return formatFollowupDate(bySlot.scheduledDate);
+
+    // fallback to legacy followUp if it matches type
+    const legacy = lead?.followUp || null;
+    if (legacy?.scheduledDate && String(legacy?.followUpType || '').toLowerCase() === t) {
+      return formatFollowupDate(legacy.scheduledDate);
+    }
+    return '—';
+  };
+
+  const getFollowupBucket = (followUpLike) => {
+    if (!followUpLike) return null;
+    const status = String(followUpLike?.status || '').toLowerCase();
+    if (status === 'completed') return 'done';
+
+    const dt = followUpLike?.scheduledDate ? new Date(followUpLike.scheduledDate) : null;
+    if (!dt || Number.isNaN(dt.getTime())) return null;
+
+    const now = Date.now();
+    if (dt.getTime() < now) return 'missed';
+    return 'planned';
+  };
+
+  const getLeadFollowupBucket = (lead, type) => {
+    const t = String(type || '').toLowerCase();
+    const slot = t === 'visit' ? (lead?.followUpVisit || null) : (lead?.followUpCall || null);
+    const slotBucket = getFollowupBucket(slot);
+    if (slotBucket) return slotBucket;
+
+    const legacy = lead?.followUp || null;
+    if (legacy && String(legacy?.followUpType || '').toLowerCase() === t) {
+      return getFollowupBucket(legacy);
+    }
+    return null;
+  };
+
+  const getLeadDocumentsBucket = (lead) => {
+    const required = Array.isArray(lead?.leadCategory?.documents) ? lead.leadCategory.documents : [];
+    // Only count documents for lead sources where documents are configured/required
+    if (required.length === 0) return null;
+
+    const docs = Array.isArray(lead?.documents) ? lead.documents : [];
+    if (docs.length === 0) return 'pending';
+
+    const anyPending = docs.some((d) => String(d?.status || 'PENDING').toUpperCase() !== 'APPROVED');
+    return anyPending ? 'pending' : 'done';
   };
 
   const initializeBusinessNameAutocomplete = () => {
@@ -795,6 +1065,7 @@ const B2BSales = () => {
     fetchB2BDropdownOptions();
     fetchUsers(); // Fetch users for Lead Owner dropdown
     fetchStatusCounts(); // Fetch status counts
+    fetchApprovalCounts(); // Fetch lead approval counts
   }, []);
 
 
@@ -1024,29 +1295,83 @@ const B2BSales = () => {
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState(null);
 
+  const [aiLeadIntelById, setAiLeadIntelById] = useState({});
+  const [aiLeadIntelLoading, setAiLeadIntelLoading] = useState(false);
+  const [aiLeadIntelError, setAiLeadIntelError] = useState('');
+
   // Add state for status counts
   const [statusCounts, setStatusCounts] = useState([]);
   const [totalLeads, setTotalLeads] = useState(0);
   const [loadingStatusCounts, setLoadingStatusCounts] = useState(false);
 
+  const sortedPerformanceStatuses = useMemo(() => {
+    const order = ['HOT', 'WARM', 'COLD', 'PROSPECT'];
+    const list = [...(statusCounts || [])];
+    list.sort((a, b) => {
+      const na = (a.statusName || '').toUpperCase();
+      const nb = (b.statusName || '').toUpperCase();
+      const ia = order.indexOf(na);
+      const ib = order.indexOf(nb);
+      if (ia === -1 && ib === -1) return 0;
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+    return list;
+  }, [statusCounts]);
+
+  const dashboardB2BCounts = useMemo(() => {
+    const list = Array.isArray(leads) ? leads : [];
+    const counts = {
+      call: { done: 0, planned: 0, missed: 0 },
+      visit: { done: 0, planned: 0, missed: 0 },
+      docs: { done: 0, pending: 0 },
+    };
+
+    for (const lead of list) {
+      const cb = getLeadFollowupBucket(lead, 'Call');
+      if (cb) counts.call[cb] += 1;
+
+      const vb = getLeadFollowupBucket(lead, 'Visit');
+      if (vb) counts.visit[vb] += 1;
+
+      const db = getLeadDocumentsBucket(lead);
+      if (db) counts.docs[db] += 1;
+    }
+    return counts;
+  }, [leads]);
+
   // Filter states
   const [filters, setFilters] = useState({
     search: '',
-    leadCategory: '',
-    typeOfB2B: '',
-    leadOwner: '',
+    leadCategory: [],
+    typeOfB2B: [],
+    leadOwner: [],
+    hasFollowUpCall: false,
+    hasFollowUpVisit: false,
+    documentsStatus: [], // ['done','pending']
     dateRange: {
       start: null,
       end: null
     },
-    status: null,
-    subStatus: null
+    status: [],
+    subStatus: []
   });
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     fetchLeads(null, 1);
   }, []);
+
+  // When a follow-up is saved, refresh the list so dates update per-lead
+  useEffect(() => {
+    const handler = () => {
+      fetchLeads(selectedStatusFilter, currentPage);
+    };
+    window.addEventListener('b2b-followup-updated', handler);
+    return () => window.removeEventListener('b2b-followup-updated', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStatusFilter, currentPage]);
 
   // Auto-select leads based on Input 1 value for bulk refer
   useEffect(() => {
@@ -1059,7 +1384,7 @@ const B2BSales = () => {
     }
 
     const numValue = input1Value === '' ? 0 : parseInt(input1Value, 10);
-    
+
     if (isNaN(numValue) || numValue < 1) {
       setSelectedProfiles([]);
       return;
@@ -1081,13 +1406,13 @@ const B2BSales = () => {
             limit: validNumValue.toString(),
             ...(selectedStatusFilter && { status: selectedStatusFilter }),
             ...(eff.search && { search: eff.search }),
-            ...(eff.leadCategory && { leadCategory: eff.leadCategory }),
-            ...(eff.typeOfB2B && { typeOfB2B: eff.typeOfB2B }),
-            ...(eff.leadOwner && { leadOwner: eff.leadOwner }),
+            ...(Array.isArray(eff.leadCategory) && eff.leadCategory.length && { leadCategoryIn: toCsv(eff.leadCategory) }),
+            ...(Array.isArray(eff.typeOfB2B) && eff.typeOfB2B.length && { typeOfB2BIn: toCsv(eff.typeOfB2B) }),
+            ...(Array.isArray(eff.leadOwner) && eff.leadOwner.length && { leadOwnerIn: toCsv(eff.leadOwner) }),
             ...(eff.dateRange?.start && { startDate: eff.dateRange.start }),
             ...(eff.dateRange?.end && { endDate: eff.dateRange.end }),
-            ...(eff.status && { status: eff.status }),
-            ...(eff.subStatus && { subStatus: eff.subStatus })
+            ...(Array.isArray(eff.status) && eff.status.length && { statusIn: toCsv(eff.status) }),
+            ...(Array.isArray(eff.subStatus) && eff.subStatus.length && { subStatusIn: toCsv(eff.subStatus) })
           };
 
           const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
@@ -1150,6 +1475,8 @@ const B2BSales = () => {
     }));
   };
 
+  const toCsv = (arr) => (Array.isArray(arr) ? arr.filter(Boolean).join(',') : '');
+
   const handleDateRangeChange = (type, value) => {
     setFilters(prev => ({
       ...prev,
@@ -1164,30 +1491,36 @@ const B2BSales = () => {
     setCurrentPage(1);
     fetchLeads(selectedStatusFilter, 1, filterOverrides);
     fetchStatusCounts(filterOverrides); // Update status counts with current filters
+    fetchApprovalCounts(filterOverrides);
   };
 
   const clearFilters = () => {
     setFilters({
       search: '',
-      leadCategory: '',
-      typeOfB2B: '',
-      leadOwner: '',
+      leadCategory: [],
+      typeOfB2B: [],
+      leadOwner: [],
+      hasFollowUpCall: false,
+      hasFollowUpVisit: false,
+      documentsStatus: [],
       dateRange: {
         start: null,
         end: null
       },
-      status: null,
-      subStatus: null
+      status: [],
+      subStatus: []
     });
     setCurrentPage(1);
     fetchLeads(selectedStatusFilter, 1);
     fetchStatusCounts(); // Update status counts after clearing filters
+    fetchApprovalCounts();
   };
 
   const fetchLeads = async (statusFilter = null, page = 1, filterOverrides = {}) => {
     try {
       closePanel();
       setLoadingLeads(true);
+      setAiLeadIntelError('');
 
       const eff = { ...filters, ...filterOverrides };
 
@@ -1205,14 +1538,14 @@ const B2BSales = () => {
       if (eff.search) {
         params.search = eff.search;
       }
-      if (eff.leadCategory) {
-        params.leadCategory = eff.leadCategory;
+      if (Array.isArray(eff.leadCategory) && eff.leadCategory.length) {
+        params.leadCategoryIn = toCsv(eff.leadCategory);
       }
-      if (eff.typeOfB2B) {
-        params.typeOfB2B = eff.typeOfB2B;
+      if (Array.isArray(eff.typeOfB2B) && eff.typeOfB2B.length) {
+        params.typeOfB2BIn = toCsv(eff.typeOfB2B);
       }
-      if (eff.leadOwner) {
-        params.leadOwner = eff.leadOwner;
+      if (Array.isArray(eff.leadOwner) && eff.leadOwner.length) {
+        params.leadOwnerIn = toCsv(eff.leadOwner);
       }
       if (eff.dateRange?.start) {
         params.startDate = eff.dateRange.start;
@@ -1220,11 +1553,21 @@ const B2BSales = () => {
       if (eff.dateRange?.end) {
         params.endDate = eff.dateRange.end;
       }
-      if (eff.status) {
-        params.status = eff.status;
+      if (Array.isArray(eff.status) && eff.status.length) {
+        params.statusIn = toCsv(eff.status);
       }
-      if (eff.subStatus) {
-        params.subStatus = eff.subStatus;
+      if (Array.isArray(eff.subStatus) && eff.subStatus.length) {
+        params.subStatusIn = toCsv(eff.subStatus);
+      }
+      if (eff.hasFollowUpCall) params.hasFollowUpCall = true;
+      if (eff.hasFollowUpVisit) params.hasFollowUpVisit = true;
+      if (Array.isArray(eff.documentsStatus) && eff.documentsStatus.length) {
+        params.documentsStatusIn = toCsv(eff.documentsStatus);
+      }
+      // Lead Approval filter
+      const approval = eff.approvalStatus ?? selectedApprovalStatus;
+      if (approval) {
+        params.approvalStatus = approval;
       }
 
       // console.log('🔍 [FRONTEND] fetchLeads called:', {
@@ -1243,7 +1586,7 @@ const B2BSales = () => {
 
       if (response.data.status) {
         const fetchedLeads = response.data.data.leads || [];
-        
+
         // console.log('📥 [FRONTEND] Response received:', {
         //   status: response.data.status,
         //   leadsCount: fetchedLeads.length,
@@ -1251,7 +1594,7 @@ const B2BSales = () => {
         //   message: response.data.message,
         //   appliedFilter: filters.leadOwner ? `leadOwner: ${filters.leadOwner}` : 'No filter'
         // });
-        
+
         // Debug: Log leadOwner data from response
         // if (fetchedLeads.length > 0) {
         //   console.log('👤 [FRONTEND] Lead Owner Data Received:');
@@ -1269,21 +1612,39 @@ const B2BSales = () => {
         // } else {
         //   console.log('⚠️ [FRONTEND] No leads in response - Setting empty array');
         // }
-        
+
         // console.log('🔄 [FRONTEND] Updating leads state:', {
         //   previousLeadsCount: leads.length,
         //   newLeadsCount: fetchedLeads.length,
         //   willClear: fetchedLeads.length === 0
         // });
-        
+
         setLeads(fetchedLeads);
+
+        try {
+          if (Array.isArray(fetchedLeads) && fetchedLeads.length > 0) {
+            setAiLeadIntelLoading(true);
+            const aiRes = await axios.post(
+              `${backendUrl}/api/ai/lead-intel/bulk`,
+              { leads: fetchedLeads },
+              { headers: { 'x-auth': token } }
+            );
+            if (aiRes?.data?.success && aiRes?.data?.data) {
+              setAiLeadIntelById((prev) => ({ ...prev, ...(aiRes.data.data || {}) }));
+            }
+          }
+        } catch (aiErr) {
+          setAiLeadIntelError(aiErr?.response?.data?.message || 'AI lead supervision unavailable.');
+        } finally {
+          setAiLeadIntelLoading(false);
+        }
         // ✅ Extract pagination data from backend response
         if (response.data.data.pagination) {
           setTotalPages(response.data.data.pagination.totalPages || 1);
           setCurrentPage(response.data.data.pagination.currentPage || 1);
           setPageSize(response.data.data.pagination.totalLeads || 0);
         }
-        
+
         // console.log('✅ [FRONTEND] Leads state updated');
       } else {
         console.error('❌ [FRONTEND] Failed to fetch leads:', response.data.message);
@@ -1302,14 +1663,20 @@ const B2BSales = () => {
       const eff = { ...filters, ...filterOverrides };
       // Build params with current filters (except status filter, as we're counting by status)
       const params = {};
-      if (eff.leadCategory) params.leadCategory = eff.leadCategory;
-      if (eff.typeOfB2B) params.typeOfB2B = eff.typeOfB2B;
-      if (eff.leadOwner) params.leadOwner = eff.leadOwner;
+      if (Array.isArray(eff.leadCategory) && eff.leadCategory.length) params.leadCategoryIn = toCsv(eff.leadCategory);
+      if (Array.isArray(eff.typeOfB2B) && eff.typeOfB2B.length) params.typeOfB2BIn = toCsv(eff.typeOfB2B);
+      if (Array.isArray(eff.leadOwner) && eff.leadOwner.length) params.leadOwnerIn = toCsv(eff.leadOwner);
       if (eff.search) params.search = eff.search;
-      if (eff.subStatus) params.subStatus = eff.subStatus;
+      if (Array.isArray(eff.subStatus) && eff.subStatus.length) params.subStatusIn = toCsv(eff.subStatus);
       if (eff.dateRange?.start) params.startDate = eff.dateRange.start;
       if (eff.dateRange?.end) params.endDate = eff.dateRange.end;
-      
+      if (Array.isArray(eff.status) && eff.status.length) params.statusIn = toCsv(eff.status);
+      if (eff.hasFollowUpCall) params.hasFollowUpCall = true;
+      if (eff.hasFollowUpVisit) params.hasFollowUpVisit = true;
+      if (Array.isArray(eff.documentsStatus) && eff.documentsStatus.length) params.documentsStatusIn = toCsv(eff.documentsStatus);
+      const approval = eff.approvalStatus ?? selectedApprovalStatus;
+      if (approval) params.approvalStatus = approval;
+
       const response = await axios.get(`${backendUrl}/college/b2b/leads/status-count`, {
         headers: { 'x-auth': token },
         params: params
@@ -1328,24 +1695,224 @@ const B2BSales = () => {
     }
   };
 
+  const isAdmin = () => {
+    const permissionType = permissions?.permission_type || userData?.permissions?.permission_type;
+    return permissionType === 'Admin';
+  };
 
+  // Lead Approval counts (Total/Approved/Pending/Rejected) - respects current filters
+  const fetchApprovalCounts = async (filterOverrides = {}) => {
+    try {
+      setApprovalCountsLoading(true);
+      const eff = { ...filters, ...filterOverrides };
+      const baseParams = {};
+      if (Array.isArray(eff.leadCategory) && eff.leadCategory.length) baseParams.leadCategoryIn = toCsv(eff.leadCategory);
+      if (Array.isArray(eff.typeOfB2B) && eff.typeOfB2B.length) baseParams.typeOfB2BIn = toCsv(eff.typeOfB2B);
+      if (Array.isArray(eff.leadOwner) && eff.leadOwner.length) baseParams.leadOwnerIn = toCsv(eff.leadOwner);
+      if (eff.search) baseParams.search = eff.search;
+      if (Array.isArray(eff.subStatus) && eff.subStatus.length) baseParams.subStatusIn = toCsv(eff.subStatus);
+      if (eff.dateRange?.start) baseParams.startDate = eff.dateRange.start;
+      if (eff.dateRange?.end) baseParams.endDate = eff.dateRange.end;
+      if (Array.isArray(eff.status) && eff.status.length) baseParams.statusIn = toCsv(eff.status);
+      if (eff.hasFollowUpCall) baseParams.hasFollowUpCall = true;
+      if (eff.hasFollowUpVisit) baseParams.hasFollowUpVisit = true;
+      if (Array.isArray(eff.documentsStatus) && eff.documentsStatus.length) baseParams.documentsStatusIn = toCsv(eff.documentsStatus);
 
+      const [allRes, approvedRes, pendingRes, rejectedRes] = await Promise.all([
+        axios.get(`${backendUrl}/college/b2b/leads/status-count`, { headers: { 'x-auth': token }, params: baseParams }),
+        axios.get(`${backendUrl}/college/b2b/leads/status-count`, { headers: { 'x-auth': token }, params: { ...baseParams, approvalStatus: 'APPROVED' } }),
+        axios.get(`${backendUrl}/college/b2b/leads/status-count`, { headers: { 'x-auth': token }, params: { ...baseParams, approvalStatus: 'PENDING' } }),
+        axios.get(`${backendUrl}/college/b2b/leads/status-count`, { headers: { 'x-auth': token }, params: { ...baseParams, approvalStatus: 'REJECTED' } }),
+      ]);
+
+      const safeTotal = allRes?.data?.status ? (allRes.data.data?.totalLeads || 0) : 0;
+      const safeApproved = approvedRes?.data?.status ? (approvedRes.data.data?.totalLeads || 0) : 0;
+      const safePending = pendingRes?.data?.status ? (pendingRes.data.data?.totalLeads || 0) : 0;
+      const safeRejected = rejectedRes?.data?.status ? (rejectedRes.data.data?.totalLeads || 0) : 0;
+
+      setApprovalCounts({ total: safeTotal, approved: safeApproved, pending: safePending, rejected: safeRejected });
+    } catch (error) {
+      console.error('Error fetching approval counts:', error);
+    } finally {
+      setApprovalCountsLoading(false);
+    }
+  };
+
+  const handleApprovalCardClick = (nextStatus) => {
+    setSelectedApprovalStatus(nextStatus);
+    setCurrentPage(1);
+    fetchLeads(selectedStatusFilter, 1, { approvalStatus: nextStatus });
+    fetchStatusCounts({ approvalStatus: nextStatus });
+  };
+
+  const approveLead = async (lead) => {
+    try {
+      const res = await axios.put(
+        `${backendUrl}/college/b2b/leads/${lead._id}/approval`,
+        { status: 'APPROVED', moveToProspect: true },
+        { headers: { 'x-auth': token } }
+      );
+      if (res?.data?.status) {
+        await fetchLeads(selectedStatusFilter, currentPage);
+        await fetchStatusCounts();
+        await fetchApprovalCounts();
+        alert('Lead approved successfully');
+      } else {
+        alert(res?.data?.message || 'Failed to approve lead');
+      }
+    } catch (error) {
+      console.error('Error approving lead:', error);
+      alert(error.response?.data?.message || 'Failed to approve lead');
+    }
+  };
+
+  const rejectLead = async (lead, reason) => {
+    try {
+      const res = await axios.put(
+        `${backendUrl}/college/b2b/leads/${lead._id}/approval`,
+        { status: 'REJECTED', rejectionReason: reason || '' },
+        { headers: { 'x-auth': token } }
+      );
+      if (res?.data?.status) {
+        await fetchLeads(selectedStatusFilter, currentPage);
+        await fetchStatusCounts();
+        await fetchApprovalCounts();
+        alert('Lead rejected successfully');
+      } else {
+        alert(res?.data?.message || 'Failed to reject lead');
+      }
+    } catch (error) {
+      console.error('Error rejecting lead:', error);
+      alert(error.response?.data?.message || 'Failed to reject lead');
+    }
+  };
+
+  const openLeadDocuments = async (lead) => {
+    setDocumentsLead(lead);
+    setShowLeadDocumentsModal(true);
+    setLeadDocuments([]);
+    setLeadCategoryDocuments([]);
+    setLeadDocType('');
+    setLeadDocFileSelected(false);
+    if (leadDocFileRef.current) leadDocFileRef.current.value = '';
+
+    try {
+      setLeadDocumentsLoading(true);
+
+      try {
+        const catId =
+          lead?.leadCategory?._id ||
+          lead?.leadCategory ||
+          lead?.leadCategoryId ||
+          '';
+        if (catId) {
+          const catRes = await axios.get(`${backendUrl}/college/b2b/lead-categories/${catId}`, {
+            headers: { 'x-auth': token }
+          });
+          if (catRes?.data?.status && catRes?.data?.data) {
+            setLeadCategoryDocuments(catRes.data.data.documents || []);
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching lead category documents:', e);
+      }
+
+      const res = await axios.get(`${backendUrl}/college/b2b/leads/${lead._id}/documents`, {
+        headers: { 'x-auth': token }
+      });
+      if (res?.data?.status) {
+        setLeadDocuments(res.data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching lead documents:', error);
+    } finally {
+      setLeadDocumentsLoading(false);
+    }
+  };
+
+  const uploadLeadDocument = async () => {
+    if (!documentsLead?._id) return;
+    const file = leadDocFileRef.current?.files?.[0];
+    if (!file) {
+      alert('Please select a file');
+      return;
+    }
+    if (!String(leadDocType || '').trim()) {
+      alert('Please select a Doc Type');
+      return;
+    }
+    if ((leadCategoryDocuments || []).length) {
+      const allowed = new Set((leadCategoryDocuments || []).map((d) => String(d?.name || '').trim()).filter(Boolean));
+      if (!allowed.has(String(leadDocType || '').trim())) {
+        alert('Please select a valid Doc Type from Lead Source documents');
+        return;
+      }
+    }
+    try {
+      setLeadDocumentUploading(true);
+      const form = new FormData();
+      form.append('file', file);
+      if (leadDocType) form.append('docType', leadDocType);
+
+      const res = await axios.post(`${backendUrl}/college/b2b/leads/${documentsLead._id}/documents`, form, {
+        headers: { 'x-auth': token }
+      });
+      if (res?.data?.status) {
+        const listRes = await axios.get(`${backendUrl}/college/b2b/leads/${documentsLead._id}/documents`, {
+          headers: { 'x-auth': token }
+        });
+        if (listRes?.data?.status) setLeadDocuments(listRes.data.data || []);
+        setLeadDocType('');
+        setLeadDocFileSelected(false);
+        if (leadDocFileRef.current) leadDocFileRef.current.value = '';
+      } else {
+        alert(res?.data?.message || 'Failed to upload document');
+      }
+    } catch (error) {
+      console.error('Error uploading lead document:', error);
+      alert(error.response?.data?.message || 'Failed to upload document');
+    } finally {
+      setLeadDocumentUploading(false);
+    }
+  };
+
+  const updateLeadDocumentStatus = async (docId, nextStatus) => {
+    if (!documentsLead?._id || !docId) return;
+    try {
+      const res = await axios.put(
+        `${backendUrl}/college/b2b/leads/${documentsLead._id}/documents/${docId}/status`,
+        { status: nextStatus },
+        { headers: { 'x-auth': token } }
+      );
+      if (res?.data?.status) {
+        const listRes = await axios.get(`${backendUrl}/college/b2b/leads/${documentsLead._id}/documents`, {
+          headers: { 'x-auth': token }
+        });
+        if (listRes?.data?.status) setLeadDocuments(listRes.data.data || []);
+      } else {
+        alert(res?.data?.message || 'Failed to update document status');
+      }
+    } catch (error) {
+      console.error('Error updating document status:', error);
+      alert(error.response?.data?.message || 'Failed to update document status');
+    }
+  };
 
   // Check if user can update a lead
   const canUpdateLead = (lead) => {
     if (!lead || !userData?._id) return false;
-    
+
     // Admin can always update - check both permissions state and userData
     const permissionType = permissions?.permission_type || userData?.permissions?.permission_type;
     if (permissionType === 'Admin') return true;
-    
+
     // Check if user is the lead owner or lead added by
     const userId = userData._id;
     const leadAddedById = lead.leadAddedBy?._id || lead.leadAddedBy;
     const leadOwnerId = lead.leadOwner?._id || lead.leadOwner;
-    
-    return leadAddedById?.toString() === userId?.toString() || 
-           leadOwnerId?.toString() === userId?.toString();
+
+    return leadAddedById?.toString() === userId?.toString() ||
+      leadOwnerId?.toString() === userId?.toString();
   };
 
   // Update lead status
@@ -1433,6 +2000,7 @@ const B2BSales = () => {
         // Refresh the leads list and status counts
         fetchLeads(null, 1);
         fetchStatusCounts();
+        fetchApprovalCounts();
 
         // Reset form
         setLeadFormData({
@@ -1503,6 +2071,30 @@ const B2BSales = () => {
 
   // Open lead modal and initialize autocomplete
   const handleOpenLeadModal = () => {
+    const uid = userData?._id != null ? String(userData._id) : '';
+    setLeadFormData({
+      leadCategory: '',
+      typeOfB2B: '',
+      businessName: '',
+      businessAddress: '',
+      concernPersonName: '',
+      address: '',
+      city: '',
+      state: '',
+      latitude: '',
+      longitude: '',
+      designation: '',
+      email: '',
+      mobile: '',
+      whatsapp: '',
+      landlineNumber: '',
+      leadOwner: uid,
+      remark: ''
+    });
+    setFormErrors({});
+    setExtractedNumbers([]);
+    setSelectedLocation(null);
+    setShowMap(false);
     setShowAddLeadModal(true);
   };
 
@@ -1530,13 +2122,13 @@ const B2BSales = () => {
       ];
       const validExtensions = ['.xlsx', '.xls'];
       const fileExtension = selectedFile.name.substring(selectedFile.name.lastIndexOf('.')).toLowerCase();
-      
+
       if (!validTypes.includes(selectedFile.type) && !validExtensions.includes(fileExtension)) {
         setBulkUploadMessage('Please select an Excel file (.xlsx or .xls)');
         e.target.value = '';
         return;
       }
-      
+
       // Validate file size (max 10MB)
       const maxSize = 10 * 1024 * 1024; // 10MB
       if (selectedFile.size > maxSize) {
@@ -1544,7 +2136,7 @@ const B2BSales = () => {
         e.target.value = '';
         return;
       }
-      
+
       setBulkUploadFile(selectedFile);
       setBulkUploadMessage('');
       setBulkUploadErrors([]);
@@ -1589,7 +2181,7 @@ const B2BSales = () => {
     console.log('File size:', selectedFile?.size);
     console.log('File type:', selectedFile?.type);
     console.log('Is File instance:', selectedFile instanceof File);
-    
+
     // Verify FormData
     console.log('FormData entries:');
     for (let pair of formData.entries()) {
@@ -1609,11 +2201,11 @@ const B2BSales = () => {
         const successCount = response.data.data?.inserted || 0;
         const errorCount = response.data.data?.errors || 0;
         const errorDetails = response.data.data?.errorDetails || [];
-        
+
         setBulkUploadMessage(
           `✅ ${successCount} leads imported successfully${errorCount > 0 ? `. ${errorCount} errors found.` : ''}`
         );
-        
+
         if (errorDetails.length > 0) {
           setBulkUploadErrors(errorDetails);
         }
@@ -1706,6 +2298,8 @@ const B2BSales = () => {
   const [seletectedSubStatus, setSelectedSubStatus] = useState(null);
   // Single state for all follow-up form data
   const [followupFormData, setFollowupFormData] = useState({
+    followUpType: 'Call', // 'Call' | 'Visit' (backend default is 'Call')
+    description: '',
     followupDate: '',
     followupTime: '',
     remarks: '',
@@ -1715,6 +2309,53 @@ const B2BSales = () => {
     selectedCounselor: null,
     selectedDocument: null
   });
+
+  // AI Summary for Follow-up Notes (summarize existing notes text)
+  const [notesAI, setNotesAI] = useState({
+    loading: false,
+    error: '',
+    data: null
+  });
+
+  const summarizeFollowupNotes = async () => {
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+    const text = String(followupFormData.remarks || '').trim();
+    if (!text) {
+      setNotesAI((prev) => ({ ...prev, error: 'Please enter Follow-up Notes first.' }));
+      return;
+    }
+    try {
+      setNotesAI({ loading: true, error: '', data: null });
+      const leadContext = {
+        leadId: selectedProfile?._id || null,
+        businessName: selectedProfile?.businessName || '',
+        concernPersonName: selectedProfile?.concernPersonName || '',
+        mobile: selectedProfile?.mobile || '',
+        whatsapp: selectedProfile?.whatsapp || '',
+        email: selectedProfile?.email || '',
+        status: selectedProfile?.status?.title || selectedProfile?.status?.name || '',
+        subStatus: selectedProfile?.subStatus?.title || ''
+      };
+
+      const resp = await axios.post(
+        `${backendUrl}/api/ai/conversation-summary`,
+        { channel: 'Notes', leadContext, text },
+        { headers: token ? { 'x-auth': token } : undefined }
+      );
+
+      if (resp?.data?.success) {
+        setNotesAI({ loading: false, error: '', data: resp.data.data || null });
+      } else {
+        setNotesAI({ loading: false, error: resp?.data?.message || 'AI summarization failed.', data: null });
+      }
+    } catch (err) {
+      setNotesAI({
+        loading: false,
+        error: err?.response?.data?.message || err?.message || 'AI summarization failed.',
+        data: null
+      });
+    }
+  };
 
 
   const [subStatuses, setSubStatuses] = useState([
@@ -1738,6 +2379,7 @@ const B2BSales = () => {
   useEffect(() => {
     const checkIfMobile = () => {
       setIsMobile(window.innerWidth <= 992);
+      setViewportWidth(window.innerWidth);
     };
 
     checkIfMobile();
@@ -1745,6 +2387,9 @@ const B2BSales = () => {
 
     return () => window.removeEventListener('resize', checkIfMobile);
   }, []);
+
+  const panelWidthPx = Math.round(Math.min(420, Math.max(320, viewportWidth * 0.28)));
+  const isDesktopPanelOpen = !isMobile && Boolean(showPanel);
   useEffect(() => {
     fetchStatus()
 
@@ -1874,7 +2519,7 @@ const B2BSales = () => {
 
 
 
-  const openEditPanel = async (profile = null, panel) => {
+  const openEditPanel = async (profile = null, panel, followUpType = null) => {
     // Check permission before opening panel
     if (profile && (panel === 'StatusChange' || panel === 'SetFollowup')) {
       if (!canUpdateLead(profile)) {
@@ -1916,6 +2561,11 @@ const B2BSales = () => {
     }
     else if (panel === 'SetFollowup') {
       setShowPopup(null)
+      setFollowupFormData(prev => ({
+        ...prev,
+        followUpType: followUpType || prev.followUpType || 'Call',
+        description: (followUpType || prev.followUpType) === 'Visit' ? 'Follow-up visit' : 'Follow-up call',
+      }));
       setShowPanel('followUp')
     }
     else if (panel === 'bulkstatuschange') {
@@ -1995,7 +2645,7 @@ const B2BSales = () => {
 
   const handleReferLead = async (e) => {
     e.preventDefault();
-    
+
     // Validation
     if (!selectedConcernPerson) {
       alert('Please select a counselor');
@@ -2016,7 +2666,7 @@ const B2BSales = () => {
 
     try {
       const isBulk = showPanel === 'RefferAllLeads';
-      
+
       if (isBulk) {
         // Bulk route (backend supports array)
         try {
@@ -2122,6 +2772,10 @@ const B2BSales = () => {
 
   const toggleLeadDetails = (profileIndex) => {
     setLeadDetailsVisible(prev => prev === profileIndex ? null : profileIndex);
+  };
+
+  const togglePopup = (profileIndex) => {
+    setShowPopup(prev => (prev === profileIndex ? null : profileIndex));
   };
 
 
@@ -2441,9 +3095,41 @@ const B2BSales = () => {
 
               {/* Remarks */}
               <div className="mb-4">
-                <label htmlFor="followupRemarks" className="form-label small fw-medium text-dark" style={{ fontSize: '13px', marginBottom: '8px' }}>
-                  Follow-up Notes
-                </label>
+                <div className="d-flex align-items-center justify-content-between">
+                  <label htmlFor="followupRemarks" className="form-label small fw-medium text-dark" style={{ fontSize: '13px', marginBottom: '8px' }}>
+                    Follow-up Notes
+                  </label>
+                  <div className="d-flex align-items-center gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-primary"
+                      onClick={() => {
+                        const suggestion = buildFollowupNotesSuggestion({
+                          followupFormData,
+                          selectedProfile,
+                          seletectedStatus,
+                          seletectedSubStatus,
+                          statuses
+                        });
+                        setFollowupFormData((prev) => ({
+                          ...prev,
+                          remarks: prev.remarks ? `${prev.remarks}\n\n${suggestion}` : suggestion
+                        }));
+                      }}
+                    >
+                      AI Suggest
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      onClick={summarizeFollowupNotes}
+                      disabled={notesAI.loading}
+                      title="Summarize the current Follow-up Notes with AI"
+                    >
+                      {notesAI.loading ? 'Summarizing...' : 'AI Summarize'}
+                    </button>
+                  </div>
+                </div>
                 <textarea
                   className="form-control border-0 bgcolor"
                   id="followupRemarks"
@@ -2462,6 +3148,60 @@ const B2BSales = () => {
                     minHeight: '100px'
                   }}
                 />
+                {notesAI.error ? (
+                  <div className="text-danger small mt-2">{notesAI.error}</div>
+                ) : null}
+                {notesAI.data ? (
+                  <div className="mt-3 p-3" style={{ border: '1px solid #e9ecef', borderRadius: '10px', background: '#f8fafc' }}>
+                    <div className="d-flex align-items-center justify-content-between mb-2">
+                      <div className="fw-semibold">AI Summary (from Notes)</div>
+                      <div className="d-flex gap-2">
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-success"
+                          onClick={() => {
+                            const block = [
+                              notesAI.data?.summary ? `Summary:\n${notesAI.data.summary}` : '',
+                              Array.isArray(notesAI.data?.nextActions) && notesAI.data.nextActions.length
+                                ? `Next actions:\n- ${notesAI.data.nextActions.join('\n- ')}`
+                                : '',
+                              notesAI.data?.entities?.requirements?.length
+                                ? `Requirements:\n- ${notesAI.data.entities.requirements.join('\n- ')}`
+                                : '',
+                              notesAI.data?.entities?.budget ? `Budget: ${notesAI.data.entities.budget}` : '',
+                              notesAI.data?.entities?.timeline ? `Timeline: ${notesAI.data.entities.timeline}` : '',
+                              notesAI.data?.entities?.decisionMaker ? `Decision maker: ${notesAI.data.entities.decisionMaker}` : '',
+                              notesAI.data?.entities?.location ? `Location: ${notesAI.data.entities.location}` : '',
+                              Array.isArray(notesAI.data?.objections) && notesAI.data.objections.length
+                                ? `Objections:\n- ${notesAI.data.objections.join('\n- ')}`
+                                : '',
+                              String(notesAI.data?.suggestedReply || '').trim()
+                                ? `Suggested reply:\n${String(notesAI.data.suggestedReply || '').trim()}`
+                                : ''
+                            ].filter(Boolean).join('\n\n');
+
+                            setFollowupFormData((prev) => ({
+                              ...prev,
+                              remarks: block
+                            }));
+                          }}
+                        >
+                          Add to Notes
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={() => setNotesAI((prev) => ({ ...prev, data: null, error: '' }))}
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                    {notesAI.data?.summary ? (
+                      <div className="small" style={{ whiteSpace: 'pre-wrap' }}>{notesAI.data.summary}</div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
 
               {/* Action Buttons */}
@@ -2601,7 +3341,7 @@ const B2BSales = () => {
               </div>
             </>
 
-            {/* Bulk refer info (selection happens from the bulk bar above the cards) */} 
+            {/* Bulk refer info (selection happens from the bulk bar above the cards) */}
             {showPanel === 'RefferAllLeads' && (
               <div className="mb-3 p-2 bg-light rounded" style={{ fontSize: '13px' }}>
                 <div className="d-flex justify-content-between align-items-center">
@@ -2633,13 +3373,13 @@ const B2BSales = () => {
                 className="btn text-white"
                 onClick={(e) => handleReferLead(e)}
                 disabled={
-                  !selectedConcernPerson || 
+                  !selectedConcernPerson ||
                   (showPanel === 'RefferAllLeads' && (selectedProfiles.length === 0 && !input1Value))
                 }
-                style={{ 
-                  background: (!selectedConcernPerson || (showPanel === 'RefferAllLeads' && selectedProfiles.length === 0 && !input1Value)) ? '#ccc' : 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)', 
-                  border: 'none', 
-                  padding: '8px 24px', 
+                style={{
+                  background: (!selectedConcernPerson || (showPanel === 'RefferAllLeads' && selectedProfiles.length === 0 && !input1Value)) ? '#ccc' : 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)',
+                  border: 'none',
+                  padding: '8px 24px',
                   fontSize: '14px',
                   cursor: (!selectedConcernPerson || (showPanel === 'RefferAllLeads' && selectedProfiles.length === 0 && !input1Value)) ? 'not-allowed' : 'pointer'
                 }}
@@ -2854,11 +3594,14 @@ const B2BSales = () => {
     <div className="container-fluid">
 
       <div className="row">
-        <div className={isMobile ? 'col-12' : mainContentClass} style={{
-          width: !isMobile && showPanel ? 'calc(100% - 350px)' : '100%',
-          marginRight: !isMobile && showPanel ? '350px' : '0',
-          transition: 'all 0.3s ease'
-        }}>
+        <div
+          className={`mbdiv  ${isMobile ? 'col-12' : mainContentClass} ${isDesktopPanelOpen ? 'b2b-panel-open' : ''}`}
+          style={{
+            width: isDesktopPanelOpen ? `calc(100% - ${panelWidthPx}px)` : '100%',
+            marginRight: isDesktopPanelOpen ? `${panelWidthPx}px` : '0',
+            transition: 'all 0.3s ease'
+          }}
+        >
           <div
             className="content-blur-overlay"
             style={{
@@ -2885,15 +3628,17 @@ const B2BSales = () => {
           <div className="position-relative" ref={widthRef} >
             <nav
               ref={navRef}
-              className=""
+              className="b2b-cycle-header-nav"
               style={{
                 zIndex: 11,
-                backgroundColor: 'white',
+                backgroundColor: '#fff',
                 position: 'fixed',
+
                 width: `${width}px`,
                 left: `${leftOffset}px`,
-                boxShadow: '0 4px 25px 0 #0000001a',
-                paddingBlock: '5px'
+                boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)',
+                paddingBlock: '10px',
+                paddingInline: '4px'
               }}
             >
               <div className="container-fluid">
@@ -3016,73 +3761,8 @@ const B2BSales = () => {
                         >
                           <i className="fas fa-filter me-1"></i>
                         </button>
-                        
-                        {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom')|| permissions?.permission_type === 'Admin') && (
-                          <>
-                            <button className="btn btn-sm " style={{
-                              padding: "6px 12px",
-                              fontSize: "11px",
-                              fontWeight: "600",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px",
-                              color: 'rgb(250, 85, 121)',
-                              borderColor: 'rgb(250, 85, 121)'
-                            }}
-                              onClick={handleOpenLeadModal}
-                            >
-                              <i className="fas fa-plus" style={{ fontSize: "10px" }}></i>
-                              Add Lead
-                            </button>
-                            <button 
-                              className="btn btn-sm" 
-                              style={{
-                                padding: "6px 12px",
-                                fontSize: "11px",
-                                fontWeight: "600",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px",
-                                 color: 'rgb(250, 85, 121)',
-                              borderColor: 'rgb(250, 85, 121)'
-                              }}
-                              onClick={() => {
-                                setShowBulkInputs(true);
-                                setBulkMode('bulkupload');
-                                setInput1Value('');
-                                setShowBulkUploadModal(true);
-                              }}
-                            >
-                              <i className="fas fa-file-upload" style={{ fontSize: "10px" }}></i>
-                              Bulk Upload
-                            </button>
-                          </>
-                        )}
-                        {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-                          <button 
-                            className="btn btn-sm " 
-                            disabled={loadingLeads || leads.length === 0}
-                            style={{
-                              padding: "6px 12px",
-                              fontSize: "11px",
-                              fontWeight: "600",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px",
-                              color: 'rgb(250, 85, 121)',
-                              borderColor: 'rgb(250, 85, 121)'
-                            }}
-                            onClick={() => {
-                              setShowBulkInputs(true);
-                              setBulkMode('bulkrefer');
-                              setInput1Value('');
-                              openRefferPanel(null, 'RefferAllLeads');
-                            }}
-                          >
-                            <i className="fas fa-share-alt" style={{ fontSize: "10px" }}></i>
-                            Refer All Leads
-                          </button>
-                        )}
+
+
                       </div>
 
                       {/* Right side - Input Fields for Bulk Refer */}
@@ -3105,20 +3785,20 @@ const B2BSales = () => {
                             onChange={(e) => {
                               const maxValue = totalLeads || leads?.length || 0;
                               let inputValue = e.target.value.replace(/[^0-9]/g, '');
-                              
+
                               if (inputValue === '') {
                                 setInput1Value('');
                                 return;
                               }
-                              
+
                               const numValue = parseInt(inputValue, 10);
-                              
+
                               if (numValue < 1 || isNaN(numValue)) {
                                 inputValue = '1';
                               } else if (numValue > maxValue) {
                                 inputValue = maxValue.toString();
                               }
-                              
+
                               setInput1Value(inputValue);
                             }}
                             onKeyDown={(e) => {
@@ -3160,140 +3840,150 @@ const B2BSales = () => {
                     </div>
                   </div>
 
-                  {/* Mobile Layout */}
-                  <div className="col-12 d-md-none mt-2">
-                    <div className="row g-2">
-                      <div className="col-12">
-                        <Link
-                          to="/institute/lrp"
-                          className="btn w-100 btn-outline-secondary"
-                          style={{
-                            padding: '10px 12px',
-                            fontSize: '13px',
-                            fontWeight: '600',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            textDecoration: 'none',
-                          }}
-                        >
-                          <i className="fas fa-clipboard-list" style={{ fontSize: '14px' }}></i>
-                          Report
-                        </Link>
-                      </div>
-                      {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom')|| permissions?.permission_type === 'Admin') && (
+                  {/* Desktop: primary actions (fixed with header) */}
+                  <div className="col-12 d-none d-md-block mt-2 pt-1 border-top" style={{ borderColor: '#eee' }}>
+                    <div className="d-flex flex-wrap gap-2 align-items-center">
+                      {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
                         <>
-                          <div className="col-6">
-                            <button className="btn w-100" style={{
-                              padding: "12px 8px",
-                              fontSize: "13px",
-                              fontWeight: "600",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: "6px",
-                              backgroundColor: '#007bff',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '8px',
-                              boxShadow: '0 2px 8px rgba(0, 123, 255, 0.3)',
-                              transition: 'all 0.2s ease'
-                            }}
-                              onClick={handleOpenLeadModal}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 123, 255, 0.4)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 123, 255, 0.3)';
-                              }}
-                            >
-                              <i className="fas fa-plus" style={{ fontSize: "14px" }}></i>
-                              Add Lead
-                            </button>
-                          </div>
-                          <div className="col-6">
-                            <button className="btn w-100" style={{
-                              padding: "12px 8px",
-                              fontSize: "13px",
-                              fontWeight: "600",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: "6px",
-                              backgroundColor: '#28a745',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '8px',
-                              boxShadow: '0 2px 8px rgba(40, 167, 69, 0.3)',
-                              transition: 'all 0.2s ease'
-                            }}
-                              onClick={() => {
-                                setShowBulkInputs(true);
-                                setBulkMode('bulkupload');
-                                setInput1Value('');
-                                setShowBulkUploadModal(true);
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(40, 167, 69, 0.4)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = '0 2px 8px rgba(40, 167, 69, 0.3)';
-                              }}
-                            >
-                              <i className="fas fa-file-upload" style={{ fontSize: "14px" }}></i>
-                              Bulk Upload
-                            </button>
-                          </div>
-                        </>
-                      )}
-                      {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-                        <div className="col-6">
-                          <button 
-                            className="btn w-100" 
-                            disabled={loadingLeads || leads.length === 0}
+                          <button
+                            type="button"
+                            className="btn btn-sm border-0"
                             style={{
-                              padding: "12px 8px",
-                              fontSize: "13px",
-                              fontWeight: "600",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: "6px",
-                              backgroundColor: loadingLeads || leads.length === 0 ? '#ccc' : '#6c757d',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '8px',
-                              boxShadow: '0 2px 8px rgba(108, 117, 125, 0.3)',
-                              transition: 'all 0.2s ease',
-                              cursor: loadingLeads || leads.length === 0 ? 'not-allowed' : 'pointer'
+                              padding: '8px 16px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              color: '#fff',
+                              backgroundColor: 'rgb(250, 85, 121)',
+                              borderRadius: '999px'
+                            }}
+                            onClick={handleOpenLeadModal}
+                          >
+                            <i className="fas fa-plus" style={{ fontSize: '11px' }}></i>
+                            Add Lead
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm border-0"
+                            style={{
+                              padding: '8px 16px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              color: '#fff',
+                              backgroundColor: 'rgb(250, 85, 121)',
+                              borderRadius: '999px'
                             }}
                             onClick={() => {
                               setShowBulkInputs(true);
-                              setBulkMode('bulkrefer');
+                              setBulkMode('bulkupload');
                               setInput1Value('');
-                              openRefferPanel(null, 'RefferAllLeads');
+                              setShowBulkUploadModal(true);
                             }}
+                          >
+                            <i className="fas fa-file-upload" style={{ fontSize: '11px' }}></i>
+                            Bulk Upload
+                          </button>
+                        </>
+                      )}
+                      {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                        <button
+                          type="button"
+                          className="btn btn-sm border-0"
+                          disabled={loadingLeads || leads.length === 0}
+                          style={{
+                            padding: '8px 16px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            color: '#fff',
+                            backgroundColor: 'rgb(250, 85, 121)',
+                            borderRadius: '999px',
+                            opacity: loadingLeads || leads.length === 0 ? 0.55 : 1
+                          }}
+                          onClick={() => {
+                            setShowBulkInputs(true);
+                            setBulkMode('bulkrefer');
+                            setInput1Value('');
+                            openRefferPanel(null, 'RefferAllLeads');
+                          }}
+                        >
+                          <i className="fas fa-share-alt" style={{ fontSize: '11px' }}></i>
+                          Refer All
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Mobile Layout */}
+                  <div className="col-12 d-md-none mt-2">
+                    <div className="b2b-mobile-hscroll b2b-mobile-hscroll--actions">
+
+                      {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                        <>
+                          <button className="btn b2b-mobile-action-btn"
+                            onClick={handleOpenLeadModal}
                             onMouseEnter={(e) => {
-                              if (!loadingLeads && leads.length > 0) {
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(108, 117, 125, 0.4)';
-                              }
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(250, 85, 121, 0.35)';
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.transform = 'translateY(0)';
-                              e.currentTarget.style.boxShadow = '0 2px 8px rgba(108, 117, 125, 0.3)';
+                              e.currentTarget.style.boxShadow = '0 2px 8px rgba(250, 85, 121, 0.25)';
                             }}
                           >
-                            <i className="fas fa-share-alt" style={{ fontSize: "14px" }}></i>
-                            Refer Leads
+                            <i className="fas fa-plus" style={{ fontSize: "14px" }}></i>
+                            Add Lead
                           </button>
-                        </div>
+                          <button className="btn b2b-mobile-action-btn"
+                            onClick={() => {
+                              setShowBulkInputs(true);
+                              setBulkMode('bulkupload');
+                              setInput1Value('');
+                              setShowBulkUploadModal(true);
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(250, 85, 121, 0.35)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = '0 2px 8px rgba(250, 85, 121, 0.25)';
+                            }}
+                          >
+                            <i className="fas fa-file-upload" style={{ fontSize: "14px" }}></i>
+                            Bulk Upload
+                          </button>
+                        </>
                       )}
+                      {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                        <button
+                          className="btn b2b-mobile-action-btn"
+                          disabled={loadingLeads || leads.length === 0}
+                          style={{
+                            opacity: loadingLeads || leads.length === 0 ? 0.55 : 1,
+                            cursor: loadingLeads || leads.length === 0 ? 'not-allowed' : 'pointer'
+                          }}
+                          onClick={() => {
+                            setShowBulkInputs(true);
+                            setBulkMode('bulkrefer');
+                            setInput1Value('');
+                            openRefferPanel(null, 'RefferAllLeads');
+                          }}
+                        >
+                          <i className="fas fa-share-alt" style={{ fontSize: "14px" }}></i>
+                          Refer Leads
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="row g-2">
                       {/* Mobile Bulk Input Fields for Bulk Refer */}
                       {showBulkInputs && bulkMode === 'bulkrefer' && (
                         <div className="col-12 mt-2">
@@ -3313,20 +4003,20 @@ const B2BSales = () => {
                               onChange={(e) => {
                                 const maxValue = totalLeads || leads?.length || 0;
                                 let inputValue = e.target.value.replace(/[^0-9]/g, '');
-                                
+
                                 if (inputValue === '') {
                                   setInput1Value('');
                                   return;
                                 }
-                                
+
                                 const numValue = parseInt(inputValue, 10);
-                                
+
                                 if (numValue < 1 || isNaN(numValue)) {
                                   inputValue = '1';
                                 } else if (numValue > maxValue) {
                                   inputValue = maxValue.toString();
                                 }
-                                
+
                                 setInput1Value(inputValue);
                               }}
                               onKeyDown={(e) => {
@@ -3488,82 +4178,6 @@ const B2BSales = () => {
                     </div>
                   </div>
 
-                  {/* Filter Buttons Row */}
-                  <div className="col-12 mt-1">
-                    <div className="d-flex flex-wrap gap-1 align-items-center mt-sm-3 mt-3">
-                      {/* Status Count Cards */}
-                      {loadingStatusCounts ? (
-                        <div className="d-flex gap-2">
-                          {[1, 2, 3, 4].map((i) => (
-                            <div key={i} className="card border-0 shadow-sm" style={{ minWidth: '110px', height: '45px' }}>
-                              <div className="card-body d-flex align-items-center justify-content-center">
-                                <div className="spinner-border spinner-border-sm text-primary" role="status">
-                                  <span className="visually-hidden">Loading...</span>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <>
-                          {/* Total Leads Card */}
-                          <div
-                            className={`card border-0 shadow-sm status-count-card total ${selectedStatusFilter === null ? 'selected' : ''}`}
-                            style={{
-                              minWidth: '110px',
-                              height: '45px',
-                              cursor: 'pointer',
-                              border: selectedStatusFilter === null ? '2px solid #007bff' : '1px solid transparent'
-                            }}
-                            onClick={handleTotalCardClick}
-                            title="Click to view all leads"
-                          >
-                            <div className="card-body p-1 text-center d-flex align-items-center justify-content-center">
-                              <div className="d-flex align-items-center">
-                                <i className="fas fa-chart-line me-1 text-white" style={{ color: '#007bff', fontSize: '12px' }}></i>
-                                <div>
-                                  <h6 className="mb-0 fw-bold" style={{ color: '#ffffff', fontSize: '12px', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>Total</h6>
-                                  <small style={{ color: '#ffffff', fontSize: '10px', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>{totalLeads} leads</small>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Status Count Cards */}
-                          {statusCounts.map((status, index) => {
-                            const isSelected = selectedStatusFilter === status.statusId;
-                            return (
-                              <div
-                                key={status.statusId || index}
-                                className={`card border-0 shadow-sm status-count-card status ${isSelected ? 'selected' : ''}`}
-                                style={{
-                                  minWidth: '110px',
-                                  height: '45px',
-                                  cursor: 'pointer',
-                                  border: isSelected ? '2px solid #007bff' : '1px solid transparent',
-                                  backgroundColor: isSelected ? '#f8f9ff' : 'white'
-                                }}
-                                onClick={() => handleStatusCardClick(status.statusId)}
-                                title={`Click to view ${status.statusName} leads`}
-                              >
-                                <div className="card-body p-1 text-center d-flex align-items-center justify-content-center">
-                                  <div className="d-flex align-items-center">
-                                    <i className="fas fa-tag me-1" style={{ color: '#28a745', fontSize: '12px' }}></i>
-                                    <div>
-                                      <h6 className="mb-0 fw-bold" style={{ color: '#212529', fontSize: '11px' }}>{status.statusName}</h6>
-                                      <small style={{ color: '#6c757d', fontSize: '9px' }}>{status.count} leads</small>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </>
-                      )}
-
-
-                    </div>
-                  </div>
                 </div>
               </div>
             </nav>
@@ -3578,6 +4192,262 @@ const B2BSales = () => {
             transition: 'margin-top 0.2s ease-in-out'
           }}>
             <section className="list-view">
+              <div className="container-fluid px-0">
+                <div className="row">
+                  <div className="col-12 mt-1 b2b-crm-dashboard">
+                    <div className="b2b-dash-section mt-2">
+                      <span className="b2b-dash-section__label">Lead Approval</span>
+                      <div className="b2b-mobile-hscroll b2b-mobile-hscroll--approval d-flex gap-2 align-items-stretch pt-1">
+                        {[
+                          { key: 'total', label: 'Total', value: approvalCounts.total, bg: '#5b4fc9', approval: null },
+                          { key: 'approved', label: 'Approved', value: approvalCounts.approved, bg: '#10b981', approval: 'APPROVED' },
+                          { key: 'pending', label: 'Pending', value: approvalCounts.pending, bg: '#f59e0b', approval: 'PENDING' },
+                          { key: 'rejected', label: 'Rejected', value: approvalCounts.rejected, bg: '#ef4444', approval: 'REJECTED' },
+                        ].map((row) => {
+                          const isSelected = (selectedApprovalStatus || null) === row.approval;
+                          return (
+                          <div
+                            key={row.key}
+                            role="button"
+                            tabIndex={0}
+                            className="b2b-dash-stat-card b2b-dash-stat-card--lead text-center text-white"
+                            style={{
+                              background: row.bg,
+                              cursor: 'pointer',
+                              outline: isSelected ? '3px solid rgba(255,255,255,0.55)' : 'none',
+                              transform: isSelected ? 'translateY(-1px)' : 'none',
+                              opacity: approvalCountsLoading ? 0.7 : 1
+                            }}
+                            onClick={() => handleApprovalCardClick(row.approval)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') handleApprovalCardClick(row.approval);
+                            }}
+                          >
+                            <div className="b2b-dash-stat-card__label">{row.label}</div>
+                            <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                            <div className="b2b-dash-stat-card__value text-white">
+                              {String(row.value).padStart(2, '0')}
+                            </div>
+                          </div>
+                        )})}
+                      </div>
+                    </div>
+
+                    <div className="b2b-dash-section mt-3">
+                      <span className="b2b-dash-section__label">Performance</span>
+                      <div className="b2b-mobile-hscroll b2b-mobile-hscroll--chips d-flex gap-2 align-items-center pt-1">
+                        {loadingStatusCounts ? (
+                          <div className="d-flex gap-2 flex-wrap py-1">
+                            {[1, 2, 3, 4, 5].map((i) => (
+                              <div key={i} style={{ width: '92px', height: '34px', borderRadius: '999px', background: '#f1f3f5' }} className="d-flex align-items-center justify-content-center">
+                                <div className="spinner-border spinner-border-sm text-secondary" role="status">
+                                  <span className="visually-hidden">Loading...</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              className="b2b-perf-chip"
+                              style={{
+                                padding: '6px 14px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                borderRadius: '999px',
+                                cursor: 'pointer',
+                                color: selectedStatusFilter === null ? '#fff' : 'rgb(250, 85, 121)',
+                                backgroundColor: selectedStatusFilter === null ? 'rgb(250, 85, 121)' : '#fff',
+                                border: selectedStatusFilter === null ? 'none' : '1.5px solid rgb(250, 85, 121)'
+                              }}
+                              onClick={handleTotalCardClick}
+                            >
+                              All ({totalLeads})
+                            </button>
+                            {sortedPerformanceStatuses.map((status, index) => {
+                              const isSelected = selectedStatusFilter === status.statusId;
+                              return (
+                                <button
+                                  key={status.statusId || index}
+                                  type="button"
+                                  className="b2b-perf-chip"
+                                  style={{
+                                    padding: '6px 14px',
+                                    fontSize: '12px',
+                                    fontWeight: 600,
+                                    borderRadius: '999px',
+                                    cursor: 'pointer',
+                                    color: isSelected ? '#fff' : 'rgb(250, 85, 121)',
+                                    backgroundColor: isSelected ? 'rgb(250, 85, 121)' : '#fff',
+                                    border: isSelected ? 'none' : '1.5px solid rgb(250, 85, 121)'
+                                  }}
+                                  onClick={() => handleStatusCardClick(status.statusId)}
+                                >
+                                  {(status.statusName || 'Status').toUpperCase()} ({status.count ?? 0})
+                                </button>
+                              );
+                            })}
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="row g-2 mt-1">
+                      <div className="col-12 col-lg-4">
+                        <div className="b2b-dash-section h-100">
+                          <span className="b2b-dash-section__label">Followup Calling</span>
+                          <div className="d-flex flex-wrap gap-2 pt-1">
+                            {[
+                              { key: 'fc-done', label: 'Done', value: dashboardB2BCounts.call.done, bg: '#e8a317' },
+                              { key: 'fc-planned', label: 'Planned', value: dashboardB2BCounts.call.planned, bg: '#e8a317' },
+                              { key: 'fc-missed', label: 'Missed', value: dashboardB2BCounts.call.missed, bg: '#e8a317' }
+                            ].map((row) => (
+                              <div
+                                key={row.key}
+                                className="b2b-dash-stat-card text-center text-white flex-grow-1"
+                                style={{ background: row.bg }}
+                              >
+                                <div className="b2b-dash-stat-card__label">{row.label}</div>
+                                <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                                <div className="b2b-dash-stat-card__value text-white">
+                                  {String(row.value).padStart(2, '0')}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="col-12 col-lg-4">
+                        <div className="b2b-dash-section h-100">
+                          <span className="b2b-dash-section__label">Followup Visit</span>
+                          <div className="d-flex flex-wrap gap-2 pt-1">
+                            {[
+                              { key: 'fv-done', label: 'Done', value: dashboardB2BCounts.visit.done, bg: '#4b5563' },
+                              { key: 'fv-planned', label: 'Planned', value: dashboardB2BCounts.visit.planned, bg: '#4b5563' },
+                              { key: 'fv-missed', label: 'Missed', value: dashboardB2BCounts.visit.missed, bg: '#4b5563' }
+                            ].map((row) => (
+                              <div
+                                key={row.key}
+                                className="b2b-dash-stat-card text-center text-white flex-grow-1"
+                                style={{ background: row.bg }}
+                              >
+                                <div className="b2b-dash-stat-card__label">{row.label}</div>
+                                <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                                <div className="b2b-dash-stat-card__value text-white">
+                                  {String(row.value).padStart(2, '0')}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="col-12 col-lg-4">
+                        <div className="b2b-dash-section h-100">
+                          <span className="b2b-dash-section__label">Documents</span>
+                          <div className="d-flex flex-wrap gap-2 pt-1">
+                            {[
+                              { key: 'doc-done', label: 'Done', value: dashboardB2BCounts.docs.done, bg: '#4b5563' },
+                              { key: 'doc-pending', label: 'Pending', value: dashboardB2BCounts.docs.pending, bg: '#4b5563' }
+                            ].map((row) => (
+                              <div
+                                key={row.key}
+                                className="b2b-dash-stat-card text-center text-white flex-grow-1"
+                                style={{ background: row.bg }}
+                              >
+                                <div className="b2b-dash-stat-card__label">{row.label}</div>
+                                <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                                <div className="b2b-dash-stat-card__value text-white">
+                                  {String(row.value).padStart(2, '0')}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <style>
+                      {`
+                        .b2b-crm-dashboard .b2b-dash-section {
+                          position: relative;
+                          border: 1px solid #dee2e6;
+                          border-radius: 8px;
+                          padding: 5px 7px 5px;
+                          background: #fff;
+                        }
+                        .b2b-crm-dashboard .b2b-dash-section__label {
+                          position: absolute;
+                          top: -10px;
+                          left: 12px;
+                          padding: 0 6px;
+                          background: #fff;
+                          font-size: 13px;
+                          font-weight: 600;
+                          color: #333;
+                          line-height: 1.2;
+                        }
+                        .b2b-crm-dashboard .b2b-dash-stat-card {
+                          border-radius: 8px;
+                          padding: 5px;
+                          display: flex;
+                          flex-direction: column;
+                          align-items: center;
+                          justify-content: center;
+                          min-height: 45px;
+                          box-sizing: border-box;
+                        }
+                        .b2b-crm-dashboard .b2b-dash-stat-card--lead {
+                          flex: 1 1 96px;
+                          min-width: 50px;
+                          max-width: 90px;
+                        }
+                        .b2b-crm-dashboard .b2b-dash-stat-card:not(.b2b-dash-stat-card--lead) {
+                          min-width: 84px;
+                          min-height: 45px;
+                        }
+                        .b2b-crm-dashboard .b2b-dash-stat-card__label {
+                          font-size: 11px;
+                          font-weight: 600;
+                          margin: 0;
+                          line-height: 1.2;
+                          opacity: 0.98;
+                        }
+                        .b2b-crm-dashboard .b2b-dash-stat-card__divider {
+                          width: 72%;
+                          max-width: 52px;
+                          height: 1px;
+                          margin: 8px 0;
+                          background: rgba(255, 255, 255, 0.95);
+                          flex-shrink: 0;
+                        }
+                        .b2b-crm-dashboard .b2b-dash-stat-card__value {
+                          margin: 0;
+                          font-size: 15px;
+                          font-weight: 700;
+                          line-height: 1.2;
+                          min-width: 1.5em;
+                        }
+
+                        /* Mobile: horizontal scroll for Lead Approval cards */
+                        @media (max-width: 768px){
+                          .b2b-crm-dashboard .b2b-mobile-hscroll--approval{
+                            overflow-x: auto;
+                            overflow-y: hidden;
+                            flex-wrap: nowrap;
+                            -webkit-overflow-scrolling: touch;
+                            padding-bottom: 4px;
+                          }
+
+                          .b2b-crm-dashboard .b2b-mobile-hscroll--approval > *{
+                            flex: 0 0 auto;
+                          }
+                        }
+                      `}
+                    </style>
+                  </div>
+                </div>
+              </div>
 
               {/* Bulk refer bar (shows above lead cards) */}
               {showBulkInputs && bulkMode === 'bulkrefer' && (
@@ -3700,6 +4570,10 @@ const B2BSales = () => {
                   </div>
                   <p className="mt-3 text-muted">Loading B2B leads...</p>
                 </div>
+              ) : aiLeadIntelError ? (
+                <div className="alert alert-warning py-2" style={{ fontSize: '13px' }}>
+                  {aiLeadIntelError}
+                </div>
               ) : leads.length === 0 ? (
                 <div className="text-center py-5">
                   <i className="fas fa-inbox text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
@@ -3716,241 +4590,708 @@ const B2BSales = () => {
                     <div key={lead._id || leadIndex} className="col-12">
                       <div className={`lead-card ${(bulkMode === 'bulkrefer' && (selectedProfiles || []).includes(lead._id)) ? 'bulk-selected' : ''}`}>
                         {/* Card Header */}
-                        <div className="lead-header">
-                          <div className="lead-title-section">
-                            {/* <h5 className="lead-business-name">
-                              {lead.businessName || 'Business Name Not Available'}
-                            </h5> */}
-                            <p className="lead-contact-person text-capitalize text-white">
-                              <i className="fas fa-user me-2"></i>
-                              {lead.concernPersonName || 'Contact Person Not Available'}
-                            </p>
+                        <div className="lead-header lead-header-v2">
+                          <button
+                            type="button"
+                            className="lead-header-v2__float-icon"
+                            aria-label={leadDetailsVisible === leadIndex ? 'Collapse lead' : 'Expand lead'}
+                            title={leadDetailsVisible === leadIndex ? 'Collapse' : 'Expand'}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              toggleLeadDetails(leadIndex);
+                            }}
+                          >
+                            <i className={leadDetailsVisible === leadIndex ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
+                          </button>
 
-                            {/* Compact Contact Info */}
-                            <div className="lead-contact-info">
-                              {lead.email && (
-                                <div className="lead-contact-item">
-                                  <i className="fas fa-envelope"></i>
-                                  <span>{lead.email}</span>
-                                </div>
-                              )}
-                              {lead.designation && (
-                                <div className="lead-contact-item">
-                                  <i className="fas fa-id-badge"></i>
-                                  <span>{lead.designation}</span>
-                                </div>
-                              )}
-                              {lead.mobile && (
-                                <div className="lead-contact-item">
-                                  <i className="fas fa-phone"></i>
-                                  <span>{lead.mobile}</span>
-                                </div>
-                              )}
-                              {lead.whatsapp && (
-                                <div className="lead-contact-item">
-                                  <i className="fab fa-whatsapp"></i>
-                                  <span>{lead.whatsapp}</span>
-                                </div>
-                              )}
+                          {/* {aiLeadIntelById?.[lead._id] && (
+                            <div
+                              className="lead-header-v2__float-ai d-none d-md-inline-flex"
+                              title={`AI score: ${aiLeadIntelById[lead._id]?.score ?? 0}${aiLeadIntelById[lead._id]?.suggestedAction ? ` • ${aiLeadIntelById[lead._id].suggestedAction}` : ''}`}
+                            >
+                              AI
                             </div>
-                          </div>
-                          <div className="lead-badges">
+                          )} */}
+                          {isMobile ? (
+                            <div className="lhm">
 
-                          <Link
-                          to="/institute/lrp"
-                          className="btn btn-sm btn-outline-secondary text-white border-1 border-white dayReport"
-                          style={{
-                            padding: '6px 12px',
-                            fontSize: '11px',
-                            fontWeight: '600',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            textDecoration: 'none',
-                            
-                          }}
-                          title="Day Report"
-                        >
-                          <i className="fas fa-clipboard-list" style={{ fontSize: '10px' }}></i>
-                          Report
-                        </Link>
+                              {/* Row 1 — Name + Refer/History pills + Status */}
+                              <div className="lhm__row1">
 
-                            {lead.leadCategory?.name && (
-                              <span className="lead-badge category">
-                                {lead.leadCategory.name}
-                              </span>
-                            )}
-                            {lead.typeOfB2B?.name && (
-                              <span className="lead-badge type">
-                                {lead.typeOfB2B.name}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Card Content */}
-                        <div className="lead-content">
-                          {/* Status Section */}
-                          <div className="status-section mb-2">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <div className="d-flex align-items-center">
-                                <i className="fas fa-tag text-primary me-2"></i>
-                                <span className="fw-bold text-dark">Status:</span>
-                                <span className="ms-2 badge StatusBadge">
-                                  {lead.status?.title || lead.status?.name || 'No Status'}
-                                </span>
-                                {lead.subStatus && (
-                                  <span className="ms-2 badge bg-secondary">
-                                    {(() => {
-                                      const substatus = lead.status?.substatuses?.find(sub => sub._id === lead.subStatus);
-                                      return substatus?.title || 'No Sub-Status';
-                                    })()}
+                                <div className="lhm__name" title={lead.concernPersonName || lead.businessName || ''}>
+                                  <i className="fas fa-user-circle lhm__name-icon" aria-hidden="true"></i>
+                                  <span className="text-capitalize lhm__name-text">
+                                    {lead.concernPersonName || lead.businessName || '—'}
                                   </span>
-                                )}
-                              </div>
-                              {canUpdateLead(lead) ? (
-                                <button
-                                  className="btn btn-sm btn-outline-primary StatusChange"
-                                  onClick={() => openEditPanel(lead, 'StatusChange')}
-                                  title="Change Status"
-                                  style={{ borderColor: 'rgb(250, 85, 121)', color: 'rgb(250, 85, 121)' }}
-                                 
-                                 
-                                
-                              >
-                                  <i className="fas fa-edit me-1"></i>
-                                  Change Status
-                                </button>
-                              ) : (
-                                <button
-                                  className="btn btn-sm btn-outline-secondary"
-                                  disabled
-                                  title="You don't have permission to update this lead"
-                                  style={{ cursor: 'not-allowed', opacity: 0.6 }}
-                                >
-                                  <i className="fas fa-lock me-1"></i>
-                                  No Permission
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Compact Additional Info */}
-                          <div className="compact-info-section">
-                            <div className="compact-info-grid">
-                              {lead.address && (
-                                <div className="compact-info-item">
-                                  <i className="fas fa-map-marker-alt text-danger"></i>
-                                  <span className="compact-info-label">Address:</span>
-                                  <span className="compact-info-value">{lead.address}</span>
                                 </div>
-                              )}
-                              {lead.leadOwner?.name && (
-                                <div className="compact-info-item">
-                                  <i className="fas fa-user-tie text-warning"></i>
-                                  <span className="compact-info-label">Owner:</span>
-                                  <span className="compact-info-value">{lead.leadOwner.name}</span>
-                                </div>
-                              )}
-                              {lead.leadAddedBy?.name && (
-                                <div className="compact-info-item">
-                                  <i className="fas fa-user-plus text-info"></i>
-                                  <span className="compact-info-label">Added:</span>
-                                  <span className="compact-info-value">{lead.leadAddedBy.name}</span>
-                                </div>
-                              )}
-                              {(() => {
-                                let latestRemark = '';
 
-                                if (Array.isArray(lead.logs) && lead.logs.length > 0) {
-                                  const lastLog = lead.logs[lead.logs.length - 1];
-                                  latestRemark = lastLog?.remarks || '';
-                                }
-
-                                if (!latestRemark && typeof lead.remark === 'string' && lead.remark.trim()) {
-                                  latestRemark = lead.remark;
-                                }
-
-                                return latestRemark ? (
-                                  <div className="compact-info-item">
-                                    <i className="fas fa-comment text-success"></i>
-                                    <span className="compact-info-label">Remarks:</span>
-                                    <span className="compact-info-value">{latestRemark}</span>
+                                {/* {aiLeadIntelById?.[lead._id] && (
+                                  <div
+                                    className="lhm__pills"
+                                    style={{ gap: '6px' }}
+                                    title={aiLeadIntelById[lead._id]?.suggestedAction || ''}
+                                  >
+                                    <span
+                                      className="badge"
+                                      style={{
+                                        background: aiLeadIntelById[lead._id]?.priority === 'High'
+                                          ? '#dc2626'
+                                          : aiLeadIntelById[lead._id]?.priority === 'Medium'
+                                            ? '#f59e0b'
+                                            : '#64748b',
+                                        color: 'white',
+                                        borderRadius: '999px',
+                                        padding: '6px 10px',
+                                        fontSize: '11px',
+                                        fontWeight: 700
+                                      }}
+                                    >
+                                      AI
+                                    </span>
                                   </div>
-                                ) : null;
-                              })()}
+                                )} */}
+
+                                <div className="lhm__pills">
+                                <button
+                                    type="button"
+                                    className="lead-meta-v2__pill"
+                                    onClick={() => openRefferPanel(lead, 'Reffer')}
+                                    title="Refer"
+                                  >
+                                    <i className="fas fa-share-alt" aria-hidden="true"></i>
+                                    
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="lead-meta-v2__pill"
+                                    onClick={() => navigate(`/institute/lrp?b2bLeadId=${lead._id}&mode=add`)}
+                                    title="Add Lead Report"
+                                  >
+                                    <i className="fas fa-plus" aria-hidden="true"></i>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="lead-meta-v2__pill"
+                                    onClick={() => navigate(`/institute/lrp-view?b2bLeadId=${lead._id}`)}
+                                    title="View lead Report"
+                                  >
+                                    <i className="fas fa-eye" aria-hidden="true"></i>
+                                  </button>
+                                </div>
+
+                                <div className="lhm__status-block" onClick={() => openEditPanel(lead, 'StatusChange')}>
+                                  <button
+                                    type="button"
+                                    className="lhm__editbtn"
+                                    title="Edit Status"
+                                    aria-label="Edit Status"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(lead, 'StatusChange'); }}
+                                  >
+                                    <i className="fas fa-edit" aria-hidden="true"></i>
+                                  </button>
+                                  <div className="lhm__status-row">
+                                    <span className="lhm__status-label">Status</span>
+                                    <span className="lhm__status-val">
+                                      {lead.status?.title || lead.status?.name || 'Untouch Lead'}
+                                    </span>
+                                  </div>
+                                  <div className="lhm__status-row">
+                                    <span className="lhm__status-label">Sub</span>
+                                    <span className="lhm__status-val">
+                                      {lead.subStatus?.title || 'Untouch Lead'}
+                                    </span>
+                                  </div>
+                                </div>
+
+                              </div>
+
+                              {/* Row 2 — Phone + More + Expand */}
+                              <div className="lhm__row2">
+                                <div className="lhm__phone" title={lead.mobile || ''}>
+                                  <i className="fas fa-phone" aria-hidden="true"></i>
+                                  <span>{lead.mobile || '—'}</span>
+                                </div>
+
+                                <div className="lhm__actions">
+                                  {/* Lead Approval (Mobile) — match desktop pill + pen, no "Approval:" prefix */}
+                                  <div className="lead-header-mob__approval-v2">
+                                    {(() => {
+                                      const st = String(lead?.approval?.status || 'PENDING').toUpperCase();
+                                      const safe = ['PENDING', 'APPROVED', 'REJECTED'].includes(st) ? st : 'PENDING';
+                                      return (
+                                        <>
+                                          <button
+                                            type="button"
+                                            className={`lead-approval-v2__pill lead-approval-v2__pill--${safe.toLowerCase()}`}
+                                            title={`Approval: ${safe}`}
+                                            onClick={() => handleApprovalCardClick(safe)}
+                                          >
+                                            {safe}
+                                          </button>
+
+                                          {isAdmin() && (
+                                            <button
+                                              type="button"
+                                              className="lead-approval-v2__iconbtn"
+                                              title="Change approval"
+                                              onClick={() => setApprovalEditLeadId((prev) => (prev === lead._id ? null : lead._id))}
+                                              aria-label="Change approval"
+                                            >
+                                              <i className="fas fa-pen" aria-hidden="true"></i>
+                                            </button>
+                                          )}
+
+                                          {isAdmin() && (
+                                            <div
+                                              className={`lead-header-v2__approval-editor ${approvalEditLeadId === lead._id ? 'is-open' : ''}`}
+                                              aria-hidden={approvalEditLeadId === lead._id ? 'false' : 'true'}
+                                            >
+                                              {safe === 'PENDING' ? (
+                                                <div className="lead-approval-v2__menu">
+                                                  <button
+                                                    type="button"
+                                                    className="lead-approval-v2__action lead-approval-v2__action--approve"
+                                                    onClick={async () => {
+                                                      setApprovalEditLeadId(null);
+                                                      await approveLead(lead);
+                                                    }}
+                                                  >
+                                                    <i className="fas fa-check" aria-hidden="true"></i>
+                                                    Approve
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    className="lead-approval-v2__action lead-approval-v2__action--reject"
+                                                    onClick={() => {
+                                                      setApprovalEditLeadId(null);
+                                                      setApprovalLeadTarget(lead);
+                                                      setRejectionReason('');
+                                                      setShowRejectionForm(true);
+                                                    }}
+                                                  >
+                                                    <i className="fas fa-times" aria-hidden="true"></i>
+                                                    Reject
+                                                  </button>
+                                                </div>
+                                              ) : (
+                                                <div className="lead-approval-v2__menu lead-approval-v2__menu--readonly">
+                                                  {safe}
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
+                                        </>
+                                      );
+                                    })()}
+                                  </div>
+
+                                  <button type="button" className="lhm__action-btn lhm__action-btn--more"
+                                    onClick={() => setMobileMoreLead(lead)} aria-label="More">
+                                    More
+                                  </button>
+                                  <button type="button" className="lhm__action-btn"
+                                    onClick={() => toggleLeadDetails(leadIndex)}
+                                    aria-label={leadDetailsVisible === leadIndex ? 'Collapse' : 'Expand'}>
+                                    <i className={leadDetailsVisible === leadIndex ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Row 3 — Followup Calling + Followup Visit */}
+                              <div className="lhm__row3">
+                                {/* Followup Calling */}
+                                <div className="lhm__followup-box">
+                                  <span className="lhm__followup-title">Followup Calling</span>
+                                  <button
+                                    type="button"
+                                    className="lhm__editbtn"
+                                    title="Set Followup"
+                                    aria-label="Set Followup"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(lead, 'SetFollowup', 'Call'); }}
+                                  >
+                                    <i className="fas fa-edit" aria-hidden="true"></i>
+                                  </button>
+                                  <div className="lhm__followup-cards">
+                                    {(() => {
+                                      const b = getLeadFollowupBucket(lead, 'Call');
+                                      return [
+                                        { label: 'Done', value: b === 'done' ? 1 : 0, bg: '#12b3ff' },
+                                        { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#f59e0b' },
+                                        { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#7c3d14' },
+                                      ];
+                                    })().map((s) => (
+                                      <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
+                                        <span className="lhm__stat-label">{s.label}</span>
+                                        <span className="lhm__stat-divider" />
+                                        <span className="lhm__stat-val">{String(s.value).padStart(2, '0')}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className="lhm__followup-date">
+                                    <span>Next Follow-up Date:</span><span>{getLeadFollowupDateLabel(lead, 'Call')}</span>
+                                  </div>
+                                </div>
+
+                                {/* Followup Visit */}
+                                <div className="lhm__followup-box">
+                                  <span className="lhm__followup-title">Followup Visit</span>
+                                  <button
+                                    type="button"
+                                    className="lhm__editbtn"
+                                    title="Set Followup"
+                                    aria-label="Set Followup"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(lead, 'SetFollowup', 'Visit'); }}
+                                  >
+                                    <i className="fas fa-edit" aria-hidden="true"></i>
+                                  </button>
+                                  <div className="lhm__followup-cards">
+                                    {(() => {
+                                      const b = getLeadFollowupBucket(lead, 'Visit');
+                                      return [
+                                        { label: 'Done', value: b === 'done' ? 1 : 0, bg: '#4b5563' },
+                                        { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#4b5563' },
+                                        { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#7c3d14' },
+                                      ];
+                                    })().map((s) => (
+                                      <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
+                                        <span className="lhm__stat-label">{s.label}</span>
+                                        <span className="lhm__stat-divider" />
+                                        <span className="lhm__stat-val">{String(s.value).padStart(2, '0')}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className="lhm__followup-date">
+                                    <span>Next Follow-up Date:</span><span>{getLeadFollowupDateLabel(lead, 'Visit')}</span>
+                                  </div>
+                                </div>
+                                {/* Documents */}
+                                <div className="lhm__followup-box">
+                                  <span className="lhm__followup-title">Documents</span>
+                                  <button
+                                    type="button"
+                                    className="lhm__editbtn"
+                                    title="Open Documents"
+                                    aria-label="Open Documents"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); openLeadDocuments(lead); }}
+                                  >
+                                    <i className="fas fa-edit" aria-hidden="true"></i>
+                                  </button>
+                                  <div className="lhm__followup-cards">
+                                    {(() => {
+                                      const b = getLeadDocumentsBucket(lead); // done | pending | null (not required)
+                                      return [
+                                        { label: 'Done', value: b === 'done' ? 1 : 0, bg: '#4b5563' },
+                                        { label: 'Pending', value: b === 'pending' ? 1 : 0, bg: '#4b5563' },
+                                      ];
+                                    })().map((s) => (
+                                      <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
+                                        <span className="lhm__stat-label">{s.label}</span>
+                                        <span className="lhm__stat-divider" />
+                                        <span className="lhm__stat-val">{String(s.value).padStart(2, '0')}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className="lhm__followup-date">
+                                    <span></span><span></span>
+                                  </div>
+                                </div>
+                              </div>
+
                             </div>
-                          </div>
+                          ) : (
+                            <div className="lead-header-v2__row">
+                              <div className="lead-header-v2__left">
+                                <div className="lead-header-v2__inputs">
+                                  <div className="lead-header-v2__input-row">
+                                    <div className="lead-header-v2__input-wrap">
+                                      <i className="fas fa-user lead-header-v2__input-icon" aria-hidden="true"></i>
+                                      <input
+                                        type="text"
+                                        className="lead-header-v2__input text-capitalize"
+                                        readOnly
+                                        value={lead.concernPersonName || lead.businessName || ''}
+                                        placeholder="Name"
+                                        title={lead.concernPersonName || lead.businessName || 'NA'}
+                                      />
+                                    </div>
+                                    <div className="lead-header-v2__input-wrap">
+                                      <i className="fas fa-phone lead-header-v2__input-icon" aria-hidden="true"></i>
+                                      <input
+                                        type="text"
+                                        className="lead-header-v2__input"
+                                        readOnly
+                                        value={lead.mobile || ''}
+                                        placeholder="Mobile no"
+                                        title={lead.mobile || 'NA'}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* <div className="lead-header-v2__input-row">
+                                    <div className="lead-header-v2__input-wrap">
+                                      <i className="fas fa-envelope lead-header-v2__input-icon" aria-hidden="true"  style={{fontSize:'9px'}}></i>
+                                      <input
+                                        type="text"
+                                        className="lead-header-v2__input"
+                                        readOnly
+                                        value={lead.email || ''}
+                                        placeholder="Email"   style={{fontSize:'9px'}}
+                                        title={lead.email || lead.email || 'NA'}
+                                      />
+                                    </div>
+                                  </div> */}
+                                </div>
+                              </div>
+
+                              <div className="lead-header-v2__right">
+                                {/* Lead Approval (PENDING / APPROVED / REJECTED) */}
+                                <div className="lead-header-v2__approval">
+                                  <span
+                                    className="lead-header-v2__approval-label"
+                                  >
+                                    Lead Approval
+                                  </span>
+                                  {(() => {
+                                    const st = String(lead?.approval?.status || 'PENDING').toUpperCase();
+                                    const safe = ['PENDING', 'APPROVED', 'REJECTED'].includes(st) ? st : 'PENDING';
+                                    return (
+                                      <div className="lead-approval-v2__row">
+                                        <button
+                                          type="button"
+                                          className={`lead-approval-v2__pill lead-approval-v2__pill--${safe.toLowerCase()}`}
+                                          title={`Approval: ${safe}`}
+                                          onClick={() => handleApprovalCardClick(safe)}
+                                        >
+                                          {safe}
+                                        </button>
+
+                                        {isAdmin() && (
+                                          <button
+                                            type="button"
+                                            className="lead-approval-v2__iconbtn"
+                                            title="Change approval"
+                                            onClick={() => setApprovalEditLeadId((prev) => (prev === lead._id ? null : lead._id))}
+                                            aria-label="Change approval"
+                                          >
+                                            <i className="fas fa-pen" aria-hidden="true"></i>
+                                          </button>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
+
+                                  {isAdmin() && (
+                                    <div
+                                      className={`lead-header-v2__approval-editor ${approvalEditLeadId === lead._id ? 'is-open' : ''}`}
+                                      aria-hidden={approvalEditLeadId === lead._id ? 'false' : 'true'}
+                                    >
+                                      {String(lead?.approval?.status || 'PENDING').toUpperCase() === 'PENDING' ? (
+                                        <div className="lead-approval-v2__menu">
+                                          <button
+                                            type="button"
+                                            className="lead-approval-v2__action lead-approval-v2__action--approve"
+                                            onClick={async () => {
+                                              setApprovalEditLeadId(null);
+                                              await approveLead(lead);
+                                            }}
+                                          >
+                                            <i className="fas fa-check" aria-hidden="true"></i>
+                                            Approve
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="lead-approval-v2__action lead-approval-v2__action--reject"
+                                            onClick={() => {
+                                              setApprovalEditLeadId(null);
+                                              setApprovalLeadTarget(lead);
+                                              setRejectionReason('');
+                                              setShowRejectionForm(true);
+                                            }}
+                                          >
+                                            <i className="fas fa-times" aria-hidden="true"></i>
+                                            Reject
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <div className="lead-approval-v2__menu lead-approval-v2__menu--readonly">
+                                          {String(lead?.approval?.status || '').toUpperCase()}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Refer / History pills — stacked vertically, no white box */}
+                                <div className="lead-header-v2__pills">
+                                  <button
+                                    type="button"
+                                    className="lead-meta-v2__pill"
+                                    onClick={() => openRefferPanel(lead, 'Reffer')}
+                                    title="Refer"
+                                  >
+                                    <i className="fas fa-share-alt" aria-hidden="true"></i>
+                                    
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="lead-meta-v2__pill"
+                                    onClick={() => navigate(`/institute/lrp?b2bLeadId=${lead._id}&mode=add`)}
+                                    title="Add Lead Report"
+                                  >
+                                    <i className="fas fa-plus" aria-hidden="true"></i>
+                                    
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="lead-meta-v2__pill"
+                                    onClick={() => navigate(`/institute/lrp-view?b2bLeadId=${lead._id}`)}
+                                    title="View lead Report"
+                                  >
+                                    <i className="fas fa-eye" aria-hidden="true"></i>
+                                    
+                                  </button>
+                                </div>
+
+                                {/* Performance block — label paired with each input */}
+                                <div className="lead-header-v2__perf-block" style={{width:'20%'
+                                }}>
+                                  <span className="lead-header-v2__perf-title">Performance</span>
+                                  <button
+                                    type="button"
+                                    className="lead-header-v2__editbtn"
+                                    title="Edit Performance"
+                                    aria-label="Edit Performance"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(lead, 'StatusChange'); }}
+                                  >
+                                    <i className="fas fa-edit" aria-hidden="true"></i>
+                                  </button>
+                                  <div className="lead-header-v2__perf-row">
+                                    <span className="lead-header-v2__perf-label">Status</span>
+                                    <input
+                                      type="text"
+                                      className="form-control form-control-sm m-0 lead-header-v2__perf-input"
+                                      value={lead.status?.title || lead.status?.name || 'Untouch Lead'}
+                                      readOnly
+                                      onClick={() => openEditPanel(lead, 'StatusChange')}
+                                    />
+                                  </div>
+                                  <div className="lead-header-v2__perf-row">
+                                    <span className="lead-header-v2__perf-label">Sub-Status</span>
+                                    <input
+                                      type="text"
+                                      className="form-control form-control-sm m-0 lead-header-v2__perf-input"
+                                      value={lead.subStatus?.title || 'Untouch Lead'}
+                                      readOnly
+                                      style={{fontSize:'8px'}}
+                                    />
+                                  </div>
+                                  {/* mobile expand/options — keep hidden on desktop */}
+                                  <div className="d-md-none d-sm-block d-block mt-1">
+                                    <div className="btn-group">
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-outline-secondary border-0"
+                                        onClick={() => togglePopup(leadIndex)}
+                                        aria-label="Options"
+                                      >
+                                        <i className="fas fa-ellipsis-v"></i>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-outline-secondary border-0"
+                                        onClick={() => toggleLeadDetails(leadIndex)}
+                                        aria-label="Expand/Collapse"
+                                      >
+                                        {leadDetailsVisible === leadIndex ? (
+                                          <i className="fas fa-chevron-up"></i>
+                                        ) : (
+                                          <i className="fas fa-chevron-down"></i>
+                                        )}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Followup Calling & Visit — Done/Planned/Missed with distinct colours */}
+                                <div className="lead-header-v2__dash">
+                                  <div className="lead-header-v2__dash-col">
+                                    <div className="b2b-dash-section h-100">
+                                      <span className="b2b-dash-section__label">Followup Calling</span>
+                                      <button
+                                        type="button"
+                                        className="lead-header-v2__editbtn"
+                                        title="Edit Followup Calling"
+                                        aria-label="Edit Followup Calling"
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(lead, 'SetFollowup', 'Call'); }}
+                                      >
+                                        <i className="fas fa-edit" aria-hidden="true"></i>
+                                      </button>
+                                      <div className="d-flex flex-wrap gap-2 pt-1">
+                                        {(() => {
+                                          const b = getLeadFollowupBucket(lead, 'Call');
+                                          return [
+                                            { key: 'fc-done', label: 'Done', value: b === 'done' ? 1 : 0, bg: '#12b3ff' },
+                                            { key: 'fc-planned', label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#f59e0b' },
+                                            { key: 'fc-missed', label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#7c3d14' },
+                                          ];
+                                        })().map((row) => (
+                                          <div
+                                            key={row.key}
+                                            className="b2b-dash-stat-card text-center text-white flex-grow-1"
+                                            style={{ background: row.bg }}
+                                          >
+                                            <div className="b2b-dash-stat-card__label">{row.label}</div>
+                                            <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                                            <div className="b2b-dash-stat-card__value text-white">
+                                              {String(row.value).padStart(2, '0')}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                      <div className="ActionsDates">
+                                        <span>Next Follow-up Date:</span> <span>{getLeadFollowupDateLabel(lead, 'Call')}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="lead-header-v2__dash-col">
+                                    <div className="b2b-dash-section h-100">
+                                      <span className="b2b-dash-section__label">Followup Visit</span>
+                                      <button
+                                        type="button"
+                                        className="lead-header-v2__editbtn"
+                                        title="Edit Followup Visit"
+                                        aria-label="Edit Followup Visit"
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(lead, 'SetFollowup', 'Visit'); }}
+                                      >
+                                        <i className="fas fa-edit" aria-hidden="true"></i>
+                                      </button>
+                                      <div className="d-flex flex-wrap gap-2 pt-1">
+                                        {(() => {
+                                          const b = getLeadFollowupBucket(lead, 'Visit');
+                                          return [
+                                            { key: 'fv-done', label: 'Done', value: b === 'done' ? 1 : 0, bg: '#4b5563' },
+                                            { key: 'fv-planned', label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#4b5563' },
+                                            { key: 'fv-missed', label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#7c3d14' },
+                                          ];
+                                        })().map((row) => (
+                                          <div
+                                            key={row.key}
+                                            className="b2b-dash-stat-card text-center text-white flex-grow-1"
+                                            style={{ background: row.bg }}
+                                          >
+                                            <div className="b2b-dash-stat-card__label">{row.label}</div>
+                                            <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                                            <div className="b2b-dash-stat-card__value text-white">
+                                              {String(row.value).padStart(2, '0')}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                      <div className="ActionsDates">
+                                        <span>Next Follow-up Date:</span> <span>{getLeadFollowupDateLabel(lead, 'Visit')}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="lead-header-v2__dash-col">
+                                    <div className="b2b-dash-section h-100">
+                                      <span className="b2b-dash-section__label">Documents</span>
+                                      <button
+                                        type="button"
+                                        className="lead-header-v2__editbtn"
+                                        title="Open Documents"
+                                        aria-label="Open Documents"
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); openLeadDocuments(lead); }}
+                                      >
+                                        <i className="fas fa-edit" aria-hidden="true"></i>
+                                      </button>
+                                      <div className="d-flex flex-wrap gap-2 pt-1">
+                                        {(() => {
+                                          const b = getLeadDocumentsBucket(lead);
+                                          return [
+                                            { key: 'doc-done', label: 'Done', value: b === 'done' ? 1 : 0, bg: '#4b5563' },
+                                            { key: 'doc-pending', label: 'Pending', value: b === 'pending' ? 1 : 0, bg: '#4b5563' },
+                                          ];
+                                        })().map((row) => (
+                                          <div
+                                            key={row.key}
+                                            className="b2b-dash-stat-card text-center text-white flex-grow-1"
+                                            style={{ background: row.bg }}
+                                          >
+                                            <div className="b2b-dash-stat-card__label">{row.label}</div>
+                                            <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                                            <div className="b2b-dash-stat-card__value text-white">
+                                              {String(row.value).padStart(2, '0')}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                      <div className="ActionsDates">
+                                        <span></span> <span></span>
+                                      </div>  
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* expand/collapse is handled by the single floating button */}
+                              </div>
+                            </div>
+                          )}
                         </div>
 
-                        {/* Action Buttons */}
-                        <div className="lead-actions">
-                          <div className="action-group primary">
-                            {/* <button
-                              className="action-btn view"
-                              onClick={() => togglePopup(leadIndex)}
-                              title="View Details"
-                            >
-                              <i className="fas fa-eye"></i>
-                              <span>View</span>
-                            </button> */}
-                            <button
-                              className="action-btn refer"
-                              onClick={() => openRefferPanel(lead, 'Reffer')}
-                              title="Refer Lead"
-                            >
-                              <i className="fas fa-share"></i>
-                              <span>Refer</span>
-                            </button>
-                            <button
-                              className="action-btn history"
-                              onClick={() => openleadHistoryPanel(lead)}
-                              title="Lead History"
-                            >
-                              <i className="fas fa-history"></i>
-                              <span>History</span>
-                            </button>
+                        {leadDetailsVisible === leadIndex && (
+                          <div className="lead-meta-v2">
+                            <div className="lead-meta-v2__panel lead-meta-v2__panel--detail">
+                              <div className="lead-meta-v2__panel-title">Lead Detail</div>
+                              <div className="lead-meta-v2__grid">
+                                <div className="lead-meta-v2__item">
+                                  <div className="lead-meta-v2__label">Lead Age</div>
+                                  {(() => {
+                                    const days = getLeadAgeDays(lead);
+                                    return (
+                                      <div
+                                        className="lead-meta-v2__value"
+                                        title={days != null ? `${days} days since created` : undefined}
+                                      >
+                                        {days === null ? '—' : `${days} ${days === 1 ? 'day' : 'days'}`}
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                                <div className="lead-meta-v2__item">
+                                  <div className="lead-meta-v2__label">Lead Owner</div>
+                                  <div className="lead-meta-v2__value text-capitalize" title={lead.leadOwner?.name || '—'}>{lead.leadOwner?.name || '—'}</div>
+                                </div>
+                                <div className="lead-meta-v2__item">
+                                  <div className="lead-meta-v2__label">Added by</div>
+                                  <div className="lead-meta-v2__value text-capitalize" title={lead.leadAddedBy?.name || '—'}>{lead.leadAddedBy?.name || '—'}</div>
+                                </div>
+                                <div className="lead-meta-v2__item">
+                                  <div className="lead-meta-v2__label">Lead Source</div>
+                                  <div className="lead-meta-v2__value text-capitalize" title={lead.leadCategory?.name || '—'}>{lead.leadCategory?.name || '—'}</div>
+                                </div>
+                                <div className="lead-meta-v2__item">
+                                  <div className="lead-meta-v2__label">B2B Type</div>
+                                  <div className="lead-meta-v2__value text-capitalize" title={lead.typeOfB2B?.name || '—'}>{lead.typeOfB2B?.name || '—'}</div>
+                                </div>
+                              </div>
+                              <div className="d-flex justify-content-end mt-2">
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-outline-secondary"
+                                  onClick={() => openleadHistoryPanel(lead)}
+                                  title="History"
+                                >
+                                  <i className="fas fa-history me-1" aria-hidden="true"></i>
+                                  History
+                                </button>
+                              </div>
+                            </div>
+
                           </div>
-                          <div className="action-group secondary">
-                            {canUpdateLead(lead) ? (
-                              <>
-                                <button
-                                  className="action-btn status"
-                                  onClick={() => openEditPanel(lead, 'StatusChange')}
-                                  title="Change Status"
-                                >
-                                  <i className="fas fa-edit"></i>
-                                </button>
-                                <button
-                                  className="action-btn followup"
-                                  onClick={() => openEditPanel(lead, 'SetFollowup')}
-                                  title="Set Follow-up"
-                                >
-                                  <i className="fas fa-calendar-plus"></i>
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <button
-                                  className="action-btn status"
-                                  disabled
-                                  title="You don't have permission to update this lead"
-                                  style={{ opacity: 0.5, cursor: 'not-allowed' }}
-                                >
-                                  <i className="fas fa-lock"></i>
-                                </button>
-                                <button
-                                  className="action-btn followup"
-                                  disabled
-                                  title="You don't have permission to set follow-up for this lead"
-                                  style={{ opacity: 0.5, cursor: 'not-allowed' }}
-                                >
-                                  <i className="fas fa-lock"></i>
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </div>
+                        )}
+
+
                       </div>
                     </div>
                   ))}
@@ -4023,10 +5364,10 @@ const B2BSales = () => {
           !isMobile && showPanel && (
             <div className="col-4" style={{
               position: 'fixed',
-              top: '130px',
+              top: `${navHeight + 10}px`,
               right: '0',
-              width: '350px',
-              maxHeight: 'calc(100vh - 135px)',
+              width: `${panelWidthPx}px`,
+              maxHeight: `calc(100vh - ${navHeight + 15}px)`,
               overflowY: 'auto',
               backgroundColor: 'white',
               zIndex: 1000,
@@ -4035,6 +5376,22 @@ const B2BSales = () => {
               transition: 'transform 0.3s ease',
               borderRadius: '8px 0 0 8px'
             }}>
+
+              {/* Floating lead identity badge — always visible at top of panel */}
+              {selectedProfile && (
+                <div className="panel-lead-badge">
+                  <div className="panel-lead-badge__name">
+                    <i className="fas fa-user-circle" aria-hidden="true"></i>
+                    <span className="text-capitalize">{selectedProfile.concernPersonName || selectedProfile.businessName || '—'}</span>
+                  </div>
+                  {selectedProfile.mobile && (
+                    <div className="panel-lead-badge__phone">
+                      <i className="fas fa-phone" aria-hidden="true"></i>
+                      <span>{selectedProfile.mobile}</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {renderStatusChangePanel()}
               {renderFollowupPanel()}
@@ -4051,6 +5408,115 @@ const B2BSales = () => {
         {isMobile && renderRefferPanel()}
         {isMobile && renderLeadHistoryPanel()}
 
+        {/* Mobile-only: More actions modal */}
+        {isMobile && mobileMoreLead && (
+          <div
+            className="modal show d-block"
+            style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1065 }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setMobileMoreLead(null);
+            }}
+          >
+            <div className="modal-dialog modal-dialog-centered modal-sm" style={{ maxWidth: '420px' }}>
+              <div className="modal-content border-0 shadow">
+                <div className="modal-header bg-header text-white">
+                  <h6 className="modal-title mb-0">
+                    Actions
+                  </h6>
+                  <button
+                    type="button"
+                    className="btn-close btn-close-white"
+                    aria-label="Close"
+                    onClick={() => setMobileMoreLead(null)}
+                  />
+                </div>
+                <div className="modal-body p-3">
+                  <div className="d-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <button
+                      type="button"
+                      className="lead-meta-v2__action-btn"
+                      onClick={() => {
+                        const l = mobileMoreLead;
+                        setMobileMoreLead(null);
+                        openEditPanel(l, 'SetFollowup');
+                      }}
+                      disabled={!canUpdateLead(mobileMoreLead)}
+                      title={canUpdateLead(mobileMoreLead) ? 'Set Follow-up' : "You don't have permission to set follow-up"}
+                    >
+                      <i className="fas fa-calendar-plus"></i>
+                      Followup
+                    </button>
+
+                    <button
+                      type="button"
+                      className="lead-meta-v2__action-btn"
+                      onClick={() => {
+                        const l = mobileMoreLead;
+                        setMobileMoreLead(null);
+                        openleadHistoryPanel(l);
+                      }}
+                    >
+                      <i className="fas fa-history"></i>
+                      History
+                    </button>
+
+                    <button
+                      type="button"
+                      className="lead-meta-v2__action-btn"
+                      onClick={() => {
+                        const l = mobileMoreLead;
+                        setMobileMoreLead(null);
+                        openRefferPanel(l, 'Reffer');
+                      }}
+                    >
+                      <i className="fas fa-share-alt"></i>
+                      Refer
+                    </button>
+
+                    {/* <button
+                      type="button"
+                      className="lead-meta-v2__action-btn"
+                      onClick={() => {
+                        const l = mobileMoreLead;
+                        setMobileMoreLead(null);
+                        openProfileEditPanel(l);
+                      }}
+                    >
+                      <i className="fas fa-file-alt"></i>
+                      Details
+                    </button> */}
+
+                    <button
+                      type="button"
+                      className="lead-meta-v2__action-btn"
+                      onClick={() => {
+                        const l = mobileMoreLead;
+                        setMobileMoreLead(null);
+                        openEditPanel(l, 'StatusChange');
+                      }}
+                      disabled={!canUpdateLead(mobileMoreLead)}
+                      title={canUpdateLead(mobileMoreLead) ? 'Change Status' : "You don't have permission to change status"}
+                    >
+                      <i className="fas fa-edit"></i>
+                      Status
+                    </button>
+
+                    <Link
+                      to="/institute/lrp"
+                      className="lead-meta-v2__action-btn"
+                      style={{ textDecoration: 'none' }}
+                      onClick={() => setMobileMoreLead(null)}
+                    >
+                      <i className="fas fa-clipboard-list"></i>
+                      Report
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div >
 
       {/* Filter Modal */}
@@ -4060,13 +5526,12 @@ const B2BSales = () => {
           style={{
             backgroundColor: 'rgba(0,0,0,0.5)',
             zIndex: 1060,
-            // Ensure modal overlay can scroll on smaller screens
             overflowY: 'auto',
             maxHeight: '100vh'
           }}
         >
-          <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable" style={{ maxHeight: '90vh' }}>
-            <div className="modal-content border-0 shadow" style={{ maxHeight: '90vh' }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg b2b-filter-dialog" style={{ maxHeight: '90vh' }}>
+            <div className="modal-content border-0 shadow b2b-filter-modal" style={{ maxHeight: '90vh' }}>
               <div className="modal-header bg-header text-white">
                 <h5 className="modal-title">
                   <i className="fas fa-filter me-2"></i>
@@ -4078,65 +5543,118 @@ const B2BSales = () => {
                   onClick={() => setShowFilters(false)}
                 ></button>
               </div>
-              <div className="modal-body p-4" style={{ overflowY: 'auto' }}>
+              <div className="modal-body p-4">
                 <div className="row g-3">
                   <div className="col-md-4">
-                    <label className="form-label fw-medium text-dark mb-2">
-                      <i className="fas fa-tag text-success me-2"></i>
-                      Lead Source
-                    </label>
-                    <select
-                      className="form-select border-0 bg-light"
-                      value={filters.leadCategory}
-                      onChange={(e) => handleFilterChange('leadCategory', e.target.value)}
-                      style={{ backgroundColor: '#f8f9fa' }}
-                    >
-                      <option value="">All Categories</option>
-                      {leadCategoryOptions && leadCategoryOptions.map(category => (
-                        <option key={category.value} value={category.value}>
-                          {category.label}
-                        </option>
-                      ))}
-                    </select>
+                    <MultiSelectCheckbox
+                      title="Lead Source"
+                      icon="fas fa-tag"
+                      options={leadCategoryOptions || []}
+                      selectedValues={filters.leadCategory || []}
+                      onChange={(vals) => handleFilterChange('leadCategory', vals)}
+                      isOpen={openModalId === 'leadCategory'}
+                      onToggle={() => setOpenModalId((prev) => (prev === 'leadCategory' ? null : 'leadCategory'))}
+                      onClose={() => setOpenModalId(null)}
+                    />
                   </div>
                   <div className="col-md-4">
-                    <label className="form-label fw-medium text-dark mb-2">
-                      <i className="fas fa-building text-info me-2"></i>
-                      Type of B2B
-                    </label>
-                    <select
-                      className="form-select border-0 bg-light"
-                      value={filters.typeOfB2B}
-                      onChange={(e) => handleFilterChange('typeOfB2B', e.target.value)}
-                      style={{ backgroundColor: '#f8f9fa' }}
-                    >
-                      <option value="">All Types</option>
-                      {typeOfB2BOptions && typeOfB2BOptions.map(type => (
-                        <option key={type.value} value={type.value}>
-                          {type.label}
-                        </option>
-                      ))}
-                    </select>
+                    <MultiSelectCheckbox
+                      title="Type of B2B"
+                      icon="fas fa-building"
+                      options={typeOfB2BOptions || []}
+                      selectedValues={filters.typeOfB2B || []}
+                      onChange={(vals) => handleFilterChange('typeOfB2B', vals)}
+                      isOpen={openModalId === 'typeOfB2B'}
+                      onToggle={() => setOpenModalId((prev) => (prev === 'typeOfB2B' ? null : 'typeOfB2B'))}
+                      onClose={() => setOpenModalId(null)}
+                    />
                   </div>
                   <div className="col-md-4">
-                    <label className="form-label fw-medium text-dark mb-2">
-                      <i className="fas fa-user text-warning me-2"></i>
-                      Lead Owner
-                    </label>
-                    <select
-                      className="form-select border-0 bg-light"
-                      value={filters.leadOwner}
-                      onChange={(e) => handleFilterChange('leadOwner', e.target.value)}
-                      style={{ backgroundColor: '#f8f9fa' }}
-                    >
-                      <option value="">All Owners</option>
-                      {users && users.map(user => (
-                        <option key={user._id} value={user._id}>
-                          {user.name}
-                        </option>
-                      ))}
-                    </select>
+                    <MultiSelectCheckbox
+                      title="Lead Owner"
+                      icon="fas fa-user"
+                      options={(users || []).map((u) => ({ value: u._id, label: u.name || u.email || 'User' }))}
+                      selectedValues={filters.leadOwner || []}
+                      onChange={(vals) => handleFilterChange('leadOwner', vals)}
+                      isOpen={openModalId === 'leadOwner'}
+                      onToggle={() => setOpenModalId((prev) => (prev === 'leadOwner' ? null : 'leadOwner'))}
+                      onClose={() => setOpenModalId(null)}
+                    />
                   </div>
+                  <div className="col-md-6">
+                    <MultiSelectCheckbox
+                      title="Status"
+                      icon="fas fa-calendar"
+                      options={(statuses || []).map((s) => ({ value: s._id, label: s.name || s.title || 'Status' }))}
+                      selectedValues={filters.status || []}
+                      onChange={(vals) => handleFilterChange('status', vals)}
+                      isOpen={openModalId === 'status'}
+                      onToggle={() => setOpenModalId((prev) => (prev === 'status' ? null : 'status'))}
+                      onClose={() => setOpenModalId(null)}
+                    />
+
+                  </div>
+                  <div className="col-md-6">
+                    <MultiSelectCheckbox
+                      title="Sub Status"
+                      icon="fas fa-calendar"
+                      options={(subStatuses || []).map((ss) => ({ value: ss._id, label: ss.title || 'Sub Status' }))}
+                      selectedValues={filters.subStatus || []}
+                      onChange={(vals) => handleFilterChange('subStatus', vals)}
+                      isOpen={openModalId === 'subStatus'}
+                      onToggle={() => setOpenModalId((prev) => (prev === 'subStatus' ? null : 'subStatus'))}
+                      onClose={() => setOpenModalId(null)}
+                    />
+                  </div>
+
+                  <div className="col-md-3">
+                    <label className="form-label fw-medium text-dark mb-2">
+                      <i className="fas fa-phone text-primary me-2"></i>
+                      Followup Calling
+                    </label>
+                    <div className="form-check form-switch m-0">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        role="switch"
+                        checked={Boolean(filters.hasFollowUpCall)}
+                        onChange={(e) => handleFilterChange('hasFollowUpCall', e.target.checked)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-3">
+                    <label className="form-label fw-medium text-dark mb-2">
+                      <i className="fas fa-map-marker-alt text-primary me-2"></i>
+                      Followup Visit
+                    </label>
+                    <div className="form-check form-switch m-0">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        role="switch"
+                        checked={Boolean(filters.hasFollowUpVisit)}
+                        onChange={(e) => handleFilterChange('hasFollowUpVisit', e.target.checked)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-md-6">
+                    <MultiSelectCheckbox
+                      title="Documents"
+                      icon="fas fa-file"
+                      options={[
+                        { value: 'pending', label: 'Pending' },
+                        { value: 'done', label: 'Done' },
+                      ]}
+                      selectedValues={filters.documentsStatus || []}
+                      onChange={(vals) => handleFilterChange('documentsStatus', vals)}
+                      isOpen={openModalId === 'documentsStatus'}
+                      onToggle={() => setOpenModalId((prev) => (prev === 'documentsStatus' ? null : 'documentsStatus'))}
+                      onClose={() => setOpenModalId(null)}
+                    />
+                  </div>
+
                   <div className="col-md-6">
                     <label className="form-label fw-medium text-dark mb-2">
                       <i className="fas fa-calendar text-danger me-2"></i>
@@ -4162,51 +5680,6 @@ const B2BSales = () => {
                       onChange={(e) => handleDateRangeChange('end', e.target.value)}
                       style={{ backgroundColor: '#f8f9fa' }}
                     />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label fw-medium text-dark mb-2">
-                      <i className="fas fa-calendar text-danger me-2"></i>
-                      Status
-                    </label>
-                    <select
-                      className="form-select border-0 bg-light"
-                      value={filters.status}
-                      onChange={(e) => handleFilterChange('status', e.target.value)}
-                      style={{ backgroundColor: '#f8f9fa' }}
-                    >
-                      <option value="">All Statuses</option>
-                      {statuses.map(status => (
-                        <option key={status._id} value={status._id}>
-                          {status.name}
-                        </option>
-                      ))}
-                    </select>
-
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label fw-medium text-dark mb-2">
-                      <i className="fas fa-calendar text-danger me-2"></i>
-                      Sub Status
-                    </label>
-                    <select
-                      className="form-select border-0  bgcolor"
-                      name="subStatus"
-                      id="subStatus"
-                      value={filters.subStatus}
-                      style={{
-                        height: '42px',
-                        paddingTop: '8px',
-                        backgroundColor: '#f1f2f6',
-                        paddingInline: '10px',
-                        width: '100%'
-                      }}
-                      onChange={(e) => handleFilterChange('subStatus', e.target.value)}
-
-                    >
-                      <option value="">Select Sub-Status</option>
-                      {subStatuses.map((filter, index) => (
-                        <option value={filter._id}>{filter.title}</option>))}
-                    </select>
                   </div>
                 </div>
               </div>
@@ -4237,6 +5710,268 @@ const B2BSales = () => {
                 >
                   <i className="fas fa-check me-1"></i>
                   Apply Filters
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Lead Modal */}
+      {showRejectionForm && (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1065 }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowRejectionForm(false);
+              setApprovalLeadTarget(null);
+            }
+          }}
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h6 className="modal-title">Reject Lead</h6>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    setShowRejectionForm(false);
+                    setApprovalLeadTarget(null);
+                  }}
+                />
+              </div>
+              <div className="modal-body">
+                <label className="form-label fw-medium">Reason (optional)</label>
+                <textarea
+                  className="form-control"
+                  rows={3}
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  placeholder="Enter rejection reason"
+                />
+                <small className="text-muted d-block mt-2">
+                  Lead: {approvalLeadTarget?.businessName || approvalLeadTarget?.concernPersonName || '—'}
+                </small>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setShowRejectionForm(false);
+                    setApprovalLeadTarget(null);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={async () => {
+                    if (!approvalLeadTarget) return;
+                    const lead = approvalLeadTarget;
+                    setShowRejectionForm(false);
+                    setApprovalLeadTarget(null);
+                    await rejectLead(lead, rejectionReason);
+                  }}
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lead Documents Modal */}
+      {showLeadDocumentsModal && (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1065 }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowLeadDocumentsModal(false);
+              setDocumentsLead(null);
+            }
+          }}
+        >
+          <div className="modal-dialog modal-lg modal-dialog-centered">
+            <div className="modal-content b2b-docs-modal">
+              <div className="modal-header b2b-docs-modal__header">
+                <h6 className="modal-title b2b-docs-modal__title">
+                  Documents — {documentsLead?.businessName || documentsLead?.concernPersonName || 'Lead'}
+                </h6>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    setShowLeadDocumentsModal(false);
+                    setDocumentsLead(null);
+                  }}
+                />
+              </div>
+
+              <div className="modal-body">
+                <div className="row g-2 align-items-end">
+                  <div className="col-md-5">
+                    <label className="form-label small fw-semibold mb-1">Doc Type</label>
+                    {(leadCategoryDocuments || []).length ? (
+                      <select
+                        className="form-select b2b-docs-modal__select"
+                        value={leadDocType}
+                        onChange={(e) => setLeadDocType(e.target.value)}
+                      >
+                        <option value="">Select</option>
+                        {(leadCategoryDocuments || []).map((d) => (
+                          <option key={String(d?.name || '')} value={String(d?.name || '')}>
+                            {String(d?.name || '')}{d?.isMandatory ? ' *' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        className="form-control b2b-docs-modal__select"
+                        value={leadDocType}
+                        onChange={(e) => setLeadDocType(e.target.value)}
+                        placeholder="e.g. PAN, GST"
+                      />
+                    )}
+                  </div>
+                  <div className="col-md-5">
+                    <label className="form-label small fw-semibold mb-1">File</label>
+                    <input
+                      ref={leadDocFileRef}
+                      type="file"
+                      className="form-control b2b-docs-modal__file"
+                      onChange={(e) => setLeadDocFileSelected(Boolean(e.target?.files?.[0]))}
+                    />
+                  </div>
+                  <div className="col-md-2 d-flex justify-content-end">
+                    <button
+                      type="button"
+                      className="btn btn-primary w-100 b2b-docs-modal__uploadbtn"
+                      disabled={
+                        leadDocumentUploading ||
+                        !String(leadDocType || '').trim() ||
+                        !leadDocFileSelected
+                      }
+                      onClick={uploadLeadDocument}
+                    >
+                      {leadDocumentUploading ? 'Uploading...' : 'Upload'}
+                    </button>
+                  </div>
+                </div>
+
+                <hr />
+
+                {leadDocumentsLoading ? (
+                  <div className="text-center py-4">
+                    <div className="spinner-border text-secondary" role="status" />
+                  </div>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table table-sm align-middle b2b-docs-modal__table">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Type</th>
+                          <th>Status</th>
+                          <th className="text-end">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(mergedLeadDocuments || []).length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="text-center text-muted py-4">
+                              No documents
+                            </td>
+                          </tr>
+                        ) : (
+                          (mergedLeadDocuments || []).map((doc) => (
+                            <tr key={doc._id || doc.id || doc.url}>
+                              <td style={{ maxWidth: 260 }}>
+                                <div className="fw-medium text-truncate" title={doc.name || doc.url}>
+                                  {doc.name || 'Document'}
+                                </div>
+                                {doc.isMandatory && <span className="b2b-docs-modal__req">Required</span>}
+                                {doc.url ? (
+                                  <a href={doc.url} target="_blank" rel="noreferrer" className="small">
+                                    View
+                                  </a>
+                                ) : doc.isPlaceholder ? (
+                                  <div className="small text-muted">Not uploaded yet</div>
+                                ) : null}
+                                {doc.isExtra && (
+                                  <div className="small text-muted">Extra</div>
+                                )}
+                              </td>
+                              <td>{doc.docType || '—'}</td>
+                              <td>
+                                <span
+                                  className={`badge ${String(doc.status).toUpperCase() === 'APPROVED'
+                                    ? 'bg-success'
+                                    : String(doc.status).toUpperCase() === 'REJECTED'
+                                      ? 'bg-danger'
+                                      : String(doc.status).toUpperCase() === 'MISSING'
+                                        ? 'bg-secondary'
+                                        : 'bg-warning text-dark'
+                                    }`}
+                                >
+                                  {String(doc.status || 'PENDING')}
+                                </span>
+                              </td>
+                              <td className="text-end">
+                                {doc.isPlaceholder ? (
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline-primary btn-sm"
+                                    onClick={() => {
+                                      setLeadDocType(doc.docType || doc.name || '');
+                                      if (leadDocFileRef.current) leadDocFileRef.current.focus();
+                                    }}
+                                  >
+                                    Upload
+                                  </button>
+                                ) : isAdmin() && (
+                                  <div className="btn-group btn-group-sm" role="group">
+                                    <button
+                                      type="button"
+                                      className="btn btn-outline-success"
+                                      onClick={() => updateLeadDocumentStatus(doc._id, 'APPROVED')}
+                                    >
+                                      Approve
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-outline-danger"
+                                      onClick={() => updateLeadDocumentStatus(doc._id, 'REJECTED')}
+                                    >
+                                      Reject
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setShowLeadDocumentsModal(false);
+                    setDocumentsLead(null);
+                  }}
+                >
+                  Close
                 </button>
               </div>
             </div>
@@ -4535,6 +6270,12 @@ const B2BSales = () => {
                         onChange={handleLeadInputChange}
                       >
                         <option value="">Select Lead Owner</option>
+                        {userData?._id &&
+                          !users?.some((u) => String(u?._id) === String(userData._id)) && (
+                            <option key={`me-${userData._id}`} value={String(userData._id)}>
+                              {userData.name || 'Me'}
+                            </option>
+                          )}
                         {users?.map(user => (
                           <option key={user?._id} value={user?._id}>
                             {user?.name}
@@ -4545,17 +6286,40 @@ const B2BSales = () => {
 
                     {/* Remark */}
                     <div className="col-12">
-                      <label className="form-label fw-bold">
-                        <i className="fas fa-comment text-primary me-1"></i>
-                        Remark
-                      </label>
+                      <div className="d-flex align-items-center justify-content-between">
+                        <label className="form-label fw-bold mb-1">
+                          <i className="fas fa-comment text-primary me-1"></i>
+                          Remark
+                        </label>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-primary"
+                          onClick={() => {
+                            const suggestion = buildLeadRemarkSuggestion({
+                              leadFormData,
+                              leadCategoryOptions,
+                              typeOfB2BOptions
+                            });
+                            setLeadFormData((prev) => ({
+                              ...prev,
+                              remark: prev.remark ? `${prev.remark}\n\n${suggestion}` : suggestion
+                            }));
+                          }}
+                        >
+                          AI Suggest
+                        </button>
+                      </div>
                       <textarea
                         className="form-control"
                         name="remark"
                         value={leadFormData.remark}
                         onChange={handleLeadInputChange}
                         placeholder="Enter remark"
+                        rows={4}
                       />
+                      <div className="form-text">
+                        Use AI Suggest
+                      </div>
                     </div>
 
 
@@ -4624,7 +6388,7 @@ const B2BSales = () => {
                     <li>Upload an Excel file only (.xlsx or .xls)</li>
                     <li>Maximum file size: 10MB</li>
                     <li><strong>Required fields:</strong> Business Name, Concern Person Name, Mobile, Lead Source, Type of B2B</li>
-                   
+
                   </ul>
                 </div>
 
@@ -4769,6 +6533,58 @@ const B2BSales = () => {
     z-index: 99999 !important;
     position: fixed !important;
   }
+
+  .b2b-docs-modal{
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .b2b-docs-modal__header{
+    background: linear-gradient(90deg, #0b5ed7 0%, #1aa3ff 55%, #2dd4ff 100%);
+    color: #fff;
+    border-bottom: 0;
+    padding: 10px 14px;
+  }
+  .b2b-docs-modal__title{
+    font-weight: 800;
+  }
+  .b2b-docs-modal__header .btn-close{
+    filter: invert(1) grayscale(1);
+    opacity: 0.9;
+  }
+
+  .b2b-docs-modal__select,
+  .b2b-docs-modal__file{
+    border-radius: 12px;
+  }
+
+  .b2b-docs-modal__uploadbtn{
+    border-radius: 12px;
+    font-weight: 800;
+  }
+
+  .b2b-docs-modal__table thead th{
+    font-size: 12px;
+    font-weight: 800;
+    color: #334155;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .b2b-docs-modal__table tbody td{
+    border-top: 1px solid #f1f5f9;
+  }
+
+  .b2b-docs-modal__req{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #b91c1c;
+    background: rgba(239,68,68,0.10);
+    border: 1px solid rgba(239,68,68,0.22);
+  }
   
   .modal .pac-item {
     cursor: pointer;
@@ -4785,15 +6601,202 @@ const B2BSales = () => {
     color: white;
   }
 
+  /* MultiSelectCheckbox (Filter Modal) */
+  .multi-select-container-new{
+    position: relative;
+  }
+  .multi-select-dropdown-new{
+    position: relative;
+  }
+  .multi-select-trigger{
+    border-radius: 12px !important;
+    border: 1px solid #e5e7eb !important;
+    background: #fff !important;
+    height: 44px;
+    padding: 10px 40px 10px 12px !important;
+    font-weight: 600;
+    color: #111827;
+    transition: box-shadow 160ms ease, border-color 160ms ease, transform 160ms ease;
+  }
+  .multi-select-trigger:hover{
+    border-color: #d1d5db !important;
+    box-shadow: 0 6px 18px rgba(17, 24, 39, 0.08);
+    transform: translateY(-1px);
+  }
+  .multi-select-trigger.open{
+    border-color: rgba(252, 86, 123, 0.75) !important;
+    box-shadow: 0 10px 26px rgba(252, 86, 123, 0.18);
+    transform: translateY(-1px);
+  }
+  .multi-select-trigger .dropdown-arrow{
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0.7;
+    transition: transform 160ms ease, opacity 160ms ease;
+  }
+  .multi-select-trigger.open .dropdown-arrow{
+    opacity: 0.95;
+  }
+  .multi-select-trigger .select-display-text{
+    display: inline-block;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 18px;
+  }
+
+  .multi-select-options-new{
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    z-index: 1066;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    box-shadow: 0 18px 46px rgba(17, 24, 39, 0.12);
+    overflow: hidden;
+
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+    pointer-events: none;
+    transition: opacity 160ms ease, transform 160ms ease;
+  }
+  .multi-select-options-new.up{
+    top: auto;
+    bottom: calc(100% + 8px);
+  }
+  .multi-select-options-new.open{
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+  .multi-select-options-new.open.up{
+    transform: translateY(0) scale(1);
+  }
+  .multi-select-options-new .options-search{
+    padding: 10px 10px 8px;
+    border-bottom: 1px solid #f1f5f9;
+    background: #fff;
+  }
+  .multi-select-options-new .options-search .input-group-text{
+    border-radius: 12px 0 0 12px !important;
+    border: 1px solid #e5e7eb !important;
+    background: #f8fafc !important;
+    color: #6b7280;
+  }
+  .multi-select-options-new .options-search input.form-control{
+    border-radius: 0 12px 12px 0 !important;
+    border: 1px solid #e5e7eb !important;
+    border-left: 0 !important;
+    height: 40px;
+    box-shadow: none !important;
+  }
+  .multi-select-options-new .options-search input.form-control:focus{
+    border-color: rgba(252, 86, 123, 0.65) !important;
+  }
+  .options-list-new{
+    max-height: 260px;
+    overflow: auto;
+    padding: 8px;
+  }
+  .option-item-new{
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 140ms ease, transform 140ms ease;
+  }
+  .option-item-new:hover{
+    background: rgba(252, 86, 123, 0.08);
+    transform: translateY(-1px);
+  }
+  .option-label-new{
+    font-weight: 600;
+    font-size: 13px;
+    color: #111827;
+  }
+  .option-item-new .form-check-input{
+    cursor: pointer;
+    margin-top: 0 !important;
+  }
+  .options-footer{
+    padding: 8px 10px;
+    border-top: 1px solid #f1f5f9;
+    background: #fff;
+  }
+  .no-options{
+    padding: 12px 10px;
+    color: #6b7280;
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  /* Filter modal spacing: keep dropdown above footer (scoped) */
+  .b2b-filter-modal .modal-body{
+    overflow: visible !important;
+  }
+
+  /* Filter modal: mobile layout + scrolling */
+  @media (max-width: 576px){
+    .b2b-filter-dialog{
+      width: calc(100vw - 16px);
+      margin: 8px auto;
+      max-width: calc(100vw - 16px);
+    }
+    .b2b-filter-modal{
+      border-radius: 14px;
+      overflow: hidden;
+      max-height: 92vh !important;
+      display: flex;
+      flex-direction: column;
+    }
+    .b2b-filter-modal .modal-header{
+      padding: 10px 12px;
+      flex: 0 0 auto;
+    }
+    .b2b-filter-modal .modal-body{
+      padding: 12px !important;
+      overflow-y: auto !important;
+      overflow-x: visible !important;
+      -webkit-overflow-scrolling: touch;
+      flex: 1 1 auto;
+      min-height: 0; /* allow flex child to scroll */
+    }
+    .b2b-filter-modal .modal-footer{
+      gap: 8px;
+      padding: 10px 12px;
+      flex: 0 0 auto;
+    }
+    .b2b-filter-modal .modal-footer .btn{
+      flex: 1;
+      white-space: nowrap;
+    }
+    .options-list-new{
+      max-height: 210px;
+    }
+    .multi-select-options-new{
+      border-radius: 12px;
+    }
+  }
+
   /* Modern Lead Card Styles */
   .lead-card {
     background: white;
     border-radius: 16px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     border: 1px solid #f0f0f0;
-    overflow: hidden;
+    overflow: visible;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     margin-bottom: 0.5rem;
+    position: relative;
   }
 
   .lead-card:hover {
@@ -4809,12 +6812,1775 @@ const B2BSales = () => {
 
   /* Header Section */
   .lead-header {
-    // background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    background: linear-gradient(135deg, #fc567b 13%, #fc567b 50%);
     color: white;
-    padding: 1rem;
     position: relative;
     overflow: hidden;
+  }
+
+  .lead-header-v2{
+    background: linear-gradient(90deg, #0b5ed7 0%, #1aa3ff 55%, #2dd4ff 100%);
+    padding: 8px 10px;
+    position: relative;
+    --lead-header-v2-block-h: 92px;
+    overflow: visible;
+    z-index: 2;
+  }
+
+  .lead-header-v2__float-icon{
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    transform: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.85);
+    background: rgba(255,255,255,0.92);
+    color: #0b5ed7;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+  }
+
+  .lead-header-v2__float-icon:hover{
+    background: rgba(255,255,255,0.98);
+  }
+
+  .lead-header-v2__float-ai{
+    position: absolute;
+    top: 10px;
+    right: 54px; /* leave space for expand button */
+    transform: none;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(220, 38, 38, 0.95);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+    border: 1px solid rgba(255,255,255,0.35);
+    z-index: 998;
+    white-space: nowrap;
+    cursor: default;
+  }
+
+  .lead-header-v2__row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    flex-wrap: nowrap;
+  }
+
+  .lead-header-v2__left{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    min-width: 132px;
+    flex: 0 0 132px;
+        position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 10px;
+    padding: 8px 8px 6px;
+    background: rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(6px);
+  }
+
+  .lead-header-v2__inputs{
+    width: 100%;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+
+  .lead-header-v2__input-row{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    flex-wrap: nowrap;
+    flex-direction: column;
+  }
+
+  .lead-header-v2__input-wrap{
+    position: relative;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    background: rgba(255,255,255,0.18);
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 10px;
+    padding: 5px 8px;
+    // flex: 1 1 0;
+    // min-width: 150px;
+    // width: 250px;
+  }
+
+  .lead-header-v2__input-icon{
+    font-size: 13px;
+    opacity: 0.95;
+    flex-shrink:0;
+  }
+
+  .lead-header-v2__input{
+    width: 100%;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+    line-height: 1.1;
+    padding: 0;
+    min-width: 0;
+  }
+
+  .lead-header-v2__input::placeholder{
+    color: rgba(255,255,255,0.85);
+    font-weight: 600;
+  }
+
+  .lead-header-v2__approval{
+    position: relative;
+    display:flex;
+    gap:8px;
+    flex-shrink:0;
+    flex-direction: column;
+    padding: 12px 8px 8px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255,255,255,0.28);
+    backdrop-filter: blur(6px);
+  }
+
+  .lead-header-v2__approval-label{
+    position: absolute;
+    top: -10px;
+    left: 10px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: rgba(11, 94, 215, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 18px;
+    white-space: nowrap;
+  }
+
+  .lead-header-v2__approval-btn{
+    background: rgba(255,255,255,0.22);
+    border: 1px solid rgba(255,255,255,0.35);
+    color:#fff;
+    border-radius: 8px;
+    padding: 5px 7px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    height: 32px;
+  }
+
+
+  .lead-approval-v2__row{
+    display:flex;
+    align-items:center;
+    gap: 8px;
+    width: 100%;
+    justify-content: center;
+    flex-direction: column
+  }
+
+  .lead-approval-v2__pill{
+    border: 1px solid rgba(255,255,255,0.35);
+    color: #fff;
+    border-radius: 999px;
+    padding: 6px 12px;
+    height: 32px;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    background: rgba(255,255,255,0.18);
+    text-transform: uppercase;
+    min-width: 110px;
+  }
+
+  .lead-approval-v2__pill--pending{
+    background: rgba(245, 158, 11, 0.28);
+    border-color: rgba(245, 158, 11, 0.55);
+  }
+  .lead-approval-v2__pill--approved{
+    background: rgba(16, 185, 129, 0.28);
+    border-color: rgba(16, 185, 129, 0.55);
+  }
+  .lead-approval-v2__pill--rejected{
+    background: rgba(239, 68, 68, 0.26);
+    border-color: rgba(239, 68, 68, 0.55);
+  }
+
+  .lead-approval-v2__iconbtn{
+    width: 32px;
+    height: 32px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.16);
+    color: #fff;
+    transition: transform 120ms ease, background 120ms ease, box-shadow 120ms ease;
+  }
+  .lead-approval-v2__iconbtn:hover{
+    transform: translateY(-1px);
+    background: rgba(255,255,255,0.24);
+    box-shadow: 0 6px 14px rgba(0,0,0,0.18);
+  }
+  .lead-approval-v2__iconbtn i{ font-size: 12px; }
+
+  .lead-approval-v2__menu{
+    display:flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.85);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+  }
+
+  .lead-approval-v2__menu--readonly{
+    font-size: 12px;
+    font-weight: 800;
+    color: #0f172a;
+    text-align: center;
+  }
+
+  .lead-approval-v2__action{
+    width: 100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap: 8px;
+    border-radius: 10px;
+    border: none;
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 900;
+    cursor: pointer;
+  }
+  .lead-approval-v2__action--approve{
+    background: #10b981;
+    color: #fff;
+  }
+  .lead-approval-v2__action--reject{
+    background: #ef4444;
+    color: #fff;
+  }
+
+
+  .lead-header-v2__editbtn{
+    position: absolute;
+    right: 0px;
+    bottom: 0px;
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.18);
+    color: #fff;
+    padding: 0;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 120ms ease, background 120ms ease, box-shadow 120ms ease;
+    z-index: 2;
+  }
+
+  .lead-header-v2__editbtn:hover{
+    transform: translateY(-1px);
+    background: rgba(255,255,255,0.24);
+    box-shadow: 0 6px 14px rgba(0,0,0,0.18);
+  }
+
+  .lead-header-v2__editbtn i{
+    font-size: 10px;
+  }
+
+  .lead-header-v2__approval-editor{
+    position:absolute;
+    top: calc(100% + 8px);
+    width: 100%;
+    max-width: 100%;
+    z-index: 999;
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+    pointer-events: none;
+    visibility: hidden;
+    transition: opacity 160ms ease, transform 160ms ease, visibility 0s linear 160ms;
+  }
+
+  .lead-header-v2__approval-editor.is-open{
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+    visibility: visible;
+    transition: opacity 180ms ease, transform 180ms ease;
+  }
+
+  .lead-header-v2__approval-select{
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.22);
+    color:#111;
+    font-weight: 800;
+  }
+
+  .lead-header-v2__kv{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    min-width: 120px;
+    flex: 0 0 auto;
+  }
+
+  /* Desktop: Lead Source + B2B Type as one tab */
+  .lead-header-v2__kv-tab{
+    display:flex;
+    align-items:stretch;
+    gap: 12px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.14);
+    border: 1px solid rgba(255,255,255,0.28);
+  }
+
+  .lead-header-v2__kv-tab .lead-header-v2__kv{
+    min-width: 0;
+  }
+
+  .lead-header-v2__kv-tab .lead-header-v2__kv + .lead-header-v2__kv{
+    padding-left: 12px;
+    border-left: 1px solid rgba(255,255,255,0.22);
+  }
+
+  .lead-header-v2__kv-label{
+    font-size: 12px;
+    font-weight: 800;
+    opacity: 0.9;
+    line-height: 1;
+    text-align: left;
+  }
+
+  .lead-header-v2__kv-value{
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.28);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    max-width: 135px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .lead-header-v2__right{
+    display:flex;
+    align-items:stretch;
+    gap:8px;
+    flex-wrap: nowrap;
+    justify-content:flex-end;
+    flex: 1 1 auto;
+    min-width: 0;
+    // overflow: hidden;
+    white-space: nowrap;
+    position: relative;
+  }
+
+  .lead-header-v2__dash{
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    width: clamp(480px, 48vw, 700px);
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .lead-header-v2__dash-col{
+    width: auto;
+    min-width: 0;
+    display: flex;
+    align-items: stretch;
+  }
+
+  /* Header followup mini-cards (match fig-1 look) */
+  .lead-header-v2 .b2b-dash-section{
+    position: relative;
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 10px;
+    padding: 8px 8px 6px;
+    background: rgba(255,255,255,0.14);
+    backdrop-filter: blur(6px);
+    width: 100%;
+    min-height: var(--lead-header-v2-block-h);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Make stats row use remaining height so all blocks match */
+  .lead-header-v2 .b2b-dash-section > .d-flex{
+    flex: 1 1 auto;
+    min-height: 0;
+    align-items: center;
+  }
+
+  .lead-header-v2 .b2b-dash-section > .ActionsDates{
+    margin-top: auto;
+  }
+
+  .lead-header-v2__approval,
+  .lead-header-v2__perf-block{
+    min-height: var(--lead-header-v2-block-h);
+  }
+
+  .lead-header-v2 .b2b-dash-section__label{
+    position: absolute;
+    top: -10px;
+    left: 10px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: rgba(11, 94, 215, 0.95);
+    border: 1px solid rgba(255,255,255,0.35);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 18px;
+    white-space: nowrap;
+  }
+
+  .lead-header-v2 .b2b-dash-stat-card{
+    border-radius: 8px;
+    padding: 5px 5px 4px;
+    min-height: 48px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    box-shadow: 0 6px 14px rgba(0,0,0,0.14);
+    min-width: 0;
+  }
+
+  .lead-header-v2 .b2b-dash-stat-card__label{
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 1.05;
+    opacity: 0.98;
+  }
+
+  .lead-header-v2 .b2b-dash-stat-card__divider{
+    width: 72%;
+    max-width: 56px;
+    height: 1px;
+    margin: 4px 0;
+    background: rgba(255,255,255,0.95);
+    flex-shrink: 0;
+  }
+
+  .lead-header-v2 .b2b-dash-stat-card__value{
+    font-size: 13px;
+    font-weight: 900;
+    line-height: 1.05;
+    letter-spacing: 0.3px;
+  }
+
+  /* Keep dashboard compact on one line (desktop) */
+  @media (max-width: 1360px){
+    .lead-header-v2__dash{ width: clamp(480px, 48vw, 680px); gap: 8px; }
+    .lead-header-v2 .b2b-dash-section{ padding: 7px 7px 6px; }
+  }
+
+  @media (max-width: 1200px){
+    .lead-header-v2__dash{ width: clamp(420px, 46vw, 620px); gap: 8px; }
+    .lead-header-v2 .b2b-dash-stat-card{ min-height: 44px; }
+    .lead-header-v2 .b2b-dash-stat-card__label{ font-size: 8.5px; }
+    .lead-header-v2 .b2b-dash-stat-card__value{ font-size: 12px; }
+    .lead-header-v2 .ActionsDates{ font-size: 10px; }
+  }
+
+  @media (max-width: 1100px){
+    .lead-header-v2__dash{
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 820px){
+    .lead-header-v2__dash{
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .lead-header-v2 .ActionsDates{
+    display:flex;
+    justify-content:left;
+    gap:10px;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255,255,255,0.22);
+    color: rgba(255,255,255,0.95);
+    font-size: 11px;
+    font-weight: 800;
+    // flex-wrap: wrap;
+    white-space: normal;
+    min-width: 0;
+  }
+
+  .lead-header-v2 .ActionsDates span:last-child{
+    color: #fff;
+  }
+
+  /* Prevent Next Follow-up Date from overflowing */
+  .lead-header-v2 .ActionsDates span:first-child{
+    // flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .lead-header-v2 .ActionsDates span:last-child{
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  /* Pills wrapper in card header (Refer / History) — no white background */
+  .lead-header-v2__pills{
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  /* Performance block: title + label-input rows */
+  .lead-header-v2__perf-block{
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    flex-shrink: 0;
+    min-width: 148px;
+        position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 10px;
+    padding: 10px 10px 8px;
+    background: rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(6px);
+  }
+.lead-header-v2__perf-title{
+position: absolute;
+    top: -10px;
+    left: 10px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: rgba(11, 94, 215, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 18px;
+    white-space: nowrap;
+}
+  .lead-header-v2__perf-title{
+    font-size: 11px;
+    font-weight: 900;
+    color: rgba(255,255,255,0.95);
+    text-align: center;
+    letter-spacing: 0.3px;
+  }
+
+  .lead-header-v2__perf-row{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .lead-header-v2__perf-label{
+    font-size: 10px;
+    font-weight: 800;
+    color: rgba(255,255,255,0.9);
+    white-space: nowrap;
+    min-width: 58px;
+  }
+
+  .lead-header-v2__perf-input{
+    cursor: pointer;
+    height: 22px !important;
+    font-size: 10px !important;
+    border-radius: 6px !important;
+    border: 1px solid rgba(255,255,255,0.35) !important;
+    background: rgba(255,255,255,0.18) !important;
+    color: #fff !important;
+    font-weight: 700 !important;
+    padding: 0 6px !important;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .lead-header-v2__perf-input::placeholder{
+    color: rgba(255,255,255,0.75);
+  }
+
+  /* Legacy — keep status-stack for mobile header */
+  .lead-header-v2__status-stack{
+    width: clamp(92px, 11vw, 120px);
+    flex: 0 0 auto;
+    min-width: 92px;
+  }
+
+  .lead-header-v2__status-stack input{
+    width: 100%;
+  }
+
+  /* ══════════════════════════════════════════
+     LHM — Redesigned mobile lead card header
+     ══════════════════════════════════════════ */
+  .lhm{
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* ── Row 1: Name | Pills | Status ── */
+  .lhm__row1{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .lhm__name{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 1 clamp(150px, 40vw, 220px);
+    max-width: clamp(150px, 40vw, 220px);
+    min-width: 0;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 10px;
+    padding: 6px 10px;
+    overflow: hidden;
+  }
+
+  .lhm__name-icon{
+    font-size: 15px;
+    color: #fff;
+    opacity: 0.9;
+    flex-shrink: 0;
+  }
+
+  .lhm__name-text{
+    font-size: 13px;
+    font-weight: 800;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  /* Refer + History — stacked, compact */
+  .lhm__pills{
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  /* Mobile: make icon pills match header glass style (not red) */
+  @media (max-width: 768px){
+    .lhm__pills .lead-meta-v2__pill{
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.16);
+      border: 1px solid rgba(255,255,255,0.35);
+      box-shadow: 0 8px 18px rgba(0,0,0,0.18);
+      color: #fff;
+    }
+
+    .lhm__pills .lead-meta-v2__pill i{
+      font-size: 14px;
+    }
+  }
+
+  .lhm__pill{
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: none;
+    font-size: 11px;
+    font-weight: 800;
+    color: #fff;
+    white-space: nowrap;
+    line-height: 1;
+  }
+
+  .lhm__pill--refer{
+    background: #ff3b30;
+  }
+
+  .lhm__pill--history{
+    background: rgba(255,255,255,0.22);
+    border: 1px solid rgba(255,255,255,0.35);
+  }
+
+  /* Status block — tappable, shows status + sub-status */
+  .lhm__status-block{
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex-shrink: 0;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 10px;
+    padding: 5px 8px;
+    cursor: pointer;
+    min-width: 145px;
+    position: relative;
+  }
+
+  .lhm__status-row{
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .lhm__status-label{
+    font-size: 9px;
+    font-weight: 900;
+    color: rgba(255,255,255,0.75);
+    white-space: nowrap;
+    min-width: 26px;
+  }
+
+  .lhm__status-val{
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 70px;
+  }
+
+  /* ── Row 2: Phone | More | Expand ── */
+  .lhm__row2{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .lhm__phone{
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 10px;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-weight: 800;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .lhm__phone i{
+    font-size: 12px;
+    opacity: 0.85;
+    flex-shrink: 0;
+  }
+
+  .lhm__actions{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .lhm__action-btn{
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.18);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    white-space: nowrap;
+    min-width: 34px;
+  }
+
+  .lhm__action-btn--more{
+    background: rgba(255,255,255,0.22);
+  }
+
+  /* ── Row 3: Followup Calling + Followup Visit ── */
+  .lhm__row3{
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .lhm__row3::-webkit-scrollbar{
+    display:none;
+  }
+
+  .lhm__followup-box{
+    flex: 1 1 calc(33.333% - 8px);
+    min-width: 0;
+    background: rgba(255,255,255,0.13);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 10px;
+    padding: 10px 8px 7px;
+    position: relative;
+    overflow: visible;
+  }
+
+  /* Bottom-right edit button (mobile header boxes) */
+  .lhm__editbtn{
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.18);
+    color: #fff;
+    padding: 0;
+    line-height: 1;
+    z-index: 2;
+  }
+
+  .lhm__editbtn i{
+    font-size: 11px;
+  }
+
+  @media (max-width: 520px){
+    .lhm__followup-box{
+      flex: 1 1 100%;
+    }
+  }
+
+  .lhm__followup-title{
+    position: absolute;
+    top: -9px;
+    left: 8px;
+    background: rgba(11,94,215,0.95);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 999px;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 900;
+    padding: 0 7px;
+    line-height: 17px;
+    white-space: nowrap;
+  }
+
+  .lhm__followup-cards{
+    display: flex;
+    gap: 5px;
+  }
+
+  .lhm__stat-card{
+    flex: 1 1 0;
+    border-radius: 7px;
+    padding: 5px 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  }
+
+  .lhm__stat-label{
+    font-size: 9.5px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.1;
+  }
+
+  .lhm__stat-divider{
+    display: block;
+    width: 65%;
+    height: 1px;
+    background: rgba(255,255,255,0.85);
+    margin: 3px 0;
+  }
+
+  .lhm__stat-val{
+    font-size: 14px;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1.1;
+  }
+
+  .lhm__followup-date{
+    display: flex;
+    justify-content: flex-start;
+    gap: 8px;
+    margin-top: 6px;
+    padding-top: 5px;
+    border-top: 1px solid rgba(255,255,255,0.2);
+    font-size: 9.5px;
+    font-weight: 800;
+    color: rgba(255,255,255,0.9);
+    white-space: nowrap;
+  }
+
+  /* Mobile header (Option A) */
+  .lead-header-mob{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    position: relative;
+    padding-top: 0; /* top bar moved to normal flow */
+  }
+
+  .lead-header-mob .lead-business-name{
+    padding: 0 2px;
+  }
+
+  /* Top bar (now in normal flow, below row2) */
+  .lead-header-mob__top{
+    position: static;
+    display:flex;
+    flex-direction: column;
+    gap:8px;
+    margin-top: 8px;
+  }
+
+  /* (No overlay z-index needed anymore) */
+
+  .lead-header-mob__row1{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+
+  .lead-header-mob__name{
+    flex: 1 1 auto;
+    min-width: 0;
+    font-weight: 800;
+    font-size: 14px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .lead-header-mob .lead-header-v2__status-stack{
+    width: clamp(120px, 38vw, 150px);
+  }
+
+  .lead-header-mob__row2{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+
+  .lead-header-mob__phone{
+    flex: 1 1 auto;
+    min-width: 0;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    background: rgba(255,255,255,0.18);
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .lead-header-mob__email{
+    flex: 1 1 auto;
+    min-width: 0;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    background: rgba(255,255,255,0.18);
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .lead-header-mob__actions{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex: 0 0 auto;
+  }
+
+  .lead-header-mob__icon-btn{
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.18);
+    color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:0;
+  }
+
+  .lead-header-mob__more-btn{
+    width: auto;
+    padding: 0 10px;
+    gap: 8px;
+    font-weight: 900;
+    font-size: 12px;
+    line-height: 1;
+  }
+
+  .lead-header-mob__icon-btn:disabled{
+    opacity: 0.55;
+  }
+
+  .lead-header-mob__floats{
+    position: relative;
+    flex: 0 0 auto;
+    min-width: 0;
+    height: 44px;
+    padding-right: 0;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+  }
+
+  .lead-header-mob__float{
+    position: absolute;
+    top: 0;
+    background: rgba(255,255,255,0.18);
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 12px;
+    padding: 14px 10px 8px;
+    min-width: 0;
+    width: calc(50% - 6px);
+  }
+
+  .lead-header-mob__float:nth-child(1){
+    left: 0;
+  }
+
+  .lead-header-mob__float:nth-child(2){
+    left: calc(50% + 6px);
+  }
+
+  .lead-header-mob__float-label{
+    position:absolute;
+    top: 0px;
+    left: 10px;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.2px;
+    opacity: 0.95;
+    color: rgba(255,255,255,0.95);
+  }
+
+  .lead-header-mob__float-value{
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .lead-header-mob__approval{
+    position: relative;
+    width: 100%;
+    display:flex;
+    justify-content:flex-start;
+    gap:8px;
+    height: 34px;
+  }
+
+  .lead-header-mob__approval-select{
+    height: 34px;
+    min-width: 160px;
+    border-radius: 12px;
+    font-weight: 900;
+    font-size: 12px;
+    border: 1px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.18);
+    color: #fff;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.18);
+  }
+
+  .lead-header-mob__approval-select option{
+    color: #111; /* dropdown list text */
+  }
+
+  .lead-header-mob__approval-v2{
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .lead-header-mob__approval-v2 .lead-approval-v2__pill{
+    min-width: 0;
+    padding: 6px 10px;
+    height: 30px;
+    font-size: 11px;
+  }
+
+  .lead-header-mob__approval-v2 .lead-approval-v2__iconbtn{
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+  }
+
+  .lead-header-mob__approval-v2 .lead-header-v2__approval-editor{
+    width: 190px;
+    right: 0;
+    left: auto;
+  }
+
+  .lead-header-mob__approval-btn{
+    border:none;
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 1;
+    color:#fff;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.18);
+    white-space: nowrap;
+    position: relative;
+    height: 34px;
+    width: auto;
+    min-width: 72px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .lead-header-mob__approval-btn--approve{
+    background: rgba(16, 185, 129, 0.95);
+  }
+
+  .lead-header-mob__approval-btn--reject{
+    display: flex;
+  }
+
+  /* Mobile horizontal scroll rows (actions + performance chips) */
+  .b2b-mobile-hscroll{
+    gap: 10px;
+  }
+
+  /* Desktop/tablet: keep original wrap behavior */
+  @media (min-width: 769px){
+    .b2b-mobile-hscroll--chips{
+      flex-wrap: wrap;
+    }
+  }
+
+  @media (max-width: 768px){
+    .b2b-mobile-hscroll{
+      display:flex;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 6px;
+      scrollbar-width: none;
+    }
+
+    .b2b-mobile-hscroll::-webkit-scrollbar{
+      display:none;
+    }
+
+    .b2b-mobile-hscroll > *{
+      flex: 0 0 auto;
+    }
+
+    .b2b-mobile-action-btn{
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap: 6px;
+      border-radius: 999px;
+      min-width: 130px;
+      transition: all 0.2s ease;
+      background-color: rgb(250, 85, 121);
+      color: #fff;
+      border: none;
+      box-shadow: 0 2px 8px rgba(250, 85, 121, 0.25);
+    }
+
+    .b2b-mobile-hscroll--chips .b2b-perf-chip{
+      white-space: nowrap;
+    }
+  }
+
+  @media (max-width: 420px){
+    .lead-header-mob{ padding-top: 0; }
+    .lead-header-mob__top{ flex-direction: column; gap: 8px; }
+    .lead-header-mob__floats{ height: auto; padding-right: 0; }
+    .lead-header-mob__float{ position: relative; width: 100%; left: auto !important; }
+    .lead-header-mob__approval{ position: relative; width: 100%; height: 40px; }
+    .lead-header-mob__approval-btn{ width: calc(50% - 5px); height: 40px; }
+    .lead-header-mob .lead-header-v2__status-stack{ width: clamp(120px, 42vw, 160px); }
+  }
+
+  .b2b-panel-open .lead-header-v2__approval{
+    flex-wrap: wrap;
+  }
+
+  .b2b-panel-open .lead-header-v2__kv{
+    min-width: 110px;
+  }
+
+  .lead-header-v2__right > *{
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .lead-header-v2__chip-group{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+
+  .lead-header-v2__chip-label{
+    font-size:11px;
+    font-weight:700;
+    opacity:0.9;
+    white-space:nowrap;
+  }
+
+  .lead-header-v2__chip{
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.28);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    max-width: 160px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .lead-header-v2__chev{
+    border: none;
+    background: rgba(255,255,255,0.18);
+    border: 1px solid rgba(255,255,255,0.28);
+    color:#fff;
+    border-radius: 999px;
+    width: 34px;
+    height: 22px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:0;
+    margin-left: 2px;
+  }
+
+  .lead-header-v2__chev i{ font-size: 12px; }
+
+  .lead-header-v2__iconbtn{
+    border: none;
+    background: rgba(255,255,255,0.18);
+    border: 1px solid rgba(255,255,255,0.28);
+    color:#fff;
+    border-radius: 10px;
+    width: 32px;
+    height: 32px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:0;
+  }
+
+  .lead-header-v2__iconbtn i{ font-size: 14px; }
+
+  .lead-header-v2__iconbtn--report{
+    width: auto;
+    padding: 0 10px;
+    gap: 8px;
+    justify-content: flex-start;
+    white-space: nowrap;
+  }
+
+  .lead-header-v2__report-text{
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .lead-meta-v2{
+    padding: 12px 14px 10px;
+    background:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+  }
+
+  .lead-meta-v2__panel{
+    position: relative;
+    border: 1px solid rgba(17, 24, 39, 0.35);
+    border-radius: 10px;
+    background: #fff;
+    padding: 18px 14px 12px;
+    min-width: 0;
+  }
+
+  .lead-meta-v2__panel-title{
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fff;
+    padding: 0 10px;
+    font-weight: 900;
+    color: #111827;
+    font-size: 16px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .lead-meta-v2__panel--detail{
+    flex: 1 1 auto;
+  }
+
+  .lead-meta-v2__panel--actions{
+    flex: 0 0 auto;
+    min-width: 360px;
+  }
+
+  .lead-meta-v2__grid{
+    display:grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px 18px;
+    align-items:flex-start;
+  }
+
+  .lead-meta-v2__mid{
+    flex: 0 0 auto;
+    display:flex;
+    gap: 12px;
+    align-items:center;
+    justify-content:center;
+    padding: 0 6px;
+    flex-direction:column;
+  }
+
+  .lead-meta-v2__pill{
+    border:none;
+    border-radius: 999px;
+    padding: 8px 14px;
+    background: #ff3b30;
+    color: #fff;
+    font-weight: 900;
+    font-size: 13px;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    box-shadow: 0 6px 14px rgba(255, 59, 48, 0.22);
+    line-height: 1;
+    white-space: nowrap;
+    text-align: center;
+    justify-content:center;
+  }
+
+  .lead-meta-v2__pill i{
+    font-size: 13px;
+  }
+
+  .lead-meta-v2__pill:disabled{
+    opacity: 0.55;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  /* Mobile "More actions" modal buttons (still use this class) */
+  .lead-meta-v2__action-btn{
+    border:none;
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: #ff3b30;
+    color: #fff;
+    font-weight: 900;
+    font-size: 13px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    box-shadow: 0 6px 14px rgba(255, 59, 48, 0.22);
+    line-height: 1;
+    width: 100%;
+  }
+
+  .lead-meta-v2__action-btn i{ font-size: 13px; }
+
+  .lead-meta-v2__action-btn:disabled{
+    opacity: 0.55;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .lead-meta-v2__action-grid{
+    display:grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    align-items: start;
+  }
+
+  .lead-meta-v2__icon-action{
+    border: none;
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .lead-meta-v2__icon-action:disabled{
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .lead-meta-v2__icon-action-label{
+    font-size: 13px;
+    font-weight: 700;
+    color: #ff3b7d;
+    line-height: 1.1;
+    text-align:center;
+    white-space: nowrap;
+  }
+
+  .lead-meta-v2__icon-action-btn{
+    width: 44px;
+    height: 36px;
+    border-radius: 10px;
+    background: #ff3b30;
+    color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow: 0 6px 14px rgba(255, 59, 48, 0.28);
+  }
+
+  .lead-meta-v2__icon-action-btn i{
+    font-size: 14px;
+  }
+
+  .lead-meta-v2__label{
+    font-size: 13px;
+    color: #ff3b7d;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .lead-meta-v2__value{
+    font-size: 15px;
+    font-weight: 800;
+    color: #111827;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .lead-meta-v2__followup{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:6px;
+    min-width: 120px;
+  }
+
+  .lead-meta-v2__followup-label{
+    font-size: 13px;
+    font-weight: 700;
+    color: #111827;
+    white-space:nowrap;
+  }
+
+  .lead-meta-v2__followup-btn{
+    width: 46px;
+    height: 34px;
+    border-radius: 10px;
+    border:none;
+    background: #ff3b30;
+    color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow: 0 6px 14px rgba(255, 59, 48, 0.28);
+  }
+
+  .lead-meta-v2__followup-btn:disabled{
+    opacity:0.55;
+    cursor:not-allowed;
+    box-shadow:none;
+  }
+
+  /* When the desktop right panel opens, main content narrows.
+     Keep header "cute + compact": top row (pills + performance), second row (dash cards). */
+  /* ── Panel-open: keep header in ONE compact row, no wrapping ── */
+  .b2b-panel-open .lead-header-v2{
+    padding: 8px 10px;
+  }
+
+  .b2b-panel-open .lead-header-v2__row{
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Left: hide name/phone when panel is open — no space, no overlap */
+  .b2b-panel-open .lead-header-v2__left{
+    display: none;
+  }
+
+  /* Right: take full width, single flex row, no wrap */
+  .b2b-panel-open .lead-header-v2__right{
+    flex: 1 1 100%;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 8px;
+    overflow: visible;
+    white-space: normal;
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
+  /* Pills: stay vertical, smaller */
+  .b2b-panel-open .lead-header-v2__pills{
+    flex-direction: column;
+    gap: 5px;
+    flex-shrink: 0;
+  }
+
+  .b2b-panel-open .lead-header-v2__pills .lead-meta-v2__pill{
+    padding: 6px 10px;
+    font-size: 11px;
+    gap: 5px;
+  }
+
+  /* Performance block: compact */
+  .b2b-panel-open .lead-header-v2__perf-block{
+    flex-shrink: 0;
+    min-width: 130px;
+    gap: 4px;
+  }
+
+  .b2b-panel-open .lead-header-v2__perf-title{
+    font-size: 10px;
+  }
+
+  .b2b-panel-open .lead-header-v2__perf-label{
+    font-size: 9px;
+    min-width: 52px;
+  }
+
+  .b2b-panel-open .lead-header-v2__perf-input{
+    height: 20px !important;
+    font-size: 9px !important;
+    padding: 0 5px !important;
+    border-radius: 5px !important;
+  }
+
+  .b2b-panel-open .lead-header-v2__perf-row{
+    gap: 5px;
+  }
+
+  /* Dash: side-by-side, narrower columns */
+  .b2b-panel-open .lead-header-v2__dash{
+    width: 100%;
+    flex: 1 1 100%;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .b2b-panel-open .lead-header-v2__dash-col{
+    width: auto;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  @media (max-width: 1180px){
+    .b2b-panel-open .lead-header-v2__dash{
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .b2b-panel-open .lead-header-v2 .b2b-dash-section{
+    padding: 8px 7px 6px;
+  }
+
+  .b2b-panel-open .lead-header-v2 .b2b-dash-section__label{
+    font-size: 10px;
+    top: -9px;
+    padding: 0 6px;
+    background: rgba(11, 94, 215, 0.95);
+  }
+
+  .b2b-panel-open .lead-header-v2 .b2b-dash-stat-card{
+    min-height: 38px;
+    padding: 4px 4px 4px;
+    border-radius: 7px;
+  }
+
+  .b2b-panel-open .lead-header-v2 .b2b-dash-stat-card__label{
+    font-size: 9.5px;
+  }
+
+  .b2b-panel-open .lead-header-v2 .b2b-dash-stat-card__divider{
+    margin: 3px 0;
+  }
+
+  .b2b-panel-open .lead-header-v2 .b2b-dash-stat-card__value{
+    font-size: 13px;
+  }
+
+  .b2b-panel-open .lead-header-v2 .ActionsDates{
+    margin-top: 4px;
+    padding-top: 4px;
+    font-size: 9.5px;
+    gap: 4px;
+  }
+
+  /* Slightly softer "cute" feel (safe changes only) */
+  .lead-header-v2 .b2b-dash-stat-card{
+    box-shadow: 0 8px 18px rgba(0,0,0,0.16);
+    transition: transform 180ms ease, box-shadow 180ms ease;
+  }
+
+  .lead-header-v2 .b2b-dash-stat-card:hover{
+    transform: translateY(-1px);
+    box-shadow: 0 12px 26px rgba(0,0,0,0.20);
+  }
+
+  /* ── Floating lead identity badge at top of desktop action panel ── */
+  .panel-lead-badge{
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 14px;
+    background: linear-gradient(90deg, #0b5ed7 0%, #1aa3ff 100%);
+    border-radius: 8px 0 0 0;
+    flex-wrap: wrap;
+  }
+
+  .panel-lead-badge__name,
+  .panel-lead-badge__phone{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .panel-lead-badge__name i,
+  .panel-lead-badge__phone i{
+    font-size: 12px;
+    opacity: 0.85;
+  }
+
+  .panel-lead-badge__phone{
+    font-size: 12px;
+    opacity: 0.92;
+    border-left: 1px solid rgba(255,255,255,0.35);
+    padding-left: 14px;
+  }
+
+  .lead-meta-v2__icon-action-btn{
+    transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+  }
+
+  .lead-meta-v2__icon-action:hover .lead-meta-v2__icon-action-btn{
+    transform: translateY(-1px);
+    filter: brightness(1.02);
+    box-shadow: 0 10px 22px rgba(255, 59, 48, 0.30);
+  }
+
+  @media (max-width: 768px){
+    .lead-header-v2__left{ min-width: auto; }
+    /* Mobile/tablet: allow the header to wrap instead of squeezing/overlapping */
+    .lead-header-v2__row{ flex-wrap: wrap; align-items: flex-start; }
+    .lead-header-v2__left{ flex: 1 1 100%; }
+    .lead-header-v2__input-row{ flex-wrap: wrap; }
+    .lead-header-v2__input-wrap{ min-width: 0; flex: 1 1 220px; width: auto; }
+    .lead-header-v2__right{
+      flex: 1 1 100%;
+      justify-content: flex-start;
+      flex-wrap: wrap;
+      overflow: visible;
+      white-space: normal;
+    }
+    .lead-header-v2__approval{ justify-content:flex-start; flex-wrap: wrap; }
+    .lead-header-v2__kv{ min-width: 120px; width: auto; }
+    .lead-header-v2__status-stack{ width: 120px; }
+    .lead-meta-v2{ flex-direction:column; align-items: stretch; }
+    .lead-meta-v2__panel--actions{ min-width: 0; }
+    .lead-meta-v2__mid{ justify-content:flex-start; padding: 2px 0 0; }
+    .lead-meta-v2__grid{ grid-template-columns: 1fr 1fr; }
+    .lead-meta-v2__action-grid{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .lead-meta-v2__followup{ align-items:flex-start; }
+  }
+
+  @media (max-width: 576px){
+    .lead-header-v2{ padding: 10px 12px; }
+    .lead-header-v2__input-row{ flex-direction: column; align-items: stretch; }
+    .lead-header-v2__input-wrap{ flex: 1 1 auto; width: 100%; }
+    .lead-header-v2__right .d-flex{ width: 100%; }
+    .lead-header-v2__status-stack{ width: 100%; }
+    .lead-header-v2__kv{ min-width: 0; flex: 1 1 48%; }
+    .lead-header-v2__kv-value{ max-width: 100%; }
   }
 
   .lead-header::before {
@@ -4840,6 +8606,19 @@ const B2BSales = () => {
     margin: 0 0 0.25rem 0;
     color: white;
     line-height: 1.2;
+  }
+
+  /* B2B lead header v2: keep business name compact on mobile */
+  @media (max-width: 768px){
+    .lead-header-mob .lead-business-name{
+      font-size: 13px;
+      font-weight: 900;
+      margin: 0;
+      opacity: 0.95;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
   }
 
   .lead-contact-person {
@@ -5089,11 +8868,13 @@ const B2BSales = () => {
   }
 
   .action-btn.refer {
-    background: linear-gradient(135deg, #6c757d, #495057);
+    background: #ff3b30;
+    box-shadow: 0 6px 14px rgba(255, 59, 48, 0.24);
   }
 
   .action-btn.history {
-    background: linear-gradient(135deg, #17a2b8, #138496);
+    background: #ff3b30;
+    box-shadow: 0 6px 14px rgba(255, 59, 48, 0.24);
   }
 
   .action-btn.status {
@@ -5380,8 +9161,8 @@ const B2BSales = () => {
     margin-bottom: 0.5rem !important;
   }
 `}</style>
-<style>
-{`
+      <style>
+        {`
 @media (max-width:992px){
 .react-calendar {
   transform: translateY(-200px) !important;
@@ -5481,7 +9262,9 @@ const B2BSales = () => {
 }
 /* Tablet */
 @media (max-width: 768px) {
-
+.mbdiv{
+padding:0px;
+}
   .SerachClear {
             width: 22px !important;
         height: 22px !important;
@@ -5491,7 +9274,7 @@ const B2BSales = () => {
 }
 }
 `}
-</style>
+      </style>
     </div >
   );
 };

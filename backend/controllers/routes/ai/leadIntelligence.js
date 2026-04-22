@@ -676,10 +676,10 @@ ${JSON.stringify(lead, null, 2)}
           }
           parsed = JSON.parse(jsonStr);
         } catch (e) {
-          console.warn(
-            `[AI lead-intel/bulk] Failed to parse JSON for lead ${lead._id}:`,
-            e.message
-          );
+          // console.warn(
+          //   `[AI lead-intel/bulk] Failed to parse JSON for lead ${lead._id}:`,
+          //   e.message
+          // );
           continue;
         }
 
