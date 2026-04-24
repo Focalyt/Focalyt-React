@@ -73,6 +73,15 @@ function pickFirstNonEmpty(...values) {
   return '';
 }
 
+function getLeadSubStatusTitle(lead) {
+  const id = lead?.subStatus?._id || lead?.subStatus;
+  if (!id) return '';
+  const list = lead?.status?.substatuses;
+  if (!Array.isArray(list) || list.length === 0) return '';
+  const found = list.find((ss) => String(ss?._id) === String(id));
+  return pickFirstNonEmpty(found?.title, found?.name);
+}
+
 function buildLeadRemarkSuggestion({ leadFormData, leadCategoryOptions, typeOfB2BOptions }) {
   const business = safeStr(leadFormData?.businessName);
   const city = safeStr(leadFormData?.city);
@@ -209,8 +218,15 @@ const MultiSelectCheckbox = ({
   const filteredOptions = useMemo(() => {
     const list = Array.isArray(options) ? options : [];
     const q = String(query || '').trim().toLowerCase();
-    if (!q) return list;
-    return list.filter((o) => String(o?.label || '').toLowerCase().includes(q));
+    const filtered = !q
+      ? list
+      : list.filter((o) => String(o?.label || '').toLowerCase().includes(q));
+    return [...filtered].sort((a, b) =>
+      String(a?.label ?? '').localeCompare(String(b?.label ?? ''), undefined, {
+        sensitivity: 'base',
+        numeric: true,
+      })
+    );
   }, [options, query]);
 
   return (
@@ -2403,7 +2419,10 @@ const B2BSales = () => {
 
 
   const handleStatusChange = (e) => {
-    setSelectedStatus(e.target.value);
+    const nextStatus = e.target.value;
+    setSelectedStatus(nextStatus);
+    // Reset sub-status when status/performance changes (old sub-status may not belong to new status)
+    setSelectedSubStatus(null);
   };
 
 
@@ -2845,7 +2864,14 @@ const B2BSales = () => {
                   onChange={handleStatusChange}
                 >
                   <option value="">Select Status</option>
-                  {statuses.map((status, index) => (
+                  {[...(statuses || [])]
+                    .sort((a, b) =>
+                      String(a?.name || a?.title || '').localeCompare(String(b?.name || b?.title || ''), undefined, {
+                        sensitivity: 'base',
+                        numeric: true,
+                      })
+                    )
+                    .map((status) => (
                     <option key={status._id} value={status._id}>{status.name}</option>
                   ))}
                 </select>
@@ -2870,9 +2896,16 @@ const B2BSales = () => {
                   onChange={handleSubStatusChange}
                 >
                   <option value="">Select Sub-Status</option>
-                  {subStatuses.map((subStatus, index) => (
-                    <option key={subStatus._id} value={subStatus._id}>{subStatus.title}</option>
-                  ))}
+                  {[...(subStatuses || [])]
+                    .sort((a, b) =>
+                      String(a?.title || a?.name || '').localeCompare(String(b?.title || b?.name || ''), undefined, {
+                        sensitivity: 'base',
+                        numeric: true,
+                      })
+                    )
+                    .map((subStatus) => (
+                      <option key={subStatus._id} value={subStatus._id}>{subStatus.title}</option>
+                    ))}
                 </select>
               </div>
 
@@ -4619,11 +4652,16 @@ const B2BSales = () => {
                               {/* Row 1 — Name + Refer/History pills + Status */}
                               <div className="lhm__row1">
 
-                                <div className="lhm__name" title={lead.concernPersonName || lead.businessName || ''}>
+                                <div className="lhm__name" title={lead.businessName || lead.concernPersonName || ''}>
                                   <i className="fas fa-user-circle lhm__name-icon" aria-hidden="true"></i>
                                   <span className="text-capitalize lhm__name-text">
-                                    {lead.concernPersonName || lead.businessName || '—'}
+                                    {lead.concernPersonName || '—'}
                                   </span>
+                                  {lead.businessName && lead.businessName !== lead.concernPersonName && (
+                                    <small className="text-muted lhm__biz text-capitalize" title={lead.businessName}>
+                                      {lead.businessName}
+                                    </small>
+                                  )}
                                 </div>
 
                                 {/* {aiLeadIntelById?.[lead._id] && (
@@ -4699,7 +4737,7 @@ const B2BSales = () => {
                                   <div className="lhm__status-row">
                                     <span className="lhm__status-label">Sub</span>
                                     <span className="lhm__status-val">
-                                      {lead.subStatus?.title || 'Untouch Lead'}
+                                      {getLeadSubStatusTitle(lead) || 'Untouch Lead'}
                                     </span>
                                   </div>
                                 </div>
@@ -4916,6 +4954,17 @@ const B2BSales = () => {
                                       />
                                     </div>
                                     <div className="lead-header-v2__input-wrap">
+                                      <i className="fas fa-building lead-header-v2__input-icon" aria-hidden="true"></i>
+                                      <input
+                                        type="text"
+                                        className="lead-header-v2__input text-capitalize"
+                                        readOnly
+                                        value={lead.businessName || ''}
+                                        placeholder="Business"
+                                        title={lead.businessName || 'NA'}
+                                      />
+                                    </div>
+                                    <div className="lead-header-v2__input-wrap">
                                       <i className="fas fa-phone lead-header-v2__input-icon" aria-hidden="true"></i>
                                       <input
                                         type="text"
@@ -5081,7 +5130,7 @@ const B2BSales = () => {
                                     <input
                                       type="text"
                                       className="form-control form-control-sm m-0 lead-header-v2__perf-input"
-                                      value={lead.subStatus?.title || 'Untouch Lead'}
+                                      value={getLeadSubStatusTitle(lead) || 'Untouch Lead'}
                                       readOnly
                                       style={{fontSize:'8px'}}
                                     />

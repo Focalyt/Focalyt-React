@@ -2959,6 +2959,7 @@ router.post('/leads/import', isCollege, async (req, res) => {
 			'mobile': 'mobile',
 			'email': 'email',
 			'leadcategory': 'leadCategory',
+			'leadsource': 'leadCategory',
 			'typeofb2b': 'typeOfB2B',
 			'address': 'address',
 			'city': 'city',
@@ -2984,6 +2985,9 @@ router.post('/leads/import', isCollege, async (req, res) => {
 			'emailaddress': 'email',
 			'leadcate': 'leadCategory',
 			'category': 'leadCategory',
+			'source': 'leadCategory',
+			'leadsrc': 'leadCategory',
+			'leadsourcecategory': 'leadCategory',
 			'typeofb2': 'typeOfB2B',
 			'typeofb': 'typeOfB2B',
 			'b2btype': 'typeOfB2B',
@@ -3117,7 +3121,7 @@ router.post('/leads/import', isCollege, async (req, res) => {
 
 				// Validate and get Lead Category (case-insensitive search)
 				if (!row.leadCategory) {
-					errors.push(`Row ${i + 2}: Lead Category is required`);
+					errors.push(`Row ${i + 2}: Lead Source is required`);
 					continue;
 				}
 				
@@ -3142,7 +3146,7 @@ router.post('/leads/import', isCollege, async (req, res) => {
 					}
 					const categoryNames = availableCategories.map(c => c.name).join(', ');
 					// console.log(`Row ${i + 2}: Lead Category "${row.leadCategory}" not found. Total categories in DB: ${availableCategories.length}`);
-					errors.push(`Row ${i + 2}: Lead Category "${row.leadCategory}" not found. Available categories: ${categoryNames || 'None'}`);
+					errors.push(`Row ${i + 2}: Lead Source "${row.leadCategory}" not found. Available sources: ${categoryNames || 'None'}`);
 					continue;
 				}
 

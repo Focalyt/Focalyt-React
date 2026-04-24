@@ -25,8 +25,8 @@ dns.setServers(["8.8.8.8", "8.8.4.4"]);
 // cron api 
 const missedFollowupSchedular = require("./schedular/missedFollowupSchedular");
 missedFollowupSchedular();
-const dataBaseBackup = require("./schedular/dataBaseBackup");
-dataBaseBackup();
+// const dataBaseBackup = require("./schedular/dataBaseBackup");
+// dataBaseBackup();
 const counselorPerformanceEmailScheduler = require("./schedular/counselorPerformanceEmailScheduler");
 counselorPerformanceEmailScheduler();
 //upload('
