@@ -2874,7 +2874,7 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 // Bulk import leads from CSV/Excel
 router.post('/leads/import', isCollege, async (req, res) => {
 	try {
-		// Find "Untouch Leads" status as default status for bulk upload
+		// Default status for bulk upload should be PROSPECT (fallback: Untouch Leads)
 		const College = require("../../../models/college");
 		const college = await College.findOne({
 			'_concernPerson._id': req.user._id
@@ -2884,24 +2884,30 @@ router.post('/leads/import', isCollege, async (req, res) => {
 		let defaultSubStatusId = null;
 		
 		if (college) {
-			const untouchStatus = await StatusB2b.findOne({
+			// Prefer PROSPECT if configured for this college
+			let defaultStatus = await StatusB2b.findOne({
 				college: college._id,
-				title: { $regex: /^Untouch Leads$/i }
+				title: { $regex: /^PROSPECT$/i }
 			});
 
-			if (untouchStatus) {
-				defaultStatusId = untouchStatus._id;
-				// If there's a substatus with same name, use it
-				if (untouchStatus.substatuses && untouchStatus.substatuses.length > 0) {
-					const untouchSubStatus = untouchStatus.substatuses.find(
-						sub => sub.title && /^Untouch Leads$/i.test(sub.title)
-					);
-					if (untouchSubStatus) {
-						defaultSubStatusId = untouchSubStatus._id;
-					} else {
-						// Use first substatus if exact match not found
-						defaultSubStatusId = untouchStatus.substatuses[0]._id;
-					}
+			// Fallback to Untouch Leads
+			if (!defaultStatus) {
+				defaultStatus = await StatusB2b.findOne({
+					college: college._id,
+					title: { $regex: /^Untouch Leads$/i }
+				});
+			}
+
+			if (!defaultStatus) {
+				defaultStatusId = null;
+				defaultSubStatusId = null;
+			} else {
+				defaultStatusId = defaultStatus._id;
+				// If there's a substatus with same name, use it; otherwise use first substatus
+				if (defaultStatus.substatuses && defaultStatus.substatuses.length > 0) {
+					const titleRx = new RegExp(`^${String(defaultStatus.title).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+					const exactSub = defaultStatus.substatuses.find((sub) => sub.title && titleRx.test(sub.title));
+					defaultSubStatusId = (exactSub || defaultStatus.substatuses[0])._id;
 				}
 			}
 		}
@@ -3276,10 +3282,10 @@ router.post('/leads/import', isCollege, async (req, res) => {
 					}
 				}
 			}
-			// Group Lead Category errors
-			else if (error.includes('Lead Category') && error.includes('not found')) {
-				const valueMatch = error.match(/Lead Category "([^"]+)" not found/);
-				const availableMatch = error.match(/Available categories: (.+)$/);
+			// Group Lead Source errors
+			else if (error.includes('Lead Source') && error.includes('not found')) {
+				const valueMatch = error.match(/Lead Source "([^"]+)" not found/);
+				const availableMatch = error.match(/Available sources: (.+)$/);
 				if (valueMatch) {
 					errorGroups.leadCategory.values.add(valueMatch[1]);
 					if (rowNum) errorGroups.leadCategory.rows.push(rowNum);
@@ -3304,7 +3310,7 @@ router.post('/leads/import', isCollege, async (req, res) => {
 		if (errorGroups.leadCategory.rows.length > 0) {
 			const sortedRows = [...new Set(errorGroups.leadCategory.rows)].sort((a, b) => a - b);
 			const valuesList = Array.from(errorGroups.leadCategory.values).join(', ');
-			groupedErrors.push(`Rows ${sortedRows.join(', ')}: Lead Category (${valuesList}) not found. Available categories: ${errorGroups.leadCategory.availableCategories || 'None'}`);
+			groupedErrors.push(`Rows ${sortedRows.join(', ')}: Lead Source (${valuesList}) not found. Available sources: ${errorGroups.leadCategory.availableCategories || 'None'}`);
 		}
 
 		// Add other errors as-is
