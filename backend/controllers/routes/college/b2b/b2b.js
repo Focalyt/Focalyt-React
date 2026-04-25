@@ -2040,7 +2040,10 @@ router.put('/leads/:id/approval', isCollege, async (req, res) => {
 				if (statusDoc?._id) {
 					lead.status = statusDoc._id;
 					const sub = Array.isArray(statusDoc.substatuses)
-						? statusDoc.substatuses.find((s) => String(s.title || '').toLowerCase() === 'prospect')
+						? statusDoc.substatuses.find((s) => {
+							const t = String(s?.title || '').trim().toLowerCase();
+							return t === 'untouch leads' || t === 'untouch leads' || t === 'untouch';
+						})
 						: null;
 					if (sub?._id) lead.subStatus = sub._id;
 				}
