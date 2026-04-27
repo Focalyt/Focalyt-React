@@ -3134,17 +3134,23 @@ router.post('/leads/import', isCollege, async (req, res) => {
 					continue;
 				}
 				
-				// Try to find category - first with isActive, then without
-				let leadCategory = await LeadCategory.findOne({ 
-					name: { $regex: new RegExp(`^${row.leadCategory.trim()}$`, 'i') },
+				const leadSourceNorm = row.leadCategory.trim().toLowerCase();
+				const leadCatNameLowerMatch = {
+					$expr: {
+						$eq: [
+							{ $toLower: { $trim: { input: '$name' } } },
+							leadSourceNorm
+						]
+					}
+				};
+
+				let leadCategory = await LeadCategory.findOne({
+					...leadCatNameLowerMatch,
 					isActive: true
 				});
-				
-				// If not found with isActive, try without isActive filter
+
 				if (!leadCategory) {
-					leadCategory = await LeadCategory.findOne({ 
-						name: { $regex: new RegExp(`^${row.leadCategory.trim()}$`, 'i') }
-					});
+					leadCategory = await LeadCategory.findOne(leadCatNameLowerMatch);
 				}
 				
 				if (!leadCategory) {
@@ -3165,17 +3171,23 @@ router.post('/leads/import', isCollege, async (req, res) => {
 					continue;
 				}
 				
-				// Try to find type - first with isActive, then without
-				let typeOfB2B = await TypeOfB2B.findOne({ 
-					name: { $regex: new RegExp(`^${row.typeOfB2B.trim()}$`, 'i') },
-					isActive: true 
+				const b2bTypeNorm = row.typeOfB2B.trim().toLowerCase();
+				const b2bTypeNameLowerMatch = {
+					$expr: {
+						$eq: [
+							{ $toLower: { $trim: { input: '$name' } } },
+							b2bTypeNorm
+						]
+					}
+				};
+
+				let typeOfB2B = await TypeOfB2B.findOne({
+					...b2bTypeNameLowerMatch,
+					isActive: true
 				});
-				
-				// If not found with isActive, try without isActive filter
+
 				if (!typeOfB2B) {
-					typeOfB2B = await TypeOfB2B.findOne({ 
-						name: { $regex: new RegExp(`^${row.typeOfB2B.trim()}$`, 'i') }
-					});
+					typeOfB2B = await TypeOfB2B.findOne(b2bTypeNameLowerMatch);
 				}
 				
 				if (!typeOfB2B) {
@@ -3216,20 +3228,23 @@ router.post('/leads/import', isCollege, async (req, res) => {
 					}
 				}
 
-				// Add leadOwner if provided (by name or ID) - case-insensitive search
 				if (row.leadOwner && row.leadOwner.trim()) {
 					const ownerName = row.leadOwner.trim();
-					
-					// Check if it's a valid ObjectId first
+
 					let owner = null;
 					if (mongoose.Types.ObjectId.isValid(ownerName)) {
 						owner = await User.findById(ownerName);
 					}
-					
-					// If not found by ID, search by name (case-insensitive)
+
 					if (!owner) {
+						const ownerNorm = ownerName.toLowerCase();
 						owner = await User.findOne({
-							name: { $regex: new RegExp(`^${ownerName}$`, 'i') }
+							$expr: {
+								$eq: [
+									{ $toLower: { $trim: { input: '$name' } } },
+									ownerNorm
+								]
+							}
 						});
 					}
 					
