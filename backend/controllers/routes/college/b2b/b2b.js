@@ -1828,33 +1828,42 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			landlineNumber
 		} = req.body;
 
-		const requiredFields = [leadCategory, typeOfB2B, businessName, concernPersonName, mobile];
+		const missingFields = [];
+		if (!leadCategory) missingFields.push("leadCategory");
+		if (!typeOfB2B) missingFields.push("typeOfB2B");
+		if (!businessName) missingFields.push("businessName");
+		if (!concernPersonName) missingFields.push("concernPersonName");
+		if (!mobile) missingFields.push("mobile");
 
-		let missingFields = [];
-		requiredFields.forEach(field => {
-			if (!field) {
-				missingFields.push(field);
-			}
-		});
-
-		if (missingFields.length > 0) {
+		if (missingFields.length) {
 			return res.status(400).json({
 				status: false,
 				message: `Required fields missing: ${missingFields.join(", ")}`
 			});
 		}
 
-		// Check if email already exists
-		const existingLead = await Lead.findOne({
-			email,
-			leadAddedBy: req.user._id
-		});
+		const normalizedEmail = typeof email === "string" ? email.trim() : "";
+		if (normalizedEmail) {
+			const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+			if (!emailRegex.test(normalizedEmail)) {
+				return res.status(400).json({
+					status: false,
+					message: "Please enter a valid email address"
+				});
+			}
 
-		if (existingLead) {
-			return res.status(400).json({
-				status: false,
-				message: 'Lead with this email already exists'
+			// Check if email already exists (only when email is provided)
+			const existingLead = await Lead.findOne({
+				email: normalizedEmail,
+				leadAddedBy: req.user._id
 			});
+
+			if (existingLead) {
+				return res.status(400).json({
+					status: false,
+					message: "Lead with this email already exists"
+				});
+			}
 		}
 
 		// Handle leadOwner - convert name to ObjectId if needed, or skip if empty
@@ -1924,7 +1933,7 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			coordinates,
 			concernPersonName,
 			designation,
-			email,
+			email: normalizedEmail || undefined,
 			mobile,
 			whatsapp,
 			leadAddedBy: req.user._id,
