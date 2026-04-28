@@ -1268,18 +1268,24 @@ function CollegeLayout({ children }) {
                         opacity: openSubmenu.dropdown ? 1 : 0
                       }}
                     >
-                      <li className={`nav-item ${location.pathname === '/institute/typeOfB2b' ? 'active' : ''}`}>
-                        <Link to="/institute/typeOfB2b" onClick={() => handleSidebarClose()}>
-                          <FontAwesomeIcon icon={faIndustry} />
-                          <span className="menu-title">{t('type_of_b2b')}</span>
-                        </Link>
-                      </li>
-                      <li className={`nav-item ${location.pathname === '/institute/typeOfCategory' ? 'active' : ''}`}>
-                        <Link to="/institute/typeOfCategory" onClick={() => handleSidebarClose()}>
-                          <FontAwesomeIcon icon={faTags} />
-                          <span className="menu-title">{t('type_of_category')}</span>
-                        </Link>
-                      </li>
+                      {(permissions?.permission_type === 'Admin' ||
+                        (permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_edit_lead_type_b2b)) && (
+                        <li className={`nav-item ${location.pathname === '/institute/typeOfB2b' ? 'active' : ''}`}>
+                          <Link to="/institute/typeOfB2b" onClick={() => handleSidebarClose()}>
+                            <FontAwesomeIcon icon={faIndustry} />
+                            <span className="menu-title">{t('type_of_b2b')}</span>
+                          </Link>
+                        </li>
+                      )}
+                      {(permissions?.permission_type === 'Admin' ||
+                        (permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_edit_lead_source_b2b)) && (
+                        <li className={`nav-item ${location.pathname === '/institute/typeOfCategory' ? 'active' : ''}`}>
+                          <Link to="/institute/typeOfCategory" onClick={() => handleSidebarClose()}>
+                            <FontAwesomeIcon icon={faTags} />
+                            <span className="menu-title">{t('type_of_category')}</span>
+                          </Link>
+                        </li>
+                      )}
                       <li className={`nav-item ${location.pathname === '/institute/source' ? 'active' : ''}`}>
                         <Link to="/institute/source" onClick={() => handleSidebarClose()}>
                           <FontAwesomeIcon icon={faGlobe} />

@@ -470,6 +470,20 @@ const B2BSales = () => {
   const token = userData.token;
   // const permissions = userData.permissions
   const [permissions, setPermissions] = useState();
+  const canEditLeadSourceB2B =
+    permissions?.permission_type === 'Admin' ||
+    (permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_edit_lead_source_b2b);
+  const canEditLeadTypeB2B =
+    permissions?.permission_type === 'Admin' ||
+    (permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_edit_lead_type_b2b);
+  const canApproveLeadsB2B =
+    permissions?.permission_type === 'Admin' ||
+    (permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_approve_leads_b2b);
+
+  const [showLeadMetaEditModal, setShowLeadMetaEditModal] = useState(false);
+  const [metaEditLead, setMetaEditLead] = useState(null);
+  const [metaEditForm, setMetaEditForm] = useState({ leadCategory: '', typeOfB2B: '' });
+  const [metaEditSaving, setMetaEditSaving] = useState(false);
 
   useEffect(() => {
     updatedPermission()
@@ -506,6 +520,50 @@ const B2BSales = () => {
       setPermissions(respose.data.permissions);
     }
   }
+
+  const openMetaEdit = (lead) => {
+    if (!lead?._id) return;
+    setMetaEditLead(lead);
+    setMetaEditForm({
+      leadCategory: lead?.leadCategory?._id || lead?.leadCategory || lead?.leadCategoryId || '',
+      typeOfB2B: lead?.typeOfB2B?._id || lead?.typeOfB2B || lead?.typeOfB2BId || ''
+    });
+    setShowLeadMetaEditModal(true);
+  };
+
+  const saveMetaEdit = async () => {
+    if (!metaEditLead?._id) return;
+    if (!metaEditForm.leadCategory || !metaEditForm.typeOfB2B) {
+      alert('Please select Lead Source and B2B Type');
+      return;
+    }
+    if (!canUpdateLead(metaEditLead)) {
+      alert("You don't have permission to update this lead.");
+      return;
+    }
+    try {
+      setMetaEditSaving(true);
+      const res = await axios.put(
+        `${backendUrl}/college/b2b/leads/${metaEditLead._id}`,
+        { leadCategory: metaEditForm.leadCategory, typeOfB2B: metaEditForm.typeOfB2B },
+        { headers: { 'x-auth': token } }
+      );
+      if (res?.data?.status) {
+        setShowLeadMetaEditModal(false);
+        setMetaEditLead(null);
+        await fetchLeads(selectedStatusFilter, currentPage);
+        await fetchStatusCounts();
+        await fetchApprovalCounts();
+      } else {
+        alert(res?.data?.message || 'Failed to update lead');
+      }
+    } catch (e) {
+      console.error('Failed to update lead meta:', e);
+      alert(e?.response?.data?.message || 'Failed to update lead');
+    } finally {
+      setMetaEditSaving(false);
+    }
+  };
 
   const [openModalId, setOpenModalId] = useState(null);
 
@@ -4768,7 +4826,7 @@ const B2BSales = () => {
                                             {safe}
                                           </button>
 
-                                          {isAdmin() && (
+                                          {canApproveLeadsB2B && (
                                             <button
                                               type="button"
                                               className="lead-approval-v2__iconbtn"
@@ -4780,7 +4838,7 @@ const B2BSales = () => {
                                             </button>
                                           )}
 
-                                          {isAdmin() && (
+                                          {canApproveLeadsB2B && (
                                             <div
                                               className={`lead-header-v2__approval-editor ${approvalEditLeadId === lead._id ? 'is-open' : ''}`}
                                               aria-hidden={approvalEditLeadId === lead._id ? 'false' : 'true'}
@@ -5015,7 +5073,7 @@ const B2BSales = () => {
                                           {safe}
                                         </button>
 
-                                        {isAdmin() && (
+                                        {canApproveLeadsB2B && (
                                           <button
                                             type="button"
                                             className="lead-approval-v2__iconbtn"
@@ -5030,7 +5088,7 @@ const B2BSales = () => {
                                     );
                                   })()}
 
-                                  {isAdmin() && (
+                                  {canApproveLeadsB2B && (
                                     <div
                                       className={`lead-header-v2__approval-editor ${approvalEditLeadId === lead._id ? 'is-open' : ''}`}
                                       aria-hidden={approvalEditLeadId === lead._id ? 'false' : 'true'}
@@ -5317,7 +5375,20 @@ const B2BSales = () => {
                                 </div>
                                 <div className="lead-meta-v2__item">
                                   <div className="lead-meta-v2__label">Lead Source</div>
-                                  <div className="lead-meta-v2__value text-capitalize" title={lead.leadCategory?.name || '—'}>{lead.leadCategory?.name || '—'}</div>
+                                  <div className="d-flex align-items-center gap-2">
+                                    <div className="lead-meta-v2__value text-capitalize" title={lead.leadCategory?.name || '—'}>{lead.leadCategory?.name || '—'}</div>
+                                    {(canEditLeadSourceB2B || canEditLeadTypeB2B) && (
+                                      <button
+                                        type="button"
+                                        className="btn btn-link p-0"
+                                        onClick={() => openMetaEdit(lead)}
+                                        title="Edit Lead Source / B2B Type"
+                                        style={{ lineHeight: 1, color: '#0d6efd' }}
+                                      >
+                                        <i className="fas fa-pen" aria-hidden="true" style={{ fontSize: 12 }}></i>
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                                 <div className="lead-meta-v2__item">
                                   <div className="lead-meta-v2__label">B2B Type</div>
@@ -5983,7 +6054,7 @@ const B2BSales = () => {
                                   >
                                     Upload
                                   </button>
-                                ) : isAdmin() && (
+                                ) : canApproveLeadsB2B && (
                                   <div className="btn-group btn-group-sm" role="group">
                                     <button
                                       type="button"
@@ -9210,6 +9281,80 @@ position: absolute;
     margin-bottom: 0.5rem !important;
   }
 `}</style>
+
+      {/* Lead Source / B2B Type edit modal (from lead card) */}
+      {showLeadMetaEditModal && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1065 }}>
+          <div className="modal-dialog modal-md modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Update Lead Source &amp; B2B Type</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => {
+                    if (metaEditSaving) return;
+                    setShowLeadMetaEditModal(false);
+                    setMetaEditLead(null);
+                  }}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <div className="row g-3">
+                  <div className="col-12">
+                    <label className="form-label fw-bold">Lead Source</label>
+                    <select
+                      className="form-select"
+                      value={metaEditForm.leadCategory}
+                      onChange={(e) => setMetaEditForm((p) => ({ ...p, leadCategory: e.target.value }))}
+                      disabled={metaEditSaving}
+                    >
+                      <option value="">Select Lead Source</option>
+                      {(leadCategoryOptions || []).map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-12">
+                    <label className="form-label fw-bold">Type of B2B</label>
+                    <select
+                      className="form-select"
+                      value={metaEditForm.typeOfB2B}
+                      onChange={(e) => setMetaEditForm((p) => ({ ...p, typeOfB2B: e.target.value }))}
+                      disabled={metaEditSaving}
+                    >
+                      <option value="">Select B2B Type</option>
+                      {(typeOfB2BOptions || []).map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    if (metaEditSaving) return;
+                    setShowLeadMetaEditModal(false);
+                    setMetaEditLead(null);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button type="button" className="btn btn-primary" onClick={saveMetaEdit} disabled={metaEditSaving}>
+                  {metaEditSaving ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <style>
         {`
 @media (max-width:992px){

@@ -25,6 +25,8 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
       can_approve_leads_b2b: false,
       can_change_lead_status_b2b: false,
       can_delete_leads_b2b: false,
+      can_edit_lead_source_b2b: false,
+      can_edit_lead_type_b2b: false,
 
       // Lead Management
       can_view_leads: false,
@@ -78,6 +80,8 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
         can_delete_leads_b2b: true,
         can_approve_leads_b2b: true,
         can_change_lead_status_b2b: true,
+        can_edit_lead_source_b2b: true,
+        can_edit_lead_type_b2b: true,
 
         can_view_leads: true,
         can_add_leads: true,
@@ -226,7 +230,7 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
       }
 
       // Lead Management (B2B) Dependencies
-      if (['can_add_leads_b2b', 'can_edit_leads_b2b', 'can_assign_leads_b2b', 'can_delete_leads_b2b', 'can_approve_leads_b2b', 'can_change_lead_status_b2b'].includes(permission) && value === true) {
+      if (['can_add_leads_b2b', 'can_edit_leads_b2b', 'can_assign_leads_b2b', 'can_delete_leads_b2b', 'can_approve_leads_b2b', 'can_change_lead_status_b2b', 'can_edit_lead_source_b2b', 'can_edit_lead_type_b2b'].includes(permission) && value === true) {
         updatedPermissions.can_view_leads_b2b = true;
       }
       if (permission === 'can_view_leads_b2b' && value === false) {
@@ -236,6 +240,8 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
         updatedPermissions.can_approve_leads_b2b = false;
         updatedPermissions.can_change_lead_status_b2b = false;
         updatedPermissions.can_delete_leads_b2b = false;
+        updatedPermissions.can_edit_lead_source_b2b = false;
+        updatedPermissions.can_edit_lead_type_b2b = false;
       }
 
       return {
@@ -538,8 +544,10 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
                       can_edit_leads_b2b: '✏️ Edit Leads',
                       can_assign_leads_b2b: '🔄 Assign Leads',
                       can_approve_leads_b2b: '🔄 Approve Leads',
-                      can_change_lead_status_b2b: '🔄 Change Lead Status',
-                      can_delete_leads_b2b: '🗑️ Delete Leads'
+                      // can_change_lead_status_b2b: '🔄 Change Lead Status',
+                      can_delete_leads_b2b: '🗑️ Delete Leads',
+                      can_edit_lead_source_b2b: '🏷️ Edit Lead Source',
+                      can_edit_lead_type_b2b: '🧩 Edit Lead Type'
                     }).map(([permission, label]) => (
                       <div key={permission} className="col-md-6">
                         <div className="form-check">
