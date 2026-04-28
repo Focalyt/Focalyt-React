@@ -1709,10 +1709,8 @@ router.get('/leads', isCollege, async (req, res) => {
 // Get lead by ID
 router.get('/leads/:id', isCollege, async (req, res) => {
 	try {
-		const lead = await Lead.findOne({
-			_id: req.params.id,
-			leadAddedBy: req.user._id
-		})
+		const isAdminUser = (req) => req.user?.permissions?.permission_type === 'Admin';
+		const lead = await Lead.findById(req.params.id)
 			.populate('leadCategory', 'name questions isActive')
 			.populate('typeOfB2B', 'name')
 			.populate('status', 'name')
@@ -1726,6 +1724,19 @@ router.get('/leads/:id', isCollege, async (req, res) => {
 			return res.status(404).json({
 				status: false,
 				message: 'Lead not found'
+			});
+		}
+
+		// Permission: Admin OR leadAddedBy OR leadOwner can view
+		const userId = String(req.user?._id || '');
+		const leadAddedById = lead.leadAddedBy ? String(lead.leadAddedBy?._id || lead.leadAddedBy) : '';
+		const leadOwnerId = lead.leadOwner ? String(lead.leadOwner?._id || lead.leadOwner) : '';
+		const canView = isAdminUser(req) || leadAddedById === userId || leadOwnerId === userId;
+
+		if (!canView) {
+			return res.status(403).json({
+				status: false,
+				message: 'You do not have permission to view this lead'
 			});
 		}
 
@@ -2357,12 +2368,10 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 		} = req.body;
 
 		const user = req.user;
+		const isAdminUser = (req) => req.user?.permissions?.permission_type === 'Admin';
 
-		// Check if lead exists and belongs to the user
-		const existingLead = await Lead.findOne({
-			_id: req.params.id,
-			leadAddedBy: req.user._id
-		});
+		// Check if lead exists
+		const existingLead = await Lead.findById(req.params.id);
 
 		if (!existingLead) {
 			return res.status(404).json({
@@ -2371,11 +2380,33 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 			});
 		}
 
+		// Permission: Admin OR leadAddedBy OR leadOwner can update
+		const userId = String(req.user?._id || '');
+		const leadAddedById = existingLead.leadAddedBy ? String(existingLead.leadAddedBy) : '';
+		const leadOwnerId = existingLead.leadOwner ? String(existingLead.leadOwner) : '';
+		const canEdit = isAdminUser(req) || leadAddedById === userId || leadOwnerId === userId;
+
+		if (!canEdit) {
+			return res.status(403).json({
+				status: false,
+				message: 'You do not have permission to update this lead'
+			});
+		}
+
 		// Check if email already exists (excluding current lead)
-		if (email && email !== existingLead.email) {
+		const normalizedEmail = typeof email === "string" ? email.trim() : "";
+		if (normalizedEmail && normalizedEmail !== (existingLead.email || "")) {
+			const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+			if (!emailRegex.test(normalizedEmail)) {
+				return res.status(400).json({
+					status: false,
+					message: "Please enter a valid email address"
+				});
+			}
+
 			const emailExists = await Lead.findOne({
-				email,
-				leadAddedBy: req.user._id,
+				email: normalizedEmail,
+				leadAddedBy: existingLead.leadAddedBy,
 				_id: { $ne: req.params.id }
 			});
 
@@ -2398,12 +2429,11 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 				coordinates,
 				concernPersonName,
 				designation,
-				email,
+				email: normalizedEmail || undefined,
 				mobile,
 				whatsapp,
 				leadOwner,
 				landlineNumber,
-				leadAddedBy: user._id
 			},
 			{ new: true, runValidators: true }
 		).populate([
@@ -2430,17 +2460,29 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 // Delete lead
 router.delete('/leads/:id', isCollege, async (req, res) => {
 	try {
-		const deletedLead = await Lead.findOneAndDelete({
-			_id: req.params.id,
-			leadAddedBy: req.user._id
-		});
+		const isAdminUser = (req) => req.user?.permissions?.permission_type === 'Admin';
+		const lead = await Lead.findById(req.params.id);
 
-		if (!deletedLead) {
+		if (!lead) {
 			return res.status(404).json({
 				status: false,
 				message: 'Lead not found'
 			});
 		}
+
+		// Permission: Admin OR leadAddedBy OR leadOwner can delete
+		const userId = String(req.user?._id || '');
+		const leadAddedById = lead.leadAddedBy ? String(lead.leadAddedBy) : '';
+		const leadOwnerId = lead.leadOwner ? String(lead.leadOwner) : '';
+		const canDelete = isAdminUser(req) || leadAddedById === userId || leadOwnerId === userId;
+		if (!canDelete) {
+			return res.status(403).json({
+				status: false,
+				message: 'You do not have permission to delete this lead'
+			});
+		}
+
+		await Lead.deleteOne({ _id: req.params.id });
 
 		// Also delete associated follow-ups
 		await FollowUp.deleteMany({ leadId: req.params.id });
