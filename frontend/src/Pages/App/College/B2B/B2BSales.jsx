@@ -253,58 +253,58 @@ const MultiSelectCheckbox = ({
         </button>
 
         <div className={`multi-select-options-new ${isOpen ? 'open' : ''} ${placement === 'up' ? 'up' : ''}`}>
-            {/* Search functionality (optional) */}
-            <div className="options-search">
-              <div className="input-group input-group-sm">
-                <span className="input-group-text" style={{ height: '40px' }}>
-                  <i className="fas fa-search"></i>
-                </span>
+          {/* Search functionality (optional) */}
+          <div className="options-search">
+            <div className="input-group input-group-sm">
+              <span className="input-group-text" style={{ height: '40px' }}>
+                <i className="fas fa-search"></i>
+              </span>
+              <input
+                type="text"
+                className="form-control"
+                placeholder={`Search ${title.toLowerCase()}...`}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          </div>
+
+          {/* Options List */}
+          <div className="options-list-new">
+            {filteredOptions.map((option) => (
+              <label key={option.value} className="option-item-new">
                 <input
-                  type="text"
-                  className="form-control"
-                  placeholder={`Search ${title.toLowerCase()}...`}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  type="checkbox"
+                  className="form-check-input me-2"
+                  checked={selectedValues.includes(option.value)}
+                  onChange={() => handleCheckboxChange(option.value)}
                   onClick={(e) => e.stopPropagation()}
                 />
-              </div>
-            </div>
+                <span className="option-label-new">{option.label}</span>
+                {selectedValues.includes(option.value) && (
+                  <i className="fas fa-check text-primary ms-auto"></i>
+                )}
+              </label>
+            ))}
 
-            {/* Options List */}
-            <div className="options-list-new">
-              {filteredOptions.map((option) => (
-                <label key={option.value} className="option-item-new">
-                  <input
-                    type="checkbox"
-                    className="form-check-input me-2"
-                    checked={selectedValues.includes(option.value)}
-                    onChange={() => handleCheckboxChange(option.value)}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                  <span className="option-label-new">{option.label}</span>
-                  {selectedValues.includes(option.value) && (
-                    <i className="fas fa-check text-primary ms-auto"></i>
-                  )}
-                </label>
-              ))}
-
-              {filteredOptions.length === 0 && (
-                <div className="no-options">
-                  <i className="fas fa-info-circle me-2"></i>
-                  No results
-                </div>
-              )}
-            </div>
-
-            {/* Footer with count */}
-            {selectedValues.length > 0 && (
-              <div className="options-footer">
-                <small className="text-muted">
-                  {selectedValues.length} of {(options || []).length} selected
-                </small>
+            {filteredOptions.length === 0 && (
+              <div className="no-options">
+                <i className="fas fa-info-circle me-2"></i>
+                No results
               </div>
             )}
           </div>
+
+          {/* Footer with count */}
+          {selectedValues.length > 0 && (
+            <div className="options-footer">
+              <small className="text-muted">
+                {selectedValues.length} of {(options || []).length} selected
+              </small>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -706,6 +706,7 @@ const B2BSales = () => {
     mobile: '',
     whatsapp: '',
     leadOwner: '',
+    leadStatus: '',
     remark: ''
   });
 
@@ -2046,6 +2047,9 @@ const B2BSales = () => {
         leadOwner: leadFormData.leadOwner,
         remark: leadFormData.remark
       };
+      if (leadFormData.leadStatus) {
+        leadData.status = leadFormData.leadStatus;
+      }
       // Add coordinates if location is selected
       if (selectedLocation) {
         leadData.coordinates = {
@@ -2092,6 +2096,7 @@ const B2BSales = () => {
           whatsapp: '',
           landlineNumber: '',
           leadOwner: '',
+          leadStatus: '',
           remark: ''
         });
         setFormErrors({});
@@ -2135,6 +2140,7 @@ const B2BSales = () => {
       whatsapp: '',
       landlineNumber: '',
       leadOwner: '',
+      leadStatus: '',
       remark: ''
     });
     setFormErrors({});
@@ -2163,6 +2169,7 @@ const B2BSales = () => {
       whatsapp: '',
       landlineNumber: '',
       leadOwner: uid,
+      leadStatus: '',
       remark: ''
     });
     setFormErrors({});
@@ -2175,10 +2182,10 @@ const B2BSales = () => {
   // Bulk Upload Functions (Excel only — same columns as backend import)
   const downloadB2bLeadsSampleExcel = () => {
     const rows = [
-      ['Business Name', 'Concern Person Name', 'Mobile', 'Email', 'Lead Source', 'Type of B2B', 'Address', 'City', 'State', 'Designation', 'WhatsApp', 'Landline Number', 'Lead Owner', 'Remark'],
-      ['ABC Company', 'John Doe', '9876543210', 'john@abc.com', 'Corporate', 'Partner', '123 Main Street', 'Mumbai', 'Maharashtra', 'Manager', '9876543210', '0221234567', 'Owner Name', 'Sample remark'],
-      ['XYZ Corp', 'Jane Smith', '9876543211', 'jane@xyz.com', 'Individual', 'Client', '456 Park Avenue', 'Delhi', 'Delhi', 'Director', '9876543211', '0111234567', 'Owner Name', 'Another remark'],
-      ['Tech Solutions', 'Raj Kumar', '9876543212', 'raj@tech.com', 'Corporate', 'Partner', '789 Tech Park', 'Bangalore', 'Karnataka', 'CEO', '9876543212', '0801234567', 'Owner Name', 'Technology company']
+      ['Business Name', 'Concern Person Name', 'Mobile', 'Email', 'Lead Source', 'Type of B2B', 'Lead Status', 'Address', 'City', 'State', 'Designation', 'WhatsApp', 'Landline Number', 'Lead Owner', 'Remark'],
+      ['ABC Company', 'John Doe', '9876543210', 'john@abc.com', 'Corporate', 'Partner', 'PROSPECT', '123 Main Street', 'Mumbai', 'Maharashtra', 'Manager', '9876543210', '0221234567', 'Owner Name', 'Sample remark'],
+      ['XYZ Corp', 'Jane Smith', '9876543211', 'jane@xyz.com', 'Individual', 'Client', '', '456 Park Avenue', 'Delhi', 'Delhi', 'Director', '9876543211', '0111234567', 'Owner Name', 'Another remark'],
+      ['Tech Solutions', 'Raj Kumar', '9876543212', 'raj@tech.com', 'Corporate', 'Partner', 'Untouch Leads', '789 Tech Park', 'Bangalore', 'Karnataka', 'CEO', '9876543212', '0801234567', 'Owner Name', 'Technology company']
     ];
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -2930,8 +2937,8 @@ const B2BSales = () => {
                       })
                     )
                     .map((status) => (
-                    <option key={status._id} value={status._id}>{status.name}</option>
-                  ))}
+                      <option key={status._id} value={status._id}>{status.name}</option>
+                    ))}
                 </select>
               </div>
 
@@ -4297,30 +4304,31 @@ const B2BSales = () => {
                         ].map((row) => {
                           const isSelected = (selectedApprovalStatus || null) === row.approval;
                           return (
-                          <div
-                            key={row.key}
-                            role="button"
-                            tabIndex={0}
-                            className="b2b-dash-stat-card b2b-dash-stat-card--lead text-center text-white"
-                            style={{
-                              background: row.bg,
-                              cursor: 'pointer',
-                              outline: isSelected ? '3px solid rgba(255,255,255,0.55)' : 'none',
-                              transform: isSelected ? 'translateY(-1px)' : 'none',
-                              opacity: approvalCountsLoading ? 0.7 : 1
-                            }}
-                            onClick={() => handleApprovalCardClick(row.approval)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') handleApprovalCardClick(row.approval);
-                            }}
-                          >
-                            <div className="b2b-dash-stat-card__label">{row.label}</div>
-                            <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
-                            <div className="b2b-dash-stat-card__value text-white">
-                              {String(row.value).padStart(2, '0')}
+                            <div
+                              key={row.key}
+                              role="button"
+                              tabIndex={0}
+                              className="b2b-dash-stat-card b2b-dash-stat-card--lead text-center text-white"
+                              style={{
+                                background: row.bg,
+                                cursor: 'pointer',
+                                outline: isSelected ? '3px solid rgba(255,255,255,0.55)' : 'none',
+                                transform: isSelected ? 'translateY(-1px)' : 'none',
+                                opacity: approvalCountsLoading ? 0.7 : 1
+                              }}
+                              onClick={() => handleApprovalCardClick(row.approval)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') handleApprovalCardClick(row.approval);
+                              }}
+                            >
+                              <div className="b2b-dash-stat-card__label">{row.label}</div>
+                              <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                              <div className="b2b-dash-stat-card__value text-white">
+                                {String(row.value).padStart(2, '0')}
+                              </div>
                             </div>
-                          </div>
-                        )})}
+                          )
+                        })}
                       </div>
                     </div>
 
@@ -4749,14 +4757,14 @@ const B2BSales = () => {
                                 )} */}
 
                                 <div className="lhm__pills">
-                                <button
+                                  <button
                                     type="button"
                                     className="lead-meta-v2__pill"
                                     onClick={() => openRefferPanel(lead, 'Reffer')}
                                     title="Refer"
                                   >
                                     <i className="fas fa-share-alt" aria-hidden="true"></i>
-                                    
+
                                   </button>
                                   <button
                                     type="button"
@@ -5138,7 +5146,7 @@ const B2BSales = () => {
                                     title="Refer"
                                   >
                                     <i className="fas fa-share-alt" aria-hidden="true"></i>
-                                    
+
                                   </button>
                                   <button
                                     type="button"
@@ -5147,7 +5155,7 @@ const B2BSales = () => {
                                     title="Add Lead Report"
                                   >
                                     <i className="fas fa-plus" aria-hidden="true"></i>
-                                    
+
                                   </button>
                                   <button
                                     type="button"
@@ -5156,12 +5164,13 @@ const B2BSales = () => {
                                     title="View lead Report"
                                   >
                                     <i className="fas fa-eye" aria-hidden="true"></i>
-                                    
+
                                   </button>
                                 </div>
 
                                 {/* Performance block — label paired with each input */}
-                                <div className="lead-header-v2__perf-block" style={{width:'20%'
+                                <div className="lead-header-v2__perf-block" style={{
+                                  width: '20%'
                                 }}>
                                   <span className="lead-header-v2__perf-title">Performance</span>
                                   <button
@@ -5190,7 +5199,7 @@ const B2BSales = () => {
                                       className="form-control form-control-sm m-0 lead-header-v2__perf-input"
                                       value={getLeadSubStatusTitle(lead) || 'Untouch Lead'}
                                       readOnly
-                                      style={{fontSize:'8px'}}
+                                      style={{ fontSize: '8px' }}
                                     />
                                   </div>
                                   {/* mobile expand/options — keep hidden on desktop */}
@@ -5335,7 +5344,7 @@ const B2BSales = () => {
                                       </div>
                                       <div className="ActionsDates">
                                         <span></span> <span></span>
-                                      </div>  
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
@@ -6404,6 +6413,35 @@ const B2BSales = () => {
                       </select>
                     </div>
 
+                    {/* Status */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-chart-line text-primary me-1"></i>
+                        Lead Status
+                      </label>
+                      <select
+                        className="form-select"
+                        name="leadStatus"
+                        value={leadFormData.leadStatus}
+                        onChange={handleLeadInputChange}
+                      >
+                        <option value="">Select Lead Status </option>
+                        {[...(statuses || [])]
+                          .sort((a, b) =>
+                            String(a?.name || a?.title || '').localeCompare(
+                              String(b?.name || b?.title || ''),
+                              undefined,
+                              { sensitivity: 'base', numeric: true }
+                            )
+                          )
+                          .map((status) => (
+                            <option key={status._id} value={status._id}>
+                              {status.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
                     {/* Remark */}
                     <div className="col-12">
                       <div className="d-flex align-items-center justify-content-between">
@@ -6508,6 +6546,7 @@ const B2BSales = () => {
                     <li>Upload an Excel file only (.xlsx or .xls)</li>
                     <li>Maximum file size: 10MB</li>
                     <li><strong>Required fields:</strong> Business Name, Concern Person Name, Mobile, Lead Source, Type of B2B</li>
+                    <li><strong>Optional:</strong> Lead Status — use the exact status title as in Performance (e.g. PROSPECT, HOT), or a valid status ID. Leave blank to use the default pipeline status (same as bulk import default).</li>
 
                   </ul>
                 </div>

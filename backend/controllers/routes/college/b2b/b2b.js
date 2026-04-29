@@ -1836,7 +1836,9 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			whatsapp,
 			leadOwner,
 			remark,
-			landlineNumber
+			landlineNumber,
+			status: requestedPipelineStatus,
+			subStatus: requestedPipelineSubStatus,
 		} = req.body;
 
 		const missingFields = [];
@@ -1909,8 +1911,8 @@ router.post('/add-lead', isCollege, async (req, res) => {
 
 		let defaultStatusId = null;
 		let defaultSubStatusId = null;
-		
-		if (college) {
+
+		if (!resolvedStatusId && college) {
 			const untouchStatus = await StatusB2b.findOne({
 				college: college._id,
 				title: { $regex: /^Untouch Leads$/i }
@@ -1933,7 +1935,10 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			}
 		}
 
-		// Create new lead with default status "Untouch Leads"
+		const finalStatusId = resolvedStatusId || defaultStatusId;
+		const finalSubStatusId = resolvedSubStatusId || defaultSubStatusId;
+
+	
 		const leadData = {
 			leadCategory,
 			typeOfB2B,
@@ -1953,11 +1958,10 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			approval: { status: 'PENDING' }
 		};
 
-		// Set default status to "Untouch Leads" if found
-		if (defaultStatusId) {
-			leadData.status = defaultStatusId;
-			if (defaultSubStatusId) {
-				leadData.subStatus = defaultSubStatusId;
+		if (finalStatusId) {
+			leadData.status = finalStatusId;
+			if (finalSubStatusId) {
+				leadData.subStatus = finalSubStatusId;
 			}
 		}
 
@@ -1973,7 +1977,11 @@ router.post('/add-lead', isCollege, async (req, res) => {
 		let savedLead = await newLead.save();
 
 		if (savedLead) {
-			const statusMessage = defaultStatusId ? 'Untouch Leads' : 'default status';
+			let statusMessage = 'default status';
+			if (finalStatusId) {
+				const sd = await StatusB2b.findById(finalStatusId).select('title');
+				statusMessage = sd?.title || 'pipeline status';
+			}
 			savedLead.logs.push({
 				user: req.user._id,
 				timestamp: new Date(),
@@ -2966,6 +2974,56 @@ router.post('/leads/import', isCollege, async (req, res) => {
 			}
 		}
 
+		const collegeIdForPipeline = req.user?.college?._id;
+		const pipelineStatusScope = collegeIdForPipeline
+			? {
+					$or: [
+						{ college: collegeIdForPipeline },
+						{ college: null },
+						{ college: { $exists: false } },
+					],
+			  }
+			: {
+					$or: [{ college: null }, { college: { $exists: false } }],
+			  };
+
+		const resolveBulkPipelineStatus = async (cellValue) => {
+			const raw = cellValue != null ? String(cellValue).trim() : '';
+			if (!raw) return { statusId: null, subStatusId: null };
+
+			const titleMatch = (lowerTitle) => ({
+				$expr: {
+					$eq: [
+						{ $toLower: { $trim: { input: '$title' } } },
+						lowerTitle,
+					],
+				},
+			});
+
+			if (mongoose.Types.ObjectId.isValid(raw)) {
+				const byId = await StatusB2b.findOne({
+					$and: [{ _id: raw }, pipelineStatusScope],
+				});
+				if (byId) {
+					const subId =
+						byId.substatuses?.length > 0 ? byId.substatuses[0]._id : null;
+					return { statusId: byId._id, subStatusId: subId };
+				}
+			}
+
+			const norm = raw.toLowerCase();
+			const byTitle = await StatusB2b.findOne({
+				$and: [titleMatch(norm), pipelineStatusScope],
+			});
+			if (byTitle) {
+				const subId =
+					byTitle.substatuses?.length > 0 ? byTitle.substatuses[0]._id : null;
+				return { statusId: byTitle._id, subStatusId: subId };
+			}
+
+			return { notFound: raw };
+		};
+
 		// Debug: Log request details
 		// console.log('Import request received');
 		// console.log('req.file:', req.file);
@@ -3028,6 +3086,12 @@ router.post('/leads/import', isCollege, async (req, res) => {
 			'whatsapp': 'whatsapp',
 			'landlinenumber': 'landlineNumber',
 			'leadowner': 'leadOwner',
+			'leadstatus': 'leadStatus',
+			'performance': 'leadStatus',
+			'performancestatus': 'leadStatus',
+			'pipelinestatus': 'leadStatus',
+			'b2bstatus': 'leadStatus',
+			'status': 'leadStatus',
 			'remark': 'remark',
 			'latitude': 'latitude',
 			'longitude': 'longitude',
@@ -3253,6 +3317,25 @@ router.post('/leads/import', isCollege, async (req, res) => {
 					continue;
 				}
 
+				let rowPipelineStatusId = null;
+				let rowPipelineSubStatusId = null;
+				if (row.leadStatus != null && String(row.leadStatus).trim() !== '') {
+					const resolved = await resolveBulkPipelineStatus(row.leadStatus);
+					if (resolved.notFound != null) {
+						const avail = await StatusB2b.find(pipelineStatusScope)
+							.select('title')
+							.sort({ index: 1 })
+							.limit(40);
+						const names = avail.map((s) => s.title).filter(Boolean).join(', ');
+						errors.push(
+							`Row ${i + 2}: Lead Status "${resolved.notFound}" not found. Available: ${names || 'None'}`
+						);
+						continue;
+					}
+					rowPipelineStatusId = resolved.statusId;
+					rowPipelineSubStatusId = resolved.subStatusId;
+				}
+
 				// Create lead object
 				const leadData = {
 					leadCategory: leadCategory._id,
@@ -3271,8 +3354,12 @@ router.post('/leads/import', isCollege, async (req, res) => {
 					leadAddedBy: req.user._id
 				};
 
-				// Set default status to "Untouch Leads" if found
-				if (defaultStatusId) {
+				if (rowPipelineStatusId) {
+					leadData.status = rowPipelineStatusId;
+					if (rowPipelineSubStatusId) {
+						leadData.subStatus = rowPipelineSubStatusId;
+					}
+				} else if (defaultStatusId) {
 					leadData.status = defaultStatusId;
 					if (defaultSubStatusId) {
 						leadData.subStatus = defaultSubStatusId;
