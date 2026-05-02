@@ -1840,7 +1840,7 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			status: requestedPipelineStatus,
 			subStatus: requestedPipelineSubStatus,
 		} = req.body;
-
+// console.log(req.body);
 		const missingFields = [];
 		if (!leadCategory) missingFields.push("leadCategory");
 		if (!typeOfB2B) missingFields.push("typeOfB2B");
@@ -1901,6 +1901,58 @@ router.post('/add-lead', isCollege, async (req, res) => {
 				leadOwnerId = owner._id;
 			}
 			// If owner not found, leadOwnerId remains null (optional field)
+		}
+
+		const collegeIdForPipeline = req.user?.college?._id;
+		const pipelineStatusScope = collegeIdForPipeline
+			? {
+					$or: [
+						{ college: collegeIdForPipeline },
+						{ college: null },
+						{ college: { $exists: false } },
+					],
+			  }
+			: {
+					$or: [{ college: null }, { college: { $exists: false } }],
+			  };
+
+		const titleMatchExpr = (lowerTitle) => ({
+			$expr: {
+				$eq: [{ $toLower: { $trim: { input: '$title' } } }, lowerTitle],
+			},
+		});
+
+		let resolvedStatusId = null;
+		let resolvedSubStatusId = null;
+
+		const rawStatus = requestedPipelineStatus != null ? String(requestedPipelineStatus).trim() : '';
+		if (rawStatus) {
+			let statusDoc = null;
+			if (mongoose.Types.ObjectId.isValid(rawStatus)) {
+				statusDoc = await StatusB2b.findOne({
+					$and: [{ _id: rawStatus }, pipelineStatusScope],
+				});
+			}
+			if (!statusDoc) {
+				const norm = rawStatus.toLowerCase();
+				statusDoc = await StatusB2b.findOne({
+					$and: [titleMatchExpr(norm), pipelineStatusScope],
+				});
+			}
+			if (statusDoc) {
+				resolvedStatusId = statusDoc._id;
+				const subs = statusDoc.substatuses || [];
+				const rawSub = requestedPipelineSubStatus != null ? String(requestedPipelineSubStatus).trim() : '';
+				if (rawSub && mongoose.Types.ObjectId.isValid(rawSub)) {
+					const matchSub = subs.find((s) => String(s._id) === rawSub);
+					if (matchSub) {
+						resolvedSubStatusId = matchSub._id;
+					}
+				}
+				if (!resolvedSubStatusId && subs.length > 0) {
+					resolvedSubStatusId = subs[0]._id;
+				}
+			}
 		}
 
 		// Find "Untouch Leads" status as default status
@@ -3092,6 +3144,11 @@ router.post('/leads/import', isCollege, async (req, res) => {
 			'pipelinestatus': 'leadStatus',
 			'b2bstatus': 'leadStatus',
 			'status': 'leadStatus',
+			'pipelinesubstatus': 'pipelineSubStatus',
+			'substatus': 'pipelineSubStatus',
+			'leadsubstatus': 'pipelineSubStatus',
+			'b2bsubstatus': 'pipelineSubStatus',
+			'substatusname': 'pipelineSubStatus',
 			'remark': 'remark',
 			'latitude': 'latitude',
 			'longitude': 'longitude',
@@ -3336,6 +3393,38 @@ router.post('/leads/import', isCollege, async (req, res) => {
 					rowPipelineSubStatusId = resolved.subStatusId;
 				}
 
+				const rawPipelineSub =
+					row.pipelineSubStatus != null && String(row.pipelineSubStatus).trim() !== ''
+						? String(row.pipelineSubStatus).trim()
+						: '';
+				if (rawPipelineSub) {
+					const parentId = rowPipelineStatusId || defaultStatusId;
+					if (!parentId) {
+						errors.push(
+							`Row ${i + 2}: Sub Status "${rawPipelineSub}" cannot be used without a resolvable pipeline status (set Lead Status or rely on import default).`
+						);
+						continue;
+					}
+					const stDoc = await StatusB2b.findById(parentId).select('substatuses');
+					const subs = stDoc?.substatuses || [];
+					let matchedSub = null;
+					if (mongoose.Types.ObjectId.isValid(rawPipelineSub)) {
+						matchedSub = subs.find((s) => String(s._id) === rawPipelineSub);
+					}
+					if (!matchedSub) {
+						const norm = rawPipelineSub.toLowerCase();
+						matchedSub = subs.find((s) => (s.title || '').trim().toLowerCase() === norm);
+					}
+					if (!matchedSub) {
+						const titles = subs.map((s) => s.title).filter(Boolean).join(', ');
+						errors.push(
+							`Row ${i + 2}: Sub Status "${rawPipelineSub}" not found for this pipeline status. Available: ${titles || 'None'}`
+						);
+						continue;
+					}
+					rowPipelineSubStatusId = matchedSub._id;
+				}
+
 				// Create lead object
 				const leadData = {
 					leadCategory: leadCategory._id,
@@ -3361,7 +3450,9 @@ router.post('/leads/import', isCollege, async (req, res) => {
 					}
 				} else if (defaultStatusId) {
 					leadData.status = defaultStatusId;
-					if (defaultSubStatusId) {
+					if (rowPipelineSubStatusId) {
+						leadData.subStatus = rowPipelineSubStatusId;
+					} else if (defaultSubStatusId) {
 						leadData.subStatus = defaultSubStatusId;
 					}
 				}

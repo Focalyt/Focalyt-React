@@ -707,6 +707,7 @@ const B2BSales = () => {
     whatsapp: '',
     leadOwner: '',
     leadStatus: '',
+    leadSubStatus: '',
     remark: ''
   });
 
@@ -742,6 +743,10 @@ const B2BSales = () => {
   // B2B Dropdown Options
   const [leadCategoryOptions, setLeadCategoryOptions] = useState([]);
   const [typeOfB2BOptions, setTypeOfB2BOptions] = useState([]);
+
+  /** Sub-statuses for the Add Lead modal (loaded from `/statusB2b/:id/substatus`) */
+  const [addLeadSubStatuses, setAddLeadSubStatuses] = useState([]);
+  const [addLeadSubStatusesLoading, setAddLeadSubStatusesLoading] = useState(false);
 
   // Google Maps API
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -1271,10 +1276,18 @@ const B2BSales = () => {
   const handleLeadInputChange = (e) => {
     const { name, value } = e.target;
 
-    setLeadFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    if (name === 'leadStatus') {
+      setLeadFormData(prev => ({
+        ...prev,
+        leadStatus: value,
+        leadSubStatus: ''
+      }));
+    } else {
+      setLeadFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
 
     // Clear error for this field
     if (formErrors[name]) {
@@ -2050,6 +2063,9 @@ const B2BSales = () => {
       if (leadFormData.leadStatus) {
         leadData.status = leadFormData.leadStatus;
       }
+      if (leadFormData.leadSubStatus) {
+        leadData.subStatus = leadFormData.leadSubStatus;
+      }
       // Add coordinates if location is selected
       if (selectedLocation) {
         leadData.coordinates = {
@@ -2097,12 +2113,14 @@ const B2BSales = () => {
           landlineNumber: '',
           leadOwner: '',
           leadStatus: '',
+          leadSubStatus: '',
           remark: ''
         });
         setFormErrors({});
         setExtractedNumbers([]);
         setSelectedLocation(null);
         setShowMap(false);
+        setAddLeadSubStatuses([]);
 
         // Close modal
         setShowAddLeadModal(false);
@@ -2141,12 +2159,14 @@ const B2BSales = () => {
       landlineNumber: '',
       leadOwner: '',
       leadStatus: '',
+      leadSubStatus: '',
       remark: ''
     });
     setFormErrors({});
     setExtractedNumbers([]);
     setSelectedLocation(null);
     setShowMap(false);
+    setAddLeadSubStatuses([]);
   };
 
   // Open lead modal and initialize autocomplete
@@ -2170,22 +2190,60 @@ const B2BSales = () => {
       landlineNumber: '',
       leadOwner: uid,
       leadStatus: '',
+      leadSubStatus: '',
       remark: ''
     });
     setFormErrors({});
     setExtractedNumbers([]);
     setSelectedLocation(null);
     setShowMap(false);
+    setAddLeadSubStatuses([]);
     setShowAddLeadModal(true);
   };
+
+  useEffect(() => {
+    if (!showAddLeadModal || !leadFormData.leadStatus) {
+      if (!leadFormData.leadStatus) {
+        setAddLeadSubStatuses([]);
+        setAddLeadSubStatusesLoading(false);
+      }
+      return;
+    }
+    let cancelled = false;
+    setAddLeadSubStatusesLoading(true);
+    axios
+      .get(`${backendUrl}/college/statusB2b/${leadFormData.leadStatus}/substatus`, {
+        headers: { 'x-auth': token }
+      })
+      .then((response) => {
+        if (cancelled) return;
+        if (response.data.success) {
+          setAddLeadSubStatuses(Array.isArray(response.data.data) ? response.data.data : []);
+        } else {
+          setAddLeadSubStatuses([]);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          console.error('Add lead: failed to load sub-statuses', err);
+          setAddLeadSubStatuses([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAddLeadSubStatusesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showAddLeadModal, leadFormData.leadStatus, backendUrl, token]);
 
   // Bulk Upload Functions (Excel only — same columns as backend import)
   const downloadB2bLeadsSampleExcel = () => {
     const rows = [
-      ['Business Name', 'Concern Person Name', 'Mobile', 'Email', 'Lead Source', 'Type of B2B', 'Lead Status', 'Address', 'City', 'State', 'Designation', 'WhatsApp', 'Landline Number', 'Lead Owner', 'Remark'],
-      ['ABC Company', 'John Doe', '9876543210', 'john@abc.com', 'Corporate', 'Partner', 'PROSPECT', '123 Main Street', 'Mumbai', 'Maharashtra', 'Manager', '9876543210', '0221234567', 'Owner Name', 'Sample remark'],
-      ['XYZ Corp', 'Jane Smith', '9876543211', 'jane@xyz.com', 'Individual', 'Client', '', '456 Park Avenue', 'Delhi', 'Delhi', 'Director', '9876543211', '0111234567', 'Owner Name', 'Another remark'],
-      ['Tech Solutions', 'Raj Kumar', '9876543212', 'raj@tech.com', 'Corporate', 'Partner', 'Untouch Leads', '789 Tech Park', 'Bangalore', 'Karnataka', 'CEO', '9876543212', '0801234567', 'Owner Name', 'Technology company']
+      ['Business Name', 'Concern Person Name', 'Mobile', 'Email', 'Lead Source', 'Type of B2B', 'Lead Status', 'Sub Status', 'Address', 'City', 'State', 'Designation', 'WhatsApp', 'Landline Number', 'Lead Owner', 'Remark'],
+      ['ABC Company', 'John Doe', '9876543210', 'john@abc.com', 'Corporate', 'Partner', 'PROSPECT', '', '123 Main Street', 'Mumbai', 'Maharashtra', 'Manager', '9876543210', '0221234567', 'Owner Name', 'Sample remark'],
+      ['XYZ Corp', 'Jane Smith', '9876543211', 'jane@xyz.com', 'Individual', 'Client', '', '', '456 Park Avenue', 'Delhi', 'Delhi', 'Director', '9876543211', '0111234567', 'Owner Name', 'Another remark'],
+      ['Tech Solutions', 'Raj Kumar', '9876543212', 'raj@tech.com', 'Corporate', 'Partner', 'Untouch Leads', '', '789 Tech Park', 'Bangalore', 'Karnataka', 'CEO', '9876543212', '0801234567', 'Owner Name', 'Technology company']
     ];
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -2276,7 +2334,7 @@ const B2BSales = () => {
           // Don't set Content-Type - axios will automatically set it with boundary for FormData
         }
       });
-
+console.log("response" , response)
       if (response.data.status) {
         setBulkUploadSuccess(true);
         const successCount = response.data.data?.inserted || 0;
@@ -6442,6 +6500,37 @@ const B2BSales = () => {
                       </select>
                     </div>
 
+                    {/* Sub Status (options from API for selected Lead Status) */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-layer-group text-primary me-1"></i>
+                        Sub Status
+                      </label>
+                      <select
+                        className="form-select"
+                        name="leadSubStatus"
+                        value={leadFormData.leadSubStatus}
+                        onChange={handleLeadInputChange}
+                        disabled={!leadFormData.leadStatus || addLeadSubStatusesLoading}
+                      >
+                        <option value="">
+                          {addLeadSubStatusesLoading
+                            ? 'Loading sub-statuses...'
+                            : !leadFormData.leadStatus
+                              ? 'Select lead status first'
+                              : 'Select sub-status'}
+                        </option>
+                        {addLeadSubStatuses.map((ss) => (
+                          <option key={ss._id} value={ss._id}>
+                            {ss.title}
+                          </option>
+                        ))}
+                      </select>
+                      {leadFormData.leadStatus && !addLeadSubStatusesLoading && addLeadSubStatuses.length === 0 && (
+                        <div className="form-text text-muted small">No sub-statuses configured for this status.</div>
+                      )}
+                    </div>
+
                     {/* Remark */}
                     <div className="col-12">
                       <div className="d-flex align-items-center justify-content-between">
@@ -6546,7 +6635,8 @@ const B2BSales = () => {
                     <li>Upload an Excel file only (.xlsx or .xls)</li>
                     <li>Maximum file size: 10MB</li>
                     <li><strong>Required fields:</strong> Business Name, Concern Person Name, Mobile, Lead Source, Type of B2B</li>
-                    <li><strong>Optional:</strong> Lead Status — use the exact status title as in Performance (e.g. PROSPECT, HOT), or a valid status ID. Leave blank to use the default pipeline status (same as bulk import default).</li>
+                    <li><strong>Lead Status:</strong> Use the exact status title as in Performance (e.g. PROSPECT, HOT), or a valid status ID. If the column is empty, the default pipeline status is used (same as bulk import default).</li>
+                    <li><strong>Sub Status:</strong> Use the exact sub-status title for that pipeline status, or a valid sub-status ID. If the column is empty, the first sub-status for the resolved Lead Status (or default pipeline) is used.</li>
 
                   </ul>
                 </div>
