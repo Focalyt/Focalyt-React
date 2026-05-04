@@ -27,8 +27,8 @@ const missedFollowupSchedular = require("./schedular/missedFollowupSchedular");
 missedFollowupSchedular();
 const dataBaseBackup = require("./schedular/dataBaseBackup");
 dataBaseBackup();
-const counselorPerformanceEmailScheduler = require("./schedular/counselorPerformanceEmailScheduler");
-counselorPerformanceEmailScheduler();
+// const counselorPerformanceEmailScheduler = require("./schedular/counselorPerformanceEmailScheduler");
+// counselorPerformanceEmailScheduler();
 //upload('
 NODE_TLS_REJECT_UNAUTHORIZED = "0";
 const {
