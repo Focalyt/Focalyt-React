@@ -1,0 +1,16 @@
+export const college = {
+  pageBg: '#f5f5f5',
+  cardBg: '#ffffff',
+  primary: '#7a29c9',
+  primaryPressed: '#6a1ca9',
+  text: '#333333',
+  textMuted: '#666666',
+  icon: '#999999',
+  border: '#dddddd',
+  tabBorder: '#eeeeee',
+  error: '#f44336',
+  success: '#4caf50',
+  modalBtn: '#ff4081',
+  modalBtnPressed: '#e91e63',
+  inputDisabledBg: '#f9f9f9',
+} as const;

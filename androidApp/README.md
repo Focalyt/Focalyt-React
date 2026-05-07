@@ -1,158 +1,97 @@
-# Focalyt Portal
+This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
 
-A React Native app with OTP-based authentication and location tracking features.
+# Getting Started
 
-## Features
+> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
 
-### 🔐 OTP-Based Login System
-- **Phone Number Validation**: Validates Indian phone numbers (10 digits starting with 6-9)
-- **OTP Generation**: Automatically generates 4-digit OTP codes
-- **Resend Functionality**: 30-second cooldown timer for resending OTP
-- **Auto-focus OTP Inputs**: Seamless navigation between OTP input fields
-- **Session Management**: Persistent login state using AsyncStorage
+## Step 1: Start Metro
 
-### 📍 Location Tracking
-- Real-time location tracking with Expo Location
-- Background location monitoring
-- Location permission handling
-- Location history and timeline
+First, you will need to run **Metro**, the JavaScript build tool for React Native.
 
-### 🌐 Connectivity Monitoring
-- Internet connectivity status tracking
-- Connection type detection (WiFi, Cellular, etc.)
-- Connectivity history and statistics
+To start the Metro dev server, run the following command from the root of your React Native project:
 
-## Getting Started
+```sh
+# Using npm
+npm start
 
-### Prerequisites
-- Node.js (v14 or higher)
-- Expo CLI
-- React Native development environment
-
-### Installation
-
-1. **Install dependencies:**
-   ```bash
-   cd FocalytPortal
-   npm install
-   ```
-
-2. **Start the development server:**
-   ```bash
-   npm start
-   ```
-
-3. **Run on device/simulator:**
-   ```bash
-   # For Android
-   npm run android
-   
-   # For iOS
-   npm run ios
-   
-   # For web
-   npm run web
-   ```
-
-## OTP Login Flow
-
-### Testing the OTP System
-
-1. **Enter Phone Number**: 
-   - Use any valid Indian phone number (10 digits starting with 6-9)
-   - Example: `9876543210`
-
-2. **Send OTP**:
-   - Click "Send OTP" button
-   - Wait for the 2-second simulation delay
-   - Check console logs for the generated OTP
-
-3. **Verify OTP**:
-   - Enter the 4-digit OTP shown in console
-   - Click "Verify OTP" to login
-
-4. **Resend OTP**:
-   - If you need a new OTP, click "Resend OTP"
-   - 30-second cooldown timer prevents spam
-
-### Features of the Login System
-
-- **Phone Number Formatting**: Automatically formats as XXX-XXX-XXXX
-- **Input Validation**: Ensures valid Indian phone number format
-- **Loading States**: Shows loading indicators during API calls
-- **Error Handling**: Displays appropriate error messages
-- **Session Persistence**: Remembers login state across app restarts
-- **Logout Functionality**: Clear session and return to login
-
-## App Structure
-
-```
-FocalytPortal/
-├── App.tsx                 # Main app with authentication logic
-├── components/
-│   ├── LoginPage.tsx      # OTP-based login component
-│   ├── LocationTrackerExpo.tsx  # Location tracking
-│   ├── TimelinePage.tsx   # Location timeline
-│   └── ConnectivityTracker.tsx  # Connectivity monitoring
-├── assets/                # App icons and images
-└── package.json          # Dependencies and scripts
+# OR using Yarn
+yarn start
 ```
 
-## Key Components
+## Step 2: Build and run your app
 
-### LoginPage.tsx
-- Handles phone number input and validation
-- Manages OTP generation and verification
-- Implements resend functionality with timer
-- Provides smooth UX with auto-focus and keyboard handling
+With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
 
-### App.tsx
-- Manages authentication state
-- Handles login/logout flow
-- Provides navigation between app sections
-- Implements session persistence
+### Android
 
-## Dependencies
+```sh
+# Using npm
+npm run android
 
-- **React Native**: Core framework
-- **Expo**: Development platform and tools
-- **AsyncStorage**: Local data persistence
-- **Expo Location**: Location services
-- **NetInfo**: Network connectivity monitoring
+# OR using Yarn
+yarn android
+```
 
-## Development Notes
+### iOS
 
-### OTP Testing
-- OTP codes are logged to console for testing
-- In production, integrate with SMS service (Twilio, AWS SNS, etc.)
-- Implement proper server-side OTP generation and verification
+For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
 
-### Security Considerations
-- Current implementation is for demo purposes
-- Add proper API integration for production
-- Implement rate limiting for OTP requests
-- Add proper error handling and validation
+The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
 
-### Future Enhancements
-- Biometric authentication
-- Social login integration
-- Push notifications
-- Offline mode support
-- Data encryption
+```sh
+bundle install
+```
 
-## Troubleshooting
+Then, and every time you update your native dependencies, run:
 
-### Common Issues
+```sh
+bundle exec pod install
+```
 
-1. **OTP not working**: Check console logs for generated OTP
-2. **Location not working**: Ensure location permissions are granted
-3. **Build errors**: Clear cache with `expo start -c`
+For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
 
-### Debug Mode
-- Enable debug logging in console
-- Check AsyncStorage for session data
-- Monitor network requests in development
+```sh
+# Using npm
+npm run ios
 
-## License
+# OR using Yarn
+yarn ios
+```
 
-This project is for educational and demonstration purposes. 
+If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+
+This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+
+## Step 3: Modify your app
+
+Now that you have successfully run the app, let's make changes!
+
+Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+
+When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+
+- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
+- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+
+## Congratulations! :tada:
+
+You've successfully run and modified your React Native App. :partying_face:
+
+### Now what?
+
+- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
+- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+
+# Troubleshooting
+
+If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+
+# Learn More
+
+To learn more about React Native, take a look at the following resources:
+
+- [React Native Website](https://reactnative.dev) - learn more about React Native.
+- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
+- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
+- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
+- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
