@@ -78,6 +78,7 @@ const botTrainingRoutes = require('./botTraining');
 const chatHistoryRoutes = require('./chatHistory');
 const referAmountRoutes = require('./referAmount');
 const referralTrackingRoutes = require('./referralTracking');
+const certificatesRoutes = require('./certificates');
 const router = express.Router();
 router.use('/appBanner', appBannerRoutes);
 router.use('/post', postRoutes);
@@ -135,6 +136,7 @@ router.use('/botTraining', botTrainingRoutes);
 router.use('/chatHistory', chatHistoryRoutes);
 router.use('/referAmount', referAmountRoutes);
 router.use('/referralTracking', referralTrackingRoutes);
+router.use('/certificates', certificatesRoutes);
 const backendUrl = process.env.MIPIE_BACKEND_URL;
 
 // router.use(isAdmin);
