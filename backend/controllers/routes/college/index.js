@@ -9380,9 +9380,9 @@ router.put("/upload_docs/:id", isCollege, async (req, res) => {
 			};
 
 			uploadPromises.push(
-				s3.upload(params).promise().then((uploadResult) => {
+				s3.upload(params).promise().then(() => {
 					uploadedFiles.push({
-						fileURL: uploadResult.Location,
+						fileURL: key,
 						fileType,
 					});
 				})
@@ -9392,7 +9392,7 @@ router.put("/upload_docs/:id", isCollege, async (req, res) => {
 		await Promise.all(uploadPromises);
 		const fileUrl = uploadedFiles[0].fileURL;
 
-		// Add document to uploadedDocs array
+		// Add document to uploadedDocs array (S3 key only, not full bucket URL)
 		appliedCourse.uploadedDocs.push({
 			docsId: new mongoose.Types.ObjectId(docsId),
 			fileUrl: fileUrl,

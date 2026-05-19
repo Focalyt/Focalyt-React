@@ -3287,12 +3287,73 @@ Return JSON in exactly this shape:
 						continue;
 					}
 
+<<<<<<< HEAD
 					// Check if email already exists (only if email is provided)
 					if (row.email) {
 						const existingLead = await Lead.findOne({
 							email: row.email,
 							leadAddedBy: req.user._id
 						});
+=======
+		let defaultLeadCategoryDoc = null;
+		let defaultTypeOfB2BDoc = null;
+		let modalStatusId = null;
+		let modalSubStatusId = null;
+
+		const bodyLeadCategory = req.body?.leadCategory ? String(req.body.leadCategory).trim() : '';
+		const bodyTypeOfB2B = req.body?.typeOfB2B ? String(req.body.typeOfB2B).trim() : '';
+		const bodyLeadStatus = req.body?.leadStatus ? String(req.body.leadStatus).trim() : '';
+		const bodyLeadSubStatus = req.body?.leadSubStatus ? String(req.body.leadSubStatus).trim() : '';
+
+		if (bodyLeadCategory && mongoose.Types.ObjectId.isValid(bodyLeadCategory)) {
+			defaultLeadCategoryDoc = await LeadCategory.findById(bodyLeadCategory);
+		}
+		if (bodyTypeOfB2B && mongoose.Types.ObjectId.isValid(bodyTypeOfB2B)) {
+			defaultTypeOfB2BDoc = await TypeOfB2B.findById(bodyTypeOfB2B);
+		}
+		if (bodyLeadStatus) {
+			const resolvedModal = await resolveBulkPipelineStatus(bodyLeadStatus);
+			if (resolvedModal.statusId) {
+				modalStatusId = resolvedModal.statusId;
+				modalSubStatusId = resolvedModal.subStatusId;
+			}
+		}
+		if (bodyLeadSubStatus && mongoose.Types.ObjectId.isValid(bodyLeadSubStatus) && modalStatusId) {
+			const stDoc = await StatusB2b.findById(modalStatusId).select('substatuses');
+			const matched = (stDoc?.substatuses || []).find((s) => String(s._id) === bodyLeadSubStatus);
+			if (matched) modalSubStatusId = matched._id;
+		}
+
+		if (!defaultLeadCategoryDoc || !defaultTypeOfB2BDoc) {
+			return res.status(400).json({
+				status: false,
+				message: 'Please select Lead Source and Type of B2B in the upload form before importing.'
+			});
+		}
+
+		if (bodyLeadStatus && !modalStatusId) {
+			return res.status(400).json({
+				status: false,
+				message: 'Invalid Lead Status selected in the upload form. Please choose again.'
+			});
+		}
+
+		const useModalLeadSource = Boolean(defaultLeadCategoryDoc);
+		const useModalB2bType = Boolean(defaultTypeOfB2BDoc);
+		const useModalPipeline = Boolean(modalStatusId);
+
+		leads = leads.filter((row) => {
+			if (!row || typeof row !== 'object') return false;
+			const hasBusiness = row.businessName != null && String(row.businessName).trim() !== '';
+			const hasPerson = row.concernPersonName != null && String(row.concernPersonName).trim() !== '';
+			const hasMobile = row.mobile != null && String(row.mobile).trim() !== '';
+			return hasBusiness || hasPerson || hasMobile;
+		});
+
+		// Process and validate leads
+		const processedLeads = [];
+		const errors = [];
+>>>>>>> 88a542652307b8485067571bdf4e8fa58acf59d3
 
 						if (existingLead) {
 							errors.push(`Row ${i + 2}: Email ${row.email} already exists`);
@@ -3337,12 +3398,116 @@ Return JSON in exactly this shape:
 						continue;
 					}
 
+<<<<<<< HEAD
 					// Validate and get Type of B2B (case-insensitive search)
 					if (!row.typeOfB2B) {
 						errors.push(`Row ${i + 2}: Type of B2B is required`);
+=======
+				// Lead Source: modal selection applies to all rows when set on upload form
+				let leadCategory = defaultLeadCategoryDoc;
+				const rowLeadSource =
+					!useModalLeadSource &&
+					row.leadCategory != null &&
+					String(row.leadCategory).trim() !== ''
+						? String(row.leadCategory).trim()
+						: '';
+
+				if (rowLeadSource) {
+					const leadSourceNorm = rowLeadSource.toLowerCase();
+					const leadCatNameLowerMatch = {
+						$expr: {
+							$eq: [
+								{ $toLower: { $trim: { input: '$name' } } },
+								leadSourceNorm
+							]
+						}
+					};
+
+					let rowLeadCategory = await LeadCategory.findOne({
+						...leadCatNameLowerMatch,
+						isActive: true
+					});
+					if (!rowLeadCategory) {
+						rowLeadCategory = await LeadCategory.findOne(leadCatNameLowerMatch);
+					}
+					if (!rowLeadCategory && mongoose.Types.ObjectId.isValid(rowLeadSource)) {
+						rowLeadCategory = await LeadCategory.findById(rowLeadSource);
+					}
+					if (!rowLeadCategory) {
+						let availableCategories = await LeadCategory.find({ isActive: true }).select('name').limit(10);
+						if (availableCategories.length === 0) {
+							availableCategories = await LeadCategory.find({}).select('name').limit(10);
+						}
+						const categoryNames = availableCategories.map((c) => c.name).join(', ');
+						errors.push(`Row ${i + 2}: Lead Source "${rowLeadSource}" not found. Available sources: ${categoryNames || 'None'}`);
+						continue;
+					}
+					leadCategory = rowLeadCategory;
+				}
+
+				// Type of B2B: modal selection applies to all rows when set on upload form
+				let typeOfB2B = defaultTypeOfB2BDoc;
+				const rowB2bType =
+					!useModalB2bType &&
+					row.typeOfB2B != null &&
+					String(row.typeOfB2B).trim() !== ''
+						? String(row.typeOfB2B).trim()
+						: '';
+
+				if (rowB2bType) {
+					const b2bTypeNorm = rowB2bType.toLowerCase();
+					const b2bTypeNameLowerMatch = {
+						$expr: {
+							$eq: [
+								{ $toLower: { $trim: { input: '$name' } } },
+								b2bTypeNorm
+							]
+						}
+					};
+
+					let rowTypeOfB2B = await TypeOfB2B.findOne({
+						...b2bTypeNameLowerMatch,
+						isActive: true
+					});
+					if (!rowTypeOfB2B) {
+						rowTypeOfB2B = await TypeOfB2B.findOne(b2bTypeNameLowerMatch);
+					}
+					if (!rowTypeOfB2B && mongoose.Types.ObjectId.isValid(rowB2bType)) {
+						rowTypeOfB2B = await TypeOfB2B.findById(rowB2bType);
+					}
+					if (!rowTypeOfB2B) {
+						let availableTypes = await TypeOfB2B.find({ isActive: true }).select('name').limit(10);
+						if (availableTypes.length === 0) {
+							availableTypes = await TypeOfB2B.find({}).select('name').limit(10);
+						}
+						const typeNames = availableTypes.map((t) => t.name).join(', ');
+						errors.push(`Row ${i + 2}: Type of B2B "${rowB2bType}" not found. Available types: ${typeNames || 'None'}`);
+						continue;
+					}
+					typeOfB2B = rowTypeOfB2B;
+				}
+
+				let rowPipelineStatusId = null;
+				let rowPipelineSubStatusId = null;
+				if (useModalPipeline) {
+					rowPipelineStatusId = modalStatusId;
+					rowPipelineSubStatusId = modalSubStatusId;
+				} else if (row.leadStatus != null && String(row.leadStatus).trim() !== '') {
+					const resolved = await resolveBulkPipelineStatus(row.leadStatus);
+					if (resolved.notFound != null) {
+						const avail = await StatusB2b.find(pipelineStatusScope)
+							.select('title')
+							.sort({ index: 1 })
+							.limit(40);
+						const names = avail.map((s) => s.title).filter(Boolean).join(', ');
+						errors.push(
+							`Row ${i + 2}: Lead Status "${resolved.notFound}" not found. Available: ${names || 'None'}`
+						);
+>>>>>>> 88a542652307b8485067571bdf4e8fa58acf59d3
 						continue;
 					}
 
+<<<<<<< HEAD
 					const b2bTypeNorm = row.typeOfB2B.trim().toLowerCase();
 					const b2bTypeNameLowerMatch = {
 						$expr: {
@@ -3351,6 +3516,108 @@ Return JSON in exactly this shape:
 								b2bTypeNorm
 							]
 						}
+=======
+				const rawPipelineSub =
+					!useModalPipeline &&
+					row.pipelineSubStatus != null &&
+					String(row.pipelineSubStatus).trim() !== ''
+						? String(row.pipelineSubStatus).trim()
+						: '';
+				if (rawPipelineSub) {
+					const parentId = rowPipelineStatusId || defaultStatusId;
+					if (!parentId) {
+						errors.push(
+							`Row ${i + 2}: Sub Status "${rawPipelineSub}" cannot be used without a resolvable pipeline status (set Lead Status or rely on import default).`
+						);
+						continue;
+					}
+					const stDoc = await StatusB2b.findById(parentId).select('substatuses');
+					const subs = stDoc?.substatuses || [];
+					let matchedSub = null;
+					if (mongoose.Types.ObjectId.isValid(rawPipelineSub)) {
+						matchedSub = subs.find((s) => String(s._id) === rawPipelineSub);
+					}
+					if (!matchedSub) {
+						const norm = rawPipelineSub.toLowerCase();
+						matchedSub = subs.find((s) => (s.title || '').trim().toLowerCase() === norm);
+					}
+					if (!matchedSub) {
+						const titles = subs.map((s) => s.title).filter(Boolean).join(', ');
+						errors.push(
+							`Row ${i + 2}: Sub Status "${rawPipelineSub}" not found for this pipeline status. Available: ${titles || 'None'}`
+						);
+						continue;
+					}
+					rowPipelineSubStatusId = matchedSub._id;
+				} else if (!rawPipelineSub && modalSubStatusId && rowPipelineStatusId) {
+					rowPipelineSubStatusId = modalSubStatusId;
+				}
+
+				// Create lead object
+				const leadData = {
+					leadCategory: leadCategory._id,
+					typeOfB2B: typeOfB2B._id,
+					businessName: row.businessName.trim(),
+					concernPersonName: row.concernPersonName.trim(),
+					mobile: cleanMobile,
+					address: row.address || row.businessAddress || '',
+					city: row.city || '',
+					state: row.state || '',
+					designation: row.designation || '',
+					email: row.email || '',
+					whatsapp: row.whatsapp ? row.whatsapp.replace(/\D/g, '') : '',
+					landlineNumber: row.landlineNumber || row.landline || '',
+					remark: row.remark || row.remarks || '',
+					leadAddedBy: req.user._id
+				};
+
+				if (rowPipelineStatusId) {
+					leadData.status = rowPipelineStatusId;
+					if (rowPipelineSubStatusId) {
+						leadData.subStatus = rowPipelineSubStatusId;
+					}
+				} else if (defaultStatusId) {
+					leadData.status = defaultStatusId;
+					if (rowPipelineSubStatusId) {
+						leadData.subStatus = rowPipelineSubStatusId;
+					} else if (defaultSubStatusId) {
+						leadData.subStatus = defaultSubStatusId;
+					}
+				}
+
+				if (row.leadOwner && row.leadOwner.trim()) {
+					const ownerName = row.leadOwner.trim();
+
+					let owner = null;
+					if (mongoose.Types.ObjectId.isValid(ownerName)) {
+						owner = await User.findById(ownerName);
+					}
+
+					if (!owner) {
+						const ownerNorm = ownerName.toLowerCase();
+						owner = await User.findOne({
+							$expr: {
+								$eq: [
+									{ $toLower: { $trim: { input: '$name' } } },
+									ownerNorm
+								]
+							}
+						});
+					}
+					
+					if (owner) {
+						leadData.leadOwner = owner._id;
+					} else {
+						// console.log(`Row ${i + 2}: Lead Owner "${ownerName}" not found. Continuing without owner.`);
+					}
+				}
+
+				// Add coordinates if provided
+				if (row.latitude && row.longitude) {
+					leadData.coordinates = {
+						type: "Point",
+						coordinates: [parseFloat(row.longitude), parseFloat(row.latitude)]
+>>>>>>> 88a542652307b8485067571bdf4e8fa58acf59d3
 					};
 
 					let typeOfB2B = await TypeOfB2B.findOne({

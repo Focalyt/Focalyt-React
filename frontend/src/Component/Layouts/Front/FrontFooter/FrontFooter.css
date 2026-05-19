@@ -1,20 +1,178 @@
+/* Import Orbitron for footer typography */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800;900&display=swap');
+
+#footer,
+.footer-v2,
+.footer-v2.footer-padding-default,
+.footer-v2.footer-l02 {
+  /* allow theme-driven footer styles */
+}
+
+/* ── Footer theme tokens (driven by :root[data-foc-theme]) ── */
+:root {
+  --ftr-bg: #f6f8ff;
+  --ftr-surface: #ffffff;
+  --ftr-text: #0b1220;
+  --ftr-muted: #4b5b78;
+  --ftr-border: rgba(16, 24, 40, 0.12);
+  --ftr-accent-1: #7a2bff;
+  --ftr-accent-2: #ff2d7a;
+}
+
+:root[data-foc-theme="aurora"],
+:root[data-foc-theme="light"] {
+  --ftr-bg: #f6f8ff;
+  --ftr-surface: #ffffff;
+  --ftr-text: #0b1220;
+  --ftr-muted: #4b5b78;
+  --ftr-border: rgba(16, 24, 40, 0.12);
+  --ftr-accent-1: #7a2bff;
+  --ftr-accent-2: #ff2d7a;
+}
+
+:root[data-foc-theme="pearl"] {
+  --ftr-bg: #fff7f1;
+  --ftr-surface: #ffffff;
+  --ftr-text: #1d1a16;
+  --ftr-muted: #5c4e42;
+  --ftr-border: rgba(31, 24, 16, 0.12);
+  --ftr-accent-1: #c06a2b;
+  --ftr-accent-2: #e05a7b;
+}
+
+:root[data-foc-theme="sky-magenta"] {
+  --ftr-bg: #f5fbff;
+  --ftr-surface: #ffffff;
+  --ftr-text: #061426;
+  --ftr-muted: #3e5876;
+  --ftr-border: rgba(4, 25, 45, 0.12);
+  --ftr-accent-1: #1ba7ff;
+  --ftr-accent-2: #ff2daa;
+}
+
+:root[data-foc-theme="quantum-mint"] {
+  --ftr-bg: #f6fffb;
+  --ftr-surface: #ffffff;
+  --ftr-text: #07161a;
+  --ftr-muted: #355b61;
+  --ftr-border: rgba(7, 22, 26, 0.12);
+  --ftr-accent-1: #2afdAD;
+  --ftr-accent-2: #7c3bff;
+}
+
+:root[data-foc-theme="arctic-holo"] {
+  --ftr-bg: #f4faff;
+  --ftr-surface: #ffffff;
+  --ftr-text: #061426;
+  --ftr-muted: #3d5a7b;
+  --ftr-border: rgba(6, 20, 38, 0.12);
+  --ftr-accent-1: #2bbaff;
+  --ftr-accent-2: #ff2de2;
+}
+
+:root[data-foc-theme="solarpunk"] {
+  --ftr-bg: #f7fffd;
+  --ftr-surface: #ffffff;
+  --ftr-text: #061b1a;
+  --ftr-muted: #2f5b57;
+  --ftr-border: rgba(6, 27, 26, 0.12);
+  --ftr-accent-1: #00c2a8;
+  --ftr-accent-2: #ff8a00;
+}
+
+:root[data-foc-theme="dark"] {
+  --ftr-bg: #060e1e;
+  --ftr-surface: #0d1b38;
+  --ftr-text: #e0f0ff;
+  --ftr-muted: #4a6fa5;
+  --ftr-border: rgba(0, 229, 255, 0.14);
+  --ftr-accent-1: #00e5ff;
+  --ftr-accent-2: #fc2b5a;
+}
+
+:root[data-foc-theme="neon-slate"] {
+  --ftr-bg: #070b16;
+  --ftr-surface: #0c142c;
+  --ftr-text: #eaf3ff;
+  --ftr-muted: #7ea2d1;
+  --ftr-border: rgba(0, 229, 255, 0.16);
+  --ftr-accent-1: #00e5ff;
+  --ftr-accent-2: #ff4d9d;
+}
+
+:root[data-foc-theme="matrix-lime"] {
+  --ftr-bg: #050a08;
+  --ftr-surface: #09120d;
+  --ftr-text: #d9ffe8;
+  --ftr-muted: #5daa80;
+  --ftr-border: rgba(124, 255, 0, 0.18);
+  --ftr-accent-1: #7cff00;
+  --ftr-accent-2: #00e5ff;
+}
+
+/* Obsidian Burst (exact values) */
+:root[data-foc-theme="obsidian-burst"] {
+  --ftr-bg: #000000;
+  --ftr-surface: #0d0d0d;
+  --ftr-text: #ffffff;
+  --ftr-muted: #5a5a6a;
+  --ftr-border: rgba(201,48,96,.2);
+  --ftr-accent-1: #c93060;
+  --ftr-accent-2: #7b3f9e;
+}
+
+/* ── Apply theme styles to footer ── */
+.footer-v2.footer-padding-default.footer-l02 {
+  background: var(--ftr-bg) !important;
+  color: var(--ftr-text) !important;
+  border-top: 1px solid var(--ftr-border);
+  font-family: 'Orbitron', sans-serif;
+}
+
+.footer-v2.footer-padding-default.footer-l02 a,
+.footer-v2.footer-padding-default.footer-l02 .footer-list a {
+  color: var(--ftr-muted) !important;
+  font-family: 'Orbitron', sans-serif;
+}
+.footer-v2.footer-padding-default.footer-l02 a:hover,
+.footer-v2.footer-padding-default.footer-l02 .footer-list a:hover {
+  color: var(--ftr-accent-1) !important;
+}
+
+/* “pink” headings should follow theme accent */
+.footer-v2.footer-padding-default.footer-l02 .color-pink {
+  color: var(--ftr-accent-1) !important;
+  font-family: 'Orbitron', sans-serif;
+}
+
+.footer-v2.footer-padding-default.footer-l02 .copyright-border {
+  border-top: 1px solid var(--ftr-border);
+}
+
+.footer-v2.footer-padding-default.footer-l02 .list-social a {
+  color: var(--ftr-muted) !important;
+}
+.footer-v2.footer-padding-default.footer-l02 .list-social a:hover {
+  color: var(--ftr-accent-1) !important;
+}
+
 #mobile-footer-nav {
     position: fixed;
     bottom: 0;
     left: 0;
     right:0;
     width: 100%;
-    background-color: #000;
+    background-color: var(--ftr-bg);
     padding: 10px 0;
     display: block;
     border-top-left-radius: 40px;
     border-top-right-radius: 40px;
-    box-shadow: 0px -3px 5px 0px rgb(255 246 246 / 30%);
+    box-shadow: 0px -3px 10px 0px color-mix(in srgb, var(--ftr-accent-1) 18%, transparent);
     transition-duration: .5s;
     z-index: 1000;
   }
   #mobile-footer-nav figure img{
-    border: 1px solid #FC2B5A;
+    border: 1px solid color-mix(in srgb, var(--ftr-accent-1) 70%, transparent);
     border-radius: 50px;   
     padding: 4px; 
     width: 40%;
@@ -36,7 +194,7 @@
 font-size: 1.2em;}
 
 #mobile-footer-nav figure img{
-    border: 1px solid #FC2B5A;
+    border: 1px solid color-mix(in srgb, var(--ftr-accent-1) 70%, transparent);
     border-radius: 50px;   
     padding: 4px; 
     width: 40%;
@@ -50,7 +208,7 @@ font-size: 1.2em;}
 
 .footer-nav .login_col {
     padding: 8px 16px!important;
-    background: linear-gradient(to right, #9747FF, #FC2B5A);
+    background: linear-gradient(to right, var(--ftr-accent-2), var(--ftr-accent-1));
     border-radius: 50px;
 }
 @media only screen and (max-width: 992px) {

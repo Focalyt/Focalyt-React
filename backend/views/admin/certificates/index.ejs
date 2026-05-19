@@ -1,0 +1,98 @@
+<% include ../partials/header %>
+
+<div class="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
+  <div class="content-header-left col-md-9 col-12 mb-2">
+    <div class="row breadcrumbs-top">
+      <div class="col-12">
+        <h3 class="content-header-title float-left mb-0">Certificates</h3>
+        <div class="breadcrumb-wrapper col-12">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+              <a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a>
+            </li>
+            <li class="breadcrumb-item active">Certificates</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="content-body">
+  <% include ../partials/flash %>
+
+  <section class="row">
+    <div class="col-xl-6 col-lg-6 col-md-12 col-12">
+      <div class="card">
+        <div class="card-header border border-top-0 border-left-0 border-right-0">
+          <h4 class="card-title pb-1">Issue Certificate to Student</h4>
+        </div>
+        <div class="card-body">
+          <form method="post" action="<%= process.env.MIPIE_BACKEND_URL %>/admin/certificates/add">
+            <div class="form-group">
+              <label>Student Name <span class="asterisk">*</span></label>
+              <input type="text" class="form-control" name="name" required placeholder="Varsha" />
+            </div>
+
+            <div class="form-group">
+              <label>Course <span class="asterisk">*</span></label>
+              <input type="text" class="form-control" name="course" required placeholder="Big Data" />
+            </div>
+
+            <div class="form-group">
+              <label>Date From</label>
+              <input type="text" class="form-control" name="dateFrom" placeholder="24-11-2025" />
+            </div>
+
+            <div class="form-group">
+              <label>Date End</label>
+              <input type="text" class="form-control" name="dateEnd" placeholder="03-03-2026" />
+            </div>
+
+            <button class="btn btn-success" type="submit">Issue</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-6 col-lg-6 col-md-12 col-12">
+      <div class="card">
+        <div class="card-header border border-top-0 border-left-0 border-right-0">
+          <h4 class="card-title pb-1">Latest Issued</h4>
+          <small>Open the card page after issuing</small>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Course</th>
+                  <th>Date From</th>
+                  <th>Date End</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (issues && issues.length) { %>
+                  <% issues.forEach(function(i){ %>
+                    <tr>
+                      <td><%= i.name %></td>
+                      <td><%= i.course %></td>
+                      <td><%= i.dateFrom || '-' %></td>
+                      <td><%= i.dateEnd || '-' %></td>
+                    </tr>
+                  <% }) %>
+                <% } else { %>
+                  <tr>
+                    <td colspan="4">No issued certificates yet</td>
+                  </tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+

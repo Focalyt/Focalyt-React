@@ -65,6 +65,7 @@ import JobOffer from './Pages/App/Candidate/JobOffer/jobOffer';
 import CompanyPartners from './Pages/Front/CompanyPartners/CompanyPartners';
 import CandidateReview from './Pages/Front/CandidateReview/CandidateReview';
 import Certificate from './Pages/Front/Certificate/certificate';
+import Certificates from './Pages/Front/Certificate/certificates';
 import Registration from './Pages/Front/StudentRegistration/Registration';
 import CollegeLayout from './Component/Layouts/App/College';
 import CollegeLogin from './Pages/App/College/Login/CollegeLogin';
@@ -202,6 +203,7 @@ const Layout = () => {
         <Route exact path="/candidate-review" element={<CandidateReview />} />
         {/* <Route exact path="/about_us" element={<About />} /> */}
         <Route exact path="/certificate" element={<Certificate />} />
+        <Route exact path="/certificates" element={<Certificates />} />
         <Route exact path="/labs" element={<Labs />} />
         <Route exact path="/results" element={<Result />} />
         <Route exact path="/courses" element={<Course />} />
@@ -218,6 +220,7 @@ const Layout = () => {
         <Route path="/Resumetest" element={<ResumeTest/>}/>
         <Route path="/employersTermsofService" element={<EmployersTermsofService/>}/>
         <Route path="/userAgreement" element={<UserAgreement/>}/>
+
         {/* Candidate Parent Route */}
         <Route path="/candidate/login" element={<CandidateLogin />} />
         <Route path="/live-class/:id" element={<LiveClassRoom />} />

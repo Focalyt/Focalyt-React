@@ -957,8 +957,10 @@ router.get('/b2b-users', isCollege, async (req, res) => {
 
     // Fetch all users who are concern persons
     const allConcernPersons = await User.find({
-      _id: { $in: concernPersonIds }
-    }).select('_id name email permissions').lean();
+      _id: { $in: concernPersonIds },
+      status: true,
+      isDeleted: false
+    }).select('_id name email permissions status').lean();
 
     console.log('📋 [BACKEND] All Concern Persons:', {
       total: allConcernPersons.length,

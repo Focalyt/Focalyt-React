@@ -848,6 +848,7 @@ const AddCourse = () => {
     } else if (file instanceof File) {
       // For new video files, create an object URL
       return URL.createObjectURL(file);
+
     }
     return '';
   };

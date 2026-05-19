@@ -6,6 +6,7 @@ const frontRoutes = require('./front');
 const conversionTrakingRoutes = require('./conversionTrackingAPI');
 const viewsRoutes = require('./views');
 const apiRoutes = require('./api');
+const certificatesApiRoutes = require('./api/certificates');
 const chatRoutes = require('./chat');
 const adminRoutes = require('./admin');
 const collegeRoutes = require('./college');
@@ -32,6 +33,7 @@ router.use('/', frontRoutes);
 router.use('/', conversionTrakingRoutes);
 router.use('/candidate', candidateRoutes);
 router.use('/api', apiRoutes);
+router.use('/api/certificates', certificatesApiRoutes);
 router.use('/api/ai', aiRoutes); // AI-powered job recommendations
 router.use('/api/ai', botTrainingRoutes); // AI bot training data management
 router.use('/api/ai', jobScraperRoutes); // LinkedIn job scraping with Anthropic & Google Sheets

@@ -17,6 +17,19 @@ const EditCourse = () => {
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
+  const stripStorageKey = (value) => {
+    if (value == null || typeof value !== 'string') return value;
+    if (value.startsWith('blob:')) return value;
+    let key = value.trim();
+    const base = (bucketUrl || '').replace(/\/$/, '');
+    if (base && key.startsWith(base)) {
+      key = key.slice(base.length).replace(/^\//, '');
+    }
+    const s3Match = key.match(/amazonaws\.com\/(.+)$/i);
+    if (s3Match) key = s3Match[1];
+    return key.replace(/^\//, '');
+  };
+
   //vertical and project handle
   const [selectedVertical, setSelectedVertical] = useState([]);
   const [verticals, setVerticals] = useState([]);
@@ -308,11 +321,11 @@ const EditCourse = () => {
           youtubeURL: course.youtubeURL || '',
           courseFeatures: course.courseFeatures || '',
           importantTerms: course.importantTerms || '',
-          brochure: course.brochure || '',
-          thumbnail: course.thumbnail || '',
-          photos: course.photos || [],
-          videos: course.videos || [],
-          testimonialvideos: course.testimonialvideos || [],
+          brochure: stripStorageKey(course.brochure) || '',
+          thumbnail: stripStorageKey(course.thumbnail) || '',
+          photos: (course.photos || []).map(stripStorageKey),
+          videos: (course.videos || []).map(stripStorageKey),
+          testimonialvideos: (course.testimonialvideos || []).map(stripStorageKey),
           isContact: !!course.counslername || !!course.counslerphonenumber,
           counslername: course.counslername || '',
           counslerphonenumber: course.counslerphonenumber || '',
@@ -535,13 +548,11 @@ const EditCourse = () => {
     files.forEach(file => {
       if (validateFile(file, 'photos')) {
         validFiles.push(file);
-
-        setFormData(prevData => ({
-          ...prevData,
-          photos: [...prevData.photos, file]
-        }));
-
-
+        previews.push({
+          file,
+          url: URL.createObjectURL(file),
+          name: file.name,
+        });
       }
     });
 
@@ -575,29 +586,21 @@ const EditCourse = () => {
         });
       }
 
-      // Update state with new video
       setSelectedVideos([file]);
-      setFormData(prevData => ({
-        ...prevData,
-        videos: [file]
-      }));
-
       console.log('Video replaced with:', file.name);
     }
   };
 
   const getFileUrl = (file) => {
-
-    if (typeof file === 'string') {
-      // Check if the file is already a URL starting with Amazon bucket URL
-      if (file.includes(bucketUrl) || file.includes('http') || file.includes('blob')) {
-        return file; // Return the file URL as is if it starts with the bucket URL
-      } else {
-        return `${bucketUrl}/${file}`; // Prepend the bucket URL to the file path if it's not already a complete URL
-      }
-    } else if (file instanceof File) {
-      // For new video files, create an object URL
+    if (file instanceof File) {
       return URL.createObjectURL(file);
+    }
+    if (typeof file === 'string') {
+      if (file.startsWith('blob:')) return file;
+      const key = stripStorageKey(file);
+      if (!key) return '';
+      const base = (bucketUrl || '').replace(/\/$/, '');
+      return `${base}/${key}`;
     }
     return '';
   };
@@ -747,19 +750,11 @@ const EditCourse = () => {
         if (validateTestimonialVideo(file)) {
           validFiles.push(file);
 
-          setFormData(prev => ({
-            ...prev,
-            testimonialvideos: [...prev.testimonialvideos, file]
-          }));
-
-          // Create preview object
-          // previews.push({
-          //   file: file,
-          //   url: URL.createObjectURL(file),
-          //   name: file.name,
-          //   size: file.size,
-          //   type: file.type
-          // });
+          previews.push({
+            file,
+            url: URL.createObjectURL(file),
+            name: file.name,
+          });
         }
       });
 
@@ -827,11 +822,6 @@ const EditCourse = () => {
         if (selectedBrochurePreview && selectedBrochurePreview.url) {
           URL.revokeObjectURL(selectedBrochurePreview.url);
         }
-        setFormData(prevData => ({
-          ...prevData,
-          brochure: file
-        }));
-
         setSelectedBrochure(file);
 
         // Create preview object
@@ -864,12 +854,11 @@ const EditCourse = () => {
           URL.revokeObjectURL(selectedThumbnailPreview.url);
         }
 
-        setFormData(prevData => ({
-          ...prevData,
-          thumbnail: URL.createObjectURL(file)
-        }));
-
         setSelectedThumbnail(file);
+        setSelectedThumbnailPreview({
+          url: URL.createObjectURL(file),
+          name: file.name,
+        });
 
         console.log('Thumbnail uploaded successfully:', file.name);
       }
@@ -879,135 +868,104 @@ const EditCourse = () => {
     }
   };
 
-  // Handle remove file from server
+  // Handle remove file from server (DB stores S3 key only)
   const removeFile = async (fileType, key) => {
-
     const confirm = window.confirm('Are you sure you want to remove this file?');
-    if (!confirm) {
-      return;
-    }
+    if (!confirm) return;
+
+    let shouldCallApi = false;
+    let fileUrl = '';
+
     if (fileType === 'video') {
-      // Clean up object URL if it's a new video file
-
-
-
-      // Remove from formData
-      setFormData(prev => ({
-        ...prev,
-        videos: [] // Empty array for single video
-      }));
-
-      // Clear selectedVideos
-      setSelectedVideos([]);
-
-      // Reset the file input
-      const videoInput = document.getElementById('videos');
-      if (videoInput) {
-        videoInput.value = '';
-
+      if (selectedVideos.length > 0) {
+        setSelectedVideos([]);
+        const videoInput = document.getElementById('videos');
+        if (videoInput) videoInput.value = '';
+        return;
       }
-
-
+      if (formData.videos?.length > 0 && typeof formData.videos[0] === 'string') {
+        fileUrl = stripStorageKey(formData.videos[0]);
+        setFormData(prev => ({ ...prev, videos: [] }));
+        shouldCallApi = true;
+      }
     } else if (fileType === 'photo') {
-
-      console.log(key, 'key');
-      // Remove from formData.photos (server photos)
-      if (typeof key === 'string') {
-        setFormData(prev => ({
-          ...prev,
-          photos: prev.photos.filter(p => p !== key)
-        }));
-      }
-
-      // Remove from selectedPhotos and cleanup object URL
       if (key instanceof File) {
-        // Find and cleanup object URL
-
         const previewToRemove = selectedPhotoPreviews.find(p => p.file === key);
-        if (previewToRemove) {
-          URL.revokeObjectURL(previewToRemove.url);
-        }
-
+        if (previewToRemove) URL.revokeObjectURL(previewToRemove.url);
         setSelectedPhotos(prev => prev.filter(p => p !== key));
         setSelectedPhotoPreviews(prev => prev.filter(p => p.file !== key));
+        const photoInput = document.getElementById('photos');
+        if (photoInput) photoInput.value = '';
+        return;
+      }
+      if (typeof key === 'string') {
+        fileUrl = stripStorageKey(key);
         setFormData(prev => ({
           ...prev,
-          photos: prev.photos.filter(p => p !== key)
+          photos: prev.photos.filter(p => stripStorageKey(p) !== fileUrl),
         }));
-
-        const photoInput = document.getElementById('photos');
-        if (photoInput) {
-          photoInput.value = '';
-        }
-
-
+        shouldCallApi = true;
       }
-    }
-    if (fileType === 'brochure') {
-      if (typeof key === 'string') {
-        setFormData(prev => ({ ...prev, brochure: '' }));
-      }
-
-      if (key instanceof File) {
-        if (selectedBrochurePreview && selectedBrochurePreview.url) {
-          URL.revokeObjectURL(selectedBrochurePreview.url);
-        }
-
+    } else if (fileType === 'brochure') {
+      if (selectedBrochure) {
+        if (selectedBrochurePreview?.url) URL.revokeObjectURL(selectedBrochurePreview.url);
         setSelectedBrochure(null);
         setSelectedBrochurePreview(null);
-
         const brochureInput = document.getElementById('brochure');
-        if (brochureInput) {
-          brochureInput.value = '';
-        }
+        if (brochureInput) brochureInput.value = '';
+        return;
+      }
+      if (formData.brochure) {
         setFormData(prev => ({ ...prev, brochure: '' }));
+        shouldCallApi = true;
       }
     } else if (fileType === 'thumbnail') {
-      // Remove server thumbnail
-      if (typeof key === 'string') {
-        setFormData(prev => ({ ...prev, thumbnail: '' }));
-      }
-
-      // Remove new thumbnail and cleanup object URL
-      if (key instanceof File) {
-        if (selectedThumbnailPreview && selectedThumbnailPreview.url) {
-          URL.revokeObjectURL(selectedThumbnailPreview.url);
-        }
-
+      if (selectedThumbnail) {
+        if (selectedThumbnailPreview?.url) URL.revokeObjectURL(selectedThumbnailPreview.url);
         setSelectedThumbnail(null);
         setSelectedThumbnailPreview(null);
-        setFormData(prev => ({ ...prev, thumbnail: '' }));
-
         const thumbnailInput = document.getElementById('thumbnail');
-        if (thumbnailInput) {
-          thumbnailInput.value = '';
-        }
+        if (thumbnailInput) thumbnailInput.value = '';
+        return;
+      }
+      if (formData.thumbnail) {
+        setFormData(prev => ({ ...prev, thumbnail: '' }));
+        shouldCallApi = true;
       }
     } else if (fileType === 'testimonial') {
-      setFormData(prev => ({ ...prev, testimonialvideos: prev.testimonialvideos.filter(t => t !== key) }));
-      setSelectedTestimonialVideos(prev => prev.filter(t => t !== key));
-      setSelectedTestimonialPreviews(prev => prev.filter(t => t.file !== key));
-      const testimonialInput = document.getElementById('testimonialvideos');
-      if (testimonialInput) {
-        testimonialInput.value = '';
+      if (key instanceof File) {
+        setSelectedTestimonialVideos(prev => prev.filter(t => t !== key));
+        setSelectedTestimonialPreviews(prev => prev.filter(t => t.file !== key));
+        const testimonialInput = document.getElementById('testimonialvideos');
+        if (testimonialInput) testimonialInput.value = '';
+        return;
+      }
+      if (typeof key === 'string') {
+        fileUrl = stripStorageKey(key);
+        setFormData(prev => ({
+          ...prev,
+          testimonialvideos: prev.testimonialvideos.filter(t => stripStorageKey(t) !== fileUrl),
+        }));
+        shouldCallApi = true;
       }
     }
+
+    if (!shouldCallApi) return;
 
     try {
       const response = await axios.put(`${backendUrl}/college/courses/remove_course_media/${id}`, {
         fileType,
-        fileUrl: key
+        fileUrl: fileUrl || undefined,
       }, {
         headers: {
           'Content-Type': 'application/json',
-          'x-auth': token
-        }
+          'x-auth': token,
+        },
       });
-      console.log(response, 'response');
       alert(response.data.message);
-
     } catch (error) {
-      console.log(error, 'error');
+      console.error(error);
+      alert('Failed to remove file');
     }
 
 
@@ -1850,21 +1808,21 @@ const EditCourse = () => {
 
 
                         {/* Video Preview */}
-                        {formData.videos && formData.videos.length > 0 ? (
+                        {(selectedVideos[0] || (formData.videos && formData.videos.length > 0)) ? (
 
                           <div className="card m-0">
                             {/* <div className="card-body p-0 position-relative"> */}
                             {/* Video Preview with forced re-render */}
                             <video
-                              key={formData.videos[0] instanceof File ? formData.videos[0].name + Date.now() : formData.videos[0]}
+                              key={selectedVideos[0] ? selectedVideos[0].name : formData.videos[0]}
                               width="100%"
                               height="auto"
                               controls
                               style={{ borderRadius: '5px' }}
                             >
-                              <source src={getFileUrl(formData.videos[0])} type="video/mp4" />
-                              <source src={getFileUrl(formData.videos[0])} type="video/webm" />
-                              <source src={getFileUrl(formData.videos[0])} type="video/ogg" />
+                              <source src={getFileUrl(selectedVideos[0] || formData.videos[0])} type="video/mp4" />
+                              <source src={getFileUrl(selectedVideos[0] || formData.videos[0])} type="video/webm" />
+                              <source src={getFileUrl(selectedVideos[0] || formData.videos[0])} type="video/ogg" />
                               Your browser does not support the video tag.
                             </video>
 
@@ -1873,7 +1831,7 @@ const EditCourse = () => {
                               type="button"
                               className="btn btn-sm btn-danger position-absolute"
                               style={{ right: '5px', top: '5px', zIndex: 10 }}
-                              onClick={() => removeFile('video', formData.videos[0])}
+                              onClick={() => removeFile('video', selectedVideos[0] || formData.videos[0])}
                             >
                               <i className="fa fa-times"></i>
                             </button>
@@ -1891,7 +1849,7 @@ const EditCourse = () => {
                       <div className='innerUploadedVideos' style={{ height: '70px', width: '100%' }}>
                         <div className="col-xl-12 col-xl-lg-12 col-md-12 col-sm-12 col-12 mb-1">
                           <label htmlFor="videos">
-                            {formData.videos && formData.videos.length > 0 ? 'Replace Video' : 'Add Video'}
+                            {(selectedVideos[0] || (formData.videos && formData.videos.length > 0)) ? 'Replace Video' : 'Add Video'}
                           </label>
                           <input
                             name="videos"
@@ -1910,8 +1868,9 @@ const EditCourse = () => {
                     <div className="uploadedPhotos  card m-2 p-1">
                       <h5 className="m-2 text-center">Photos</h5>
                       <div className='innerUploadedPhotos' style={{ height: '140px', width: '100%', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center', justifyContent: 'center' }}>
-                        {formData.photos && formData.photos.length > 0 ? (
-                          formData.photos.map((photo, i) => (
+                        {(formData.photos?.length > 0 || selectedPhotos.length > 0) ? (
+                          <>
+                          {formData.photos.map((photo, i) => (
                             <div className=" position-relative w-25" key={`photo-${i}`}>
                               <div className="card-body p-1 text-center ">
 
@@ -1938,7 +1897,27 @@ const EditCourse = () => {
                                 </button>
                               </div>
                             </div>
-                          ))
+                          ))}
+                          {selectedPhotos.map((photo, i) => (
+                            <div className=" position-relative w-25" key={`photo-new-${i}`}>
+                              <div className="card-body p-1 text-center ">
+                                <img
+                                  src={getFileUrl(photo)}
+                                  alt={`New photo ${i + 1}`}
+                                  className="img-fluid mb-1"
+                                  style={{ maxHeight: '100px' }}
+                                />
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-danger position-absolute" style={{ width: "15px", height: "15px", top: '-4px', right: '-4px' }}
+                                  onClick={() => removeFile('photo', photo)}
+                                >
+                                  <i className="fa fa-times" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: '10px', transform: 'translateY(-4px' }}></i>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                          </>
                         ) : <p>No photos uploaded</p>}
                       </div>
                       <div className='innerUploadedPhotos' style={{ height: '70px', width: '100%' }}>
@@ -1963,16 +1942,16 @@ const EditCourse = () => {
                       <h5 className="m-2 text-center">Brouchers</h5>
 
                       <div className='innerUploadedBrouchers' style={{ height: '140px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {formData.brochure ? (
+                        {(formData.brochure || selectedBrochure) ? (
                           <div className="card-body p-3 position-relative">
-                            <div className="d-flex align-items-center justify-content-center" onClick={() => window.open(getFileUrl(formData.brochure), '_blank')}>
+                            <div className="d-flex align-items-center justify-content-center" onClick={() => window.open(getFileUrl(selectedBrochure || formData.brochure), '_blank')}>
                               <div className="brochure-icon mr-3">
                                 <i style={{ fontSize: '100px' }} className={`fa-solid fa-file`}></i>
                                 <button
                                   type="button"
                                   className="btn btn-sm btn-danger position-absolute"
                                   style={{ right: '10px', top: '10px' }}
-                                  onClick={() => removeFile('brochure', formData.brochure)}
+                                  onClick={(e) => { e.stopPropagation(); removeFile('brochure', selectedBrochure || formData.brochure); }}
                                   title="Remove brochure"
                                 >
                                   <i className="fa fa-times"></i>
@@ -2005,12 +1984,12 @@ const EditCourse = () => {
                       <h5 className="m-2 text-center">Thumbnails</h5>
                       <div className='innerUploadedThumbnails' style={{ height: '140px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
 
-                        {formData.thumbnail ? (
+                        {(formData.thumbnail || selectedThumbnail) ? (
 
                           <div className="thumbnail-preview-container p-1 position-relative">
                             <img
-                              src={formData.thumbnail}
-                              alt="New Thumbnail"
+                              src={getFileUrl(selectedThumbnail || formData.thumbnail)}
+                              alt="Thumbnail"
                               className="img-fluid rounded"
                               style={{
                                 width: '100%',
@@ -2032,7 +2011,7 @@ const EditCourse = () => {
                                 fontSize: '12px',
                                 zIndex: 10
                               }}
-                              onClick={() => removeFile('thumbnail', formData.thumbnail)}
+                              onClick={() => removeFile('thumbnail', selectedThumbnail || formData.thumbnail)}
                               title="Remove thumbnail"
                             >
                               ×
@@ -2093,22 +2072,20 @@ const EditCourse = () => {
                       </div>
 
                     </div>
-                    {formData.testimonialvideos && formData.testimonialvideos.length > 0 && (
-
-formData.testimonialvideos.map((video, i) => (
+                    {formData.testimonialvideos?.map((video, i) => (
                     <div className="col-xl-3 m-2">
                       <div className="card" style={{height:'138px', width:'100%'}}>
                             {/* Existing Testimonial Videos */}
                            
                                 <div key={`testimonial-${i}`} className="col-12 mb-2">
                               
-                                      <video key={formData.videos[0] instanceof File ? formData.videos[0].name + Date.now() : formData.videos[0]}
+                                      <video key={`testimonial-server-${i}`}
                                         width="100%"
                                         height="auto"
                                         controls className="text-primary">
                                         <source src={getFileUrl(video)} type="video/mp4" />
                                         <source src={getFileUrl(video)} type="video/webm" />
-                                        <source src={getFileUrl(video)} type="  video/ogg" />
+                                        <source src={getFileUrl(video)} type="video/ogg" />
                                         Your browser does not support the video tag.
                                       </video>
                                       <button
@@ -2123,9 +2100,25 @@ formData.testimonialvideos.map((video, i) => (
                              
                       </div>
                     </div>
-                    ))
-                  )}
-                </div>
+                    ))}
+                    {selectedTestimonialVideos.map((video, i) => (
+                    <div className="col-xl-3 m-2" key={`testimonial-new-${i}`}>
+                      <div className="card position-relative" style={{height:'138px', width:'100%'}}>
+                        <video width="100%" height="auto" controls className="text-primary">
+                          <source src={getFileUrl(video)} type="video/mp4" />
+                          Your browser does not support the video tag.
+                        </video>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-danger ml-2 position-absolute" style={{right:'1px'}}
+                          onClick={() => removeFile('testimonial', video)}
+                        >
+                          <i className="fa fa-times"></i>
+                        </button>
+                      </div>
+                    </div>
+                    ))}
+                  </div>
 
                 </div>
 
