@@ -683,6 +683,15 @@ const B2BSales = () => {
   const [bulkUploadMessage, setBulkUploadMessage] = useState('');
   const [bulkUploadErrors, setBulkUploadErrors] = useState([]);
   const [bulkUploadSuccess, setBulkUploadSuccess] = useState(false);
+  const [bulkUploadFormData, setBulkUploadFormData] = useState({
+    leadCategory: '',
+    typeOfB2B: '',
+    leadStatus: '',
+    leadSubStatus: ''
+  });
+  const [bulkUploadFormErrors, setBulkUploadFormErrors] = useState({});
+  const [bulkUploadSubStatuses, setBulkUploadSubStatuses] = useState([]);
+  const [bulkUploadSubStatusesLoading, setBulkUploadSubStatusesLoading] = useState(false);
 
   // Bulk inputs state
   const [showBulkInputs, setShowBulkInputs] = useState(false);
@@ -2237,13 +2246,89 @@ const B2BSales = () => {
     };
   }, [showAddLeadModal, leadFormData.leadStatus, backendUrl, token]);
 
+  useEffect(() => {
+    if (!showBulkUploadModal || !bulkUploadFormData.leadStatus) {
+      if (!bulkUploadFormData.leadStatus) {
+        setBulkUploadSubStatuses([]);
+        setBulkUploadSubStatusesLoading(false);
+      }
+      return;
+    }
+    let cancelled = false;
+    setBulkUploadSubStatusesLoading(true);
+    axios
+      .get(`${backendUrl}/college/statusB2b/${bulkUploadFormData.leadStatus}/substatus`, {
+        headers: { 'x-auth': token }
+      })
+      .then((response) => {
+        if (cancelled) return;
+        setBulkUploadSubStatuses(
+          response.data.success && Array.isArray(response.data.data) ? response.data.data : []
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setBulkUploadSubStatuses([]);
+      })
+      .finally(() => {
+        if (!cancelled) setBulkUploadSubStatusesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [showBulkUploadModal, bulkUploadFormData.leadStatus, backendUrl, token]);
+
+  const handleBulkUploadInputChange = (e) => {
+    const { name, value } = e.target;
+    if (name === 'leadStatus') {
+      setBulkUploadFormData((prev) => ({ ...prev, leadStatus: value, leadSubStatus: '' }));
+    } else {
+      setBulkUploadFormData((prev) => ({ ...prev, [name]: value }));
+    }
+    if (bulkUploadFormErrors[name]) {
+      setBulkUploadFormErrors((prev) => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const validateBulkUploadForm = () => {
+    const errors = {};
+    if (!bulkUploadFormData.leadCategory) errors.leadCategory = 'Lead source is required';
+    if (!bulkUploadFormData.typeOfB2B) errors.typeOfB2B = 'Type of B2B is required';
+    if (!bulkUploadFormData.leadStatus) errors.leadStatus = 'Lead status is required';
+    if (
+      bulkUploadFormData.leadStatus &&
+      bulkUploadSubStatuses.length > 0 &&
+      !bulkUploadFormData.leadSubStatus
+    ) {
+      errors.leadSubStatus = 'Sub status is required';
+    }
+    setBulkUploadFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const isBulkUploadConfigComplete = Boolean(
+    bulkUploadFormData.leadCategory &&
+    bulkUploadFormData.typeOfB2B &&
+    bulkUploadFormData.leadStatus &&
+    (bulkUploadSubStatuses.length === 0 || bulkUploadFormData.leadSubStatus)
+  );
+
+  const openBulkUploadModal = () => {
+    setBulkUploadFormData({ leadCategory: '', typeOfB2B: '', leadStatus: '', leadSubStatus: '' });
+    setBulkUploadFormErrors({});
+    setBulkUploadSubStatuses([]);
+    setBulkUploadFile(null);
+    setBulkUploadMessage('');
+    setBulkUploadErrors([]);
+    setBulkUploadSuccess(false);
+    setShowBulkUploadModal(true);
+    if (bulkUploadFileInputRef.current) bulkUploadFileInputRef.current.value = '';
+  };
+
   // Bulk Upload Functions (Excel only — same columns as backend import)
   const downloadB2bLeadsSampleExcel = () => {
     const rows = [
-      ['Business Name', 'Concern Person Name', 'Mobile', 'Email', 'Lead Source', 'Type of B2B', 'Lead Status', 'Sub Status', 'Address', 'City', 'State', 'Designation', 'WhatsApp', 'Landline Number', 'Lead Owner', 'Remark'],
-      ['ABC Company', 'John Doe', '9876543210', 'john@abc.com', 'Corporate', 'Partner', 'PROSPECT', '', '123 Main Street', 'Mumbai', 'Maharashtra', 'Manager', '9876543210', '0221234567', 'Owner Name', 'Sample remark'],
-      ['XYZ Corp', 'Jane Smith', '9876543211', 'jane@xyz.com', 'Individual', 'Client', '', '', '456 Park Avenue', 'Delhi', 'Delhi', 'Director', '9876543211', '0111234567', 'Owner Name', 'Another remark'],
-      ['Tech Solutions', 'Raj Kumar', '9876543212', 'raj@tech.com', 'Corporate', 'Partner', 'Untouch Leads', '', '789 Tech Park', 'Bangalore', 'Karnataka', 'CEO', '9876543212', '0801234567', 'Owner Name', 'Technology company']
+      ['Business Name', 'Concern Person Name', 'Mobile', 'Email', 'Address', 'City', 'State', 'Designation', 'WhatsApp', 'Landline Number', 'Lead Owner', 'Remark'],
+      ['ABC Company', 'John Doe', '9876543210', 'john@abc.com', '123 Main Street', 'Mumbai', 'Maharashtra', 'Manager', '9876543210', '0221234567', 'Owner Name', 'Sample remark'],
+      ['XYZ Corp', 'Jane Smith', '9876543211', 'jane@xyz.com',  '456 Park Avenue', 'Delhi', 'Delhi', 'Director', '9876543211', '0111234567', 'Owner Name', 'Another remark'],
+      ['Tech Solutions', 'Raj Kumar', '9876543212', 'raj@tech.com','789 Tech Park', 'Bangalore', 'Karnataka', 'CEO', '9876543212', '0801234567', 'Owner Name', 'Technology company']
     ];
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -2311,30 +2396,25 @@ const B2BSales = () => {
     setBulkUploadSuccess(false);
 
     // Create FormData and append file
+    if (!validateBulkUploadForm()) {
+      setBulkUploadMessage('Please select Lead Source, Type of B2B, Lead Status, and Sub Status from the dropdowns above');
+      setBulkUploadLoading(false);
+      return;
+    }
+
     const formData = new FormData();
     formData.append('file', selectedFile, selectedFile.name);
-
-    // Debug: Log FormData contents
-    console.log('File to upload:', selectedFile);
-    console.log('File name:', selectedFile?.name);
-    console.log('File size:', selectedFile?.size);
-    console.log('File type:', selectedFile?.type);
-    console.log('Is File instance:', selectedFile instanceof File);
-
-    // Verify FormData
-    console.log('FormData entries:');
-    for (let pair of formData.entries()) {
-      console.log('  -', pair[0], ':', pair[1]);
+    formData.append('leadCategory', bulkUploadFormData.leadCategory);
+    formData.append('typeOfB2B', bulkUploadFormData.typeOfB2B);
+    formData.append('leadStatus', bulkUploadFormData.leadStatus);
+    if (bulkUploadFormData.leadSubStatus) {
+      formData.append('leadSubStatus', bulkUploadFormData.leadSubStatus);
     }
 
     try {
       const response = await axios.post(`${backendUrl}/college/b2b/leads/import`, formData, {
-        headers: {
-          'x-auth': token
-          // Don't set Content-Type - axios will automatically set it with boundary for FormData
-        }
+        headers: { 'x-auth': token }
       });
-console.log("response" , response)
       if (response.data.status) {
         setBulkUploadSuccess(true);
         const successCount = response.data.data?.inserted || 0;
@@ -4034,12 +4114,7 @@ console.log("response" , response)
                               backgroundColor: 'rgb(250, 85, 121)',
                               borderRadius: '999px'
                             }}
-                            onClick={() => {
-                              setShowBulkInputs(true);
-                              setBulkMode('bulkupload');
-                              setInput1Value('');
-                              setShowBulkUploadModal(true);
-                            }}
+                            onClick={openBulkUploadModal}
                           >
                             <i className="fas fa-file-upload" style={{ fontSize: '11px' }}></i>
                             Bulk Upload
@@ -4098,12 +4173,7 @@ console.log("response" , response)
                             Add Lead
                           </button>
                           <button className="btn b2b-mobile-action-btn"
-                            onClick={() => {
-                              setShowBulkInputs(true);
-                              setBulkMode('bulkupload');
-                              setInput1Value('');
-                              setShowBulkUploadModal(true);
-                            }}
+                            onClick={openBulkUploadModal}
                             onMouseEnter={(e) => {
                               e.currentTarget.style.transform = 'translateY(-2px)';
                               e.currentTarget.style.boxShadow = '0 4px 12px rgba(250, 85, 121, 0.35)';
@@ -6610,7 +6680,6 @@ console.log("response" , response)
         <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
           <div className="modal-dialog modal-lg modal-dialog-centered">
             <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
-              {/* Modal Header */}
               <div className="modal-header" style={{ background: 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)', color: 'white' }}>
                 <h5 className="modal-title d-flex align-items-center">
                   <i className="fas fa-file-upload me-2"></i>
@@ -6623,30 +6692,145 @@ console.log("response" , response)
                 ></button>
               </div>
 
-              {/* Modal Body */}
               <div className="modal-body p-4">
-                {/* Instructions */}
                 <div className="alert alert-info mb-4">
                   <h6 className="fw-bold mb-2">
                     <i className="fas fa-info-circle me-2"></i>
                     Instructions:
                   </h6>
                   <ul className="mb-0 small">
-                    <li>Upload an Excel file only (.xlsx or .xls)</li>
-                    <li>Maximum file size: 10MB</li>
-                    <li><strong>Required fields:</strong> Business Name, Concern Person Name, Mobile, Lead Source, Type of B2B</li>
-                    <li><strong>Lead Status:</strong> Use the exact status title as in Performance (e.g. PROSPECT, HOT), or a valid status ID. If the column is empty, the default pipeline status is used (same as bulk import default).</li>
-                    <li><strong>Sub Status:</strong> Use the exact sub-status title for that pipeline status, or a valid sub-status ID. If the column is empty, the first sub-status for the resolved Lead Status (or default pipeline) is used.</li>
-
+                    <li>Step 1: Select Lead Source, Type of B2B, Lead Status, and Sub Status below.</li>
+                    <li>Step 2: Upload an Excel file (.xlsx or .xls, max 10MB).</li>
+                    <li><strong>Required in Excel:</strong> Business Name, Concern Person Name, Mobile.</li>
+                    <li>All imported leads use your selections above. You do not need Lead Source, Type of B2B, or Status columns in Excel.</li>
                   </ul>
                 </div>
 
-                {/* File Upload Section */}
+                <div className="row g-3 mb-4">
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-tag text-primary me-1"></i>
+                      Lead Source <span className="text-danger">*</span>
+                    </label>
+                    <select
+                      className={`form-select ${bulkUploadFormErrors.leadCategory ? 'is-invalid' : ''}`}
+                      name="leadCategory"
+                      value={bulkUploadFormData.leadCategory}
+                      onChange={handleBulkUploadInputChange}
+                      disabled={bulkUploadLoading}
+                    >
+                      <option value="">Select Lead Source</option>
+                      {leadCategoryOptions.filter((category) => category).map((category) => (
+                        <option key={category.value} value={category.value}>
+                          {category.label}
+                        </option>
+                      ))}
+                    </select>
+                    {bulkUploadFormErrors.leadCategory && (
+                      <div className="invalid-feedback d-block">{bulkUploadFormErrors.leadCategory}</div>
+                    )}
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-building text-primary me-1"></i>
+                      Type of B2B <span className="text-danger">*</span>
+                    </label>
+                    <select
+                      className={`form-select ${bulkUploadFormErrors.typeOfB2B ? 'is-invalid' : ''}`}
+                      name="typeOfB2B"
+                      value={bulkUploadFormData.typeOfB2B}
+                      onChange={handleBulkUploadInputChange}
+                      disabled={bulkUploadLoading}
+                    >
+                      <option value="">Select B2B Type</option>
+                      {typeOfB2BOptions.filter((type) => type).map((type) => (
+                        <option key={type.value} value={type.value}>
+                          {type.label}
+                        </option>
+                      ))}
+                    </select>
+                    {bulkUploadFormErrors.typeOfB2B && (
+                      <div className="invalid-feedback d-block">{bulkUploadFormErrors.typeOfB2B}</div>
+                    )}
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-chart-line text-primary me-1"></i>
+                      Lead Status <span className="text-danger">*</span>
+                    </label>
+                    <select
+                      className={`form-select ${bulkUploadFormErrors.leadStatus ? 'is-invalid' : ''}`}
+                      name="leadStatus"
+                      value={bulkUploadFormData.leadStatus}
+                      onChange={handleBulkUploadInputChange}
+                      disabled={bulkUploadLoading}
+                    >
+                      <option value="">Select Lead Status</option>
+                      {[...(statuses || [])]
+                        .sort((a, b) =>
+                          String(a?.name || a?.title || '').localeCompare(
+                            String(b?.name || b?.title || ''),
+                            undefined,
+                            { sensitivity: 'base', numeric: true }
+                          )
+                        )
+                        .map((status) => (
+                          <option key={status._id} value={status._id}>
+                            {status.name}
+                          </option>
+                        ))}
+                    </select>
+                    {bulkUploadFormErrors.leadStatus && (
+                      <div className="invalid-feedback d-block">{bulkUploadFormErrors.leadStatus}</div>
+                    )}
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-layer-group text-primary me-1"></i>
+                      Sub Status <span className="text-danger">*</span>
+                    </label>
+                    <select
+                      className={`form-select ${bulkUploadFormErrors.leadSubStatus ? 'is-invalid' : ''}`}
+                      name="leadSubStatus"
+                      value={bulkUploadFormData.leadSubStatus}
+                      onChange={handleBulkUploadInputChange}
+                      disabled={!bulkUploadFormData.leadStatus || bulkUploadSubStatusesLoading || bulkUploadLoading}
+                    >
+                      <option value="">
+                        {bulkUploadSubStatusesLoading
+                          ? 'Loading sub-statuses...'
+                          : !bulkUploadFormData.leadStatus
+                            ? 'Select lead status first'
+                            : 'Select sub-status'}
+                      </option>
+                      {bulkUploadSubStatuses.map((ss) => (
+                        <option key={ss._id} value={ss._id}>
+                          {ss.title}
+                        </option>
+                      ))}
+                    </select>
+                    {bulkUploadFormErrors.leadSubStatus && (
+                      <div className="invalid-feedback d-block">{bulkUploadFormErrors.leadSubStatus}</div>
+                    )}
+                    {bulkUploadFormData.leadStatus && !bulkUploadSubStatusesLoading && bulkUploadSubStatuses.length === 0 && (
+                      <div className="form-text text-muted small">No sub-statuses configured for this status.</div>
+                    )}
+                  </div>
+                </div>
+
                 <div className="mb-4">
                   <label className="form-label fw-bold mb-3">
                     <i className="fas fa-file-excel text-success me-2"></i>
                     Select File <span className="text-danger">*</span>
                   </label>
+                  {!isBulkUploadConfigComplete && (
+                    <div className="alert alert-warning py-2 small mb-2">
+                      Complete all four fields above before choosing a file.
+                    </div>
+                  )}
                   <div className="input-group">
                     <input
                       type="file"
@@ -6655,13 +6839,13 @@ console.log("response" , response)
                       className="form-control"
                       accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                       onChange={handleBulkFileChange}
-                      disabled={bulkUploadLoading}
+                      disabled={bulkUploadLoading || !isBulkUploadConfigComplete}
                     />
                     <button
                       className="btn btn-outline-secondary"
                       type="button"
                       onClick={() => bulkUploadFileInputRef.current?.click()}
-                      disabled={bulkUploadLoading}
+                      disabled={bulkUploadLoading || !isBulkUploadConfigComplete}
                     >
                       <i className="fas fa-folder-open me-1"></i>
                       Browse
@@ -6677,7 +6861,6 @@ console.log("response" , response)
                   )}
                 </div>
 
-                {/* Sample File Download */}
                 <div className="mb-4">
                   <button
                     type="button"
@@ -6689,7 +6872,6 @@ console.log("response" , response)
                   </button>
                 </div>
 
-                {/* Message Display */}
                 {bulkUploadMessage && (
                   <div className={`alert ${bulkUploadSuccess ? 'alert-success' : 'alert-danger'} mb-3`}>
                     <i className={`fas ${bulkUploadSuccess ? 'fa-check-circle' : 'fa-exclamation-circle'} me-2`}></i>
@@ -6697,7 +6879,6 @@ console.log("response" , response)
                   </div>
                 )}
 
-                {/* Error Details */}
                 {bulkUploadErrors.length > 0 && (
                   <div className="mb-3">
                     <h6 className="fw-bold text-danger mb-2">
@@ -6714,7 +6895,6 @@ console.log("response" , response)
                   </div>
                 )}
 
-                {/* Action Buttons */}
                 <div className="d-flex justify-content-end gap-2 mt-4">
                   <button
                     type="button"
@@ -6729,7 +6909,7 @@ console.log("response" , response)
                     type="button"
                     className="btn uploadLeads px-4 text-white"
                     onClick={handleBulkUpload}
-                    disabled={!bulkUploadFile || bulkUploadLoading}
+                    disabled={!bulkUploadFile || bulkUploadLoading || !isBulkUploadConfigComplete}
                   >
                     {bulkUploadLoading ? (
                       <>

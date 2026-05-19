@@ -13,6 +13,16 @@ import useWebsocket from '../../../../utils/websocket';
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
+const DOC_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
+
+const getDocFileUrl = (fileUrl) => {
+  if (!fileUrl) return '';
+  if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://') || fileUrl.startsWith('blob:')) {
+    return fileUrl;
+  }
+  return `${DOC_BUCKET_URL}/${String(fileUrl).replace(/^\//, '')}`;
+};
+
 const MultiSelectCheckbox = ({
   title,
   options,
@@ -189,7 +199,7 @@ const DocumentModal = memo(({
     setDocumentRotation(0);
   }, []);
 
-  const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+  const fileUrl = getDocFileUrl(latestUpload?.fileUrl || selectedDocument?.fileUrl);
   const fileType = fileUrl ? getFileType(fileUrl) : null;
 
   const handleRejectClick = useCallback(() => {
@@ -212,7 +222,7 @@ const DocumentModal = memo(({
 
   // Fixed renderDocumentThumbnail - removed setCurrentPreviewUpload calls
   const renderDocumentThumbnail = (upload, isSmall = true) => {
-    const fileUrl = upload?.fileUrl;
+    const fileUrl = getDocFileUrl(upload?.fileUrl);
     if (!fileUrl) {
       return (
         <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
@@ -325,7 +335,7 @@ const DocumentModal = memo(({
                   {(() => {
 
 
-                    const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+                    const fileUrl = getDocFileUrl(latestUpload?.fileUrl || selectedDocument?.fileUrl);
                     const hasDocument = fileUrl ||
                       (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
 
@@ -484,7 +494,7 @@ const DocumentModal = memo(({
                         {upload.fileUrl && (
                           <div className="history-actions" style={{ marginTop: '8px' }}>
                             <a
-                              href={upload.fileUrl}
+                              href={getDocFileUrl(upload.fileUrl)}
                               download
                               className="btn btn-sm btn-outline-primary"
                               target="_blank"
@@ -13350,7 +13360,7 @@ useEffect(() => {
                                                           {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
                                                             <>
                                                               {(() => {
-                                                                const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
+                                                                const fileUrl = getDocFileUrl(latestUpload?.fileUrl || doc.fileUrl);
                                                                 const fileType = getFileType(fileUrl);
 
                                                                 if (fileType === 'image') {

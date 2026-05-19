@@ -3266,6 +3266,61 @@ router.post('/leads/import', isCollege, async (req, res) => {
 			});
 		}
 
+		let defaultLeadCategoryDoc = null;
+		let defaultTypeOfB2BDoc = null;
+		let modalStatusId = null;
+		let modalSubStatusId = null;
+
+		const bodyLeadCategory = req.body?.leadCategory ? String(req.body.leadCategory).trim() : '';
+		const bodyTypeOfB2B = req.body?.typeOfB2B ? String(req.body.typeOfB2B).trim() : '';
+		const bodyLeadStatus = req.body?.leadStatus ? String(req.body.leadStatus).trim() : '';
+		const bodyLeadSubStatus = req.body?.leadSubStatus ? String(req.body.leadSubStatus).trim() : '';
+
+		if (bodyLeadCategory && mongoose.Types.ObjectId.isValid(bodyLeadCategory)) {
+			defaultLeadCategoryDoc = await LeadCategory.findById(bodyLeadCategory);
+		}
+		if (bodyTypeOfB2B && mongoose.Types.ObjectId.isValid(bodyTypeOfB2B)) {
+			defaultTypeOfB2BDoc = await TypeOfB2B.findById(bodyTypeOfB2B);
+		}
+		if (bodyLeadStatus) {
+			const resolvedModal = await resolveBulkPipelineStatus(bodyLeadStatus);
+			if (resolvedModal.statusId) {
+				modalStatusId = resolvedModal.statusId;
+				modalSubStatusId = resolvedModal.subStatusId;
+			}
+		}
+		if (bodyLeadSubStatus && mongoose.Types.ObjectId.isValid(bodyLeadSubStatus) && modalStatusId) {
+			const stDoc = await StatusB2b.findById(modalStatusId).select('substatuses');
+			const matched = (stDoc?.substatuses || []).find((s) => String(s._id) === bodyLeadSubStatus);
+			if (matched) modalSubStatusId = matched._id;
+		}
+
+		if (!defaultLeadCategoryDoc || !defaultTypeOfB2BDoc) {
+			return res.status(400).json({
+				status: false,
+				message: 'Please select Lead Source and Type of B2B in the upload form before importing.'
+			});
+		}
+
+		if (bodyLeadStatus && !modalStatusId) {
+			return res.status(400).json({
+				status: false,
+				message: 'Invalid Lead Status selected in the upload form. Please choose again.'
+			});
+		}
+
+		const useModalLeadSource = Boolean(defaultLeadCategoryDoc);
+		const useModalB2bType = Boolean(defaultTypeOfB2BDoc);
+		const useModalPipeline = Boolean(modalStatusId);
+
+		leads = leads.filter((row) => {
+			if (!row || typeof row !== 'object') return false;
+			const hasBusiness = row.businessName != null && String(row.businessName).trim() !== '';
+			const hasPerson = row.concernPersonName != null && String(row.concernPersonName).trim() !== '';
+			const hasMobile = row.mobile != null && String(row.mobile).trim() !== '';
+			return hasBusiness || hasPerson || hasMobile;
+		});
+
 		// Process and validate leads
 		const processedLeads = [];
 		const errors = [];
@@ -3300,83 +3355,96 @@ router.post('/leads/import', isCollege, async (req, res) => {
 					}
 				}
 
-				// Validate and get Lead Category (case-insensitive search)
-				if (!row.leadCategory) {
-					errors.push(`Row ${i + 2}: Lead Source is required`);
-					continue;
-				}
-				
-				const leadSourceNorm = row.leadCategory.trim().toLowerCase();
-				const leadCatNameLowerMatch = {
-					$expr: {
-						$eq: [
-							{ $toLower: { $trim: { input: '$name' } } },
-							leadSourceNorm
-						]
+				// Lead Source: modal selection applies to all rows when set on upload form
+				let leadCategory = defaultLeadCategoryDoc;
+				const rowLeadSource =
+					!useModalLeadSource &&
+					row.leadCategory != null &&
+					String(row.leadCategory).trim() !== ''
+						? String(row.leadCategory).trim()
+						: '';
+
+				if (rowLeadSource) {
+					const leadSourceNorm = rowLeadSource.toLowerCase();
+					const leadCatNameLowerMatch = {
+						$expr: {
+							$eq: [
+								{ $toLower: { $trim: { input: '$name' } } },
+								leadSourceNorm
+							]
+						}
+					};
+
+					let rowLeadCategory = await LeadCategory.findOne({
+						...leadCatNameLowerMatch,
+						isActive: true
+					});
+					if (!rowLeadCategory) {
+						rowLeadCategory = await LeadCategory.findOne(leadCatNameLowerMatch);
 					}
-				};
-
-				let leadCategory = await LeadCategory.findOne({
-					...leadCatNameLowerMatch,
-					isActive: true
-				});
-
-				if (!leadCategory) {
-					leadCategory = await LeadCategory.findOne(leadCatNameLowerMatch);
-				}
-				
-				if (!leadCategory) {
-					// Get available categories for better error message (try both with and without isActive)
-					let availableCategories = await LeadCategory.find({ isActive: true }).select('name').limit(10);
-					if (availableCategories.length === 0) {
-						availableCategories = await LeadCategory.find({}).select('name').limit(10);
+					if (!rowLeadCategory && mongoose.Types.ObjectId.isValid(rowLeadSource)) {
+						rowLeadCategory = await LeadCategory.findById(rowLeadSource);
 					}
-					const categoryNames = availableCategories.map(c => c.name).join(', ');
-					// console.log(`Row ${i + 2}: Lead Category "${row.leadCategory}" not found. Total categories in DB: ${availableCategories.length}`);
-					errors.push(`Row ${i + 2}: Lead Source "${row.leadCategory}" not found. Available sources: ${categoryNames || 'None'}`);
-					continue;
-				}
-
-				// Validate and get Type of B2B (case-insensitive search)
-				if (!row.typeOfB2B) {
-					errors.push(`Row ${i + 2}: Type of B2B is required`);
-					continue;
-				}
-				
-				const b2bTypeNorm = row.typeOfB2B.trim().toLowerCase();
-				const b2bTypeNameLowerMatch = {
-					$expr: {
-						$eq: [
-							{ $toLower: { $trim: { input: '$name' } } },
-							b2bTypeNorm
-						]
+					if (!rowLeadCategory) {
+						let availableCategories = await LeadCategory.find({ isActive: true }).select('name').limit(10);
+						if (availableCategories.length === 0) {
+							availableCategories = await LeadCategory.find({}).select('name').limit(10);
+						}
+						const categoryNames = availableCategories.map((c) => c.name).join(', ');
+						errors.push(`Row ${i + 2}: Lead Source "${rowLeadSource}" not found. Available sources: ${categoryNames || 'None'}`);
+						continue;
 					}
-				};
-
-				let typeOfB2B = await TypeOfB2B.findOne({
-					...b2bTypeNameLowerMatch,
-					isActive: true
-				});
-
-				if (!typeOfB2B) {
-					typeOfB2B = await TypeOfB2B.findOne(b2bTypeNameLowerMatch);
+					leadCategory = rowLeadCategory;
 				}
-				
-				if (!typeOfB2B) {
-					// Get available types for better error message (try both with and without isActive)
-					let availableTypes = await TypeOfB2B.find({ isActive: true }).select('name').limit(10);
-					if (availableTypes.length === 0) {
-						availableTypes = await TypeOfB2B.find({}).select('name').limit(10);
+
+				// Type of B2B: modal selection applies to all rows when set on upload form
+				let typeOfB2B = defaultTypeOfB2BDoc;
+				const rowB2bType =
+					!useModalB2bType &&
+					row.typeOfB2B != null &&
+					String(row.typeOfB2B).trim() !== ''
+						? String(row.typeOfB2B).trim()
+						: '';
+
+				if (rowB2bType) {
+					const b2bTypeNorm = rowB2bType.toLowerCase();
+					const b2bTypeNameLowerMatch = {
+						$expr: {
+							$eq: [
+								{ $toLower: { $trim: { input: '$name' } } },
+								b2bTypeNorm
+							]
+						}
+					};
+
+					let rowTypeOfB2B = await TypeOfB2B.findOne({
+						...b2bTypeNameLowerMatch,
+						isActive: true
+					});
+					if (!rowTypeOfB2B) {
+						rowTypeOfB2B = await TypeOfB2B.findOne(b2bTypeNameLowerMatch);
 					}
-					const typeNames = availableTypes.map(t => t.name).join(', ');
-					// console.log(`Row ${i + 2}: Type of B2B "${row.typeOfB2B}" not found. Total types in DB: ${availableTypes.length}`);
-					errors.push(`Row ${i + 2}: Type of B2B "${row.typeOfB2B}" not found. Available types: ${typeNames || 'None'}`);
-					continue;
+					if (!rowTypeOfB2B && mongoose.Types.ObjectId.isValid(rowB2bType)) {
+						rowTypeOfB2B = await TypeOfB2B.findById(rowB2bType);
+					}
+					if (!rowTypeOfB2B) {
+						let availableTypes = await TypeOfB2B.find({ isActive: true }).select('name').limit(10);
+						if (availableTypes.length === 0) {
+							availableTypes = await TypeOfB2B.find({}).select('name').limit(10);
+						}
+						const typeNames = availableTypes.map((t) => t.name).join(', ');
+						errors.push(`Row ${i + 2}: Type of B2B "${rowB2bType}" not found. Available types: ${typeNames || 'None'}`);
+						continue;
+					}
+					typeOfB2B = rowTypeOfB2B;
 				}
 
 				let rowPipelineStatusId = null;
 				let rowPipelineSubStatusId = null;
-				if (row.leadStatus != null && String(row.leadStatus).trim() !== '') {
+				if (useModalPipeline) {
+					rowPipelineStatusId = modalStatusId;
+					rowPipelineSubStatusId = modalSubStatusId;
+				} else if (row.leadStatus != null && String(row.leadStatus).trim() !== '') {
 					const resolved = await resolveBulkPipelineStatus(row.leadStatus);
 					if (resolved.notFound != null) {
 						const avail = await StatusB2b.find(pipelineStatusScope)
@@ -3394,7 +3462,9 @@ router.post('/leads/import', isCollege, async (req, res) => {
 				}
 
 				const rawPipelineSub =
-					row.pipelineSubStatus != null && String(row.pipelineSubStatus).trim() !== ''
+					!useModalPipeline &&
+					row.pipelineSubStatus != null &&
+					String(row.pipelineSubStatus).trim() !== ''
 						? String(row.pipelineSubStatus).trim()
 						: '';
 				if (rawPipelineSub) {
@@ -3423,6 +3493,8 @@ router.post('/leads/import', isCollege, async (req, res) => {
 						continue;
 					}
 					rowPipelineSubStatusId = matchedSub._id;
+				} else if (!rawPipelineSub && modalSubStatusId && rowPipelineStatusId) {
+					rowPipelineSubStatusId = modalSubStatusId;
 				}
 
 				// Create lead object

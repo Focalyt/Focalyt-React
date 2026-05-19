@@ -81,8 +81,8 @@ const uploadFilesToS3 = async ({ files, folder, courseName, s3, bucketName, allo
 			ContentType: file.mimetype,
 		};
 
-		return s3.upload(params).promise().then((result) => {
-			uploaded.push(result.Location);
+		return s3.upload(params).promise().then(() => {
+			uploaded.push(key);
 		});
 	});
 
@@ -90,7 +90,26 @@ const uploadFilesToS3 = async ({ files, folder, courseName, s3, bucketName, allo
 	return uploaded;
 };
 
+const normalizeStorageKey = (value) => {
+	if (!value || typeof value !== 'string') return value;
+	let key = value.trim();
+	const bucketUrl = (process.env.MIPIE_BUCKET_URL || '').replace(/\/$/, '');
+	if (bucketUrl && key.startsWith(bucketUrl)) {
+		key = key.slice(bucketUrl.length).replace(/^\//, '');
+	}
+	const s3Match = key.match(/amazonaws\.com\/(.+)$/i);
+	if (s3Match) key = s3Match[1];
+	return key.replace(/^\//, '');
+};
 
+const normalizeCourseMedia = (body) => {
+	if (body.photos) body.photos = body.photos.map(normalizeStorageKey);
+	if (body.videos) body.videos = body.videos.map(normalizeStorageKey);
+	if (body.testimonialvideos) body.testimonialvideos = body.testimonialvideos.map(normalizeStorageKey);
+	if (body.thumbnail) body.thumbnail = normalizeStorageKey(body.thumbnail);
+	if (body.brochure) body.brochure = normalizeStorageKey(body.brochure);
+	return body;
+};
 
 router.route("/").get(async (req, res) => {
 
@@ -298,6 +317,8 @@ router
 				body.center = body.center.map(id => new mongoose.Types.ObjectId(id));
 			}
 		}
+
+		normalizeCourseMedia(body);
 
 		// Save course
 		const newCourse = await Courses.create(body);
@@ -542,6 +563,8 @@ router
 			}
 
 
+			normalizeCourseMedia(body);
+
 			// Update the course
 			const updatedCourse = await Courses.findByIdAndUpdate(courseId, body, { new: true });
 
@@ -555,6 +578,7 @@ router.put('/remove_course_media/:courseId', async (req, res) => {
 	try {
 		const { courseId } = req.params;
 		const { fileType, fileUrl } = req.body;
+		const normalizedFileUrl = normalizeStorageKey(fileUrl);
 		const course = await Courses.findById(courseId);
 		// console.log(course, 'course');
 		if (!course) {
@@ -562,13 +586,13 @@ router.put('/remove_course_media/:courseId', async (req, res) => {
 			return res.status(404).json({ status: false, message: "Course not found" });
 		}
 		if (fileType === 'photo') {
-			course.photos = course.photos.filter(photo => photo !== fileUrl);
+			course.photos = course.photos.filter(photo => normalizeStorageKey(photo) !== normalizedFileUrl);
 		}
 		if (fileType === 'video') {
-			course.videos = course.videos.filter(video => video !== fileUrl);
+			course.videos = course.videos.filter(video => normalizeStorageKey(video) !== normalizedFileUrl);
 		}
 		if (fileType === 'testimonialvideo') {
-			course.testimonialvideos = course.testimonialvideos.filter(testimonialvideo => testimonialvideo !== fileUrl);
+			course.testimonialvideos = course.testimonialvideos.filter(testimonialvideo => normalizeStorageKey(testimonialvideo) !== normalizedFileUrl);
 		}
 		if (fileType === 'brochure') {
 			course.brochure = '';
@@ -577,7 +601,7 @@ router.put('/remove_course_media/:courseId', async (req, res) => {
 			course.thumbnail = '';
 		}
 		if (fileType === 'testimonial') {
-			course.testimonialvideos = course.testimonialvideos.filter(testimonial => testimonial !== fileUrl);
+			course.testimonialvideos = course.testimonialvideos.filter(testimonial => normalizeStorageKey(testimonial) !== normalizedFileUrl);
 		}
 		await course.save();
 		return res.status(200).json({ status: true, message: `${fileType} removed successfully` });
@@ -717,9 +741,9 @@ router.route('/:courseId/candidate/upload-docs')
 				};
 
 				uploadPromises.push(
-					s3.upload(params).promise().then((uploadResult) => {
+					s3.upload(params).promise().then(() => {
 						uploadedFiles.push({
-							fileURL: uploadResult.Location,
+							fileURL: key,
 							fileType,
 						});
 					})
