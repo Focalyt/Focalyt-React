@@ -87,7 +87,7 @@ frontend/.env
 /frontend/src/Component/Layouts/Front/FrontFooter/FrontFooter copy.css
 /frontend/src/Pages/Front/HomePage/PillarProjectLogos.jsx
 /frontend/src/Pages/Front/HomePage/PillarProjectLogos.css
-/frontend/src/Component/Layouts/Front/FrontHeader/FrontHeader.jsx
-/frontend/src/Component/Layouts/Front/FrontHeader/FrontHeader.css
+# /frontend/src/Component/Layouts/Front/FrontHeader/FrontHeader.jsx
+# /frontend/src/Component/Layouts/Front/FrontHeader/FrontHeader.css
 # /frontend/src/Pages/Front/HomePage/HomePage.jsx
 # frontend/src/Pages/Front/HomePage/HomePage.jsx
