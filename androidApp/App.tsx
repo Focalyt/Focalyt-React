@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './app/auth/AuthContext';
 import { loadUser } from './app/auth/authStorage';
 import { AppNavigator } from './app/navigation/AppNavigator';
+import { AppVersionGate } from './app/components/AppVersionGate';
 import type { AuthUser } from './app/auth/authTypes';
 
 export default function App() {
@@ -42,5 +43,9 @@ export default function App() {
 
 function Root() {
   const { user } = useAuth();
-  return <AppNavigator user={user} />;
+  return (
+    <AppVersionGate>
+      <AppNavigator user={user} />
+    </AppVersionGate>
+  );
 }

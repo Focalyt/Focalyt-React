@@ -1,5 +1,18 @@
 export type UserRole = 1 | 2 | 3 | 4;
 
+export type GoogleAuthToken = {
+  accessToken?: string;
+  expiresAt?: string;
+  tokenType?: string;
+  idToken?: string;
+  refreshToken?: string;
+  scopes?: string;
+  lastUpdated?: string;
+  email?: string;
+  name?: string;
+  picture?: string;
+};
+
 export type AuthUser = {
   _id: string;
   name?: string;
@@ -11,5 +24,6 @@ export type AuthUser = {
   collegeId?: string;
   isDefaultAdmin?: boolean;
   permissions?: unknown;
+  googleAuthToken?: GoogleAuthToken;
 };
 

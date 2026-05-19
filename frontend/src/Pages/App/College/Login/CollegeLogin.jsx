@@ -34,8 +34,38 @@ const CollegeLogin = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showNewPassword, setShowNewPassword] = useState(false);
 
+    const [appDownload, setAppDownload] = useState(null);
+    const [appDownloadLoading, setAppDownloadLoading] = useState(true);
+
     // Logo URL
     const logoUrl = "/Assets/images/logo/logo.png";
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+    const loginBtnRef = useRef(null);
+
+    useEffect(() => {
+        const fetchAppDownload = async () => {
+            try {
+                const res = await axios.get(`${backendUrl}/api/app/download`, {
+                    params: { platform: 'android' },
+                });
+                if (res.data?.status && res.data?.data?.available) {
+                    setAppDownload(res.data.data);
+                } else {
+                    setAppDownload(null);
+                }
+            } catch (err) {
+                console.error('App download info:', err);
+                setAppDownload(null);
+            } finally {
+                setAppDownloadLoading(false);
+            }
+        };
+        if (backendUrl) {
+            fetchAppDownload();
+        } else {
+            setAppDownloadLoading(false);
+        }
+    }, [backendUrl]);
 
     useEffect(() => {
         console.log('userData', userData)
@@ -47,9 +77,6 @@ const CollegeLogin = () => {
             }
         }
     }, [userData]);
-
-    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-    const loginBtnRef = useRef(null);
 
     const handleMobileNumberKeyPress = (e) => {
         const charCode = e.which ? e.which : e.keyCode;
@@ -317,6 +344,32 @@ const CollegeLogin = () => {
 
                 <h3 className="title">Institute Portal</h3>
                 <p className="subtitle">Please login to your account</p>
+
+                {!appDownloadLoading && appDownload?.downloadUrl && (
+                    <div className="app-download-box">
+                        <div className="app-download-icon">
+                            <i className="fa-brands fa-android"></i>
+                        </div>
+                        <div className="app-download-text">
+                            <span className="app-download-title">Download Focalyt Android App</span>
+                            <span className="app-download-version">
+                                v{appDownload.versionName}
+                                {appDownload.fileSizeBytes
+                                    ? ` · ${(appDownload.fileSizeBytes / (1024 * 1024)).toFixed(1)} MB`
+                                    : ''}
+                            </span>
+                        </div>
+                        <a
+                            href={appDownload.downloadUrl}
+                            className="app-download-btn"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download
+                        >
+                            <i className="fa-solid fa-download"></i> APK
+                        </a>
+                    </div>
+                )}
 
                 <div className="login-tabs">
                     <span
@@ -647,6 +700,70 @@ const CollegeLogin = () => {
                     font-size: 14px;
                     color: #666;
                     margin-bottom: 20px;
+                }
+
+                .app-download-box {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 12px 14px;
+                    margin-bottom: 20px;
+                    border: 1px solid #e8dff5;
+                    border-radius: 8px;
+                    background: linear-gradient(135deg, #faf7ff 0%, #f3ecff 100%);
+                }
+
+                .app-download-icon {
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 8px;
+                    background: #7a29c9;
+                    color: #fff;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 22px;
+                    flex-shrink: 0;
+                }
+
+                .app-download-text {
+                    flex: 1;
+                    min-width: 0;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2px;
+                }
+
+                .app-download-title {
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: #333;
+                }
+
+                .app-download-version {
+                    font-size: 12px;
+                    color: #666;
+                }
+
+                .app-download-btn {
+                    flex-shrink: 0;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 8px 14px;
+                    background: #7a29c9;
+                    color: #fff;
+                    border-radius: 6px;
+                    font-size: 13px;
+                    font-weight: 500;
+                    text-decoration: none;
+                    transition: background-color 0.2s;
+                }
+
+                .app-download-btn:hover {
+                    background: #6a1ca9;
+                    color: #fff;
+                    text-decoration: none;
                 }
                 
                 .login-tabs {

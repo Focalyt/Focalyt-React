@@ -4,7 +4,7 @@ const { google } = require('googleapis')
 const multer  = require('multer')
 var multipleUpload = multer().array('file');
 const { authenti, authCollege, authCommon, isCandidate, isAdmin, authentiAdmin, auth1 } = require("../../helpers");
-const { User, TrainerTimeTable } = require("../models");
+const { User, TrainerTimeTable, AppRelease } = require("../models");
 const {
 	commonFunc,
 	educationlist,
@@ -43,6 +43,98 @@ const smsTemplateRoutes = express.Router();
 const educationRoutes = express.Router();
 
 educationRoutes.get("/educationlist", educationlist.educationlist);
+
+// Latest Android APK for download links (no auth) — college login, marketing
+commonRoutes.get("/app/download", async (req, res) => {
+  try {
+    const platform = String(req.query.platform || "android").toLowerCase();
+    const latest = await AppRelease.findOne({
+      platform,
+      isActive: true,
+    })
+      .sort({ versionCode: -1 })
+      .lean();
+
+    if (!latest) {
+      return res.json({
+        status: true,
+        data: { available: false },
+      });
+    }
+
+    return res.json({
+      status: true,
+      data: {
+        available: true,
+        versionCode: latest.versionCode,
+        versionName: latest.versionName,
+        downloadUrl: latest.apkUrl,
+        releaseNotes: latest.releaseNotes || "",
+        fileSizeBytes: latest.fileSizeBytes,
+      },
+    });
+  } catch (err) {
+    console.error("App download info error:", err);
+    return res.status(500).json({
+      status: false,
+      message: err.message || "Failed to fetch app download",
+    });
+  }
+});
+
+// Mobile app version check (no auth) — used by React Native app on launch
+commonRoutes.get("/app/version", async (req, res) => {
+  try {
+    const platform = String(req.query.platform || "android").toLowerCase();
+    const clientVersionCode = parseInt(req.query.versionCode, 10);
+
+    if (!clientVersionCode || clientVersionCode < 1) {
+      return res.status(400).json({
+        status: false,
+        message: "versionCode query param is required",
+      });
+    }
+
+    const latest = await AppRelease.findOne({
+      platform,
+      isActive: true,
+    })
+      .sort({ versionCode: -1 })
+      .lean();
+
+    if (!latest || clientVersionCode >= latest.versionCode) {
+      return res.json({
+        status: true,
+        data: {
+          updateRequired: false,
+          forceUpdate: false,
+          currentVersionCode: clientVersionCode,
+          latestVersionCode: latest?.versionCode || clientVersionCode,
+        },
+      });
+    }
+
+    return res.json({
+      status: true,
+      data: {
+        updateRequired: true,
+        forceUpdate: latest.forceUpdate !== false,
+        currentVersionCode: clientVersionCode,
+        latestVersionCode: latest.versionCode,
+        versionName: latest.versionName,
+        downloadUrl: latest.apkUrl,
+        releaseNotes: latest.releaseNotes || "",
+        fileSizeBytes: latest.fileSizeBytes,
+      },
+    });
+  } catch (err) {
+    console.error("App version check error:", err);
+    return res.status(500).json({
+      status: false,
+      message: err.message || "Failed to check app version",
+    });
+  }
+});
 
 commonRoutes.post("/sendOtptoAddLead", commonFunc.sendOtptoAddLead);
 commonRoutes.post("/otpCollegeLogin", commonFunc.loginAsCollege);

@@ -58,11 +58,28 @@ export async function postJson(
   body: Json,
   token?: string,
 ): Promise<Json> {
+  return sendJson('POST', pathname, body, token);
+}
+
+export async function putJson(
+  pathname: string,
+  body: Json,
+  token?: string,
+): Promise<Json> {
+  return sendJson('PUT', pathname, body, token);
+}
+
+async function sendJson(
+  method: 'POST' | 'PUT',
+  pathname: string,
+  body: Json,
+  token?: string,
+): Promise<Json> {
   const url = buildUrl(pathname);
   let res: Response;
   try {
     res = await fetch(url, {
-      method: 'POST',
+      method,
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',

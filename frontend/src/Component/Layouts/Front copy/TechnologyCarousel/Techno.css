@@ -1,0 +1,42 @@
+.tech_area_img{
+    width: 100%;
+}
+.tech_area_img img{
+    width: 50%;
+}
+.partner_col {
+    background: #ffffff;
+    margin: 10px;
+    border-radius: 10px;
+    text-align: center;
+    justify-content: center;
+    padding: 20px 0px 0px 0px;
+}
+.partner_col img {
+    text-align: center;
+    margin: 0 auto;
+}
+.partner_col h5 {
+    font-size: 15px!important;
+    padding: 10px 0px;
+    color: black;
+    font-size: 20px;
+    font-weight: 600;
+    word-wrap: break-word;
+}
+.partner_col a {
+    background-color: #FC2B5A;
+    color: #fff;
+    display: block;
+    font-size: 14px;
+    font-weight: 400;
+    word-wrap: break-word;
+    padding: 5px;
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+    transition: .3s ease;
+}
+.partner_col a:hover {
+    background-color: #9747ff;
+    transition: .4s ease;
+}

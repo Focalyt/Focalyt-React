@@ -23,6 +23,7 @@ const moment = require('moment')
 
 const appBannerRoutes = require('./appBanner');
 const appUpdateRoutes = require('./appUpdate');
+const appReleaseRoutes = require('./appRelease');
 const careerObjectiveRoutes = require('./careerObjective');
 const candidateRoutes = require('./candidate');
 const collegeRoutes = require('./college');
@@ -83,6 +84,7 @@ router.use('/appBanner', appBannerRoutes);
 router.use('/post', postRoutes);
 router.use('/freelancer', freelancerRoutes);
 router.use('/appUpdate', appUpdateRoutes);
+router.use('/appRelease', appReleaseRoutes);
 router.use('/careerObjective', careerObjectiveRoutes);
 router.use('/candidate', candidateRoutes);
 router.use('/college', collegeRoutes);

@@ -3,6 +3,7 @@ module.exports.Batch = require('./batch');
 module.exports.Event = require('./event');
 module.exports.AppliedEvent = require('./appliedEvent');
 module.exports.AppUpdate = require('./appUpdate');
+module.exports.AppRelease = require('./appRelease');
 module.exports.User = require('./users');
 module.exports.CareerObjective = require('./careerObjective');
 module.exports.City = require('./cities');

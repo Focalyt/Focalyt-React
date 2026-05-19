@@ -344,6 +344,11 @@
                                                       class="fa fa-youtube-play"></i><span class="menu-title"
                                                       data-i18n="Todo">YouTube Gallery</span></a>
                                     </li>
+                                    <li class="nav-item <% if(menu==='appRelease') {%>active<%}%>"><a
+                                                href="<%= process.env.MIPIE_BACKEND_URL %>/admin/appRelease"><i
+                                                      class="feather icon-smartphone"></i><span class="menu-title"
+                                                      data-i18n="App Release">Android APK Release</span></a>
+                                    </li>
                                     <!--
 
           <li class="nav-item"><a href="#"><i class="feather icon-plus"></i><span class="menu-title" data-i18n="Todo">Vacancy</span></a>
@@ -380,6 +385,9 @@
         </li>
         <li class="nav-item"><a href="/admin/appBanner"><i class="feather icon-edit"></i><span class="menu-title"
           data-i18n="App Banner">App Banners</span></a>
+        </li>
+        <li class="nav-item <% if(menu==='appRelease') {%>active<%}%>"><a href="/admin/appRelease"><i class="feather icon-smartphone"></i><span class="menu-title"
+          data-i18n="App Release">Android APK Release</span></a>
         </li>
         <li class="nav-item"><a href="/admin/appUpdate"><i class="feather icon-edit"></i><span class="menu-title"
           data-i18n="App Upload">App Updates</span></a>

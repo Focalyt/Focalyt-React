@@ -204,7 +204,11 @@ app.use((req, res, next) => {
 	if (req.path.includes('/whatsapp/send-file') || req.path.includes('/whatsapp/send-audio')) {
 		return next();
 	}
-	fileupload()(req, res, next);
+	const isApkUpload = req.path.includes('/admin/appRelease/upload');
+	fileupload({
+		limits: { fileSize: isApkUpload ? 250 * 1024 * 1024 : 50 * 1024 * 1024 },
+		abortOnLimit: true,
+	})(req, res, next);
 });
 app.use((req, res, next) => {
 	res.locals.currentUser = req.session.user;

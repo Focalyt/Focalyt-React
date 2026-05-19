@@ -14,7 +14,9 @@ import {
   B2BCalendarEvent,
   fetchB2BCalendarEvents,
 } from '../../services/b2bApi';
+import { getGoogleEmail, isGoogleConnected } from '../../services/googleAuth';
 import { college } from '../../theme/college';
+import { B2BGoogleConnectModal } from './B2BGoogleConnectModal';
 
 type RangeMode = 'today' | 'week' | 'month';
 
@@ -53,12 +55,15 @@ export function B2BFollowUpTab() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const token = user?.token ?? '';
+  const googleConnected = isGoogleConnected(user);
+  const googleEmail = getGoogleEmail(user);
 
   const [mode, setMode] = React.useState<RangeMode>('today');
   const [events, setEvents] = React.useState<B2BCalendarEvent[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
   const [info, setInfo] = React.useState<string | null>(null);
+  const [showGoogleConnect, setShowGoogleConnect] = React.useState(false);
 
   const load = React.useCallback(
     async (refresh = false) => {
@@ -106,6 +111,41 @@ export function B2BFollowUpTab() {
         <Text style={styles.sub}>
           Google Calendar par schedule kiye gaye B2B follow-ups.
         </Text>
+
+        {!googleConnected ? (
+          <Pressable
+            style={styles.connectBanner}
+            onPress={() => setShowGoogleConnect(true)}
+          >
+            <Text style={styles.connectBannerIcon}>🗓</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.connectBannerTitle}>
+                Google Calendar connect karo
+              </Text>
+              <Text style={styles.connectBannerSub}>
+                Follow-ups auto-sync hone ke liye permission do.
+              </Text>
+            </View>
+            <Text style={styles.connectBannerCta}>Connect ›</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.connectedRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.connectedText}>
+                ✓ Google Calendar connected
+              </Text>
+              {googleEmail ? (
+                <Text style={styles.connectedEmail} numberOfLines={1}>
+                  {googleEmail}
+                </Text>
+              ) : null}
+            </View>
+            <Pressable onPress={() => setShowGoogleConnect(true)}>
+              <Text style={styles.connectedReconnect}>Switch</Text>
+            </Pressable>
+          </View>
+        )}
+
         <View style={styles.modeRow}>
           {(['today', 'week', 'month'] as RangeMode[]).map(m => (
             <Pressable
@@ -158,6 +198,12 @@ export function B2BFollowUpTab() {
           }
         />
       )}
+
+      <B2BGoogleConnectModal
+        visible={showGoogleConnect}
+        onClose={() => setShowGoogleConnect(false)}
+        onConnected={() => load(true)}
+      />
     </View>
   );
 }
@@ -234,5 +280,60 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 6,
     marginBottom: 8,
+  },
+  connectBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    marginBottom: 10,
+  },
+  connectBannerIcon: { fontSize: 22 },
+  connectBannerTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#1e3a8a',
+  },
+  connectBannerSub: {
+    fontSize: 11,
+    color: '#1e40af',
+    marginTop: 2,
+  },
+  connectBannerCta: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#1d4ed8',
+  },
+  connectedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  connectedText: {
+    fontSize: 12,
+    color: '#065f46',
+    fontWeight: '700',
+  },
+  connectedEmail: {
+    fontSize: 11,
+    color: '#047857',
+    marginTop: 1,
+  },
+  connectedReconnect: {
+    fontSize: 11,
+    color: '#047857',
+    fontWeight: '700',
   },
 });

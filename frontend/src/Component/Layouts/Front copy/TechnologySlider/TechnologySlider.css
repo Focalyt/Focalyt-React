@@ -1,0 +1,146 @@
+.custom-arrow {
+  width: 40px;
+  height: 40px;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s ease;
+}
+
+.slick-dots li button:before {
+  color: #fff;
+
+}
+
+.technology-slider-section {
+  background: #1a1a1a;
+  padding: 60px 0;
+}
+
+.slider-title {
+  text-align: center;
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: white;
+  margin-bottom: 40px;
+}
+
+.gradient-text {
+  background: linear-gradient(to right, #ff3366, #ff6b6b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.slider-container {
+  padding: 0 20px;
+}
+
+.slide-wrapper {
+  padding: 10px;
+}
+
+.technology-slide {
+  background: white;
+  border-radius: 8px;
+  padding: 30px 20px;
+  text-align: center;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-container {
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.tech-icon {
+  max-height: 80px;
+  width: auto;
+  transition: transform 0.3s ease;
+}
+
+.technology-slide:hover .tech-icon {
+  transform: scale(1.1);
+}
+
+.tech-title {
+  margin: 0;
+  color: #333;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+/* Custom arrow styles */
+.custom-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  background: #333;
+  border: none;
+  border-radius: 50%;
+  z-index: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s ease;
+}
+
+.custom-arrow:hover {
+  background: #ff3366;
+}
+
+.custom-arrow.prev {
+  left: -20px;
+}
+
+.custom-arrow.next {
+  right: -20px;
+}
+
+/* Dots styling */
+.slick-dots {
+  bottom: -40px;
+}
+
+.slick-dots li button:before {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.slick-dots li.slick-active button:before {
+  color: #ff3366;
+}
+
+/* Responsive adjustments */
+@media (max-width: 991px) {
+  .slider-title {
+    font-size: 2rem;
+  }
+
+  .technology-slide {
+    padding: 20px 15px;
+  }
+
+  .image-container {
+    height: 80px;
+  }
+}
+
+@media (max-width: 576px) {
+  .slider-title {
+    font-size: 1.75rem;
+  }
+
+  .slide-wrapper {
+    padding: 5px;
+  }
+}

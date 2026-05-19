@@ -1,0 +1,198 @@
+<% include ./partials/header %>
+<style>
+  .app-release-page .release-notice {
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    z-index: auto !important;
+    width: 100%;
+    margin-bottom: 1rem;
+    padding: 0.85rem 1rem;
+    border-radius: 0.35rem;
+    border: 1px solid #dae1e7;
+    background: #f8f9fa;
+    color: #626262;
+    line-height: 1.5;
+  }
+  .app-release-page .release-notice-info {
+    background: #e7f3ff;
+    border-color: #b8daff;
+    color: #004085;
+  }
+  .app-release-page .release-notice strong {
+    color: inherit;
+  }
+  .app-release-page label {
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+  }
+  .app-release-page .version-auto-badge {
+    display: inline-block;
+    font-size: 1.1rem;
+    font-weight: 600;
+    padding: 0.35rem 0.75rem;
+    border-radius: 0.35rem;
+    background: #fff;
+    border: 1px solid #b8daff;
+    color: #004085;
+    margin-top: 0.35rem;
+  }
+  .app-release-page .release-notice-warn {
+    background: #fff3cd;
+    border-color: #ffeeba;
+    color: #856404;
+  }
+</style>
+<div class="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
+  <div class="content-header-left col-md-9 col-12 mb-2">
+    <div class="row breadcrumbs-top">
+      <div class="col-12">
+        <h3 class="content-header-title float-left mb-0">Android App Release</h3>
+        <div class="breadcrumb-wrapper col-12">
+          <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="<%= process.env.MIPIE_BACKEND_URL %>/admin">Home</a></li>
+            <li class="breadcrumb-item active">Android APK</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="content-body app-release-page">
+  <% include ./partials/flash %>
+  <section class="list-view">
+    <div class="row">
+      <div class="col-xl-12">
+        <div class="card">
+          <div class="card-header border border-top-0 border-left-0 border-right-0">
+            <h4 class="card-title pb-1">Upload new Android APK</h4>
+          </div>
+          <div class="card-content">
+            <div class="card-body">
+              <% if (lastRelease) { %>
+                <div class="release-notice release-notice-info">
+                  <strong>Last uploaded:</strong>
+                  v<%= lastRelease.versionName %> (code <strong><%= lastRelease.versionCode %></strong>)
+                  <% if (lastRelease.isActive) { %>
+                    <span class="badge badge-success ml-1">Active</span>
+                  <% } %>
+                  · <%= new Date(lastRelease.createdAt).toLocaleString('en-IN') %>
+                  <% if (lastRelease.apkUrl) { %>
+                    · <a href="<%= lastRelease.apkUrl %>" target="_blank" rel="noopener">Download APK</a>
+                  <% } %>
+                </div>
+              <% } %>
+
+              <% if (autoVersion && autoVersion.versionCode) { %>
+                <div class="release-notice release-notice-info">
+                  <div><strong>Is upload ka version (auto)</strong> — <code>build.gradle</code> se:</div>
+                  <div class="version-auto-badge">v<%= autoVersion.versionName %> · code <%= autoVersion.versionCode %></div>
+                  <div class="small mt-1 text-muted">Sirf APK file choose karein. Version likhne ki zaroorat nahi.</div>
+                </div>
+              <% } %>
+
+              <% if (!canUpload && uploadBlockedReason) { %>
+                <div class="release-notice release-notice-warn">
+                  <strong>Upload abhi band hai:</strong> <%= uploadBlockedReason %>
+                </div>
+              <% } %>
+
+              <form class="form-horizontal" action="<%= process.env.MIPIE_BACKEND_URL %>/admin/appRelease/upload" method="post" enctype="multipart/form-data">
+                <div class="row">
+                  <div class="col-xl-12 mb-1">
+                    <label>APK File <span class="text-danger">*</span></label>
+                    <input type="file" class="form-control" name="apk" accept=".apk" required <%= canUpload ? '' : 'disabled' %>>
+                  </div>
+                  <div class="col-xl-12 mb-1">
+                    <label>Release Notes</label>
+                    <textarea class="form-control" name="releaseNotes" rows="3" placeholder="Is version me kya naya hai…"></textarea>
+                  </div>
+                  <div class="col-xl-12 mb-2">
+                    <div class="custom-control custom-checkbox">
+                      <input type="checkbox" class="custom-control-input" id="forceUpdate" name="forceUpdate" checked>
+                      <label class="custom-control-label" for="forceUpdate">Force update (bina update ke app use na ho)</label>
+                    </div>
+                  </div>
+                  <div class="col-xl-12">
+                    <button type="submit" class="btn btn-primary" <%= canUpload ? '' : 'disabled' %>>
+                      <i class="feather icon-upload"></i> Publish APK
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-2">
+          <div class="card-header">
+            <h4 class="card-title mb-0">Published releases</h4>
+          </div>
+          <div class="card-content">
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                  <thead>
+                    <tr>
+                      <th>Status</th>
+                      <th>Version</th>
+                      <th>Code</th>
+                      <th>Force</th>
+                      <th>Size</th>
+                      <th>APK</th>
+                      <th>Uploaded</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% if (releases && releases.length) { %>
+                      <% releases.forEach(function(r) { %>
+                        <tr>
+                          <td>
+                            <% if (r.isActive) { %>
+                              <span class="badge badge-success">Active</span>
+                            <% } else { %>
+                              <span class="badge badge-secondary">Inactive</span>
+                            <% } %>
+                          </td>
+                          <td><strong><%= r.versionName %></strong></td>
+                          <td><%= r.versionCode %></td>
+                          <td><%= r.forceUpdate ? 'Yes' : 'No' %></td>
+                          <td>
+                            <% if (r.fileSizeBytes) { %>
+                              <%= (r.fileSizeBytes / (1024*1024)).toFixed(2) %> MB
+                            <% } else { %>—<% } %>
+                          </td>
+                          <td><a href="<%= r.apkUrl %>" target="_blank" rel="noopener">Download</a></td>
+                          <td><%= new Date(r.createdAt).toLocaleString('en-IN') %></td>
+                          <td>
+                            <form action="<%= process.env.MIPIE_BACKEND_URL %>/admin/appRelease/<%= r._id %>/toggle" method="post" style="display:inline">
+                              <button type="submit" class="btn btn-sm btn-outline-primary">
+                                <%= r.isActive ? 'Deactivate' : 'Set active' %>
+                              </button>
+                            </form>
+                          </td>
+                        </tr>
+                        <% if (r.releaseNotes) { %>
+                          <tr>
+                            <td colspan="8" class="text-muted small border-top-0 pt-0"><%= r.releaseNotes %></td>
+                          </tr>
+                        <% } %>
+                      <% }); %>
+                    <% } else { %>
+                      <tr>
+                        <td colspan="8" class="text-center text-muted py-3">No releases yet.</td>
+                      </tr>
+                    <% } %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+<% include ./partials/footer %>
