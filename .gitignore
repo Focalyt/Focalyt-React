@@ -89,5 +89,5 @@ frontend/.env
 /frontend/src/Pages/Front/HomePage/PillarProjectLogos.css
 /frontend/src/Component/Layouts/Front/FrontHeader/FrontHeader.jsx
 /frontend/src/Component/Layouts/Front/FrontHeader/FrontHeader.css
-/frontend/src/Pages/Front/HomePage/HomePage.jsx
-frontend/src/Pages/Front/HomePage/HomePage.jsx
+# /frontend/src/Pages/Front/HomePage/HomePage.jsx
+# frontend/src/Pages/Front/HomePage/HomePage.jsx
