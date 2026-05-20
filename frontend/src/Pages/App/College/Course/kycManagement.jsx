@@ -8,6 +8,35 @@ import axios from 'axios'
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
+const DOC_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
+
+const DOC_COURSE_PREFIX = /^Documents for course\/?/i;
+
+const normalizeDocStorageKey = (fileUrl) => {
+  if (!fileUrl) return '';
+  let key = String(fileUrl).trim();
+  if (key.startsWith('blob:')) return key;
+  if (key.startsWith('http://') || key.startsWith('https://')) {
+    const bucketBase = DOC_BUCKET_URL.replace(/\/$/, '');
+    if (bucketBase && key.startsWith(bucketBase)) {
+      key = key.slice(bucketBase.length);
+    } else {
+      const s3Match = key.match(/amazonaws\.com\/(.+)$/i);
+      if (s3Match) key = decodeURIComponent(s3Match[1]);
+      else return key;
+    }
+  }
+  return key.replace(/^\//, '').replace(DOC_COURSE_PREFIX, '');
+};
+
+const getDocFileUrl = (fileUrl) => {
+  const key = normalizeDocStorageKey(fileUrl);
+  if (!key) return '';
+  if (key.startsWith('blob:') || key.startsWith('http://') || key.startsWith('https://')) {
+    return key;
+  }
+  return `${DOC_BUCKET_URL}/${key}`;
+};
 
 const MultiSelectCheckbox = ({
   title,
@@ -384,7 +413,6 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     }
   `;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const user = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
@@ -2525,7 +2553,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
       setAccumulatedPan({ x: 0, y: 0 });
     }, []);
 
-    const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+    const fileUrl = getDocFileUrl(latestUpload?.fileUrl || selectedDocument?.fileUrl);
     const fileType = fileUrl ? getFileType(fileUrl) : null;
 
     const handleRejectClick = useCallback(() => {
@@ -2549,7 +2577,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     // Helper function to render document preview thumbnail using iframe/img
     // यदि आप बिल्कुल auto height चाहते हैं (बिना किसी limit के):
     const renderDocumentThumbnail = (upload, isSmall = true) => {
-      const fileUrl = upload?.fileUrl;
+      const fileUrl = getDocFileUrl(upload?.fileUrl);
       if (!fileUrl) {
         return (
           <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
@@ -2765,7 +2793,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                       console.log('selectedDocument:', selectedDocument);
                       console.log('latestUpload:', latestUpload);
 
-                      const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+                      const fileUrl = getDocFileUrl(latestUpload?.fileUrl || selectedDocument?.fileUrl);
                       const hasDocument = fileUrl ||
                         (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
 
@@ -2928,7 +2956,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                           {upload.fileUrl && (
                             <div className="history-actions" style={{ marginTop: '8px' }}>
                               <a
-                                href={upload.fileUrl}
+                                href={getDocFileUrl(upload.fileUrl)}
                                 download
                                 className="btn btn-sm btn-outline-primary"
                                 target="_blank"
@@ -5377,7 +5405,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                                 {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
                                                                   <>
                                                                     {(() => {
-                                                                      const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
+                                                                      const fileUrl = getDocFileUrl(latestUpload?.fileUrl || doc.fileUrl);
                                                                       const fileType = getFileType(fileUrl);
 
                                                                       if (fileType === 'image') {

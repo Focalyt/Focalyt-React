@@ -88,7 +88,7 @@ function Footer() {
                       <img src="/Assets/public_assets/images/icons/home.png" draggable="false"
                         className="img-fluid footer-skill-course m-0" />
                     </figure>
-                    <span className="text-white pt-1">Home</span>
+                    <span className="footer-nav-label pt-1">Home</span>
                   </a>
                 </li>
                 {/* <!----> */}
@@ -99,13 +99,13 @@ function Footer() {
                       <img src="/Assets/public_assets/images/icons/learn.png" draggable="false"
                         className="footer-skill-course img-fluid m-0" />
                     </figure>
-                    <span className="text-white pt-1">Courses</span>
+                    <span className="footer-nav-label pt-1">Courses</span>
                   </a>
                 </li>
                 {/* <!----> */}
                 <li className="login_col">
                   <a href="/candidate/login">
-                    <span className="text-white login_ty bg-transparent" style={{ backgroundColor: "transparent;" }}>Login</span>
+                    <span className="login_ty">Login</span>
                   </a>
                 </li>
                 <li>
@@ -113,7 +113,7 @@ function Footer() {
                     <figure>
                       <img src="/Assets/public_assets/images/icons/jobs.png" draggable="false"
                         className="footer-skill-course img-fluid m-0" /></figure>
-                    <span className="text-white pt-1">Jobs</span>
+                    <span className="footer-nav-label pt-1">Jobs</span>
                   </a>
                 </li>
                 <li>
@@ -121,7 +121,7 @@ function Footer() {
                     <figure>
                       <img src="/Assets/public_assets/images/icons/share.png" draggable="false"
                         className="footer-skill-course img-fluid m-0" /></figure>
-                    <span className="text-white pt-1">Share</span>
+                    <span className="footer-nav-label pt-1">Share</span>
                   </a>
                 </li>
               </ul>

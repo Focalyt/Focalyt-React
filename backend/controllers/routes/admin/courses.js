@@ -1126,7 +1126,7 @@ router.route('/:courseId/candidate/upload-docs')
 					fileType = "video";
 				}
 
-				const key = `Documents for course/${courseId}/${candidateId}/${docsId}/${uuid()}.${ext}`;
+				const key = `${courseId}/${candidateId}/${docsId}/${uuid()}.${ext}`;
 				const params = {
 					Bucket: bucketName,
 					Key: key,
@@ -1135,9 +1135,9 @@ router.route('/:courseId/candidate/upload-docs')
 				};
 
 				uploadPromises.push(
-					s3.upload(params).promise().then((uploadResult) => {
+					s3.upload(params).promise().then(() => {
 						uploadedFiles.push({
-							fileURL: uploadResult.Location,
+							fileURL: key,
 							fileType,
 						});
 					})

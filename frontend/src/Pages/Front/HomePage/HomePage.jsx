@@ -118,36 +118,36 @@ html { scroll-behavior: smooth; }
 
 .foc-cyber-home {
   /* these are filled by the active theme below */
-  --cyan: #7A2BFF;
-  --red: #FF2D7A;
-  --bg: #F6F8FF;
-  --bg2: #EEF3FF;
+  --cyan: #1BA7FF;
+  --red: #FF2DAA;
+  --bg: #F5FBFF;
+  --bg2: #EAF4FF;
   --surface: #FFFFFF;
-  --surface2: #F3F6FF;
-  --border: rgba(16, 24, 40, .12);
-  --border-hi: rgba(16, 24, 40, .18);
-  --text: #0B1220;
-  --muted: #4B5B78;
-  --muted2: #6B7A97;
-  --scanline-a: rgba(11,18,32,.00);
-  --scanline-b: rgba(11,18,32,.02);
-  --grid-line: rgba(11,18,32,.06);
-  --orb1: rgba(122,43,255,.16);
-  --orb2: rgba(255,45,122,.14);
-  --heroGlowC: rgba(122,43,255,.18);
-  --heroGlowR: rgba(255,45,122,.16);
-  --pillBg: rgba(122,43,255,.06);
-  --pillHoverBorder: rgba(122,43,255,.28);
-  --pillHoverShadow: rgba(122,43,255,.12);
-  --primaryShadow: rgba(122,43,255,.18);
-  --primaryShadowHover: rgba(255,45,122,.18);
-  --statHoverBorder: rgba(122,43,255,.28);
-  --statHoverShadow: rgba(122,43,255,.12);
-  --dotShadow: rgba(122,43,255,.16);
+  --surface2: #F1F7FF;
+  --border: rgba(4, 25, 45, .12);
+  --border-hi: rgba(4, 25, 45, .18);
+  --text: #061426;
+  --muted: #3E5876;
+  --muted2: #5B7390;
+  --scanline-a: rgba(6,20,38,.00);
+  --scanline-b: rgba(6,20,38,.018);
+  --grid-line: rgba(6,20,38,.055);
+  --orb1: rgba(27,167,255,.14);
+  --orb2: rgba(255,45,170,.12);
+  --heroGlowC: rgba(27,167,255,.22);
+  --heroGlowR: rgba(255,45,170,.18);
+  --pillBg: rgba(27,167,255,.06);
+  --pillHoverBorder: rgba(27,167,255,.30);
+  --pillHoverShadow: rgba(27,167,255,.12);
+  --primaryShadow: rgba(27,167,255,.18);
+  --primaryShadowHover: rgba(255,45,170,.16);
+  --statHoverBorder: rgba(27,167,255,.30);
+  --statHoverShadow: rgba(27,167,255,.12);
+  --dotShadow: rgba(27,167,255,.14);
   --terminalBg: var(--surface2);
-  --cyan-soft: rgba(122,43,255,.08);
-  --cyan-dim: rgba(122,43,255,.65);
-  --cyan-glow: rgba(122,43,255,.28);
+  --cyan-soft: rgba(27,167,255,.085);
+  --cyan-dim: rgba(27,167,255,.80);
+  --cyan-glow: rgba(27,167,255,.22);
 
   --r: 14px;
   --ease: cubic-bezier(.4,0,.2,1);
@@ -160,9 +160,43 @@ html { scroll-behavior: smooth; }
   display: flow-root;
 }
 
-/* Default + explicit light theme */
+/* Default (Sky Magenta) + explicit light theme */
 :root:not([data-foc-theme]) .foc-cyber-home,
 :root[data-foc-theme="light"] .foc-cyber-home,
+:root[data-foc-theme="sky-magenta"] .foc-cyber-home {
+  --cyan:      #1BA7FF; /* sky */
+  --red:       #FF2DAA; /* magenta */
+  --bg:        #F5FBFF;
+  --bg2:       #EAF4FF;
+  --surface:   #FFFFFF;
+  --surface2:  #F1F7FF;
+  --border:    rgba(4, 25, 45, .12);
+  --border-hi: rgba(4, 25, 45, .18);
+  --text:      #061426;
+  --muted:     #3E5876;
+  --muted2:    #5B7390;
+  --scanline-a: rgba(6,20,38,.00);
+  --scanline-b: rgba(6,20,38,.018);
+  --grid-line: rgba(6,20,38,.055);
+  --orb1: rgba(27,167,255,.14);
+  --orb2: rgba(255,45,170,.12);
+  --heroGlowC: rgba(27,167,255,.22);
+  --heroGlowR: rgba(255,45,170,.18);
+  --pillBg: rgba(27,167,255,.06);
+  --pillHoverBorder: rgba(27,167,255,.30);
+  --pillHoverShadow: rgba(27,167,255,.12);
+  --primaryShadow: rgba(27,167,255,.18);
+  --primaryShadowHover: rgba(255,45,170,.16);
+  --statHoverBorder: rgba(27,167,255,.30);
+  --statHoverShadow: rgba(27,167,255,.12);
+  --dotShadow: rgba(27,167,255,.14);
+  --terminalBg: var(--surface2);
+  --cyan-soft: rgba(27,167,255,.085);
+  --cyan-dim: rgba(27,167,255,.80);
+  --cyan-glow: rgba(27,167,255,.22);
+}
+
+/* Theme A — Aurora (purple → pink) */
 :root[data-foc-theme="aurora"] .foc-cyber-home {
   --cyan:      #7A2BFF;
   --red:       #FF2D7A;
@@ -228,40 +262,6 @@ html { scroll-behavior: smooth; }
   --cyan-soft: rgba(192,106,43,.08);
   --cyan-dim: rgba(192,106,43,.75);
   --cyan-glow: rgba(192,106,43,.22);
-}
-
-/* Theme C — Sky + Magenta (bright, energetic, still light) */
-:root[data-foc-theme="sky-magenta"] .foc-cyber-home {
-  --cyan:      #1BA7FF; /* sky */
-  --red:       #FF2DAA; /* magenta */
-  --bg:        #F5FBFF;
-  --bg2:       #EAF4FF;
-  --surface:   #FFFFFF;
-  --surface2:  #F1F7FF;
-  --border:    rgba(4, 25, 45, .12);
-  --border-hi: rgba(4, 25, 45, .18);
-  --text:      #061426;
-  --muted:     #3E5876;
-  --muted2:    #5B7390;
-  --scanline-a: rgba(6,20,38,.00);
-  --scanline-b: rgba(6,20,38,.018);
-  --grid-line: rgba(6,20,38,.055);
-  --orb1: rgba(27,167,255,.14);
-  --orb2: rgba(255,45,170,.12);
-  --heroGlowC: rgba(27,167,255,.22);
-  --heroGlowR: rgba(255,45,170,.18);
-  --pillBg: rgba(27,167,255,.06);
-  --pillHoverBorder: rgba(27,167,255,.30);
-  --pillHoverShadow: rgba(27,167,255,.12);
-  --primaryShadow: rgba(27,167,255,.18);
-  --primaryShadowHover: rgba(255,45,170,.16);
-  --statHoverBorder: rgba(27,167,255,.30);
-  --statHoverShadow: rgba(27,167,255,.12);
-  --dotShadow: rgba(27,167,255,.14);
-  --terminalBg: var(--surface2);
-  --cyan-soft: rgba(27,167,255,.085);
-  --cyan-dim: rgba(27,167,255,.80);
-  --cyan-glow: rgba(27,167,255,.22);
 }
 
 /* Theme D — Quantum Mint (clean cyber, mint + violet) */
@@ -957,6 +957,7 @@ html { scroll-behavior: smooth; }
 @media (max-width: 480px) {
   .foc-theme-fab-wrap { right: 14px; }
   .foc-theme-fab__btn-text { max-width: 104px; }
+  .foc-theme-fab-wrap { display: none !important; }
 }
 .hero-orb1 {
   position: absolute; top: -200px; right: -200px;
@@ -3460,6 +3461,7 @@ const CORE_AREAS = [
         icon: "🏆",
         title: "Center of Excellence (CoE) in Emerging Technologies",
         desc: "Integrated innovation and advanced learning ecosystem for students, faculty, startups, MSMEs, and institutions — developed with premier partners including IIT Ropar for research support, innovation mentorship, and ecosystem development — Impact: Regional hub bridging academia, industry, startups, and government.",
+        img: "/Assets/public_assets/images/homepage/center_of_excellence.jpeg",
       },
       {
         icon: "🔬",
@@ -3595,7 +3597,7 @@ const PILLAR_UI = {
     sub: "Building Tomorrow's Workforce",
     desc: "Industry-aligned skilling initiatives designed to equip youth, students, and professionals with future-ready capabilities across emerging technologies and high-growth sectors. We collaborate with leading corporates, government bodies, sector skill councils, universities, and academic institutions to deliver scalable, employment-oriented learning programs.",
     headerIcons: [
-      [{ icon: "cpu", label: "Electronics & Mfg" }, { icon: "sparkles", label: "Emerging Tech" }, { icon: "brain", label: "AI & Data" }],
+      [{ icon: "cpu", label: "Electronics & Mfg" }, { icon: "sparkles", label: "Emerging Tech" }, { icon: "brain", label: "AI" }],
       [{ icon: "award", label: "Employability" }, { icon: "target", label: "Impact" }],
     ],
     focusAreas: [
@@ -3647,7 +3649,7 @@ const PILLAR_UI = {
         num: 3,
         name: "IoT Training Program for School Students",
         desc: "IoT training for underprivileged Govt. School Students of Class 11–12 for high-growth emerging sector careers through practical, project-oriented training.",
-        img: "/Assets/images/futureready/iot.jpeg",
+        img: "/Assets/public_assets/images/homepage/iot.jpeg",
         logoKey: "iot",
         chips: { target: "Class 11th & 12th students", coverage: "Delhi-NCR", impact: "Career building in emerging sectors" },
       },
@@ -3655,6 +3657,7 @@ const PILLAR_UI = {
         num: 4,
         name: "Rural Youth Livelihood Program",
         desc: "Vocational and technical skilling enabling rural youth to access sustainable livelihood opportunities in mobile repair and allied sectors.",
+        img: "/Assets/public_assets/images/homepage/esdm.jpeg",
         logoKey: "rural-youth",
         chips: { target: "Rural youth", coverage: "Uttarakhand & adjoining regions", impact: "Employment & livelihood generation" },
       },
@@ -3841,6 +3844,7 @@ const PILLAR_UI = {
         num: "05",
         name: "Entrepreneurship & Innovation Enablement Program",
         desc: "Innovation-led ecosystem initiative supporting startups and aspiring entrepreneurs through mentorship, incubation support, digital business enablement, and market readiness programs.",
+        img: "/Assets/public_assets/images/homepage/enterprenuership.png",
         logoKey: "entrepreneurship",
         chips: { target: "Entrepreneurs & Startups", coverage: "Innovation ecosystems", impact: "Innovation & business growth" },
       },
@@ -3925,7 +3929,7 @@ const PILLAR_UI = {
         num: 3,
         name: "Organic Farming & Sustainable Livelihood Initiative",
         desc: "Community-driven agritech initiative empowering Scheduled Tribe communities and Self Help Groups through sustainable agriculture, household training, and livelihood enhancement programs.",
-        img: "/Assets/images/futureready/aadigram.jpeg",
+        img: "/Assets/public_assets/images/homepage/Organic_Farming.jpeg",
         logoKey: "organic-farming",
         chips: { target: "SHGs, Tribal Households & Rural Communities", coverage: "Uttarakhand", impact: "Organic farming & rural development" },
       },
@@ -4285,34 +4289,15 @@ const GOVT_MARQUEE_PARTNERS = [
 
 const FOC_HOME_THEME_STORAGE_KEY = "foc-homepage-theme";
 
-/** Id values must match :root[data-foc-theme="…"] in STYLES. */
+const FOC_HOME_THEME = "sky-magenta";
+
+/* Theme picker (disabled — fixed Sky Magenta)
 const FOC_HOME_THEMES = [
   { id: "aurora", label: "Aurora", tone: "light" },
-  { id: "pearl", label: "Warm Pearl", tone: "light" },
-  { id: "sky-magenta", label: "Sky Magenta", tone: "light" },
-  { id: "quantum-mint", label: "Quantum Mint", tone: "light" },
-  { id: "arctic-holo", label: "Arctic Holo", tone: "light" },
-  { id: "solarpunk", label: "Solarpunk", tone: "light" },
-  { id: "lavender-cream", label: "Lavender Cream", tone: "light" },
-  { id: "sunshine-paper", label: "Sunshine Paper", tone: "light" },
-  { id: "rose-quartz", label: "Rose Quartz", tone: "light" },
-  { id: "nordic-sage", label: "Nordic Sage", tone: "light" },
-  { id: "neon-slate", label: "Neon Slate", tone: "dark" },
-  { id: "matrix-lime", label: "Matrix Lime", tone: "dark" },
-  { id: "obsidian-burst", label: "Obsidian", tone: "dark" },
-  { id: "dark", label: "Cyber Dark", tone: "dark" },
+  ...
 ];
-
-function getInitialFocHomeTheme() {
-  if (typeof window === "undefined") return "aurora";
-  try {
-    const raw = window.localStorage.getItem(FOC_HOME_THEME_STORAGE_KEY);
-    if (raw && FOC_HOME_THEMES.some((t) => t.id === raw)) return raw;
-  } catch {
-    /* private mode */
-  }
-  return "aurora";
-}
+function getInitialFocHomeTheme() { ... }
+*/
 
 
 export default function HomePage() {
@@ -4342,9 +4327,9 @@ export default function HomePage() {
   /** Scroll down → CSR strip RTL (right-to-left); scroll up → LTR. Govt strip uses the opposite. */
   const [marqueeScrollDown, setMarqueeScrollDown] = useState(true);
   const lastScrollY = useRef(typeof window !== "undefined" ? window.scrollY : 0);
-  const [focTheme, setFocTheme] = useState(getInitialFocHomeTheme);
-  const [themePanelOpen, setThemePanelOpen] = useState(false);
-  const themeFabRef = useRef(null);
+  // const [focTheme, setFocTheme] = useState(getInitialFocHomeTheme);
+  // const [themePanelOpen, setThemePanelOpen] = useState(false);
+  // const themeFabRef = useRef(null);
   const courseCarouselRef = useRef(null);
   const jobCarouselRef = useRef(null);
   const eventsCarouselRef = useRef(null);
@@ -4456,10 +4441,10 @@ export default function HomePage() {
 
   useEffect(() => {
     const root = document.documentElement;
-    root.setAttribute("data-foc-theme", focTheme);
+    root.setAttribute("data-foc-theme", FOC_HOME_THEME);
     root.style.setProperty("--front-layout-bg", "var(--bg)");
     try {
-      window.localStorage.setItem(FOC_HOME_THEME_STORAGE_KEY, focTheme);
+      window.localStorage.setItem(FOC_HOME_THEME_STORAGE_KEY, FOC_HOME_THEME);
     } catch {
       /* ignore */
     }
@@ -4467,25 +4452,14 @@ export default function HomePage() {
       root.removeAttribute("data-foc-theme");
       root.style.removeProperty("--front-layout-bg");
     };
-  }, [focTheme]);
+  }, []);
 
+  /* Theme picker panel (disabled)
   useEffect(() => {
     if (!themePanelOpen) return undefined;
-    const onDocMouseDown = (e) => {
-      if (themeFabRef.current && !themeFabRef.current.contains(e.target)) {
-        setThemePanelOpen(false);
-      }
-    };
-    const onKey = (e) => {
-      if (e.key === "Escape") setThemePanelOpen(false);
-    };
-    document.addEventListener("mousedown", onDocMouseDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDocMouseDown);
-      window.removeEventListener("keydown", onKey);
-    };
+    ...
   }, [themePanelOpen]);
+  */
 
   useEffect(() => {
     setHoveredAreaItemIdx(null);
@@ -6600,63 +6574,9 @@ export default function HomePage() {
           </div>
         </section> */}
 
-        <div className="foc-theme-fab-wrap" ref={themeFabRef}>
-          <div className="foc-theme-fab__track">
-            {themePanelOpen && (
-              <div className="foc-theme-panel" role="listbox" aria-label="Homepage appearance theme">
-                <div className="foc-theme-panel__group">Light</div>
-                {FOC_HOME_THEMES.filter((t) => t.tone === "light").map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    role="option"
-                    aria-selected={focTheme === t.id}
-                    className={`foc-theme-option${focTheme === t.id ? " is-active" : ""}`}
-                    onClick={() => {
-                      setFocTheme(t.id);
-                      setThemePanelOpen(false);
-                    }}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-                <div className="foc-theme-panel__group">Dark</div>
-                {FOC_HOME_THEMES.filter((t) => t.tone === "dark").map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    role="option"
-                    aria-selected={focTheme === t.id}
-                    className={`foc-theme-option${focTheme === t.id ? " is-active" : ""}`}
-                    onClick={() => {
-                      setFocTheme(t.id);
-                      setThemePanelOpen(false);
-                    }}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            )}
-            <span className="foc-theme-fab__label" id="foc-theme-fab-label">
-              Theme
-            </span>
-            <button
-              type="button"
-              className="foc-theme-fab__btn"
-              aria-expanded={themePanelOpen}
-              aria-haspopup="listbox"
-              aria-labelledby="foc-theme-fab-label"
-              onClick={() => setThemePanelOpen((o) => !o)}
-            >
-              <span className="theme-dot" aria-hidden />
-              <span className="foc-theme-fab__btn-text">
-                {FOC_HOME_THEMES.find((t) => t.id === focTheme)?.label ?? focTheme}
-              </span>
-              <span className="foc-theme-fab__chev" aria-hidden />
-            </button>
-          </div>
-        </div>
+        {/* Theme picker — hidden (fixed Sky Magenta)
+        <div className="foc-theme-fab-wrap" ref={themeFabRef}>...</div>
+        */}
 
 <style>
           {

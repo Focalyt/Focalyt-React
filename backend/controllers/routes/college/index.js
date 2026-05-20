@@ -9370,7 +9370,7 @@ router.put("/upload_docs/:id", isCollege, async (req, res) => {
 				fileType = "video";
 			}
 
-			const key = `Documents for course/${appliedCourse._course._id}/${appliedCourse._candidate}/${docsId}/${uuid()}.${ext}`;
+			const key = `${appliedCourse._course._id}/${appliedCourse._candidate}/${docsId}/${uuid()}.${ext}`;
 
 			const params = {
 				Bucket: bucketName,

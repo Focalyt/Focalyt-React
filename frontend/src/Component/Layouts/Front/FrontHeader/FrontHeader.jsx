@@ -14,22 +14,16 @@ const FrontHeader = () => {
   const [isDropdownActive, setIsDropdownActive] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
-  const [theme, setTheme] = useState(() => {
-    try {
-      return localStorage.getItem("foc-theme") || "light";
-    } catch {
-      return "light";
-    }
-  });
+  const FOC_THEME = "sky-magenta";
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-foc-theme", theme);
+    document.documentElement.setAttribute("data-foc-theme", FOC_THEME);
     try {
-      localStorage.setItem("foc-theme", theme);
+      localStorage.setItem("foc-theme", FOC_THEME);
     } catch {
       // ignore
     }
-  }, [theme]);
+  }, []);
 
   const toggleMenu = () => {
     setIsMenuActive(!isMenuActive);
@@ -48,10 +42,6 @@ const FrontHeader = () => {
     e.preventDefault();
     e.stopPropagation();
     setIsDropdownActive(!isDropdownActive);
-  };
-
-  const toggleTheme = () => {
-    setTheme((t) => (t === "light" ? "dark" : "light"));
   };
 
   // Close dropdown when clicking outside
@@ -216,7 +206,6 @@ const FrontHeader = () => {
   // Dynamic header classes — cyber electric shell; scroll classes kept for mobile menu compat
   const headerClasses = [
     'site-header',
-    'site-header--transparent',
     'site-header--sticky',
     'front-header--cyber',
     isScrolled ? 'scrolling' : '',
@@ -254,15 +243,24 @@ const FrontHeader = () => {
                 </Link>
               </div>
               
-              <div className="menu-block-wrapper" onClick={toggleMenu}>
-                <div className="menu-overlay" ref={menuOverlayRef}></div>
-                <nav className="menu-block" ref={menuRef} id="append-menu-header">
+              <div className="menu-block-wrapper">
+                <div className="menu-overlay" ref={menuOverlayRef} onClick={toggleMenu} role="presentation" />
+                <nav className="menu-block" ref={menuRef} id="append-menu-header" onClick={(e) => e.stopPropagation()}>
                   <div className="mobile-menu-head">
                     <a href='index.html'>
                       <img src="/Assets/public_assets/images/newpage/logo-ha.svg" alt="brand logo" />
                     </a>
                     <div className="current-menu-title"></div>
-                    <div className="mobile-menu-close">&times;</div>
+                    <div
+                      className="mobile-menu-close"
+                      onClick={(e) => { e.stopPropagation(); toggleMenu(); }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleMenu(); } }}
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Close menu"
+                    >
+                      &times;
+                    </div>
                   </div>
                   
                   <ul className="site-menu-main" ref={menuMainRef} onClick={handleMenuClick}>

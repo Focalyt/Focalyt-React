@@ -15,12 +15,32 @@ import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
 const DOC_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
 
-const getDocFileUrl = (fileUrl) => {
+const DOC_COURSE_PREFIX = /^Documents for course\/?/i;
+
+const normalizeDocStorageKey = (fileUrl) => {
   if (!fileUrl) return '';
-  if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://') || fileUrl.startsWith('blob:')) {
-    return fileUrl;
+  let key = String(fileUrl).trim();
+  if (key.startsWith('blob:')) return key;
+  if (key.startsWith('http://') || key.startsWith('https://')) {
+    const bucketBase = DOC_BUCKET_URL.replace(/\/$/, '');
+    if (bucketBase && key.startsWith(bucketBase)) {
+      key = key.slice(bucketBase.length);
+    } else {
+      const s3Match = key.match(/amazonaws\.com\/(.+)$/i);
+      if (s3Match) key = decodeURIComponent(s3Match[1]);
+      else return key;
+    }
   }
-  return `${DOC_BUCKET_URL}/${String(fileUrl).replace(/^\//, '')}`;
+  return key.replace(/^\//, '').replace(DOC_COURSE_PREFIX, '');
+};
+
+const getDocFileUrl = (fileUrl) => {
+  const key = normalizeDocStorageKey(fileUrl);
+  if (!key) return '';
+  if (key.startsWith('blob:') || key.startsWith('http://') || key.startsWith('https://')) {
+    return key;
+  }
+  return `${DOC_BUCKET_URL}/${key}`;
 };
 
 const MultiSelectCheckbox = ({

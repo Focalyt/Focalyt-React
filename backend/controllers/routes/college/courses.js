@@ -732,7 +732,7 @@ router.route('/:courseId/candidate/upload-docs')
 					fileType = "video";
 				}
 
-				const key = `Documents for course/${courseId}/${candidateId}/${docsId}/${uuid()}.${ext}`;
+				const key = `${courseId}/${candidateId}/${docsId}/${uuid()}.${ext}`;
 				const params = {
 					Bucket: bucketName,
 					Key: key,

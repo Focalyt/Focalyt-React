@@ -19,13 +19,19 @@ const FrontLayout = ({ children }) => {
       <style>
         {
           `
-          @media (max-width: 768px) {
+          @media (max-width: 991px) {
             main {
               overflow-x: hidden;
+              padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
             }
-              .images{
-              gap:10px;
-              }
+            .foc-cyber-home {
+              padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+            }
+          }
+          @media (max-width: 768px) {
+            .images {
+              gap: 10px;
+            }
           }
           `
         }
