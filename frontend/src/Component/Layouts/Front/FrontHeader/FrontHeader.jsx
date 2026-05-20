@@ -9,12 +9,27 @@ const FrontHeader = () => {
   const menuMainRef = useRef(null);
   const menuOverlayRef = useRef(null);
   const dropdownRef = useRef(null);
-  const botContainerRef = useRef(null);
 
   const [isMenuActive, setIsMenuActive] = useState(false);
   const [isDropdownActive, setIsDropdownActive] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem("foc-theme") || "light";
+    } catch {
+      return "light";
+    }
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-foc-theme", theme);
+    try {
+      localStorage.setItem("foc-theme", theme);
+    } catch {
+      // ignore
+    }
+  }, [theme]);
 
   const toggleMenu = () => {
     setIsMenuActive(!isMenuActive);
@@ -33,6 +48,10 @@ const FrontHeader = () => {
     e.preventDefault();
     e.stopPropagation();
     setIsDropdownActive(!isDropdownActive);
+  };
+
+  const toggleTheme = () => {
+    setTheme((t) => (t === "light" ? "dark" : "light"));
   };
 
   // Close dropdown when clicking outside
@@ -194,42 +213,45 @@ const FrontHeader = () => {
     };
   }, [isMenuActive, isScrolled, isRevealed]);
 
-  // Dynamic header classes
+  // Dynamic header classes — cyber electric shell; scroll classes kept for mobile menu compat
   const headerClasses = [
     'site-header',
     'site-header--transparent',
     'site-header--sticky',
+    'front-header--cyber',
     isScrolled ? 'scrolling' : '',
     isRevealed ? 'reveal-header' : ''
   ].filter(Boolean).join(' ');
 
-  // Dynamic header styles
-  const headerStyles = {
-    backgroundColor: isScrolled ? '#ffffff' : '#121212',
-  };
-
-  // Dynamic nav link styles
-  const navLinkStyles = {
-    color: isScrolled ? '#000' : '#fff'
-  };
-
-  // Dynamic login button styles
-  const loginButtonStyles = {
-    backgroundColor: isScrolled ? '#FC2B5A' : '#fff',
-    color: isScrolled ? '#fff' : '#FC2B5A'
-  };
+   const SUB_TABS = [
+    // { label: "Home", to: "/" },
+    // { label: "About Us", to: "/about" },
+    { label: "Impact", to: "" },
+    { label: "Labs", to: "/labs" },
+    // { label: "Lab As A Service", to: "/labs" },
+    { label: "Events", to: "/events" },
+    // { label: "Contact Us", to: "/contact" },
+    { label: "Jobs", to: "/joblisting" },
+    { label: "Courses", to: "/courses" },
+    { label: "Social Impact", to: "/socialimpact" },
+    { label: "Community", to: "/community" },
+    { label: "Projects", to: "/#projects" },
+    { label: "Media", to: "" },
+    { label: "Our Reach", to: "/#reach" },
+    { label: "Partners", to: "/#partners" },
+  ];
 
   return (
     <>
-      <div className="page-wrapper overflow-hidden">
-        <header className={headerClasses} style={headerStyles}>
+      <div className="page-wrapper">
+        <header className={headerClasses}>
           <div className="container">
             <nav className="navbar site-navbar">
               <div className="brand-logo">
-                <a href="#">
+                <Link to="/" aria-label="Focalyt Home">
                   <img className="logo-light" src={logo} alt="brand logo" />
                   <img className="logo-dark" src={logo} alt="brand logo" />
-                </a>
+                </Link>
               </div>
               
               <div className="menu-block-wrapper" onClick={toggleMenu}>
@@ -245,33 +267,41 @@ const FrontHeader = () => {
                   
                   <ul className="site-menu-main" ref={menuMainRef} onClick={handleMenuClick}>
                     <li className="nav-item">
-                      <Link className='nav-link-item drop-trigger' to="/" style={navLinkStyles}>Home</Link>
+                      <Link className='nav-link-item drop-trigger' to="/">Home</Link>
                     </li>
                     <li className="nav-item nav-item-has-children">
-                      <Link to="/about" className="nav-link-item drop-trigger" style={navLinkStyles}>About Us</Link>
+                      <Link to="/about" className="nav-link-item drop-trigger">About Us</Link>
+                    </li>
+                    {/* <li className="nav-item">
+                      <Link className='nav-link-item drop-trigger' to="/socialimpact">Social Impact</Link>
+                    </li> */}
+                    {/* <li className="nav-item">
+                      <Link className='nav-link-item drop-trigger' to="/joblisting">Jobs</Link>
+                    </li> */}
+                    {/* <li className="nav-item">
+                      <Link className='nav-link-item drop-trigger' to='/courses'>Courses</Link>
+                    </li> */}
+                    {/* <li className="nav-item">
+                      <Link className='nav-link-item drop-trigger' to='/labs'>Labs</Link>
                     </li>
                     <li className="nav-item">
-                      <Link className='nav-link-item drop-trigger' to="/socialimpact" style={navLinkStyles}>Social Impact</Link>
-                    </li>
-                    <li className="nav-item">
-                      <Link className='nav-link-item drop-trigger' to="/joblisting" style={navLinkStyles}>Jobs</Link>
-                    </li>
-                    <li className="nav-item">
-                      <Link className='nav-link-item drop-trigger' to='/courses' style={navLinkStyles}>Courses</Link>
-                    </li>
-                    <li className="nav-item">
-                      <Link className='nav-link-item drop-trigger' to='/labs' style={navLinkStyles}>Labs</Link>
-                    </li>
-                    <li className="nav-item">
-                      <Link className='nav-link-item drop-trigger' to='/events' style={navLinkStyles}>Events</Link>
-                    </li>
+                      <Link className='nav-link-item drop-trigger' to='/events'>Events</Link>
+                    </li> */}
                     <li className="nav-item d-xl-none d-lg-none d-md-none d-sm-block d-block">
-                      <Link className='nav-link-item drop-trigger' to='/contact' style={navLinkStyles}>Contact Us</Link>
+                      <Link className='nav-link-item drop-trigger' to='/contact'>Contact Us</Link>
                     </li>
                     <li className="nav-item d-xl-flex d-lg-flex d-md-flex d-sm-none d-none">
-                      <Link className='nav-link-item drop-trigger' to='/contact' style={navLinkStyles}>Contact Us</Link>
+                      <Link className='nav-link-item drop-trigger' to='/contact'>Contact Us</Link>
                     </li>
                     
+                    {/* Theme Toggle */}
+                    {/* <li className="nav-item">
+                      <button type="button" className="theme-toggle" onClick={toggleTheme}>
+                        <span className="theme-toggle__dot" />
+                        {theme === "light" ? "Light" : "Dark"}
+                      </button>
+                    </li> */}
+
                     {/* Fixed Login Dropdown */}
                     <li className="nav-item small smallMobile">
                       <div 
@@ -282,7 +312,6 @@ const FrontHeader = () => {
                           className="drop-trigger active_menu loginbtnn homeMenu" 
                           id="loginLink"
                           onClick={toggleDropdown}
-                          style={loginButtonStyles}
                         >
                           Login
                         </span>
@@ -314,6 +343,16 @@ const FrontHeader = () => {
                 <span></span>
               </div>
             </nav>
+
+            <div className="front-subtabs" aria-label="Quick links">
+              <div className="front-subtabs__scroller">
+                {SUB_TABS.map((t) => (
+                  <Link key={t.label} className="front-subtabs__tab" to={t.to}>
+                    {t.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
           </div>
         </header>
       </div>
