@@ -172,12 +172,6 @@
     transition-duration: .5s;
     z-index: 10050;
   }
-  #mobile-footer-nav figure img{
-    border: 1px solid color-mix(in srgb, var(--ftr-accent-1) 70%, transparent);
-    border-radius: 50px;   
-    padding: 4px; 
-    width: 40%;
-  }
   .footer-nav {
     position: relative;
     display: block;
@@ -200,14 +194,29 @@
 .fa-2x {
 font-size: 1.2em;}
 
-#mobile-footer-nav figure img{
-    border: 1px solid color-mix(in srgb, var(--ftr-accent-1) 70%, transparent);
-    border-radius: 50px;   
-    padding: 4px; 
-    width: 40%;
+#mobile-footer-nav ul li a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
 }
-.footer-nav .footer-skill-course {
-    width: 40px;
+.footer-nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid color-mix(in srgb, var(--ftr-accent-1) 70%, transparent);
+  border-radius: 50%;
+  color: var(--ftr-accent-1);
+  background: color-mix(in srgb, var(--ftr-accent-1) 8%, transparent);
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+#mobile-footer-nav a:hover .footer-nav-icon {
+  color: var(--ftr-accent-2);
+  border-color: var(--ftr-accent-2);
+  background: color-mix(in srgb, var(--ftr-accent-2) 12%, transparent);
 }
 
 .footer-nav .login_col {

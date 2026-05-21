@@ -74,6 +74,17 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 
 	const isAdminUser = (req) => req.user?.permissions?.permission_type === 'Admin';
 
+	const repairLeadApprovalIfNeeded = async (leadId) => {
+		const id = new mongoose.Types.ObjectId(leadId);
+		const raw = await Lead.collection.findOne({ _id: id });
+		if (!raw) return null;
+		if (raw.approval && Lead.approvalNeedsRepair(raw.approval)) {
+			const fixed = Lead.normalizeApproval(raw.approval);
+			await Lead.collection.updateOne({ _id: id }, { $set: { approval: fixed } });
+		}
+		return raw;
+	};
+
 	// AI client (optional): used for supervision report narrative
 	const getAnthropicClient = () => {
 		const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -2081,6 +2092,9 @@ router.put('/leads/:id/approval', isCollege, async (req, res) => {
 			return res.status(400).json({ status: false, message: 'status must be APPROVED or REJECTED' });
 		}
 
+		const leadRaw = await repairLeadApprovalIfNeeded(req.params.id);
+		if (!leadRaw) return res.status(404).json({ status: false, message: 'Lead not found' });
+
 		const lead = await Lead.findById(req.params.id);
 		if (!lead) return res.status(404).json({ status: false, message: 'Lead not found' });
 
@@ -2088,23 +2102,16 @@ router.put('/leads/:id/approval', isCollege, async (req, res) => {
 
 		if (normalized === 'APPROVED') {
 			lead.approval = {
-				...(lead.approval || {}),
 				status: 'APPROVED',
 				approvedBy: req.user._id,
 				approvedAt: now,
-				rejectedBy: undefined,
-				rejectedAt: undefined,
-				rejectionReason: undefined,
 			};
 		} else {
 			lead.approval = {
-				...(lead.approval || {}),
 				status: 'REJECTED',
 				rejectedBy: req.user._id,
 				rejectedAt: now,
 				rejectionReason: rejectionReason ? String(rejectionReason).trim() : '',
-				approvedBy: undefined,
-				approvedAt: undefined,
 			};
 		}
 
@@ -2277,11 +2284,12 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			});
 		}
 
-		// Find the lead
-		const lead = await Lead.findById(id);
-		console.log('[B2B Update Status] Step 4: Lead lookup', { leadFound: !!lead, leadId: id });
+		const leadId = new mongoose.Types.ObjectId(id);
+		// Use native collection read — corrupted approval ($date/$oid) breaks Mongoose findById
+		const leadRaw = await repairLeadApprovalIfNeeded(id);
+		console.log('[B2B Update Status] Step 4: Lead lookup', { leadFound: !!leadRaw, leadId: id });
 
-		if (!lead) {
+		if (!leadRaw) {
 			console.log('[B2B Update Status] Step 5: Exiting - lead not found');
 			return res.status(404).json({
 				status: false,
@@ -2305,13 +2313,15 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 		// If not Admin, check ownership
 		if (!isAdmin()) {
 			let teamMembers = await getAllTeamMembers(req.user._id);
-			const isOwner = teamMembers.some(member =>
-				lead.leadAddedBy.toString() === member.toString() ||
-				lead.leadOwner.toString() === member.toString()
-			);
+			const leadAddedById = leadRaw.leadAddedBy ? String(leadRaw.leadAddedBy) : '';
+			const leadOwnerId = leadRaw.leadOwner ? String(leadRaw.leadOwner) : '';
+			const isOwner = teamMembers.some((member) => {
+				const memberId = String(member);
+				return (leadAddedById && leadAddedById === memberId) || (leadOwnerId && leadOwnerId === memberId);
+			});
 			console.log('[B2B Update Status] Step 7: Ownership check (non-admin)', {
-				leadAddedBy: lead.leadAddedBy?.toString(),
-				leadOwner: lead.leadOwner?.toString(),
+				leadAddedBy: leadAddedById || null,
+				leadOwner: leadOwnerId || null,
 				teamMembersCount: teamMembers?.length,
 				isOwner
 			});
@@ -2328,8 +2338,8 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 		}
 
 		// Get old status for logging
-		const oldStatus = lead.status;
-		const oldSubStatus = lead.subStatus;
+		const oldStatus = leadRaw.status;
+		const oldSubStatus = leadRaw.subStatus;
 
 		// Get status names for better logging
 		let oldStatusName = 'No Status';
@@ -2365,24 +2375,24 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			}
 		}
 
-		// Update the lead
-		lead.status = status;
-		lead.subStatus = subStatus;
-		lead.updatedBy = req.user._id;
-
-		if (remarks) {
-			lead.remark = remarks;
-		}
-
-		// Add to logs with detailed status change information
-		lead.logs.push({
+		const logEntry = {
 			user: req.user._id,
 			timestamp: new Date(),
 			action: `Status changed from ${oldStatusName} (${oldSubStatusName}) to ${newStatusName} (${newSubStatusName})`,
 			remarks: remarks || `Status updated from ${oldStatusName} to ${newStatusName}`
-		});
+		};
 
-		await lead.save();
+		const $set = {
+			status: new mongoose.Types.ObjectId(status),
+			subStatus: subStatus ? new mongoose.Types.ObjectId(subStatus) : null,
+			updatedBy: req.user._id,
+		};
+		if (remarks) $set.remark = remarks;
+
+		await Lead.collection.updateOne(
+			{ _id: leadId },
+			{ $set, $push: { logs: logEntry } }
+		);
 		console.log('[B2B Update Status] Step 9: Lead saved', { leadId: id, newStatus: status, newSubStatus: subStatus || '(none)' });
 
 		// Populate the updated lead
@@ -2820,7 +2830,8 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			isAdminResult: isAdmin()
 		});
 
-		// Check if lead exists
+		// Check if lead exists (repair approval first if imported with $date/$oid)
+		await repairLeadApprovalIfNeeded(req.params.id);
 		let lead;
 		if (isAdmin()) {
 			lead = await Lead.findById(req.params.id);
@@ -2829,14 +2840,16 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			lead = await Lead.findById(req.params.id);
 			if (lead) {
 				let teamMembers = await getAllTeamMembers(req.user._id);
-				const isOwner = teamMembers.some(member =>
-					lead.leadAddedBy.toString() === member.toString() ||
-					lead.leadOwner.toString() === member.toString()
-				);
+				const leadAddedById = lead.leadAddedBy ? String(lead.leadAddedBy) : '';
+				const leadOwnerId = lead.leadOwner ? String(lead.leadOwner) : '';
+				const isOwner = teamMembers.some((member) => {
+					const memberId = String(member);
+					return (leadAddedById && leadAddedById === memberId) || (leadOwnerId && leadOwnerId === memberId);
+				});
 				console.log('[B2B Update Status v2] Step 5: Non-admin ownership', {
 					leadFound: true,
-					leadAddedBy: lead.leadAddedBy?.toString(),
-					leadOwner: lead.leadOwner?.toString(),
+					leadAddedBy: leadAddedById || null,
+					leadOwner: leadOwnerId || null,
 					teamMembersCount: teamMembers?.length,
 					isOwner
 				});

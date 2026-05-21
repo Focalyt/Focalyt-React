@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {Link } from 'react-router-dom';
-import { faFacebookF, faLinkedinIn, faYoutube ,faInstagram} from '@fortawesome/free-brands-svg-icons';
+import { Link } from 'react-router-dom';
+import { faFacebookF, faLinkedinIn, faYoutube, faInstagram } from '@fortawesome/free-brands-svg-icons';
+import { Home, GraduationCap, Briefcase, Share2 } from 'lucide-react';
 import "./FrontFooter.css";
 import axios from 'axios'
 function Footer() {
@@ -83,44 +84,39 @@ function Footer() {
               <ul className="h-100 d-flex align-items-center justify-content-between mb-0">
                 {/* <!----> */}
                 <li>
-                  <a href="/">
-                    <figure>
-                      <img src="/Assets/public_assets/images/icons/home.png" draggable="false"
-                        className="img-fluid footer-skill-course m-0" />
-                    </figure>
+                  <Link to="/">
+                    <span className="footer-nav-icon" aria-hidden>
+                      <Home size={18} strokeWidth={2} />
+                    </span>
                     <span className="footer-nav-label pt-1">Home</span>
-                  </a>
+                  </Link>
                 </li>
-                {/* <!----> */}
-                {/* <!----> */}
                 <li>
-                  <a href="/courses">
-                    <figure>
-                      <img src="/Assets/public_assets/images/icons/learn.png" draggable="false"
-                        className="footer-skill-course img-fluid m-0" />
-                    </figure>
+                  <Link to="/courses">
+                    <span className="footer-nav-icon" aria-hidden>
+                      <GraduationCap size={18} strokeWidth={2} />
+                    </span>
                     <span className="footer-nav-label pt-1">Courses</span>
-                  </a>
+                  </Link>
                 </li>
-                {/* <!----> */}
                 <li className="login_col">
-                  <a href="/candidate/login">
+                  <Link to="/candidate/login">
                     <span className="login_ty">Login</span>
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="/joblisting">
-                    <figure>
-                      <img src="/Assets/public_assets/images/icons/jobs.png" draggable="false"
-                        className="footer-skill-course img-fluid m-0" /></figure>
+                  <Link to="/joblisting">
+                    <span className="footer-nav-icon" aria-hidden>
+                      <Briefcase size={18} strokeWidth={2} />
+                    </span>
                     <span className="footer-nav-label pt-1">Jobs</span>
-                  </a>
+                  </Link>
                 </li>
                 <li>
                   <a href="https://api.whatsapp.com/send?text=Check%20out%20Focalyt's%20courses%20and%20job%20opportunities%20at%20https://focalyt.com.%20Enhance%20your%20skills%20and%20secure%20a%20great%20job%20now">
-                    <figure>
-                      <img src="/Assets/public_assets/images/icons/share.png" draggable="false"
-                        className="footer-skill-course img-fluid m-0" /></figure>
+                    <span className="footer-nav-icon" aria-hidden>
+                      <Share2 size={18} strokeWidth={2} />
+                    </span>
                     <span className="footer-nav-label pt-1">Share</span>
                   </a>
                 </li>

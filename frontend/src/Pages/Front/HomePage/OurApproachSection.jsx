@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 const STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Baloo+2:wght@700;800&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;900&display=swap');
 
   .oa, .oa *, .oa *::before, .oa *::after { box-sizing: border-box; }
 
@@ -14,7 +14,7 @@ const STYLES = `
     --teal: #00838f;
     --navy: #0d2146;
     --cream: #f8faff;
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Inter', sans-serif;
     background: var(--cream);
     overflow-x: hidden;
   }
@@ -30,11 +30,11 @@ const STYLES = `
   }
 
   .oa .oa-title {
-    font-family: 'Baloo 2', cursive; font-weight: 800;
+    font-family: 'Orbitron', monospace; font-weight: 800;
     font-size: clamp(30px, 4.5vw, 52px); line-height: 1.1; color: var(--navy); margin-bottom: 12px;
   }
 
-  .oa .oa-subtitle { color: #5a6680; font-size: clamp(14px, 1.5vw, 17px); line-height: 1.75; max-width: 720px; margin: 0 auto 36px; }
+  .oa .oa-subtitle { color: #5a6680; font-family: 'Inter', sans-serif; font-size: clamp(14px, 1.5vw, 17px); line-height: 1.75; margin: 0 auto 36px; }
 
   .oa .oa-tabs {
     display: flex; gap: 10px; overflow-x: auto; padding: 6px 4px 14px;
@@ -49,7 +49,7 @@ const STYLES = `
     padding: 12px 20px; border-radius: 50px; border: 2px solid #dce4f5;
     background: #fff; color: #4a5568; font-weight: 700; font-size: 13px;
     cursor: pointer; transition: all 0.25s ease; white-space: nowrap;
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Orbitron', monospace;
   }
   .oa .oa-tab:hover { transform: translateY(-2px); border-color: #b0c4de; }
   .oa .oa-tab.active {
@@ -84,11 +84,11 @@ const STYLES = `
   }
 
   .oa .oa-hero h3 {
-    font-family: 'Baloo 2', cursive; font-weight: 800;
+    font-family: 'Orbitron', monospace; font-weight: 800;
     font-size: clamp(22px, 3vw, 32px); line-height: 1.2; margin-bottom: 12px;
   }
 
-  .oa .oa-hero p { color: #5a6680; font-size: 14.5px; line-height: 1.75; }
+  .oa .oa-hero p { font-family: 'Inter', sans-serif; color: #5a6680; font-size: 14.5px; line-height: 1.75; }
 
   .oa .oa-hero-visual {
     width: 120px; height: 120px; border-radius: 50%;
@@ -146,7 +146,7 @@ const STYLES = `
   }
 
   .oa .oa-block-title {
-    font-family: 'Baloo 2', cursive;
+    font-family: 'Orbitron', monospace;
     font-weight: 800;
     font-size: 16px;
     color: var(--navy);
@@ -160,6 +160,7 @@ const STYLES = `
     background: #fff;
   }
   .oa .oa-info-list li {
+    font-family: 'Inter', sans-serif;
     display: flex;
     align-items: flex-start;
     gap: 12px;
@@ -188,6 +189,7 @@ const STYLES = `
 
   .oa .oa-list { list-style: none; padding: 0; margin: 0; }
   .oa .oa-list li {
+    font-family: 'Inter', sans-serif;
     display: flex; align-items: flex-start; gap: 10px;
     font-size: 13px; color: #5a6680; line-height: 1.6; margin-bottom: 8px;
   }
@@ -211,13 +213,13 @@ const STYLES = `
   .oa .oa-subcard-num {
     width: 36px; height: 36px; border-radius: 10px; color: #fff;
     display: flex; align-items: center; justify-content: center;
-    font-family: 'Baloo 2', cursive; font-weight: 800; font-size: 14px; flex-shrink: 0;
+    font-family: 'Orbitron', monospace; font-weight: 800; font-size: 14px; flex-shrink: 0;
   }
   .oa .oa-subcard-title {
-    font-family: 'Baloo 2', cursive; font-weight: 800; font-size: 14.5px; line-height: 1.3;
+    font-family: 'Orbitron', monospace; font-weight: 800; font-size: 14.5px; line-height: 1.3;
   }
   .oa .oa-subcard-body { padding: 0 18px 18px; }
-  .oa .oa-subcard-body p { font-size: 12.5px; color: #5a6680; line-height: 1.65; margin-bottom: 12px; }
+  .oa .oa-subcard-body p { font-family: 'Inter', sans-serif; font-size: 12.5px; color: #5a6680; line-height: 1.65; margin-bottom: 12px; }
   .oa .oa-subcard-body h5 { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; margin: 10px 0 8px; }
 
   .oa .oa-pill-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
@@ -233,8 +235,9 @@ const STYLES = `
     border: 2px solid #d8edf8; border-radius: 18px; padding: 22px 24px; margin-bottom: 24px;
   }
   .oa .oa-commit h4 {
-    font-family: 'Baloo 2', cursive; font-weight: 800; font-size: 17px; color: var(--navy); margin-bottom: 12px;
+    font-family: 'Orbitron', monospace; font-weight: 800; font-size: 17px; color: var(--navy); margin-bottom: 12px;
   }
+  .oa .oa-commit p { font-family: 'Inter', sans-serif; }
 
   .oa .oa-cta {
     display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 18px;
@@ -242,13 +245,13 @@ const STYLES = `
     border-radius: 18px; padding: 24px 28px; margin-top: 8px;
   }
   .oa .oa-cta-text { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 220px; }
-  .oa .oa-cta-text p { color: #b8cce0; font-size: 13.5px; line-height: 1.6; margin: 0; }
-  .oa .oa-cta-text strong { display: block; color: #fff; font-family: 'Baloo 2', cursive; font-size: 16px; margin-bottom: 4px; }
+  .oa .oa-cta-text p { font-family: 'Inter', sans-serif; color: #b8cce0; font-size: 13.5px; line-height: 1.6; margin: 0; }
+  .oa .oa-cta-text strong { display: block; color: #fff; font-family: 'Orbitron', monospace; font-size: 16px; margin-bottom: 4px; }
   .oa .oa-cta-btn {
     display: inline-flex; align-items: center; gap: 8px;
     background: linear-gradient(135deg, var(--green), #25a060); color: #fff;
     border: none; border-radius: 12px; padding: 14px 28px;
-    font-family: 'Baloo 2', cursive; font-weight: 800; font-size: 14px;
+    font-family: 'Orbitron', monospace; font-weight: 800; font-size: 14px;
     text-decoration: none; cursor: pointer; transition: all 0.25s ease;
     box-shadow: 0 8px 26px rgba(26,122,74,0.35); white-space: nowrap;
   }
@@ -259,7 +262,7 @@ const STYLES = `
     border-top: 2px dashed #e4ebf8;
   }
   .oa .oa-closing p {
-    font-family: 'Baloo 2', cursive; font-weight: 800; font-size: clamp(16px, 2vw, 20px); line-height: 1.4;
+    font-family: 'Orbitron', monospace; font-weight: 800; font-size: clamp(16px, 2vw, 20px); line-height: 1.4;
   }
 
   .oa .oa-flow {
@@ -739,7 +742,7 @@ function PillarPanel({ pillar }) {
             {pillar.stats.map((s) => (
               <div key={s.label} className="oa-block oa-block-stat" style={{ "--block-accent": c }}>
                 <div style={{ fontSize: 28, marginBottom: 6 }}>{s.emoji}</div>
-                <div style={{ fontFamily: "'Baloo 2', cursive", fontWeight: 800, fontSize: 20, color: c }}>{s.value}</div>
+                <div style={{ fontFamily: "'Orbitron', monospace", fontWeight: 800, fontSize: 20, color: c }}>{s.value}</div>
                 <div style={{ fontSize: 11.5, color: "#5a6680", fontWeight: 600, marginTop: 4, lineHeight: 1.4 }}>{s.label}</div>
               </div>
             ))}
@@ -784,7 +787,7 @@ export default function OurApproachSection() {
         <div className="oa-wrap" style={{ textAlign: "center", marginBottom: 8 }}>
           <div className="oa-badge">🎯 Our Approach</div>
           <h2 className="oa-title">
-            Integrated <span style={{ color: "#1a7a4a" }}>Implementation</span> Ecosystem
+            Integrated <span style={{ color: "#1a7a4a" }}>Implementation</span> 
           </h2>
           <p className="oa-subtitle">
             A holistic framework connecting mobilisation, training infrastructure, expert trainers, delivery, assessments, placements, and entrepreneurship — designed to create skilled, employable, and future-ready communities.
