@@ -1,8 +1,7 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect, useMemo } from "react";
 
 const STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Baloo+2:wght@700;800&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;900&display=swap');
 
   .fp, .fp *, .fp *::before, .fp *::after { box-sizing: border-box; }
 
@@ -12,10 +11,41 @@ const STYLES = `
     --acad:  #6a1f9a;
     --ind:   #e65100;
     --navy:  #0d2146;
-    --cream: #f8faff;
-    font-family: 'Nunito', sans-serif;
-    background: var(--cream);
+    --cream: #f1f5f9;
+    font-family: 'Inter', sans-serif;
+    background: #fff;
     overflow-x: hidden;
+    overflow: hidden;
+    position: relative;
+    z-index: 1;
+    max-width: 1280px;
+    margin: 40px auto 48px;
+    border-radius: 20px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 8px 32px rgba(15, 23, 42, 0.1), 0 2px 8px rgba(15, 23, 42, 0.06);
+  }
+
+  .fp-sub {
+    position: relative;
+    overflow: hidden;
+    padding: 56px 0;
+  }
+
+  .fp-sub--media {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 56px;
+    padding-bottom: 56px;
+  }
+
+  @media (max-width: 768px) {
+    .fp {
+      margin: 24px 16px 32px;
+      border-radius: 16px;
+    }
+    .fp-sub, .fp-sub--media {
+      padding-top: 40px;
+      padding-bottom: 40px;
+    }
   }
 
   .fp .pulse { animation: fpPulse 2.2s ease-in-out infinite; }
@@ -221,19 +251,29 @@ const PARTNER_CATS = [
 ];
 
 const MEDIA_TABS = [
-  { label: "Social Media", emoji: "📱" },
-  { label: "Awards & Recognitions", emoji: "🏆" },
-  { label: "Print Media Coverage", emoji: "📰" },
-  { label: "Events & Engagement", emoji: "📅" },
+  { id: "social", label: "Social Media", emoji: "📱" },
+  { id: "awards", label: "Awards & Recognitions", emoji: "🏆" },
+  { id: "print", label: "Print Media Coverage", emoji: "📰" },
+  { id: "events", label: "Events & Engagement", emoji: "📅" },
 ];
 
 const MEDIA_CARDS = [
-  { title: "Skill Training in Action", desc: "Hands-on training for a future ready workforce.", emoji: "📱", tag: "Social Media", accent: "#1a7a4a", img: "🧑‍💻" },
-  { title: "Placement Success", desc: "Connecting talent with meaningful opportunities.", emoji: "🤝", tag: "Placement Drive", accent: "#1565c0", img: "👩‍🎓" },
-  { title: "Award of Excellence", desc: "Recognized for impact, innovation and excellence.", emoji: "🥇", tag: "Award 2024", accent: "#e65100", img: "🏆" },
-  { title: "In the News", desc: "Our initiatives featured across leading publications.", emoji: "📰", tag: "Media", accent: "#6a1f9a", img: "📄" },
-  { title: "Community Events", desc: "Engaging communities through nationwide skill drives.", emoji: "🌍", tag: "Events", accent: "#1a7a4a", img: "🎪" },
-  { title: "Digital Campaigns", desc: "Amplifying reach through targeted campaigns.", emoji: "📣", tag: "Digital", accent: "#1565c0", img: "📣" },
+  { tab: "social", title: "Skill Training in Action", desc: "Hands-on training for a future ready workforce.", emoji: "📱", tag: "Social Media", accent: "#1a7a4a", img: "🧑‍💻" },
+  { tab: "social", title: "Placement Success", desc: "Connecting talent with meaningful opportunities.", emoji: "🤝", tag: "Placement Drive", accent: "#1565c0", img: "👩‍🎓" },
+  { tab: "social", title: "Digital Campaigns", desc: "Amplifying reach through targeted social campaigns.", emoji: "📣", tag: "Digital", accent: "#1565c0", img: "📣" },
+  { tab: "social", title: "Youth Outreach", desc: "Inspiring young learners through stories and live updates.", emoji: "🌟", tag: "Instagram", accent: "#6a1f9a", img: "📸" },
+  { tab: "awards", title: "Award of Excellence", desc: "Recognized for impact, innovation and excellence.", emoji: "🥇", tag: "Award 2024", accent: "#e65100", img: "🏆" },
+  { tab: "awards", title: "National Skill Honor", desc: "Celebrated for transformative skilling outcomes at scale.", emoji: "🏅", tag: "National Award", accent: "#1a7a4a", img: "🎖️" },
+  { tab: "awards", title: "CSR Impact Recognition", desc: "Honored for measurable CSR and community impact.", emoji: "⭐", tag: "CSR Award", accent: "#1565c0", img: "✨" },
+  { tab: "awards", title: "Innovation in EdTech", desc: "Awarded for technology-led learning and employability.", emoji: "💡", tag: "EdTech 2024", accent: "#6a1f9a", img: "🔬" },
+  { tab: "print", title: "In the News", desc: "Our initiatives featured across leading publications.", emoji: "📰", tag: "Print Media", accent: "#6a1f9a", img: "📄" },
+  { tab: "print", title: "Leading Daily Feature", desc: "Coverage in top newspapers on skills and employment.", emoji: "🗞️", tag: "National Daily", accent: "#1565c0", img: "📰" },
+  { tab: "print", title: "Industry Journal", desc: "Thought leadership on workforce development.", emoji: "📑", tag: "Industry Press", accent: "#e65100", img: "📋" },
+  { tab: "print", title: "Regional Spotlight", desc: "Local media highlighting grassroots training impact.", emoji: "🌍", tag: "Regional Press", accent: "#1a7a4a", img: "🗞️" },
+  { tab: "events", title: "Community Events", desc: "Engaging communities through nationwide skill drives.", emoji: "🌍", tag: "Events", accent: "#1a7a4a", img: "🎪" },
+  { tab: "events", title: "Partner Engagement Summit", desc: "Collaborating with partners to scale impact together.", emoji: "🤝", tag: "Summit", accent: "#1565c0", img: "🎤" },
+  { tab: "events", title: "Nationwide Skill Drive", desc: "Mobilizing trainers and learners across multiple states.", emoji: "🚌", tag: "Skill Drive", accent: "#e65100", img: "🛣️" },
+  { tab: "events", title: "Campus Connect Program", desc: "On-ground engagement with colleges and institutions.", emoji: "🎓", tag: "Campus Event", accent: "#6a1f9a", img: "🏫" },
 ];
 
 const MEDIA_STATS = [
@@ -273,7 +313,7 @@ function Blobs({ colors }) {
   );
 }
 
-function SectionHeader({ icon, titleHtml, subtitle, accentColor = "#1a7a4a" }) {
+function SectionHeader({ icon, titleHtml, subtitle, accentColor = "#1a7a4a", noSubtitleMaxWidth = false }) {
   return (
     <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 16, marginBottom: 14 }}>
@@ -314,7 +354,7 @@ function SectionHeader({ icon, titleHtml, subtitle, accentColor = "#1a7a4a" }) {
       </div>
       <h2
         style={{
-          fontFamily: "'Baloo 2',cursive",
+          fontFamily: "'Orbitron',monospace",
           fontWeight: 800,
           fontSize: "clamp(28px,4.5vw,52px)",
           lineHeight: 1.1,
@@ -323,7 +363,16 @@ function SectionHeader({ icon, titleHtml, subtitle, accentColor = "#1a7a4a" }) {
         }}
         dangerouslySetInnerHTML={{ __html: titleHtml }}
       />
-      <p style={{ color: "#5a6680", fontSize: "clamp(13px,1.5vw,16.5px)", lineHeight: 1.75, maxWidth: 580, margin: "0 auto" }}>
+      <p
+        style={{
+          fontFamily: "'Inter', sans-serif",
+          color: "#5a6680",
+          fontSize: "clamp(13px,1.5vw,16.5px)",
+          lineHeight: 1.75,
+          margin: "0 auto",
+          ...(noSubtitleMaxWidth ? {} : { maxWidth: 580 }),
+        }}
+      >
         {subtitle}
       </p>
     </div>
@@ -399,19 +448,10 @@ function PartnerCard({ cat, delay = 0 }) {
         >
           {cat.emoji}
         </div>
-        <div style={{ fontFamily: "'Baloo 2',cursive", fontWeight: 800, fontSize: 17.5, color: cat.color, marginBottom: 6, textAlign: "center" }}>
+        <div style={{ fontFamily: "'Orbitron',monospace", fontWeight: 800, fontSize: 17.5, color: cat.color, marginBottom: 6, textAlign: "center" }}>
           {cat.title}
         </div>
-        <div
-          style={{
-            width: 44,
-            height: 3.5,
-            borderRadius: 4,
-            background: `linear-gradient(90deg,${cat.color},${cat.color}55)`,
-            marginBottom: 13,
-          }}
-        />
-        <p style={{ fontSize: 13, color: "#5a6680", textAlign: "center", lineHeight: 1.65, marginBottom: 18, flex: 1 }}>{cat.desc}</p>
+        <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: "#5a6680", textAlign: "center", lineHeight: 1.65, marginBottom: 18, flex: 1 }}>{cat.desc}</p>
         <div style={{ width: "100%", borderRadius: 16, background: cat.bg, padding: "14px 12px 10px", position: "relative", marginBottom: 16 }}>
           <button
             type="button"
@@ -539,7 +579,7 @@ function PartnersStrengthSection() {
   ];
 
   return (
-    <section style={{ background: "#f8faff", padding: "72px 0 0", position: "relative", overflow: "hidden" }}>
+    <section className="fp-sub" style={{ background: "#fff", position: "relative" }}>
       <Blobs colors={["#1a7a4a", "#1565c0", "#6a1f9a", "#e65100"]} />
       <div
         className="spin-slow"
@@ -576,6 +616,7 @@ function PartnersStrengthSection() {
           titleHtml={`<span style="color:#0d2146">Our Partners.</span> <span style="color:#1a7a4a">Our Strength.</span>`}
           subtitle="Collaborating with government, corporates, academia and industry to build skills, create opportunities and drive meaningful impact."
           accentColor="#1a7a4a"
+          noSubtitleMaxWidth
         />
         <div className="partner-cards-grid">
           {PARTNER_CATS.map((cat, i) => (
@@ -621,9 +662,9 @@ function PartnersStrengthSection() {
               🤝
             </div>
             <div>
-              <div style={{ color: "#fff", fontFamily: "'Baloo 2',cursive", fontWeight: 800, fontSize: 18, lineHeight: 1.3 }}>Stronger Together,</div>
-              <div style={{ color: "#4ade80", fontFamily: "'Baloo 2',cursive", fontWeight: 800, fontSize: 18 }}>Greater Impact.</div>
-              <p style={{ color: "#8aadcc", fontSize: 12.5, marginTop: 8, lineHeight: 1.6 }}>
+              <div style={{ color: "#fff", fontFamily: "'Orbitron',monospace", fontWeight: 800, fontSize: 18, lineHeight: 1.3 }}>Stronger Together,</div>
+              <div style={{ color: "#4ade80", fontFamily: "'Orbitron',monospace", fontWeight: 800, fontSize: 18 }}>Greater Impact.</div>
+              <p style={{ fontFamily: "'Inter', sans-serif", color: "#8aadcc", fontSize: 12.5, marginTop: 8, lineHeight: 1.6 }}>
                 Our partners drive innovation, create opportunities and transform lives across communities.
               </p>
             </div>
@@ -658,7 +699,7 @@ function PartnersStrengthSection() {
                 {s.emoji}
               </div>
               <div>
-                <div style={{ fontFamily: "'Baloo 2',cursive", fontWeight: 800, fontSize: 17.5, color: s.color }}>{s.value}</div>
+                <div style={{ fontFamily: "'Orbitron',monospace", fontWeight: 800, fontSize: 17.5, color: s.color }}>{s.value}</div>
                 <div style={{ fontWeight: 700, fontSize: 12, color: "#0d2146" }}>{s.label}</div>
                 <div style={{ fontSize: 11, color: "#8896aa" }}>{s.sub}</div>
               </div>
@@ -666,101 +707,100 @@ function PartnersStrengthSection() {
           ))}
         </div>
       </div>
-      <div style={{ height: 52 }} />
     </section>
   );
 }
 
-function OurPartnersSection() {
-  return (
-    <section style={{ background: "#fff", padding: "72px 0 0", position: "relative", overflow: "hidden" }}>
-      <Blobs colors={["#1565c0", "#1a7a4a", "#e65100", "#6a1f9a"]} />
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 5,
-          background: "linear-gradient(90deg,#1a7a4a,#1565c0,#6a1f9a,#e65100)",
-        }}
-      />
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 32px", position: "relative", zIndex: 1 }}>
-        <SectionHeader
-          icon="🤝"
-          titleHtml={`<span style="color:#0d2146">Our </span><span style="color:#1a7a4a">Partners</span>`}
-          subtitle="Collaborating with government, corporates, academia and industry to build skills, create opportunities and drive meaningful impact."
-          accentColor="#1a7a4a"
-        />
-        <div className="partner-cards-grid">
-          {PARTNER_CATS.map((cat, i) => (
-            <PartnerCard key={`${cat.id}-cta`} cat={cat} delay={i * 110} />
-          ))}
-        </div>
-        <div
-          style={{
-            marginTop: 44,
-            borderRadius: 24,
-            background: "linear-gradient(135deg,#f0f8f4,#e8f4ff)",
-            border: "2px solid #d8edf8",
-            padding: "28px 32px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: 22,
-            boxShadow: "0 8px 40px rgba(21,101,192,0.07)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-            <div
-              style={{
-                width: 60,
-                height: 60,
-                borderRadius: "50%",
-                background: "linear-gradient(135deg,#e8f8ef,#c8efda)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 28,
-                boxShadow: "0 6px 22px rgba(26,122,74,0.2)",
-              }}
-            >
-              👥
-            </div>
-            <div>
-              <div style={{ fontFamily: "'Baloo 2',cursive", fontWeight: 800, fontSize: 20, color: "#0d2146" }}>
-                Stronger Together, <span style={{ color: "#1a7a4a" }}>Greater Impact</span>
-              </div>
-              <p style={{ color: "#5a6680", fontSize: 13.5, marginTop: 4 }}>Our partners play a vital role in driving innovation and transforming lives.</p>
-            </div>
-          </div>
-          <Link
-            to="/contact"
-            className="become-btn"
-            style={{
-              background: "linear-gradient(135deg,#1a7a4a,#25a060)",
-              color: "#fff",
-              border: "none",
-              borderRadius: 14,
-              padding: "15px 32px",
-              fontFamily: "'Baloo 2',cursive",
-              fontWeight: 800,
-              fontSize: 16,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 10,
-              boxShadow: "0 8px 26px rgba(26,122,74,0.3)",
-            }}
-          >
-            🤝 Become a Partner →
-          </Link>
-        </div>
-      </div>
-      <div style={{ height: 52 }} />
-    </section>
-  );
-}
+// function OurPartnersSection() {
+//   return (
+//     <section id="partners" style={{ background: "#fff", padding: "72px 0 0", position: "relative", overflow: "hidden" }}>
+//       <Blobs colors={["#1565c0", "#1a7a4a", "#e65100", "#6a1f9a"]} />
+//       {/* <div
+//         style={{
+//           position: "absolute",
+//           top: 0,
+//           left: 0,
+//           right: 0,
+//           height: 5,
+//           background: "linear-gradient(90deg,#1a7a4a,#1565c0,#6a1f9a,#e65100)",
+//         }}
+//       /> */}
+//       {/* <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 32px", position: "relative", zIndex: 1 }}>
+//         <SectionHeader
+//           icon="🤝"
+//           titleHtml={`<span style="color:#0d2146">Our </span><span style="color:#1a7a4a">Partners</span>`}
+//           subtitle="Collaborating with government, corporates, academia and industry to build skills, create opportunities and drive meaningful impact."
+//           accentColor="#1a7a4a"
+//         />
+//         <div className="partner-cards-grid">
+//           {PARTNER_CATS.map((cat, i) => (
+//             <PartnerCard key={`${cat.id}-cta`} cat={cat} delay={i * 110} />
+//           ))}
+//         </div>
+//         <div
+//           style={{
+//             marginTop: 44,
+//             borderRadius: 24,
+//             background: "linear-gradient(135deg,#f0f8f4,#e8f4ff)",
+//             border: "2px solid #d8edf8",
+//             padding: "28px 32px",
+//             display: "flex",
+//             alignItems: "center",
+//             justifyContent: "space-between",
+//             flexWrap: "wrap",
+//             gap: 22,
+//             boxShadow: "0 8px 40px rgba(21,101,192,0.07)",
+//           }}
+//         >
+//           <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+//             <div
+//               style={{
+//                 width: 60,
+//                 height: 60,
+//                 borderRadius: "50%",
+//                 background: "linear-gradient(135deg,#e8f8ef,#c8efda)",
+//                 display: "flex",
+//                 alignItems: "center",
+//                 justifyContent: "center",
+//                 fontSize: 28,
+//                 boxShadow: "0 6px 22px rgba(26,122,74,0.2)",
+//               }}
+//             >
+//               👥
+//             </div>
+//             <div>
+//               <div style={{ fontFamily: "'Orbitron',monospace", fontWeight: 800, fontSize: 20, color: "#0d2146" }}>
+//                 Stronger Together, <span style={{ color: "#1a7a4a" }}>Greater Impact</span>
+//               </div>
+//               <p style={{ color: "#5a6680", fontSize: 13.5, marginTop: 4 }}>Our partners play a vital role in driving innovation and transforming lives.</p>
+//             </div>
+//           </div>
+//           <Link
+//             to="/contact"
+//             className="become-btn"
+//             style={{
+//               background: "linear-gradient(135deg,#1a7a4a,#25a060)",
+//               color: "#fff",
+//               border: "none",
+//               borderRadius: 14,
+//               padding: "15px 32px",
+//               fontFamily: "'Orbitron',monospace",
+//               fontWeight: 800,
+//               fontSize: 16,
+//               display: "inline-flex",
+//               alignItems: "center",
+//               gap: 10,
+//               boxShadow: "0 8px 26px rgba(26,122,74,0.3)",
+//             }}
+//           >
+//             🤝 Become a Partner →
+//           </Link>
+//         </div>
+//       </div> */}
+//       {/* <div style={{ height: 52 }} /> */}
+//     </section>
+//   );
+// }
 
 function MediaCard({ card, delay = 0 }) {
   const [hov, setHov] = useState(false);
@@ -828,8 +868,8 @@ function MediaCard({ card, delay = 0 }) {
         </div>
       </div>
       <div style={{ padding: "17px 19px 19px" }}>
-        <div style={{ fontFamily: "'Baloo 2',cursive", fontWeight: 800, fontSize: 15.5, color: "#fff", marginBottom: 6 }}>{card.title}</div>
-        <div style={{ color: "#7aaac8", fontSize: 12.5, lineHeight: 1.55 }}>{card.desc}</div>
+        <div style={{ fontFamily: "'Orbitron',monospace", fontWeight: 800, fontSize: 15.5, color: "#fff", marginBottom: 6 }}>{card.title}</div>
+        <div style={{ fontFamily: "'Inter', sans-serif", color: "#7aaac8", fontSize: 12.5, lineHeight: 1.55 }}>{card.desc}</div>
         <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 7, color: card.accent, fontWeight: 700, fontSize: 12.5 }}>
           <span>{card.emoji}</span> Explore More
           <div
@@ -859,27 +899,37 @@ function MediaSection() {
   const [offset, setOffset] = useState(0);
   const cardW = 268 + 20;
   const visible = 4;
-  const maxOff = Math.max(0, MEDIA_CARDS.length - visible);
+
+  const activeTabId = MEDIA_TABS[activeTab]?.id ?? MEDIA_TABS[0].id;
+  const filteredCards = useMemo(
+    () => MEDIA_CARDS.filter((card) => card.tab === activeTabId),
+    [activeTabId]
+  );
+  const maxOff = Math.max(0, filteredCards.length - visible);
+
+  useEffect(() => {
+    setOffset(0);
+  }, [activeTabId]);
+
+  useEffect(() => {
+    if (offset > maxOff) setOffset(maxOff);
+  }, [offset, maxOff]);
+
+  const handleTabClick = (index) => {
+    setActiveTab(index);
+    setOffset(0);
+  };
 
   return (
-    <section style={{ background: "#f0f5ff", padding: "72px 0 0", position: "relative", overflow: "hidden" }}>
+    <section id="media" className="fp-sub fp-sub--media" style={{ background: "#fff", position: "relative" }}>
       <Blobs colors={["#0d2146", "#1565c0", "#1a7a4a", "#6a1f9a"]} />
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 5,
-          background: "linear-gradient(90deg,#1a7a4a,#1565c0,#6a1f9a,#e65100,#1a7a4a)",
-        }}
-      />
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 32px", position: "relative", zIndex: 1 }}>
         <SectionHeader
           icon="⭐"
           titleHtml={`<span style="color:#0d2146">Media &amp; </span><span style="color:#1565c0">Recognition</span>`}
           subtitle="Celebrating our journey of impact, partnerships, and achievements across platforms and communities."
           accentColor="#1565c0"
+          noSubtitleMaxWidth
         />
         <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 10, marginTop: 36 }}>
           {MEDIA_TABS.map((t, i) => (
@@ -887,7 +937,7 @@ function MediaSection() {
               key={t.label}
               type="button"
               className="tab-btn"
-              onClick={() => setActiveTab(i)}
+              onClick={() => handleTabClick(i)}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -897,7 +947,7 @@ function MediaSection() {
                 border: activeTab === i ? "2px solid #0d2146" : "2px solid #dce4f5",
                 background: activeTab === i ? "linear-gradient(135deg,#0d2146,#163972)" : "#fff",
                 color: activeTab === i ? "#fff" : "#4a5568",
-                fontFamily: "'Nunito',sans-serif",
+                fontFamily: "'Orbitron',monospace",
                 fontWeight: 700,
                 fontSize: 13.5,
                 boxShadow: activeTab === i ? "0 6px 22px rgba(13,33,70,0.22)" : "0 2px 8px rgba(0,0,0,0.05)",
@@ -913,6 +963,7 @@ function MediaSection() {
             className="arrow-btn"
             aria-label="Scroll media left"
             onClick={() => setOffset(Math.max(0, offset - 1))}
+            disabled={offset === 0}
             style={{
               position: "absolute",
               left: -22,
@@ -931,6 +982,8 @@ function MediaSection() {
               alignItems: "center",
               justifyContent: "center",
               boxShadow: "0 4px 16px rgba(13,33,70,0.10)",
+              opacity: offset === 0 ? 0.4 : 1,
+              cursor: offset === 0 ? "default" : "pointer",
             }}
           >
             ‹
@@ -944,9 +997,15 @@ function MediaSection() {
                 transition: "transform 0.45s cubic-bezier(.4,0,.2,1)",
               }}
             >
-              {MEDIA_CARDS.map((card, i) => (
-                <MediaCard key={card.title} card={card} delay={i * 75} />
-              ))}
+              {filteredCards.length === 0 ? (
+                <div style={{ padding: "48px 24px", color: "#5a6680", fontSize: 14, fontWeight: 600 }}>
+                  No items in this category yet.
+                </div>
+              ) : (
+                filteredCards.map((card, i) => (
+                  <MediaCard key={`${activeTabId}-${card.title}`} card={card} delay={i * 75} />
+                ))
+              )}
             </div>
           </div>
           <button
@@ -954,6 +1013,7 @@ function MediaSection() {
             className="arrow-btn"
             aria-label="Scroll media right"
             onClick={() => setOffset(Math.min(maxOff, offset + 1))}
+            disabled={offset >= maxOff}
             style={{
               position: "absolute",
               right: -22,
@@ -972,6 +1032,8 @@ function MediaSection() {
               alignItems: "center",
               justifyContent: "center",
               boxShadow: "0 4px 16px rgba(13,33,70,0.10)",
+              opacity: offset >= maxOff ? 0.4 : 1,
+              cursor: offset >= maxOff ? "default" : "pointer",
             }}
           >
             ›
@@ -1040,20 +1102,15 @@ function MediaSection() {
                 {s.emoji}
               </div>
               <div>
-                <div style={{ fontFamily: "'Baloo 2',cursive", fontWeight: 800, fontSize: 20, color: s.color }}>{s.value}</div>
+                <div style={{ fontFamily: "'Orbitron',monospace", fontWeight: 800, fontSize: 20, color: s.color }}>{s.value}</div>
                 <div style={{ fontSize: 12, color: "#5a6680", fontWeight: 600 }}>{s.label}</div>
               </div>
             </div>
           ))}
         </div>
       </div>
-      <div style={{ height: 60 }} />
     </section>
   );
-}
-
-function RainbowDivider() {
-  return <div style={{ height: 5, background: "linear-gradient(90deg,#1a7a4a,#1565c0,#6a1f9a,#e65100)" }} />;
 }
 
 export default function PartnersMediaSection() {
@@ -1062,9 +1119,7 @@ export default function PartnersMediaSection() {
       <style>{STYLES}</style>
       <div className="fp" id="partners-media">
         <PartnersStrengthSection />
-        <RainbowDivider />
-        <OurPartnersSection />
-        <RainbowDivider />
+        {/* <OurPartnersSection /> */}
         <MediaSection />
       </div>
     </>

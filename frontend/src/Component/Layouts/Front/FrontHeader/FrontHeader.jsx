@@ -1,8 +1,26 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import "./FrontHeader.css";
 
+const HOME_SECTION_SCROLL_OFFSET = 130;
+
+const SUB_TABS = [
+  { label: "Impact", sectionId: "about" },
+  { label: "Labs", sectionId: "labs" },
+  { label: "Events", sectionId: "events" },
+  { label: "Courses", sectionId: "future-courses" },
+  { label: "Jobs", sectionId: "future-jobs" },
+  { label: "Social Impact", to: "/socialimpact" },
+  { label: "Community", to: "/community" },
+  { label: "Projects", to: "/#projects" },
+  { label: "Media", sectionId: "media" },
+  { label: "Our Reach", sectionId: "our-approach" },
+  { label: "Partners", sectionId: "partners" },
+];
+
 const FrontHeader = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const logo = "/Assets/images/logo/focalyt_new_logo.png";
   const menuRef = useRef(null);
@@ -26,13 +44,15 @@ const FrontHeader = () => {
   }, []);
 
   const toggleMenu = () => {
-    setIsMenuActive(!isMenuActive);
+    const next = !isMenuActive;
+    setIsMenuActive(next);
+    document.body.classList.toggle("foc-mobile-nav-open", next);
     if (menuRef.current) {
-      menuRef.current.classList.toggle("active");
+      menuRef.current.classList.toggle("active", next);
       menuRef.current.classList.add("transition");
     }
     if (menuOverlayRef.current) {
-      menuOverlayRef.current.classList.toggle("active");
+      menuOverlayRef.current.classList.toggle("active", next);
       menuOverlayRef.current.classList.add("transition");
     }
   };
@@ -200,6 +220,7 @@ const FrontHeader = () => {
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('resize', handleResize);
       document.removeEventListener('click', handleClickOutside);
+      document.body.classList.remove('foc-mobile-nav-open');
     };
   }, [isMenuActive, isScrolled, isRevealed]);
 
@@ -212,23 +233,28 @@ const FrontHeader = () => {
     isRevealed ? 'reveal-header' : ''
   ].filter(Boolean).join(' ');
 
-   const SUB_TABS = [
-    // { label: "Home", to: "/" },
-    // { label: "About Us", to: "/about" },
-    { label: "Impact", to: "" },
-    { label: "Labs", to: "/labs" },
-    // { label: "Lab As A Service", to: "/labs" },
-    { label: "Events", to: "/events" },
-    // { label: "Contact Us", to: "/contact" },
-    { label: "Jobs", to: "/joblisting" },
-    { label: "Courses", to: "/courses" },
-    { label: "Social Impact", to: "/socialimpact" },
-    { label: "Community", to: "/community" },
-    { label: "Projects", to: "/#projects" },
-    { label: "Media", to: "" },
-    { label: "Our Reach", to: "/#reach" },
-    { label: "Partners", to: "/#partners" },
-  ];
+  const isHomePage = () => {
+    const path = location.pathname.replace(/\/$/, "") || "/";
+    return path === "/" || path === "/home";
+  };
+
+  const scrollToHomeSection = (sectionId) => {
+    const el = document.getElementById(sectionId);
+    if (!el) return;
+    const top = el.getBoundingClientRect().top + window.scrollY - HOME_SECTION_SCROLL_OFFSET;
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    window.history.replaceState(null, "", `/#${sectionId}`);
+  };
+
+  const handleSubTabClick = (e, tab) => {
+    if (!tab.sectionId) return;
+    e.preventDefault();
+    if (isHomePage()) {
+      scrollToHomeSection(tab.sectionId);
+    } else {
+      navigate(`/#${tab.sectionId}`);
+    }
+  };
 
   return (
     <>
@@ -286,10 +312,10 @@ const FrontHeader = () => {
                       <Link className='nav-link-item drop-trigger' to='/events'>Events</Link>
                     </li> */}
                     <li className="nav-item d-xl-none d-lg-none d-md-none d-sm-block d-block">
-                      <Link className='nav-link-item drop-trigger' to='/contact'>Contact Us</Link>
+                      <Link className='nav-link-item drop-trigger' to='/contact'>Partner with Us</Link>
                     </li>
                     <li className="nav-item d-xl-flex d-lg-flex d-md-flex d-sm-none d-none">
-                      <Link className='nav-link-item drop-trigger' to='/contact'>Contact Us</Link>
+                      <Link className='nav-link-item drop-trigger' to='/contact'>Partner with Us</Link>
                     </li>
                     
                     {/* Theme Toggle */}
@@ -344,11 +370,22 @@ const FrontHeader = () => {
 
             <div className="front-subtabs" aria-label="Quick links">
               <div className="front-subtabs__scroller">
-                {SUB_TABS.map((t) => (
-                  <Link key={t.label} className="front-subtabs__tab" to={t.to}>
-                    {t.label}
-                  </Link>
-                ))}
+                {SUB_TABS.map((t) =>
+                  t.sectionId ? (
+                    <a
+                      key={t.label}
+                      href={`/#${t.sectionId}`}
+                      className="front-subtabs__tab"
+                      onClick={(e) => handleSubTabClick(e, t)}
+                    >
+                      {t.label}
+                    </a>
+                  ) : (
+                    <Link key={t.label} className="front-subtabs__tab" to={t.to}>
+                      {t.label}
+                    </Link>
+                  )
+                )}
               </div>
             </div>
           </div>

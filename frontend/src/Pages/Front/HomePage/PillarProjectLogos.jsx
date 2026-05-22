@@ -12,14 +12,14 @@ function LogoWrap({ children, bg = "transparent" }) {
   export function LogoSamsung() {
     return (
       <LogoWrap bg="#1428A0">
-        <text x="17" y="14" textAnchor="middle" fill="white" fontSize="5.5" fontFamily="DM Sans, Arial, sans-serif" fontWeight="800" letterSpacing="0.3">
+        <text x="17" y="14" textAnchor="middle" fill="white" fontSize="5.5" fontFamily="Orbitron, monospace" fontWeight="800" letterSpacing="0.3">
           SAMSUNG
         </text>
         <rect x="6" y="16" width="22" height="0.7" fill="rgba(255,255,255,0.35)" />
-        <text x="17" y="23" textAnchor="middle" fill="#a0b8f0" fontSize="4.2" fontFamily="DM Sans, Arial, sans-serif" fontWeight="700" letterSpacing="0.4">
+        <text x="17" y="23" textAnchor="middle" fill="#a0b8f0" fontSize="4.2" fontFamily="Orbitron, monospace" fontWeight="700" letterSpacing="0.4">
           INNOVATION
         </text>
-        <text x="17" y="28" textAnchor="middle" fill="#a0b8f0" fontSize="3.8" fontFamily="DM Sans, Arial, sans-serif" fontWeight="500">
+        <text x="17" y="28" textAnchor="middle" fill="#a0b8f0" fontSize="3.8" fontFamily="Orbitron, monospace" fontWeight="500">
           CAMPUS
         </text>
       </LogoWrap>
@@ -55,7 +55,7 @@ function LogoWrap({ children, bg = "transparent" }) {
         <circle cx="17" cy="22" r="2.2" fill="white" />
         <path d="M12 18 Q17 13 22 18" fill="none" stroke="white" strokeWidth="1.6" strokeLinecap="round" />
         <path d="M8.5 14.5 Q17 7 25.5 14.5" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1.5" strokeLinecap="round" />
-        <text x="17" y="30.5" textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="5" fontFamily="DM Sans, Arial, sans-serif" fontWeight="800" letterSpacing="1">
+        <text x="17" y="30.5" textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="5" fontFamily="Orbitron, monospace" fontWeight="800" letterSpacing="1">
           IoT
         </text>
       </LogoWrap>
@@ -79,7 +79,7 @@ function LogoWrap({ children, bg = "transparent" }) {
         <circle cx="17" cy="24" r="2" fill="white" />
         <path d="M12 19.5 Q17 14.5 22 19.5" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
         <path d="M8.5 16 Q17 8.5 25.5 16" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.4" strokeLinecap="round" />
-        <text x="17" y="10" textAnchor="middle" fill="rgba(255,255,255,0.75)" fontSize="4" fontFamily="DM Sans, Arial, sans-serif" fontWeight="700" letterSpacing="0.5">
+        <text x="17" y="10" textAnchor="middle" fill="rgba(255,255,255,0.75)" fontSize="4" fontFamily="Orbitron, monospace" fontWeight="700" letterSpacing="0.5">
           ERICSSON
         </text>
       </LogoWrap>
@@ -95,7 +95,7 @@ function LogoWrap({ children, bg = "transparent" }) {
         <line x1="17" y1="20.5" x2="17" y2="23.5" stroke="rgba(255,255,255,0.7)" strokeWidth="1.2" strokeLinecap="round" />
         <line x1="8.5" y1="15" x2="11.5" y2="15" stroke="rgba(255,255,255,0.7)" strokeWidth="1.2" strokeLinecap="round" />
         <line x1="22.5" y1="15" x2="25.5" y2="15" stroke="rgba(255,255,255,0.7)" strokeWidth="1.2" strokeLinecap="round" />
-        <text x="17" y="30" textAnchor="middle" fill="rgba(255,255,255,0.8)" fontSize="4.5" fontFamily="DM Sans, Arial, sans-serif" fontWeight="800">
+        <text x="17" y="30" textAnchor="middle" fill="rgba(255,255,255,0.8)" fontSize="4.5" fontFamily="Orbitron, monospace" fontWeight="800">
           CoE
         </text>
       </LogoWrap>
@@ -109,7 +109,7 @@ function LogoWrap({ children, bg = "transparent" }) {
         <rect x="10" y="13" width="14" height="8" rx="1" fill="rgba(255,255,255,0.18)" />
         <line x1="10" y1="16" x2="24" y2="16" stroke="rgba(255,255,255,0.4)" strokeWidth="0.7" />
         <line x1="10" y1="18.5" x2="24" y2="18.5" stroke="rgba(255,255,255,0.4)" strokeWidth="0.7" />
-        <text x="17" y="29.5" textAnchor="middle" fill="rgba(255,255,255,0.8)" fontSize="4" fontFamily="DM Sans, Arial, sans-serif" fontWeight="800" letterSpacing="0.3">
+        <text x="17" y="29.5" textAnchor="middle" fill="rgba(255,255,255,0.8)" fontSize="4" fontFamily="Orbitron, monospace" fontWeight="800" letterSpacing="0.3">
           FTLaaS
         </text>
       </LogoWrap>
@@ -164,7 +164,7 @@ function LogoWrap({ children, bg = "transparent" }) {
         <rect x="11" y="11" width="8" height="6" rx="2" fill="rgba(255,255,255,0.55)" />
         <circle cx="17" cy="14" r="2" fill="rgba(255,255,255,0.9)" />
         <line x1="8" y1="22" x2="26" y2="22" stroke="rgba(255,255,255,0.35)" strokeWidth="0.8" />
-        <text x="17" y="30.5" textAnchor="middle" fill="rgba(255,255,255,0.75)" fontSize="3.8" fontFamily="DM Sans, Arial, sans-serif" fontWeight="700" letterSpacing="0.3">
+        <text x="17" y="30.5" textAnchor="middle" fill="rgba(255,255,255,0.75)" fontSize="3.8" fontFamily="Orbitron, monospace" fontWeight="700" letterSpacing="0.3">
           INDUSTRY 4.0
         </text>
       </LogoWrap>
@@ -210,7 +210,7 @@ function LogoWrap({ children, bg = "transparent" }) {
     return (
       <svg viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg" aria-hidden>
         <rect width="17" height="34" rx="8" fill="#00436b" />
-        <text x="9" y="22" fill="white" fontSize="14" fontFamily="DM Sans, Arial, sans-serif" fontWeight="900">
+        <text x="9" y="22" fill="white" fontSize="14" fontFamily="Orbitron, monospace" fontWeight="900">
           P
         </text>
         <rect width="17" height="34" x="17" rx="8" fill="#2e7d32" />

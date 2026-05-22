@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 const STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Baloo+2:wght@700;800&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;900&display=swap');
 
   .oa, .oa *, .oa *::before, .oa *::after { box-sizing: border-box; }
 
@@ -14,7 +14,7 @@ const STYLES = `
     --teal: #00838f;
     --navy: #0d2146;
     --cream: #f8faff;
-    font-family: 'Nunito', sans-serif;
+    font-family: 'Inter', sans-serif;
     background: var(--cream);
     overflow-x: hidden;
   }
@@ -30,34 +30,135 @@ const STYLES = `
   }
 
   .oa .oa-title {
-    font-family: 'Baloo 2', cursive; font-weight: 800;
+    font-family: 'Orbitron', monospace; font-weight: 800;
     font-size: clamp(30px, 4.5vw, 52px); line-height: 1.1; color: var(--navy); margin-bottom: 12px;
   }
 
-  .oa .oa-subtitle { color: #5a6680; font-size: clamp(14px, 1.5vw, 17px); line-height: 1.75; max-width: 720px; margin: 0 auto 36px; }
+  .oa .oa-subtitle { color: #5a6680; font-family: 'Inter', sans-serif; font-size: clamp(14px, 1.5vw, 17px); line-height: 1.75; margin: 0 auto 36px; }
 
   .oa .oa-tabs {
-    display: flex; gap: 10px; overflow-x: auto; padding: 6px 4px 14px;
-    margin-bottom: 32px; scrollbar-width: thin;
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin: 0 0 28px;
+    padding: 0;
+    list-style: none;
+    border-bottom: 2px solid #e8edf5;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
   }
-  .oa .oa-tabs::-webkit-scrollbar { height: 5px; }
-  .oa .oa-tabs::-webkit-scrollbar-thumb { background: #c8d4e8; border-radius: 4px; }
+  .oa .oa-tabs::-webkit-scrollbar { display: none; }
 
   .oa .oa-tab {
-    flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
-    padding: 12px 20px; border-radius: 50px; border: 2px solid #dce4f5;
-    background: #fff; color: #4a5568; font-weight: 700; font-size: 13px;
-    cursor: pointer; transition: all 0.25s ease; white-space: nowrap;
-    font-family: 'Nunito', sans-serif;
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 5px;
+    padding: 0 4px 12px;
+    margin: 0;
+    border: none;
+    background: transparent;
+    appearance: none;
+    -webkit-appearance: none;
+    box-shadow: none;
+    cursor: default;
+    position: relative;
+    color: #64748b;
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.25;
+    text-align: center;
+    transition: color 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
   }
-  .oa .oa-tab:hover { transform: translateY(-2px); border-color: #b0c4de; }
-  .oa .oa-tab.active {
-    background: linear-gradient(135deg, var(--navy), #163972);
-    color: #fff; border-color: var(--navy);
-    box-shadow: 0 8px 24px rgba(13,33,70,0.22);
+  .oa .oa-tab::after {
+    content: '';
+    position: absolute;
+    left: 20%;
+    right: 20%;
+    bottom: -2px;
+    height: 3px;
+    border-radius: 3px 3px 0 0;
+    background: transparent;
+    transition: left 0.2s ease, right 0.2s ease, background 0.2s ease;
   }
-  .oa .oa-tab-ico { font-size: 18px; }
+  .oa .oa-tab:hover { color: #334155; cursor: pointer; }
+  .oa .oa-tab[aria-selected="true"] {
+    color: var(--tab-accent, #1a7a4a);
+    font-weight: 700;
+    cursor: default;
+  }
+  .oa .oa-tab[aria-selected="true"]::after {
+    left: 10%;
+    right: 10%;
+    background: var(--tab-accent, #1a7a4a);
+  }
+  .oa .oa-tab:focus { outline: none; }
+  .oa .oa-tab:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--tab-accent, #1a7a4a) 55%, #94a3b8);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  .oa .oa-tab-ico {
+    display: block;
+    font-size: 22px;
+    line-height: 1;
+    opacity: 0.5;
+    filter: grayscale(0.15);
+    transition: opacity 0.2s ease, transform 0.2s ease, filter 0.2s ease;
+    pointer-events: none;
+  }
+  .oa .oa-tab:hover .oa-tab-ico { opacity: 0.72; }
+  .oa .oa-tab[aria-selected="true"] .oa-tab-ico {
+    opacity: 1;
+    filter: none;
+    transform: scale(1.06);
+  }
+
+  .oa .oa-tab-label {
+    display: block;
+    max-width: 100%;
+    padding: 0 2px;
+    word-break: break-word;
+    hyphens: auto;
+    pointer-events: none;
+  }
+
+  .oa .oa-tabpanel {
+    margin: 0;
+    padding: 0;
+    border: none;
+    animation: oaFadeIn 0.4s ease;
+  }
+
+  @media (min-width: 1100px) {
+    .oa .oa-tab { font-size: 10.5px; padding: 0 6px 14px; }
+    .oa .oa-tab-ico { font-size: 24px; }
+  }
+
+  @media (max-width: 900px) {
+    .oa .oa-tabs {
+      gap: 0;
+      margin-bottom: 22px;
+      mask-image: linear-gradient(90deg, #000 92%, transparent 100%);
+      -webkit-mask-image: linear-gradient(90deg, #000 92%, transparent 100%);
+    }
+    .oa .oa-tab {
+      flex: 0 0 auto;
+      min-width: 76px;
+      max-width: 94px;
+      padding: 0 2px 10px;
+      font-size: 9px;
+    }
+    .oa .oa-tab-ico { font-size: 20px; }
+  }
 
   .oa .oa-panel {
     background: #fff; border-radius: 24px; border: 2px solid #e4ebf8;
@@ -84,11 +185,11 @@ const STYLES = `
   }
 
   .oa .oa-hero h3 {
-    font-family: 'Baloo 2', cursive; font-weight: 800;
+    font-family: 'Orbitron', monospace; font-weight: 800;
     font-size: clamp(22px, 3vw, 32px); line-height: 1.2; margin-bottom: 12px;
   }
 
-  .oa .oa-hero p { color: #5a6680; font-size: 14.5px; line-height: 1.75; }
+  .oa .oa-hero p { font-family: 'Inter', sans-serif; color: #5a6680; font-size: 14.5px; line-height: 1.75; }
 
   .oa .oa-hero-visual {
     width: 120px; height: 120px; border-radius: 50%;
@@ -146,7 +247,7 @@ const STYLES = `
   }
 
   .oa .oa-block-title {
-    font-family: 'Baloo 2', cursive;
+    font-family: 'Orbitron', monospace;
     font-weight: 800;
     font-size: 16px;
     color: var(--navy);
@@ -160,6 +261,7 @@ const STYLES = `
     background: #fff;
   }
   .oa .oa-info-list li {
+    font-family: 'Inter', sans-serif;
     display: flex;
     align-items: flex-start;
     gap: 12px;
@@ -188,6 +290,7 @@ const STYLES = `
 
   .oa .oa-list { list-style: none; padding: 0; margin: 0; }
   .oa .oa-list li {
+    font-family: 'Inter', sans-serif;
     display: flex; align-items: flex-start; gap: 10px;
     font-size: 13px; color: #5a6680; line-height: 1.6; margin-bottom: 8px;
   }
@@ -211,13 +314,13 @@ const STYLES = `
   .oa .oa-subcard-num {
     width: 36px; height: 36px; border-radius: 10px; color: #fff;
     display: flex; align-items: center; justify-content: center;
-    font-family: 'Baloo 2', cursive; font-weight: 800; font-size: 14px; flex-shrink: 0;
+    font-family: 'Orbitron', monospace; font-weight: 800; font-size: 14px; flex-shrink: 0;
   }
   .oa .oa-subcard-title {
-    font-family: 'Baloo 2', cursive; font-weight: 800; font-size: 14.5px; line-height: 1.3;
+    font-family: 'Orbitron', monospace; font-weight: 800; font-size: 14.5px; line-height: 1.3;
   }
   .oa .oa-subcard-body { padding: 0 18px 18px; }
-  .oa .oa-subcard-body p { font-size: 12.5px; color: #5a6680; line-height: 1.65; margin-bottom: 12px; }
+  .oa .oa-subcard-body p { font-family: 'Inter', sans-serif; font-size: 12.5px; color: #5a6680; line-height: 1.65; margin-bottom: 12px; }
   .oa .oa-subcard-body h5 { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; margin: 10px 0 8px; }
 
   .oa .oa-pill-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
@@ -233,8 +336,9 @@ const STYLES = `
     border: 2px solid #d8edf8; border-radius: 18px; padding: 22px 24px; margin-bottom: 24px;
   }
   .oa .oa-commit h4 {
-    font-family: 'Baloo 2', cursive; font-weight: 800; font-size: 17px; color: var(--navy); margin-bottom: 12px;
+    font-family: 'Orbitron', monospace; font-weight: 800; font-size: 17px; color: var(--navy); margin-bottom: 12px;
   }
+  .oa .oa-commit p { font-family: 'Inter', sans-serif; }
 
   .oa .oa-cta {
     display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 18px;
@@ -242,13 +346,13 @@ const STYLES = `
     border-radius: 18px; padding: 24px 28px; margin-top: 8px;
   }
   .oa .oa-cta-text { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 220px; }
-  .oa .oa-cta-text p { color: #b8cce0; font-size: 13.5px; line-height: 1.6; margin: 0; }
-  .oa .oa-cta-text strong { display: block; color: #fff; font-family: 'Baloo 2', cursive; font-size: 16px; margin-bottom: 4px; }
+  .oa .oa-cta-text p { font-family: 'Inter', sans-serif; color: #b8cce0; font-size: 13.5px; line-height: 1.6; margin: 0; }
+  .oa .oa-cta-text strong { display: block; color: #fff; font-family: 'Orbitron', monospace; font-size: 16px; margin-bottom: 4px; }
   .oa .oa-cta-btn {
     display: inline-flex; align-items: center; gap: 8px;
     background: linear-gradient(135deg, var(--green), #25a060); color: #fff;
     border: none; border-radius: 12px; padding: 14px 28px;
-    font-family: 'Baloo 2', cursive; font-weight: 800; font-size: 14px;
+    font-family: 'Orbitron', monospace; font-weight: 800; font-size: 14px;
     text-decoration: none; cursor: pointer; transition: all 0.25s ease;
     box-shadow: 0 8px 26px rgba(26,122,74,0.35); white-space: nowrap;
   }
@@ -259,7 +363,7 @@ const STYLES = `
     border-top: 2px dashed #e4ebf8;
   }
   .oa .oa-closing p {
-    font-family: 'Baloo 2', cursive; font-weight: 800; font-size: clamp(16px, 2vw, 20px); line-height: 1.4;
+    font-family: 'Orbitron', monospace; font-weight: 800; font-size: clamp(16px, 2vw, 20px); line-height: 1.4;
   }
 
   .oa .oa-flow {
@@ -739,7 +843,7 @@ function PillarPanel({ pillar }) {
             {pillar.stats.map((s) => (
               <div key={s.label} className="oa-block oa-block-stat" style={{ "--block-accent": c }}>
                 <div style={{ fontSize: 28, marginBottom: 6 }}>{s.emoji}</div>
-                <div style={{ fontFamily: "'Baloo 2', cursive", fontWeight: 800, fontSize: 20, color: c }}>{s.value}</div>
+                <div style={{ fontFamily: "'Orbitron', monospace", fontWeight: 800, fontSize: 20, color: c }}>{s.value}</div>
                 <div style={{ fontSize: 11.5, color: "#5a6680", fontWeight: 600, marginTop: 4, lineHeight: 1.4 }}>{s.label}</div>
               </div>
             ))}
@@ -784,7 +888,7 @@ export default function OurApproachSection() {
         <div className="oa-wrap" style={{ textAlign: "center", marginBottom: 8 }}>
           <div className="oa-badge">🎯 Our Approach</div>
           <h2 className="oa-title">
-            Integrated <span style={{ color: "#1a7a4a" }}>Implementation</span> Ecosystem
+            Integrated <span style={{ color: "#1a7a4a" }}>Implementation</span> 
           </h2>
           <p className="oa-subtitle">
             A holistic framework connecting mobilisation, training infrastructure, expert trainers, delivery, assessments, placements, and entrepreneurship — designed to create skilled, employable, and future-ready communities.
@@ -793,22 +897,38 @@ export default function OurApproachSection() {
 
         <div className="oa-wrap">
           <div className="oa-tabs" role="tablist" aria-label="Our Approach pillars">
-            {PILLARS.map((p, i) => (
-              <button
-                key={p.id}
-                type="button"
-                role="tab"
-                aria-selected={active === i}
-                className={`oa-tab${active === i ? " active" : ""}`}
-                onClick={() => setActive(i)}
-              >
-                <span className="oa-tab-ico">{p.emoji}</span>
-                {p.label}
-              </button>
-            ))}
+            {PILLARS.map((p, i) => {
+              const tabId = `oa-tab-${p.id}`;
+              const panelId = `oa-panel-${p.id}`;
+              const isSelected = active === i;
+              return (
+                <button
+                  key={p.id}
+                  id={tabId}
+                  type="button"
+                  role="tab"
+                  aria-selected={isSelected}
+                  aria-controls={panelId}
+                  tabIndex={isSelected ? 0 : -1}
+                  className="oa-tab"
+                  style={{ "--tab-accent": p.color }}
+                  onClick={() => setActive(i)}
+                >
+                  <span className="oa-tab-ico" aria-hidden>{p.emoji}</span>
+                  <span className="oa-tab-label">{p.label}</span>
+                </button>
+              );
+            })}
           </div>
 
-          <PillarPanel pillar={pillar} />
+          <div
+            role="tabpanel"
+            id={`oa-panel-${pillar.id}`}
+            aria-labelledby={`oa-tab-${pillar.id}`}
+            className="oa-tabpanel"
+          >
+            <PillarPanel pillar={pillar} />
+          </div>
         </div>
       </section>
 

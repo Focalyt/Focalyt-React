@@ -32,6 +32,69 @@ const ApprovalSchema = new mongoose.Schema(
   { _id: false }
 );
 
+function unwrapMongoDate(val) {
+  if (val == null) return undefined;
+  if (val instanceof Date) return val;
+  if (typeof val === 'object' && val.$date != null) return new Date(val.$date);
+  if (typeof val === 'string' || typeof val === 'number') {
+    const d = new Date(val);
+    return Number.isNaN(d.getTime()) ? undefined : d;
+  }
+  return undefined;
+}
+
+function toObjectIdSafe(val) {
+  if (val == null) return undefined;
+  if (val instanceof mongoose.Types.ObjectId) return val;
+  if (typeof val === 'string' && mongoose.Types.ObjectId.isValid(val)) {
+    return new mongoose.Types.ObjectId(val);
+  }
+  if (typeof val === 'object') {
+    const raw = val.$oid || val._id || val.id;
+    if (raw && mongoose.Types.ObjectId.isValid(String(raw))) {
+      return new mongoose.Types.ObjectId(String(raw));
+    }
+  }
+  return undefined;
+}
+
+function approvalNeedsRepair(approval) {
+  if (!approval || typeof approval !== 'object') return false;
+  const dateKeys = ['approvedAt', 'rejectedAt'];
+  for (const key of dateKeys) {
+    const v = approval[key];
+    if (v && typeof v === 'object' && !(v instanceof Date) && v.$date != null) return true;
+  }
+  const idKeys = ['approvedBy', 'rejectedBy'];
+  for (const key of idKeys) {
+    const v = approval[key];
+    if (v && typeof v === 'object' && !(v instanceof mongoose.Types.ObjectId) && (v.$oid != null || v._id != null)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function normalizeB2BApproval(approval) {
+  if (!approval || typeof approval !== 'object') {
+    return { status: 'PENDING' };
+  }
+  const status = ['PENDING', 'APPROVED', 'REJECTED'].includes(approval.status)
+    ? approval.status
+    : 'PENDING';
+  const out = { status };
+  const approvedBy = toObjectIdSafe(approval.approvedBy);
+  const rejectedBy = toObjectIdSafe(approval.rejectedBy);
+  const approvedAt = unwrapMongoDate(approval.approvedAt);
+  const rejectedAt = unwrapMongoDate(approval.rejectedAt);
+  if (approvedBy) out.approvedBy = approvedBy;
+  if (rejectedBy) out.rejectedBy = rejectedBy;
+  if (approvedAt) out.approvedAt = approvedAt;
+  if (rejectedAt) out.rejectedAt = rejectedAt;
+  if (approval.rejectionReason) out.rejectionReason = String(approval.rejectionReason).trim();
+  return out;
+}
+
 const B2BLeadSchema = new mongoose.Schema({
   leadCategory: { type: ObjectId, ref: 'LeadCategory', required: true },
   b2bProject: { type: ObjectId, ref: 'B2BProject' },
@@ -92,6 +155,16 @@ const B2BLeadSchema = new mongoose.Schema({
   updatedBy: { type: ObjectId, ref: 'User' },
 }, {
   timestamps: true // adds createdAt and updatedAt
+});
+
+B2BLeadSchema.statics.normalizeApproval = normalizeB2BApproval;
+B2BLeadSchema.statics.approvalNeedsRepair = approvalNeedsRepair;
+
+B2BLeadSchema.pre('save', function(next) {
+  if (this.approval && approvalNeedsRepair(this.approval)) {
+    this.approval = normalizeB2BApproval(this.approval);
+  }
+  next();
 });
 
 // Pre-save middleware to set default status for new leads

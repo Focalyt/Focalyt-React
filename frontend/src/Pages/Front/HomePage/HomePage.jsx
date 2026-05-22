@@ -1,10 +1,11 @@
 ﻿import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import FrontLayout from "../../../Component/Layouts/Front/index";
 import { PillarProjectLogo } from "./PillarProjectLogos";
 // import ZenithXSection from "./ZenithXSection";
 import PartnersMediaSection from "./PartnersMediaSection";
 import OurApproachSection from "./OurApproachSection";
+import IndustryAutomationSection from "./IndustryAutomationSection";
 import axios from "axios";
 import moment from "moment";
 import L from "leaflet";
@@ -27,6 +28,7 @@ import {
   Glasses,
   Globe,
   Handshake,
+  Mail,
   Image as ImageIcon,
   Laptop,
   Leaf,
@@ -41,6 +43,7 @@ import {
   Shield,
   Smartphone,
   Sparkles,
+  MessageCircle,
   Sprout,
   Star,
   Sun,
@@ -110,7 +113,7 @@ function IpIcon({ name, size = 14, className = "" }) {
    BG: off-white / cool gray for readability
 ───────────────────────────────────────────────────────────────── */
 const STYLES = `
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:ital,wght@0,300;0,400;0,500;0,600;1,300&family=DM+Sans:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;900&display=swap');
 
 html { scroll-behavior: smooth; }
 
@@ -151,7 +154,7 @@ html { scroll-behavior: smooth; }
 
   --r: 14px;
   --ease: cubic-bezier(.4,0,.2,1);
-  font-family: 'Exo 2', sans-serif;
+  font-family: 'Inter', sans-serif;
   background: var(--bg);
   color: var(--text);
   overflow-x: hidden;
@@ -836,7 +839,7 @@ html { scroll-behavior: smooth; }
   right: 22px;
   bottom: max(24px, env(safe-area-inset-bottom, 0px));
   z-index: 10050;
-  font-family: 'Exo 2', sans-serif;
+  font-family: 'Orbitron', monospace;
 }
 .foc-theme-fab__track {
   position: relative;
@@ -1008,6 +1011,7 @@ html { scroll-behavior: smooth; }
   margin-top:20px;
 }
 .hero-right-desc {
+  font-family: 'Inter', sans-serif;
   max-width: 520px;
   font-size: 12px;
   line-height: 1.7;
@@ -1053,7 +1057,8 @@ html { scroll-behavior: smooth; }
   text-shadow: 0 10px 40px var(--heroGlowR);
 }
 .hero-sub {
-  font-size: 15px; font-weight: 300;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px; font-weight: 400;
   color: var(--muted); line-height: 1.8;
   margin-bottom: 32px; max-width: 460px;
   font-style: italic;
@@ -1083,9 +1088,9 @@ html { scroll-behavior: smooth; }
   color: #fff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
   border: none; border-radius: 4px;
-  font-family: 'Exo 2', sans-serif;
+  font-family: 'Orbitron', monospace;
   font-size: 13px; font-weight: 700;
-  letter-spacing: .08em; text-transform: uppercase;
+  letter-spacing: .08em; 
   cursor: pointer; text-decoration: none;
   display: inline-flex; align-items: center; gap: 8px;
   transition: all .25s var(--ease);
@@ -1101,7 +1106,7 @@ html { scroll-behavior: smooth; }
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 4px;
-  font-family: 'Exo 2', sans-serif;
+  font-family: 'Orbitron', monospace;
   font-size: 13px; font-weight: 500;
   letter-spacing: .06em;
   cursor: pointer; text-decoration: none;
@@ -1180,9 +1185,10 @@ html { scroll-behavior: smooth; }
   text-shadow: 0 1px 0 color-mix(in srgb, var(--surface) 40%, transparent),
     0 10px 28px color-mix(in srgb, var(--text) 18%, transparent);
 }
-.hero-tile-text span { display: block; }
+// .hero-tile-text span { display: inline; }
+.hero-tile-text .hero-tile-lower { text-transform: lowercase; }
 .terminal-line {
-  font-family: 'Courier New', monospace;
+  font-family: 'Orbitron', monospace;
   font-size: 11px; color: var(--cyan);
   background: var(--terminalBg);
   border: 1px solid var(--border);
@@ -1196,12 +1202,19 @@ html { scroll-behavior: smooth; }
   background: var(--surface);
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
-  margin-top: 12px;
+  margin-top: 112px;
   padding: 12px 0; overflow: hidden;
   position: relative;
 }
 @media(max-width:768px) {
-  .marquee-bar { margin-top: 8px; }
+  .marquee-bar { margin-top: 120px; }
+}
+  .foc-cyber-home .container{
+  padding:0;
+  }
+.hero-btns{
+    gap: 7px;
+    flex-wrap: wrap;
 }
 .marquee-bar::before, .marquee-bar::after {
   content: '';
@@ -1317,7 +1330,7 @@ html { scroll-behavior: smooth; }
   gap: 10px;
   padding: 0 28px;
   flex-shrink: 0;
-  font-family: 'Exo 2', sans-serif;
+  font-family: 'Orbitron', monospace;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: .04em;
@@ -1364,6 +1377,7 @@ html { scroll-behavior: smooth; }
 .sh2 .cyan { color: var(--cyan); text-shadow: 0 0 16px rgba(0,229,255,.4); }
 .sh2 .red  { color: var(--red);  text-shadow: 0 0 16px rgba(252,43,90,.4); }
 .s-body {
+  font-family: 'Inter', sans-serif;
   font-size: 15px; color: var(--muted);
   margin-top: 12px; 
   // max-width: 520px;
@@ -1403,8 +1417,8 @@ html { scroll-behavior: smooth; }
 }
 .pillar:hover .pillar-num { color: rgba(0,229,255,.2); }
 .pillar-icon { font-size: 26px; margin-bottom: 10px; }
-.pillar-title { font-weight: 600; font-size: 14px; color: var(--text); margin-bottom: 6px; }
-.pillar-desc { font-size: 12px; color: var(--muted); line-height: 1.65; }
+.pillar-title { font-family: 'Orbitron', monospace; font-weight: 600; font-size: 14px; color: var(--text); margin-bottom: 6px; }
+.pillar-desc { font-family: 'Inter', sans-serif; font-size: 12px; color: var(--muted); line-height: 1.65; }
 
 .core-tabs {
   display: flex; gap: 4px; justify-content: center;
@@ -1415,7 +1429,7 @@ html { scroll-behavior: smooth; }
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 2px;
-  font-family: 'Exo 2', sans-serif;
+  font-family: 'Orbitron', monospace;
   font-size: 11px; font-weight: 600;
   letter-spacing: .1em; text-transform: uppercase;
   color: var(--muted); cursor: pointer;
@@ -1429,7 +1443,7 @@ html { scroll-behavior: smooth; }
 }
 .ctab:hover:not(.on) { border-color: var(--cyan); color: var(--cyan); }
 
-/* CSR — poster layout (reference design); fonts: Orbitron + Exo 2 like rest of home */
+/* CSR — poster layout (reference design); font: Orbitron */
 @keyframes csrPosterFadeUp {
   from { opacity: 0; transform: translateY(24px); }
   to { opacity: 1; transform: translateY(0); }
@@ -1586,7 +1600,7 @@ html { scroll-behavior: smooth; }
   z-index: 1;
   width: 100%;
   min-width: 0;
-  font-family: 'Exo 2', sans-serif;
+  font-family: 'Orbitron', monospace;
   background: var(--surface);
   border-radius: 18px;
   box-shadow: var(--csr-card-shadow);
@@ -1662,7 +1676,7 @@ html { scroll-behavior: smooth; }
   list-style: none;
   margin: 0 0 14px;
   padding: 0;
-  font-family: 'Exo 2', sans-serif;
+  font-family: 'Orbitron', monospace;
   font-size: 13px;
   line-height: 1.5;
   color: var(--muted);
@@ -1724,7 +1738,7 @@ html { scroll-behavior: smooth; }
   list-style: none;
   margin: 0;
   padding: 0;
-  font-family: 'Exo 2', sans-serif;
+  font-family: 'Orbitron', monospace;
   font-size: 12px;
   line-height: 1.45;
   color: var(--muted);
@@ -1793,7 +1807,7 @@ html { scroll-behavior: smooth; }
 }
 .csr-poster-footerbar span {
   color: rgba(255,255,255,.62);
-  font-family: 'Exo 2', sans-serif;
+  font-family: 'Orbitron', monospace;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: .06em;
@@ -1906,6 +1920,7 @@ html { scroll-behavior: smooth; }
   line-height: 1.25;
 }
 .event-subtitle {
+  font-family: 'Inter', sans-serif;
   font-size: 12px;
   color: var(--muted);
   line-height: 1.55;
@@ -2027,6 +2042,7 @@ html { scroll-behavior: smooth; }
   line-height: 1.25;
 }
 .course-sector {
+  font-family: 'Inter', sans-serif;
   font-size: 11px;
   color: var(--muted);
   letter-spacing: .08em;
@@ -2196,7 +2212,7 @@ html { scroll-behavior: smooth; }
   color: var(--text); margin-bottom: 12px;
   line-height: 1.15; letter-spacing: .03em;
 }
-.area-desc { font-size: 14px; color: var(--muted); line-height: 1.8; margin-bottom: 24px; font-style: italic; }
+.area-desc { font-family: 'Inter', sans-serif; font-size: 14px; color: var(--muted); line-height: 1.8; margin-bottom: 24px; font-style: italic; }
 .area-items { display: flex; flex-direction: column; gap: 10px; }
 .aitem {
   display: flex; gap: 14px; align-items: flex-start;
@@ -2273,7 +2289,7 @@ html { scroll-behavior: smooth; }
   font-size: 24px; margin-bottom: 14px;
 }
 .lab-name { font-family: 'Orbitron', monospace; font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 6px; letter-spacing: .04em; }
-.lab-desc { font-size: 12px; color: var(--muted); line-height: 1.65; }
+.lab-desc { font-family: 'Inter', sans-serif; font-size: 12px; color: var(--muted); line-height: 1.65; }
 
 /* FFTLaaS — intro matches site; blocks below use soft “cute” shapes (not lab/why cards) */
 .fftl-nep {
@@ -2488,7 +2504,7 @@ html { scroll-behavior: smooth; }
 }
 .role-emoji { font-size: 30px; }
 .role-name { font-family: 'Orbitron', monospace; font-size: 11px; font-weight: 700; letter-spacing: .1em; color: var(--text); }
-.role-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+.role-desc { font-family: 'Inter', sans-serif; font-size: 11px; color: var(--muted); line-height: 1.5; }
 .role-cta { font-size: 11px; color: var(--cyan); font-weight: 600; letter-spacing: .06em; }
 
 .why-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
@@ -2505,7 +2521,7 @@ html { scroll-behavior: smooth; }
 }
 .why-icon { font-size: 30px; margin-bottom: 12px; }
 .why-title { font-family: 'Orbitron', monospace; font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 7px; letter-spacing: .04em; }
-.why-desc { font-size: 12px; color: var(--muted); line-height: 1.65; }
+.why-desc { font-family: 'Inter', sans-serif; font-size: 12px; color: var(--muted); line-height: 1.65; }
 
 .projects-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .proj-card {
@@ -2637,7 +2653,7 @@ html { scroll-behavior: smooth; }
   color: var(--cyan);
   margin-bottom: 10px;
 }
-.partner-with-card .pwc-desc { font-size: 13px; color: var(--muted); line-height: 1.55; margin: 0; }
+.partner-with-card .pwc-desc { font-family: 'Inter', sans-serif; font-size: 13px; color: var(--muted); line-height: 1.55; margin: 0; }
 .partner-with-highlights {
   margin-top: 28px;
   display: grid;
@@ -2719,7 +2735,7 @@ html { scroll-behavior: smooth; }
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 8px 40px rgba(10, 34, 64, 0.08);
-  font-family: 'DM Sans', 'Exo 2', sans-serif;
+  font-family: 'Orbitron', monospace;
 }
 .foc-cyber-home .ip-shell-panel {
   background: #ffffff;
@@ -2830,6 +2846,7 @@ html { scroll-behavior: smooth; }
 .foc-cyber-home .ip-hdr.p3 .ip-pillar-tag { background: #6d28d9; }
 .foc-cyber-home .ip-hdr.p4 .ip-pillar-tag { background: #16a34a; }
 .foc-cyber-home .ip-hdr .ip-hdr-title {
+  font-family: 'Orbitron', monospace;
   font-size: clamp(1.4rem, 3vw, 1.95rem);
   font-weight: 800;
   color: #ffffff;
@@ -2851,6 +2868,7 @@ html { scroll-behavior: smooth; }
 .foc-cyber-home .ip-hdr.p3 .ip-hdr-sub { color: #ede9fe; }
 .foc-cyber-home .ip-hdr.p4 .ip-hdr-sub { color: #dcfce7; }
 .foc-cyber-home .ip-hdr .ip-hdr-desc {
+  font-family: 'Inter', sans-serif;
   font-size: 14px;
   line-height: 1.75;
   max-width: 680px;
@@ -2974,6 +2992,7 @@ html { scroll-behavior: smooth; }
   gap: 8px;
 }
 .foc-cyber-home .ip-focus-list li {
+  font-family: 'Inter', sans-serif;
   font-size: 14.5px;
   color: #152536;
   padding: 11px 13px;
@@ -3014,6 +3033,7 @@ html { scroll-behavior: smooth; }
 .foc-cyber-home .ip-three-col.p3 .ip-focus-list li { border-left: 4px solid #6d28d9; }
 .foc-cyber-home .ip-three-col.p4 .ip-focus-list li { border-left: 4px solid #16a34a; }
 .foc-cyber-home .ip-check {
+  font-family: 'Inter', sans-serif;
   display: flex; align-items: flex-start; gap: 9px;
   font-size: 14px; color: #1e2d3d; padding: 10px 12px;
   border: 1px solid #e2e8f0; border-radius: 8px;
@@ -3125,7 +3145,7 @@ html { scroll-behavior: smooth; }
 .foc-cyber-home .ip-proj-logo--wide { width: 52px; height: 40px; }
 .foc-cyber-home .ip-proj-logo svg { width: 100%; height: 100%; display: block; }
 .foc-cyber-home .ip-proj-name { font-size: 14px; font-weight: 700; color: #0a2240; line-height: 1.35; margin: 0; }
-.foc-cyber-home .ip-proj-desc { font-size: 12.5px; color: #3d4f63; line-height: 1.6; margin: 0; }
+.foc-cyber-home .ip-proj-desc { font-family: 'Inter', sans-serif; font-size: 12.5px; color: #3d4f63; line-height: 1.6; margin: 0; }
 .foc-cyber-home .ip-chips {
   display: flex; flex-wrap: wrap; gap: 7px;
   margin-top: 8px; padding-top: 10px;
@@ -3207,14 +3227,104 @@ html { scroll-behavior: smooth; }
   .foc-cyber-home .ip-hdr-icons { align-items: flex-start; flex-direction: row; flex-wrap: wrap; }
   .foc-cyber-home .ip-impact-row { grid-template-columns: repeat(2, 1fr); }
 }
-@media(max-width:600px) {
-  .foc-cyber-home .ip-tab-nav { gap: 8px; }
-  .foc-cyber-home .ip-tab-btn {
-    flex: 1 1 calc(50% - 4px);
-    justify-content: center;
-    padding: 10px 12px;
+@media(max-width:768px) {
+  .foc-cyber-home #about.section {
+    padding: 56px 0;
+  }
+  .foc-cyber-home #about .container {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .foc-cyber-home #about .section-head {
+    margin-bottom: 20px;
+  }
+  .foc-cyber-home #about .section-head .sh2 {
+    font-size: clamp(1.35rem, 5.5vw, 1.85rem);
+    line-height: 1.15;
+  }
+  .foc-cyber-home #about .section-head .stag {
     font-size: 10px;
   }
+  .foc-cyber-home .ip-pillars-wrap {
+    gap: 10px;
+  }
+  .foc-cyber-home .ip-tab-nav {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+    scrollbar-color: #b0c4de transparent;
+    padding-bottom: 8px;
+    margin-left: -16px;
+    margin-right: -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+    width: auto;
+  }
+  .foc-cyber-home .ip-tab-nav::-webkit-scrollbar {
+    height: 4px;
+  }
+  .foc-cyber-home .ip-tab-nav::-webkit-scrollbar-thumb {
+    background: #b0c4de;
+    border-radius: 4px;
+  }
+  .foc-cyber-home .ip-tab-btn {
+    flex: 0 0 auto;
+    width: auto;
+    justify-content: flex-start;
+    align-items: center;
+    white-space: nowrap;
+    text-align: left;
+    line-height: 1.2;
+    font-size: 10px;
+    letter-spacing: 0.3px;
+    padding: 11px 14px;
+    gap: 8px;
+    min-height: 44px;
+    scroll-snap-align: start;
+  }
+  .foc-cyber-home .ip-tab-num {
+    width: 26px;
+    height: 26px;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+  .foc-cyber-home .ip-shell {
+    border-radius: 10px;
+  }
+  .foc-cyber-home .ip-hdr {
+    padding: 1.15rem 1rem 1rem;
+  }
+  .foc-cyber-home .ip-hdr .ip-hdr-title {
+    font-size: clamp(1.15rem, 4.5vw, 1.5rem);
+  }
+  .foc-cyber-home .ip-hdr .ip-hdr-desc {
+    font-size: 13px;
+    line-height: 1.65;
+  }
+  .foc-cyber-home .ip-three-col {
+    padding: 0.85rem 0.75rem 1rem;
+    gap: 12px;
+  }
+  .foc-cyber-home .ip-sec-head {
+    margin-left: 0.75rem;
+    margin-right: 0.75rem;
+  }
+  .foc-cyber-home .ip-projects {
+    padding: 1rem 0.75rem 1.15rem;
+  }
+  .foc-cyber-home .ip-footer {
+    padding: 10px 0.75rem;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media(max-width:600px) {
   .foc-cyber-home .ip-proj-card,
   .foc-cyber-home .ip-proj-card--reverse { flex-direction: column; }
   .foc-cyber-home .ip-photo {
@@ -3222,7 +3332,45 @@ html { scroll-behavior: smooth; }
   }
   .foc-cyber-home .ip-proj-card--reverse .ip-proj-num { left: 10px; right: auto; }
   .foc-cyber-home .ip-card-info { padding: 14px 16px; }
-  .foc-cyber-home .ip-tab-btn { padding: 12px 14px; font-size: 10px; }
+  .foc-cyber-home .ip-impact-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 0.75rem 0.85rem;
+  }
+}
+
+@media(max-width:480px) {
+  .foc-cyber-home #about .container {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .foc-cyber-home .ip-tab-nav {
+    margin-left: -12px;
+    margin-right: -12px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .foc-cyber-home .ip-tab-btn {
+    font-size: 9px;
+    padding: 10px 12px;
+    gap: 7px;
+  }
+  .foc-cyber-home .ip-tab-num {
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+  }
+  .foc-cyber-home .ip-focus-list li {
+    font-size: 13px;
+    padding: 9px 10px;
+  }
+  .foc-cyber-home .ip-check,
+  .foc-cyber-home .ip-snap-text {
+    font-size: 13px;
+  }
+  .foc-cyber-home .ip-impact-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media(max-width:1024px) {
@@ -3328,7 +3476,7 @@ html { scroll-behavior: smooth; }
   margin-top: 22px;
 }
 .foc-map-legend-chip {
-  font-family: 'Exo 2', sans-serif;
+  font-family: 'Orbitron', monospace;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -3342,7 +3490,7 @@ html { scroll-behavior: smooth; }
 .foc-map-attrib {
   margin: 14px 0 0;
   text-align: center;
-  font-family: 'Exo 2', sans-serif;
+  font-family: 'Orbitron', monospace;
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -3359,7 +3507,7 @@ html { scroll-behavior: smooth; }
   border-bottom-color: var(--cyan);
 }
 .leaflet-container.foc-india-map-inner {
-  font-family: 'Exo 2', sans-serif;
+  font-family: 'Orbitron', monospace;
 }
 .leaflet-container.foc-india-map-inner .leaflet-control-container {
   display: none;
@@ -3388,6 +3536,16 @@ const PILLARS = [
   { num: "02", icon: "🔬", title: "Future Ready Schools/Colleges", desc: "State-of-the-art hands-on labs installed in schools & colleges across India." },
   { num: "03", icon: "💼", title: "Future Ready MSME", desc: "Bridging skills and industry demand — global tech careers in emerging fields." },
   { num: "04", icon: "🌱", title: "Future Ready Environment", desc: "Government & CSR initiatives for skill development, education, and employment." },
+];
+
+const INDIAN_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa",
+  "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala",
+  "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland",
+  "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
+  "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands",
+  "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Lakshadweep",
+  "Puducherry", "Ladakh", "Jammu and Kashmir",
 ];
 
 const CORE_AREAS = [
@@ -3455,7 +3613,7 @@ const CORE_AREAS = [
         icon: "📡",
         title: "IoT Lab Setup under Ericsson CSR",
         desc: "Technology-enabled innovation labs established in government schools to provide hands-on exposure to IoT, AI, Robotics, and emerging technologies for school students — Target: Government school students (Class 11–12) — Coverage: Delhi NCR — Impact: Digital inclusion and future technology exposure.",
-        img: "/Assets/images/futureready/iot.jpeg",
+        img: "/Assets/images/futureready/iot_lab.png",
       },
       {
         icon: "🏆",
@@ -3472,11 +3630,13 @@ const CORE_AREAS = [
         icon: "🎓",
         title: "Industry-Aligned College Innovation Programs",
         desc: "Skill-integrated practical learning initiatives designed for higher education institutions to bridge the gap between academics and industry requirements — Target: Engineering, Polytechnic, BCA & MCA students — Coverage: Multi-institution model — Impact: Employability, innovation, and industry readiness.",
+        img: "/Assets/public_assets/images/homepage/industry_align.jpeg",
       },
       {
         icon: "👩‍🏫",
         title: "Faculty Development & Innovation Enablement",
         desc: "Capacity-building initiatives empowering educators with emerging technology knowledge, lab operations capability, and experiential teaching methodologies — Target: Teachers & institutional trainers — Coverage: Schools, colleges & technical institutes — Impact: Sustainable future-ready academic ecosystems.",
+        img: "/Assets/public_assets/images/homepage/Faculty.jpeg",
       },
     ],
   },
@@ -3727,6 +3887,7 @@ const PILLAR_UI = {
         num: 2,
         name: "Center of Excellence (CoE) in Emerging Technologies",
         desc: "Advanced learning ecosystem for students, faculty & startups with industry-oriented labs, applied research, and incubation support. Developed with IIT Ropar.",
+        img: "/Assets/public_assets/images/homepage/center_of_excellence.jpeg",
         logoKey: "coe",
         chips: { target: "Institutions & Faculty", coverage: "Pan India", impact: "Innovation & research" },
       },
@@ -3742,6 +3903,7 @@ const PILLAR_UI = {
         num: 4,
         name: "Industry-Aligned College Innovation Programs",
         desc: "Skill-integrated practical learning for higher education institutions bridging the gap between academics and industry requirements.",
+        img: "/Assets/public_assets/images/homepage/industry_align.jpeg",
         logoKey: "college-innovation",
         chips: { target: "Colleges & Students", coverage: "Across India", impact: "Industry readiness" },
       },
@@ -3749,6 +3911,7 @@ const PILLAR_UI = {
         num: 5,
         name: "Faculty Development & Innovation Enablement",
         desc: "Capacity-building initiatives empowering educators with emerging technology knowledge, lab operations capability, and experiential teaching methodologies.",
+        img: "/Assets/public_assets/images/homepage/Faculty.jpeg",
         logoKey: "faculty-dev",
         chips: { target: "Faculty & Educators", coverage: "Across India", impact: "Future-ready faculty" },
       },
@@ -4193,9 +4356,739 @@ const PROJECTS = [
 const HERO_TILES = [
   { key: "skills", icon: "⚡", title: "Future Ready Skills" },
   { key: "schools", icon: "🏫", title: "Future Ready Schools & Colleges" },
-  { key: "msme", icon: "🏭", title: "Future Ready MSMES" },
+  { key: "msme", icon: "🏭", title: "Future Ready MSMEs" },
   { key: "env", icon: "🌿", title: "Future Ready Environment" },
 ];
+
+const FTLAAS_STYLES = `
+.ftl{
+  font-family:'Orbitron',monospace;
+  background:#fff;
+  color:#0f172a;
+  overflow-x:hidden;
+  position:relative;
+  z-index:1;
+  border-radius:20px;
+  border:1px solid #e2e8f0;
+  box-shadow:0 8px 32px rgba(15,23,42,.1),0 2px 8px rgba(15,23,42,.06);
+  padding:1.75rem 2rem 2rem;
+}
+.ftl *{box-sizing:border-box;margin:0;padding:0;}
+.ftl-hero,.ftl-card,.ftl-card-sm,.ftl-snap,.ftl-prog,.ftl-pchip{background:#fff;border:1px solid #e2e8f0;}
+.ftl-hero{
+  border-radius:16px;
+  padding:1.5rem;
+  margin-bottom:1.25rem;
+  background:#fff;
+  box-shadow:0 2px 12px rgba(15,23,42,.05);
+}
+.ftl-badge{display:inline-flex;align-items:center;gap:5px;background:#dcfce7;color:#166534;font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;margin-bottom:.75rem;}
+.ftl-badge.college{background:#ede9fe;color:#4c1d95;}
+.ftl-hero-grid{display:grid;grid-template-columns:1fr auto;gap:1.5rem;align-items:center;}
+.ftl-h1{font-size:22px;font-weight:700;line-height:1.2;margin-bottom:.4rem;color:#0f172a;}
+.ftl-h1 span{color:#534AB7;}
+.ftl-sub{font-size:13px;color:#475569;line-height:1.65;margin-bottom:.9rem;max-width:620px;}
+.ftl-row{display:flex;gap:8px;flex-wrap:wrap;}
+.ftl-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;font-weight:500;color:#1e293b;}
+.ftl-btn,.ftl-btn-lite{display:inline-flex;align-items:center;gap:5px;padding:9px 14px;border-radius:8px;font-family:'Orbitron',monospace;font-size:13px;cursor:pointer;transition:.2s;white-space:nowrap;}
+.ftl-btn{background:#534AB7;color:#fff;border:none;font-weight:600;}
+.ftl-btn:hover{background:#4338ca;transform:translateY(-1px);}
+.ftl-btn-lite{background:transparent;color:#334155;border:1px solid #e2e8f0;font-weight:500;}
+.ftl-btn-lite:hover{border-color:#534AB7;color:#534AB7;}
+.ftl-hex-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.ftl-hex{border:1px solid #e2e8f0;border-radius:12px;padding:10px 8px;text-align:center;}
+.ftl-hex-lbl{font-size:10px;font-weight:600;color:#475569;margin-top:2px;}
+.ftl-inst-tabs{display:flex;gap:8px;margin-bottom:1.25rem;}
+.ftl-inst-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;border:1px solid #e2e8f0;border-radius:12px;font-family:'Orbitron',monospace;font-size:13px;font-weight:600;color:#64748b;cursor:pointer;background:#fff;transition:all .15s;}
+.ftl-inst-tab.on{border-color:#534AB7;color:#534AB7;background:#f5f3ff;}
+.ftl-sub-tabs{display:flex;border-bottom:1px solid #e2e8f0;margin-bottom:1.25rem;overflow-x:auto;scrollbar-width:none;}
+.ftl-sub-tabs::-webkit-scrollbar{display:none;}
+.ftl-sub-tab{flex-shrink:0;padding:10px 18px;border:none;background:transparent;font-family:'Orbitron',monospace;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;}
+.ftl-sub-tab.on{color:#534AB7;border-bottom-color:#534AB7;}
+.ftl-main-layout{display:grid;grid-template-columns:1fr 230px;gap:1.25rem;align-items:start;}
+.ftl-grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.ftl-grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+.ftl-grid-6{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;}
+.ftl-card{border-radius:12px;padding:1rem;}
+.ftl-card-sm,.ftl-prog,.ftl-pchip{border-radius:8px;padding:.75rem;}
+.ftl-ico{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ftl-card-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.ftl-card-h3{font-size:13px;font-weight:600;color:#0f172a;}
+.ftl-card-p,.ftl-list-item{font-size:12px;color:#475569;line-height:1.55;}
+.ftl-list{display:flex;flex-direction:column;gap:5px;}
+.ftl-list-item{display:flex;align-items:flex-start;gap:8px;}
+.ftl-dot{width:5px;height:5px;border-radius:50%;background:#534AB7;flex-shrink:0;margin-top:7px;}
+.ftl-check{color:#16a34a;font-weight:700;flex-shrink:0;}
+.ftl-snap{border-radius:12px;padding:1rem;position:sticky;top:8px;}
+.ftl-snap-title,.ftl-sec-head{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;margin-bottom:.75rem;}
+.ftl-sec-head{font-size:11px;display:flex;align-items:center;gap:8px;}
+.ftl-sec-head::after{content:'';flex:1;height:1px;background:#f1f5f9;}
+.ftl-snap-row{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid #f1f5f9;}
+.ftl-snap-row:last-child{border-bottom:none;}
+.ftl-snap-num{font-size:17px;font-weight:700;line-height:1;}
+.ftl-snap-lbl{font-size:11px;color:#64748b;line-height:1.3;}
+.ftl-process{display:grid;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:1.25rem;}
+.ftl-step{padding:.9rem .75rem;text-align:center;border-right:1px solid #f1f5f9;}
+.ftl-step:last-child{border-right:none;}
+.ftl-step-top{display:flex;align-items:center;justify-content:center;gap:5px;margin-bottom:6px;}
+.ftl-step-num{font-size:10px;color:#94a3b8;font-weight:600;}
+.ftl-step h4{font-size:11px;font-weight:600;color:#0f172a;margin-bottom:3px;}
+.ftl-step p{font-size:10px;color:#64748b;line-height:1.4;}
+.ftl-prog{text-align:center;}
+.ftl-prog-label{font-size:11px;font-weight:600;color:#0f172a;margin-bottom:2px;}
+.ftl-prog-sub{font-size:10px;color:#64748b;line-height:1.3;}
+.ftl-ticker{display:flex;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:1.25rem;}
+.ftl-ticker-item{display:flex;align-items:center;gap:6px;padding:9px 12px;border-right:1px solid #e2e8f0;font-size:11px;color:#475569;flex:1;justify-content:center;white-space:nowrap;}
+.ftl-partner-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:7px;margin-bottom:1.25rem;}
+.ftl-pchip{display:flex;align-items:center;gap:8px;padding:8px 10px;}
+.ftl-pi{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;}
+.ftl-pn{font-size:11px;font-weight:500;color:#334155;line-height:1.3;}
+.ftl-cta{background:#3C3489;border-radius:12px;padding:1.25rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-top:1.25rem;}
+.ftl-cta-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.12);color:#e0d9ff;font-size:10px;padding:3px 9px;border-radius:999px;margin-bottom:6px;}
+.ftl-cta-h{font-size:16px;font-weight:700;color:#fff;margin-bottom:3px;}
+.ftl-cta-sub{font-size:12px;color:#a8a0e8;}
+@media(max-width:1100px){.ftl-main-layout{grid-template-columns:1fr;}.ftl-snap{position:static;}.ftl-grid-6{grid-template-columns:repeat(3,1fr);}.ftl-hex-grid{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:768px){.ftl{padding:1.25rem 1rem 1.5rem;border-radius:16px;}.ftl-hero-grid{grid-template-columns:1fr;}.ftl-hex-grid{display:none;}.ftl-grid-2{grid-template-columns:1fr;}.ftl-grid-3{grid-template-columns:1fr 1fr;}.ftl-grid-6{grid-template-columns:repeat(2,1fr);}.ftl-inst-tabs{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;scrollbar-width:thin;scrollbar-color:#cbd5e1 transparent;padding-bottom:8px;margin-left:-4px;margin-right:-4px;padding-left:4px;padding-right:4px;}.ftl-inst-tabs::-webkit-scrollbar{height:4px;}.ftl-inst-tabs::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px;}.ftl-inst-tab{flex:0 0 auto;white-space:nowrap;scroll-snap-align:start;padding:11px 14px;font-size:12px;}.ftl-ticker{flex-wrap:wrap;}.ftl-ticker-item{flex:1 1 45%;border:none;border-bottom:1px solid #e2e8f0;}}
+@media(max-width:480px){.ftl-grid-3{grid-template-columns:1fr;}.ftl-grid-6{grid-template-columns:1fr 1fr;}.ftl-process{grid-template-columns:1fr !important;}.ftl-step{border-right:none;border-bottom:1px solid #f1f5f9;}}
+`;
+
+const FTLAAS_DATA = {
+  school: {
+    badge: "FTLaaS for Schools",
+    title: "for Schools",
+    accent: "#16a34a",
+    intro: "Transform your school into a future ready learning hub with our subscription-based model that brings advanced technology education to every student.",
+    stats: [["5,000+", "Students impacted"], ["100+", "Schools connected"]],
+    ticker: [["🖐️", "Hands-on learning"], ["💡", "Innovation exposure"], ["🔗", "Industry connect"], ["🎓", "Certified programs"], ["📈", "Scalable & affordable"]],
+    overview: [
+      ["💡", "#ede9fe", "Access to emerging technologies", "AI, Robotics & IoT learning exposure for every student across all grades."],
+      ["🖐️", "#dcfce7", "Hands-on practical learning", "Project-based experiential learning ecosystem aligned to real-world skills."],
+      ["👩‍🏫", "#dbeafe", "Teacher empowerment", "Quarterly Training of Trainers support with resources and manuals."],
+      ["📖", "#dcfce7", "Curriculum integration", "Integrated with school academic structure and NEP 2020 framework."],
+      ["🏅", "#fef3c7", "Certifications & competitions", "Student and teacher certification pathways with inter-school competitions."],
+      ["💰", "#ede9fe", "Flexible subscription model", "Affordable and scalable implementation options for all school types."],
+    ],
+    labs: [
+      ["🧠", "#ede9fe", "AI Labs", ["AI Fundamentals", "Machine Learning Basics", "AI Projects & Applications"]],
+      ["🤖", "#dcfce7", "Robotics Labs", ["Sensor-based Robotics", "Automation Kits", "Coding & Hardware Integration"]],
+      ["📡", "#dbeafe", "IoT Labs", ["Smart Devices", "IoT Systems", "Connected Technology Learning"]],
+      ["🔬", "#dcfce7", "STEM Innovation Labs", ["Innovation-based Experimentation", "Practical Science-Tech Ecosystem"]],
+      ["🚁", "#fef3c7", "Drone Technology", ["Drone Assembly", "Flying Concepts", "Future Mobility Exposure"]],
+      ["👩‍🏫", "#ede9fe", "Teacher Empowerment", ["Quarterly TTT support", "Certification & competitions", "Innovation exposure"]],
+    ],
+    snap: [
+      ["👩‍🎓", "#ede9fe", "#534AB7", "5,000+", "Students impacted"],
+      ["🔬", "#dcfce7", "#16a34a", "25+", "Future tech labs deployed"],
+      ["🏫", "#dbeafe", "#1d4ed8", "100+", "Schools connected"],
+      ["📍", "#fef3c7", "#92400e", "Multiple", "Punjab · Haryana · Chandigarh · UP & more"],
+      ["🤝", "#dcfce7", "#166534", "Strong", "Industry · Academic · CSR partnerships"],
+    ],
+    process: [
+      ["01", "📋", "#ede9fe", "Select your plan", "Choose the right plan as per your school strength & needs."],
+      ["02", "📅", "#dbeafe", "Academic alignment", "We align the program with your academic calendar."],
+      ["03", "👩‍🏫", "#dcfce7", "Teacher training", "Quarterly training for teachers to stay future-tech ready."],
+      ["04", "📦", "#fef3c7", "Project kit delivery", "Provision of project kits & learning resources to students."],
+      ["05", "🎧", "#ede9fe", "Continuous support", "Ongoing support, mentoring, audits & innovation opportunities."],
+    ],
+    program: [
+      ["📚", "24 sessions annually", "Structured across 4 quarters"],
+      ["🖥️", "Theory + demonstration", "Concept learning made easy"],
+      ["🔧", "Practical sessions", "Hands-on activities & experiments"],
+      ["📢", "Show & tell", "Quarterly student presentations"],
+      ["🏆", "Project exhibitions", "At PTM & inter-school events"],
+      ["🎓", "Assessments & certification", "Evaluate. Certify. Recognize."],
+    ],
+    approach: ["Experiential & project-based learning", "Industry exposure & real-world applications", "Innovation challenges & hackathons", "Quarterly teacher enablement (TTT)", "Integrated LMS & digital support", "Subscription-based scalable model"],
+    outcomes: ["Build curiosity & innovative thinking in students", "Future-ready skills from an early age", "Improved STEM participation & results", "School recognized as Future Ready institution", "Teacher confidence with emerging technologies", "Parent & community engagement through exhibitions"],
+    partners: [["DP", "#dbeafe", "#1d4ed8", "Delhi Public School"], ["DA", "#ede9fe", "#534AB7", "DAV Group of Schools"], ["RI", "#dcfce7", "#16a34a", "Ryan International School"], ["30+", "#fef3c7", "#92400e", "Leading schools across Punjab & Haryana"], ["++", "#dcfce7", "#166534", "And many more..."]],
+    geo: ["Punjab", "Haryana", "Chandigarh", "Rajasthan", "Delhi & NCR · Uttar Pradesh & more"],
+    types: ["Government schools (Classes 2-12)", "Private CBSE & ICSE schools", "International & IB schools", "CSR-backed educational institutions"],
+    cta: "Become a future ready school",
+  },
+  college: {
+    badge: "FTLaaS for Colleges & Universities",
+    title: "for Colleges & Universities",
+    accent: "#534AB7",
+    intro: "Empower your campus with next-generation technology labs, industry-aligned training and innovation-driven learning through our flexible subscription model.",
+    stats: [["10,000+", "Students impacted"], ["75+", "Colleges & universities connected"]],
+    ticker: [["🏭", "Industry-aligned curriculum"], ["🖐️", "Hands-on & experiential"], ["🔭", "Innovation & research"], ["🎓", "Certifications & internships"], ["💰", "Scalable & cost effective"]],
+    overview: [
+      ["🏭", "#ede9fe", "Industry aligned curriculum", "Curriculum designed with industry experts and sector skill councils."],
+      ["🔭", "#dcfce7", "Research & innovation", "Promote innovation, projects & startups through hands-on learning."],
+      ["🎓", "#dbeafe", "Certification & placement", "Enhance employability with industry-recognized certifications & skills."],
+      ["🖐️", "#dcfce7", "Hands-on & experiential", "Advanced lab kits, project resources & real-world tech exposure."],
+      ["🤝", "#fef3c7", "Industry connect & expert talks", "Guest lectures, industry visits and employer engagement activities."],
+      ["💰", "#ede9fe", "Scalable & cost effective", "Flexible subscription plans for institutions of all sizes."],
+    ],
+    labs: [
+      ["🧠", "#ede9fe", "AI & ML Labs", ["Deep Learning Concepts", "Data Science Projects", "AI Application Development"]],
+      ["🤖", "#dcfce7", "Advanced Robotics", ["Industrial Automation", "Robotic Programming", "Manufacturing Simulation"]],
+      ["📡", "#dbeafe", "IoT Systems", ["Smart Connected Devices", "Industrial IoT", "Edge Computing Basics"]],
+      ["🔭", "#dcfce7", "Innovation Labs", ["Research & Innovation", "Startup Incubation", "Industry Projects"]],
+      ["🚁", "#fef3c7", "Drone Technology", ["Advanced Drone Systems", "Aerial Data Collection", "Agriculture & Surveillance"]],
+      ["🏭", "#ede9fe", "Industry Alignment", ["Curriculum by industry experts", "Certifications & internships", "Placement support"]],
+    ],
+    snap: [
+      ["👩‍🎓", "#ede9fe", "#534AB7", "10,000+", "Students impacted"],
+      ["🔬", "#dcfce7", "#16a34a", "50+", "Future tech labs deployed"],
+      ["🏛️", "#dbeafe", "#1d4ed8", "75+", "Colleges & universities"],
+      ["📍", "#fef3c7", "#92400e", "Multiple", "Punjab · Haryana · Delhi · Rajasthan · UP & more"],
+      ["🏭", "#dcfce7", "#166534", "Industry", "Collaborations with leading industries & orgs"],
+    ],
+    process: [
+      ["01", "📋", "#ede9fe", "Select your plan", "Choose the plan that suits your institution's needs."],
+      ["02", "📅", "#dbeafe", "Academic alignment", "We align the program with your academic structure."],
+      ["03", "👩‍🏫", "#dcfce7", "Faculty training", "Quarterly training for faculty & resource support."],
+      ["04", "📦", "#fef3c7", "Project kit delivery", "Delivery of advanced kits & lab resources to campus."],
+      ["05", "🎧", "#ede9fe", "Continuous support", "Ongoing mentoring, technical support & innovation ecosystem."],
+    ],
+    program: [
+      ["📚", "Industry-aligned sessions", "Designed with sector experts"],
+      ["🖥️", "Theory + case studies", "Industry-oriented concepts"],
+      ["🔧", "Lab & practical sessions", "Hands-on advanced lab time"],
+      ["🔭", "Research & innovation", "Projects, hackathons & startups"],
+      ["🏆", "Tech exhibitions", "Showcase to industry & judges"],
+      ["🎓", "Certifications & internships", "Evaluate. Certify. Place."],
+    ],
+    approach: ["Industry-aligned curriculum design", "Research & innovation support", "Certification & placement pathways", "Hackathons, projects & startup exposure", "Faculty resource & training support", "Advanced lab kits & resources"],
+    outcomes: ["Industry-ready graduates with practical skills", "Improved placement rates & career outcomes", "Student innovation & startup culture", "College ranked as innovation hub", "Faculty upskilled with emerging technologies", "Strong industry & CSR partnerships"],
+    partners: [["CU", "#fef3c7", "#92400e", "Chitkara University"], ["PC", "#dcfce7", "#166534", "PCTE Group of Institutes"], ["II", "#ede9fe", "#534AB7", "IIT Ropar (Partner)"], ["75+", "#dbeafe", "#1d4ed8", "Colleges & universities connected"], ["++", "#dcfce7", "#16a34a", "And many more..."]],
+    geo: ["Punjab", "Haryana", "Chandigarh", "Delhi & NCR", "Rajasthan · Uttar Pradesh & more"],
+    types: ["Engineering & technical colleges", "Universities - Arts, Science, Commerce", "Polytechnics & ITIs", "Deemed & autonomous institutions"],
+    cta: "Partner with Focalyt",
+  },
+};
+
+function FTLaaSSection() {
+  const [inst, setInst] = useState("school");
+  const [subTab, setSubTab] = useState("overview");
+  const data = FTLAAS_DATA[inst];
+  const isSchool = inst === "school";
+  const subTabs = [
+    ["overview", "Overview"],
+    ["labs", "What We Offer"],
+    ["process", "Our Process"],
+    ["program", "Program Structure"],
+    ["approach", "Our Approach"],
+    // ["partners", "Partner Institutions"],
+  ];
+
+  return (
+    <>
+      <style>{FTLAAS_STYLES}</style>
+      <div className="ftl">
+        <div className="ftl-hero">
+          <div className="ftl-badge">✓ Integrated with NEP 2020</div>
+          <div className="ftl-hero-grid">
+            <div>
+              <h1 className="ftl-h1">Future Technology Lab as a Service <span>(FTLaaS)</span></h1>
+              <p className="ftl-sub">Focalyt&apos;s FTLaaS enables schools and colleges to implement immersive AI, Robotics, IoT, and STEM learning ecosystems through a scalable subscription-based model.</p>
+              <div className="ftl-row" style={{ marginBottom: "1rem" }}>
+                {[["🧠", "AI"], ["🤖", "Robotics"], ["📡", "IoT"], ["🚁", "Drones"], ["🔬", "STEM Labs"]].map(([ico, label]) => <div key={label} className="ftl-pill"><span>{ico}</span>{label}</div>)}
+              </div>
+              <div className="ftl-row">
+                <button type="button" className="ftl-btn">→ Explore Programs</button>
+                <button type="button" className="ftl-btn-lite">📅 Book a Demo</button>
+                <button type="button" className="ftl-btn-lite" data-bs-toggle="modal" data-bs-target="#partnerModal">🤝 Partner With Us</button>
+              </div>
+            </div>
+            <div className="ftl-hex-grid">
+              {[["🧠", "AI", "#ede9fe"], ["🤖", "Robotics", "#dcfce7"], ["📡", "IoT", "#dbeafe"], ["🚁", "Drones", "#fef3c7"], ["🔬", "STEM", "#fce7f3"], ["💡", "Innovation", "#ede9fe"]].map(([ico, label, bg]) => (
+                <div key={label} className="ftl-hex" style={{ background: bg }}><div style={{ fontSize: 20 }}>{ico}</div><div className="ftl-hex-lbl">{label}</div></div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="ftl-inst-tabs">
+          <button type="button" className={`ftl-inst-tab${inst === "school" ? " on" : ""}`} onClick={() => { setInst("school"); setSubTab("overview"); }}>🏫 FTLaaS for Schools</button>
+          <button type="button" className={`ftl-inst-tab${inst === "college" ? " on" : ""}`} onClick={() => { setInst("college"); setSubTab("overview"); }}>🏛️ FTLaaS for Colleges & Universities</button>
+        </div>
+
+        <div style={{ marginBottom: "1rem" }}>
+          <div className={`ftl-badge${isSchool ? "" : " college"}`}>✓ {data.badge}</div>
+          <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: ".3rem", color: "#0f172a" }}>
+            Future Technology Lab as a Service — <span style={{ color: data.accent }}>{data.title}</span>
+          </h2>
+          <p className="ftl-sub">{data.intro}</p>
+        </div>
+
+        <div className="ftl-sub-tabs">
+          {subTabs.map(([id, label]) => <button key={id} type="button" className={`ftl-sub-tab${subTab === id ? " on" : ""}`} onClick={() => setSubTab(id)}>{label}</button>)}
+        </div>
+
+        {subTab === "overview" && (
+          <>
+            <div className="ftl-ticker">{data.ticker.map(([ico, label]) => <div key={label} className="ftl-ticker-item"><span>{ico}</span>{label}</div>)}</div>
+            <div className="ftl-grid-3" style={{ marginBottom: "1rem" }}>
+              {data.overview.map(([ico, bg, title, desc]) => (
+                <div key={title} className="ftl-card">
+                  <div className="ftl-card-head"><div className="ftl-ico" style={{ background: bg }}><span style={{ fontSize: 16 }}>{ico}</span></div><span className="ftl-card-h3">{title}</span></div>
+                  <p className="ftl-card-p">{desc}</p>
+                </div>
+              ))}
+            </div>
+            <div className="ftl-grid-2">
+              {data.stats.map(([value, label], idx) => (
+                <div key={label} className="ftl-card" style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: idx === 0 ? "#534AB7" : "#16a34a", marginBottom: 4 }}>{value}</div>
+                  <div style={{ fontSize: 12, color: "#64748b" }}>{label}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {subTab === "labs" && (
+          <div className="ftl-main-layout">
+            <div>
+              <div className="ftl-sec-head">Lab types we offer</div>
+              <div className="ftl-grid-2">
+                {data.labs.map(([ico, bg, title, items]) => (
+                  <div key={title} className="ftl-card">
+                    <div className="ftl-card-head"><div className="ftl-ico" style={{ background: bg }}><span style={{ fontSize: 16 }}>{ico}</span></div><span className="ftl-card-h3">{title}</span></div>
+                    <div className="ftl-list">{items.map((item) => <div key={item} className="ftl-list-item"><span className="ftl-dot" />{item}</div>)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="ftl-snap">
+              <div className="ftl-snap-title">Impact Snapshot</div>
+              {data.snap.map(([ico, bg, col, num, lbl]) => (
+                <div key={lbl} className="ftl-snap-row">
+                  <div className="ftl-ico" style={{ background: bg }}><span style={{ fontSize: 15 }}>{ico}</span></div>
+                  <div><div className="ftl-snap-num" style={{ color: col }}>{num}</div><div className="ftl-snap-lbl">{lbl}</div></div>
+                </div>
+              ))}
+              <button type="button" className="ftl-btn" style={{ width: "100%", justifyContent: "center", fontSize: 12, marginTop: ".75rem" }}>{data.cta} →</button>
+            </div>
+          </div>
+        )}
+
+        {subTab === "process" && (
+          <>
+            <div className="ftl-sec-head">Our simple process</div>
+            <div className="ftl-process" style={{ gridTemplateColumns: `repeat(${data.process.length},1fr)` }}>
+              {data.process.map(([num, ico, bg, title, desc]) => (
+                <div key={num} className="ftl-step">
+                  <div className="ftl-step-top"><span className="ftl-step-num">{num}</span><div className="ftl-ico" style={{ width: 28, height: 28, borderRadius: "50%", background: bg }}><span style={{ fontSize: 13 }}>{ico}</span></div></div>
+                  <h4>{title}</h4><p>{desc}</p>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {subTab === "program" && (
+          <>
+            <div className="ftl-sec-head">Annual program structure</div>
+            <div className="ftl-grid-6" style={{ marginBottom: "1.25rem" }}>
+              {data.program.map(([ico, label, sub]) => <div key={label} className="ftl-prog"><div style={{ fontSize: 20, marginBottom: 4 }}>{ico}</div><div className="ftl-prog-label">{label}</div><div className="ftl-prog-sub">{sub}</div></div>)}
+            </div>
+            <div className="ftl-grid-3">
+              {[
+                ["📦", "#ede9fe", isSchool ? "Project kits & resources" : "Advanced lab kits & resources", isSchool ? ["Quarterly project kits for students", "Lab tools & equipment", "Digital learning materials"] : ["Advanced project kits for students", "Industry-grade lab equipment", "Research & innovation materials"]],
+                ["👩‍🏫", "#dcfce7", isSchool ? "Teacher enablement" : "Faculty enablement", isSchool ? ["Quarterly TTT workshops", "Master trainer support", "Curriculum alignment sessions"] : ["Quarterly faculty TTT workshops", "Master trainer support", "Industry collaboration sessions"]],
+                ["💻", "#dbeafe", "LMS & digital access", isSchool ? ["Integrated LMS platform", "Student & teacher login", "Progress tracking dashboard"] : ["Advanced LMS platform", "Student & faculty login", "Research & project tracking"]],
+              ].map(([ico, bg, title, items]) => (
+                <div key={title} className="ftl-card">
+                  <div className="ftl-card-head"><div className="ftl-ico" style={{ background: bg }}><span>{ico}</span></div><span className="ftl-card-h3">{title}</span></div>
+                  <div className="ftl-list">{items.map((item) => <div key={item} className="ftl-list-item"><span className="ftl-check">✓</span>{item}</div>)}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {subTab === "approach" && (
+          <>
+            <div className="ftl-grid-2" style={{ marginBottom: "1rem" }}>
+              {[["Our approach", data.approach], ["Outcomes & impact", data.outcomes]].map(([title, items]) => (
+                <div key={title} className="ftl-card"><div className="ftl-sec-head">{title}</div><div className="ftl-list">{items.map((item) => <div key={item} className="ftl-list-item"><span className="ftl-check">✓</span>{item}</div>)}</div></div>
+              ))}
+            </div>
+            <div className="ftl-grid-3">
+              {(isSchool
+                ? [["🖐️", "Hands-on learning", "Project-based, experiential learning with real tech kits."], ["👩‍🏫", "Teacher empowerment", "Quarterly training, TTT support & resources."], ["🎓", "Certified & future ready", "Certification, competitions & innovation exposure."]]
+                : [["🏭", "Industry aligned", "Curriculum designed with industry experts & sector skill councils."], ["🔭", "Research & innovation", "Promote innovation, projects & startup readiness."], ["🎓", "Certification & placement", "Enhance employability with industry-recognized certifications."]]
+              ).map(([ico, title, desc]) => <div key={title} className="ftl-card-sm"><div className="ftl-card-head"><span>{ico}</span><span className="ftl-card-h3">{title}</span></div><p className="ftl-card-p">{desc}</p></div>)}
+            </div>
+          </>
+        )}
+
+        {/* Partner Institutions — hidden for Schools & Colleges FTLaaS
+        {subTab === "partners" && (
+          <>
+            <div className="ftl-sec-head">Partner institutions</div>
+            <div className="ftl-partner-grid">
+              {data.partners.map(([init, bg, col, name]) => <div key={name} className="ftl-pchip"><div className="ftl-pi" style={{ background: bg, color: col }}>{init}</div><div className="ftl-pn">{name}</div></div>)}
+            </div>
+            <div className="ftl-grid-2">
+              {[["Geographies covered", data.geo], ["Institution types supported", data.types]].map(([title, items]) => (
+                <div key={title} className="ftl-card"><div className="ftl-sec-head">{title}</div><div className="ftl-list">{items.map((item) => <div key={item} className="ftl-list-item"><span className="ftl-check">✓</span>{item}</div>)}</div></div>
+              ))}
+            </div>
+            <div className="ftl-cta">
+              <div><div className="ftl-cta-badge">✓ NEP 2020 Integrated · Scalable · 21st Century Skills</div><div className="ftl-cta-h">Create your future ready campus</div><div className="ftl-cta-sub">Empower your students with AI, Robotics, IoT, STEM and innovation-driven learning.</div></div>
+              <div className="ftl-row"><button type="button" className="ftl-btn" data-bs-toggle="modal" data-bs-target="#partnerModal">📅 Schedule consultation</button><button type="button" className="ftl-btn-lite" style={{ color: "#fff", borderColor: "rgba(255,255,255,.3)" }}>⬇ Download brochure</button><button type="button" className="ftl-btn-lite" data-bs-toggle="modal" data-bs-target="#partnerModal" style={{ color: "#fff", borderColor: "rgba(255,255,255,.3)" }}>🏫 {data.cta}</button></div>
+            </div>
+          </>
+        )}
+        */}
+      </div>
+    </>
+  );
+}
+
+const GEOGRAPHIC_COVERAGE_STYLES = `
+.gc{--navy:#0a2240;--teal:#0e7c6b;--green:#16a34a;--bg:#f0f7ff;--surface:#fff;--brd:#d1e0ef;--t1:#0a2240;--t2:#2d4a6e;--t3:#64748b;font-family:'Inter',sans-serif;background:var(--bg);color:var(--t1);overflow-x:hidden;border-radius:16px;}
+.gc *{box-sizing:border-box;margin:0;padding:0;}
+.gc-hero{background:linear-gradient(135deg,#f0f7ff 0%,#e8f4f0 50%,#f0f7ff 100%);border:1px solid var(--brd);border-radius:16px;padding:56px 0 0;position:relative;overflow:hidden;}
+.gc-hero::before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle at 20% 30%,rgba(14,124,107,.06) 0%,transparent 50%),radial-gradient(circle at 80% 70%,rgba(10,34,64,.05) 0%,transparent 50%),radial-gradient(var(--brd) 1px,transparent 1px);background-size:100%,100%,32px 32px;pointer-events:none;}
+.gc-cont{max-width:1240px;margin:0 auto;padding:0 48px;position:relative;z-index:1;}
+.gc-eyebrow{display:flex;align-items:center;gap:12px;margin-bottom:20px;}
+.gc-eyebrow-line{width:48px;height:2px;background:var(--teal);}
+.gc-eyebrow-text{font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--teal);}
+.gc-h1{font-family:'Orbitron',monospace;font-size:clamp(32px,4.5vw,58px);font-weight:900;line-height:1.05;color:var(--navy);margin-bottom:6px;}
+.gc-h1-sub{font-family:'Orbitron',monospace;font-size:clamp(28px,3.8vw,48px);font-weight:900;color:var(--green);margin-bottom:20px;}
+.gc-desc{font-family:'Inter',sans-serif;font-size:15px;color:var(--t2);line-height:1.75;max-width:440px;margin-bottom:28px;}
+.gc-reach-badge{display:flex;align-items:flex-start;gap:14px;background:rgba(14,124,107,.07);border:1px solid rgba(14,124,107,.18);border-radius:12px;padding:16px 20px;max-width:440px;margin-bottom:36px;}
+.gc-reach-ico{width:44px;height:44px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.gc-reach-text{font-size:13px;font-weight:700;color:var(--teal);line-height:1.4;}
+.gc-hero-grid{display:grid;grid-template-columns:1fr 1.1fr;align-items:end;}
+.gc-hero-left{padding-bottom:48px;}
+.gc-map-wrap{position:relative;width:100%;max-width:580px;margin:0 auto;}
+.gc-map-leaflet-wrap{position:relative;border-radius:16px;overflow:hidden;border:1px solid var(--brd);background:#e8f4ff;box-shadow:0 24px 48px rgba(10,34,64,.15);}
+.gc-map-leaflet{width:100%;height:min(52vh,480px);min-height:320px;z-index:0;}
+.gc-leaflet-pin-wrap{background:transparent!important;border:none!important;}
+.gc-leaflet-pin{position:relative;width:36px;height:36px;display:flex;align-items:center;justify-content:center;}
+.gc-leaflet-pin-dot{width:14px;height:14px;border-radius:50%;background:#0e7c6b;border:2px solid #fff;box-shadow:0 2px 12px rgba(10,34,64,.35);position:relative;z-index:2;transition:transform .2s,background .2s;}
+.gc-leaflet-pin-ring{position:absolute;inset:0;margin:auto;width:28px;height:28px;border-radius:50%;border:2px solid rgba(14,124,107,.45);animation:gcMapRing 2.5s ease-out infinite;}
+.gc-leaflet-pin-active .gc-leaflet-pin-dot{background:#16a34a;transform:scale(1.15);}
+.gc-leaflet-pin-active .gc-leaflet-pin-ring{border-color:rgba(22,163,74,.55);}
+@keyframes gcMapRing{0%{transform:scale(.55);opacity:.75;}100%{transform:scale(2.1);opacity:0;}}
+.leaflet-container.gc-map-leaflet{font-family:'Inter',sans-serif;}
+.leaflet-container.gc-map-leaflet .leaflet-control-container{display:none;}
+.leaflet-popup-content-wrapper{border-radius:12px!important;border:1px solid var(--brd)!important;box-shadow:0 12px 32px rgba(10,34,64,.12)!important;}
+.gc-state-row-interactive{cursor:pointer;border-radius:6px;padding:4px 6px;margin:-4px -6px;transition:background .2s;}
+.gc-state-row-interactive:hover,.gc-state-row-active{background:rgba(14,124,107,.08);}
+.gc-inline-card{background:#fff;border:1px solid var(--brd);border-radius:12px;padding:20px 24px;max-width:480px;}
+.gc-inline-title{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--teal);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.gc-state-list{display:grid;grid-template-columns:repeat(3,1fr);gap:6px 10px;}
+.gc-state-row{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:500;color:var(--t1);}
+.gc-state-dot{width:7px;height:7px;border-radius:50%;background:var(--teal);flex-shrink:0;}
+.gc-commit{margin-top:14px;padding:10px 14px;background:rgba(14,124,107,.06);border:1px solid rgba(14,124,107,.14);border-radius:8px;display:flex;gap:10px;align-items:flex-start;}
+.gc-commit span:last-child{font-size:12px;color:var(--t2);line-height:1.5;}
+.gc-section{padding:48px 0 0;}
+.gc-section-head{font-size:14px;font-weight:700;color:var(--navy);letter-spacing:1px;margin-bottom:20px;padding-bottom:10px;border-bottom:2px solid var(--teal);display:inline-block;}
+.gc-reach-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;}
+.gc-reach-card{background:var(--surface);border:1px solid var(--brd);border-radius:12px;padding:18px 12px;text-align:center;transition:.28s;}
+.gc-reach-card:hover{border-color:var(--teal);transform:translateY(-3px);box-shadow:0 8px 20px rgba(14,124,107,.12);}
+.gc-reach-card-ico{width:48px;height:48px;border-radius:50%;background:rgba(14,124,107,.08);border:1px solid rgba(14,124,107,.18);display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 12px;}
+.gc-reach-card-label{font-size:9.5px;font-weight:700;color:var(--navy);line-height:1.4;letter-spacing:.3px;}
+.gc-quote-banner{background:var(--navy);border-radius:16px;padding:36px 44px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:32px;align-items:center;margin-top:48px;position:relative;overflow:hidden;}
+.gc-quote-mark{font-family:Georgia,serif;font-size:64px;color:rgba(14,124,107,.4);line-height:.8;margin-bottom:8px;}
+.gc-quote-text{font-size:14px;font-weight:600;color:rgba(255,255,255,.85);line-height:1.55;}
+.gc-quote-accent{color:#22c55e;}
+.gc-quote-stat{text-align:center;padding:16px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);border-radius:12px;}
+.gc-quote-stat-ico{font-size:28px;margin-bottom:6px;}
+.gc-quote-stat-title{font-size:13px;font-weight:700;color:#fff;margin-bottom:4px;}
+.gc-quote-stat-sub{font-size:12px;color:rgba(255,255,255,.5);}
+.gc-enables-wrap{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:start;margin-bottom:24px;}
+.gc-enables-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.gc-enables-card{background:var(--surface);border:1px solid var(--brd);border-radius:14px;padding:22px 20px;display:flex;align-items:flex-start;gap:14px;transition:.25s;}
+.gc-enables-card:hover{border-color:var(--teal);box-shadow:0 8px 20px rgba(14,124,107,.10);transform:translateY(-2px);}
+.gc-enables-ico{width:48px;height:48px;border-radius:12px;background:rgba(14,124,107,.08);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;border:1px solid rgba(14,124,107,.15);}
+.gc-enables-title{font-family:'Orbitron',monospace;font-size:12px;font-weight:700;color:var(--navy);margin-bottom:5px;line-height:1.3;}
+.gc-enables-desc{font-family:'Inter',sans-serif;font-size:12px;color:var(--t3);line-height:1.55;}
+.gc-presence-right{display:flex;flex-direction:column;gap:10px;min-width:200px;}
+.gc-pstat{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--surface);border:1px solid var(--brd);border-radius:10px;transition:.2s;}
+.gc-pstat:hover{border-color:var(--teal);box-shadow:0 4px 12px rgba(14,124,107,.10);}
+.gc-pstat-ico{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.gc-pstat-title{font-size:12px;font-weight:700;color:var(--navy);margin-bottom:2px;}
+.gc-pstat-sub{font-size:11px;color:var(--t3);}
+.gc-bottom-cta{background:linear-gradient(135deg,var(--teal) 0%,var(--navy) 100%);border-radius:16px;padding:32px 44px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;margin:0 0 48px;position:relative;overflow:hidden;}
+.gc-cta-left{display:flex;align-items:center;gap:16px;}
+.gc-cta-ico{font-size:36px;}
+.gc-cta-h{font-family:'Orbitron',monospace;font-size:16px;font-weight:700;color:#fff;margin-bottom:4px;line-height:1.3;}
+.gc-cta-sub{font-family:'Inter',sans-serif;font-size:13px;color:rgba(255,255,255,.65);max-width:480px;line-height:1.6;}
+.gc-cta-btn{display:inline-flex;align-items:center;gap:8px;padding:13px 28px;background:#fff;color:var(--navy);border:none;border-radius:8px;font-size:12px;font-weight:700;letter-spacing:.5px;white-space:nowrap;text-decoration:none;transition:.2s;}
+.gc-cta-btn:hover{background:#e8f4f0;transform:translateY(-1px);}
+@media(max-width:1100px){.gc-hero-grid{grid-template-columns:1fr;gap:32px;}.gc-hero-left{padding-bottom:0;}.gc-map-wrap{max-width:100%;}.gc-reach-grid{grid-template-columns:repeat(4,1fr);}.gc-quote-banner{grid-template-columns:1fr;}.gc-state-list{grid-template-columns:repeat(3,1fr);}.gc-enables-wrap{grid-template-columns:1fr;}.gc-presence-right{display:grid;grid-template-columns:repeat(2,1fr);}}
+@media(max-width:768px){.gc-cont{padding:0 20px;}.gc-map-leaflet{height:min(48vh,400px);min-height:280px;}.gc-enables-grid{grid-template-columns:1fr 1fr;}.gc-reach-grid{grid-template-columns:repeat(2,1fr);}.gc-state-list{grid-template-columns:1fr 1fr;}.gc-h1{font-size:clamp(22px,6vw,36px);}.gc-h1-sub{font-size:clamp(20px,5.5vw,32px);}.gc-presence-right{grid-template-columns:1fr;}}
+@media(max-width:480px){.gc-enables-grid{grid-template-columns:1fr;}.gc-state-list{grid-template-columns:1fr;}.gc-bottom-cta,.gc-quote-banner{padding:24px 20px;}.gc-cta-left{align-items:flex-start;}}
+`;
+
+/** Focalyt presence — lat/lng at state hubs for Leaflet map */
+const GC_WORK_LOCATIONS = [
+  { id: "PB", label: "Punjab", sub: "Skilling & institutional outreach", lat: 31.1471, lng: 75.3412 },
+  { id: "HR", label: "Haryana", sub: "NCR-adjacent programmes", lat: 29.0588, lng: 76.0856 },
+  { id: "HP", label: "Himachal Pradesh", sub: "Hospitality & tourism skilling", lat: 31.1048, lng: 77.1734 },
+  { id: "UP", label: "Uttar Pradesh", sub: "Ghaziabad · NCR skilling & outreach", lat: 26.8467, lng: 80.9462 },
+  { id: "UK", label: "Uttarakhand", sub: "Rural & tribal development programmes", lat: 30.3165, lng: 78.0322 },
+  { id: "RJ", label: "Rajasthan", sub: "State-wide mobilisation & training", lat: 26.9124, lng: 75.7873 },
+  { id: "GJ", label: "Gujarat", sub: "Industry & campus partnerships", lat: 23.0225, lng: 72.5714 },
+  { id: "CG", label: "Chhattisgarh", sub: "CSR & community skilling", lat: 21.2514, lng: 81.6296 },
+  { id: "OD", label: "Odisha", sub: "Government & sector programmes", lat: 20.2961, lng: 85.8245 },
+  { id: "AP", label: "Andhra Pradesh", sub: "Future-tech & placement tracks", lat: 16.5062, lng: 80.648 },
+  { id: "TN", label: "Tamil Nadu", sub: "Manufacturing & services corridors", lat: 13.0827, lng: 80.2707 },
+];
+
+const GC_INDIA_BOUNDS = L.latLngBounds(L.latLng(5.8, 68.2), L.latLng(37.1, 97.4));
+
+function makeGcMapIcon(active) {
+  return L.divIcon({
+    className: "gc-leaflet-pin-wrap",
+    html: `<div class="gc-leaflet-pin${active ? " gc-leaflet-pin-active" : ""}"><span class="gc-leaflet-pin-dot"></span><span class="gc-leaflet-pin-ring"></span></div>`,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+  });
+}
+
+const GC_REACH_MODEL = [
+  { ico: "👥", label: "Local Mobilisation Teams" },
+  { ico: "🤝", label: "Academic & Institutional Partnerships" },
+  { ico: "🏭", label: "Industry-linked Training Centers" },
+  { ico: "🏘️", label: "Rural & Remote Training Hubs" },
+  { ico: "🚌", label: "Mobile Training Vans" },
+  { ico: "👨‍👩‍👧", label: "Community-based Delivery Models" },
+  { ico: "💻", label: "Digital & Blended Learning Support" },
+];
+
+const GC_ENABLES = [
+  { ico: "👥", title: "Wider Beneficiary Outreach", desc: "Reaching more lives across geographies with targeted, community-driven outreach." },
+  { ico: "🚀", title: "Faster Project Deployment", desc: "Agile execution, wherever it's needed - quick deployment with local teams." },
+  { ico: "🏛️", title: "Access to Underserved Communities", desc: "Bridging the gap for rural, tribal and aspirational district communities." },
+  { ico: "📍", title: "State-specific Implementation Models", desc: "Localized strategies, greater outcomes aligned to each state's requirements." },
+  { ico: "📈", title: "Scalable Government & CSR Interventions", desc: "Flexible models that scale across states with govt. and CSR partnerships." },
+  { ico: "🤝", title: "Stronger Local Partnerships & Community Impact", desc: "Building trust-based partnerships at local, district and state levels." },
+];
+
+const GC_PSTATS = [
+  { ico: "👥", bg: "rgba(14,124,107,.10)", title: "Multiple States", sub: "Wide Reach" },
+  { ico: "🎯", bg: "rgba(29,78,216,.10)", title: "Diverse Communities", sub: "Inclusive Impact" },
+  { ico: "🤝", bg: "rgba(22,163,74,.10)", title: "Strong Partnerships", sub: "Local to Global" },
+  { ico: "📈", bg: "rgba(249,115,22,.10)", title: "Scalable Solutions", sub: "Sustainable Change" },
+];
+
+function GeographicCoverageLeafletMap({ activeState, onStateHover }) {
+  const wrapRef = useRef(null);
+  const elRef = useRef(null);
+  const mapRef = useRef(null);
+  const markersRef = useRef([]);
+
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    const el = elRef.current;
+    if (!wrap || !el) return undefined;
+
+    const destroyMap = () => {
+      if (mapRef.current) {
+        try {
+          mapRef.current.remove();
+        } catch {
+          /* already detached */
+        }
+        mapRef.current = null;
+      }
+      markersRef.current = [];
+    };
+
+    let io;
+    let started = false;
+    let resizeHandler;
+
+    const initMap = () => {
+      if (started || mapRef.current) return;
+      started = true;
+
+      const map = L.map(el, {
+        scrollWheelZoom: false,
+        zoomControl: false,
+        attributionControl: false,
+        worldCopyJump: false,
+        maxBounds: GC_INDIA_BOUNDS,
+        maxBoundsViscosity: 1.0,
+        center: [22.5, 80.0],
+        zoom: 5,
+      });
+
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        subdomains: "abcd",
+        maxZoom: 19,
+        noWrap: true,
+      }).addTo(map);
+
+      markersRef.current = GC_WORK_LOCATIONS.map((loc) => {
+        const marker = L.marker([loc.lat, loc.lng], { icon: makeGcMapIcon(activeState === loc.id) }).addTo(map);
+        marker.bindPopup(
+          `<strong style="font-family:'Orbitron',monospace;font-size:13px;color:#0a2240">${loc.label}</strong><br/><span style="font-size:12px;color:#2d4a6e">${loc.sub}</span>`
+        );
+        marker.on("mouseover", () => onStateHover?.(loc.id));
+        marker.on("mouseout", () => onStateHover?.(null));
+        marker.on("click", () => marker.openPopup());
+        return { marker, loc };
+      });
+
+      const fitFullIndia = () => {
+        const size = map.getSize();
+        const w = el.clientWidth || size.x || 800;
+        const h = el.clientHeight || size.y || 320;
+        const aspect = w / Math.max(h, 1);
+        const padCornerY = Math.min(120, Math.max(48, Math.round(h * 0.22)));
+        const padCornerX = Math.min(72, Math.max(24, Math.round(20 + aspect * 5)));
+        map.fitBounds(GC_INDIA_BOUNDS, {
+          paddingTopLeft: [padCornerX, padCornerY],
+          paddingBottomRight: [padCornerX, padCornerY],
+          animate: false,
+        });
+        const floor = 4;
+        if (map.getZoom() > floor) map.setZoom(floor);
+        map.setMinZoom(Math.max(map.getZoom() - 1, floor));
+        map.setMaxZoom(10);
+        map.panInsideBounds(GC_INDIA_BOUNDS, { animate: false });
+      };
+
+      fitFullIndia();
+      requestAnimationFrame(() => {
+        map.invalidateSize();
+        requestAnimationFrame(() => {
+          map.invalidateSize();
+          fitFullIndia();
+        });
+      });
+
+      mapRef.current = map;
+      resizeHandler = () => {
+        map.invalidateSize();
+        fitFullIndia();
+      };
+      window.addEventListener("resize", resizeHandler);
+    };
+
+    io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          initMap();
+          io?.disconnect();
+        }
+      },
+      { rootMargin: "120px 0px", threshold: 0.05 }
+    );
+    io.observe(wrap);
+
+    return () => {
+      io?.disconnect();
+      if (resizeHandler) window.removeEventListener("resize", resizeHandler);
+      destroyMap();
+    };
+  }, [onStateHover]);
+
+  useEffect(() => {
+    markersRef.current.forEach(({ marker, loc }) => {
+      marker.setIcon(makeGcMapIcon(activeState === loc.id));
+    });
+  }, [activeState]);
+
+  return (
+    <div ref={wrapRef} className="gc-map-leaflet-wrap">
+      <div ref={elRef} className="gc-map-leaflet" aria-label="Map of India showing Focalyt presence locations" role="img" />
+    </div>
+  );
+}
+
+function GeographicCoverageSection() {
+  const [hoveredState, setHoveredState] = useState(null);
+
+  return (
+    <>
+      <style>{GEOGRAPHIC_COVERAGE_STYLES}</style>
+      <div className="gc">
+        <section className="gc-hero">
+          <div className="gc-cont">
+            <div className="gc-hero-grid">
+              <div className="gc-hero-left">
+                <div className="gc-eyebrow"><div className="gc-eyebrow-line" /><span className="gc-eyebrow-text">Geographic Coverage</span><div className="gc-eyebrow-line" /></div>
+                <h1 className="gc-h1">No Boundaries.</h1>
+                <div className="gc-h1-sub">Only Impact.</div>
+                <p className="gc-desc">Focalyt delivers skills, opportunities and sustainable impact across India - beyond boundaries.</p>
+                <div className="gc-reach-badge"><div className="gc-reach-ico">🌐</div><div className="gc-reach-text">We reach beyond boundaries to create skills, opportunities and sustainable impact.</div></div>
+                <div className="gc-inline-card">
+                  <div className="gc-inline-title"><span>📍</span> Our presence across states</div>
+                  <div className="gc-state-list">
+                    {GC_WORK_LOCATIONS.map((loc) => (
+                      <div
+                        key={loc.id}
+                        className={`gc-state-row gc-state-row-interactive${hoveredState === loc.id ? " gc-state-row-active" : ""}`}
+                        onMouseEnter={() => setHoveredState(loc.id)}
+                        onMouseLeave={() => setHoveredState(null)}
+                        onFocus={() => setHoveredState(loc.id)}
+                        onBlur={() => setHoveredState(null)}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`Highlight ${loc.label} on map`}
+                      >
+                        <span className="gc-state-dot" />
+                        {loc.label}
+                      </div>
+                    ))}
+                    <div className="gc-state-row"><span className="gc-state-dot" />…and more</div>
+                  </div>
+                  <div className="gc-commit"><span style={{ fontSize: 18 }}>🌐</span><span>We are committed to reaching every region, <strong style={{ color: "var(--navy)" }}>empowering communities everywhere.</strong></span></div>
+                </div>
+              </div>
+              <div className="gc-hero-right">
+                <div className="gc-map-wrap">
+                  <GeographicCoverageLeafletMap activeState={hoveredState} onStateHover={setHoveredState} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="gc-section">
+          <div className="gc-cont">
+            <div className="gc-section-head">Our Reach Model</div>
+            <div className="gc-reach-grid">
+              {GC_REACH_MODEL.map((item) => <div key={item.label} className="gc-reach-card"><div className="gc-reach-card-ico">{item.ico}</div><div className="gc-reach-card-label">{item.label}</div></div>)}
+            </div>
+          </div>
+        </section>
+
+        <div className="gc-cont">
+          <div className="gc-quote-banner">
+            <div><div className="gc-quote-mark">"</div><div className="gc-quote-text">From cities to villages, from plains to hills - our commitment reaches <span className="gc-quote-accent">every corner of India.</span></div></div>
+            {[{ ico: "👥", title: "Wider Beneficiary Outreach", sub: "Reaching more lives across geographies" }, { ico: "🚀", title: "Faster Project Deployment", sub: "Agile execution, wherever it's needed" }].map((item) => (
+              <div key={item.title} className="gc-quote-stat"><div className="gc-quote-stat-ico">{item.ico}</div><div className="gc-quote-stat-title">{item.title}</div><div className="gc-quote-stat-sub">{item.sub}</div></div>
+            ))}
+          </div>
+        </div>
+
+        <section className="gc-section">
+          <div className="gc-cont">
+            <div className="gc-section-head">What This Enables</div>
+            <div className="gc-enables-wrap">
+              <div className="gc-enables-grid">
+                {GC_ENABLES.map((item) => <div key={item.title} className="gc-enables-card"><div className="gc-enables-ico">{item.ico}</div><div><div className="gc-enables-title">{item.title}</div><div className="gc-enables-desc">{item.desc}</div></div></div>)}
+              </div>
+              <div className="gc-presence-right">
+                {GC_PSTATS.map((item) => <div key={item.title} className="gc-pstat"><div className="gc-pstat-ico" style={{ background: item.bg }}><span>{item.ico}</span></div><div><div className="gc-pstat-title">{item.title}</div><div className="gc-pstat-sub">{item.sub}</div></div></div>)}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="gc-cont">
+          <div className="gc-bottom-cta">
+            <div className="gc-cta-left"><span className="gc-cta-ico">🌐</span><div><div className="gc-cta-h">No boundary limitations.<br />Limitless possibilities.</div><div className="gc-cta-sub">Focalyt is equipped to design, deploy and scale skill development, livelihood, entrepreneurship, education, MSME and community impact programs across India.</div></div></div>
+            <button type="button" className="gc-cta-btn" data-bs-toggle="modal" data-bs-target="#partnerModal">Partner With Us →</button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
 
 const STATS = [
   { num: "10L+", label: "Students Community" },
@@ -4222,20 +5115,6 @@ const MARQUEE = [
 ];
 
 const SIC_PARTNERS = ["Chandigarh University", "Amity University", "Central University of Haryana", "Lovely Professional University", "SGT University", "Rayat-Bahra University", "APIIT SD India", "G.M.N. College Ambala", "SIET Nilokheri", "MRSPTU"];
-
-/** Regions shown on home geographic map (aligned with pan-India / partner footprint). */
-const WORK_LOCATIONS = [
-  { id: "ncr", label: "NCR & Uttar Pradesh", sub: "Ghaziabad · NCR skilling & outreach", lat: 28.6692, lng: 77.4538 },
-  { id: "uk", label: "Uttarakhand", sub: "Rural & tribal development programmes", lat: 30.3165, lng: 78.0322 },
-  { id: "hp", label: "Himachal Pradesh", sub: "Hospitality & tourism skilling", lat: 31.1048, lng: 77.1734 },
-  { id: "blr", label: "Karnataka", sub: "Industry & campus partnerships", lat: 12.9716, lng: 77.5946 },
-  { id: "mum", label: "Maharashtra", sub: "Corporate & institutional networks", lat: 19.076, lng: 72.8777 },
-  { id: "hyd", label: "Telangana", sub: "TSSC-aligned future-tech tracks", lat: 17.385, lng: 78.4867 },
-  { id: "chn", label: "Tamil Nadu", sub: "Manufacturing & services corridors", lat: 13.0827, lng: 80.2707 },
-];
-
-/** Leaflet view clamp — India only. Tighter SW/NE so frame stays subcontinental (not Middle East / SE Asia). */
-const INDIA_MAX_BOUNDS = L.latLngBounds(L.latLng(5.8, 68.2), L.latLng(37.1, 97.4));
 
 /** Partner-with-us section — narrative aligned with company profile / pillars on site. */
 const PARTNER_PROFILE_HIGHLIGHTS = [
@@ -4300,7 +5179,10 @@ function getInitialFocHomeTheme() { ... }
 */
 
 
+const HOME_HASH_SCROLL_OFFSET = 130;
+
 export default function HomePage() {
+  const location = useLocation();
   const [activeArea, setActiveArea] = useState("skills");
   const currentArea = CORE_AREAS.find((a) => a.key === activeArea);
   const [hoveredAreaItemIdx, setHoveredAreaItemIdx] = useState(null);
@@ -4319,6 +5201,17 @@ export default function HomePage() {
     projectName: "",
     typeOfProject: "",
   });
+  const [partnerForm, setPartnerForm] = useState({
+    name: "",
+    organization: "",
+    state: "",
+    mobile: "",
+    email: "",
+    message: "",
+  });
+  const [partnerLoading, setPartnerLoading] = useState(false);
+  const [partnerSuccess, setPartnerSuccess] = useState("");
+  const [partnerError, setPartnerError] = useState("");
   const [jobs, setJobs] = useState([]);
   const [jobsError, setJobsError] = useState("");
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
@@ -4334,9 +5227,6 @@ export default function HomePage() {
   const jobCarouselRef = useRef(null);
   const eventsCarouselRef = useRef(null);
   const expiredEventsCarouselRef = useRef(null);
-  const indiaMapSectionRef = useRef(null);
-  const indiaMapElRef = useRef(null);
-  const indiaLeafletMapRef = useRef(null);
   const [activeFilter, setActiveFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [feeFilter, setFeeFilter] = useState("all");
@@ -4586,127 +5476,6 @@ export default function HomePage() {
     };
   }, []);
 
-  useEffect(() => {
-    const wrap = indiaMapSectionRef.current;
-    const el = indiaMapElRef.current;
-    if (!wrap || !el) return undefined;
-
-    const destroyMap = () => {
-      if (indiaLeafletMapRef.current) {
-        try {
-          indiaLeafletMapRef.current.remove();
-        } catch {
-          /* map already detached */
-        }
-        indiaLeafletMapRef.current = null;
-      }
-    };
-
-    let io;
-    let started = false;
-    let resizeHandler;
-
-    const initMap = () => {
-      if (started || indiaLeafletMapRef.current) return;
-      started = true;
-
-      const map = L.map(el, {
-        scrollWheelZoom: false,
-        zoomControl: false,
-        attributionControl: false,
-        worldCopyJump: false,
-        maxBounds: INDIA_MAX_BOUNDS,
-        maxBoundsViscosity: 1.0,
-        center: [22.5, 80.0],
-        zoom: 5,
-      });
-
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-        attribution: "",
-        subdomains: "abcd",
-        maxZoom: 19,
-        noWrap: true,
-      }).addTo(map);
-
-      const markers = WORK_LOCATIONS.map((loc, i) => {
-        const icon = L.divIcon({
-          className: "foc-leaflet-pin-wrap",
-          html: `<div class="foc-leaflet-pin" style="animation-delay:${i * 0.12}s"><span class="foc-leaflet-pin-dot"></span><span class="foc-leaflet-pin-ring" style="animation-delay:${i * 0.12}s"></span></div>`,
-          iconSize: [36, 36],
-          iconAnchor: [18, 18],
-        });
-        const m = L.marker([loc.lat, loc.lng], { icon }).addTo(map);
-        m.bindPopup(
-          `<strong style="font-family:Orbitron,system-ui,sans-serif;font-size:13px">${loc.label}</strong><br/><span style="font-size:12px;opacity:.9">${loc.sub}</span>`
-        );
-        return m;
-      });
-
-      const fitFullIndia = () => {
-        const size = map.getSize();
-        const w = el.clientWidth || size.x || 800;
-        const h = el.clientHeight || size.y || 320;
-        const aspect = w / Math.max(h, 1);
-        /* Wide + short viewports need large vertical padding so fitBounds picks a lower zoom (full N–S India). */
-        const padCornerY = Math.min(120, Math.max(48, Math.round(h * 0.22)));
-        const padCornerX = Math.min(72, Math.max(24, Math.round(20 + aspect * 5)));
-        map.fitBounds(INDIA_MAX_BOUNDS, {
-          paddingTopLeft: [padCornerX, padCornerY],
-          paddingBottomRight: [padCornerX, padCornerY],
-          animate: false,
-        });
-        const floor = 3;
-        let z = map.getZoom();
-        if (z > floor) {
-          map.setZoom(z - 1);
-        }
-        if (aspect > 2.4 && map.getZoom() > floor) {
-          map.setZoom(map.getZoom() - 1);
-        }
-        map.setMinZoom(Math.max(map.getZoom() - 1, floor));
-        map.setMaxZoom(12);
-        map.panInsideBounds(INDIA_MAX_BOUNDS, { animate: false });
-      };
-
-      fitFullIndia();
-
-      requestAnimationFrame(() => {
-        map.invalidateSize();
-        requestAnimationFrame(() => {
-          map.invalidateSize();
-          fitFullIndia();
-        });
-      });
-
-      indiaLeafletMapRef.current = map;
-
-      resizeHandler = () => {
-        map.invalidateSize();
-        fitFullIndia();
-      };
-      window.addEventListener("resize", resizeHandler);
-    };
-
-    io = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          initMap();
-          io?.disconnect();
-        }
-      },
-      { rootMargin: "120px 0px", threshold: 0.05 }
-    );
-    io.observe(wrap);
-
-    return () => {
-      io?.disconnect();
-      if (resizeHandler) {
-        window.removeEventListener("resize", resizeHandler);
-      }
-      destroyMap();
-    };
-  }, []);
-
   const checkRegistrationStatus = (eventDate) => {
     const today = moment();
     const eventEndDate = moment(eventDate);
@@ -4749,8 +5518,65 @@ export default function HomePage() {
 
   const scrollToCoreArea = (areaKey) => {
     if (areaKey) setActiveArea(areaKey);
-    const el = document.getElementById("core");
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    scrollToSection("core");
+  };
+
+  const scrollToSection = (sectionId) => {
+    const el = document.getElementById(sectionId);
+    if (!el) return;
+    const top = el.getBoundingClientRect().top + window.scrollY - HOME_HASH_SCROLL_OFFSET;
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    const hash = location.hash.replace("#", "");
+    if (!hash) return undefined;
+    const timer = setTimeout(() => {
+      const el = document.getElementById(hash);
+      if (!el) return;
+      const top = el.getBoundingClientRect().top + window.scrollY - HOME_HASH_SCROLL_OFFSET;
+      window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [location.hash]);
+
+  const handlePartnerChange = (e) => {
+    const { name, value } = e.target;
+    setPartnerForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handlePartnerSubmit = async (e) => {
+    e.preventDefault();
+    setPartnerLoading(true);
+    setPartnerSuccess("");
+    setPartnerError("");
+
+    const orgLine = partnerForm.organization ? `Organization: ${partnerForm.organization}\n\n` : "";
+    const payload = {
+      name: partnerForm.name,
+      state: partnerForm.state,
+      mobile: partnerForm.mobile,
+      email: partnerForm.email,
+      message: `${orgLine}${partnerForm.message}`,
+      courseName: "Partnership Inquiry",
+      sectorName: "Partnership",
+      projectName: "Website",
+      typeOfProject: "Partner With Us",
+    };
+
+    try {
+      const response = await axios.post(`${backendUrl}/callback`, payload, {
+        headers: { "Content-Type": "application/json" },
+      });
+      if (response.status === 200 || response.status === 201) {
+        setPartnerSuccess("Thank you! We will get back to you within 2–3 business days.");
+        setPartnerForm({ name: "", organization: "", state: "", mobile: "", email: "", message: "" });
+      }
+    } catch {
+      setPartnerError("Failed to submit. Please try again or email parveen.bansal@focalyt.com.");
+    } finally {
+      setPartnerLoading(false);
+    }
   };
 
   return (
@@ -4790,12 +5616,27 @@ export default function HomePage() {
                   ))}
                 </div> */}
                 <div className="hero-btns">
-                  <Link to="/joblisting" className="btn-primary">
-                    Explore Jobs →
-                  </Link>
-                  <Link to="/courses" className="btn-ghost">
-                    Browse Courses
-                  </Link>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => scrollToSection("future-jobs")}
+                  >
+                    Live Jobs →
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => scrollToSection("future-courses")}
+                  >
+                    Live Courses →
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => scrollToSection("events")}
+                  >
+                    Live Events →
+                  </button>
                 </div>
               </div>
 
@@ -4817,16 +5658,30 @@ export default function HomePage() {
                             .replace("Future Ready ", "Future Ready\n")
                             .split("\n")
                             .map((line, i) => (
-                              <span key={i}>{line}</span>
+                              <span key={i}>
+                                {t.key === "msme" && line.endsWith("MSMEs")
+                                  ? (
+                                    <>
+                                      {line.slice(0, -1)}
+                                      <span className="hero-tile-lower">s</span>
+                                    </>
+                                  )
+                                  : line}
+                              </span>
                             ))}
                         </div>
                       </button>
                     ))}
                   </div>
                 </div>
-                <Link to="/contact" className="btn-primary hero-right-cta">
+                <button
+                  type="button"
+                  className="btn-primary hero-right-cta"
+                  data-bs-toggle="modal"
+                  data-bs-target="#partnerModal"
+                >
                   Partner with us →
-                </Link>
+                </button>
               </div>
             </div>
           </div>
@@ -4836,7 +5691,7 @@ export default function HomePage() {
 
         <section className="section grid-bg" id="about">
           <div className="container">
-            <div className="section-head">
+            <div className="section-head" id="core">
               <div className="stag">What We Do</div>
               <h2 className="sh2">
                 Four Pillars of <span className="cyan">Impact</span>
@@ -4854,7 +5709,7 @@ export default function HomePage() {
               ))}
             </div> */}
             {pillarUi && (
-              <div className="ip-pillars-wrap" id="core">
+              <div className="ip-pillars-wrap">
                 <nav className="ip-tab-nav" aria-label="Impact pillars">
                   {PILLAR_TABS.map((tab) => (
                     <button
@@ -5115,13 +5970,23 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* <ZenithXSection /> */}
-
         <section className="section grid-bg" id="labsAsService">
-          <div></div>
+          <div className="container">
+            <FTLaaSSection />
+          </div>
         </section>
 
-        {/* <section className="section grid-bg" id="labsAsService">
+        <section className="section grid-bg" id="industry-automation">
+          <div className="container">
+            <IndustryAutomationSection />
+          </div>
+        </section>
+
+        {/* <ZenithXSection /> */}
+
+     
+
+         {/* <section className="section grid-bg" id="labsAsService">
           <div className="container">
             <div className="section-head">
               <div className="stag">FFTLaaS · AI + Robotics + IoT</div>
@@ -5180,12 +6045,12 @@ export default function HomePage() {
               ))}
             </div>
 
-            {/* <div className="section-head" style={{ marginTop: 48, marginBottom: 22 }}>
+            <div className="section-head" style={{ marginTop: 48, marginBottom: 22 }}>
               <h2 className="sh2">
                 Partnership journey — <span className="red">launching your FFTL</span>
               </h2>
-            </div> */}
-            {/* <div className="fftl-cute-path">
+            </div> 
+             <div className="fftl-cute-path">
               {FFTLAA_JOURNEY.map((j) => (
                 <div key={j.step} className="fftl-cute-step">
                   <div className="fftl-cute-ball">{j.step}</div>
@@ -5197,7 +6062,7 @@ export default function HomePage() {
               ))}
             </div> 
           </div>
-        </section> */}
+        </section>  */}
 
 
 
@@ -6353,97 +7218,13 @@ export default function HomePage() {
 
         <PartnersMediaSection />
 
-        <section className="section section-alt" id="geographic-reach" ref={indiaMapSectionRef}>
+        <section className="section section-alt" id="geographic-reach">
           <div className="container">
-            <div className="section-head">
-              <div className="stag">Pan India</div>
-              <h2 className="sh2">
-                Where We <span className="cyan">Work</span>
-              </h2>
-             
-            </div>
-            <div className="foc-india-map-card">
-              <div ref={indiaMapElRef} className="foc-india-map-inner" aria-label="Map of India with Focalyt presence markers" />
-            </div>
-            <div className="foc-map-legend">
-              {WORK_LOCATIONS.map((loc) => (
-                <span key={loc.id} className="foc-map-legend-chip">
-                  {loc.label}
-                </span>
-              ))}
-            </div>
-            <p className="foc-map-attrib">
-              Map data ©{" "}
-              <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer noopener">
-                OpenStreetMap
-              </a>{" "}
-              contributors · Tiles ©{" "}
-              <a href="https://carto.com/attributions" target="_blank" rel="noreferrer noopener">
-                CARTO
-              </a>
-            </p>
+            <GeographicCoverageSection />
           </div>
         </section>
 
-        <section className="section grid-bg" id="partner-with-us">
-          <div className="container">
-            <div className="section-head">
-              <div className="stag">Partnerships</div>
-              <h2 className="sh2">
-                Partner With Us For <span className="red">Future–Tech</span> <span className="cyan">Driven Impact</span>
-              </h2>
-              <p className="s-body">
-                Co-design measurable programmes with our delivery teams — from future-ready skills and on-campus labs to CSR,
-                MSME adoption and sustainability — backed by the same government, industry and institutional network highlighted
-                across our profile.
-              </p>
-            </div>
-
-            <div className="partner-with-grid">
-              {PILLARS.map((p) => (
-                <div key={p.num} className="partner-with-card">
-                  <div className="pwc-ico" aria-hidden="true">
-                    {p.icon}
-                  </div>
-                  <div className="pwc-title">{p.title}</div>
-                  <p className="pwc-desc">{p.desc}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="partner-with-highlights">
-              {PARTNER_PROFILE_HIGHLIGHTS.map((line, i) => (
-                <div key={`pwh-${i}`} className="pwh-item">
-                  <span className="pwh-dot" aria-hidden="true" />
-                  <span>{line}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="cta-block" style={{ marginTop: 36 }}>
-              <h2 className="cta-h">
-                Let&apos;s build your next
-                <br />
-                programme together
-              </h2>
-              <p className="cta-sub">
-                Future Ready Skills · Future Ready Schools · Future Ready MSME · Future Ready Environment
-              </p>
-              <div className="cta-btns">
-                <Link to="/contact" className="btn-primary">
-                  Partner with us →
-                </Link>
-                <Link to="/candidate/login" className="btn-ghost">
-                  Candidate login
-                </Link>
-                <a href="mailto:parveen.bansal@focalyt.com" className="btn-ghost">
-                  Email us
-                </a>
-              </div>
-              <p className="cta-contact">For proposals and collaborations — we typically respond within 2–3 business days.</p>
-            </div>
-          </div>
-        </section>
+        
         {/* <section className="section grid-bg">
           <div className="container">
             <div className="section-head">
@@ -6612,7 +7393,7 @@ img.group1 {
 .btn.cta-callnow {
     background: #fff;
     color: #FC2B5A;
-    font-family: inter;
+    font-family: 'Orbitron', monospace;
     border-radius: 50px;
     font-weight: 500;
     padding: 10px 4px;
@@ -6638,7 +7419,7 @@ img.group1 {
     color: #FC2B5A;
     font-size: 45px;
     font-weight: 700;
-    font-family: 'INTER', sans-serif;
+    font-family: 'Orbitron', monospace;
 }
 
 .courseCard{
@@ -7088,6 +7869,265 @@ button.close span {
   background: transparent!important;
   scale: 1.1;
 }
+
+/* Partner modal — matches homepage Sky Magenta theme */
+#partnerModal {
+  --pm-cyan: #1BA7FF;
+  --pm-red: #FF2DAA;
+  --pm-bg: #F5FBFF;
+  --pm-surface: #FFFFFF;
+  --pm-border: rgba(4, 25, 45, .12);
+  --pm-text: #061426;
+  --pm-muted: #3E5876;
+  --pm-muted2: #5B7390;
+  --pm-r: 14px;
+  --pm-ease: cubic-bezier(.4,0,.2,1);
+  --pm-shadow: rgba(27,167,255,.18);
+  --pm-shadow-hover: rgba(255,45,170,.16);
+}
+#partnerModal .modal-dialog {
+  max-width: 520px;
+  width: calc(100% - 2rem);
+  max-height: calc(100vh - 2rem);
+  margin: 1rem auto;
+}
+#partnerModal .partner-modal-content {
+  border: 1px solid var(--pm-border);
+  border-radius: var(--pm-r);
+  max-height: calc(100vh - 2rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 18px 46px var(--pm-shadow);
+  background: var(--pm-surface);
+}
+#partnerModal .partner-modal-header {
+  background: linear-gradient(90deg, var(--pm-cyan), var(--pm-red));
+  border: none;
+  padding: 20px 22px 18px;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+#partnerModal .partner-modal-header::before,
+#partnerModal .partner-modal-header::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0.2;
+}
+#partnerModal .partner-modal-header::before {
+  width: 100px;
+  height: 100px;
+  background: #fff;
+  top: -40px;
+  right: -16px;
+}
+#partnerModal .partner-modal-header::after {
+  width: 56px;
+  height: 56px;
+  background: var(--pm-cyan);
+  bottom: -24px;
+  left: 10px;
+  opacity: 0.25;
+}
+#partnerModal .partner-modal-header-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+#partnerModal .partner-modal-emoji {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+#partnerModal .partner-modal-title {
+  margin: 0;
+  font-family: 'Orbitron', monospace;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+#partnerModal .partner-modal-tagline {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: rgba(255,255,255,.9);
+  font-weight: 500;
+  letter-spacing: .02em;
+}
+#partnerModal .partner-modal-close {
+  position: relative;
+  z-index: 2;
+  opacity: 0.92;
+  filter: brightness(0) invert(1);
+  transition: transform 0.2s var(--pm-ease), opacity 0.2s ease;
+}
+#partnerModal .partner-modal-close:hover {
+  transform: scale(1.08);
+  opacity: 1;
+}
+#partnerModal .partner-modal-body {
+  padding: 20px 22px 24px;
+  background: var(--pm-bg);
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(27, 167, 255, 0.45) transparent;
+}
+#partnerModal .partner-modal-body::-webkit-scrollbar {
+  width: 5px;
+}
+#partnerModal .partner-modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+#partnerModal .partner-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(27, 167, 255, 0.35);
+  border-radius: 999px;
+}
+#partnerModal .partner-modal-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 45, 170, 0.5);
+}
+#partnerModal .partner-modal-body::-webkit-scrollbar-button {
+  display: none;
+  height: 0;
+  width: 0;
+}
+#partnerModal .partner-modal-intro {
+  font-size: 0.85rem;
+  color: var(--pm-muted);
+  line-height: 1.6;
+  margin-bottom: 18px;
+  padding: 10px 12px;
+  background: rgba(27,167,255,.06);
+  border-radius: var(--pm-r);
+  border: 1px solid var(--pm-border);
+}
+#partnerModal .partner-field {
+  margin-bottom: 12px;
+}
+#partnerModal .partner-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--pm-muted);
+  margin-bottom: 6px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+#partnerModal .partner-label svg {
+  color: var(--pm-cyan);
+  flex-shrink: 0;
+}
+#partnerModal #partnerForm input,
+#partnerModal #partnerForm select,
+#partnerModal #partnerForm textarea {
+  width: 100%;
+  border: 1px solid var(--pm-border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-size: 0.88rem;
+  font-family: 'Orbitron', monospace;
+  background: var(--pm-surface);
+  color: var(--pm-text);
+  transition: border-color 0.2s var(--pm-ease), box-shadow 0.2s var(--pm-ease);
+  height: auto;
+}
+#partnerModal #partnerForm select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231BA7FF' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+#partnerModal #partnerForm input::placeholder,
+#partnerModal #partnerForm textarea::placeholder {
+  color: var(--pm-muted2);
+}
+#partnerModal #partnerForm input:focus,
+#partnerModal #partnerForm select:focus,
+#partnerModal #partnerForm textarea:focus {
+  outline: none;
+  border-color: rgba(27,167,255,.45);
+  box-shadow: 0 0 0 3px rgba(27,167,255,.15);
+}
+#partnerModal #partnerForm textarea {
+  resize: vertical;
+  min-height: 96px;
+  margin-bottom: 0;
+}
+#partnerModal .partner-modal-footer {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+#partnerModal .partner-modal-submit {
+  width: 100%;
+  max-width: 280px;
+  padding: 12px 28px;
+  border: none;
+  border-radius: 4px;
+  font-family: 'Orbitron', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  background: linear-gradient(90deg, var(--pm-cyan), var(--pm-red));
+  box-shadow: 0 14px 34px var(--pm-shadow);
+  cursor: pointer;
+  transition: transform 0.25s var(--pm-ease), box-shadow 0.25s var(--pm-ease);
+}
+#partnerModal .partner-modal-submit:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 46px var(--pm-shadow-hover);
+}
+#partnerModal .partner-modal-submit:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+#partnerModal .partner-modal-success {
+  font-size: 0.85rem;
+  color: var(--pm-text);
+  background: rgba(27,167,255,.08);
+  border: 1px solid rgba(27,167,255,.22);
+  padding: 10px 14px;
+  border-radius: 4px;
+  width: 100%;
+  text-align: center;
+}
+#partnerModal .partner-modal-error {
+  font-size: 0.85rem;
+  color: var(--pm-red);
+  background: rgba(255,45,170,.06);
+  border: 1px solid rgba(255,45,170,.2);
+  padding: 10px 14px;
+  border-radius: 4px;
+  width: 100%;
+  text-align: center;
+}
+@media (max-width: 576px) {
+  #partnerModal .modal-dialog {
+    margin: 0.75rem auto;
+  }
+  #partnerModal .partner-modal-body {
+    padding: 16px 14px 20px;
+  }
+}
 .newWidth{
   width: 30%!important;
 }
@@ -7395,7 +8435,7 @@ button.close span {
 .share-Event .tooltip-container {
     position: relative;
     display: inline-block;
-    font-family: "Arial", sans-serif;
+    font-family: 'Orbitron', monospace;
     overflow: visible;
   }
   
@@ -7834,7 +8874,7 @@ height:15rem;
     border-right: 0;
     box-shadow: .5px 0 2px #0000004d;
     color: #fc2b5a;
-    font-family: inter;
+    font-family: 'Orbitron', monospace;
     font-weight: 700;
     outline: 3px solid #fff;
     padding: 2px 10px;
@@ -7853,6 +8893,251 @@ height:15rem;
     `
   }
 </style>
+<style>
+{
+  `
+  .w{width:100%;font-family:'Orbitron',monospace;color:var(--color-text-primary)}
+
+.hero{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1.5rem;margin-bottom:1.25rem}
+.hero-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;padding:3px 10px;border-radius:999px;margin-bottom:.75rem;background:var(--color-background-success);color:var(--color-text-success)}
+.hero-grid{display:grid;grid-template-columns:1fr auto;gap:1.5rem;align-items:center}
+.hero-h{font-size:22px;font-weight:500;line-height:1.2;margin-bottom:.4rem}
+.hero-h span{color:#534AB7}
+.hero-sub{font-size:13px;color:var(--color-text-secondary);line-height:1.6;margin-bottom:.9rem;max-width:500px}
+.tpills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem}
+.tp{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:var(--color-background-primary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);font-size:12px}
+.tp i{font-size:13px}
+.hbtns{display:flex;gap:8px;flex-wrap:wrap}
+.bp{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;background:#534AB7;color:#EEEDFE;border:none;border-radius:var(--border-radius-md);font-size:12px;font-weight:500;cursor:pointer}
+.bg{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;background:transparent;color:var(--color-text-primary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);font-size:12px;cursor:pointer}
+.hex-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.hex{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:10px 8px;text-align:center}
+.hex i{font-size:20px;display:block;margin-bottom:3px}
+.hex-lbl{font-size:10px;font-weight:500;color:var(--color-text-secondary)}
+
+
+.inst-tabs{display:flex;gap:8px;margin-bottom:1.25rem}
+.itb{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:11px 16px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-lg);font-family:'Orbitron',monospace;font-size:13px;font-weight:500;color:var(--color-text-secondary);cursor:pointer;background:var(--color-background-primary);transition:all .15s}
+.itb.on{border-color:#534AB7;color:#534AB7;background:var(--color-background-secondary)}
+.itb:hover:not(.on){color:var(--color-text-primary);border-color:var(--color-border-primary)}
+.itb i{font-size:18px}
+
+
+.sub-tabs{display:flex;border-bottom:0.5px solid var(--color-border-tertiary);margin-bottom:1.25rem;gap:0;overflow-x:auto;scrollbar-width:none}
+.sub-tabs::-webkit-scrollbar{display:none}
+.stb{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:9px 16px;border:none;background:transparent;font-family:'Orbitron',monospace;font-size:12px;font-weight:500;color:var(--color-text-secondary);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-0.5px}
+.stb.on{color:#534AB7;border-bottom-color:#534AB7}
+.stb:hover:not(.on){color:var(--color-text-primary)}
+.stb i{font-size:14px}
+
+.inst-pane{display:none}.inst-pane.on{display:block}
+.sub-pane{display:none}.sub-pane.on{display:block}
+
+
+.main-layout{display:grid;grid-template-columns:1fr 220px;gap:1.25rem;align-items:start}
+.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.grid-6{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+
+
+.card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);}
+.card-sm{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:.75rem}
+.ico-wrap{width:32px;height:32px;border-radius:var(--border-radius-md);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.card-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.card h3{font-size:13px;font-weight:500}
+.card p,.card-sm p{font-size:12px;color:var(--color-text-secondary);line-height:1.5}
+.dot-list{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.dl{display:flex;align-items:flex-start;gap:7px;font-size:12px;color:var(--color-text-secondary);line-height:1.4}
+.dl::before{content:'';width:4px;height:4px;border-radius:50%;background:#534AB7;flex-shrink:0;margin-top:5px}
+.check-list{display:flex;flex-direction:column;gap:5px}
+.cl{display:flex;align-items:flex-start;gap:7px;font-size:12px;color:var(--color-text-secondary);line-height:1.4}
+.cl i{font-size:13px;color:#1D9E75;flex-shrink:0;margin-top:1px}
+
+.snap-card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1rem;position:sticky;top:0}
+.snap-title{font-size:10px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--color-text-tertiary);margin-bottom:.75rem}
+.snap-row{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:.5px solid var(--color-border-tertiary)}
+.snap-row:last-child{border-bottom:none}
+.snap-num{font-size:17px;font-weight:500;line-height:1}
+.snap-lbl{font-size:11px;color:var(--color-text-secondary);line-height:1.3}
+
+.process-bar{display:grid;background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden;margin-bottom:1rem}
+.ps{padding:.9rem .75rem;text-align:center;position:relative;border-right:.5px solid var(--color-border-tertiary)}
+.ps:last-child{border-right:none}
+.ps-ni{display:flex;align-items:center;justify-content:center;gap:5px;margin-bottom:6px}
+.ps-num{font-size:10px;color:var(--color-text-tertiary);font-weight:500}
+.ps-ico{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.ps i{font-size:13px}
+.ps h4{font-size:11px;font-weight:500;margin-bottom:3px}
+.ps p{font-size:10px;color:var(--color-text-secondary);line-height:1.4}
+
+
+.prog-item{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:.75rem;text-align:center}
+.prog-item i{font-size:18px;display:block;margin-bottom:4px}
+.prog-label{font-size:11px;font-weight:500;margin-bottom:2px}
+.prog-sub{font-size:10px;color:var(--color-text-secondary);line-height:1.3}
+
+
+.ticker{display:flex;background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);overflow:hidden;margin-bottom:1.25rem}
+.ti-item{display:flex;align-items:center;gap:6px;padding:9px 12px;border-right:.5px solid var(--color-border-tertiary);font-size:11px;color:var(--color-text-secondary);flex:1;justify-content:center;white-space:nowrap}
+.ti-item:last-child{border-right:none}
+.ti-item i{font-size:13px;color:#534AB7}
+
+
+.sec-head{font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-tertiary);margin-bottom:.75rem;display:flex;align-items:center;gap:8px}
+.sec-head i{font-size:14px;color:#534AB7}
+.sec-head::after{content:'';flex:1;height:.5px;background:var(--color-border-tertiary)}
+
+
+.approach-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem}
+
+
+.partner-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:7px;margin-bottom:1.25rem}
+.pchip{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md)}
+.pi{width:28px;height:28px;border-radius:var(--border-radius-md);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;flex-shrink:0}
+.pn{font-size:11px;font-weight:500;line-height:1.3}
+
+
+.cta{background:#3C3489;border-radius:var(--border-radius-lg);padding:1.25rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-top:1.25rem}
+.cta-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.12);color:#EEEDFE;font-size:10px;padding:3px 9px;border-radius:999px;margin-bottom:6px}
+.cta-h{font-size:16px;font-weight:500;color:#fff;margin-bottom:3px}
+.cta-sub{font-size:12px;color:#AFA9EC}
+.cta-btns{display:flex;gap:7px;flex-wrap:wrap}
+.cta-bw{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;background:#fff;color:#3C3489;border:none;border-radius:var(--border-radius-md);font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap}
+.cta-bg{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;background:transparent;color:#fff;border:.5px solid rgba(255,255,255,.35);border-radius:var(--border-radius-md);font-size:12px;cursor:pointer;white-space:nowrap}
+
+  `
+}
+
+</style>
+
+      </div>
+
+      <div className="modal fade" id="partnerModal" tabIndex="-1" aria-labelledby="partnerModalLabel" aria-hidden="true">
+        <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+          <div className="modal-content partner-modal-content">
+            <div className="modal-header partner-modal-header">
+              <div className="partner-modal-header-inner">
+                <span className="partner-modal-emoji" aria-hidden="true">
+                  🤝
+                </span>
+                <div>
+                  <h5 className="partner-modal-title" id="partnerModalLabel">
+                    Partner With Us
+                  </h5>
+                  <p className="partner-modal-tagline">Future-tech partnerships that create real impact</p>
+                </div>
+              </div>
+              <button type="button" className="btn-close partner-modal-close" data-bs-dismiss="modal" aria-label="Close" />
+            </div>
+            <div className="modal-body partner-modal-body">
+              <p className="partner-modal-intro">
+                Share your proposal and we will respond within 2–3 business days.
+              </p>
+              <form id="partnerForm" onSubmit={handlePartnerSubmit}>
+                <div className="row g-2">
+                  <div className="col-sm-6 partner-field">
+                    <label className="partner-label" htmlFor="partner-name">
+                      <User size={14} aria-hidden /> Name
+                    </label>
+                    <input
+                      id="partner-name"
+                      type="text"
+                      name="name"
+                      value={partnerForm.name}
+                      onChange={handlePartnerChange}
+                      required
+                      placeholder="Your name"
+                    />
+                  </div>
+                  <div className="col-sm-6 partner-field">
+                    <label className="partner-label" htmlFor="partner-org">
+                      <Building size={14} aria-hidden /> Organization
+                    </label>
+                    <input
+                      id="partner-org"
+                      type="text"
+                      name="organization"
+                      value={partnerForm.organization}
+                      onChange={handlePartnerChange}
+                      placeholder="Company / institution"
+                    />
+                  </div>
+                  <div className="col-sm-6 partner-field">
+                    <label className="partner-label" htmlFor="partner-state">
+                      <MapPin size={14} aria-hidden /> State
+                    </label>
+                    <select
+                      id="partner-state"
+                      name="state"
+                      value={partnerForm.state}
+                      onChange={handlePartnerChange}
+                      required
+                    >
+                      <option value="" disabled>
+                        Pick your state
+                      </option>
+                      {INDIAN_STATES.map((state) => (
+                        <option key={state} value={state}>
+                          {state}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-sm-6 partner-field">
+                    <label className="partner-label" htmlFor="partner-mobile">
+                      <Smartphone size={14} aria-hidden /> Phone
+                    </label>
+                    <input
+                      id="partner-mobile"
+                      type="tel"
+                      name="mobile"
+                      value={partnerForm.mobile}
+                      onChange={handlePartnerChange}
+                      required
+                      pattern="[0-9]{10}"
+                      placeholder="10-digit number"
+                    />
+                  </div>
+                  <div className="col-12 partner-field">
+                    <label className="partner-label" htmlFor="partner-email">
+                      <Mail size={14} aria-hidden /> Email
+                    </label>
+                    <input
+                      id="partner-email"
+                      type="email"
+                      name="email"
+                      value={partnerForm.email}
+                      onChange={handlePartnerChange}
+                      required
+                      placeholder="you@company.com"
+                    />
+                  </div>
+                  <div className="col-12 partner-field">
+                    <label className="partner-label" htmlFor="partner-message">
+                      <MessageCircle size={14} aria-hidden /> Message
+                    </label>
+                    <textarea
+                      id="partner-message"
+                      name="message"
+                      value={partnerForm.message}
+                      onChange={handlePartnerChange}
+                      required
+                      rows={4}
+                      placeholder="Tell us about your partnership idea..."
+                    />
+                  </div>
+                </div>
+                <div className="partner-modal-footer">
+                  <button type="submit" className="partner-modal-submit" disabled={partnerLoading}>
+                    {partnerLoading ? "Submitting..." : "Submit →"}
+                  </button>
+                  {partnerSuccess && <p className="partner-modal-success mb-0">{partnerSuccess}</p>}
+                  {partnerError && <p className="partner-modal-error mb-0">{partnerError}</p>}
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
       </div>
     </FrontLayout>
   );
@@ -8426,56 +9711,56 @@ height:15rem;
 //       {/* <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //     Home  : Future Technolody Labs Section
 //     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ --> */}
-//       <section class="">
-//         <div class="container">
-//           <h2 class="section-title py-md-4 text-center color-pink">Empowering Minds Through Future Technology</h2>
-//           <div class="row g-4 pb-5">
+//       <section className="">
+//         <div className="container">
+//           <h2 className="section-title py-md-4 text-center color-pink">Empowering Minds Through Future Technology</h2>
+//           <div className="row g-4 pb-5">
 
-//             <div class="col-md-5 large-images" style={{display: 'flex'}}>
-//               <div class="row g-4">
-//                 <div class="col-12">
-//                   <div class="lab-gallery-item">
-//                     <img src="/Assets/images/homepage/home1.jpg" alt="Robotics Workshop" class="img-fluid" />
+//             <div className="col-md-5 large-images" style={{display: 'flex'}}>
+//               <div className="row g-4">
+//                 <div className="col-12">
+//                   <div className="lab-gallery-item">
+//                     <img src="/Assets/images/homepage/home1.jpg" alt="Robotics Workshop" className="img-fluid" />
 //                   </div>
 //                 </div>
-//                 <div class="col-12">
-//                   <div class="lab-gallery-item">
-//                     <img src="/Assets/images/homepage/home2.jpg" alt="Coding Session" class="img-fluid" />
+//                 <div className="col-12">
+//                   <div className="lab-gallery-item">
+//                     <img src="/Assets/images/homepage/home2.jpg" alt="Coding Session" className="img-fluid" />
 //                   </div>
 //                 </div>
 //               </div>
 //             </div>
 
-//             <div class="col-md-7 small-images">
-//               <div class="row g-4">
-//                 <div class="col-md-6">
-//                   <div class="lab-gallery-item">
-//                     <img src="/Assets/images/homepage/home3.jpg" alt="AI Research" class="img-fluid" />
+//             <div className="col-md-7 small-images">
+//               <div className="row g-4">
+//                 <div className="col-md-6">
+//                   <div className="lab-gallery-item">
+//                     <img src="/Assets/images/homepage/home3.jpg" alt="AI Research" className="img-fluid" />
 //                   </div>
 //                 </div>
-//                 <div class="col-md-6">
-//                   <div class="lab-gallery-item">
-//                     <img src="/Assets/images/homepage/home4.jpg" alt="Machine Learning" class="img-fluid" />
+//                 <div className="col-md-6">
+//                   <div className="lab-gallery-item">
+//                     <img src="/Assets/images/homepage/home4.jpg" alt="Machine Learning" className="img-fluid" />
 //                   </div>
 //                 </div>
-//                 <div class="col-md-6">
-//                   <div class="lab-gallery-item">
-//                     <img src="/Assets/images/homepage/home5.jpg" alt="Coding Challenge" class="img-fluid" />
+//                 <div className="col-md-6">
+//                   <div className="lab-gallery-item">
+//                     <img src="/Assets/images/homepage/home5.jpg" alt="Coding Challenge" className="img-fluid" />
 //                   </div>
 //                 </div>
-//                 <div class="col-md-6">
-//                   <div class="lab-gallery-item">
-//                     <img src="/Assets/images/homepage/home6.jpg" alt="Tech Seminar" class="img-fluid" />
+//                 <div className="col-md-6">
+//                   <div className="lab-gallery-item">
+//                     <img src="/Assets/images/homepage/home6.jpg" alt="Tech Seminar" className="img-fluid" />
 //                   </div>
 //                 </div>
-//                 <div class="col-md-6">
-//                   <div class="lab-gallery-item">
-//                     <img src="/Assets/images/homepage/home7.jpg" alt="Team Project" class="img-fluid" />
+//                 <div className="col-md-6">
+//                   <div className="lab-gallery-item">
+//                     <img src="/Assets/images/homepage/home7.jpg" alt="Team Project" className="img-fluid" />
 //                   </div>
 //                 </div>
-//                 <div class="col-md-6">
-//                   <div class="lab-gallery-item">
-//                     <img src="/Assets/images/homepage/home8.jpg" alt="Innovation Lab" class="img-fluid" />
+//                 <div className="col-md-6">
+//                   <div className="lab-gallery-item">
+//                     <img src="/Assets/images/homepage/home8.jpg" alt="Innovation Lab" className="img-fluid" />
 //                   </div>
 //                 </div>
 //               </div>
