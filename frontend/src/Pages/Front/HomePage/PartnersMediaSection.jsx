@@ -33,7 +33,7 @@ const STYLES = `
 
   .fp-sub--media {
     border-top: 1px solid #e2e8f0;
-    padding-top: 56px;
+    padding-top: 15px;
     padding-bottom: 56px;
   }
 
@@ -926,7 +926,7 @@ function MediaSection() {
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 32px", position: "relative", zIndex: 1 }}>
         <SectionHeader
           icon="⭐"
-          titleHtml={`<span style="color:#0d2146">Media &amp; </span><span style="color:#1565c0">Recognition</span>`}
+          titleHtml={`<span style="color:#0d2146">Media &amp; </span><span style="color:#1565c0"> Recognition</span>`}
           subtitle="Celebrating our journey of impact, partnerships, and achievements across platforms and communities."
           accentColor="#1565c0"
           noSubtitleMaxWidth

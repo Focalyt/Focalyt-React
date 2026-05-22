@@ -880,7 +880,7 @@ export default function OurApproachSection() {
   return (
     <>
       <style>{STYLES}</style>
-      <section className="oa" id="our-approach" style={{ padding: "72px 0", position: "relative", overflow: "hidden" }}>
+      <section className="oa" id="our-approach" style={{ padding: "15px 0", position: "relative", overflow: "hidden" }}>
         <div className="oa-blob" style={{ width: 340, height: 340, background: "#1a7a4a", top: "-8%", left: "-4%" }} />
         <div className="oa-blob" style={{ width: 280, height: 280, background: "#1565c0", top: "40%", right: "-6%" }} />
         <div className="oa-blob" style={{ width: 220, height: 220, background: "#6a1f9a", bottom: "5%", left: "30%" }} />
@@ -932,7 +932,7 @@ export default function OurApproachSection() {
         </div>
       </section>
 
-      <div style={{ height: 5, background: "linear-gradient(90deg,#1a7a4a,#1565c0,#6a1f9a,#e65100)" }} />
+      {/* <div style={{ height: 5, background: "linear-gradient(90deg,#1a7a4a,#1565c0,#6a1f9a,#e65100)" }} /> */}
     </>
   );
 }

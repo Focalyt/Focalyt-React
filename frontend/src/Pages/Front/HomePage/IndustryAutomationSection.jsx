@@ -624,7 +624,7 @@ function LiveDashboard() {
 
   return (
     <section className="ia-sec">
-      <div className="ia-wrap">
+      <div className="ia-wrap" style={{paddingBottom:"15px"}}>
         <div className="ia-dash-panel rev">
           <div style={{ textAlign: "center" }}>
             <div className="ia-live-badge">
@@ -689,38 +689,38 @@ const CTA_ACTIONS = [
   { emoji: "📄", title: "Download Brochure", desc: "Explore our offerings in detail", modal: false },
 ];
 
-function CTA() {
-  return (
-    <section className="ia-cta">
-      <div style={{ flex: "1 1 240px" }}>
-        <h2 className="ia-cta-h rev-l">Ready to Transform Your Operations?</h2>
-        <p className="ia-cta-sub rev-l">Let&apos;s build a smarter, connected and more efficient industry together.</p>
-      </div>
-      <div className="ia-cta-actions">
-        {CTA_ACTIONS.map((a, i) => (
-          <div
-            key={a.title}
-            className="ia-cta-action rev"
-            role="button"
-            tabIndex={0}
-            data-bs-toggle={a.modal !== false ? "modal" : undefined}
-            data-bs-target={a.modal !== false ? "#partnerModal" : undefined}
-            style={{ transitionDelay: `${i * 80}ms` }}
-          >
-            <span className="ia-cta-action-ico">{a.emoji}</span>
-            <div>
-              <div className="ia-cta-action-title">{a.title}</div>
-              <div className="ia-cta-action-sub">{a.desc}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-      <button type="button" className="ia-btn-outline rev-r" data-bs-toggle="modal" data-bs-target="#partnerModal">
-        Partner With Us →
-      </button>
-    </section>
-  );
-}
+// function CTA() {
+//   return (
+//     // <section className="ia-cta">
+//     //   <div style={{ flex: "1 1 240px" }}>
+//     //     <h2 className="ia-cta-h rev-l">Ready to Transform Your Operations?</h2>
+//     //     <p className="ia-cta-sub rev-l">Let&apos;s build a smarter, connected and more efficient industry together.</p>
+//     //   </div>
+//     //   <div className="ia-cta-actions">
+//     //     {CTA_ACTIONS.map((a, i) => (
+//     //       <div
+//     //         key={a.title}
+//     //         className="ia-cta-action rev"
+//     //         role="button"
+//     //         tabIndex={0}
+//     //         data-bs-toggle={a.modal !== false ? "modal" : undefined}
+//     //         data-bs-target={a.modal !== false ? "#partnerModal" : undefined}
+//     //         style={{ transitionDelay: `${i * 80}ms` }}
+//     //       >
+//     //         <span className="ia-cta-action-ico">{a.emoji}</span>
+//     //         <div>
+//     //           <div className="ia-cta-action-title">{a.title}</div>
+//     //           <div className="ia-cta-action-sub">{a.desc}</div>
+//     //         </div>
+//     //       </div>
+//     //     ))}
+//     //   </div>
+//     //   <button type="button" className="ia-btn-outline rev-r" data-bs-toggle="modal" data-bs-target="#partnerModal">
+//     //     Partner With Us →
+//     //   </button>
+//     // </section>
+//   );
+// }
 
 export default function IndustryAutomationSection() {
   const rootRef = useRef(null);
@@ -734,7 +734,7 @@ export default function IndustryAutomationSection() {
         <Solutions />
         <Benefits />
         <LiveDashboard />
-        <CTA />
+        {/* <CTA /> */}
       </div>
     </>
   );

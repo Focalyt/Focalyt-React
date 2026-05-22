@@ -4743,7 +4743,7 @@ function FTLaaSSection() {
 const GEOGRAPHIC_COVERAGE_STYLES = `
 .gc{--navy:#0a2240;--teal:#0e7c6b;--green:#16a34a;--bg:#f0f7ff;--surface:#fff;--brd:#d1e0ef;--t1:#0a2240;--t2:#2d4a6e;--t3:#64748b;font-family:'Inter',sans-serif;background:var(--bg);color:var(--t1);overflow-x:hidden;border-radius:16px;}
 .gc *{box-sizing:border-box;margin:0;padding:0;}
-.gc-hero{background:linear-gradient(135deg,#f0f7ff 0%,#e8f4f0 50%,#f0f7ff 100%);border:1px solid var(--brd);border-radius:16px;padding:56px 0 0;position:relative;overflow:hidden;}
+.gc-hero{background:linear-gradient(135deg,#f0f7ff 0%,#e8f4f0 50%,#f0f7ff 100%);border:1px solid var(--brd);border-radius:16px;padding:15px 0 0;position:relative;overflow:hidden;}
 .gc-hero::before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle at 20% 30%,rgba(14,124,107,.06) 0%,transparent 50%),radial-gradient(circle at 80% 70%,rgba(10,34,64,.05) 0%,transparent 50%),radial-gradient(var(--brd) 1px,transparent 1px);background-size:100%,100%,32px 32px;pointer-events:none;}
 .gc-cont{max-width:1240px;margin:0 auto;padding:0 48px;position:relative;z-index:1;}
 .gc-eyebrow{display:flex;align-items:center;gap:12px;margin-bottom:20px;}
@@ -4755,7 +4755,7 @@ const GEOGRAPHIC_COVERAGE_STYLES = `
 .gc-reach-badge{display:flex;align-items:flex-start;gap:14px;background:rgba(14,124,107,.07);border:1px solid rgba(14,124,107,.18);border-radius:12px;padding:16px 20px;max-width:440px;margin-bottom:36px;}
 .gc-reach-ico{width:44px;height:44px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
 .gc-reach-text{font-size:13px;font-weight:700;color:var(--teal);line-height:1.4;}
-.gc-hero-grid{display:grid;grid-template-columns:1fr 1.1fr;align-items:end;}
+.gc-hero-grid{display:grid;grid-template-columns:1fr 1.1fr;align-items:center;}
 .gc-hero-left{padding-bottom:48px;}
 .gc-map-wrap{position:relative;width:100%;max-width:580px;margin:0 auto;}
 .gc-map-leaflet-wrap{position:relative;border-radius:16px;overflow:hidden;border:1px solid var(--brd);background:#e8f4ff;box-shadow:0 24px 48px rgba(10,34,64,.15);}
@@ -5014,6 +5014,12 @@ function GeographicCoverageSection() {
                 <div className="gc-h1-sub">Only Impact.</div>
                 <p className="gc-desc">Focalyt delivers skills, opportunities and sustainable impact across India - beyond boundaries.</p>
                 <div className="gc-reach-badge"><div className="gc-reach-ico">🌐</div><div className="gc-reach-text">We reach beyond boundaries to create skills, opportunities and sustainable impact.</div></div>
+                
+              </div>
+              <div className="gc-hero-right">
+                {/* <div className="gc-map-wrap">
+                  <GeographicCoverageLeafletMap activeState={hoveredState} onStateHover={setHoveredState} />
+                </div> */}
                 <div className="gc-inline-card">
                   <div className="gc-inline-title"><span>📍</span> Our presence across states</div>
                   <div className="gc-state-list">
@@ -5036,11 +5042,6 @@ function GeographicCoverageSection() {
                     <div className="gc-state-row"><span className="gc-state-dot" />…and more</div>
                   </div>
                   <div className="gc-commit"><span style={{ fontSize: 18 }}>🌐</span><span>We are committed to reaching every region, <strong style={{ color: "var(--navy)" }}>empowering communities everywhere.</strong></span></div>
-                </div>
-              </div>
-              <div className="gc-hero-right">
-                <div className="gc-map-wrap">
-                  <GeographicCoverageLeafletMap activeState={hoveredState} onStateHover={setHoveredState} />
                 </div>
               </div>
             </div>
