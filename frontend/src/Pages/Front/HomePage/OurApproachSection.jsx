@@ -856,18 +856,18 @@ function PillarPanel({ pillar }) {
           </p>
         </div>
 
-        <div className="oa-cta">
+        {/* <div className="oa-cta">
           <div className="oa-cta-text">
             <span style={{ fontSize: 32 }}>{pillar.emoji}</span>
             <div>
               <strong>{pillar.closing}</strong>
-              <p>{pillar.cta}</p>
+               <p>{pillar.cta}</p> 
             </div>
           </div>
           <Link to="/contact" className="oa-cta-btn">
             Let&apos;s Create Impact Together →
           </Link>
-        </div>
+        </div> */}
       </div>
     </div>
   );

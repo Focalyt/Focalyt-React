@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { faFacebookF, faLinkedinIn, faYoutube, faInstagram } from "@fortawesome/free-brands-svg-icons";
 import { Home, GraduationCap, Briefcase, Share2, MapPin, Phone, Mail } from "lucide-react";
 import axios from "axios";
@@ -22,7 +22,16 @@ const SOCIAL_LINKS = [
 ];
 
 function Footer() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const isHomePage = location.pathname === "/";
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
+  const handlePartnerWithUs = (e) => {
+    if (isHomePage) return;
+    e.preventDefault();
+    navigate("/", { state: { openPartnerModal: true } });
+  };
   const [formData, setFormData] = useState({
     name: "",
     number: "",
@@ -164,7 +173,7 @@ function Footer() {
                   <a href="#" data-bs-toggle="modal" data-bs-target="#careerModal">Career</a>
                 </li>
                 <li><Link to="/results">Results</Link></li>
-                <li><Link to="/contact">Partner With Us</Link></li>
+                {/* <li><Link to="/contact">Partner With Us</Link></li> */}
                 <li><Link to="/contact">Contact Us</Link></li>
               </ul>
             </div>
@@ -189,7 +198,15 @@ function Footer() {
                   </a>
                 </li>
               </ul>
-              <Link to="/contact" className="ftr-contact-cta">Get in touch →</Link>
+              <button
+                type="button"
+                className="ftr-contact-cta"
+                data-bs-toggle={isHomePage ? "modal" : undefined}
+                data-bs-target={isHomePage ? "#partnerModal" : undefined}
+                onClick={handlePartnerWithUs}
+              >
+                Partner With Us →
+              </button>
             </div>
           </div>
         </div>

@@ -28,7 +28,7 @@ const STYLES = `
   .fp-sub {
     position: relative;
     overflow: hidden;
-    padding: 56px 0;
+    padding: 15px 0;
   }
 
   .fp-sub--media {
@@ -926,7 +926,7 @@ function MediaSection() {
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 32px", position: "relative", zIndex: 1 }}>
         <SectionHeader
           icon="⭐"
-          titleHtml={`<span style="color:#0d2146">Media &amp; </span><span style="color:#1565c0"> Recognition</span>`}
+          titleHtml={`<span style="color:#0d2146">Media &amp; </span><span style="color:#1565c0">&nbsp; Recognition</span>`}
           subtitle="Celebrating our journey of impact, partnerships, and achievements across platforms and communities."
           accentColor="#1565c0"
           noSubtitleMaxWidth
@@ -947,7 +947,7 @@ function MediaSection() {
                 border: activeTab === i ? "2px solid #0d2146" : "2px solid #dce4f5",
                 background: activeTab === i ? "linear-gradient(135deg,#0d2146,#163972)" : "#fff",
                 color: activeTab === i ? "#fff" : "#4a5568",
-                fontFamily: "'Orbitron',monospace",
+                fontFamily: "'Inter', sans-serif",
                 fontWeight: 700,
                 fontSize: 13.5,
                 boxShadow: activeTab === i ? "0 6px 22px rgba(13,33,70,0.22)" : "0 2px 8px rgba(0,0,0,0.05)",

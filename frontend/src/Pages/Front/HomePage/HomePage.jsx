@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useRef } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import FrontLayout from "../../../Component/Layouts/Front/index";
 import { PillarProjectLogo } from "./PillarProjectLogos";
 // import ZenithXSection from "./ZenithXSection";
@@ -113,7 +113,7 @@ function IpIcon({ name, size = 14, className = "" }) {
    BG: off-white / cool gray for readability
 ───────────────────────────────────────────────────────────────── */
 const STYLES = `
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;900&display=swap');
+
 
 html { scroll-behavior: smooth; }
 
@@ -1429,7 +1429,7 @@ html { scroll-behavior: smooth; }
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 2px;
-  font-family: 'Orbitron', monospace;
+  font-family: 'Inter', sans-serif;
   font-size: 11px; font-weight: 600;
   letter-spacing: .1em; text-transform: uppercase;
   color: var(--muted); cursor: pointer;
@@ -2767,7 +2767,7 @@ html { scroll-behavior: smooth; }
   border: 1.5px solid #c5d4e8;
   background: #ffffff;
   color: #0a2240;
-  font-family: inherit;
+  font-family: 'Inter', sans-serif;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.4px;
@@ -4391,19 +4391,19 @@ const FTLAAS_STYLES = `
 .ftl-row{display:flex;gap:8px;flex-wrap:wrap;}
 .ftl-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;font-weight:500;color:#1e293b;}
 .ftl-btn,.ftl-btn-lite{display:inline-flex;align-items:center;gap:5px;padding:9px 14px;border-radius:8px;font-family:'Orbitron',monospace;font-size:13px;cursor:pointer;transition:.2s;white-space:nowrap;}
-.ftl-btn{background:#534AB7;color:#fff;border:none;font-weight:600;}
-.ftl-btn:hover{background:#4338ca;transform:translateY(-1px);}
+.ftl-btn{background:linear-gradient(90deg,#1BA7FF,#FF2DAA);color:#fff;border:none;font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,.35);box-shadow:0 14px 34px rgba(27,167,255,.18);}
+.ftl-btn:hover{transform:translateY(-2px);box-shadow:0 18px 46px rgba(255,45,170,.16);}
 .ftl-btn-lite{background:transparent;color:#334155;border:1px solid #e2e8f0;font-weight:500;}
 .ftl-btn-lite:hover{border-color:#534AB7;color:#534AB7;}
 .ftl-hex-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
 .ftl-hex{border:1px solid #e2e8f0;border-radius:12px;padding:10px 8px;text-align:center;}
 .ftl-hex-lbl{font-size:10px;font-weight:600;color:#475569;margin-top:2px;}
 .ftl-inst-tabs{display:flex;gap:8px;margin-bottom:1.25rem;}
-.ftl-inst-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;border:1px solid #e2e8f0;border-radius:12px;font-family:'Orbitron',monospace;font-size:13px;font-weight:600;color:#64748b;cursor:pointer;background:#fff;transition:all .15s;}
+.ftl-inst-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;border:1px solid #e2e8f0;border-radius:12px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;color:#64748b;cursor:pointer;background:#fff;transition:all .15s;}
 .ftl-inst-tab.on{border-color:#534AB7;color:#534AB7;background:#f5f3ff;}
 .ftl-sub-tabs{display:flex;border-bottom:1px solid #e2e8f0;margin-bottom:1.25rem;overflow-x:auto;scrollbar-width:none;}
 .ftl-sub-tabs::-webkit-scrollbar{display:none;}
-.ftl-sub-tab{flex-shrink:0;padding:10px 18px;border:none;background:transparent;font-family:'Orbitron',monospace;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;}
+.ftl-sub-tab{flex-shrink:0;padding:10px 18px;border:none;background:transparent;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;}
 .ftl-sub-tab.on{color:#534AB7;border-bottom-color:#534AB7;}
 .ftl-main-layout{display:grid;grid-template-columns:1fr 230px;gap:1.25rem;align-items:start;}
 .ftl-grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
@@ -4577,19 +4577,22 @@ function FTLaaSSection() {
     <>
       <style>{FTLAAS_STYLES}</style>
       <div className="ftl">
+      <div className="section-head">
+              <div className="sh2">Future Technology Lab  <span className="red">As a Service(FTLaaS)</span></div>
+              </div>
         <div className="ftl-hero">
           <div className="ftl-badge">✓ Integrated with NEP 2020</div>
           <div className="ftl-hero-grid">
             <div>
-              <h1 className="ftl-h1">Future Technology Lab as a Service <span>(FTLaaS)</span></h1>
+              <h1 className="ftl-h1"></h1>
               <p className="ftl-sub">Focalyt&apos;s FTLaaS enables schools and colleges to implement immersive AI, Robotics, IoT, and STEM learning ecosystems through a scalable subscription-based model.</p>
               <div className="ftl-row" style={{ marginBottom: "1rem" }}>
                 {[["🧠", "AI"], ["🤖", "Robotics"], ["📡", "IoT"], ["🚁", "Drones"], ["🔬", "STEM Labs"]].map(([ico, label]) => <div key={label} className="ftl-pill"><span>{ico}</span>{label}</div>)}
               </div>
               <div className="ftl-row">
-                <button type="button" className="ftl-btn">→ Explore Programs</button>
+                {/* <button type="button" className="ftl-btn">→ Explore Programs</button> */}
                 <button type="button" className="ftl-btn-lite">📅 Book a Demo</button>
-                <button type="button" className="ftl-btn-lite" data-bs-toggle="modal" data-bs-target="#partnerModal">🤝 Partner With Us</button>
+                <button type="button" className="btn-primary" data-bs-toggle="modal" data-bs-target="#partnerModal">🤝 Partner With Us</button>
               </div>
             </div>
             <div className="ftl-hex-grid">
@@ -4812,8 +4815,8 @@ const GEOGRAPHIC_COVERAGE_STYLES = `
 .gc-cta-ico{font-size:36px;}
 .gc-cta-h{font-family:'Orbitron',monospace;font-size:16px;font-weight:700;color:#fff;margin-bottom:4px;line-height:1.3;}
 .gc-cta-sub{font-family:'Inter',sans-serif;font-size:13px;color:rgba(255,255,255,.65);max-width:480px;line-height:1.6;}
-.gc-cta-btn{display:inline-flex;align-items:center;gap:8px;padding:13px 28px;background:#fff;color:var(--navy);border:none;border-radius:8px;font-size:12px;font-weight:700;letter-spacing:.5px;white-space:nowrap;text-decoration:none;transition:.2s;}
-.gc-cta-btn:hover{background:#e8f4f0;transform:translateY(-1px);}
+.gc-cta-btn{display:inline-flex;align-items:center;gap:8px;padding:13px 28px;border:none;border-radius:8px;font-size:12px;font-weight:700;letter-spacing:.5px;white-space:nowrap;text-decoration:none;transition:.2s;}
+.gc-cta-btn:hover{transform:translateY(-1px);}
 @media(max-width:1100px){.gc-hero-grid{grid-template-columns:1fr;gap:32px;}.gc-hero-left{padding-bottom:0;}.gc-map-wrap{max-width:100%;}.gc-reach-grid{grid-template-columns:repeat(4,1fr);}.gc-quote-banner{grid-template-columns:1fr;}.gc-state-list{grid-template-columns:repeat(3,1fr);}.gc-enables-wrap{grid-template-columns:1fr;}.gc-presence-right{display:grid;grid-template-columns:repeat(2,1fr);}}
 @media(max-width:768px){.gc-cont{padding:0 20px;}.gc-map-leaflet{height:min(48vh,400px);min-height:280px;}.gc-enables-grid{grid-template-columns:1fr 1fr;}.gc-reach-grid{grid-template-columns:repeat(2,1fr);}.gc-state-list{grid-template-columns:1fr 1fr;}.gc-h1{font-size:clamp(22px,6vw,36px);}.gc-h1-sub{font-size:clamp(20px,5.5vw,32px);}.gc-presence-right{grid-template-columns:1fr;}}
 @media(max-width:480px){.gc-enables-grid{grid-template-columns:1fr;}.gc-state-list{grid-template-columns:1fr;}.gc-bottom-cta,.gc-quote-banner{padding:24px 20px;}.gc-cta-left{align-items:flex-start;}}
@@ -5083,7 +5086,7 @@ function GeographicCoverageSection() {
         <div className="gc-cont">
           <div className="gc-bottom-cta">
             <div className="gc-cta-left"><span className="gc-cta-ico">🌐</span><div><div className="gc-cta-h">No boundary limitations.<br />Limitless possibilities.</div><div className="gc-cta-sub">Focalyt is equipped to design, deploy and scale skill development, livelihood, entrepreneurship, education, MSME and community impact programs across India.</div></div></div>
-            <button type="button" className="gc-cta-btn" data-bs-toggle="modal" data-bs-target="#partnerModal">Partner With Us →</button>
+            <button type="button" className="btn-primary gc-cta-btn" data-bs-toggle="modal" data-bs-target="#partnerModal">Partner With Us →</button>
           </div>
         </div>
       </div>
@@ -5184,6 +5187,7 @@ const HOME_HASH_SCROLL_OFFSET = 130;
 
 export default function HomePage() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [activeArea, setActiveArea] = useState("skills");
   const currentArea = CORE_AREAS.find((a) => a.key === activeArea);
   const [hoveredAreaItemIdx, setHoveredAreaItemIdx] = useState(null);
@@ -5197,11 +5201,19 @@ export default function HomePage() {
   const [videoSrc, setVideoSrc] = useState("");
   const [coursesError, setCoursesError] = useState("");
   const [formData, setFormData] = useState({
+    name: "",
+    state: "",
+    mobile: "",
+    email: "",
+    message: "",
     courseName: "",
     sectorName: "",
     projectName: "",
     typeOfProject: "",
   });
+  const [callbackLoading, setCallbackLoading] = useState(false);
+  const [callbackSuccess, setCallbackSuccess] = useState("");
+  const [callbackError, setCallbackError] = useState("");
   const [partnerForm, setPartnerForm] = useState({
     name: "",
     organization: "",
@@ -5541,6 +5553,51 @@ export default function HomePage() {
     return () => clearTimeout(timer);
   }, [location.hash]);
 
+  useEffect(() => {
+    if (!location.state?.openPartnerModal) return undefined;
+    const timer = setTimeout(() => {
+      const modalEl = document.getElementById("partnerModal");
+      if (!modalEl) return;
+      const Modal = window.bootstrap?.Modal;
+      if (Modal) Modal.getOrCreateInstance(modalEl).show();
+      navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, { replace: true, state: {} });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [location.state, location.pathname, location.search, location.hash, navigate]);
+
+  const handleCallbackChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleCallbackSubmit = async (e) => {
+    e.preventDefault();
+    setCallbackLoading(true);
+    setCallbackSuccess("");
+    setCallbackError("");
+
+    try {
+      const response = await axios.post(`${backendUrl}/callback`, formData, {
+        headers: { "Content-Type": "application/json" },
+      });
+      if (response.status === 200 || response.status === 201) {
+        setCallbackSuccess("Thank you! We will call you back shortly.");
+        setFormData((prev) => ({
+          ...prev,
+          name: "",
+          state: "",
+          mobile: "",
+          email: "",
+          message: "",
+        }));
+      }
+    } catch {
+      setCallbackError("Failed to submit. Please try again.");
+    } finally {
+      setCallbackLoading(false);
+    }
+  };
+
   const handlePartnerChange = (e) => {
     const { name, value } = e.target;
     setPartnerForm((prev) => ({ ...prev, [name]: value }));
@@ -5582,7 +5639,8 @@ export default function HomePage() {
 
   return (
     <FrontLayout>
-      <div className="foc-cyber-home">
+      <div className="foc-cyber-home hp-theme">
+       
         <section className="hero grid-bg" id="hero">
           <div className="hero-orb1" />
           <div className="hero-orb2" />
@@ -7363,6 +7421,9 @@ export default function HomePage() {
 <style>
           {
             `
+            .video-fluid {
+    width: 100%;
+}
             
 .bg-img {
     position: relative;
@@ -8918,7 +8979,7 @@ height:15rem;
 
 
 .inst-tabs{display:flex;gap:8px;margin-bottom:1.25rem}
-.itb{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:11px 16px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-lg);font-family:'Orbitron',monospace;font-size:13px;font-weight:500;color:var(--color-text-secondary);cursor:pointer;background:var(--color-background-primary);transition:all .15s}
+.itb{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:11px 16px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-lg);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;color:var(--color-text-secondary);cursor:pointer;background:var(--color-background-primary);transition:all .15s}
 .itb.on{border-color:#534AB7;color:#534AB7;background:var(--color-background-secondary)}
 .itb:hover:not(.on){color:var(--color-text-primary);border-color:var(--color-border-primary)}
 .itb i{font-size:18px}
@@ -8926,7 +8987,7 @@ height:15rem;
 
 .sub-tabs{display:flex;border-bottom:0.5px solid var(--color-border-tertiary);margin-bottom:1.25rem;gap:0;overflow-x:auto;scrollbar-width:none}
 .sub-tabs::-webkit-scrollbar{display:none}
-.stb{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:9px 16px;border:none;background:transparent;font-family:'Orbitron',monospace;font-size:12px;font-weight:500;color:var(--color-text-secondary);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-0.5px}
+.stb{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:9px 16px;border:none;background:transparent;font-family:'Inter',sans-serif;font-size:12px;font-weight:500;color:var(--color-text-secondary);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-0.5px}
 .stb.on{color:#534AB7;border-bottom-color:#534AB7}
 .stb:hover:not(.on){color:var(--color-text-primary)}
 .stb i{font-size:14px}
@@ -9013,6 +9074,121 @@ height:15rem;
 
       </div>
 
+      <div
+        className="modal fade"
+        id="videoModal"
+        tabIndex="-1"
+        aria-labelledby="videoModalTitle"
+        aria-hidden="true"
+      >
+        <div className="modal-dialog modal-dialog-centered" role="document">
+          <div className="modal-content">
+            <button type="button" className="close" data-bs-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+            <div className="modal-body p-0 text-center embed-responsive">
+              <video key={videoSrc} id="eventVid" controls className="video-fluid text-center">
+                <source src={videoSrc} type="video/mp4" className="img-fluid video-fluid" />
+                Your browser does not support the video tag.
+              </video>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="modal fade" id="callbackModal" tabIndex="-1" aria-labelledby="callbackModalLabel" aria-hidden="true">
+        <div className="modal-dialog modal-dialog-centered newWidth">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title text-black" id="callbackModalLabel">
+                Request for Call Back
+              </h5>
+              <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close" />
+            </div>
+            <div className="modal-body">
+              <form id="callbackForm" onSubmit={handleCallbackSubmit}>
+                <div className="row mb-3">
+                  <div className="col-md-6 col-6">
+                    <label className="form-label">Name</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleCallbackChange}
+                      required
+                      placeholder="Enter your name"
+                    />
+                  </div>
+                  <div className="col-md-6 col-6">
+                    <label className="form-label">State</label>
+                    <select
+                      className="form-control"
+                      name="state"
+                      value={formData.state}
+                      onChange={handleCallbackChange}
+                      required
+                    >
+                      <option value="" disabled>
+                        Select your State
+                      </option>
+                      {INDIAN_STATES.map((state) => (
+                        <option key={state} value={state}>
+                          {state}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="row mb-3">
+                  <div className="col-md-6 col-6">
+                    <label className="form-label">Contact Number</label>
+                    <input
+                      type="tel"
+                      className="form-control"
+                      name="mobile"
+                      value={formData.mobile}
+                      onChange={handleCallbackChange}
+                      required
+                      pattern="[0-9]{10}"
+                      placeholder="Enter 10-digit mobile number"
+                    />
+                  </div>
+                  <div className="col-md-6 col-6">
+                    <label className="form-label">Email</label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleCallbackChange}
+                      required
+                      placeholder="Enter your email"
+                    />
+                  </div>
+                </div>
+                <div className="mb-3">
+                  <label className="form-label">Message</label>
+                  <textarea
+                    className="form-control"
+                    name="message"
+                    value={formData.message}
+                    onChange={handleCallbackChange}
+                    required
+                    placeholder="Enter your message here..."
+                  />
+                </div>
+                <button type="submit" className="btn btn-primary" disabled={callbackLoading}>
+                  {callbackLoading ? "Submitting..." : "Submit"}
+                </button>
+                {callbackSuccess && <p className="text-success">{callbackSuccess}</p>}
+                {callbackError && <p className="text-danger">{callbackError}</p>}
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="modal fade" id="partnerModal" tabIndex="-1" aria-labelledby="partnerModalLabel" aria-hidden="true">
         <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable">
           <div className="modal-content partner-modal-content">
@@ -9032,7 +9208,7 @@ height:15rem;
             </div>
             <div className="modal-body partner-modal-body">
               <p className="partner-modal-intro">
-                Share your proposal and we will respond within 2–3 business days.
+                Share your proposal.
               </p>
               <form id="partnerForm" onSubmit={handlePartnerSubmit}>
                 <div className="row g-2">

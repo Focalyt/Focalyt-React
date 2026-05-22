@@ -186,13 +186,13 @@ function B2BDepartment() {
                     resetForm();
                 }
 
-                showAlert('B2B department deleted successfully!', 'success');
+                showAlert('B2B project deleted successfully!', 'success');
             } else {
-                showAlert(data.message || 'Failed to delete B2B department', 'error');
+                showAlert(data.message || 'Failed to delete B2B project', 'error');
             }
         } catch (error) {
-            console.error('Error deleting B2B department:', error);
-            showAlert('Failed to delete B2B department', 'error');
+            console.error('Error deleting B2B project:', error);
+            showAlert('Failed to delete B2B project', 'error');
         } finally {
             setLoading(false);
         }
@@ -228,7 +228,7 @@ function B2BDepartment() {
                     <div className="row breadcrumbs-top">
                         <div className="col-12">
                             <h3 className="content-header-title float-left mb-0">
-                                {isEditing ? 'Edit B2B Department' : 'Add B2B Department'}
+                                {isEditing ? 'Edit B2B Project' : 'Add B2B Project'}
                             </h3>
                             <div className="breadcrumb-wrapper col-12">
                                 <ol className="breadcrumb">
@@ -236,7 +236,7 @@ function B2BDepartment() {
                                         <a href="/">Home</a>
                                     </li>
                                     <li className="breadcrumb-item active">
-                                        {isEditing ? 'Edit B2B Department' : 'Add B2B Department'}
+                                        {isEditing ? 'Edit B2B Project' : 'Add B2B Project'}
                                     </li>
                                 </ol>
                             </div>
@@ -263,7 +263,7 @@ function B2BDepartment() {
                             <div className="card">
                                 <div className="card-header border border-top-0 border-left-0 border-right-0">
                                     <h4 className="card-title pb-1">
-                                        {isEditing ? 'Edit B2B Department' : 'Add B2B Department'}
+                                        {isEditing ? 'Edit B2B Project' : 'Add B2B Project'}
                                     </h4>
                                 </div>
                                 <div className="card-content">
@@ -272,7 +272,7 @@ function B2BDepartment() {
                                             <div className="row">
                                                 <div className="col-xl-8 mb-1">
                                                     <label>
-                                                        Select B2B Project
+                                                        Select B2B Department
                                                         <span className="asterisk" style={{ color: 'red' }}>*</span>
                                                     </label>
                                                     <select
@@ -299,7 +299,7 @@ function B2BDepartment() {
 
                                                 <div className="col-xl-8 mb-1">
                                                     <label>
-                                                        Enter Department Name
+                                                        Enter Project Name
                                                         <span className="asterisk" style={{ color: 'red' }}>*</span>
                                                     </label>
                                                     <input
@@ -307,7 +307,7 @@ function B2BDepartment() {
                                                         name="name"
                                                         value={formData.name}
                                                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                                        placeholder="Enter Department Name"
+                                                        placeholder="Enter Project Name"
                                                         required
                                                         maxLength={50}
                                                         disabled={loading}
@@ -371,7 +371,7 @@ function B2BDepartment() {
                                     <div className="col-xl-8">
                                         <div className="row">
                                             <div className="card-header">
-                                                <h4 className="card-title">All B2B Departments</h4>
+                                                <h4 className="card-title">All B2B Projects</h4>
                                             </div>
                                         </div>
                                     </div>
@@ -398,14 +398,14 @@ function B2BDepartment() {
                                         {loading && b2bDepartments.length === 0 ? (
                                             <div className="text-center p-4">
                                                 <div className="spinner-border text-primary"></div>
-                                                <p className="mt-2">Loading B2B departments...</p>
+                                                <p className="mt-2">Loading B2B projects...</p>
                                             </div>
                                         ) : (
                                             <table className="table table-hover-animation mb-0 table-hover">
                                                 <thead>
                                                     <tr>
-                                                        <th>Department</th>
                                                         <th>Project</th>
+                                                        <th>Department</th>
                                                         <th>Description</th>
                                                         <th>Status</th>
                                                         <th>Action</th>
@@ -415,8 +415,8 @@ function B2BDepartment() {
                                                     {b2bDepartments.length > 0 ? (
                                                         b2bDepartments.map((department) => (
                                                             <tr key={department._id}>
-                                                                <td>{department.name}</td>
                                                                 <td>{department.project?.name || '—'}</td>
+                                                                <td>{department.name}</td>
                                                                 <td>
                                                                     <span className="text-muted">
                                                                         {department.description || 'No description'}
@@ -437,7 +437,7 @@ function B2BDepartment() {
                                                                         <button
                                                                             className="btn btn-sm btn-outline-primary"
                                                                             onClick={() => handleEdit(department)}
-                                                                            title="Edit B2B Department"
+                                                                            title="Edit B2B Project"
                                                                             disabled={loading}
                                                                         >
                                                                             <i className="fas fa-edit me-1"></i>
@@ -446,7 +446,7 @@ function B2BDepartment() {
                                                                         <button
                                                                             className="btn btn-sm btn-outline-danger"
                                                                             onClick={() => handleDelete(department._id, department.name)}
-                                                                            title="Delete B2B Department"
+                                                                            title="Delete B2B Project"
                                                                             disabled={loading}
                                                                         >
                                                                             <i className="fas fa-trash me-1"></i>
@@ -459,7 +459,7 @@ function B2BDepartment() {
                                                     ) : (
                                                         <tr>
                                                             <td colSpan="5" className="text-center">
-                                                                {loading ? 'Loading...' : 'No B2B departments found'}
+                                                                {loading ? 'Loading...' : 'No B2B projects found'}
                                                             </td>
                                                         </tr>
                                                     )}
