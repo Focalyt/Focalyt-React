@@ -14,17 +14,22 @@ const STYLES = `
   --blue: #1565c0;
   --purple: #6a1f9a;
   --orange: #e65100;
-  --bg: #f0f7ff;
-  --cream: #f8faff;
+  --bg: #fff;
+  --cream: #f1f5f9;
   --surface: #fff;
-  --brd: #d1e0ef;
+  --brd: #e2e8f0;
   --t1: #0d2146;
-  --t2: #2d4a6e;
-  --t3: #64748b;
-  background: var(--bg);
+  --t2: #334155;
+  --t3: #475569;
+  background: #fff;
   color: var(--t1);
   overflow-x: hidden;
-  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.1), 0 2px 8px rgba(15, 23, 42, 0.06);
 }
 
 .ia-wrap { max-width: 1240px; margin: 0 auto; padding: 0 48px; position: relative; z-index: 1; }
@@ -55,23 +60,14 @@ const STYLES = `
 .ia .rev.on, .ia .rev-l.on, .ia .rev-r.on { opacity: 1; transform: none; }
 
 .ia-hero {
-  background: linear-gradient(135deg, #f0f7ff 0%, #e8f4f0 50%, #f0f7ff 100%);
-  border: 1px solid var(--brd);
-  border-radius: 16px 16px 0 0;
-  padding: 18px 0 0;
+  background: #fff;
+  border: none;
+  border-bottom: 1px solid var(--brd);
+  border-radius: 0;
+  padding: 24px 0 20px;
   position: relative;
   overflow: hidden;
-}
-.ia-hero::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    radial-gradient(circle at 20% 30%, rgba(14, 124, 107, 0.06) 0%, transparent 50%),
-    radial-gradient(circle at 80% 70%, rgba(13, 33, 70, 0.05) 0%, transparent 50%),
-    radial-gradient(var(--brd) 1px, transparent 1px);
-  background-size: 100%, 100%, 32px 32px;
-  pointer-events: none;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
 }
 .ia-eyebrow { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
 .ia-eyebrow-line { width: 48px; height: 2px; background: var(--teal); }
@@ -192,7 +188,7 @@ const STYLES = `
   animation: iaFadeIn 0.45s ease forwards;
 }
 .ia-panel-side {
-  width: 120px; flex-shrink: 0; background: linear-gradient(180deg, #f0f7ff, #e8f4f0);
+  width: 120px; flex-shrink: 0; background: #f8fafc;
   border-right: 1px solid var(--brd);
   display: flex; flex-direction: column; align-items: center;
   justify-content: center; gap: 12px; padding: 20px 10px;
@@ -295,7 +291,7 @@ const STYLES = `
 
 .ia-cta {
   background: linear-gradient(135deg, var(--teal) 0%, var(--navy) 100%);
-  border-radius: 0 0 16px 16px;
+  border-radius: 0 0 20px 20px;
   padding: 36px 44px;
   display: flex; align-items: center; justify-content: space-between;
   gap: 24px; flex-wrap: wrap; margin-bottom: 0;
@@ -314,7 +310,8 @@ const STYLES = `
 .ia-cta-action-title { font-family: 'Orbitron', monospace; font-size: 12px; font-weight: 700; color: #fff; margin-bottom: 4px; }
 .ia-cta-action-sub { font-family: 'Inter', sans-serif; font-size: 10px; color: rgba(255, 255, 255, 0.55); line-height: 1.45; }
 @media (max-width: 768px) {
-  .ia-cta { padding: 28px 20px; }
+  .ia { border-radius: 16px; }
+  .ia-cta { padding: 28px 20px; border-radius: 0 0 16px 16px; }
   .ia-panel-side { width: 100%; flex-direction: row; border-right: none; border-bottom: 1px solid var(--brd); }
   .ia-panel-side--right { border-left: none; border-top: 1px solid var(--brd); border-bottom: none; }
 }
@@ -584,7 +581,7 @@ const BENEFITS = [
 
 function Benefits() {
   return (
-    <section className="ia-sec" style={{ background: "var(--cream)" }}>
+    <section className="ia-sec">
       <div className="ia-wrap">
         <div className="ia-sec-head rev">Business Benefits</div>
         <div className="ia-benefits-grid">

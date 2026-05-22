@@ -11,10 +11,41 @@ const STYLES = `
     --acad:  #6a1f9a;
     --ind:   #e65100;
     --navy:  #0d2146;
-    --cream: #f8faff;
+    --cream: #f1f5f9;
     font-family: 'Inter', sans-serif;
-    background: var(--cream);
+    background: #fff;
     overflow-x: hidden;
+    overflow: hidden;
+    position: relative;
+    z-index: 1;
+    max-width: 1280px;
+    margin: 40px auto 48px;
+    border-radius: 20px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 8px 32px rgba(15, 23, 42, 0.1), 0 2px 8px rgba(15, 23, 42, 0.06);
+  }
+
+  .fp-sub {
+    position: relative;
+    overflow: hidden;
+    padding: 56px 0;
+  }
+
+  .fp-sub--media {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 56px;
+    padding-bottom: 56px;
+  }
+
+  @media (max-width: 768px) {
+    .fp {
+      margin: 24px 16px 32px;
+      border-radius: 16px;
+    }
+    .fp-sub, .fp-sub--media {
+      padding-top: 40px;
+      padding-bottom: 40px;
+    }
   }
 
   .fp .pulse { animation: fpPulse 2.2s ease-in-out infinite; }
@@ -548,7 +579,7 @@ function PartnersStrengthSection() {
   ];
 
   return (
-    <section style={{ background: "#f8faff", padding: "72px 0 0", position: "relative", overflow: "hidden" }}>
+    <section className="fp-sub" style={{ background: "#fff", position: "relative" }}>
       <Blobs colors={["#1a7a4a", "#1565c0", "#6a1f9a", "#e65100"]} />
       <div
         className="spin-slow"
@@ -890,7 +921,7 @@ function MediaSection() {
   };
 
   return (
-    <section id="media" style={{ background: "#f0f5ff", padding: "72px 0 0", position: "relative", overflow: "hidden" }}>
+    <section id="media" className="fp-sub fp-sub--media" style={{ background: "#fff", position: "relative" }}>
       <Blobs colors={["#0d2146", "#1565c0", "#1a7a4a", "#6a1f9a"]} />
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 32px", position: "relative", zIndex: 1 }}>
         <SectionHeader
@@ -1078,7 +1109,6 @@ function MediaSection() {
           ))}
         </div>
       </div>
-      <div style={{ height: 60 }} />
     </section>
   );
 }

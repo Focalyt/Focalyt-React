@@ -4361,18 +4361,35 @@ const HERO_TILES = [
 ];
 
 const FTLAAS_STYLES = `
-.ftl{font-family:'Orbitron',monospace;background:#f8fafc;color:#0f172a;overflow-x:hidden;}
+.ftl{
+  font-family:'Orbitron',monospace;
+  background:#fff;
+  color:#0f172a;
+  overflow-x:hidden;
+  position:relative;
+  z-index:1;
+  border-radius:20px;
+  border:1px solid #e2e8f0;
+  box-shadow:0 8px 32px rgba(15,23,42,.1),0 2px 8px rgba(15,23,42,.06);
+  padding:1.75rem 2rem 2rem;
+}
 .ftl *{box-sizing:border-box;margin:0;padding:0;}
 .ftl-hero,.ftl-card,.ftl-card-sm,.ftl-snap,.ftl-prog,.ftl-pchip{background:#fff;border:1px solid #e2e8f0;}
-.ftl-hero{border-radius:16px;padding:1.5rem;margin-bottom:1.25rem;}
+.ftl-hero{
+  border-radius:16px;
+  padding:1.5rem;
+  margin-bottom:1.25rem;
+  background:#fff;
+  box-shadow:0 2px 12px rgba(15,23,42,.05);
+}
 .ftl-badge{display:inline-flex;align-items:center;gap:5px;background:#dcfce7;color:#166534;font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;margin-bottom:.75rem;}
 .ftl-badge.college{background:#ede9fe;color:#4c1d95;}
 .ftl-hero-grid{display:grid;grid-template-columns:1fr auto;gap:1.5rem;align-items:center;}
 .ftl-h1{font-size:22px;font-weight:700;line-height:1.2;margin-bottom:.4rem;color:#0f172a;}
 .ftl-h1 span{color:#534AB7;}
-.ftl-sub{font-size:13px;color:#64748b;line-height:1.6;margin-bottom:.9rem;max-width:620px;}
+.ftl-sub{font-size:13px;color:#475569;line-height:1.65;margin-bottom:.9rem;max-width:620px;}
 .ftl-row{display:flex;gap:8px;flex-wrap:wrap;}
-.ftl-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;font-weight:500;color:#334155;}
+.ftl-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;font-weight:500;color:#1e293b;}
 .ftl-btn,.ftl-btn-lite{display:inline-flex;align-items:center;gap:5px;padding:9px 14px;border-radius:8px;font-family:'Orbitron',monospace;font-size:13px;cursor:pointer;transition:.2s;white-space:nowrap;}
 .ftl-btn{background:#534AB7;color:#fff;border:none;font-weight:600;}
 .ftl-btn:hover{background:#4338ca;transform:translateY(-1px);}
@@ -4380,7 +4397,7 @@ const FTLAAS_STYLES = `
 .ftl-btn-lite:hover{border-color:#534AB7;color:#534AB7;}
 .ftl-hex-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
 .ftl-hex{border:1px solid #e2e8f0;border-radius:12px;padding:10px 8px;text-align:center;}
-.ftl-hex-lbl{font-size:10px;font-weight:600;color:#64748b;margin-top:2px;}
+.ftl-hex-lbl{font-size:10px;font-weight:600;color:#475569;margin-top:2px;}
 .ftl-inst-tabs{display:flex;gap:8px;margin-bottom:1.25rem;}
 .ftl-inst-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;border:1px solid #e2e8f0;border-radius:12px;font-family:'Orbitron',monospace;font-size:13px;font-weight:600;color:#64748b;cursor:pointer;background:#fff;transition:all .15s;}
 .ftl-inst-tab.on{border-color:#534AB7;color:#534AB7;background:#f5f3ff;}
@@ -4397,7 +4414,7 @@ const FTLAAS_STYLES = `
 .ftl-ico{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .ftl-card-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 .ftl-card-h3{font-size:13px;font-weight:600;color:#0f172a;}
-.ftl-card-p,.ftl-list-item{font-size:12px;color:#64748b;line-height:1.55;}
+.ftl-card-p,.ftl-list-item{font-size:12px;color:#475569;line-height:1.55;}
 .ftl-list{display:flex;flex-direction:column;gap:5px;}
 .ftl-list-item{display:flex;align-items:flex-start;gap:8px;}
 .ftl-dot{width:5px;height:5px;border-radius:50%;background:#534AB7;flex-shrink:0;margin-top:7px;}
@@ -4420,8 +4437,8 @@ const FTLAAS_STYLES = `
 .ftl-prog{text-align:center;}
 .ftl-prog-label{font-size:11px;font-weight:600;color:#0f172a;margin-bottom:2px;}
 .ftl-prog-sub{font-size:10px;color:#64748b;line-height:1.3;}
-.ftl-ticker{display:flex;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:1.25rem;}
-.ftl-ticker-item{display:flex;align-items:center;gap:6px;padding:9px 12px;border-right:1px solid #e2e8f0;font-size:11px;color:#64748b;flex:1;justify-content:center;white-space:nowrap;}
+.ftl-ticker{display:flex;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:1.25rem;}
+.ftl-ticker-item{display:flex;align-items:center;gap:6px;padding:9px 12px;border-right:1px solid #e2e8f0;font-size:11px;color:#475569;flex:1;justify-content:center;white-space:nowrap;}
 .ftl-partner-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:7px;margin-bottom:1.25rem;}
 .ftl-pchip{display:flex;align-items:center;gap:8px;padding:8px 10px;}
 .ftl-pi{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;}
@@ -4431,7 +4448,7 @@ const FTLAAS_STYLES = `
 .ftl-cta-h{font-size:16px;font-weight:700;color:#fff;margin-bottom:3px;}
 .ftl-cta-sub{font-size:12px;color:#a8a0e8;}
 @media(max-width:1100px){.ftl-main-layout{grid-template-columns:1fr;}.ftl-snap{position:static;}.ftl-grid-6{grid-template-columns:repeat(3,1fr);}.ftl-hex-grid{grid-template-columns:repeat(2,1fr);}}
-@media(max-width:768px){.ftl-hero-grid{grid-template-columns:1fr;}.ftl-hex-grid{display:none;}.ftl-grid-2{grid-template-columns:1fr;}.ftl-grid-3{grid-template-columns:1fr 1fr;}.ftl-grid-6{grid-template-columns:repeat(2,1fr);}.ftl-inst-tabs{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;scrollbar-width:thin;scrollbar-color:#cbd5e1 transparent;padding-bottom:8px;margin-left:-12px;margin-right:-12px;padding-left:12px;padding-right:12px;}.ftl-inst-tabs::-webkit-scrollbar{height:4px;}.ftl-inst-tabs::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px;}.ftl-inst-tab{flex:0 0 auto;white-space:nowrap;scroll-snap-align:start;padding:11px 14px;font-size:12px;}.ftl-ticker{flex-wrap:wrap;}.ftl-ticker-item{flex:1 1 45%;border:none;border-bottom:1px solid #e2e8f0;}}
+@media(max-width:768px){.ftl{padding:1.25rem 1rem 1.5rem;border-radius:16px;}.ftl-hero-grid{grid-template-columns:1fr;}.ftl-hex-grid{display:none;}.ftl-grid-2{grid-template-columns:1fr;}.ftl-grid-3{grid-template-columns:1fr 1fr;}.ftl-grid-6{grid-template-columns:repeat(2,1fr);}.ftl-inst-tabs{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;scrollbar-width:thin;scrollbar-color:#cbd5e1 transparent;padding-bottom:8px;margin-left:-4px;margin-right:-4px;padding-left:4px;padding-right:4px;}.ftl-inst-tabs::-webkit-scrollbar{height:4px;}.ftl-inst-tabs::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px;}.ftl-inst-tab{flex:0 0 auto;white-space:nowrap;scroll-snap-align:start;padding:11px 14px;font-size:12px;}.ftl-ticker{flex-wrap:wrap;}.ftl-ticker-item{flex:1 1 45%;border:none;border-bottom:1px solid #e2e8f0;}}
 @media(max-width:480px){.ftl-grid-3{grid-template-columns:1fr;}.ftl-grid-6{grid-template-columns:1fr 1fr;}.ftl-process{grid-template-columns:1fr !important;}.ftl-step{border-right:none;border-bottom:1px solid #f1f5f9;}}
 `;
 
@@ -4553,7 +4570,7 @@ function FTLaaSSection() {
     ["process", "Our Process"],
     ["program", "Program Structure"],
     ["approach", "Our Approach"],
-    ["partners", "Partner Institutions"],
+    // ["partners", "Partner Institutions"],
   ];
 
   return (
@@ -4699,6 +4716,7 @@ function FTLaaSSection() {
           </>
         )}
 
+        {/* Partner Institutions — hidden for Schools & Colleges FTLaaS
         {subTab === "partners" && (
           <>
             <div className="ftl-sec-head">Partner institutions</div>
@@ -4716,6 +4734,7 @@ function FTLaaSSection() {
             </div>
           </>
         )}
+        */}
       </div>
     </>
   );
@@ -4738,17 +4757,21 @@ const GEOGRAPHIC_COVERAGE_STYLES = `
 .gc-reach-text{font-size:13px;font-weight:700;color:var(--teal);line-height:1.4;}
 .gc-hero-grid{display:grid;grid-template-columns:1fr 1.1fr;align-items:end;}
 .gc-hero-left{padding-bottom:48px;}
-.gc-map-wrap{position:relative;width:100%;aspect-ratio:1/1.05;max-width:580px;margin:0 auto;}
-.gc-map-svg{width:100%;height:100%;filter:drop-shadow(0 24px 48px rgba(10,34,64,.15));}
-.gc-state{cursor:pointer;transition:filter .2s,opacity .2s;}
-.gc-state:hover{filter:brightness(1.1);opacity:.9;}
-.gc-state-active{filter:brightness(1.15) saturate(1.2);}
-.gc-pin{cursor:pointer;transition:transform .2s;transform-origin:center bottom;}
-.gc-pin:hover{transform:scale(1.2);}
-.gc-map-badge{position:absolute;top:16px;right:0;background:var(--navy);color:#fff;border-radius:12px;padding:14px 18px;max-width:200px;box-shadow:0 8px 24px rgba(10,34,64,.2);}
-.gc-map-badge-ico{font-size:22px;margin-bottom:6px;}
-.gc-map-badge-title{font-size:13px;font-weight:700;line-height:1.3;margin-bottom:4px;}
-.gc-map-badge-sub{font-size:11px;color:rgba(255,255,255,.6);}
+.gc-map-wrap{position:relative;width:100%;max-width:580px;margin:0 auto;}
+.gc-map-leaflet-wrap{position:relative;border-radius:16px;overflow:hidden;border:1px solid var(--brd);background:#e8f4ff;box-shadow:0 24px 48px rgba(10,34,64,.15);}
+.gc-map-leaflet{width:100%;height:min(52vh,480px);min-height:320px;z-index:0;}
+.gc-leaflet-pin-wrap{background:transparent!important;border:none!important;}
+.gc-leaflet-pin{position:relative;width:36px;height:36px;display:flex;align-items:center;justify-content:center;}
+.gc-leaflet-pin-dot{width:14px;height:14px;border-radius:50%;background:#0e7c6b;border:2px solid #fff;box-shadow:0 2px 12px rgba(10,34,64,.35);position:relative;z-index:2;transition:transform .2s,background .2s;}
+.gc-leaflet-pin-ring{position:absolute;inset:0;margin:auto;width:28px;height:28px;border-radius:50%;border:2px solid rgba(14,124,107,.45);animation:gcMapRing 2.5s ease-out infinite;}
+.gc-leaflet-pin-active .gc-leaflet-pin-dot{background:#16a34a;transform:scale(1.15);}
+.gc-leaflet-pin-active .gc-leaflet-pin-ring{border-color:rgba(22,163,74,.55);}
+@keyframes gcMapRing{0%{transform:scale(.55);opacity:.75;}100%{transform:scale(2.1);opacity:0;}}
+.leaflet-container.gc-map-leaflet{font-family:'Inter',sans-serif;}
+.leaflet-container.gc-map-leaflet .leaflet-control-container{display:none;}
+.leaflet-popup-content-wrapper{border-radius:12px!important;border:1px solid var(--brd)!important;box-shadow:0 12px 32px rgba(10,34,64,.12)!important;}
+.gc-state-row-interactive{cursor:pointer;border-radius:6px;padding:4px 6px;margin:-4px -6px;transition:background .2s;}
+.gc-state-row-interactive:hover,.gc-state-row-active{background:rgba(14,124,107,.08);}
 .gc-inline-card{background:#fff;border:1px solid var(--brd);border-radius:12px;padding:20px 24px;max-width:480px;}
 .gc-inline-title{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--teal);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
 .gc-state-list{display:grid;grid-template-columns:repeat(3,1fr);gap:6px 10px;}
@@ -4791,12 +4814,36 @@ const GEOGRAPHIC_COVERAGE_STYLES = `
 .gc-cta-sub{font-family:'Inter',sans-serif;font-size:13px;color:rgba(255,255,255,.65);max-width:480px;line-height:1.6;}
 .gc-cta-btn{display:inline-flex;align-items:center;gap:8px;padding:13px 28px;background:#fff;color:var(--navy);border:none;border-radius:8px;font-size:12px;font-weight:700;letter-spacing:.5px;white-space:nowrap;text-decoration:none;transition:.2s;}
 .gc-cta-btn:hover{background:#e8f4f0;transform:translateY(-1px);}
-@media(max-width:1100px){.gc-hero-grid{grid-template-columns:1fr;}.gc-hero-right{display:none;}.gc-reach-grid{grid-template-columns:repeat(4,1fr);}.gc-quote-banner{grid-template-columns:1fr;}.gc-state-list{grid-template-columns:repeat(3,1fr);}.gc-enables-wrap{grid-template-columns:1fr;}.gc-presence-right{display:grid;grid-template-columns:repeat(2,1fr);}}
-@media(max-width:768px){.gc-cont{padding:0 20px;}.gc-enables-grid{grid-template-columns:1fr 1fr;}.gc-reach-grid{grid-template-columns:repeat(2,1fr);}.gc-state-list{grid-template-columns:1fr 1fr;}.gc-h1{font-size:clamp(22px,6vw,36px);}.gc-h1-sub{font-size:clamp(20px,5.5vw,32px);}.gc-presence-right{grid-template-columns:1fr;}}
+@media(max-width:1100px){.gc-hero-grid{grid-template-columns:1fr;gap:32px;}.gc-hero-left{padding-bottom:0;}.gc-map-wrap{max-width:100%;}.gc-reach-grid{grid-template-columns:repeat(4,1fr);}.gc-quote-banner{grid-template-columns:1fr;}.gc-state-list{grid-template-columns:repeat(3,1fr);}.gc-enables-wrap{grid-template-columns:1fr;}.gc-presence-right{display:grid;grid-template-columns:repeat(2,1fr);}}
+@media(max-width:768px){.gc-cont{padding:0 20px;}.gc-map-leaflet{height:min(48vh,400px);min-height:280px;}.gc-enables-grid{grid-template-columns:1fr 1fr;}.gc-reach-grid{grid-template-columns:repeat(2,1fr);}.gc-state-list{grid-template-columns:1fr 1fr;}.gc-h1{font-size:clamp(22px,6vw,36px);}.gc-h1-sub{font-size:clamp(20px,5.5vw,32px);}.gc-presence-right{grid-template-columns:1fr;}}
 @media(max-width:480px){.gc-enables-grid{grid-template-columns:1fr;}.gc-state-list{grid-template-columns:1fr;}.gc-bottom-cta,.gc-quote-banner{padding:24px 20px;}.gc-cta-left{align-items:flex-start;}}
 `;
 
-const GC_STATES = ["Punjab", "Haryana", "Himachal Pradesh", "Uttar Pradesh", "Uttarakhand", "Rajasthan", "Odisha", "Tamil Nadu", "Chhattisgarh", "Gujarat", "Andhra Pradesh", "...and more"];
+/** Focalyt presence — lat/lng at state hubs for Leaflet map */
+const GC_WORK_LOCATIONS = [
+  { id: "PB", label: "Punjab", sub: "Skilling & institutional outreach", lat: 31.1471, lng: 75.3412 },
+  { id: "HR", label: "Haryana", sub: "NCR-adjacent programmes", lat: 29.0588, lng: 76.0856 },
+  { id: "HP", label: "Himachal Pradesh", sub: "Hospitality & tourism skilling", lat: 31.1048, lng: 77.1734 },
+  { id: "UP", label: "Uttar Pradesh", sub: "Ghaziabad · NCR skilling & outreach", lat: 26.8467, lng: 80.9462 },
+  { id: "UK", label: "Uttarakhand", sub: "Rural & tribal development programmes", lat: 30.3165, lng: 78.0322 },
+  { id: "RJ", label: "Rajasthan", sub: "State-wide mobilisation & training", lat: 26.9124, lng: 75.7873 },
+  { id: "GJ", label: "Gujarat", sub: "Industry & campus partnerships", lat: 23.0225, lng: 72.5714 },
+  { id: "CG", label: "Chhattisgarh", sub: "CSR & community skilling", lat: 21.2514, lng: 81.6296 },
+  { id: "OD", label: "Odisha", sub: "Government & sector programmes", lat: 20.2961, lng: 85.8245 },
+  { id: "AP", label: "Andhra Pradesh", sub: "Future-tech & placement tracks", lat: 16.5062, lng: 80.648 },
+  { id: "TN", label: "Tamil Nadu", sub: "Manufacturing & services corridors", lat: 13.0827, lng: 80.2707 },
+];
+
+const GC_INDIA_BOUNDS = L.latLngBounds(L.latLng(5.8, 68.2), L.latLng(37.1, 97.4));
+
+function makeGcMapIcon(active) {
+  return L.divIcon({
+    className: "gc-leaflet-pin-wrap",
+    html: `<div class="gc-leaflet-pin${active ? " gc-leaflet-pin-active" : ""}"><span class="gc-leaflet-pin-dot"></span><span class="gc-leaflet-pin-ring"></span></div>`,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+  });
+}
 
 const GC_REACH_MODEL = [
   { ico: "👥", label: "Local Mobilisation Teams" },
@@ -4824,56 +4871,130 @@ const GC_PSTATS = [
   { ico: "📈", bg: "rgba(249,115,22,.10)", title: "Scalable Solutions", sub: "Sustainable Change" },
 ];
 
-const GC_MAP_STATES = [
-  { id: "HP", name: "Himachal Pradesh", col: "#5a9e8c", d: "M 310 68 L 350 55 L 410 62 L 435 80 L 420 110 L 390 125 L 355 115 L 320 100 Z", pin: [375, 72] },
-  { id: "PB", name: "Punjab", col: "#4a8a7a", d: "M 255 100 L 310 68 L 355 115 L 340 140 L 295 145 L 260 130 Z", pin: [295, 108] },
-  { id: "HR", name: "Haryana", col: "#5a9e8c", d: "M 295 145 L 340 140 L 370 160 L 365 185 L 320 195 L 285 175 Z", pin: [325, 165] },
-  { id: "UK", name: "Uttarakhand", col: "#4a8a7a", d: "M 370 160 L 435 80 L 480 110 L 470 155 L 430 165 L 390 175 L 365 185 Z", pin: [415, 130] },
-  { id: "RJ", name: "Rajasthan", col: "#7ab8a8", d: "M 200 175 L 260 130 L 295 145 L 285 175 L 320 195 L 305 250 L 270 295 L 220 310 L 185 280 L 175 240 Z", pin: [240, 240] },
-  { id: "UP", name: "Uttar Pradesh", col: "#5a9e8c", d: "M 320 195 L 365 185 L 390 175 L 430 165 L 470 155 L 495 195 L 480 245 L 440 260 L 390 265 L 345 255 L 305 250 Z", pin: [400, 220] },
-  { id: "GJ", name: "Gujarat", col: "#8ecbbf", d: "M 130 290 L 185 280 L 220 310 L 215 345 L 185 370 L 145 360 L 120 330 Z", pin: [165, 325] },
-  { id: "CG", name: "Chhattisgarh", col: "#4a8a7a", d: "M 390 265 L 440 260 L 480 290 L 475 345 L 440 370 L 395 365 L 360 335 L 358 295 Z", pin: [415, 315] },
-  { id: "OD", name: "Odisha", col: "#5a9e8c", d: "M 480 290 L 530 280 L 555 315 L 545 360 L 510 380 L 475 345 Z", pin: [510, 330] },
-  { id: "AP", name: "Andhra Pradesh", col: "#7ab8a8", d: "M 360 390 L 440 370 L 475 345 L 510 380 L 505 430 L 475 455 L 430 460 L 390 440 L 355 415 Z", pin: [430, 415] },
-  { id: "TN", name: "Tamil Nadu", col: "#4a8a7a", d: "M 355 415 L 390 440 L 430 460 L 420 505 L 390 530 L 360 520 L 340 480 L 338 450 Z", pin: [380, 475] },
-];
+function GeographicCoverageLeafletMap({ activeState, onStateHover }) {
+  const wrapRef = useRef(null);
+  const elRef = useRef(null);
+  const mapRef = useRef(null);
+  const markersRef = useRef([]);
 
-function GeographicCoverageMap({ activeState, onStateHover }) {
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    const el = elRef.current;
+    if (!wrap || !el) return undefined;
+
+    const destroyMap = () => {
+      if (mapRef.current) {
+        try {
+          mapRef.current.remove();
+        } catch {
+          /* already detached */
+        }
+        mapRef.current = null;
+      }
+      markersRef.current = [];
+    };
+
+    let io;
+    let started = false;
+    let resizeHandler;
+
+    const initMap = () => {
+      if (started || mapRef.current) return;
+      started = true;
+
+      const map = L.map(el, {
+        scrollWheelZoom: false,
+        zoomControl: false,
+        attributionControl: false,
+        worldCopyJump: false,
+        maxBounds: GC_INDIA_BOUNDS,
+        maxBoundsViscosity: 1.0,
+        center: [22.5, 80.0],
+        zoom: 5,
+      });
+
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        subdomains: "abcd",
+        maxZoom: 19,
+        noWrap: true,
+      }).addTo(map);
+
+      markersRef.current = GC_WORK_LOCATIONS.map((loc) => {
+        const marker = L.marker([loc.lat, loc.lng], { icon: makeGcMapIcon(activeState === loc.id) }).addTo(map);
+        marker.bindPopup(
+          `<strong style="font-family:'Orbitron',monospace;font-size:13px;color:#0a2240">${loc.label}</strong><br/><span style="font-size:12px;color:#2d4a6e">${loc.sub}</span>`
+        );
+        marker.on("mouseover", () => onStateHover?.(loc.id));
+        marker.on("mouseout", () => onStateHover?.(null));
+        marker.on("click", () => marker.openPopup());
+        return { marker, loc };
+      });
+
+      const fitFullIndia = () => {
+        const size = map.getSize();
+        const w = el.clientWidth || size.x || 800;
+        const h = el.clientHeight || size.y || 320;
+        const aspect = w / Math.max(h, 1);
+        const padCornerY = Math.min(120, Math.max(48, Math.round(h * 0.22)));
+        const padCornerX = Math.min(72, Math.max(24, Math.round(20 + aspect * 5)));
+        map.fitBounds(GC_INDIA_BOUNDS, {
+          paddingTopLeft: [padCornerX, padCornerY],
+          paddingBottomRight: [padCornerX, padCornerY],
+          animate: false,
+        });
+        const floor = 4;
+        if (map.getZoom() > floor) map.setZoom(floor);
+        map.setMinZoom(Math.max(map.getZoom() - 1, floor));
+        map.setMaxZoom(10);
+        map.panInsideBounds(GC_INDIA_BOUNDS, { animate: false });
+      };
+
+      fitFullIndia();
+      requestAnimationFrame(() => {
+        map.invalidateSize();
+        requestAnimationFrame(() => {
+          map.invalidateSize();
+          fitFullIndia();
+        });
+      });
+
+      mapRef.current = map;
+      resizeHandler = () => {
+        map.invalidateSize();
+        fitFullIndia();
+      };
+      window.addEventListener("resize", resizeHandler);
+    };
+
+    io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          initMap();
+          io?.disconnect();
+        }
+      },
+      { rootMargin: "120px 0px", threshold: 0.05 }
+    );
+    io.observe(wrap);
+
+    return () => {
+      io?.disconnect();
+      if (resizeHandler) window.removeEventListener("resize", resizeHandler);
+      destroyMap();
+    };
+  }, [onStateHover]);
+
+  useEffect(() => {
+    markersRef.current.forEach(({ marker, loc }) => {
+      marker.setIcon(makeGcMapIcon(activeState === loc.id));
+    });
+  }, [activeState]);
+
   return (
-    <svg viewBox="0 0 700 580" className="gc-map-svg" xmlns="http://www.w3.org/2000/svg" aria-label="India map showing Focalyt presence">
-      <rect width="700" height="580" fill="#e8f4ff" rx="16" />
-      <ellipse cx="380" cy="300" rx="230" ry="260" fill="rgba(200,220,240,.35)" />
-      {GC_MAP_STATES.map((state) => (
-        <g key={state.id}>
-          <path
-            d={state.d}
-            fill={activeState === state.id ? "#0a2240" : state.col}
-            stroke="#fff"
-            strokeWidth="1.5"
-            className={`gc-state${activeState === state.id ? " gc-state-active" : ""}`}
-            onMouseEnter={() => onStateHover(state.id)}
-            onMouseLeave={() => onStateHover(null)}
-          />
-          <text x={state.pin[0]} y={state.pin[1] - 12} textAnchor="middle" fill={activeState === state.id ? "#fff" : "#0a2240"} fontSize="8" fontFamily="Orbitron,monospace" fontWeight="600" pointerEvents="none">
-            {state.name}
-          </text>
-          <g className="gc-pin" onMouseEnter={() => onStateHover(state.id)} onMouseLeave={() => onStateHover(null)}>
-            <circle cx={state.pin[0]} cy={state.pin[1]} r="7" fill={activeState === state.id ? "#16a34a" : "#0a2240"} />
-            <circle cx={state.pin[0]} cy={state.pin[1]} r="3" fill="#fff" />
-            {activeState === state.id && (
-              <circle cx={state.pin[0]} cy={state.pin[1]} r="12" fill="none" stroke="#16a34a" strokeWidth="1.5" opacity=".5">
-                <animate attributeName="r" from="7" to="16" dur=".6s" repeatCount="indefinite" />
-                <animate attributeName="opacity" from=".5" to="0" dur=".6s" repeatCount="indefinite" />
-              </circle>
-            )}
-          </g>
-        </g>
-      ))}
-      <path d="M 260 130 L 255 100 L 230 110 L 215 145 L 200 175 L 175 240 L 185 280 L 130 290 L 120 330 L 145 360 L 185 370 L 215 345 L 220 310 L 270 295 L 305 250 L 345 255 L 358 295 L 360 335 L 395 365 L 360 390 L 338 450 L 340 480 L 360 520 L 390 530 L 420 505 L 430 460 L 475 455 L 505 430 L 510 380 L 545 360 L 555 315 L 530 280 L 480 290 L 495 195 L 470 155 L 480 110 L 435 80 L 410 62 L 350 55 L 310 68 Z" fill="none" stroke="rgba(10,34,64,.12)" strokeWidth="1" pointerEvents="none" />
-      {[[580, 180], [600, 280], [615, 360], [590, 420], [570, 470]].map(([x, y]) => <circle key={`${x}-${y}`} cx={x} cy={y} r="3" fill="rgba(14,124,107,.25)" />)}
-      <path d="M 590 150 Q 620 160 610 185" stroke="rgba(14,124,107,.4)" strokeWidth="1.5" fill="none" strokeDasharray="4 3" />
-      <polygon points="606,185 614,188 614,180" fill="rgba(14,124,107,.4)" />
-    </svg>
+    <div ref={wrapRef} className="gc-map-leaflet-wrap">
+      <div ref={elRef} className="gc-map-leaflet" aria-label="Map of India showing Focalyt presence locations" role="img" />
+    </div>
   );
 }
 
@@ -4896,19 +5017,30 @@ function GeographicCoverageSection() {
                 <div className="gc-inline-card">
                   <div className="gc-inline-title"><span>📍</span> Our presence across states</div>
                   <div className="gc-state-list">
-                    {GC_STATES.map((state) => <div key={state} className="gc-state-row"><span className="gc-state-dot" />{state}</div>)}
+                    {GC_WORK_LOCATIONS.map((loc) => (
+                      <div
+                        key={loc.id}
+                        className={`gc-state-row gc-state-row-interactive${hoveredState === loc.id ? " gc-state-row-active" : ""}`}
+                        onMouseEnter={() => setHoveredState(loc.id)}
+                        onMouseLeave={() => setHoveredState(null)}
+                        onFocus={() => setHoveredState(loc.id)}
+                        onBlur={() => setHoveredState(null)}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`Highlight ${loc.label} on map`}
+                      >
+                        <span className="gc-state-dot" />
+                        {loc.label}
+                      </div>
+                    ))}
+                    <div className="gc-state-row"><span className="gc-state-dot" />…and more</div>
                   </div>
                   <div className="gc-commit"><span style={{ fontSize: 18 }}>🌐</span><span>We are committed to reaching every region, <strong style={{ color: "var(--navy)" }}>empowering communities everywhere.</strong></span></div>
                 </div>
               </div>
               <div className="gc-hero-right">
                 <div className="gc-map-wrap">
-                  <GeographicCoverageMap activeState={hoveredState} onStateHover={setHoveredState} />
-                  <div className="gc-map-badge">
-                    <div className="gc-map-badge-ico">🌐</div>
-                    <div className="gc-map-badge-title">Wherever the need exists,<br /><span style={{ color: "#4dd9c7" }}>Focalyt is there!</span></div>
-                    <div className="gc-map-badge-sub">No boundaries. Only impact.</div>
-                  </div>
+                  <GeographicCoverageLeafletMap activeState={hoveredState} onStateHover={setHoveredState} />
                 </div>
               </div>
             </div>
@@ -4983,20 +5115,6 @@ const MARQUEE = [
 ];
 
 const SIC_PARTNERS = ["Chandigarh University", "Amity University", "Central University of Haryana", "Lovely Professional University", "SGT University", "Rayat-Bahra University", "APIIT SD India", "G.M.N. College Ambala", "SIET Nilokheri", "MRSPTU"];
-
-/** Regions shown on home geographic map (aligned with pan-India / partner footprint). */
-const WORK_LOCATIONS = [
-  { id: "ncr", label: "NCR & Uttar Pradesh", sub: "Ghaziabad · NCR skilling & outreach", lat: 28.6692, lng: 77.4538 },
-  { id: "uk", label: "Uttarakhand", sub: "Rural & tribal development programmes", lat: 30.3165, lng: 78.0322 },
-  { id: "hp", label: "Himachal Pradesh", sub: "Hospitality & tourism skilling", lat: 31.1048, lng: 77.1734 },
-  { id: "blr", label: "Karnataka", sub: "Industry & campus partnerships", lat: 12.9716, lng: 77.5946 },
-  { id: "mum", label: "Maharashtra", sub: "Corporate & institutional networks", lat: 19.076, lng: 72.8777 },
-  { id: "hyd", label: "Telangana", sub: "TSSC-aligned future-tech tracks", lat: 17.385, lng: 78.4867 },
-  { id: "chn", label: "Tamil Nadu", sub: "Manufacturing & services corridors", lat: 13.0827, lng: 80.2707 },
-];
-
-/** Leaflet view clamp — India only. Tighter SW/NE so frame stays subcontinental (not Middle East / SE Asia). */
-const INDIA_MAX_BOUNDS = L.latLngBounds(L.latLng(5.8, 68.2), L.latLng(37.1, 97.4));
 
 /** Partner-with-us section — narrative aligned with company profile / pillars on site. */
 const PARTNER_PROFILE_HIGHLIGHTS = [
@@ -5109,9 +5227,6 @@ export default function HomePage() {
   const jobCarouselRef = useRef(null);
   const eventsCarouselRef = useRef(null);
   const expiredEventsCarouselRef = useRef(null);
-  const indiaMapSectionRef = useRef(null);
-  const indiaMapElRef = useRef(null);
-  const indiaLeafletMapRef = useRef(null);
   const [activeFilter, setActiveFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [feeFilter, setFeeFilter] = useState("all");
@@ -5358,127 +5473,6 @@ export default function HomePage() {
       if (videoModal) {
         videoModal.removeEventListener("hidden.bs.modal", () => setVideoSrc(""));
       }
-    };
-  }, []);
-
-  useEffect(() => {
-    const wrap = indiaMapSectionRef.current;
-    const el = indiaMapElRef.current;
-    if (!wrap || !el) return undefined;
-
-    const destroyMap = () => {
-      if (indiaLeafletMapRef.current) {
-        try {
-          indiaLeafletMapRef.current.remove();
-        } catch {
-          /* map already detached */
-        }
-        indiaLeafletMapRef.current = null;
-      }
-    };
-
-    let io;
-    let started = false;
-    let resizeHandler;
-
-    const initMap = () => {
-      if (started || indiaLeafletMapRef.current) return;
-      started = true;
-
-      const map = L.map(el, {
-        scrollWheelZoom: false,
-        zoomControl: false,
-        attributionControl: false,
-        worldCopyJump: false,
-        maxBounds: INDIA_MAX_BOUNDS,
-        maxBoundsViscosity: 1.0,
-        center: [22.5, 80.0],
-        zoom: 5,
-      });
-
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-        attribution: "",
-        subdomains: "abcd",
-        maxZoom: 19,
-        noWrap: true,
-      }).addTo(map);
-
-      const markers = WORK_LOCATIONS.map((loc, i) => {
-        const icon = L.divIcon({
-          className: "foc-leaflet-pin-wrap",
-          html: `<div className="foc-leaflet-pin" style="animation-delay:${i * 0.12}s"><span className="foc-leaflet-pin-dot"></span><span className="foc-leaflet-pin-ring" style="animation-delay:${i * 0.12}s"></span></div>`,
-          iconSize: [36, 36],
-          iconAnchor: [18, 18],
-        });
-        const m = L.marker([loc.lat, loc.lng], { icon }).addTo(map);
-        m.bindPopup(
-          `<strong style="font-family:'Orbitron',monospace;font-size:13px">${loc.label}</strong><br/><span style="font-size:12px;opacity:.9">${loc.sub}</span>`
-        );
-        return m;
-      });
-
-      const fitFullIndia = () => {
-        const size = map.getSize();
-        const w = el.clientWidth || size.x || 800;
-        const h = el.clientHeight || size.y || 320;
-        const aspect = w / Math.max(h, 1);
-        /* Wide + short viewports need large vertical padding so fitBounds picks a lower zoom (full N–S India). */
-        const padCornerY = Math.min(120, Math.max(48, Math.round(h * 0.22)));
-        const padCornerX = Math.min(72, Math.max(24, Math.round(20 + aspect * 5)));
-        map.fitBounds(INDIA_MAX_BOUNDS, {
-          paddingTopLeft: [padCornerX, padCornerY],
-          paddingBottomRight: [padCornerX, padCornerY],
-          animate: false,
-        });
-        const floor = 3;
-        let z = map.getZoom();
-        if (z > floor) {
-          map.setZoom(z - 1);
-        }
-        if (aspect > 2.4 && map.getZoom() > floor) {
-          map.setZoom(map.getZoom() - 1);
-        }
-        map.setMinZoom(Math.max(map.getZoom() - 1, floor));
-        map.setMaxZoom(12);
-        map.panInsideBounds(INDIA_MAX_BOUNDS, { animate: false });
-      };
-
-      fitFullIndia();
-
-      requestAnimationFrame(() => {
-        map.invalidateSize();
-        requestAnimationFrame(() => {
-          map.invalidateSize();
-          fitFullIndia();
-        });
-      });
-
-      indiaLeafletMapRef.current = map;
-
-      resizeHandler = () => {
-        map.invalidateSize();
-        fitFullIndia();
-      };
-      window.addEventListener("resize", resizeHandler);
-    };
-
-    io = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          initMap();
-          io?.disconnect();
-        }
-      },
-      { rootMargin: "120px 0px", threshold: 0.05 }
-    );
-    io.observe(wrap);
-
-    return () => {
-      io?.disconnect();
-      if (resizeHandler) {
-        window.removeEventListener("resize", resizeHandler);
-      }
-      destroyMap();
     };
   }, []);
 

@@ -37,27 +37,128 @@ const STYLES = `
   .oa .oa-subtitle { color: #5a6680; font-family: 'Inter', sans-serif; font-size: clamp(14px, 1.5vw, 17px); line-height: 1.75; margin: 0 auto 36px; }
 
   .oa .oa-tabs {
-    display: flex; gap: 10px; overflow-x: auto; padding: 6px 4px 14px;
-    margin-bottom: 32px; scrollbar-width: thin;
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin: 0 0 28px;
+    padding: 0;
+    list-style: none;
+    border-bottom: 2px solid #e8edf5;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
   }
-  .oa .oa-tabs::-webkit-scrollbar { height: 5px; }
-  .oa .oa-tabs::-webkit-scrollbar-thumb { background: #c8d4e8; border-radius: 4px; }
+  .oa .oa-tabs::-webkit-scrollbar { display: none; }
 
   .oa .oa-tab {
-    flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
-    padding: 12px 20px; border-radius: 50px; border: 2px solid #dce4f5;
-    background: #fff; color: #4a5568; font-weight: 700; font-size: 13px;
-    cursor: pointer; transition: all 0.25s ease; white-space: nowrap;
-    font-family: 'Orbitron', monospace;
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 5px;
+    padding: 0 4px 12px;
+    margin: 0;
+    border: none;
+    background: transparent;
+    appearance: none;
+    -webkit-appearance: none;
+    box-shadow: none;
+    cursor: default;
+    position: relative;
+    color: #64748b;
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.25;
+    text-align: center;
+    transition: color 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
   }
-  .oa .oa-tab:hover { transform: translateY(-2px); border-color: #b0c4de; }
-  .oa .oa-tab.active {
-    background: linear-gradient(135deg, var(--navy), #163972);
-    color: #fff; border-color: var(--navy);
-    box-shadow: 0 8px 24px rgba(13,33,70,0.22);
+  .oa .oa-tab::after {
+    content: '';
+    position: absolute;
+    left: 20%;
+    right: 20%;
+    bottom: -2px;
+    height: 3px;
+    border-radius: 3px 3px 0 0;
+    background: transparent;
+    transition: left 0.2s ease, right 0.2s ease, background 0.2s ease;
   }
-  .oa .oa-tab-ico { font-size: 18px; }
+  .oa .oa-tab:hover { color: #334155; cursor: pointer; }
+  .oa .oa-tab[aria-selected="true"] {
+    color: var(--tab-accent, #1a7a4a);
+    font-weight: 700;
+    cursor: default;
+  }
+  .oa .oa-tab[aria-selected="true"]::after {
+    left: 10%;
+    right: 10%;
+    background: var(--tab-accent, #1a7a4a);
+  }
+  .oa .oa-tab:focus { outline: none; }
+  .oa .oa-tab:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--tab-accent, #1a7a4a) 55%, #94a3b8);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  .oa .oa-tab-ico {
+    display: block;
+    font-size: 22px;
+    line-height: 1;
+    opacity: 0.5;
+    filter: grayscale(0.15);
+    transition: opacity 0.2s ease, transform 0.2s ease, filter 0.2s ease;
+    pointer-events: none;
+  }
+  .oa .oa-tab:hover .oa-tab-ico { opacity: 0.72; }
+  .oa .oa-tab[aria-selected="true"] .oa-tab-ico {
+    opacity: 1;
+    filter: none;
+    transform: scale(1.06);
+  }
+
+  .oa .oa-tab-label {
+    display: block;
+    max-width: 100%;
+    padding: 0 2px;
+    word-break: break-word;
+    hyphens: auto;
+    pointer-events: none;
+  }
+
+  .oa .oa-tabpanel {
+    margin: 0;
+    padding: 0;
+    border: none;
+    animation: oaFadeIn 0.4s ease;
+  }
+
+  @media (min-width: 1100px) {
+    .oa .oa-tab { font-size: 10.5px; padding: 0 6px 14px; }
+    .oa .oa-tab-ico { font-size: 24px; }
+  }
+
+  @media (max-width: 900px) {
+    .oa .oa-tabs {
+      gap: 0;
+      margin-bottom: 22px;
+      mask-image: linear-gradient(90deg, #000 92%, transparent 100%);
+      -webkit-mask-image: linear-gradient(90deg, #000 92%, transparent 100%);
+    }
+    .oa .oa-tab {
+      flex: 0 0 auto;
+      min-width: 76px;
+      max-width: 94px;
+      padding: 0 2px 10px;
+      font-size: 9px;
+    }
+    .oa .oa-tab-ico { font-size: 20px; }
+  }
 
   .oa .oa-panel {
     background: #fff; border-radius: 24px; border: 2px solid #e4ebf8;
@@ -796,22 +897,38 @@ export default function OurApproachSection() {
 
         <div className="oa-wrap">
           <div className="oa-tabs" role="tablist" aria-label="Our Approach pillars">
-            {PILLARS.map((p, i) => (
-              <button
-                key={p.id}
-                type="button"
-                role="tab"
-                aria-selected={active === i}
-                className={`oa-tab${active === i ? " active" : ""}`}
-                onClick={() => setActive(i)}
-              >
-                <span className="oa-tab-ico">{p.emoji}</span>
-                {p.label}
-              </button>
-            ))}
+            {PILLARS.map((p, i) => {
+              const tabId = `oa-tab-${p.id}`;
+              const panelId = `oa-panel-${p.id}`;
+              const isSelected = active === i;
+              return (
+                <button
+                  key={p.id}
+                  id={tabId}
+                  type="button"
+                  role="tab"
+                  aria-selected={isSelected}
+                  aria-controls={panelId}
+                  tabIndex={isSelected ? 0 : -1}
+                  className="oa-tab"
+                  style={{ "--tab-accent": p.color }}
+                  onClick={() => setActive(i)}
+                >
+                  <span className="oa-tab-ico" aria-hidden>{p.emoji}</span>
+                  <span className="oa-tab-label">{p.label}</span>
+                </button>
+              );
+            })}
           </div>
 
-          <PillarPanel pillar={pillar} />
+          <div
+            role="tabpanel"
+            id={`oa-panel-${pillar.id}`}
+            aria-labelledby={`oa-tab-${pillar.id}`}
+            className="oa-tabpanel"
+          >
+            <PillarPanel pillar={pillar} />
+          </div>
         </div>
       </section>
 
