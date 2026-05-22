@@ -973,38 +973,36 @@ router.get('/b2b-users', isCollege, async (req, res) => {
       }))
     });
 
-    const isRequestingAdmin = user.permissions?.permission_type === 'Admin';
-
-    // Non-admin: only counsellors in reporting-manager hierarchy (my_team tree)
-    let teamIdSet = null;
-    if (!isRequestingAdmin) {
-      const teamMemberIds = await getAllTeamMembers(user._id);
-      teamIdSet = new Set(teamMemberIds.map((id) => String(id)));
-    }
-
-    // Filter: B2B-enabled users; managers see their team only, Admin sees all
+    // Filter: Users with can_view_leads_b2b permission OR Admin users
     const finalUsers = allConcernPersons
-      .filter((u) => {
+      .filter(u => {
         const hasPermission = u.permissions?.custom_permissions?.can_view_leads_b2b || false;
-        const isUserAdmin = u.permissions?.permission_type === 'Admin';
-        if (!hasPermission && !isUserAdmin) return false;
-        if (isRequestingAdmin) return true;
-        return teamIdSet.has(String(u._id));
+        const isAdmin = u.permissions?.permission_type === 'Admin';
+        return hasPermission || isAdmin;
       })
-      .map((u) => ({
+      .map(u => ({
         _id: u._id,
         name: u.name
-      }))
-      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      }));
 
-    console.log('✅ [BACKEND] B2B users for dropdown:', {
-      scope: isRequestingAdmin ? 'all' : 'team',
-      total: finalUsers.length
+    console.log('✅ [BACKEND] Filtered Users (can_view_leads_b2b OR Admin):', {
+      total: finalUsers.length,
+      users: finalUsers.map(u => ({
+        id: u._id.toString(),
+        name: u.name
+      }))
+    });
+
+    console.log('📊 [BACKEND] Final Users List:', {
+      total: finalUsers.length,
+      users: finalUsers.map(u => ({
+        id: u._id.toString(),
+        name: u.name
+      }))
     });
 
     res.status(200).json({
       success: true,
-      scope: isRequestingAdmin ? 'all' : 'team',
       data: finalUsers
     });
 

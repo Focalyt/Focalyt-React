@@ -82,19 +82,20 @@ function getLeadSubStatusTitle(lead) {
   return pickFirstNonEmpty(found?.title, found?.name);
 }
 
-function resolveLeadStatusId(lead) {
-  const s = lead?.status ?? lead?._leadStatus;
-  if (!s) return '';
-  if (typeof s === 'string') return s;
-  return s._id || '';
+function getLeadB2bProjectName(lead) {
+  return pickFirstNonEmpty(
+    lead?.b2bProject?.name,
+    lead?.typeOfB2B?.department?.project?.name,
+    ''
+  ) || '—';
 }
 
-function resolveLeadSubStatusObject(lead) {
-  const subId = lead?.subStatus?._id || lead?.subStatus || lead?._leadSubStatus;
-  if (!subId) return lead?.selectedSubstatus || null;
-  const list = lead?.status?.substatuses ?? lead?._leadStatus?.substatuses;
-  if (!Array.isArray(list)) return lead?.selectedSubstatus || null;
-  return list.find((ss) => String(ss?._id) === String(subId)) || lead?.selectedSubstatus || null;
+function getLeadB2bDepartmentName(lead) {
+  return pickFirstNonEmpty(
+    lead?.b2bDepartment?.name,
+    lead?.typeOfB2B?.department?.name,
+    ''
+  ) || '—';
 }
 
 function buildLeadRemarkSuggestion({ leadFormData, leadCategoryOptions, typeOfB2BOptions }) {
@@ -755,9 +756,8 @@ const B2BSales = () => {
 
   const [selectedProfiles, setSelectedProfiles] = useState([]);
 
-  // Users state for Lead Owner / team dropdown
+  // Users state for Lead Owner dropdown
   const [users, setUsers] = useState([]);
-  const [b2bUsersScope, setB2bUsersScope] = useState('all'); // 'all' | 'team'
   const [loadingUsers, setLoadingUsers] = useState(false);
 
 
@@ -911,6 +911,12 @@ const B2BSales = () => {
     e.preventDefault();
 
     try {
+      // Check if user has Google token
+      if (!userData.googleAuthToken?.accessToken) {
+        alert('Please login with Google first');
+        return;
+      }
+
       // Determine whether follow-up fields are filled
       const hasFollowup =
         (showPanel === 'followUp') ||
@@ -918,20 +924,6 @@ const B2BSales = () => {
 
       const hasFollowupData =
         hasFollowup && followupFormData.followupDate && followupFormData.followupTime;
-
-      const needsGoogleCalendar =
-        hasFollowupData &&
-        (showPanel === 'followUp' || (showPanel === 'editPanel' && seletectedSubStatus?.hasFollowup));
-
-      if (needsGoogleCalendar && !userData.googleAuthToken?.accessToken) {
-        alert('Please login with Google first to schedule a follow-up on your calendar');
-        return;
-      }
-
-      if (showPanel === 'editPanel' && !seletectedStatus) {
-        alert('Please select a status');
-        return;
-      }
 
       const toYmdLocal = (d) => {
         const dt = d instanceof Date ? d : new Date(d);
@@ -993,7 +985,7 @@ const B2BSales = () => {
       window.dispatchEvent(new CustomEvent('b2b-followup-updated'));
     } catch (error) {
       console.error('❌ Error in addFollowUpToGoogleCalendar:', error);
-      alert(error.response?.data?.message || error.message || '❌ Error processing request');
+      alert('❌ Error processing request');
     } finally {
       closePanel();
     }
@@ -1295,8 +1287,8 @@ const B2BSales = () => {
       });
 
       if (response.data.success) {
-        setUsers(response.data.data || []);
-        setB2bUsersScope(response.data.scope === 'team' ? 'team' : 'all');
+        // Update users state with detailed access summary
+        setUsers(response.data.data);
       } else {
         console.error('Failed to fetch users:', response.data.message);
       }
@@ -1872,7 +1864,7 @@ const B2BSales = () => {
       </div>
       <div className="b2b-cycle-filters__item">
         <label className="b2b-cycle-filters__label" htmlFor="cycle-filter-counsellor">
-          <i className="fas fa-user-tie" aria-hidden="true" /> {b2bUsersScope === 'team' ? 'Team' : 'Counsellor'}
+          <i className="fas fa-user-tie" aria-hidden="true" /> Counsellor
         </label>
         <select
           id="cycle-filter-counsellor"
@@ -1880,7 +1872,7 @@ const B2BSales = () => {
           value={(filters.leadOwner && filters.leadOwner[0]) || ''}
           onChange={(e) => handleCycleFilterChange('leadOwner', e.target.value)}
         >
-          <option value="">{b2bUsersScope === 'team' ? 'All team' : 'All'}</option>
+          <option value="">All</option>
           {(users || []).map((u) => (
             <option key={u._id} value={u._id}>{u.name || u.email || 'User'}</option>
           ))}
@@ -3096,8 +3088,14 @@ const B2BSales = () => {
 
     if (panel === 'StatusChange') {
       if (profile) {
-        setSelectedStatus(resolveLeadStatusId(profile));
-        setSelectedSubStatus(resolveLeadSubStatusObject(profile));
+        const newStatus = profile?._leadStatus?._id || '';
+        setSelectedStatus(newStatus);
+
+        // if (newStatus) {
+        //   await fetchSubStatus(newStatus);
+        // }
+
+        setSelectedSubStatus(profile?.selectedSubstatus || '');
       }
       setShowPanel('editPanel')
 
@@ -3367,7 +3365,7 @@ const B2BSales = () => {
         </div>
 
         <div className="card-body">
-          {!isgoogleLoginLoading ? (
+          {userData.googleAuthToken?.accessToken && !isgoogleLoginLoading ? (
             <form onSubmit={addFollowUpToGoogleCalendar}>
               {/* Status Selection */}
               <div className="mb-3">
@@ -3503,7 +3501,15 @@ const B2BSales = () => {
                 </button>
               </div>
             </form>
-          ) : null}
+          ) : !isgoogleLoginLoading && (
+            <div className="d-flex justify-content-center align-items-center h-100">
+              <div className="text-center">
+                <button className="btn googleLogin" onClick={handleGoogleLogin}>
+                  Login with Google to Update Status
+                </button>
+              </div>
+            </div>
+          )}
 
           {isgoogleLoginLoading && (
             <div className="d-flex justify-content-center align-items-center h-100">
@@ -6252,7 +6258,7 @@ const B2BSales = () => {
                   </div>
                   <div className="col-md-4">
                     <MultiSelectCheckbox
-                      title={b2bUsersScope === 'team' ? 'My team' : 'Lead Owner'}
+                      title="Lead Owner"
                       icon="fas fa-user"
                       options={(users || []).map((u) => ({ value: u._id, label: u.name || u.email || 'User' }))}
                       selectedValues={filters.leadOwner || []}
