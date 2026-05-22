@@ -49,6 +49,8 @@ const userSchema = new Schema(
 				can_change_lead_status_b2b: { type: Boolean, default: false },
 				can_edit_lead_source_b2b: { type: Boolean, default: false },
 				can_edit_lead_type_b2b: { type: Boolean, default: false },
+				can_edit_b2b_project: { type: Boolean, default: false },
+				can_edit_b2b_department: { type: Boolean, default: false },
 
 				can_view_leads: { type: Boolean, default: false },
 				can_add_leads: { type: Boolean, default: false },

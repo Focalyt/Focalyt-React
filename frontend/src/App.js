@@ -100,6 +100,8 @@ import MyFollowup from './Pages/App/College/MyFollowupB2C/MyFollowupB2C';
 import MyFollowupB2B from './Pages/App/College/MyFollowupB2B/MyFollowupB2B';
 import AddLeads from './Pages/App/College/Course/AddLeads';
 import TypeB2b from './Pages/App/College/Settings/TypeOfB2B/TypeB2b';
+import B2BProject from './Pages/App/College/Settings/B2BProject/B2BProject';
+import B2BDepartment from './Pages/App/College/Settings/B2BDepartment/B2BDepartment';
 import TypeCategory from './Pages/App/College/Settings/TypeOfCategory/TypeCategory';
 import Target from './Pages/App/College/Target/Target';
 import Lrp from './Pages/App/College/LRP/Lrp';
@@ -310,6 +312,8 @@ const Layout = () => {
           <Route path='sales_copy' element={<B2BSalesCopy/>}/>
           <Route path='statusdesignb2c' element={<StatusB2C/>}/>
           <Route path='typeOfB2b' element={<TypeB2b/>}/>
+          <Route path='b2bProject' element={<B2BProject/>}/>
+          <Route path='b2bDepartment' element={<B2BDepartment/>}/>
           <Route path='typeOfCategory' element={<TypeCategory/>}/>
           <Route path='calenderb2c' element={<CalenderFolowupB2C/>}/>
           <Route path='source' element={<Source/>}/>

@@ -165,6 +165,8 @@
   "training": "Training",
   "training_management": "Training Management",
   "type_of_b2b": "Type Of B2B",
+  "b2b_project": "B2B Project",
+  "b2b_department": "B2B Department",
   "type_of_category": "Type Of Source",
   "unknown": "Unknown",
   "untouch": "Untouch",

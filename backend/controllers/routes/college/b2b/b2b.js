@@ -60,6 +60,8 @@ const {
 
 } = require("../../../models");
 const TypeOfB2B = require("../../../models/b2b/typeOfB2B");
+const B2BProject = require("../../../models/b2b/b2bProject");
+const B2BDepartment = require("../../../models/b2b/b2bDepartment");
 const LeadCategory = require("../../../models/b2b/leadCategory");
 const defaultLeadModel = require("../../../models/b2b/lead");
 const FollowUp = require("../../../models/b2b/followUp");
@@ -132,13 +134,24 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 // Get all Type of B2B
 router.get('/type-of-b2b', isCollege, async (req, res) => {
 	try {
-
-		const status = req.query.status;
+		const { status, department, project } = req.query;
 		const query = {};
-		if (status) {
-			query.isActive = status;
+		if (status !== undefined && status !== '') {
+			query.isActive = status === 'true' || status === true;
 		}
+		if (department && mongoose.Types.ObjectId.isValid(department)) {
+			query.department = department;
+		} else if (project && mongoose.Types.ObjectId.isValid(project)) {
+			const deptIds = await B2BDepartment.find({ project }).distinct('_id');
+			query.department = { $in: deptIds };
+		}
+
 		const types = await TypeOfB2B.find(query)
+			.populate({
+				path: 'department',
+				select: 'name isActive project',
+				populate: { path: 'project', select: 'name isActive' }
+			})
 			.populate('addedBy', 'name email')
 			.sort({ createdAt: -1 });
 
@@ -161,6 +174,11 @@ router.get('/type-of-b2b', isCollege, async (req, res) => {
 router.get('/type-of-b2b/:id', isCollege, async (req, res) => {
 	try {
 		const type = await TypeOfB2B.findById(req.params.id)
+			.populate({
+				path: 'department',
+				select: 'name isActive project',
+				populate: { path: 'project', select: 'name isActive' }
+			})
 			.populate('addedBy', 'name email');
 
 		if (!type) {
@@ -188,33 +206,55 @@ router.get('/type-of-b2b/:id', isCollege, async (req, res) => {
 // Create new Type of B2B
 router.post('/type-of-b2b', isCollege, async (req, res) => {
 	try {
-		const { name, description } = req.body;
+		const { name, description, department } = req.body;
 
-		// Validate required fields
-		if (!name) {
+		if (!name || !String(name).trim()) {
 			return res.status(400).json({
 				status: false,
 				message: 'Name is required'
 			});
 		}
 
-		// Check if name already exists
-		const existingType = await TypeOfB2B.findOne({ name });
+		if (!department || !mongoose.Types.ObjectId.isValid(department)) {
+			return res.status(400).json({
+				status: false,
+				message: 'Valid B2B department is required'
+			});
+		}
+
+		const departmentDoc = await B2BDepartment.findById(department);
+		if (!departmentDoc) {
+			return res.status(400).json({
+				status: false,
+				message: 'B2B department not found'
+			});
+		}
+
+		const trimmedName = String(name).trim();
+		const existingType = await TypeOfB2B.findOne({ name: trimmedName, department });
 		if (existingType) {
 			return res.status(400).json({
 				status: false,
-				message: 'Type of B2B with this name already exists'
+				message: 'Type of B2B with this name already exists for the selected department'
 			});
 		}
 
 		const newType = new TypeOfB2B({
-			name,
+			name: trimmedName,
 			description,
+			department,
 			addedBy: req.user._id
 		});
 
 		const savedType = await newType.save();
-		await savedType.populate('addedBy', 'name email');
+		await savedType.populate([
+			{
+				path: 'department',
+				select: 'name isActive project',
+				populate: { path: 'project', select: 'name isActive' }
+			},
+			{ path: 'addedBy', select: 'name email' }
+		]);
 
 		res.status(201).json({
 			status: true,
@@ -234,34 +274,69 @@ router.post('/type-of-b2b', isCollege, async (req, res) => {
 // Update Type of B2B
 router.put('/type-of-b2b/:id', isCollege, async (req, res) => {
 	try {
-		const { name, description, isActive } = req.body;
+		const { name, description, isActive, department } = req.body;
+		const typeId = req.params.id;
 
-		// Check if name already exists (excluding current record)
-		if (name) {
-			const existingType = await TypeOfB2B.findOne({
-				name,
-				_id: { $ne: req.params.id }
-			});
-			if (existingType) {
-				return res.status(400).json({
-					status: false,
-					message: 'Type of B2B with this name already exists'
-				});
-			}
-		}
-
-		const updatedType = await TypeOfB2B.findByIdAndUpdate(
-			req.params.id,
-			{ name, description, isActive },
-			{ new: true, runValidators: true }
-		).populate('addedBy', 'name email');
-
-		if (!updatedType) {
+		const currentType = await TypeOfB2B.findById(typeId);
+		if (!currentType) {
 			return res.status(404).json({
 				status: false,
 				message: 'Type of B2B not found'
 			});
 		}
+
+		const departmentId = department || currentType.department;
+
+		if (department && !mongoose.Types.ObjectId.isValid(department)) {
+			return res.status(400).json({
+				status: false,
+				message: 'Valid B2B department is required'
+			});
+		}
+
+		if (department) {
+			const departmentDoc = await B2BDepartment.findById(department);
+			if (!departmentDoc) {
+				return res.status(400).json({
+					status: false,
+					message: 'B2B department not found'
+				});
+			}
+		}
+
+		if (name && departmentId) {
+			const trimmedName = String(name).trim();
+			const existingType = await TypeOfB2B.findOne({
+				name: trimmedName,
+				department: departmentId,
+				_id: { $ne: typeId }
+			});
+			if (existingType) {
+				return res.status(400).json({
+					status: false,
+					message: 'Type of B2B with this name already exists for the selected department'
+				});
+			}
+		}
+
+		const updatePayload = {};
+		if (name !== undefined) updatePayload.name = String(name).trim();
+		if (description !== undefined) updatePayload.description = description;
+		if (isActive !== undefined) updatePayload.isActive = isActive;
+		if (department !== undefined) updatePayload.department = department;
+
+		const updatedType = await TypeOfB2B.findByIdAndUpdate(
+			typeId,
+			updatePayload,
+			{ new: true, runValidators: true }
+		).populate([
+			{
+				path: 'department',
+				select: 'name isActive project',
+				populate: { path: 'project', select: 'name isActive' }
+			},
+			{ path: 'addedBy', select: 'name email' }
+		]);
 
 		res.json({
 			status: true,
@@ -310,6 +385,423 @@ router.delete('/type-of-b2b/:id', isCollege, async (req, res) => {
 		res.status(500).json({
 			status: false,
 			message: 'Failed to delete type of B2B',
+			error: error.message
+		});
+	}
+});
+
+// ==================== B2B PROJECT ROUTES ====================
+
+router.get('/b2b-projects', isCollege, async (req, res) => {
+	try {
+		const status = req.query.status;
+		const query = {};
+		if (status) {
+			query.isActive = status;
+		}
+		const projects = await B2BProject.find(query)
+			.populate('addedBy', 'name email')
+			.sort({ createdAt: -1 });
+
+		res.json({
+			status: true,
+			data: projects,
+			message: 'B2B projects retrieved successfully'
+		});
+	} catch (error) {
+		console.error('Error getting B2B projects:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to retrieve B2B projects',
+			error: error.message
+		});
+	}
+});
+
+router.get('/b2b-projects/:id', isCollege, async (req, res) => {
+	try {
+		const project = await B2BProject.findById(req.params.id)
+			.populate('addedBy', 'name email');
+
+		if (!project) {
+			return res.status(404).json({
+				status: false,
+				message: 'B2B project not found'
+			});
+		}
+
+		res.json({
+			status: true,
+			data: project,
+			message: 'B2B project retrieved successfully'
+		});
+	} catch (error) {
+		console.error('Error getting B2B project:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to retrieve B2B project',
+			error: error.message
+		});
+	}
+});
+
+router.post('/b2b-projects', isCollege, async (req, res) => {
+	try {
+		const { name, description } = req.body;
+
+		if (!name) {
+			return res.status(400).json({
+				status: false,
+				message: 'Name is required'
+			});
+		}
+
+		const existingProject = await B2BProject.findOne({ name });
+		if (existingProject) {
+			return res.status(400).json({
+				status: false,
+				message: 'B2B project with this name already exists'
+			});
+		}
+
+		const newProject = new B2BProject({
+			name,
+			description,
+			addedBy: req.user._id
+		});
+
+		const savedProject = await newProject.save();
+		await savedProject.populate('addedBy', 'name email');
+
+		res.status(201).json({
+			status: true,
+			data: savedProject,
+			message: 'B2B project created successfully'
+		});
+	} catch (error) {
+		console.error('Error creating B2B project:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to create B2B project',
+			error: error.message
+		});
+	}
+});
+
+router.put('/b2b-projects/:id', isCollege, async (req, res) => {
+	try {
+		const { name, description, isActive } = req.body;
+
+		if (name) {
+			const existingProject = await B2BProject.findOne({
+				name,
+				_id: { $ne: req.params.id }
+			});
+			if (existingProject) {
+				return res.status(400).json({
+					status: false,
+					message: 'B2B project with this name already exists'
+				});
+			}
+		}
+
+		const updatedProject = await B2BProject.findByIdAndUpdate(
+			req.params.id,
+			{ name, description, isActive },
+			{ new: true, runValidators: true }
+		).populate('addedBy', 'name email');
+
+		if (!updatedProject) {
+			return res.status(404).json({
+				status: false,
+				message: 'B2B project not found'
+			});
+		}
+
+		res.json({
+			status: true,
+			data: updatedProject,
+			message: 'B2B project updated successfully'
+		});
+	} catch (error) {
+		console.error('Error updating B2B project:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to update B2B project',
+			error: error.message
+		});
+	}
+});
+
+router.delete('/b2b-projects/:id', isCollege, async (req, res) => {
+	try {
+		const projectId = req.params.id;
+
+		const linkedDepartmentsCount = await B2BDepartment.countDocuments({ project: projectId });
+
+		if (linkedDepartmentsCount > 0) {
+			return res.status(400).json({
+				status: false,
+				message: `This project is used in ${linkedDepartmentsCount} department(s), so it cannot be deleted`
+			});
+		}
+
+		const deletedProject = await B2BProject.findByIdAndDelete(projectId);
+
+		if (!deletedProject) {
+			return res.status(404).json({
+				status: false,
+				message: 'B2B project not found'
+			});
+		}
+
+		res.json({
+			status: true,
+			message: 'B2B project deleted successfully'
+		});
+	} catch (error) {
+		console.error('Error deleting B2B project:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to delete B2B project',
+			error: error.message
+		});
+	}
+});
+
+// ==================== B2B DEPARTMENT ROUTES ====================
+
+router.get('/b2b-departments', isCollege, async (req, res) => {
+	try {
+		const { status, project } = req.query;
+		const query = {};
+
+		if (status !== undefined && status !== '') {
+			query.isActive = status === 'true' || status === true;
+		}
+		if (project && mongoose.Types.ObjectId.isValid(project)) {
+			query.project = project;
+		}
+
+		const departments = await B2BDepartment.find(query)
+			.populate('project', 'name isActive')
+			.populate('addedBy', 'name email')
+			.sort({ createdAt: -1 });
+
+		res.json({
+			status: true,
+			data: departments,
+			message: 'B2B departments retrieved successfully'
+		});
+	} catch (error) {
+		console.error('Error getting B2B departments:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to retrieve B2B departments',
+			error: error.message
+		});
+	}
+});
+
+router.get('/b2b-departments/:id', isCollege, async (req, res) => {
+	try {
+		const department = await B2BDepartment.findById(req.params.id)
+			.populate('project', 'name isActive')
+			.populate('addedBy', 'name email');
+
+		if (!department) {
+			return res.status(404).json({
+				status: false,
+				message: 'B2B department not found'
+			});
+		}
+
+		res.json({
+			status: true,
+			data: department,
+			message: 'B2B department retrieved successfully'
+		});
+	} catch (error) {
+		console.error('Error getting B2B department:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to retrieve B2B department',
+			error: error.message
+		});
+	}
+});
+
+router.post('/b2b-departments', isCollege, async (req, res) => {
+	try {
+		const { name, description, project } = req.body;
+
+		if (!name || !String(name).trim()) {
+			return res.status(400).json({
+				status: false,
+				message: 'Department name is required'
+			});
+		}
+
+		if (!project || !mongoose.Types.ObjectId.isValid(project)) {
+			return res.status(400).json({
+				status: false,
+				message: 'Valid B2B project is required'
+			});
+		}
+
+		const projectDoc = await B2BProject.findById(project);
+		if (!projectDoc) {
+			return res.status(400).json({
+				status: false,
+				message: 'B2B project not found'
+			});
+		}
+
+		const trimmedName = String(name).trim();
+		const existingDepartment = await B2BDepartment.findOne({ name: trimmedName, project });
+		if (existingDepartment) {
+			return res.status(400).json({
+				status: false,
+				message: 'Department with this name already exists for the selected project'
+			});
+		}
+
+		const newDepartment = new B2BDepartment({
+			name: trimmedName,
+			description,
+			project,
+			addedBy: req.user._id
+		});
+
+		const savedDepartment = await newDepartment.save();
+		await savedDepartment.populate([
+			{ path: 'project', select: 'name isActive' },
+			{ path: 'addedBy', select: 'name email' }
+		]);
+
+		res.status(201).json({
+			status: true,
+			data: savedDepartment,
+			message: 'B2B department created successfully'
+		});
+	} catch (error) {
+		console.error('Error creating B2B department:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to create B2B department',
+			error: error.message
+		});
+	}
+});
+
+router.put('/b2b-departments/:id', isCollege, async (req, res) => {
+	try {
+		const { name, description, isActive, project } = req.body;
+		const departmentId = req.params.id;
+
+		const currentDepartment = await B2BDepartment.findById(departmentId);
+		if (!currentDepartment) {
+			return res.status(404).json({
+				status: false,
+				message: 'B2B department not found'
+			});
+		}
+
+		const projectId = project || currentDepartment.project;
+
+		if (project && !mongoose.Types.ObjectId.isValid(project)) {
+			return res.status(400).json({
+				status: false,
+				message: 'Valid B2B project is required'
+			});
+		}
+
+		if (project) {
+			const projectDoc = await B2BProject.findById(project);
+			if (!projectDoc) {
+				return res.status(400).json({
+					status: false,
+					message: 'B2B project not found'
+				});
+			}
+		}
+
+		if (name) {
+			const trimmedName = String(name).trim();
+			const existingDepartment = await B2BDepartment.findOne({
+				name: trimmedName,
+				project: projectId,
+				_id: { $ne: departmentId }
+			});
+			if (existingDepartment) {
+				return res.status(400).json({
+					status: false,
+					message: 'Department with this name already exists for the selected project'
+				});
+			}
+		}
+
+		const updatePayload = {};
+		if (name !== undefined) updatePayload.name = String(name).trim();
+		if (description !== undefined) updatePayload.description = description;
+		if (isActive !== undefined) updatePayload.isActive = isActive;
+		if (project !== undefined) updatePayload.project = project;
+
+		const updatedDepartment = await B2BDepartment.findByIdAndUpdate(
+			departmentId,
+			updatePayload,
+			{ new: true, runValidators: true }
+		).populate([
+			{ path: 'project', select: 'name isActive' },
+			{ path: 'addedBy', select: 'name email' }
+		]);
+
+		res.json({
+			status: true,
+			data: updatedDepartment,
+			message: 'B2B department updated successfully'
+		});
+	} catch (error) {
+		console.error('Error updating B2B department:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to update B2B department',
+			error: error.message
+		});
+	}
+});
+
+router.delete('/b2b-departments/:id', isCollege, async (req, res) => {
+	try {
+		const departmentId = req.params.id;
+
+		const linkedTypesCount = await TypeOfB2B.countDocuments({ department: departmentId });
+
+		if (linkedTypesCount > 0) {
+			return res.status(400).json({
+				status: false,
+				message: `This department is used in ${linkedTypesCount} B2B type(s), so it cannot be deleted`
+			});
+		}
+
+		const deletedDepartment = await B2BDepartment.findByIdAndDelete(departmentId);
+
+		if (!deletedDepartment) {
+			return res.status(404).json({
+				status: false,
+				message: 'B2B department not found'
+			});
+		}
+
+		res.json({
+			status: true,
+			message: 'B2B department deleted successfully'
+		});
+	} catch (error) {
+		console.error('Error deleting B2B department:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to delete B2B department',
 			error: error.message
 		});
 	}
@@ -573,6 +1065,10 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 			leadCategoryIn,
 			typeOfB2B,
 			typeOfB2BIn,
+			b2bProject,
+			b2bProjectIn,
+			b2bDepartment,
+			b2bDepartmentIn,
 			search,
 			subStatus,
 			subStatusIn,
@@ -583,6 +1079,8 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 			statusIn,
 			hasFollowUpCall,
 			hasFollowUpVisit,
+			followUpCallBucket,
+			followUpVisitBucket,
 			documentsStatusIn,
 			approvalStatus
 		} = req.query;
@@ -636,6 +1134,15 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 
 		// Build filter conditions
 		const filterConditions = [];
+
+		if (followUpCallBucket) {
+			const bucketFilter = await resolveFollowupBucketLeadFilter('call', followUpCallBucket);
+			if (bucketFilter) filterConditions.push(bucketFilter);
+		}
+		if (followUpVisitBucket) {
+			const bucketFilter = await resolveFollowupBucketLeadFilter('visit', followUpVisitBucket);
+			if (bucketFilter) filterConditions.push(bucketFilter);
+		}
 		
 		// Other filters - Convert to ObjectId if valid
 		if (leadCategoryIn) {
@@ -650,6 +1157,20 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 			if (ids.length) filterConditions.push({ typeOfB2B: { $in: ids } });
 		} else if (typeOfB2B) {
 			filterConditions.push({ typeOfB2B: convertToObjectId(typeOfB2B) });
+		}
+
+		if (b2bProjectIn) {
+			const ids = parseIdList(b2bProjectIn);
+			if (ids.length) filterConditions.push({ b2bProject: { $in: ids } });
+		} else if (b2bProject) {
+			filterConditions.push({ b2bProject: convertToObjectId(b2bProject) });
+		}
+
+		if (b2bDepartmentIn) {
+			const ids = parseIdList(b2bDepartmentIn);
+			if (ids.length) filterConditions.push({ b2bDepartment: { $in: ids } });
+		} else if (b2bDepartment) {
+			filterConditions.push({ b2bDepartment: convertToObjectId(b2bDepartment) });
 		}
 
 		if (subStatusIn) {
@@ -1362,6 +1883,10 @@ router.get('/leads', isCollege, async (req, res) => {
 			leadCategoryIn,
 			typeOfB2B,
 			typeOfB2BIn,
+			b2bProject,
+			b2bProjectIn,
+			b2bDepartment,
+			b2bDepartmentIn,
 			search,
 			sortBy = 'createdAt',
 			sortOrder = 'desc',
@@ -1373,6 +1898,8 @@ router.get('/leads', isCollege, async (req, res) => {
 			leadOwnerIn,
 			hasFollowUpCall,
 			hasFollowUpVisit,
+			followUpCallBucket,
+			followUpVisitBucket,
 			documentsStatusIn,
 			approvalStatus
 		} = req.query;
@@ -1385,6 +1912,16 @@ router.get('/leads', isCollege, async (req, res) => {
 
 		const query = {};
 		let ownershipConditions = [];
+
+		const followupBucketFilters = [];
+		if (followUpCallBucket) {
+			const bucketFilter = await resolveFollowupBucketLeadFilter('call', followUpCallBucket);
+			if (bucketFilter) followupBucketFilters.push(bucketFilter);
+		}
+		if (followUpVisitBucket) {
+			const bucketFilter = await resolveFollowupBucketLeadFilter('visit', followUpVisitBucket);
+			if (bucketFilter) followupBucketFilters.push(bucketFilter);
+		}
 
 		// Only apply team member filter if user is not Admin
 		// Admin can view all leads, others can only view their team members' leads
@@ -1437,6 +1974,7 @@ router.get('/leads', isCollege, async (req, res) => {
 			$and: [
 				// Ownership condition (only if user doesn't have view all permission)
 				...(ownershipConditions.length > 0 ? [{ $or: ownershipConditions.flatMap(c => c.$or) }] : []),
+				...followupBucketFilters,
 				// Search condition (if search is provided)
 				...(search ? [searchConditions] : []),
 				// Other filters - Convert to ObjectId if valid
@@ -1448,6 +1986,12 @@ router.get('/leads', isCollege, async (req, res) => {
 
 				...(typeOfB2BIn ? [{ typeOfB2B: { $in: parseIdList(typeOfB2BIn) } }] : []),
 				...(!typeOfB2BIn && typeOfB2B ? [{ typeOfB2B: convertToObjectId(typeOfB2B) }] : []),
+
+				...(b2bProjectIn ? [{ b2bProject: { $in: parseIdList(b2bProjectIn) } }] : []),
+				...(!b2bProjectIn && b2bProject ? [{ b2bProject: convertToObjectId(b2bProject) }] : []),
+
+				...(b2bDepartmentIn ? [{ b2bDepartment: { $in: parseIdList(b2bDepartmentIn) } }] : []),
+				...(!b2bDepartmentIn && b2bDepartment ? [{ b2bDepartment: convertToObjectId(b2bDepartment) }] : []),
 
 				...(subStatusIn ? [{ subStatus: { $in: parseIdList(subStatusIn) } }] : []),
 				...(!subStatusIn && subStatus ? [{ subStatus: convertToObjectId(subStatus) }] : []),
@@ -1652,9 +2196,7 @@ router.get('/leads', isCollege, async (req, res) => {
 
 
 		// Fetch leads based on the query, sorted and paginated
-		const leads = await Lead.find(finalQuery)
-			.populate('leadCategory', 'name documents')
-			.populate('typeOfB2B', 'name')
+		const leads = await applyLeadCorePopulates(Lead.find(finalQuery))
 			.populate('status', 'name title substatuses')
 			.populate('followUp', 'followUpType scheduledDate status')
 			.populate('followUpCall', 'followUpType description status scheduledDate completedDate')
@@ -1721,9 +2263,7 @@ router.get('/leads', isCollege, async (req, res) => {
 router.get('/leads/:id', isCollege, async (req, res) => {
 	try {
 		const isAdminUser = (req) => req.user?.permissions?.permission_type === 'Admin';
-		const lead = await Lead.findById(req.params.id)
-			.populate('leadCategory', 'name questions isActive')
-			.populate('typeOfB2B', 'name')
+		const lead = await applyLeadCorePopulates(Lead.findById(req.params.id))
 			.populate('status', 'name')
 			.populate('followUp', 'followUpType description status scheduledDate completedDate')
 			.populate('followUpCall', 'followUpType description status scheduledDate completedDate')
@@ -1834,6 +2374,8 @@ router.post('/add-lead', isCollege, async (req, res) => {
 	try {
 		const {
 			leadCategory,
+			b2bProject,
+			b2bDepartment,
 			typeOfB2B,
 			businessName,
 			address,
@@ -1854,6 +2396,8 @@ router.post('/add-lead', isCollege, async (req, res) => {
 // console.log(req.body);
 		const missingFields = [];
 		if (!leadCategory) missingFields.push("leadCategory");
+		if (!b2bProject) missingFields.push("b2bProject");
+		if (!b2bDepartment) missingFields.push("b2bDepartment");
 		if (!typeOfB2B) missingFields.push("typeOfB2B");
 		if (!businessName) missingFields.push("businessName");
 		if (!concernPersonName) missingFields.push("concernPersonName");
@@ -1863,6 +2407,43 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			return res.status(400).json({
 				status: false,
 				message: `Required fields missing: ${missingFields.join(", ")}`
+			});
+		}
+
+		if (!mongoose.Types.ObjectId.isValid(b2bProject)) {
+			return res.status(400).json({ status: false, message: 'Invalid B2B project' });
+		}
+		if (!mongoose.Types.ObjectId.isValid(b2bDepartment)) {
+			return res.status(400).json({ status: false, message: 'Invalid B2B department' });
+		}
+		if (!mongoose.Types.ObjectId.isValid(typeOfB2B)) {
+			return res.status(400).json({ status: false, message: 'Invalid B2B type' });
+		}
+
+		const projectDoc = await B2BProject.findById(b2bProject);
+		if (!projectDoc) {
+			return res.status(400).json({ status: false, message: 'B2B project not found' });
+		}
+
+		const departmentDoc = await B2BDepartment.findById(b2bDepartment);
+		if (!departmentDoc) {
+			return res.status(400).json({ status: false, message: 'B2B department not found' });
+		}
+		if (String(departmentDoc.project) !== String(b2bProject)) {
+			return res.status(400).json({
+				status: false,
+				message: 'Selected department does not belong to the selected project'
+			});
+		}
+
+		const typeDoc = await TypeOfB2B.findById(typeOfB2B);
+		if (!typeDoc) {
+			return res.status(400).json({ status: false, message: 'B2B type not found' });
+		}
+		if (typeDoc.department && String(typeDoc.department) !== String(b2bDepartment)) {
+			return res.status(400).json({
+				status: false,
+				message: 'Selected B2B type does not belong to the selected department'
 			});
 		}
 
@@ -2004,6 +2585,8 @@ router.post('/add-lead', isCollege, async (req, res) => {
 	
 		const leadData = {
 			leadCategory,
+			b2bProject,
+			b2bDepartment,
 			typeOfB2B,
 			businessName,
 			address,
@@ -2147,9 +2730,7 @@ router.put('/leads/:id/approval', isCollege, async (req, res) => {
 
 		await lead.save();
 
-		const updatedLead = await Lead.findById(lead._id)
-			.populate('leadCategory', 'name')
-			.populate('typeOfB2B', 'name')
+		const updatedLead = await applyLeadCorePopulates(Lead.findById(lead._id))
 			.populate('status', 'name title substatuses')
 			.populate('leadAddedBy', 'name email')
 			.populate('leadOwner', 'name email');
@@ -2396,9 +2977,7 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 		console.log('[B2B Update Status] Step 9: Lead saved', { leadId: id, newStatus: status, newSubStatus: subStatus || '(none)' });
 
 		// Populate the updated lead
-		const updatedLead = await Lead.findById(id)
-			.populate('leadCategory', 'name')
-			.populate('typeOfB2B', 'name')
+		const updatedLead = await applyLeadCorePopulates(Lead.findById(id))
 			.populate('status', 'name title substatuses')
 			.populate('leadAddedBy', 'name email')
 			.populate('leadOwner', 'name email');
@@ -2424,9 +3003,13 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 	try {
 		const {
 			leadCategory,
+			b2bProject,
+			b2bDepartment,
 			typeOfB2B,
 			businessName,
 			address,
+			city,
+			state,
 			coordinates,
 			concernPersonName,
 			designation,
@@ -2434,11 +3017,20 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 			mobile,
 			whatsapp,
 			leadOwner,
-			landlineNumber
+			landlineNumber,
+			remark
 		} = req.body;
 
 		const user = req.user;
 		const isAdminUser = (req) => req.user?.permissions?.permission_type === 'Admin';
+		const hasEditLeadsPermission = () => {
+			const permissionType = req.user?.permissions?.permission_type;
+			if (permissionType === 'Admin') return true;
+			if (permissionType === 'Custom' && req.user?.permissions?.custom_permissions?.can_edit_leads_b2b) {
+				return true;
+			}
+			return false;
+		};
 
 		// Check if lead exists
 		const existingLead = await Lead.findById(req.params.id);
@@ -2454,7 +3046,11 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 		const userId = String(req.user?._id || '');
 		const leadAddedById = existingLead.leadAddedBy ? String(existingLead.leadAddedBy) : '';
 		const leadOwnerId = existingLead.leadOwner ? String(existingLead.leadOwner) : '';
-		const canEdit = isAdminUser(req) || leadAddedById === userId || leadOwnerId === userId;
+		const canEdit =
+			isAdminUser(req) ||
+			hasEditLeadsPermission() ||
+			leadAddedById === userId ||
+			leadOwnerId === userId;
 
 		if (!canEdit) {
 			return res.status(403).json({
@@ -2488,26 +3084,77 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 			}
 		}
 
+		const updatePayload = {
+			leadCategory,
+			typeOfB2B,
+			businessName,
+			address,
+			city,
+			state,
+			coordinates,
+			concernPersonName,
+			designation,
+			email: normalizedEmail || undefined,
+			mobile,
+			whatsapp,
+			leadOwner,
+			landlineNumber,
+			remark,
+		};
+
+		if (b2bProject !== undefined) {
+			if (!b2bProject || !mongoose.Types.ObjectId.isValid(b2bProject)) {
+				return res.status(400).json({ status: false, message: 'Invalid B2B project' });
+			}
+			const projectDoc = await B2BProject.findById(b2bProject);
+			if (!projectDoc) {
+				return res.status(400).json({ status: false, message: 'B2B project not found' });
+			}
+			updatePayload.b2bProject = b2bProject;
+		}
+
+		if (b2bDepartment !== undefined) {
+			if (!b2bDepartment || !mongoose.Types.ObjectId.isValid(b2bDepartment)) {
+				return res.status(400).json({ status: false, message: 'Invalid B2B department' });
+			}
+			const departmentDoc = await B2BDepartment.findById(b2bDepartment);
+			if (!departmentDoc) {
+				return res.status(400).json({ status: false, message: 'B2B department not found' });
+			}
+			const projectId = updatePayload.b2bProject || existingLead.b2bProject;
+			if (projectId && String(departmentDoc.project) !== String(projectId)) {
+				return res.status(400).json({
+					status: false,
+					message: 'Selected department does not belong to the selected project'
+				});
+			}
+			updatePayload.b2bDepartment = b2bDepartment;
+		}
+
+		if (typeOfB2B !== undefined) {
+			const typeDoc = await TypeOfB2B.findById(typeOfB2B);
+			if (!typeDoc) {
+				return res.status(400).json({ status: false, message: 'B2B type not found' });
+			}
+			const departmentId = updatePayload.b2bDepartment || existingLead.b2bDepartment;
+			if (typeDoc.department && departmentId && String(typeDoc.department) !== String(departmentId)) {
+				return res.status(400).json({
+					status: false,
+					message: 'Selected B2B type does not belong to the selected department'
+				});
+			}
+			updatePayload.typeOfB2B = typeOfB2B;
+		}
+
 		// Update lead
 		const updatedLead = await Lead.findByIdAndUpdate(
 			req.params.id,
-			{
-				leadCategory,
-				typeOfB2B,
-				businessName,
-				address,
-				coordinates,
-				concernPersonName,
-				designation,
-				email: normalizedEmail || undefined,
-				mobile,
-				whatsapp,
-				leadOwner,
-				landlineNumber,
-			},
+			updatePayload,
 			{ new: true, runValidators: true }
 		).populate([
 			{ path: 'leadCategory', select: 'name' },
+			{ path: 'b2bProject', select: 'name' },
+			{ path: 'b2bDepartment', select: 'name' },
 			{ path: 'typeOfB2B', select: 'name' },
 			{ path: 'leadAddedBy', select: 'name email' }
 		]);

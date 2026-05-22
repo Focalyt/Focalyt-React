@@ -485,6 +485,9 @@ const B2BSales = () => {
   const token = userData.token;
   // const permissions = userData.permissions
   const [permissions, setPermissions] = useState();
+  const canEditLeadsB2B =
+    permissions?.permission_type === 'Admin' ||
+    (permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_edit_leads_b2b);
   const canEditLeadSourceB2B =
     permissions?.permission_type === 'Admin' ||
     (permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_edit_lead_source_b2b);
@@ -692,6 +695,7 @@ const B2BSales = () => {
   const [uploadPreview, setUploadPreview] = useState(null);
   const [currentPreviewUpload, setCurrentPreviewUpload] = useState(null);
   const [showAddLeadModal, setShowAddLeadModal] = useState(false);
+  const [editingLeadId, setEditingLeadId] = useState(null);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const [bulkUploadFile, setBulkUploadFile] = useState(null);
   const [bulkUploadLoading, setBulkUploadLoading] = useState(false);
@@ -716,6 +720,8 @@ const B2BSales = () => {
   // Lead form state
   const [leadFormData, setLeadFormData] = useState({
     leadCategory: '',
+    b2bProject: '',
+    b2bDepartment: '',
     typeOfB2B: '',
     businessName: '',
     businessAddress: '',
@@ -729,6 +735,7 @@ const B2BSales = () => {
     email: '',
     mobile: '',
     whatsapp: '',
+    landlineNumber: '',
     leadOwner: '',
     leadStatus: '',
     leadSubStatus: '',
@@ -748,8 +755,9 @@ const B2BSales = () => {
 
   const [selectedProfiles, setSelectedProfiles] = useState([]);
 
-  // Users state for Lead Owner dropdown
+  // Users state for Lead Owner / team dropdown
   const [users, setUsers] = useState([]);
+  const [b2bUsersScope, setB2bUsersScope] = useState('all'); // 'all' | 'team'
   const [loadingUsers, setLoadingUsers] = useState(false);
 
 
@@ -766,7 +774,36 @@ const B2BSales = () => {
 
   // B2B Dropdown Options
   const [leadCategoryOptions, setLeadCategoryOptions] = useState([]);
-  const [typeOfB2BOptions, setTypeOfB2BOptions] = useState([]);
+  const [b2bProjectOptions, setB2bProjectOptions] = useState([]);
+  const [allB2bDepartments, setAllB2bDepartments] = useState([]);
+  const [allTypeOfB2BRaw, setAllTypeOfB2BRaw] = useState([]);
+
+  const addLeadDepartments = useMemo(() => {
+    if (!leadFormData.b2bProject) return [];
+    return allB2bDepartments.filter(
+      (dept) => (dept.project?._id || dept.project) === leadFormData.b2bProject
+    );
+  }, [allB2bDepartments, leadFormData.b2bProject]);
+
+  const typeOfB2BOptions = useMemo(() => (
+    allTypeOfB2BRaw.map((type) => ({
+      value: type._id,
+      label: type.name
+    }))
+  ), [allTypeOfB2BRaw]);
+
+  const addLeadTypeOptions = useMemo(() => {
+    if (!leadFormData.b2bDepartment) return [];
+    return allTypeOfB2BRaw
+      .filter((type) => {
+        const deptId = type.department?._id || type.department;
+        return deptId === leadFormData.b2bDepartment;
+      })
+      .map((type) => ({
+        value: type._id,
+        label: type.name
+      }));
+  }, [allTypeOfB2BRaw, leadFormData.b2bDepartment]);
 
   /** Sub-statuses for the Add Lead modal (loaded from `/statusB2b/:id/substatus`) */
   const [addLeadSubStatuses, setAddLeadSubStatuses] = useState([]);
@@ -1215,17 +1252,28 @@ const B2BSales = () => {
           })));
       }
 
-      // Fetch Type of B2B (only active)
-      const typeOfB2BRes = await axios.get(`${backendUrl}/college/b2b/type-of-b2b?status=true`, {
-        headers: { 'x-auth': token }
-      });
+      const [projectsRes, departmentsRes, typeOfB2BRes] = await Promise.all([
+        axios.get(`${backendUrl}/college/b2b/b2b-projects?status=true`, { headers: { 'x-auth': token } }),
+        axios.get(`${backendUrl}/college/b2b/b2b-departments?status=true`, { headers: { 'x-auth': token } }),
+        axios.get(`${backendUrl}/college/b2b/type-of-b2b?status=true`, { headers: { 'x-auth': token } }),
+      ]);
+
+      if (projectsRes.data.status) {
+        setB2bProjectOptions(
+          (projectsRes.data.data || [])
+            .filter((p) => p.isActive !== false)
+            .map((p) => ({ value: p._id, label: p.name }))
+        );
+      }
+
+      if (departmentsRes.data.status) {
+        setAllB2bDepartments(departmentsRes.data.data || []);
+      }
+
       if (typeOfB2BRes.data.status) {
-        setTypeOfB2BOptions(typeOfB2BRes.data.data
-          .filter(type => type.isActive === true) // Filter only active items
-          .map(type => ({
-            value: type._id,
-            label: type.name
-          })));
+        setAllTypeOfB2BRaw(
+          (typeOfB2BRes.data.data || []).filter((type) => type.isActive !== false)
+        );
       }
     } catch (err) {
       console.error('Failed to fetch B2B dropdown options:', err);
@@ -1247,8 +1295,8 @@ const B2BSales = () => {
       });
 
       if (response.data.success) {
-        // Update users state with detailed access summary
-        setUsers(response.data.data);
+        setUsers(response.data.data || []);
+        setB2bUsersScope(response.data.scope === 'team' ? 'team' : 'all');
       } else {
         console.error('Failed to fetch users:', response.data.message);
       }
@@ -1314,6 +1362,19 @@ const B2BSales = () => {
         leadStatus: value,
         leadSubStatus: ''
       }));
+    } else if (name === 'b2bProject') {
+      setLeadFormData(prev => ({
+        ...prev,
+        b2bProject: value,
+        b2bDepartment: '',
+        typeOfB2B: ''
+      }));
+    } else if (name === 'b2bDepartment') {
+      setLeadFormData(prev => ({
+        ...prev,
+        b2bDepartment: value,
+        typeOfB2B: ''
+      }));
     } else {
       setLeadFormData(prev => ({
         ...prev,
@@ -1321,12 +1382,18 @@ const B2BSales = () => {
       }));
     }
 
-    // Clear error for this field
-    if (formErrors[name]) {
-      setFormErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+    const clearFields = name === 'b2bProject'
+      ? ['b2bProject', 'b2bDepartment', 'typeOfB2B']
+      : name === 'b2bDepartment'
+        ? ['b2bDepartment', 'typeOfB2B']
+        : [name];
+
+    if (clearFields.some((f) => formErrors[f])) {
+      setFormErrors(prev => {
+        const next = { ...prev };
+        clearFields.forEach((f) => { delete next[f]; });
+        return next;
+      });
     }
 
     // Extract numbers from mobile and whatsapp fields
@@ -1376,6 +1443,8 @@ const B2BSales = () => {
 
     // Required field validation
     if (!leadFormData.leadCategory) errors.leadCategory = 'Lead source is required';
+    if (!leadFormData.b2bProject) errors.b2bProject = 'B2B project is required';
+    if (!leadFormData.b2bDepartment) errors.b2bDepartment = 'B2B department is required';
     if (!leadFormData.typeOfB2B) errors.typeOfB2B = 'B2B type is required';
     if (!leadFormData.businessName) errors.businessName = 'Business name is required';
     if (!leadFormData.concernPersonName) errors.concernPersonName = 'Concern person name is required';
@@ -1465,10 +1534,14 @@ const B2BSales = () => {
   const [filters, setFilters] = useState({
     search: '',
     leadCategory: [],
+    b2bProject: '',
+    b2bDepartment: '',
     typeOfB2B: [],
     leadOwner: [],
     hasFollowUpCall: false,
     hasFollowUpVisit: false,
+    followUpCallBucket: '', // '' | 'done' | 'planned' | 'missed'
+    followUpVisitBucket: '',
     documentsStatus: [], // ['done','pending']
     dateRange: {
       start: null,
@@ -1478,6 +1551,30 @@ const B2BSales = () => {
     subStatus: []
   });
   const [showFilters, setShowFilters] = useState(false);
+
+  const cycleDepartmentOptions = useMemo(() => {
+    if (!filters.b2bProject) return allB2bDepartments;
+    return allB2bDepartments.filter(
+      (dept) => String(dept.project?._id || dept.project) === String(filters.b2bProject)
+    );
+  }, [allB2bDepartments, filters.b2bProject]);
+
+  const cycleTypeOfB2BOptions = useMemo(() => {
+    let types = allTypeOfB2BRaw;
+    if (filters.b2bDepartment) {
+      types = types.filter(
+        (type) => String(type.department?._id || type.department) === String(filters.b2bDepartment)
+      );
+    } else if (filters.b2bProject) {
+      const deptIds = new Set(
+        cycleDepartmentOptions.map((d) => String(d._id))
+      );
+      types = types.filter((type) =>
+        deptIds.has(String(type.department?._id || type.department))
+      );
+    }
+    return types;
+  }, [allTypeOfB2BRaw, filters.b2bDepartment, filters.b2bProject, cycleDepartmentOptions]);
 
   useEffect(() => {
     fetchLeads(null, 1);
@@ -1524,16 +1621,9 @@ const B2BSales = () => {
           const params = {
             page: 1,
             limit: validNumValue.toString(),
-            ...(selectedStatusFilter && { status: selectedStatusFilter }),
-            ...(eff.search && { search: eff.search }),
-            ...(Array.isArray(eff.leadCategory) && eff.leadCategory.length && { leadCategoryIn: toCsv(eff.leadCategory) }),
-            ...(Array.isArray(eff.typeOfB2B) && eff.typeOfB2B.length && { typeOfB2BIn: toCsv(eff.typeOfB2B) }),
-            ...(Array.isArray(eff.leadOwner) && eff.leadOwner.length && { leadOwnerIn: toCsv(eff.leadOwner) }),
-            ...(eff.dateRange?.start && { startDate: eff.dateRange.start }),
-            ...(eff.dateRange?.end && { endDate: eff.dateRange.end }),
-            ...(Array.isArray(eff.status) && eff.status.length && { statusIn: toCsv(eff.status) }),
-            ...(Array.isArray(eff.subStatus) && eff.subStatus.length && { subStatusIn: toCsv(eff.subStatus) })
+            ...(selectedStatusFilter && { status: selectedStatusFilter })
           };
+          appendLeadFilterParams(params, eff);
 
           const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
             headers: { 'x-auth': token },
@@ -1576,15 +1666,79 @@ const B2BSales = () => {
     fetchLeads(statusId, 1);
   };
 
+  const defaultFiltersState = () => ({
+    search: '',
+    leadCategory: [],
+    b2bProject: '',
+    b2bDepartment: '',
+    typeOfB2B: [],
+    leadOwner: [],
+    hasFollowUpCall: false,
+    hasFollowUpVisit: false,
+    followUpCallBucket: '',
+    followUpVisitBucket: '',
+    documentsStatus: [],
+    dateRange: { start: null, end: null },
+    status: [],
+    subStatus: []
+  });
+
+  const hasActiveListFilters = useMemo(() => Boolean(
+    filters.search ||
+    filters.b2bProject ||
+    filters.b2bDepartment ||
+    (Array.isArray(filters.typeOfB2B) && filters.typeOfB2B.length) ||
+    (Array.isArray(filters.leadOwner) && filters.leadOwner.length) ||
+    filters.followUpCallBucket ||
+    filters.followUpVisitBucket ||
+    filters.hasFollowUpCall ||
+    filters.hasFollowUpVisit ||
+    (Array.isArray(filters.documentsStatus) && filters.documentsStatus.length) ||
+    filters.dateRange?.start ||
+    filters.dateRange?.end ||
+    (Array.isArray(filters.leadCategory) && filters.leadCategory.length) ||
+    (Array.isArray(filters.status) && filters.status.length) ||
+    (Array.isArray(filters.subStatus) && filters.subStatus.length) ||
+    selectedStatusFilter ||
+    selectedApprovalStatus
+  ), [filters, selectedStatusFilter, selectedApprovalStatus]);
+
+  const activeFilterSummary = useMemo(() => {
+    const parts = [];
+    if (filters.followUpCallBucket) {
+      parts.push(`Call: ${filters.followUpCallBucket}`);
+    }
+    if (filters.followUpVisitBucket) {
+      parts.push(`Visit: ${filters.followUpVisitBucket}`);
+    }
+    if (selectedStatusFilter) {
+      const st = statusCounts?.find((s) => String(s.statusId) === String(selectedStatusFilter));
+      parts.push(`Status: ${st?.statusName || 'Selected'}`);
+    }
+    if (selectedApprovalStatus) parts.push(`Approval: ${selectedApprovalStatus}`);
+    if (filters.b2bProject) {
+      const p = b2bProjectOptions.find((o) => o.value === filters.b2bProject);
+      parts.push(`Project: ${p?.label || 'Selected'}`);
+    }
+    if (filters.search) parts.push('Search');
+    return parts;
+  }, [filters, selectedStatusFilter, selectedApprovalStatus, statusCounts, b2bProjectOptions]);
+
+  /** Reset filters + status chips — show full lead list again */
+  const showAllLeads = () => {
+    const cleared = defaultFiltersState();
+    setSelectedStatusFilter(null);
+    setSelectedApprovalStatus(null);
+    setFilters(cleared);
+    setCurrentPage(1);
+    fetchLeads(null, 1, { ...cleared, approvalStatus: null });
+    fetchStatusCounts(cleared);
+    fetchApprovalCounts(cleared);
+  };
+
   // Handle total card click (show all leads)
   const handleTotalCardClick = () => {
-    // console.log('📊 [FRONTEND] Total Card Clicked:', {
-    //   currentFilters: filters,
-    //   leadOwnerFilter: filters.leadOwner
-    // });
-    setSelectedStatusFilter(null);
-    setCurrentPage(1);
-    fetchLeads(null, 1);
+    showAllLeads();
   };
 
   // Filter handlers
@@ -1596,6 +1750,144 @@ const B2BSales = () => {
   };
 
   const toCsv = (arr) => (Array.isArray(arr) ? arr.filter(Boolean).join(',') : '');
+
+  const appendLeadFilterParams = (params, eff) => {
+    if (eff.search) params.search = eff.search;
+    if (Array.isArray(eff.leadCategory) && eff.leadCategory.length) {
+      params.leadCategoryIn = toCsv(eff.leadCategory);
+    }
+    if (eff.b2bProject) params.b2bProject = eff.b2bProject;
+    if (eff.b2bDepartment) params.b2bDepartment = eff.b2bDepartment;
+    if (Array.isArray(eff.typeOfB2B) && eff.typeOfB2B.length) {
+      params.typeOfB2BIn = toCsv(eff.typeOfB2B);
+    }
+    if (Array.isArray(eff.leadOwner) && eff.leadOwner.length) {
+      params.leadOwnerIn = toCsv(eff.leadOwner);
+    }
+    if (eff.dateRange?.start) params.startDate = eff.dateRange.start;
+    if (eff.dateRange?.end) params.endDate = eff.dateRange.end;
+    if (Array.isArray(eff.status) && eff.status.length) params.statusIn = toCsv(eff.status);
+    if (Array.isArray(eff.subStatus) && eff.subStatus.length) params.subStatusIn = toCsv(eff.subStatus);
+    if (eff.hasFollowUpCall) params.hasFollowUpCall = true;
+    if (eff.hasFollowUpVisit) params.hasFollowUpVisit = true;
+    if (eff.followUpCallBucket) params.followUpCallBucket = eff.followUpCallBucket;
+    if (eff.followUpVisitBucket) params.followUpVisitBucket = eff.followUpVisitBucket;
+    if (Array.isArray(eff.documentsStatus) && eff.documentsStatus.length) {
+      params.documentsStatusIn = toCsv(eff.documentsStatus);
+    }
+    const approval = eff.approvalStatus ?? selectedApprovalStatus;
+    if (approval) params.approvalStatus = approval;
+    return params;
+  };
+
+  const handleFollowupDashClick = (type, bucket) => {
+    const filterKey = type === 'Visit' ? 'followUpVisitBucket' : 'followUpCallBucket';
+    const otherKey = type === 'Visit' ? 'followUpCallBucket' : 'followUpVisitBucket';
+    const next = { ...filters };
+    const togglingOff = next[filterKey] === bucket;
+    next[filterKey] = togglingOff ? '' : bucket;
+    if (!togglingOff) next[otherKey] = '';
+    setFilters(next);
+    setCurrentPage(1);
+    fetchLeads(selectedStatusFilter, 1, next);
+    fetchStatusCounts(next);
+    fetchApprovalCounts(next);
+  };
+
+  const isFollowupDashSelected = (type, bucket) => {
+    const filterKey = type === 'Visit' ? 'followUpVisitBucket' : 'followUpCallBucket';
+    return filters[filterKey] === bucket;
+  };
+
+  const handleCycleFilterChange = (key, value) => {
+    const next = { ...filters };
+    if (key === 'b2bProject') {
+      next.b2bProject = value;
+      next.b2bDepartment = '';
+      next.typeOfB2B = [];
+    } else if (key === 'b2bDepartment') {
+      next.b2bDepartment = value;
+      next.typeOfB2B = [];
+    } else if (key === 'typeOfB2B') {
+      next.typeOfB2B = value ? [value] : [];
+    } else if (key === 'leadOwner') {
+      next.leadOwner = value ? [value] : [];
+    }
+    setFilters(next);
+    setCurrentPage(1);
+    fetchLeads(selectedStatusFilter, 1, next);
+    fetchStatusCounts(next);
+    fetchApprovalCounts(next);
+  };
+
+  const renderCycleFilterDropdowns = (mobile = false) => (
+    <div className={`b2b-cycle-filters${mobile ? ' b2b-cycle-filters--mobile' : ''}`}>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="cycle-filter-project">
+          <i className="fas fa-project-diagram" aria-hidden="true" /> Project
+        </label>
+        <select
+          id="cycle-filter-project"
+          className="b2b-cycle-filters__select"
+          value={filters.b2bProject || ''}
+          onChange={(e) => handleCycleFilterChange('b2bProject', e.target.value)}
+        >
+          <option value="">All</option>
+          {b2bProjectOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="cycle-filter-department">
+          <i className="fas fa-sitemap" aria-hidden="true" /> Department
+        </label>
+        <select
+          id="cycle-filter-department"
+          className="b2b-cycle-filters__select"
+          value={filters.b2bDepartment || ''}
+          onChange={(e) => handleCycleFilterChange('b2bDepartment', e.target.value)}
+        >
+          <option value="">All</option>
+          {cycleDepartmentOptions.map((dept) => (
+            <option key={dept._id} value={dept._id}>{dept.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="cycle-filter-type">
+          <i className="fas fa-building" aria-hidden="true" /> Type
+        </label>
+        <select
+          id="cycle-filter-type"
+          className="b2b-cycle-filters__select"
+          value={(filters.typeOfB2B && filters.typeOfB2B[0]) || ''}
+          onChange={(e) => handleCycleFilterChange('typeOfB2B', e.target.value)}
+        >
+          <option value="">All</option>
+          {cycleTypeOfB2BOptions.map((type) => (
+            <option key={type._id} value={type._id}>{type.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="cycle-filter-counsellor">
+          <i className="fas fa-user-tie" aria-hidden="true" /> {b2bUsersScope === 'team' ? 'Team' : 'Counsellor'}
+        </label>
+        <select
+          id="cycle-filter-counsellor"
+          className="b2b-cycle-filters__select"
+          value={(filters.leadOwner && filters.leadOwner[0]) || ''}
+          onChange={(e) => handleCycleFilterChange('leadOwner', e.target.value)}
+        >
+          <option value="">{b2bUsersScope === 'team' ? 'All team' : 'All'}</option>
+          {(users || []).map((u) => (
+            <option key={u._id} value={u._id}>{u.name || u.email || 'User'}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
 
   const handleDateRangeChange = (type, value) => {
     setFilters(prev => ({
@@ -1615,25 +1907,12 @@ const B2BSales = () => {
   };
 
   const clearFilters = () => {
-    setFilters({
-      search: '',
-      leadCategory: [],
-      typeOfB2B: [],
-      leadOwner: [],
-      hasFollowUpCall: false,
-      hasFollowUpVisit: false,
-      documentsStatus: [],
-      dateRange: {
-        start: null,
-        end: null
-      },
-      status: [],
-      subStatus: []
-    });
+    const cleared = defaultFiltersState();
+    setFilters(cleared);
     setCurrentPage(1);
-    fetchLeads(selectedStatusFilter, 1);
-    fetchStatusCounts(); // Update status counts after clearing filters
-    fetchApprovalCounts();
+    fetchLeads(selectedStatusFilter, 1, cleared);
+    fetchStatusCounts(cleared);
+    fetchApprovalCounts(cleared);
   };
 
   const fetchLeads = async (statusFilter = null, page = 1, filterOverrides = {}) => {
@@ -1654,41 +1933,7 @@ const B2BSales = () => {
         params.status = statusFilter;
       }
 
-      // Add filter parameters (use effective filters so clearing search refetches all)
-      if (eff.search) {
-        params.search = eff.search;
-      }
-      if (Array.isArray(eff.leadCategory) && eff.leadCategory.length) {
-        params.leadCategoryIn = toCsv(eff.leadCategory);
-      }
-      if (Array.isArray(eff.typeOfB2B) && eff.typeOfB2B.length) {
-        params.typeOfB2BIn = toCsv(eff.typeOfB2B);
-      }
-      if (Array.isArray(eff.leadOwner) && eff.leadOwner.length) {
-        params.leadOwnerIn = toCsv(eff.leadOwner);
-      }
-      if (eff.dateRange?.start) {
-        params.startDate = eff.dateRange.start;
-      }
-      if (eff.dateRange?.end) {
-        params.endDate = eff.dateRange.end;
-      }
-      if (Array.isArray(eff.status) && eff.status.length) {
-        params.statusIn = toCsv(eff.status);
-      }
-      if (Array.isArray(eff.subStatus) && eff.subStatus.length) {
-        params.subStatusIn = toCsv(eff.subStatus);
-      }
-      if (eff.hasFollowUpCall) params.hasFollowUpCall = true;
-      if (eff.hasFollowUpVisit) params.hasFollowUpVisit = true;
-      if (Array.isArray(eff.documentsStatus) && eff.documentsStatus.length) {
-        params.documentsStatusIn = toCsv(eff.documentsStatus);
-      }
-      // Lead Approval filter
-      const approval = eff.approvalStatus ?? selectedApprovalStatus;
-      if (approval) {
-        params.approvalStatus = approval;
-      }
+      appendLeadFilterParams(params, eff);
 
       // console.log('🔍 [FRONTEND] fetchLeads called:', {
       //   statusFilter,
@@ -1781,21 +2026,8 @@ const B2BSales = () => {
     try {
       setLoadingStatusCounts(true);
       const eff = { ...filters, ...filterOverrides };
-      // Build params with current filters (except status filter, as we're counting by status)
       const params = {};
-      if (Array.isArray(eff.leadCategory) && eff.leadCategory.length) params.leadCategoryIn = toCsv(eff.leadCategory);
-      if (Array.isArray(eff.typeOfB2B) && eff.typeOfB2B.length) params.typeOfB2BIn = toCsv(eff.typeOfB2B);
-      if (Array.isArray(eff.leadOwner) && eff.leadOwner.length) params.leadOwnerIn = toCsv(eff.leadOwner);
-      if (eff.search) params.search = eff.search;
-      if (Array.isArray(eff.subStatus) && eff.subStatus.length) params.subStatusIn = toCsv(eff.subStatus);
-      if (eff.dateRange?.start) params.startDate = eff.dateRange.start;
-      if (eff.dateRange?.end) params.endDate = eff.dateRange.end;
-      if (Array.isArray(eff.status) && eff.status.length) params.statusIn = toCsv(eff.status);
-      if (eff.hasFollowUpCall) params.hasFollowUpCall = true;
-      if (eff.hasFollowUpVisit) params.hasFollowUpVisit = true;
-      if (Array.isArray(eff.documentsStatus) && eff.documentsStatus.length) params.documentsStatusIn = toCsv(eff.documentsStatus);
-      const approval = eff.approvalStatus ?? selectedApprovalStatus;
-      if (approval) params.approvalStatus = approval;
+      appendLeadFilterParams(params, eff);
 
       const response = await axios.get(`${backendUrl}/college/b2b/leads/status-count`, {
         headers: { 'x-auth': token },
@@ -1826,17 +2058,7 @@ const B2BSales = () => {
       setApprovalCountsLoading(true);
       const eff = { ...filters, ...filterOverrides };
       const baseParams = {};
-      if (Array.isArray(eff.leadCategory) && eff.leadCategory.length) baseParams.leadCategoryIn = toCsv(eff.leadCategory);
-      if (Array.isArray(eff.typeOfB2B) && eff.typeOfB2B.length) baseParams.typeOfB2BIn = toCsv(eff.typeOfB2B);
-      if (Array.isArray(eff.leadOwner) && eff.leadOwner.length) baseParams.leadOwnerIn = toCsv(eff.leadOwner);
-      if (eff.search) baseParams.search = eff.search;
-      if (Array.isArray(eff.subStatus) && eff.subStatus.length) baseParams.subStatusIn = toCsv(eff.subStatus);
-      if (eff.dateRange?.start) baseParams.startDate = eff.dateRange.start;
-      if (eff.dateRange?.end) baseParams.endDate = eff.dateRange.end;
-      if (Array.isArray(eff.status) && eff.status.length) baseParams.statusIn = toCsv(eff.status);
-      if (eff.hasFollowUpCall) baseParams.hasFollowUpCall = true;
-      if (eff.hasFollowUpVisit) baseParams.hasFollowUpVisit = true;
-      if (Array.isArray(eff.documentsStatus) && eff.documentsStatus.length) baseParams.documentsStatusIn = toCsv(eff.documentsStatus);
+      appendLeadFilterParams(baseParams, eff);
 
       const [allRes, approvedRes, pendingRes, rejectedRes] = await Promise.all([
         axios.get(`${backendUrl}/college/b2b/leads/status-count`, { headers: { 'x-auth': token }, params: baseParams }),
@@ -2035,6 +2257,12 @@ const B2BSales = () => {
       leadOwnerId?.toString() === userId?.toString();
   };
 
+  const canEditLeadDetails = (lead) => {
+    if (!lead) return false;
+    if (canEditLeadsB2B) return true;
+    return canUpdateLead(lead);
+  };
+
   // Update lead status
   const updateLeadStatus = async (leadId, statusData) => {
     try {
@@ -2067,6 +2295,39 @@ const B2BSales = () => {
     }
   };
 
+  const buildLeadPayloadFromForm = () => {
+    const leadData = {
+      leadCategory: leadFormData.leadCategory,
+      b2bProject: leadFormData.b2bProject,
+      b2bDepartment: leadFormData.b2bDepartment,
+      typeOfB2B: leadFormData.typeOfB2B,
+      businessName: leadFormData.businessName,
+      address: leadFormData.address,
+      city: leadFormData.city,
+      state: leadFormData.state,
+      concernPersonName: leadFormData.concernPersonName,
+      designation: leadFormData.designation,
+      email: leadFormData.email,
+      mobile: leadFormData.mobile,
+      whatsapp: leadFormData.whatsapp,
+      landlineNumber: leadFormData.landlineNumber,
+      leadOwner: leadFormData.leadOwner,
+      remark: leadFormData.remark
+    };
+    if (selectedLocation) {
+      leadData.coordinates = {
+        type: 'Point',
+        coordinates: [selectedLocation.lng, selectedLocation.lat]
+      };
+    } else if (leadFormData.longitude && leadFormData.latitude) {
+      leadData.coordinates = {
+        type: 'Point',
+        coordinates: [leadFormData.longitude, leadFormData.latitude]
+      };
+    }
+    return leadData;
+  };
+
   // Handle lead form submission
   const handleLeadSubmit = async () => {
     if (!validateLeadForm()) {
@@ -2075,43 +2336,35 @@ const B2BSales = () => {
 
     setLoading(true);
     try {
-      // Prepare data according to backend schema
-      const leadData = {
-        leadCategory: leadFormData.leadCategory,
-        typeOfB2B: leadFormData.typeOfB2B,
-        businessName: leadFormData.businessName,
-        address: leadFormData.address,
-        city: leadFormData.city,
-        state: leadFormData.state,
-        concernPersonName: leadFormData.concernPersonName,
-        designation: leadFormData.designation,
-        email: leadFormData.email,
-        mobile: leadFormData.mobile,
-        whatsapp: leadFormData.whatsapp,
-        landlineNumber: leadFormData.landlineNumber,
-        leadOwner: leadFormData.leadOwner,
-        remark: leadFormData.remark
-      };
+      const leadData = buildLeadPayloadFromForm();
+
+      if (editingLeadId) {
+        const response = await axios.put(`${backendUrl}/college/b2b/leads/${editingLeadId}`, leadData, {
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json',
+          }
+        });
+
+        if (response.data.status) {
+          alert('Lead updated successfully!');
+          await fetchLeads(selectedStatusFilter, currentPage);
+          await fetchStatusCounts();
+          await fetchApprovalCounts();
+          handleCloseLeadModal();
+        } else {
+          alert(response.data.message || 'Failed to update lead');
+        }
+        return;
+      }
+
       if (leadFormData.leadStatus) {
         leadData.status = leadFormData.leadStatus;
       }
       if (leadFormData.leadSubStatus) {
         leadData.subStatus = leadFormData.leadSubStatus;
       }
-      // Add coordinates if location is selected
-      if (selectedLocation) {
-        leadData.coordinates = {
-          type: "Point",
-          coordinates: [selectedLocation.lng, selectedLocation.lat] // [longitude, latitude]
-        };
-      } else if (leadFormData.longitude && leadFormData.latitude) {
-        leadData.coordinates = {
-          type: "Point",
-          coordinates: [leadFormData.longitude, leadFormData.latitude] // [longitude, latitude]
-        };
-      }
 
-      // Send data to backend API
       const response = await axios.post(`${backendUrl}/college/b2b/add-lead`, leadData, {
         headers: {
           'x-auth': token,
@@ -2131,6 +2384,8 @@ const B2BSales = () => {
         // Reset form
         setLeadFormData({
           leadCategory: '',
+          b2bProject: '',
+          b2bDepartment: '',
           typeOfB2B: '',
           businessName: '',
           businessAddress: '',
@@ -2172,11 +2427,57 @@ const B2BSales = () => {
     }
   };
 
+  const openEditLeadModal = (lead) => {
+    if (!lead?._id) return;
+    if (!canEditLeadDetails(lead)) {
+      alert("You don't have permission to edit this lead.");
+      return;
+    }
+    const coords = lead.coordinates?.coordinates;
+    setEditingLeadId(lead._id);
+    setLeadFormData({
+      leadCategory: lead.leadCategory?._id || lead.leadCategory || '',
+      b2bProject: lead.b2bProject?._id || lead.b2bProject || '',
+      b2bDepartment: lead.b2bDepartment?._id || lead.b2bDepartment || '',
+      typeOfB2B: lead.typeOfB2B?._id || lead.typeOfB2B || '',
+      businessName: lead.businessName || '',
+      businessAddress: '',
+      concernPersonName: lead.concernPersonName || '',
+      address: lead.address || '',
+      city: lead.city || '',
+      state: lead.state || '',
+      latitude: coords?.[1] != null ? String(coords[1]) : '',
+      longitude: coords?.[0] != null ? String(coords[0]) : '',
+      designation: lead.designation || '',
+      email: lead.email || '',
+      mobile: lead.mobile || '',
+      whatsapp: lead.whatsapp || '',
+      landlineNumber: lead.landlineNumber || '',
+      leadOwner: lead.leadOwner?._id || lead.leadOwner || '',
+      leadStatus: '',
+      leadSubStatus: '',
+      remark: lead.remark || ''
+    });
+    if (coords?.[0] != null && coords?.[1] != null) {
+      setSelectedLocation({ lat: coords[1], lng: coords[0] });
+    } else {
+      setSelectedLocation(null);
+    }
+    setFormErrors({});
+    setExtractedNumbers([]);
+    setShowMap(false);
+    setAddLeadSubStatuses([]);
+    setShowAddLeadModal(true);
+  };
+
   // Close lead modal
   const handleCloseLeadModal = () => {
     setShowAddLeadModal(false);
+    setEditingLeadId(null);
     setLeadFormData({
       leadCategory: '',
+      b2bProject: '',
+      b2bDepartment: '',
       typeOfB2B: '',
       businessName: '',
       businessAddress: '',
@@ -2203,9 +2504,12 @@ const B2BSales = () => {
 
   // Open lead modal and initialize autocomplete
   const handleOpenLeadModal = () => {
+    setEditingLeadId(null);
     const uid = userData?._id != null ? String(userData._id) : '';
     setLeadFormData({
       leadCategory: '',
+      b2bProject: '',
+      b2bDepartment: '',
       typeOfB2B: '',
       businessName: '',
       businessAddress: '',
@@ -2234,8 +2538,8 @@ const B2BSales = () => {
   };
 
   useEffect(() => {
-    if (!showAddLeadModal || !leadFormData.leadStatus) {
-      if (!leadFormData.leadStatus) {
+    if (!showAddLeadModal || editingLeadId || !leadFormData.leadStatus) {
+      if (!leadFormData.leadStatus || editingLeadId) {
         setAddLeadSubStatuses([]);
         setAddLeadSubStatusesLoading(false);
       }
@@ -2267,7 +2571,7 @@ const B2BSales = () => {
     return () => {
       cancelled = true;
     };
-  }, [showAddLeadModal, leadFormData.leadStatus, backendUrl, token]);
+  }, [showAddLeadModal, editingLeadId, leadFormData.leadStatus, backendUrl, token]);
 
   useEffect(() => {
     if (!showBulkUploadModal || !bulkUploadFormData.leadStatus) {
@@ -3887,9 +4191,9 @@ const B2BSales = () => {
               }}
             >
               <div className="container-fluid">
-                <div className="row align-items-center">
-                  <div className="col-md-6 d-md-block d-sm-none">
-                    <div className="d-flex align-items-center">
+                <div className="row align-items-center gy-2">
+                  <div className="col-md-4 col-xl-3 d-none d-md-block">
+                    <div className="d-flex align-items-center flex-wrap">
                       <h5 className="fw-bold text-dark mb-0 me-3" style={{ fontSize: '1.1rem' }}>B2B Cycle</h5>
                       <nav aria-label="breadcrumb">
                         <ol className="breadcrumb mb-0 small">
@@ -3902,12 +4206,164 @@ const B2BSales = () => {
                     </div>
                   </div>
 
-                  <div className="col-md-6">
-                    {/* Desktop Layout */}
-                    <div className="d-none flex-row-reverse d-md-flex justify-content-between align-items-center gap-2">
-                      {/* Left side - Buttons */}
-                      <div style={{ display: "flex", gap: "8px" }}>
-                        {/* Quick Search */}
+                  <div className="col-md-8 col-xl-9 d-none d-md-flex justify-content-end align-items-center">
+                    {showBulkInputs && bulkMode === 'bulkrefer' ? (
+                      <div className="d-flex justify-content-end align-items-center gap-2">
+                      {/* Bulk Refer inputs (desktop top row when active) */}
+                      {showBulkInputs && bulkMode === 'bulkrefer' && (
+                        <div style={{
+                          display: "flex",
+                          alignItems: "stretch",
+                          border: "1px solid #dee2e6",
+                          borderRadius: "4px",
+                          backgroundColor: "#fff",
+                          overflow: "hidden",
+                          width: "200px",
+                          height: "32px",
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+                        }}>
+                          <input
+                            type="text"
+                            placeholder="Input 1"
+                            value={input1Value}
+                            onChange={(e) => {
+                              const maxValue = totalLeads || leads?.length || 0;
+                              let inputValue = e.target.value.replace(/[^0-9]/g, '');
+
+                              if (inputValue === '') {
+                                setInput1Value('');
+                                return;
+                              }
+
+                              const numValue = parseInt(inputValue, 10);
+
+                              if (numValue < 1 || isNaN(numValue)) {
+                                inputValue = '1';
+                              } else if (numValue > maxValue) {
+                                inputValue = maxValue.toString();
+                              }
+
+                              setInput1Value(inputValue);
+                            }}
+                            onKeyDown={(e) => {
+                              if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
+                                e.preventDefault();
+                              }
+                            }}
+                            style={{
+                              width: "50%",
+                              border: "none",
+                              borderRight: "1px solid #dee2e6",
+                              outline: "none",
+                              padding: "4px 10px",
+                              fontSize: "12px",
+                              backgroundColor: "transparent",
+                              height: "100%",
+                              boxSizing: "border-box"
+                            }}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Input 2"
+                            value={totalLeads || leads?.length || 0}
+                            readOnly
+                            style={{
+                              width: "50%",
+                              border: "none",
+                              outline: "none",
+                              padding: "4px 10px",
+                              fontSize: "12px",
+                              backgroundColor: "transparent",
+                              height: "100%",
+                              boxSizing: "border-box",
+                              cursor: "default"
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    ) : (
+                      renderCycleFilterDropdowns()
+                    )}
+                  </div>
+
+                  {/* Desktop: actions + search */}
+                  <div className="col-12 d-none d-md-block mt-2 pt-1 border-top" style={{ borderColor: '#eee' }}>
+                    <div className="d-flex flex-wrap gap-2 align-items-center justify-content-between">
+                      <div className="d-flex flex-wrap gap-2 align-items-center">
+                      {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                        <>
+                          <button
+                            type="button"
+                            className="btn btn-sm border-0"
+                            style={{
+                              padding: '8px 16px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              color: '#fff',
+                              backgroundColor: 'rgb(250, 85, 121)',
+                              borderRadius: '999px'
+                            }}
+                            onClick={handleOpenLeadModal}
+                          >
+                            <i className="fas fa-plus" style={{ fontSize: '11px' }}></i>
+                            Add Lead
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-sm border-0"
+                            style={{
+                              padding: '8px 16px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              color: '#fff',
+                              backgroundColor: 'rgb(250, 85, 121)',
+                              borderRadius: '999px'
+                            }}
+                            onClick={openBulkUploadModal}
+                          >
+                            <i className="fas fa-file-upload" style={{ fontSize: '11px' }}></i>
+                            Bulk Upload
+                          </button>
+                        </>
+                      )}
+                      {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                        <button
+                          type="button"
+                          className="btn btn-sm border-0"
+                          disabled={loadingLeads || leads.length === 0}
+                          style={{
+                            padding: '8px 16px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            color: '#fff',
+                            backgroundColor: 'rgb(250, 85, 121)',
+                            borderRadius: '999px',
+                            opacity: loadingLeads || leads.length === 0 ? 0.55 : 1
+                          }}
+                          onClick={() => {
+                            setShowBulkInputs(true);
+                            setBulkMode('bulkrefer');
+                            setInput1Value('');
+                            openRefferPanel(null, 'RefferAllLeads');
+                          }}
+                        >
+                          <i className="fas fa-share-alt" style={{ fontSize: '11px' }}></i>
+                          Refer All
+                        </button>
+                      )}
+                      </div>
+
+                      <div className="d-flex align-items-center gap-2 ms-md-auto">
                         <div className="d-flex align-items-center gap-2">
                           <div className="position-relative">
                             <input
@@ -3988,7 +4444,6 @@ const B2BSales = () => {
                             <i className="fas fa-search me-1"></i>
                           </button>
                         </div>
-
                         <button
                           className={`btn btn-sm filterBadge ${showFilters ? 'btn-primary' : 'btn-outline-secondary'}`}
                           onClick={() => setShowFilters(!showFilters)}
@@ -4006,163 +4461,18 @@ const B2BSales = () => {
                         >
                           <i className="fas fa-filter me-1"></i>
                         </button>
-
-
                       </div>
-
-                      {/* Right side - Input Fields for Bulk Refer */}
-                      {showBulkInputs && bulkMode === 'bulkrefer' && (
-                        <div style={{
-                          display: "flex",
-                          alignItems: "stretch",
-                          border: "1px solid #dee2e6",
-                          borderRadius: "4px",
-                          backgroundColor: "#fff",
-                          overflow: "hidden",
-                          width: "200px",
-                          height: "32px",
-                          boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
-                        }}>
-                          <input
-                            type="text"
-                            placeholder="Input 1"
-                            value={input1Value}
-                            onChange={(e) => {
-                              const maxValue = totalLeads || leads?.length || 0;
-                              let inputValue = e.target.value.replace(/[^0-9]/g, '');
-
-                              if (inputValue === '') {
-                                setInput1Value('');
-                                return;
-                              }
-
-                              const numValue = parseInt(inputValue, 10);
-
-                              if (numValue < 1 || isNaN(numValue)) {
-                                inputValue = '1';
-                              } else if (numValue > maxValue) {
-                                inputValue = maxValue.toString();
-                              }
-
-                              setInput1Value(inputValue);
-                            }}
-                            onKeyDown={(e) => {
-                              if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
-                                e.preventDefault();
-                              }
-                            }}
-                            style={{
-                              width: "50%",
-                              border: "none",
-                              borderRight: "1px solid #dee2e6",
-                              outline: "none",
-                              padding: "4px 10px",
-                              fontSize: "12px",
-                              backgroundColor: "transparent",
-                              height: "100%",
-                              boxSizing: "border-box"
-                            }}
-                          />
-                          <input
-                            type="text"
-                            placeholder="Input 2"
-                            value={totalLeads || leads?.length || 0}
-                            readOnly
-                            style={{
-                              width: "50%",
-                              border: "none",
-                              outline: "none",
-                              padding: "4px 10px",
-                              fontSize: "12px",
-                              backgroundColor: "transparent",
-                              height: "100%",
-                              boxSizing: "border-box",
-                              cursor: "default"
-                            }}
-                          />
-                        </div>
-                      )}
                     </div>
                   </div>
 
-                  {/* Desktop: primary actions (fixed with header) */}
-                  <div className="col-12 d-none d-md-block mt-2 pt-1 border-top" style={{ borderColor: '#eee' }}>
-                    <div className="d-flex flex-wrap gap-2 align-items-center">
-                      {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-                        <>
-                          <button
-                            type="button"
-                            className="btn btn-sm border-0"
-                            style={{
-                              padding: '8px 16px',
-                              fontSize: '12px',
-                              fontWeight: 600,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              color: '#fff',
-                              backgroundColor: 'rgb(250, 85, 121)',
-                              borderRadius: '999px'
-                            }}
-                            onClick={handleOpenLeadModal}
-                          >
-                            <i className="fas fa-plus" style={{ fontSize: '11px' }}></i>
-                            Add Lead
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-sm border-0"
-                            style={{
-                              padding: '8px 16px',
-                              fontSize: '12px',
-                              fontWeight: 600,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              color: '#fff',
-                              backgroundColor: 'rgb(250, 85, 121)',
-                              borderRadius: '999px'
-                            }}
-                            onClick={openBulkUploadModal}
-                          >
-                            <i className="fas fa-file-upload" style={{ fontSize: '11px' }}></i>
-                            Bulk Upload
-                          </button>
-                        </>
-                      )}
-                      {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-                        <button
-                          type="button"
-                          className="btn btn-sm border-0"
-                          disabled={loadingLeads || leads.length === 0}
-                          style={{
-                            padding: '8px 16px',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            color: '#fff',
-                            backgroundColor: 'rgb(250, 85, 121)',
-                            borderRadius: '999px',
-                            opacity: loadingLeads || leads.length === 0 ? 0.55 : 1
-                          }}
-                          onClick={() => {
-                            setShowBulkInputs(true);
-                            setBulkMode('bulkrefer');
-                            setInput1Value('');
-                            openRefferPanel(null, 'RefferAllLeads');
-                          }}
-                        >
-                          <i className="fas fa-share-alt" style={{ fontSize: '11px' }}></i>
-                          Refer All
-                        </button>
-                      )}
-                    </div>
+                  {/* Mobile: filters on top row */}
+                  <div className="col-12 d-md-none">
+                    {!(showBulkInputs && bulkMode === 'bulkrefer') && renderCycleFilterDropdowns(true)}
                   </div>
 
                   {/* Mobile Layout */}
-                  <div className="col-12 d-md-none mt-2">
+                  <div className="col-12 d-md-none mt-2 pt-1 border-top" style={{ borderColor: '#eee' }}>
+                    <div className="b2b-mobile-toolbar d-flex flex-wrap align-items-center gap-2">
                     <div className="b2b-mobile-hscroll b2b-mobile-hscroll--actions">
 
                       {((permissions?.custom_permissions?.can_add_leads_b2b && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
@@ -4216,6 +4526,97 @@ const B2BSales = () => {
                           Refer Leads
                         </button>
                       )}
+                    </div>
+
+                    <div className="d-flex align-items-center gap-2 b2b-mobile-toolbar__search flex-grow-1" style={{ minWidth: '200px' }}>
+                      <div className="position-relative flex-grow-1">
+                        <input
+                          type="text"
+                          className="form-control form-control-sm"
+                          placeholder="Quick search..."
+                          value={filters.search}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            handleFilterChange('search', val);
+                            if (val === '') applyFilters({ search: '' });
+                          }}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              applyFilters();
+                            }
+                          }}
+                          style={{
+                            paddingRight: '28px',
+                            paddingLeft: '12px',
+                            paddingTop: '8px',
+                            paddingBottom: '8px',
+                            backgroundColor: '#ffffff',
+                            border: '1.5px solid #ced4da',
+                            fontSize: '13px',
+                            borderRadius: '6px',
+                            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+                          }}
+                        />
+                        {filters.search && (
+                          <button
+                            type="button"
+                            className="btn btn-sm position-absolute"
+                            onClick={() => {
+                              handleFilterChange('search', '');
+                              applyFilters({ search: '' });
+                            }}
+                            style={{
+                              right: '2px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              padding: '2px 6px',
+                              backgroundColor: '#dc3545',
+                              border: 'none',
+                              color: 'white',
+                              borderRadius: '50%',
+                              width: '20px',
+                              height: '20px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          >
+                            <i className="fas fa-times" style={{ fontSize: '8px' }}></i>
+                          </button>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-primary"
+                        onClick={applyFilters}
+                        disabled={!filters.search}
+                        style={{
+                          background: 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)',
+                          borderColor: 'rgb(250, 85, 121)',
+                          color: 'white',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          fontSize: '13px'
+                        }}
+                      >
+                        <i className="fas fa-search"></i>
+                      </button>
+                      <button
+                        className={`btn btn-sm filterBadge ${showFilters ? 'btn-primary' : 'btn-outline-secondary'}`}
+                        onClick={() => setShowFilters(!showFilters)}
+                        style={{
+                          background: showFilters ? 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)' : '#ffffff',
+                          color: showFilters ? '#ffffff' : 'rgb(250, 85, 121)',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          fontSize: '13px',
+                          borderWidth: '1.5px',
+                          borderColor: 'rgb(250, 85, 121)'
+                        }}
+                      >
+                        <i className="fas fa-filter"></i>
+                      </button>
+                    </div>
                     </div>
 
                     <div className="row g-2">
@@ -4291,125 +4692,6 @@ const B2BSales = () => {
                           </div>
                         </div>
                       )}
-                      <div className="col-12 mt-2">
-                        <div className="d-flex align-items-center gap-2">
-                          <div className="position-relative flex-grow-1">
-                            <input
-                              type="text"
-                              className="form-control"
-                              placeholder="🔍 Search leads..."
-                              value={filters.search}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                handleFilterChange('search', val);
-                                if (val === '') applyFilters({ search: '' });
-                              }}
-                              onKeyPress={(e) => {
-                                if (e.key === 'Enter') {
-                                  applyFilters();
-                                }
-                              }}
-                              style={{
-                                paddingRight: '35px',
-                                paddingLeft: '14px',
-                                paddingTop: '12px',
-                                paddingBottom: '12px',
-                                backgroundColor: '#ffffff',
-                                border: '1.5px solid #ced4da',
-                                color: '#212529',
-                                fontSize: '14px',
-                                borderRadius: '8px',
-                                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-                              }}
-                            />
-                            {filters.search && (
-                              <button
-                                type="button"
-                                className="btn btn-sm position-absolute"
-                                onClick={() => {
-                                  handleFilterChange('search', '');
-                                  applyFilters({ search: '' });
-                                }}
-                                style={{
-                                  right: '4px',
-                                  top: '50%',
-                                  transform: 'translateY(-50%)',
-                                  padding: '4px 8px',
-                                  backgroundColor: '#dc3545',
-                                  border: 'none',
-                                  color: 'white',
-                                  borderRadius: '50%',
-                                  width: '24px',
-                                  height: '24px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  boxShadow: '0 2px 4px rgba(220, 53, 69, 0.3)'
-                                }}
-                              >
-                                <i className="fas fa-times" style={{ fontSize: '10px' }}></i>
-                              </button>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            onClick={applyFilters}
-                            disabled={!filters.search}
-                            style={{
-                              padding: '12px 16px',
-                              borderRadius: '8px',
-                              fontSize: '14px',
-                              minWidth: '48px',
-                              height: '48px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              boxShadow: '0 2px 8px rgba(0, 123, 255, 0.3)',
-                              transition: 'all 0.2s ease'
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!e.currentTarget.disabled) {
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 123, 255, 0.4)';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.transform = 'translateY(0)';
-                              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 123, 255, 0.3)';
-                            }}
-                          >
-                            <i className="fas fa-search" style={{ fontSize: '16px' }}></i>
-                          </button>
-                          <button
-                            className={`btn ${showFilters ? 'btn-primary' : 'btn-outline-secondary'}`}
-                            onClick={() => setShowFilters(!showFilters)}
-                            style={{
-                              padding: '12px 16px',
-                              borderRadius: '8px',
-                              fontSize: '14px',
-                              minWidth: '48px',
-                              height: '48px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              boxShadow: showFilters ? '0 2px 8px rgba(0, 123, 255, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                              transition: 'all 0.2s ease',
-                              borderWidth: '1.5px'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.transform = 'translateY(0)';
-                              e.currentTarget.style.boxShadow = showFilters ? '0 2px 8px rgba(0, 123, 255, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)';
-                            }}
-                          >
-                            <i className="fas fa-filter" style={{ fontSize: '16px' }}></i>
-                          </button>
-                        </div>
-                      </div>
                     </div>
                   </div>
 
@@ -4535,22 +4817,28 @@ const B2BSales = () => {
                           <span className="b2b-dash-section__label">Followup Calling</span>
                           <div className="d-flex flex-wrap gap-2 pt-1">
                             {[
-                              { key: 'fc-done', label: 'Done', value: dashboardB2BCounts.call.done, bg: '#e8a317' },
-                              { key: 'fc-planned', label: 'Planned', value: dashboardB2BCounts.call.planned, bg: '#e8a317' },
-                              { key: 'fc-missed', label: 'Missed', value: dashboardB2BCounts.call.missed, bg: '#e8a317' }
-                            ].map((row) => (
-                              <div
+                              { key: 'fc-done', bucket: 'done', label: 'Done', value: dashboardB2BCounts.call.done, bg: '#12b3ff' },
+                              { key: 'fc-planned', bucket: 'planned', label: 'Planned', value: dashboardB2BCounts.call.planned, bg: '#f59e0b' },
+                              { key: 'fc-missed', bucket: 'missed', label: 'Missed', value: dashboardB2BCounts.call.missed, bg: '#7c3d14' }
+                            ].map((row) => {
+                              const selected = isFollowupDashSelected('Call', row.bucket);
+                              return (
+                              <button
                                 key={row.key}
-                                className="b2b-dash-stat-card text-center text-white flex-grow-1"
+                                type="button"
+                                className={`b2b-dash-stat-card text-center text-white flex-grow-1 border-0${selected ? ' b2b-dash-stat-card--active' : ''}`}
                                 style={{ background: row.bg }}
+                                onClick={() => handleFollowupDashClick('Call', row.bucket)}
+                                title={`Filter leads: Call follow-ups — ${row.label}`}
                               >
                                 <div className="b2b-dash-stat-card__label">{row.label}</div>
                                 <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
                                 <div className="b2b-dash-stat-card__value text-white">
                                   {String(row.value).padStart(2, '0')}
                                 </div>
-                              </div>
-                            ))}
+                              </button>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>
@@ -4559,22 +4847,28 @@ const B2BSales = () => {
                           <span className="b2b-dash-section__label">Followup Visit</span>
                           <div className="d-flex flex-wrap gap-2 pt-1">
                             {[
-                              { key: 'fv-done', label: 'Done', value: dashboardB2BCounts.visit.done, bg: '#4b5563' },
-                              { key: 'fv-planned', label: 'Planned', value: dashboardB2BCounts.visit.planned, bg: '#4b5563' },
-                              { key: 'fv-missed', label: 'Missed', value: dashboardB2BCounts.visit.missed, bg: '#4b5563' }
-                            ].map((row) => (
-                              <div
+                              { key: 'fv-done', bucket: 'done', label: 'Done', value: dashboardB2BCounts.visit.done, bg: '#4b5563' },
+                              { key: 'fv-planned', bucket: 'planned', label: 'Planned', value: dashboardB2BCounts.visit.planned, bg: '#4b5563' },
+                              { key: 'fv-missed', bucket: 'missed', label: 'Missed', value: dashboardB2BCounts.visit.missed, bg: '#7c3d14' }
+                            ].map((row) => {
+                              const selected = isFollowupDashSelected('Visit', row.bucket);
+                              return (
+                              <button
                                 key={row.key}
-                                className="b2b-dash-stat-card text-center text-white flex-grow-1"
+                                type="button"
+                                className={`b2b-dash-stat-card text-center text-white flex-grow-1 border-0${selected ? ' b2b-dash-stat-card--active' : ''}`}
                                 style={{ background: row.bg }}
+                                onClick={() => handleFollowupDashClick('Visit', row.bucket)}
+                                title={`Filter leads: Visit follow-ups — ${row.label}`}
                               >
                                 <div className="b2b-dash-stat-card__label">{row.label}</div>
                                 <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
                                 <div className="b2b-dash-stat-card__value text-white">
                                   {String(row.value).padStart(2, '0')}
                                 </div>
-                              </div>
-                            ))}
+                              </button>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>
@@ -4632,6 +4926,17 @@ const B2BSales = () => {
                           justify-content: center;
                           min-height: 45px;
                           box-sizing: border-box;
+                          cursor: pointer;
+                          transition: transform 0.15s ease, box-shadow 0.15s ease, outline 0.15s ease;
+                        }
+                        .b2b-crm-dashboard .b2b-dash-stat-card:hover {
+                          transform: translateY(-1px);
+                          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+                        }
+                        .b2b-crm-dashboard .b2b-dash-stat-card--active {
+                          outline: 3px solid rgb(250, 85, 121);
+                          outline-offset: 2px;
+                          box-shadow: 0 4px 12px rgba(250, 85, 121, 0.35);
                         }
                         .b2b-crm-dashboard .b2b-dash-stat-card--lead {
                           flex: 1 1 96px;
@@ -4684,6 +4989,36 @@ const B2BSales = () => {
                   </div>
                 </div>
               </div>
+
+              {hasActiveListFilters && (
+                <div className="alert alert-light border d-flex flex-wrap align-items-center justify-content-between gap-2 py-2 px-3 mb-2 b2b-active-filters-bar">
+                  <div className="d-flex flex-wrap align-items-center gap-2" style={{ fontSize: '13px' }}>
+                    <i className="fas fa-filter text-secondary" aria-hidden="true" />
+                    <span className="text-muted">Showing filtered leads</span>
+                    {activeFilterSummary.length > 0 && (
+                      <span className="text-dark fw-medium">
+                        ({activeFilterSummary.join(' · ')})
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={showAllLeads}
+                    style={{
+                      backgroundColor: 'rgb(250, 85, 121)',
+                      color: '#fff',
+                      fontWeight: 600,
+                      borderRadius: '999px',
+                      padding: '6px 14px',
+                      border: 'none'
+                    }}
+                  >
+                    <i className="fas fa-undo me-1" aria-hidden="true" />
+                    Show all leads
+                  </button>
+                </div>
+              )}
 
               {/* Bulk refer bar (shows above lead cards) */}
               {showBulkInputs && bulkMode === 'bulkrefer' && (
@@ -4814,11 +5149,37 @@ const B2BSales = () => {
                 <div className="text-center py-5">
                   <i className="fas fa-inbox text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
                   <h5 className="mt-3 text-muted">
-                    {selectedStatusFilter ? 'No leads found for selected status' : 'No B2B Leads Found'}
+                    {hasActiveListFilters
+                      ? 'No leads match your current filters'
+                      : selectedStatusFilter
+                        ? 'No leads found for selected status'
+                        : 'No B2B Leads Found'}
                   </h5>
-                  <p className="text-muted">
-                    {selectedStatusFilter ? 'Try selecting a different status or add new leads.' : 'Start by adding your first B2B lead using the "Add Lead" button.'}
+                  <p className="text-muted mb-3">
+                    {hasActiveListFilters
+                      ? 'Clear filters to see all leads again, or try a different filter.'
+                      : selectedStatusFilter
+                        ? 'Try selecting a different status or add new leads.'
+                        : 'Start by adding your first B2B lead using the "Add Lead" button.'}
                   </p>
+                  {hasActiveListFilters && (
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={showAllLeads}
+                      style={{
+                        backgroundColor: 'rgb(250, 85, 121)',
+                        color: '#fff',
+                        fontWeight: 600,
+                        borderRadius: '999px',
+                        padding: '8px 20px',
+                        border: 'none'
+                      }}
+                    >
+                      <i className="fas fa-undo me-2" aria-hidden="true" />
+                      Show all leads
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="row g-2">
@@ -4856,6 +5217,21 @@ const B2BSales = () => {
                               <div className="lhm__row1">
 
                                 <div className="lhm__name" title={lead.businessName || lead.concernPersonName || ''}>
+                                  {canEditLeadDetails(lead) && (
+                                    <button
+                                      type="button"
+                                      className="lhm__name-edit"
+                                      aria-label="Edit lead"
+                                      title="Edit Lead"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        openEditLeadModal(lead);
+                                      }}
+                                    >
+                                      <i className="fas fa-pen" aria-hidden="true"></i>
+                                    </button>
+                                  )}
                                   <i className="fas fa-user-circle lhm__name-icon" aria-hidden="true"></i>
                                   <span className="text-capitalize lhm__name-text">
                                     {lead.concernPersonName || '—'}
@@ -5143,6 +5519,21 @@ const B2BSales = () => {
                           ) : (
                             <div className="lead-header-v2__row">
                               <div className="lead-header-v2__left">
+                                {canEditLeadDetails(lead) && (
+                                  <button
+                                    type="button"
+                                    className="lead-header-v2__left-edit"
+                                    aria-label="Edit lead"
+                                    title="Edit Lead"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      openEditLeadModal(lead);
+                                    }}
+                                  >
+                                    <i className="fas fa-pen" aria-hidden="true"></i>
+                                  </button>
+                                )}
                                 <div className="lead-header-v2__inputs">
                                   <div className="lead-header-v2__input-row">
                                     <div className="lead-header-v2__input-wrap">
@@ -5520,6 +5911,14 @@ const B2BSales = () => {
                                   <div className="lead-meta-v2__value text-capitalize" title={lead.leadAddedBy?.name || '—'}>{lead.leadAddedBy?.name || '—'}</div>
                                 </div>
                                 <div className="lead-meta-v2__item">
+                                  <div className="lead-meta-v2__label">B2B Project</div>
+                                  <div className="lead-meta-v2__value text-capitalize" title={getLeadB2bProjectName(lead)}>{getLeadB2bProjectName(lead)}</div>
+                                </div>
+                                <div className="lead-meta-v2__item">
+                                  <div className="lead-meta-v2__label">B2B Department</div>
+                                  <div className="lead-meta-v2__value text-capitalize" title={getLeadB2bDepartmentName(lead)}>{getLeadB2bDepartmentName(lead)}</div>
+                                </div>
+                                <div className="lead-meta-v2__item">
                                   <div className="lead-meta-v2__label">Lead Source</div>
                                   <div className="d-flex align-items-center gap-2">
                                     <div className="lead-meta-v2__value text-capitalize" title={lead.leadCategory?.name || '—'}>{lead.leadCategory?.name || '—'}</div>
@@ -5767,6 +6166,22 @@ const B2BSales = () => {
                       Status
                     </button>
 
+                    {canEditLeadDetails(mobileMoreLead) && (
+                      <button
+                        type="button"
+                        className="lead-meta-v2__action-btn"
+                        onClick={() => {
+                          const l = mobileMoreLead;
+                          setMobileMoreLead(null);
+                          openEditLeadModal(l);
+                        }}
+                        title="Edit Lead"
+                      >
+                        <i className="fas fa-pen"></i>
+                        Edit Lead
+                      </button>
+                    )}
+
                     <Link
                       to="/institute/lrp"
                       className="lead-meta-v2__action-btn"
@@ -5837,7 +6252,7 @@ const B2BSales = () => {
                   </div>
                   <div className="col-md-4">
                     <MultiSelectCheckbox
-                      title="Lead Owner"
+                      title={b2bUsersScope === 'team' ? 'My team' : 'Lead Owner'}
                       icon="fas fa-user"
                       options={(users || []).map((u) => ({ value: u._id, label: u.name || u.email || 'User' }))}
                       selectedValues={filters.leadOwner || []}
@@ -6254,8 +6669,8 @@ const B2BSales = () => {
                 {/* Modal Header */}
                 <div className="modal-header" style={{ background: 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)', color: 'white' }}>
                   <h5 className="modal-title d-flex align-items-center">
-                    <i className="fas fa-user-plus me-2"></i>
-                    Add New B2B Lead
+                    <i className={`fas ${editingLeadId ? 'fa-pen' : 'fa-user-plus'} me-2`}></i>
+                    {editingLeadId ? 'Edit B2B Lead' : 'Add New B2B Lead'}
                   </h5>
                   <button
                     type="button"
@@ -6293,10 +6708,68 @@ const B2BSales = () => {
                       )}
                     </div>
 
-                    {/* Type of B2B */}
+                    {/* B2B Project */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-project-diagram text-primary me-1"></i>
+                        B2B Project <span className="text-danger">*</span>
+                      </label>
+                      <select
+                        className={`form-select ${formErrors.b2bProject ? 'is-invalid' : ''}`}
+                        name="b2bProject"
+                        value={leadFormData.b2bProject}
+                        onChange={handleLeadInputChange}
+                      >
+                        <option value="">Select B2B Project</option>
+                        {b2bProjectOptions.map((project) => (
+                          <option key={project.value} value={project.value}>
+                            {project.label}
+                          </option>
+                        ))}
+                      </select>
+                      {formErrors.b2bProject && (
+                        <div className="invalid-feedback">
+                          {formErrors.b2bProject}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* B2B Department */}
                     <div className="col-md-6">
                       <label className="form-label fw-bold">
                         <i className="fas fa-building text-primary me-1"></i>
+                        B2B Department <span className="text-danger">*</span>
+                      </label>
+                      <select
+                        className={`form-select ${formErrors.b2bDepartment ? 'is-invalid' : ''}`}
+                        name="b2bDepartment"
+                        value={leadFormData.b2bDepartment}
+                        onChange={handleLeadInputChange}
+                        disabled={!leadFormData.b2bProject}
+                      >
+                        <option value="">
+                          {leadFormData.b2bProject ? 'Select B2B Department' : 'Select project first'}
+                        </option>
+                        {addLeadDepartments.map((dept) => (
+                          <option key={dept._id} value={dept._id}>
+                            {dept.name}
+                          </option>
+                        ))}
+                      </select>
+                      {leadFormData.b2bProject && addLeadDepartments.length === 0 && (
+                        <small className="text-danger">No departments for this project. Add one in B2B Settings.</small>
+                      )}
+                      {formErrors.b2bDepartment && (
+                        <div className="invalid-feedback">
+                          {formErrors.b2bDepartment}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Type of B2B */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-industry text-primary me-1"></i>
                         Type of B2B <span className="text-danger">*</span>
                       </label>
                       <select
@@ -6304,14 +6777,20 @@ const B2BSales = () => {
                         name="typeOfB2B"
                         value={leadFormData.typeOfB2B}
                         onChange={handleLeadInputChange}
+                        disabled={!leadFormData.b2bDepartment}
                       >
-                        <option value="">Select B2B Type</option>
-                        {typeOfB2BOptions.filter(type => type).map(type => (
+                        <option value="">
+                          {leadFormData.b2bDepartment ? 'Select B2B Type' : 'Select department first'}
+                        </option>
+                        {addLeadTypeOptions.filter(type => type).map(type => (
                           <option key={type.value} value={type.value}>
                             {type.label}
                           </option>
                         ))}
                       </select>
+                      {leadFormData.b2bDepartment && addLeadTypeOptions.length === 0 && (
+                        <small className="text-danger">No B2B types for this department. Add one in B2B Settings.</small>
+                      )}
                       {formErrors.typeOfB2B && (
                         <div className="invalid-feedback">
                           {formErrors.typeOfB2B}
@@ -6550,6 +7029,8 @@ const B2BSales = () => {
                       </select>
                     </div>
 
+                    {!editingLeadId && (
+                    <>
                     {/* Status */}
                     <div className="col-md-6">
                       <label className="form-label fw-bold">
@@ -6609,6 +7090,8 @@ const B2BSales = () => {
                         <div className="form-text text-muted small">No sub-statuses configured for this status.</div>
                       )}
                     </div>
+                    </>
+                    )}
 
                     {/* Remark */}
                     <div className="col-12">
@@ -6670,9 +7153,10 @@ const B2BSales = () => {
                           className="btn px-4"
                           style={{ backgroundColor: '#fc2b5a', color: 'white' }}
                           onClick={handleLeadSubmit}
+                          disabled={loading}
                         >
                           <i className="fas fa-save me-1"></i>
-                          Add Lead
+                          {loading ? 'Saving...' : editingLeadId ? 'Save Changes' : 'Add Lead'}
                         </button>
                       </div>
                     </div>
@@ -7177,6 +7661,91 @@ const B2BSales = () => {
     font-size: 13px;
   }
 
+  /* B2B Cycle header filters (top row, right aligned) */
+  .b2b-cycle-filters{
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: flex-end;
+    gap: 8px 12px;
+    max-width: 100%;
+  }
+  .b2b-cycle-filters__item{
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+  .b2b-cycle-filters__label{
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    margin: 0;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  .b2b-cycle-filters__label i{
+    margin-right: 4px;
+    color: rgb(250, 85, 121);
+    font-size: 9px;
+  }
+  .b2b-cycle-filters__select{
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.3;
+    padding: 6px 28px 6px 10px;
+    height: 34px;
+    min-width: 120px;
+    max-width: 155px;
+    border: 1.5px solid #e8eaed;
+    border-radius: 8px;
+    background-color: #f9fafb;
+    color: #1f2937;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16'%3E%3Cpath fill='%236b7280' d='M4.427 6.427l3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 6H4.604a.25.25 0 0 0-.177.427z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+    background-size: 12px;
+  }
+  .b2b-cycle-filters__select:hover{
+    border-color: rgba(250, 85, 121, 0.4);
+    background-color: #fff;
+  }
+  .b2b-cycle-filters__select:focus{
+    outline: none;
+    border-color: rgb(250, 85, 121);
+    background-color: #fff;
+    box-shadow: 0 0 0 3px rgba(250, 85, 121, 0.14);
+  }
+  .b2b-cycle-filters--mobile{
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 4px 2px 8px;
+    margin-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .b2b-cycle-filters--mobile .b2b-cycle-filters__item{
+    flex: 0 0 auto;
+  }
+  .b2b-cycle-filters--mobile .b2b-cycle-filters__select{
+    min-width: 108px;
+    max-width: 130px;
+  }
+  @media (max-width: 1399px){
+    .b2b-cycle-filters__select{
+      min-width: 108px;
+      max-width: 132px;
+    }
+  }
+
   /* Filter modal spacing: keep dropdown above footer (scoped) */
   .b2b-filter-modal .modal-body{
     overflow: visible !important;
@@ -7262,6 +7831,38 @@ const B2BSales = () => {
     --lead-header-v2-block-h: 92px;
     overflow: visible;
     z-index: 2;
+  }
+
+  .lhm__name-edit,
+  .lead-header-v2__left-edit{
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.85);
+    background: rgba(255,255,255,0.92);
+    color: #0b5ed7;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    font-size: 10px;
+    line-height: 1;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  }
+
+  .lhm__name-edit:hover,
+  .lead-header-v2__left-edit:hover{
+    background: #fff;
+    color: #fc2b5a;
+  }
+
+  .lead-header-v2__left-edit{
+    position: absolute;
+    top: -6px;
+    left: -6px;
+    z-index: 3;
   }
 
   .lead-header-v2__float-icon{
@@ -7907,7 +8508,15 @@ position: absolute;
     border: 1px solid rgba(255,255,255,0.3);
     border-radius: 10px;
     padding: 6px 10px;
-    overflow: hidden;
+    overflow: visible;
+    position: relative;
+  }
+
+  .lhm__name-edit{
+    position: absolute;
+    top: -6px;
+    left: -6px;
+    z-index: 3;
   }
 
   .lhm__name-icon{

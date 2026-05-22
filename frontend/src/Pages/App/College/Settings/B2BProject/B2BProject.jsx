@@ -1,19 +1,14 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 
-function TypeB2b() {
+function B2BProject() {
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
     const token = userData.token;
 
-    const [b2bTypes, setB2bTypes] = useState([]);
     const [b2bProjects, setB2bProjects] = useState([]);
-    const [b2bDepartments, setB2bDepartments] = useState([]);
-    const [filterProject, setFilterProject] = useState('');
     const [formData, setFormData] = useState({
         name: '',
-        description: '',
-        project: '',
-        department: ''
+        description: ''
     });
     const [loading, setLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -22,16 +17,11 @@ function TypeB2b() {
 
     useEffect(() => {
         fetchB2bProjects();
-        fetchB2bDepartments();
-        fetchB2bTypes();
     }, []);
-
-    useEffect(() => {
-        fetchB2bTypes(filterProject);
-    }, [filterProject]);
 
     const fetchB2bProjects = async () => {
         try {
+            setLoading(true);
             const response = await fetch(`${backendUrl}/college/b2b/b2b-projects`, {
                 method: 'GET',
                 headers: {
@@ -50,91 +40,16 @@ function TypeB2b() {
         } catch (error) {
             console.error('Error fetching B2B projects:', error);
             showAlert('Failed to fetch B2B projects', 'error');
-        }
-    };
-
-    const fetchB2bDepartments = async () => {
-        try {
-            const response = await fetch(`${backendUrl}/college/b2b/b2b-departments`, {
-                method: 'GET',
-                headers: {
-                    'x-auth': token,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            const data = await response.json();
-
-            if (data.status) {
-                setB2bDepartments(data.data || []);
-            } else {
-                showAlert(data.message || 'Failed to fetch B2B departments', 'error');
-            }
-        } catch (error) {
-            console.error('Error fetching B2B departments:', error);
-            showAlert('Failed to fetch B2B departments', 'error');
-        }
-    };
-
-    const fetchB2bTypes = async (projectId = '') => {
-        try {
-            setLoading(true);
-            const query = projectId ? `?project=${projectId}` : '';
-            const response = await fetch(`${backendUrl}/college/b2b/type-of-b2b${query}`, {
-                method: 'GET',
-                headers: {
-                    'x-auth': token,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            const data = await response.json();
-
-            if (data.status) {
-                setB2bTypes(data.data || []);
-            } else {
-                showAlert(data.message || 'Failed to fetch B2B types', 'error');
-            }
-        } catch (error) {
-            console.error('Error fetching B2B types:', error);
-            showAlert('Failed to fetch B2B types', 'error');
         } finally {
             setLoading(false);
         }
-    };
-
-    const formDepartments = useMemo(() => {
-        if (!formData.project) return [];
-        return b2bDepartments.filter(
-            (dept) => (dept.project?._id || dept.project) === formData.project
-        );
-    }, [b2bDepartments, formData.project]);
-
-    const handleProjectChange = (projectId) => {
-        setFormData((prev) => {
-            const next = { ...prev, project: projectId };
-            const stillValid = b2bDepartments.some(
-                (dept) =>
-                    (dept.project?._id || dept.project) === projectId &&
-                    (dept._id === prev.department)
-            );
-            if (!stillValid) {
-                next.department = '';
-            }
-            return next;
-        });
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
 
         if (!formData.name.trim()) {
-            showAlert('Please enter B2B type name', 'error');
-            return;
-        }
-
-        if (!formData.department) {
-            showAlert('Please select a B2B department', 'error');
+            showAlert('Please enter B2B project name', 'error');
             return;
         }
 
@@ -142,8 +57,8 @@ function TypeB2b() {
             setLoading(true);
 
             const url = isEditing
-                ? `${backendUrl}/college/b2b/type-of-b2b/${editingId}`
-                : `${backendUrl}/college/b2b/type-of-b2b`;
+                ? `${backendUrl}/college/b2b/b2b-projects/${editingId}`
+                : `${backendUrl}/college/b2b/b2b-projects`;
 
             const method = isEditing ? 'PUT' : 'POST';
 
@@ -153,38 +68,34 @@ function TypeB2b() {
                     'x-auth': token,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    name: formData.name,
-                    description: formData.description,
-                    department: formData.department
-                })
+                body: JSON.stringify(formData)
             });
 
             const data = await response.json();
 
             if (data.status) {
                 showAlert(
-                    isEditing ? 'B2B type updated successfully!' : 'B2B type added successfully!',
+                    isEditing ? 'B2B project updated successfully!' : 'B2B project added successfully!',
                     'success'
                 );
                 resetForm();
-                fetchB2bTypes(filterProject);
+                fetchB2bProjects();
             } else {
                 showAlert(data.message || 'Operation failed', 'error');
             }
         } catch (error) {
             console.error('Error submitting form:', error);
-            showAlert('Failed to save B2B type', 'error');
+            showAlert('Failed to save B2B project', 'error');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleStatusToggle = async (typeId, currentStatus) => {
+    const handleStatusToggle = async (projectId, currentStatus) => {
         try {
             const newStatus = !currentStatus;
 
-            const response = await fetch(`${backendUrl}/college/b2b/type-of-b2b/${typeId}`, {
+            const response = await fetch(`${backendUrl}/college/b2b/b2b-projects/${projectId}`, {
                 method: 'PUT',
                 headers: {
                     'x-auth': token,
@@ -198,10 +109,10 @@ function TypeB2b() {
             const data = await response.json();
 
             if (data.status) {
-                setB2bTypes(prev => prev.map(type =>
-                    type._id === typeId
-                        ? { ...type, isActive: newStatus }
-                        : type
+                setB2bProjects(prev => prev.map(project =>
+                    project._id === projectId
+                        ? { ...project, isActive: newStatus }
+                        : project
                 ));
                 showAlert('Status updated successfully!', 'success');
             } else {
@@ -213,15 +124,15 @@ function TypeB2b() {
         }
     };
 
-    const handleDelete = async (typeId, typeName) => {
-        const confirmed = window.confirm(`Are you sure you want to delete "${typeName}"?`);
+    const handleDelete = async (projectId, projectName) => {
+        const confirmed = window.confirm(`Are you sure you want to delete "${projectName}"?`);
 
         if (!confirmed) return;
 
         try {
             setLoading(true);
 
-            const response = await fetch(`${backendUrl}/college/b2b/type-of-b2b/${typeId}`, {
+            const response = await fetch(`${backendUrl}/college/b2b/b2b-projects/${projectId}`, {
                 method: 'DELETE',
                 headers: {
                     'x-auth': token,
@@ -232,39 +143,35 @@ function TypeB2b() {
             const data = await response.json();
 
             if (data.status) {
-                setB2bTypes(prev => prev.filter(type => type._id !== typeId));
+                setB2bProjects(prev => prev.filter(project => project._id !== projectId));
 
-                if (editingId === typeId) {
+                if (editingId === projectId) {
                     resetForm();
                 }
 
-                showAlert('B2B type deleted successfully!', 'success');
+                showAlert('B2B project deleted successfully!', 'success');
             } else {
-                showAlert(data.message || 'Failed to delete B2B type', 'error');
+                showAlert(data.message || 'Failed to delete B2B project', 'error');
             }
         } catch (error) {
-            console.error('Error deleting B2B type:', error);
-            showAlert('Failed to delete B2B type', 'error');
+            console.error('Error deleting B2B project:', error);
+            showAlert('Failed to delete B2B project', 'error');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleEdit = (type) => {
-        const dept = type.department;
-        const projectId = dept?.project?._id || dept?.project || '';
+    const handleEdit = (project) => {
         setFormData({
-            name: type.name,
-            description: type.description || '',
-            project: projectId,
-            department: dept?._id || type.department || ''
+            name: project.name,
+            description: project.description || ''
         });
         setIsEditing(true);
-        setEditingId(type._id);
+        setEditingId(project._id);
     };
 
     const resetForm = () => {
-        setFormData({ name: '', description: '', project: '', department: '' });
+        setFormData({ name: '', description: '' });
         setIsEditing(false);
         setEditingId(null);
     };
@@ -283,7 +190,7 @@ function TypeB2b() {
                     <div className="row breadcrumbs-top">
                         <div className="col-12">
                             <h3 className="content-header-title float-left mb-0">
-                                {isEditing ? 'Edit B2B Type' : 'Add B2B Type'}
+                                {isEditing ? 'Edit B2B Project' : 'Add B2B Project'}
                             </h3>
                             <div className="breadcrumb-wrapper col-12">
                                 <ol className="breadcrumb">
@@ -291,7 +198,7 @@ function TypeB2b() {
                                         <a href="/">Home</a>
                                     </li>
                                     <li className="breadcrumb-item active">
-                                        {isEditing ? 'Edit B2B Type' : 'Add B2B Type'}
+                                        {isEditing ? 'Edit B2B Project' : 'Add B2B Project'}
                                     </li>
                                 </ol>
                             </div>
@@ -318,7 +225,7 @@ function TypeB2b() {
                             <div className="card">
                                 <div className="card-header border border-top-0 border-left-0 border-right-0">
                                     <h4 className="card-title pb-1">
-                                        {isEditing ? 'Edit B2B Type' : 'Add B2B Type'}
+                                        {isEditing ? 'Edit B2B Project' : 'Add B2B Project'}
                                     </h4>
                                 </div>
                                 <div className="card-content">
@@ -327,63 +234,7 @@ function TypeB2b() {
                                             <div className="row">
                                                 <div className="col-xl-8 mb-1">
                                                     <label>
-                                                        Select B2B Project
-                                                        <span className="asterisk" style={{ color: 'red' }}>*</span>
-                                                    </label>
-                                                    <select
-                                                        className="form-control"
-                                                        name="project"
-                                                        value={formData.project}
-                                                        onChange={(e) => handleProjectChange(e.target.value)}
-                                                        disabled={loading}
-                                                        required
-                                                    >
-                                                        <option value="">Select Project</option>
-                                                        {b2bProjects.map((project) => (
-                                                            <option key={project._id} value={project._id}>
-                                                                {project.name}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                    {b2bProjects.length === 0 && (
-                                                        <small className="text-danger">
-                                                            No projects found. Please add a B2B project first.
-                                                        </small>
-                                                    )}
-                                                </div>
-
-                                                <div className="col-xl-8 mb-1">
-                                                    <label>
-                                                        Select B2B Department
-                                                        <span className="asterisk" style={{ color: 'red' }}>*</span>
-                                                    </label>
-                                                    <select
-                                                        className="form-control"
-                                                        name="department"
-                                                        value={formData.department}
-                                                        onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                                                        disabled={loading || !formData.project}
-                                                        required
-                                                    >
-                                                        <option value="">
-                                                            {formData.project ? 'Select Department' : 'Select project first'}
-                                                        </option>
-                                                        {formDepartments.map((dept) => (
-                                                            <option key={dept._id} value={dept._id}>
-                                                                {dept.name}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                    {formData.project && formDepartments.length === 0 && (
-                                                        <small className="text-danger">
-                                                            No departments for this project. Add a department first.
-                                                        </small>
-                                                    )}
-                                                </div>
-
-                                                <div className="col-xl-8 mb-1">
-                                                    <label>
-                                                        Enter B2B Type
+                                                        Enter B2B Project
                                                         <span className="asterisk" style={{ color: 'red' }}>*</span>
                                                     </label>
                                                     <input
@@ -391,7 +242,7 @@ function TypeB2b() {
                                                         name="name"
                                                         value={formData.name}
                                                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                                        placeholder="Enter B2B Type"
+                                                        placeholder="Enter B2B Project"
                                                         required
                                                         maxLength={50}
                                                         disabled={loading}
@@ -419,7 +270,7 @@ function TypeB2b() {
                                                         type="button"
                                                         className="btn btn-success font-small-3"
                                                         onClick={handleSubmit}
-                                                        disabled={loading || !formData.name.trim() || !formData.department}
+                                                        disabled={loading || !formData.name.trim()}
                                                     >
                                                         {loading ? (
                                                             <>
@@ -452,60 +303,40 @@ function TypeB2b() {
                         <div className="col-6 rounded equal-height-2 coloumn-2 b2b-table-col">
                             <div className="card">
                                 <div className="row p-1">
-                                    <div className="col-xl-8">
+                                    <div className="col-xl-6">
                                         <div className="row">
                                             <div className="card-header">
-                                                <h4 className="card-title">All B2B Types</h4>
+                                                <h4 className="card-title">All B2B Projects</h4>
                                             </div>
-                                        </div>
-                                    </div>
-                                    <div className="col-xl-4">
-                                        <div className="card-header">
-                                            <select
-                                                className="form-control form-control-sm"
-                                                value={filterProject}
-                                                onChange={(e) => setFilterProject(e.target.value)}
-                                            >
-                                                <option value="">All Projects</option>
-                                                {b2bProjects.map((project) => (
-                                                    <option key={project._id} value={project._id}>
-                                                        {project.name}
-                                                    </option>
-                                                ))}
-                                            </select>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div className="card-content">
                                     <div className="table-responsive">
-                                        {loading && b2bTypes.length === 0 ? (
+                                        {loading && b2bProjects.length === 0 ? (
                                             <div className="text-center p-4">
                                                 <div className="spinner-border text-primary"></div>
-                                                <p className="mt-2">Loading B2B types...</p>
+                                                <p className="mt-2">Loading B2B projects...</p>
                                             </div>
                                         ) : (
                                             <table className="table table-hover-animation mb-0 table-hover">
                                                 <thead>
                                                     <tr>
-                                                        <th>B2B Type</th>
-                                                        <th>Department</th>
-                                                        <th>Project</th>
+                                                        <th>B2B Project</th>
                                                         <th>Description</th>
                                                         <th>Status</th>
                                                         <th>Action</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {b2bTypes.length > 0 ? (
-                                                        b2bTypes.map((type) => (
-                                                            <tr key={type._id}>
-                                                                <td>{type.name}</td>
-                                                                <td>{type.department?.name || '—'}</td>
-                                                                <td>{type.department?.project?.name || '—'}</td>
+                                                    {b2bProjects.length > 0 ? (
+                                                        b2bProjects.map((project) => (
+                                                            <tr key={project._id}>
+                                                                <td>{project.name}</td>
                                                                 <td>
                                                                     <span className="text-muted">
-                                                                        {type.description || 'No description'}
+                                                                        {project.description || 'No description'}
                                                                     </span>
                                                                 </td>
                                                                 <td>
@@ -513,8 +344,8 @@ function TypeB2b() {
                                                                         <input
                                                                             className="form-check-input"
                                                                             type="checkbox"
-                                                                            checked={type.isActive}
-                                                                            onChange={() => handleStatusToggle(type._id, type.isActive)}
+                                                                            checked={project.isActive}
+                                                                            onChange={() => handleStatusToggle(project._id, project.isActive)}
                                                                         />
                                                                     </div>
                                                                 </td>
@@ -522,8 +353,8 @@ function TypeB2b() {
                                                                     <div className="d-flex gap-2">
                                                                         <button
                                                                             className="btn btn-sm btn-outline-primary"
-                                                                            onClick={() => handleEdit(type)}
-                                                                            title="Edit B2B Type"
+                                                                            onClick={() => handleEdit(project)}
+                                                                            title="Edit B2B Project"
                                                                             disabled={loading}
                                                                         >
                                                                             <i className="fas fa-edit me-1"></i>
@@ -531,8 +362,8 @@ function TypeB2b() {
                                                                         </button>
                                                                         <button
                                                                             className="btn btn-sm btn-outline-danger"
-                                                                            onClick={() => handleDelete(type._id, type.name)}
-                                                                            title="Delete B2B Type"
+                                                                            onClick={() => handleDelete(project._id, project.name)}
+                                                                            title="Delete B2B Project"
                                                                             disabled={loading}
                                                                         >
                                                                             <i className="fas fa-trash me-1"></i>
@@ -544,8 +375,8 @@ function TypeB2b() {
                                                         ))
                                                     ) : (
                                                         <tr>
-                                                            <td colSpan="6" className="text-center">
-                                                                {loading ? 'Loading...' : 'No B2B types found'}
+                                                            <td colSpan="4" className="text-center">
+                                                                {loading ? 'Loading...' : 'No B2B projects found'}
                                                             </td>
                                                         </tr>
                                                     )}
@@ -553,7 +384,7 @@ function TypeB2b() {
                                             </table>
                                         )}
 
-                                        {!loading && b2bTypes.length === 0 && (
+                                        {!loading && b2bProjects.length === 0 && (
                                             <p className="text-center mt-3">No result found</p>
                                         )}
                                     </div>
@@ -597,9 +428,6 @@ function TypeB2b() {
     label {
     text-transform: capitalize;
 }
-
-        
-        }
         .card {
           box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
           border: none;
@@ -663,14 +491,6 @@ function TypeB2b() {
           height: 1rem;
         }
         
-        .btn-link {
-          text-decoration: none;
-        }
-        
-        .btn-link:hover {
-          text-decoration: none;
-        }
-        
         .gap-2 {
           gap: 0.5rem;
         }
@@ -680,13 +500,9 @@ function TypeB2b() {
         }
         
         @media (max-width: 768px) {
-        
-          
           .content-header {
             display: none;
           }
-          
-          
         }
 
         @media (max-width: 414px) {
@@ -738,4 +554,4 @@ function TypeB2b() {
     );
 }
 
-export default TypeB2b;
+export default B2BProject;
