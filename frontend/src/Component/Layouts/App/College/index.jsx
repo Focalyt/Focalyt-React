@@ -1250,7 +1250,7 @@ function CollegeLayout({ children }) {
                   <li className={`nav-item has-sub ${openSubmenu.dropdown ? 'open' : ''}`}>
                     <a href="#" onClick={() => toggleSubmenu('dropdown')}>
                       <FontAwesomeIcon icon={faCaretDown} />
-                      <span className="menu-title">{t('dropdown')}</span>
+                      <span className="menu-title">{t('B2B Setting')}</span>
                       <span className="dropdown-arrow">
                         <FontAwesomeIcon
                           icon={faCaretDown}
@@ -1274,6 +1274,24 @@ function CollegeLayout({ children }) {
                           <Link to="/institute/typeOfB2b" onClick={() => handleSidebarClose()}>
                             <FontAwesomeIcon icon={faIndustry} />
                             <span className="menu-title">{t('type_of_b2b')}</span>
+                          </Link>
+                        </li>
+                      )}
+                      {(permissions?.permission_type === 'Admin' ||
+                        (permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_edit_b2b_project)) && (
+                        <li className={`nav-item ${location.pathname === '/institute/b2bProject' ? 'active' : ''}`}>
+                          <Link to="/institute/b2bProject" onClick={() => handleSidebarClose()}>
+                            <FontAwesomeIcon icon={faProjectDiagram} />
+                            <span className="menu-title">{t('b2b_project')}</span>
+                          </Link>
+                        </li>
+                      )}
+                      {(permissions?.permission_type === 'Admin' ||
+                        (permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_edit_b2b_department)) && (
+                        <li className={`nav-item ${location.pathname === '/institute/b2bDepartment' ? 'active' : ''}`}>
+                          <Link to="/institute/b2bDepartment" onClick={() => handleSidebarClose()}>
+                            <FontAwesomeIcon icon={faBuilding} />
+                            <span className="menu-title">{t('b2b_department')}</span>
                           </Link>
                         </li>
                       )}
