@@ -168,7 +168,7 @@ const STYLES = `
 
 .ia-tabs { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
 .ia-tab {
-  font-family: 'Orbitron', monospace;
+  font-family: 'Inter', sans-serif;
   display: flex; align-items: center; gap: 8px; padding: 12px 20px;
   border-radius: 50px; border: 2px solid #dce4f5; background: #fff;
   color: #4a5568; font-weight: 700; font-size: 13px; cursor: pointer;
@@ -607,81 +607,81 @@ const DASH = {
   alerts: { label: "🔔 Active Alerts", unit: "", color: "#e65100", max: 5, vals: [1, 3, 2, 5, 0, 4, 2, 3, 1, 4] },
 };
 
-function LiveDashboard() {
-  const [idx, setIdx] = useState(0);
-  const [flash, setFlash] = useState(false);
+// function LiveDashboard() {
+//   const [idx, setIdx] = useState(0);
+//   const [flash, setFlash] = useState(false);
 
-  const tick = useCallback(() => {
-    setIdx((p) => (p + 1) % 10);
-    setFlash(true);
-    setTimeout(() => setFlash(false), 500);
-  }, []);
+//   const tick = useCallback(() => {
+//     setIdx((p) => (p + 1) % 10);
+//     setFlash(true);
+//     setTimeout(() => setFlash(false), 500);
+//   }, []);
 
-  useEffect(() => {
-    const t = setInterval(tick, 3000);
-    return () => clearInterval(t);
-  }, [tick]);
+//   useEffect(() => {
+//     const t = setInterval(tick, 3000);
+//     return () => clearInterval(t);
+//   }, [tick]);
 
-  return (
-    <section className="ia-sec">
-      <div className="ia-wrap" style={{paddingBottom:"15px"}}>
-        <div className="ia-dash-panel rev">
-          <div style={{ textAlign: "center" }}>
-            <div className="ia-live-badge">
-              <span className="ia-live-dot blink" />
-              LIVE DASHBOARD SIMULATION
-            </div>
-            <h2 className="ia-dash-title">Monitor Your Factory in Real-Time</h2>
-            <p className="ia-dash-sub">Data refreshes every 3 seconds — click below to update manually</p>
-          </div>
+//   return (
+//     // <section className="ia-sec">
+//     //   <div className="ia-wrap" style={{paddingBottom:"15px"}}>
+//     //     <div className="ia-dash-panel rev">
+//     //       <div style={{ textAlign: "center" }}>
+//     //         <div className="ia-live-badge">
+//     //           <span className="ia-live-dot blink" />
+//     //           LIVE DASHBOARD SIMULATION
+//     //         </div>
+//     //         <h2 className="ia-dash-title">Monitor Your Factory in Real-Time</h2>
+//     //         <p className="ia-dash-sub">Data refreshes every 3 seconds — click below to update manually</p>
+//     //       </div>
 
-          <div className="ia-dash-grid">
-            {Object.entries(DASH).map(([key, d]) => {
-              const val = d.vals[idx];
-              const pct = (val / d.max) * 100;
-              return (
-                <div key={key} className="ia-dash-card rev" style={{ "--card-accent": d.color }}>
-                  <div className="ia-dash-lbl">{d.label}</div>
-                  <div className="ia-dash-val" style={{ color: d.color, opacity: flash ? 0.5 : 1 }}>{val}{d.unit}</div>
-                  {key !== "alerts" ? (
-                    <div className="ia-progress">
-                      <div className="ia-progress-fill" style={{ width: `${pct}%`, background: `linear-gradient(90deg,${d.color},${d.color}bb)` }} />
-                    </div>
-                  ) : (
-                    <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-                      {[...Array(5)].map((_, i) => (
-                        <div key={i} style={{
-                          width: 9, height: 9, borderRadius: "50%",
-                          background: i < val ? d.color : `${d.color}33`,
-                          animation: i < val ? `iaBlink 1.4s ${i * 0.25}s ease-in-out infinite` : "none",
-                        }} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+//     //       <div className="ia-dash-grid">
+//     //         {Object.entries(DASH).map(([key, d]) => {
+//     //           const val = d.vals[idx];
+//     //           const pct = (val / d.max) * 100;
+//     //           return (
+//     //             <div key={key} className="ia-dash-card rev" style={{ "--card-accent": d.color }}>
+//     //               <div className="ia-dash-lbl">{d.label}</div>
+//     //               <div className="ia-dash-val" style={{ color: d.color, opacity: flash ? 0.5 : 1 }}>{val}{d.unit}</div>
+//     //               {key !== "alerts" ? (
+//     //                 <div className="ia-progress">
+//     //                   <div className="ia-progress-fill" style={{ width: `${pct}%`, background: `linear-gradient(90deg,${d.color},${d.color}bb)` }} />
+//     //                 </div>
+//     //               ) : (
+//     //                 <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+//     //                   {[...Array(5)].map((_, i) => (
+//     //                     <div key={i} style={{
+//     //                       width: 9, height: 9, borderRadius: "50%",
+//     //                       background: i < val ? d.color : `${d.color}33`,
+//     //                       animation: i < val ? `iaBlink 1.4s ${i * 0.25}s ease-in-out infinite` : "none",
+//     //                     }} />
+//     //                   ))}
+//     //                 </div>
+//     //               )}
+//     //             </div>
+//     //           );
+//     //         })}
+//     //       </div>
 
-          <div className="ia-wave rev">
-            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--t3)", minWidth: 100 }}>📡 Signal Activity</span>
-            <div className="ia-wave-bars">
-              {[...Array(36)].map((_, i) => {
-                const h = 30 + Math.sin(i * 0.62 + idx * 1.2) * 24;
-                return <div key={i} className="ia-wave-bar" style={{ height: `${Math.abs(h)}%`, animationDelay: `${i * 0.03}s` }} />;
-              })}
-            </div>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--teal)", animation: "iaBlink 1.5s ease-in-out infinite" }}>ACTIVE</span>
-          </div>
+//     //       <div className="ia-wave rev">
+//     //         <span style={{ fontSize: 12, fontWeight: 700, color: "var(--t3)", minWidth: 100 }}>📡 Signal Activity</span>
+//     //         <div className="ia-wave-bars">
+//     //           {[...Array(36)].map((_, i) => {
+//     //             const h = 30 + Math.sin(i * 0.62 + idx * 1.2) * 24;
+//     //             return <div key={i} className="ia-wave-bar" style={{ height: `${Math.abs(h)}%`, animationDelay: `${i * 0.03}s` }} />;
+//     //           })}
+//     //         </div>
+//     //         <span style={{ fontSize: 11, fontWeight: 700, color: "var(--teal)", animation: "iaBlink 1.5s ease-in-out infinite" }}>ACTIVE</span>
+//     //       </div>
 
-          <div style={{ textAlign: "center" }}>
-            <button type="button" className="ia-btn-primary" onClick={tick}>🔄 Simulate Data Refresh</button>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
+//     //       <div style={{ textAlign: "center" }}>
+//     //         <button type="button" className="ia-btn-primary" onClick={tick}>🔄 Simulate Data Refresh</button>
+//     //       </div>
+//     //     </div>
+//     //   </div>
+//     // </section>
+//   );
+// }
 
 const CTA_ACTIONS = [
   { emoji: "📅", title: "Schedule a Demo", desc: "See our solutions in action" },
@@ -733,7 +733,7 @@ export default function IndustryAutomationSection() {
         <Hero />
         <Solutions />
         <Benefits />
-        <LiveDashboard />
+        {/* <LiveDashboard /> */}
         {/* <CTA /> */}
       </div>
     </>

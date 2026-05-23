@@ -1282,7 +1282,7 @@ function CollegeLayout({ children }) {
                         <li className={`nav-item ${location.pathname === '/institute/b2bProject' ? 'active' : ''}`}>
                           <Link to="/institute/b2bProject" onClick={() => handleSidebarClose()}>
                             <FontAwesomeIcon icon={faProjectDiagram} />
-                            <span className="menu-title">{t('b2b_project')}</span>
+                            <span className="menu-title">{t('b2b_department')}</span>
                           </Link>
                         </li>
                       )}
@@ -1291,7 +1291,7 @@ function CollegeLayout({ children }) {
                         <li className={`nav-item ${location.pathname === '/institute/b2bDepartment' ? 'active' : ''}`}>
                           <Link to="/institute/b2bDepartment" onClick={() => handleSidebarClose()}>
                             <FontAwesomeIcon icon={faBuilding} />
-                            <span className="menu-title">{t('b2b_department')}</span>
+                            <span className="menu-title">{t('b2b_project')}</span>
                           </Link>
                         </li>
                       )}

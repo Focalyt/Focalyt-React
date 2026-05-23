@@ -10,12 +10,12 @@ const SUB_TABS = [
   { label: "Events", sectionId: "events" },
   { label: "Courses", sectionId: "future-courses" },
   { label: "Jobs", sectionId: "future-jobs" },
-  { label: "Social Impact", to: "/socialimpact" },
-  { label: "Community", to: "/community" },
-  { label: "Projects", to: "/#projects" },
+  // { label: "Social Impact", to: "/socialimpact" },
+  // { label: "Community", to: "/community" },
+  // { label: "Projects", to: "/#projects" },
   { label: "Media", sectionId: "media" },
   { label: "Our Reach", sectionId: "our-approach" },
-  { label: "Partners", sectionId: "partners" },
+  // { label: "Partners", sectionId: "partners" },
 ];
 
 const FrontHeader = () => {

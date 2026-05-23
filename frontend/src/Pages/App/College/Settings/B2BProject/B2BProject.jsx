@@ -185,12 +185,12 @@ function B2BProject() {
                     resetForm();
                 }
 
-                showAlert('B2B project deleted successfully!', 'success');
+                showAlert('B2B department deleted successfully!', 'success');
             } else {
-                showAlert(data.message || 'Failed to delete B2B project', 'error');
+                showAlert(data.message || 'Failed to delete B2B department', 'error');
             }
         } catch (error) {
-            console.error('Error deleting B2B project:', error);
+            console.error('Error deleting B2B department:', error);
             showAlert('Failed to delete B2B project', 'error');
         } finally {
             setLoading(false);
@@ -227,7 +227,7 @@ function B2BProject() {
                     <div className="row breadcrumbs-top">
                         <div className="col-12">
                             <h3 className="content-header-title float-left mb-0">
-                                {isEditing ? 'Edit B2B Project' : 'Add B2B Project'}
+                                {isEditing ? 'Edit B2B Department' : 'Add B2B Department'}
                             </h3>
                             <div className="breadcrumb-wrapper col-12">
                                 <ol className="breadcrumb">
@@ -235,7 +235,7 @@ function B2BProject() {
                                         <a href="/">Home</a>
                                     </li>
                                     <li className="breadcrumb-item active">
-                                        {isEditing ? 'Edit B2B Project' : 'Add B2B Project'}
+                                        {isEditing ? 'Edit B2B Department' : 'Add B2B Department'}
                                     </li>
                                 </ol>
                             </div>
@@ -262,7 +262,7 @@ function B2BProject() {
                             <div className="card">
                                 <div className="card-header border border-top-0 border-left-0 border-right-0">
                                     <h4 className="card-title pb-1">
-                                        {isEditing ? 'Edit B2B Project' : 'Add B2B Project'}
+                                        {isEditing ? 'Edit B2B Department' : 'Add B2B Department'}
                                     </h4>
                                 </div>
                                 <div className="card-content">
@@ -306,7 +306,7 @@ function B2BProject() {
                                                         name="name"
                                                         value={formData.name}
                                                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                                        placeholder="Enter B2B Project"
+                                                        placeholder="Enter B2B Department"
                                                         required
                                                         maxLength={50}
                                                         disabled={loading}
@@ -370,7 +370,7 @@ function B2BProject() {
                                     <div className="col-xl-6">
                                         <div className="row">
                                             <div className="card-header">
-                                                <h4 className="card-title">All B2B Projects</h4>
+                                                <h4 className="card-title">All B2B Departments</h4>
                                             </div>
                                         </div>
                                     </div>
@@ -397,7 +397,7 @@ function B2BProject() {
                                         {loading && b2bProjects.length === 0 ? (
                                             <div className="text-center p-4">
                                                 <div className="spinner-border text-primary"></div>
-                                                <p className="mt-2">Loading B2B projects...</p>
+                                                <p className="mt-2">Loading B2B departments...</p>
                                             </div>
                                         ) : (
                                             <table className="table table-hover-animation mb-0 table-hover">
@@ -436,7 +436,7 @@ function B2BProject() {
                                                                         <button
                                                                             className="btn btn-sm btn-outline-primary"
                                                                             onClick={() => handleEdit(project)}
-                                                                            title="Edit B2B Project"
+                                                                            title="Edit B2B Department"
                                                                             disabled={loading}
                                                                         >
                                                                             <i className="fas fa-edit me-1"></i>
@@ -445,7 +445,7 @@ function B2BProject() {
                                                                         <button
                                                                             className="btn btn-sm btn-outline-danger"
                                                                             onClick={() => handleDelete(project._id, project.name)}
-                                                                            title="Delete B2B Project"
+                                                                            title="Delete B2B Department"
                                                                             disabled={loading}
                                                                         >
                                                                             <i className="fas fa-trash me-1"></i>
