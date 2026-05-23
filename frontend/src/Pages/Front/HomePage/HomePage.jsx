@@ -3385,6 +3385,61 @@ html { scroll-behavior: smooth; }
 }
 @media(max-width:768px) {
   .hero-inner, .area-panel, .why-grid, .projects-grid { grid-template-columns: 1fr; }
+  .hero {
+    min-height: auto;
+    padding: 96px 0 56px;
+  }
+  .hero .container {
+    width: 100%;
+    max-width: 100%;
+    /* padding-left: 20px; */
+    /* padding-right: 20px; */
+  }
+  .hero-inner {
+    gap: 28px;
+    align-items: start;
+  }
+  .hero-eyebrow {
+    max-width: 100%;
+    margin-top: 12px;
+    margin-bottom: 18px;
+    padding: 6px 12px;
+    font-size: 9px;
+    line-height: 1.25;
+    letter-spacing: .08em;
+  }
+  .hero-h1 {
+    max-width: 14ch;
+    margin-bottom: 12px;
+    font-size: clamp(28px, 8.2vw, 40px);
+    line-height: 1.04;
+    letter-spacing: .01em;
+  }
+  .hero-btns {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    width: min(100%);
+    margin-top: 14px;
+  }
+  .hero-btns .btn-primary {
+    width: 100%;
+    min-width: 0;
+    min-height: 38px;
+    justify-content: center;
+    padding: 10px 18px;
+    font-size: 11px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .hero-right {
+    margin-top: 0;
+    gap: 14px;
+  }
+  .hero-tiles-inner {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
   .hero-tiles { gap: 18px; margin-top: 18px; }
   .hero-tile { min-height: 110px; padding: 26px 14px; }
   .labs-grid, .roles-grid { grid-template-columns: repeat(2,1fr); }
@@ -3408,6 +3463,41 @@ html { scroll-behavior: smooth; }
   .partner-with-grid { grid-template-columns: 1fr; }
 }
 @media(max-width:480px) {
+  .hero {
+    padding-top: 82px;
+    padding-bottom: 44px;
+  }
+  .hero .container {
+    /* padding-left: 24px; */
+    /* padding-right: 24px; */
+  }
+  .hero-topbar {
+    margin-bottom: 12px;
+  }
+  .hero-eyebrow {
+    font-size: 8px;
+    padding: 6px 10px;
+  }
+  .hero-h1 {
+    max-width: 13.5ch;
+    font-size: clamp(26px, 9vw, 34px);
+  }
+  .hero-btns .btn-primary {
+    padding: 10px 16px;
+    font-size: 10px;
+  }
+  .hero-kicker {
+    font-size: 9px;
+    line-height: 1.45;
+  }
+  .hero-tile {
+    min-height: 86px;
+    padding: 18px 12px;
+  }
+  .hero-tile-text {
+    font-size: 13px;
+    letter-spacing: .07em;
+  }
   .labs-grid, .roles-grid, .why-grid { grid-template-columns: 1fr; }
   .pillars { grid-template-columns: 1fr; }
 }

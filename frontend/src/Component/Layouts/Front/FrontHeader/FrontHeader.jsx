@@ -1,20 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { BookOpen, BriefcaseBusiness, CalendarDays, FlaskConical, Images, MapPin, Zap } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import "./FrontHeader.css";
 
 const HOME_SECTION_SCROLL_OFFSET = 130;
 
 const SUB_TABS = [
-  { label: "Impact", sectionId: "about" },
-  { label: "Labs", sectionId: "labs" },
-  { label: "Events", sectionId: "events" },
-  { label: "Courses", sectionId: "future-courses" },
-  { label: "Jobs", sectionId: "future-jobs" },
+  { label: "Impact", sectionId: "about", icon: Zap },
+  { label: "Labs", sectionId: "labs", icon: FlaskConical },
+  { label: "Events", sectionId: "events", icon: CalendarDays },
+  { label: "Courses", sectionId: "future-courses", icon: BookOpen },
+  { label: "Jobs", sectionId: "future-jobs", icon: BriefcaseBusiness },
   // { label: "Social Impact", to: "/socialimpact" },
   // { label: "Community", to: "/community" },
   // { label: "Projects", to: "/#projects" },
-  { label: "Media", sectionId: "media" },
-  { label: "Our Reach", sectionId: "our-approach" },
+  { label: "Media", sectionId: "media", icon: Images },
+  { label: "Our Reach", sectionId: "our-approach", icon: MapPin },
   // { label: "Partners", sectionId: "partners" },
 ];
 
@@ -30,6 +31,7 @@ const FrontHeader = () => {
 
   const [isMenuActive, setIsMenuActive] = useState(false);
   const [isDropdownActive, setIsDropdownActive] = useState(false);
+  const [hoveredSubTab, setHoveredSubTab] = useState(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
   const FOC_THEME = "sky-magenta";
@@ -249,6 +251,7 @@ const FrontHeader = () => {
   const handleSubTabClick = (e, tab) => {
     if (!tab.sectionId) return;
     e.preventDefault();
+    setHoveredSubTab(tab.label);
     if (isHomePage()) {
       scrollToHomeSection(tab.sectionId);
     } else {
@@ -368,28 +371,47 @@ const FrontHeader = () => {
               </div>
             </nav>
 
-            <div className="front-subtabs" aria-label="Quick links">
-              <div className="front-subtabs__scroller">
-                {SUB_TABS.map((t) =>
-                  t.sectionId ? (
-                    <a
-                      key={t.label}
-                      href={`/#${t.sectionId}`}
-                      className="front-subtabs__tab"
-                      onClick={(e) => handleSubTabClick(e, t)}
-                    >
-                      {t.label}
-                    </a>
-                  ) : (
-                    <Link key={t.label} className="front-subtabs__tab" to={t.to}>
-                      {t.label}
-                    </Link>
-                  )
-                )}
-              </div>
-            </div>
           </div>
         </header>
+        <nav className="floating-side-tabs" aria-label="Quick links">
+          {SUB_TABS.map((tab) => {
+            const Icon = tab.icon;
+            const tabClassName = `fst-tab${hoveredSubTab === tab.label ? " is-hovered" : ""}`;
+
+            return tab.sectionId ? (
+              <a
+                key={tab.label}
+                href={`/#${tab.sectionId}`}
+                className={tabClassName}
+                onClick={(e) => handleSubTabClick(e, tab)}
+                onMouseEnter={() => setHoveredSubTab(tab.label)}
+                onMouseLeave={() => setHoveredSubTab(null)}
+                onFocus={() => setHoveredSubTab(tab.label)}
+                onBlur={() => setHoveredSubTab(null)}
+                onTouchStart={() => setHoveredSubTab(tab.label)}
+                aria-label={tab.label}
+              >
+                <Icon className="fst-icon" aria-hidden="true" size={18} strokeWidth={2.1} />
+                <span className="fst-label">{tab.label}</span>
+              </a>
+            ) : (
+              <Link
+                key={tab.label}
+                className={tabClassName}
+                to={tab.to}
+                onMouseEnter={() => setHoveredSubTab(tab.label)}
+                onMouseLeave={() => setHoveredSubTab(null)}
+                onFocus={() => setHoveredSubTab(tab.label)}
+                onBlur={() => setHoveredSubTab(null)}
+                onTouchStart={() => setHoveredSubTab(tab.label)}
+                aria-label={tab.label}
+              >
+                <Icon className="fst-icon" aria-hidden="true" size={18} strokeWidth={2.1} />
+                <span className="fst-label">{tab.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
       </div>
     </>
   );
