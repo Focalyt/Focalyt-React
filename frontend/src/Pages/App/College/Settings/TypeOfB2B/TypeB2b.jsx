@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 
 function TypeB2b() {
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -6,13 +6,11 @@ function TypeB2b() {
     const token = userData.token;
 
     const [b2bTypes, setB2bTypes] = useState([]);
-    const [b2bProjects, setB2bProjects] = useState([]);
     const [b2bDepartments, setB2bDepartments] = useState([]);
-    const [filterProject, setFilterProject] = useState('');
+    const [filterDepartment, setFilterDepartment] = useState('');
     const [formData, setFormData] = useState({
         name: '',
         description: '',
-        project: '',
         department: ''
     });
     const [loading, setLoading] = useState(false);
@@ -21,37 +19,12 @@ function TypeB2b() {
     const [alert, setAlert] = useState({ show: false, message: '', type: '' });
 
     useEffect(() => {
-        fetchB2bProjects();
         fetchB2bDepartments();
-        fetchB2bTypes();
     }, []);
 
     useEffect(() => {
-        fetchB2bTypes(filterProject);
-    }, [filterProject]);
-
-    const fetchB2bProjects = async () => {
-        try {
-            const response = await fetch(`${backendUrl}/college/b2b/b2b-projects`, {
-                method: 'GET',
-                headers: {
-                    'x-auth': token,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            const data = await response.json();
-
-            if (data.status) {
-                setB2bProjects(data.data || []);
-            } else {
-                showAlert(data.message || 'Failed to fetch B2B projects', 'error');
-            }
-        } catch (error) {
-            console.error('Error fetching B2B projects:', error);
-            showAlert('Failed to fetch B2B projects', 'error');
-        }
-    };
+        fetchB2bTypes(filterDepartment);
+    }, [filterDepartment]);
 
     const fetchB2bDepartments = async () => {
         try {
@@ -76,10 +49,10 @@ function TypeB2b() {
         }
     };
 
-    const fetchB2bTypes = async (projectId = '') => {
+    const fetchB2bTypes = async (departmentId = '') => {
         try {
             setLoading(true);
-            const query = projectId ? `?project=${projectId}` : '';
+            const query = departmentId ? `?department=${departmentId}` : '';
             const response = await fetch(`${backendUrl}/college/b2b/type-of-b2b${query}`, {
                 method: 'GET',
                 headers: {
@@ -101,28 +74,6 @@ function TypeB2b() {
         } finally {
             setLoading(false);
         }
-    };
-
-    const formDepartments = useMemo(() => {
-        if (!formData.project) return [];
-        return b2bDepartments.filter(
-            (dept) => (dept.project?._id || dept.project) === formData.project
-        );
-    }, [b2bDepartments, formData.project]);
-
-    const handleProjectChange = (projectId) => {
-        setFormData((prev) => {
-            const next = { ...prev, project: projectId };
-            const stillValid = b2bDepartments.some(
-                (dept) =>
-                    (dept.project?._id || dept.project) === projectId &&
-                    (dept._id === prev.department)
-            );
-            if (!stillValid) {
-                next.department = '';
-            }
-            return next;
-        });
     };
 
     const handleSubmit = async (e) => {
@@ -168,7 +119,7 @@ function TypeB2b() {
                     'success'
                 );
                 resetForm();
-                fetchB2bTypes(filterProject);
+                fetchB2bTypes(filterDepartment);
             } else {
                 showAlert(data.message || 'Operation failed', 'error');
             }
@@ -252,11 +203,9 @@ function TypeB2b() {
 
     const handleEdit = (type) => {
         const dept = type.department;
-        const projectId = dept?.project?._id || dept?.project || '';
         setFormData({
             name: type.name,
             description: type.description || '',
-            project: projectId,
             department: dept?._id || type.department || ''
         });
         setIsEditing(true);
@@ -264,7 +213,7 @@ function TypeB2b() {
     };
 
     const resetForm = () => {
-        setFormData({ name: '', description: '', project: '', department: '' });
+        setFormData({ name: '', description: '', department: '' });
         setIsEditing(false);
         setEditingId(null);
     };
@@ -327,33 +276,6 @@ function TypeB2b() {
                                             <div className="row">
                                                 <div className="col-xl-8 mb-1">
                                                     <label>
-                                                        Select B2B Project
-                                                        <span className="asterisk" style={{ color: 'red' }}>*</span>
-                                                    </label>
-                                                    <select
-                                                        className="form-control"
-                                                        name="project"
-                                                        value={formData.project}
-                                                        onChange={(e) => handleProjectChange(e.target.value)}
-                                                        disabled={loading}
-                                                        required
-                                                    >
-                                                        <option value="">Select Project</option>
-                                                        {b2bProjects.map((project) => (
-                                                            <option key={project._id} value={project._id}>
-                                                                {project.name}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                    {b2bProjects.length === 0 && (
-                                                        <small className="text-danger">
-                                                            No projects found. Please add a B2B project first.
-                                                        </small>
-                                                    )}
-                                                </div>
-
-                                                <div className="col-xl-8 mb-1">
-                                                    <label>
                                                         Select B2B Department
                                                         <span className="asterisk" style={{ color: 'red' }}>*</span>
                                                     </label>
@@ -362,21 +284,19 @@ function TypeB2b() {
                                                         name="department"
                                                         value={formData.department}
                                                         onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                                                        disabled={loading || !formData.project}
+                                                        disabled={loading}
                                                         required
                                                     >
-                                                        <option value="">
-                                                            {formData.project ? 'Select Department' : 'Select project first'}
-                                                        </option>
-                                                        {formDepartments.map((dept) => (
+                                                        <option value="">Select Department</option>
+                                                        {b2bDepartments.map((dept) => (
                                                             <option key={dept._id} value={dept._id}>
-                                                                {dept.name}
+                                                                {dept.name}{dept.isActive === false ? ' (Inactive)' : ''}
                                                             </option>
                                                         ))}
                                                     </select>
-                                                    {formData.project && formDepartments.length === 0 && (
+                                                    {b2bDepartments.length === 0 && (
                                                         <small className="text-danger">
-                                                            No departments for this project. Add a department first.
+                                                            No departments found. Please add a B2B department first.
                                                         </small>
                                                     )}
                                                 </div>
@@ -463,13 +383,13 @@ function TypeB2b() {
                                         <div className="card-header">
                                             <select
                                                 className="form-control form-control-sm"
-                                                value={filterProject}
-                                                onChange={(e) => setFilterProject(e.target.value)}
+                                                value={filterDepartment}
+                                                onChange={(e) => setFilterDepartment(e.target.value)}
                                             >
-                                                <option value="">All Projects</option>
-                                                {b2bProjects.map((project) => (
-                                                    <option key={project._id} value={project._id}>
-                                                        {project.name}
+                                                <option value="">All Departments</option>
+                                                {b2bDepartments.map((dept) => (
+                                                    <option key={dept._id} value={dept._id}>
+                                                        {dept.name}
                                                     </option>
                                                 ))}
                                             </select>
@@ -490,7 +410,6 @@ function TypeB2b() {
                                                     <tr>
                                                         <th>B2B Type</th>
                                                         <th>Department</th>
-                                                        <th>Project</th>
                                                         <th>Description</th>
                                                         <th>Status</th>
                                                         <th>Action</th>
@@ -502,7 +421,6 @@ function TypeB2b() {
                                                             <tr key={type._id}>
                                                                 <td>{type.name}</td>
                                                                 <td>{type.department?.name || '—'}</td>
-                                                                <td>{type.department?.project?.name || '—'}</td>
                                                                 <td>
                                                                     <span className="text-muted">
                                                                         {type.description || 'No description'}
@@ -544,7 +462,7 @@ function TypeB2b() {
                                                         ))
                                                     ) : (
                                                         <tr>
-                                                            <td colSpan="6" className="text-center">
+                                                            <td colSpan="5" className="text-center">
                                                                 {loading ? 'Loading...' : 'No B2B types found'}
                                                             </td>
                                                         </tr>

@@ -85,7 +85,6 @@ function getLeadSubStatusTitle(lead) {
 function getLeadB2bProjectName(lead) {
   return pickFirstNonEmpty(
     lead?.b2bProject?.name,
-    lead?.typeOfB2B?.department?.project?.name,
     ''
   ) || '—';
 }
@@ -775,15 +774,16 @@ const B2BSales = () => {
   // B2B Dropdown Options
   const [leadCategoryOptions, setLeadCategoryOptions] = useState([]);
   const [b2bProjectOptions, setB2bProjectOptions] = useState([]);
+  const [allB2bProjects, setAllB2bProjects] = useState([]);
   const [allB2bDepartments, setAllB2bDepartments] = useState([]);
   const [allTypeOfB2BRaw, setAllTypeOfB2BRaw] = useState([]);
 
-  const addLeadDepartments = useMemo(() => {
-    if (!leadFormData.b2bProject) return [];
-    return allB2bDepartments.filter(
-      (dept) => (dept.project?._id || dept.project) === leadFormData.b2bProject
+  const addLeadProjects = useMemo(() => {
+    if (!leadFormData.b2bDepartment) return [];
+    return allB2bProjects.filter(
+      (proj) => String(proj.department?._id || proj.department) === String(leadFormData.b2bDepartment)
     );
-  }, [allB2bDepartments, leadFormData.b2bProject]);
+  }, [allB2bProjects, leadFormData.b2bDepartment]);
 
   const typeOfB2BOptions = useMemo(() => (
     allTypeOfB2BRaw.map((type) => ({
@@ -1015,7 +1015,7 @@ const B2BSales = () => {
 
   const getFollowupBucket = (followUpLike) => {
     if (!followUpLike) return null;
-    const status = String(followUpLike?.status || '').toLowerCase();
+    const status = String(followUpLike?.status || '').trim().toLowerCase();
     if (status === 'completed') return 'done';
 
     const dt = followUpLike?.scheduledDate ? new Date(followUpLike.scheduledDate) : null;
@@ -1251,10 +1251,10 @@ const B2BSales = () => {
       ]);
 
       if (projectsRes.data.status) {
+        const activeProjects = (projectsRes.data.data || []).filter((p) => p.isActive !== false);
+        setAllB2bProjects(activeProjects);
         setB2bProjectOptions(
-          (projectsRes.data.data || [])
-            .filter((p) => p.isActive !== false)
-            .map((p) => ({ value: p._id, label: p.name }))
+          activeProjects.map((p) => ({ value: p._id, label: p.name }))
         );
       }
 
@@ -1354,17 +1354,17 @@ const B2BSales = () => {
         leadStatus: value,
         leadSubStatus: ''
       }));
-    } else if (name === 'b2bProject') {
-      setLeadFormData(prev => ({
-        ...prev,
-        b2bProject: value,
-        b2bDepartment: '',
-        typeOfB2B: ''
-      }));
     } else if (name === 'b2bDepartment') {
       setLeadFormData(prev => ({
         ...prev,
         b2bDepartment: value,
+        b2bProject: '',
+        typeOfB2B: ''
+      }));
+    } else if (name === 'b2bProject') {
+      setLeadFormData(prev => ({
+        ...prev,
+        b2bProject: value,
         typeOfB2B: ''
       }));
     } else {
@@ -1374,10 +1374,10 @@ const B2BSales = () => {
       }));
     }
 
-    const clearFields = name === 'b2bProject'
-      ? ['b2bProject', 'b2bDepartment', 'typeOfB2B']
-      : name === 'b2bDepartment'
-        ? ['b2bDepartment', 'typeOfB2B']
+    const clearFields = name === 'b2bDepartment'
+      ? ['b2bDepartment', 'b2bProject', 'typeOfB2B']
+      : name === 'b2bProject'
+        ? ['b2bProject', 'typeOfB2B']
         : [name];
 
     if (clearFields.some((f) => formErrors[f])) {
@@ -1435,8 +1435,8 @@ const B2BSales = () => {
 
     // Required field validation
     if (!leadFormData.leadCategory) errors.leadCategory = 'Lead source is required';
-    if (!leadFormData.b2bProject) errors.b2bProject = 'B2B project is required';
     if (!leadFormData.b2bDepartment) errors.b2bDepartment = 'B2B department is required';
+    if (!leadFormData.b2bProject) errors.b2bProject = 'B2B project is required';
     if (!leadFormData.typeOfB2B) errors.typeOfB2B = 'B2B type is required';
     if (!leadFormData.businessName) errors.businessName = 'Business name is required';
     if (!leadFormData.concernPersonName) errors.concernPersonName = 'Concern person name is required';
@@ -1484,6 +1484,10 @@ const B2BSales = () => {
   const [statusCounts, setStatusCounts] = useState([]);
   const [totalLeads, setTotalLeads] = useState(0);
   const [loadingStatusCounts, setLoadingStatusCounts] = useState(false);
+  const [followupDashboardCounts, setFollowupDashboardCounts] = useState({
+    call: { done: 0, planned: 0, missed: 0 },
+    visit: { done: 0, planned: 0, missed: 0 },
+  });
 
   const sortedPerformanceStatuses = useMemo(() => {
     const order = ['HOT', 'WARM', 'COLD', 'PROSPECT'];
@@ -1503,24 +1507,19 @@ const B2BSales = () => {
 
   const dashboardB2BCounts = useMemo(() => {
     const list = Array.isArray(leads) ? leads : [];
-    const counts = {
-      call: { done: 0, planned: 0, missed: 0 },
-      visit: { done: 0, planned: 0, missed: 0 },
-      docs: { done: 0, pending: 0 },
-    };
+    const docs = { done: 0, pending: 0 };
 
     for (const lead of list) {
-      const cb = getLeadFollowupBucket(lead, 'Call');
-      if (cb) counts.call[cb] += 1;
-
-      const vb = getLeadFollowupBucket(lead, 'Visit');
-      if (vb) counts.visit[vb] += 1;
-
       const db = getLeadDocumentsBucket(lead);
-      if (db) counts.docs[db] += 1;
+      if (db) docs[db] += 1;
     }
-    return counts;
-  }, [leads]);
+
+    return {
+      call: followupDashboardCounts.call,
+      visit: followupDashboardCounts.visit,
+      docs,
+    };
+  }, [leads, followupDashboardCounts]);
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -1544,12 +1543,12 @@ const B2BSales = () => {
   });
   const [showFilters, setShowFilters] = useState(false);
 
-  const cycleDepartmentOptions = useMemo(() => {
-    if (!filters.b2bProject) return allB2bDepartments;
-    return allB2bDepartments.filter(
-      (dept) => String(dept.project?._id || dept.project) === String(filters.b2bProject)
+  const cycleProjectOptions = useMemo(() => {
+    if (!filters.b2bDepartment) return allB2bProjects;
+    return allB2bProjects.filter(
+      (proj) => String(proj.department?._id || proj.department) === String(filters.b2bDepartment)
     );
-  }, [allB2bDepartments, filters.b2bProject]);
+  }, [allB2bProjects, filters.b2bDepartment]);
 
   const cycleTypeOfB2BOptions = useMemo(() => {
     let types = allTypeOfB2BRaw;
@@ -1558,15 +1557,16 @@ const B2BSales = () => {
         (type) => String(type.department?._id || type.department) === String(filters.b2bDepartment)
       );
     } else if (filters.b2bProject) {
-      const deptIds = new Set(
-        cycleDepartmentOptions.map((d) => String(d._id))
-      );
-      types = types.filter((type) =>
-        deptIds.has(String(type.department?._id || type.department))
-      );
+      const project = allB2bProjects.find((p) => String(p._id) === String(filters.b2bProject));
+      if (project) {
+        const deptId = String(project.department?._id || project.department);
+        types = types.filter(
+          (type) => String(type.department?._id || type.department) === deptId
+        );
+      }
     }
     return types;
-  }, [allTypeOfB2BRaw, filters.b2bDepartment, filters.b2bProject, cycleDepartmentOptions]);
+  }, [allTypeOfB2BRaw, filters.b2bDepartment, filters.b2bProject, allB2bProjects]);
 
   useEffect(() => {
     fetchLeads(null, 1);
@@ -1576,6 +1576,8 @@ const B2BSales = () => {
   useEffect(() => {
     const handler = () => {
       fetchLeads(selectedStatusFilter, currentPage);
+      fetchStatusCounts();
+      fetchApprovalCounts();
     };
     window.addEventListener('b2b-followup-updated', handler);
     return () => window.removeEventListener('b2b-followup-updated', handler);
@@ -1658,69 +1660,52 @@ const B2BSales = () => {
     fetchLeads(statusId, 1);
   };
 
-  const defaultFiltersState = () => ({
-    search: '',
-    leadCategory: [],
-    b2bProject: '',
-    b2bDepartment: '',
-    typeOfB2B: [],
-    leadOwner: [],
-    hasFollowUpCall: false,
-    hasFollowUpVisit: false,
-    followUpCallBucket: '',
-    followUpVisitBucket: '',
-    documentsStatus: [],
-    dateRange: { start: null, end: null },
-    status: [],
-    subStatus: []
-  });
+  const hasActiveFollowupFilter = Boolean(
+    filters.followUpCallBucket || filters.followUpVisitBucket
+  );
 
-  const hasActiveListFilters = useMemo(() => Boolean(
-    filters.search ||
-    filters.b2bProject ||
-    filters.b2bDepartment ||
-    (Array.isArray(filters.typeOfB2B) && filters.typeOfB2B.length) ||
-    (Array.isArray(filters.leadOwner) && filters.leadOwner.length) ||
-    filters.followUpCallBucket ||
-    filters.followUpVisitBucket ||
-    filters.hasFollowUpCall ||
-    filters.hasFollowUpVisit ||
-    (Array.isArray(filters.documentsStatus) && filters.documentsStatus.length) ||
-    filters.dateRange?.start ||
-    filters.dateRange?.end ||
-    (Array.isArray(filters.leadCategory) && filters.leadCategory.length) ||
-    (Array.isArray(filters.status) && filters.status.length) ||
-    (Array.isArray(filters.subStatus) && filters.subStatus.length) ||
-    selectedStatusFilter ||
-    selectedApprovalStatus
-  ), [filters, selectedStatusFilter, selectedApprovalStatus]);
+  const hasAnyActiveFilters = () => {
+    const f = filters;
+    return Boolean(
+      f.search
+      || f.b2bProject
+      || f.b2bDepartment
+      || (Array.isArray(f.leadCategory) && f.leadCategory.length)
+      || (Array.isArray(f.typeOfB2B) && f.typeOfB2B.length)
+      || (Array.isArray(f.leadOwner) && f.leadOwner.length)
+      || f.followUpCallBucket
+      || f.followUpVisitBucket
+      || f.hasFollowUpCall
+      || f.hasFollowUpVisit
+      || (Array.isArray(f.documentsStatus) && f.documentsStatus.length)
+      || f.dateRange?.start
+      || f.dateRange?.end
+      || (Array.isArray(f.status) && f.status.length)
+      || (Array.isArray(f.subStatus) && f.subStatus.length)
+      || selectedStatusFilter
+      || selectedApprovalStatus
+    );
+  };
 
-  const activeFilterSummary = useMemo(() => {
-    const parts = [];
-    if (filters.followUpCallBucket) {
-      parts.push(`Call: ${filters.followUpCallBucket}`);
-    }
-    if (filters.followUpVisitBucket) {
-      parts.push(`Visit: ${filters.followUpVisitBucket}`);
-    }
-    if (selectedStatusFilter) {
-      const st = statusCounts?.find((s) => String(s.statusId) === String(selectedStatusFilter));
-      parts.push(`Status: ${st?.statusName || 'Selected'}`);
-    }
-    if (selectedApprovalStatus) parts.push(`Approval: ${selectedApprovalStatus}`);
-    if (filters.b2bProject) {
-      const p = b2bProjectOptions.find((o) => o.value === filters.b2bProject);
-      parts.push(`Project: ${p?.label || 'Selected'}`);
-    }
-    if (filters.search) parts.push('Search');
-    return parts;
-  }, [filters, selectedStatusFilter, selectedApprovalStatus, statusCounts, b2bProjectOptions]);
-
-  /** Reset filters + status chips — show full lead list again */
   const showAllLeads = () => {
-    const cleared = defaultFiltersState();
     setSelectedStatusFilter(null);
     setSelectedApprovalStatus(null);
+    const cleared = {
+      search: '',
+      leadCategory: [],
+      b2bProject: '',
+      b2bDepartment: '',
+      typeOfB2B: [],
+      leadOwner: [],
+      hasFollowUpCall: false,
+      hasFollowUpVisit: false,
+      followUpCallBucket: '',
+      followUpVisitBucket: '',
+      documentsStatus: [],
+      dateRange: { start: null, end: null },
+      status: [],
+      subStatus: []
+    };
     setFilters(cleared);
     setCurrentPage(1);
     fetchLeads(null, 1, { ...cleared, approvalStatus: null });
@@ -1728,9 +1713,16 @@ const B2BSales = () => {
     fetchApprovalCounts(cleared);
   };
 
-  // Handle total card click (show all leads)
+  // Handle total card click (show all leads for current header filters)
   const handleTotalCardClick = () => {
-    showAllLeads();
+    setSelectedStatusFilter(null);
+    setSelectedApprovalStatus(null);
+    const next = { ...filters, followUpCallBucket: '', followUpVisitBucket: '' };
+    setFilters(next);
+    setCurrentPage(1);
+    fetchLeads(null, 1, { ...next, approvalStatus: null });
+    fetchStatusCounts(next);
+    fetchApprovalCounts();
   };
 
   // Filter handlers
@@ -1778,10 +1770,15 @@ const B2BSales = () => {
     const next = { ...filters };
     const togglingOff = next[filterKey] === bucket;
     next[filterKey] = togglingOff ? '' : bucket;
-    if (!togglingOff) next[otherKey] = '';
+    if (!togglingOff) {
+      next[otherKey] = '';
+      setSelectedStatusFilter(null);
+      setSelectedApprovalStatus(null);
+    }
     setFilters(next);
     setCurrentPage(1);
-    fetchLeads(selectedStatusFilter, 1, next);
+    const overrides = togglingOff ? next : { ...next, approvalStatus: null };
+    fetchLeads(togglingOff ? selectedStatusFilter : null, 1, overrides);
     fetchStatusCounts(next);
     fetchApprovalCounts(next);
   };
@@ -1793,12 +1790,12 @@ const B2BSales = () => {
 
   const handleCycleFilterChange = (key, value) => {
     const next = { ...filters };
-    if (key === 'b2bProject') {
-      next.b2bProject = value;
-      next.b2bDepartment = '';
-      next.typeOfB2B = [];
-    } else if (key === 'b2bDepartment') {
+    if (key === 'b2bDepartment') {
       next.b2bDepartment = value;
+      next.b2bProject = '';
+      next.typeOfB2B = [];
+    } else if (key === 'b2bProject') {
+      next.b2bProject = value;
       next.typeOfB2B = [];
     } else if (key === 'typeOfB2B') {
       next.typeOfB2B = value ? [value] : [];
@@ -1815,22 +1812,6 @@ const B2BSales = () => {
   const renderCycleFilterDropdowns = (mobile = false) => (
     <div className={`b2b-cycle-filters${mobile ? ' b2b-cycle-filters--mobile' : ''}`}>
       <div className="b2b-cycle-filters__item">
-        <label className="b2b-cycle-filters__label" htmlFor="cycle-filter-project">
-          <i className="fas fa-project-diagram" aria-hidden="true" /> Project
-        </label>
-        <select
-          id="cycle-filter-project"
-          className="b2b-cycle-filters__select"
-          value={filters.b2bProject || ''}
-          onChange={(e) => handleCycleFilterChange('b2bProject', e.target.value)}
-        >
-          <option value="">All</option>
-          {b2bProjectOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-      </div>
-      <div className="b2b-cycle-filters__item">
         <label className="b2b-cycle-filters__label" htmlFor="cycle-filter-department">
           <i className="fas fa-sitemap" aria-hidden="true" /> Department
         </label>
@@ -1841,8 +1822,24 @@ const B2BSales = () => {
           onChange={(e) => handleCycleFilterChange('b2bDepartment', e.target.value)}
         >
           <option value="">All</option>
-          {cycleDepartmentOptions.map((dept) => (
+          {allB2bDepartments.map((dept) => (
             <option key={dept._id} value={dept._id}>{dept.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="cycle-filter-project">
+          <i className="fas fa-project-diagram" aria-hidden="true" /> Project
+        </label>
+        <select
+          id="cycle-filter-project"
+          className="b2b-cycle-filters__select"
+          value={filters.b2bProject || ''}
+          onChange={(e) => handleCycleFilterChange('b2bProject', e.target.value)}
+        >
+          <option value="">All</option>
+          {cycleProjectOptions.map((proj) => (
+            <option key={proj._id} value={proj._id}>{proj.name}</option>
           ))}
         </select>
       </div>
@@ -1899,12 +1896,29 @@ const B2BSales = () => {
   };
 
   const clearFilters = () => {
-    const cleared = defaultFiltersState();
-    setFilters(cleared);
+    setFilters({
+      search: '',
+      leadCategory: [],
+      b2bProject: '',
+      b2bDepartment: '',
+      typeOfB2B: [],
+      leadOwner: [],
+      hasFollowUpCall: false,
+      hasFollowUpVisit: false,
+      followUpCallBucket: '',
+      followUpVisitBucket: '',
+      documentsStatus: [],
+      dateRange: {
+        start: null,
+        end: null
+      },
+      status: [],
+      subStatus: []
+    });
     setCurrentPage(1);
-    fetchLeads(selectedStatusFilter, 1, cleared);
-    fetchStatusCounts(cleared);
-    fetchApprovalCounts(cleared);
+    fetchLeads(selectedStatusFilter, 1);
+    fetchStatusCounts(); // Update status counts after clearing filters
+    fetchApprovalCounts();
   };
 
   const fetchLeads = async (statusFilter = null, page = 1, filterOverrides = {}) => {
@@ -2029,6 +2043,10 @@ const B2BSales = () => {
       if (response.data.status) {
         setStatusCounts(response.data.data.statusCounts || []);
         setTotalLeads(response.data.data.totalLeads || 0);
+        const fc = response.data.data.followupDashboardCounts;
+        if (fc?.call && fc?.visit) {
+          setFollowupDashboardCounts(fc);
+        }
       } else {
         console.error('Failed to fetch status counts:', response.data.message);
       }
@@ -4817,6 +4835,26 @@ const B2BSales = () => {
                       </div>
                     </div>
 
+                    {hasActiveFollowupFilter && (
+                      <div className="d-flex flex-wrap align-items-center gap-2 mt-2 mb-1">
+                        <span className="badge rounded-pill text-bg-light border" style={{ fontSize: '12px', fontWeight: 600 }}>
+                          <i className="fas fa-filter me-1 text-danger" aria-hidden="true" />
+                          {filters.followUpCallBucket
+                            ? `Call: ${filters.followUpCallBucket}`
+                            : `Visit: ${filters.followUpVisitBucket}`}
+                        </span>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-danger"
+                          onClick={showAllLeads}
+                          style={{ fontSize: '12px', fontWeight: 600, borderRadius: '999px' }}
+                        >
+                          <i className="fas fa-list me-1" aria-hidden="true" />
+                          Show all leads
+                        </button>
+                      </div>
+                    )}
+
                     <div className="row g-2 mt-1">
                       <div className="col-12 col-lg-4">
                         <div className="b2b-dash-section h-100">
@@ -4996,36 +5034,6 @@ const B2BSales = () => {
                 </div>
               </div>
 
-              {hasActiveListFilters && (
-                <div className="alert alert-light border d-flex flex-wrap align-items-center justify-content-between gap-2 py-2 px-3 mb-2 b2b-active-filters-bar">
-                  <div className="d-flex flex-wrap align-items-center gap-2" style={{ fontSize: '13px' }}>
-                    <i className="fas fa-filter text-secondary" aria-hidden="true" />
-                    <span className="text-muted">Showing filtered leads</span>
-                    {activeFilterSummary.length > 0 && (
-                      <span className="text-dark fw-medium">
-                        ({activeFilterSummary.join(' · ')})
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-sm"
-                    onClick={showAllLeads}
-                    style={{
-                      backgroundColor: 'rgb(250, 85, 121)',
-                      color: '#fff',
-                      fontWeight: 600,
-                      borderRadius: '999px',
-                      padding: '6px 14px',
-                      border: 'none'
-                    }}
-                  >
-                    <i className="fas fa-undo me-1" aria-hidden="true" />
-                    Show all leads
-                  </button>
-                </div>
-              )}
-
               {/* Bulk refer bar (shows above lead cards) */}
               {showBulkInputs && bulkMode === 'bulkrefer' && (
                 <div className="card border-0 shadow-sm mb-2" style={{ borderRadius: '12px' }}>
@@ -5139,6 +5147,38 @@ const B2BSales = () => {
                 </div>
               )}
 
+              {hasAnyActiveFilters() && !loadingLeads && (
+                <div
+                  className="d-flex flex-wrap align-items-center gap-2 mb-3 px-2 py-2 rounded-3"
+                  style={{ background: '#fff5f7', border: '1px solid rgba(250, 85, 121, 0.25)' }}
+                >
+                  <span className="text-muted small fw-semibold">
+                    <i className="fas fa-filter me-1" style={{ color: 'rgb(250, 85, 121)' }} aria-hidden="true" />
+                    Filters active
+                  </span>
+                  {filters.followUpCallBucket && (
+                    <span className="badge rounded-pill text-bg-light border">Call: {filters.followUpCallBucket}</span>
+                  )}
+                  {filters.followUpVisitBucket && (
+                    <span className="badge rounded-pill text-bg-light border">Visit: {filters.followUpVisitBucket}</span>
+                  )}
+                  {selectedStatusFilter && (
+                    <span className="badge rounded-pill text-bg-light border">
+                      Status: {statusCounts?.find((s) => String(s.statusId) === String(selectedStatusFilter))?.statusName || 'Selected'}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-danger ms-auto"
+                    onClick={showAllLeads}
+                    style={{ borderRadius: '999px', fontWeight: 600 }}
+                  >
+                    <i className="fas fa-list me-1" aria-hidden="true" />
+                    Show all leads
+                  </button>
+                </div>
+              )}
+
               {/* Loading State */}
               {loadingLeads ? (
                 <div className="text-center py-5">
@@ -5155,34 +5195,20 @@ const B2BSales = () => {
                 <div className="text-center py-5">
                   <i className="fas fa-inbox text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
                   <h5 className="mt-3 text-muted">
-                    {hasActiveListFilters
-                      ? 'No leads match your current filters'
-                      : selectedStatusFilter
-                        ? 'No leads found for selected status'
-                        : 'No B2B Leads Found'}
+                    {hasAnyActiveFilters() ? 'No leads match your filters' : 'No B2B Leads Found'}
                   </h5>
                   <p className="text-muted mb-3">
-                    {hasActiveListFilters
-                      ? 'Clear filters to see all leads again, or try a different filter.'
-                      : selectedStatusFilter
-                        ? 'Try selecting a different status or add new leads.'
-                        : 'Start by adding your first B2B lead using the "Add Lead" button.'}
+                    {hasAnyActiveFilters()
+                      ? 'Remove filters to see all leads again, or try a different filter.'
+                      : 'Start by adding your first B2B lead using the "Add Lead" button.'}
                   </p>
-                  {hasActiveListFilters && (
+                  {hasAnyActiveFilters() && (
                     <button
                       type="button"
-                      className="btn"
+                      className="btn btn-sm btn-outline-danger"
                       onClick={showAllLeads}
-                      style={{
-                        backgroundColor: 'rgb(250, 85, 121)',
-                        color: '#fff',
-                        fontWeight: 600,
-                        borderRadius: '999px',
-                        padding: '8px 20px',
-                        border: 'none'
-                      }}
                     >
-                      <i className="fas fa-undo me-2" aria-hidden="true" />
+                      <i className="fas fa-list me-1" aria-hidden="true" />
                       Show all leads
                     </button>
                   )}
@@ -5917,12 +5943,12 @@ const B2BSales = () => {
                                   <div className="lead-meta-v2__value text-capitalize" title={lead.leadAddedBy?.name || '—'}>{lead.leadAddedBy?.name || '—'}</div>
                                 </div>
                                 <div className="lead-meta-v2__item">
-                                  <div className="lead-meta-v2__label">B2B Project</div>
-                                  <div className="lead-meta-v2__value text-capitalize" title={getLeadB2bProjectName(lead)}>{getLeadB2bProjectName(lead)}</div>
-                                </div>
-                                <div className="lead-meta-v2__item">
                                   <div className="lead-meta-v2__label">B2B Department</div>
                                   <div className="lead-meta-v2__value text-capitalize" title={getLeadB2bDepartmentName(lead)}>{getLeadB2bDepartmentName(lead)}</div>
+                                </div>
+                                <div className="lead-meta-v2__item">
+                                  <div className="lead-meta-v2__label">B2B Project</div>
+                                  <div className="lead-meta-v2__value text-capitalize" title={getLeadB2bProjectName(lead)}>{getLeadB2bProjectName(lead)}</div>
                                 </div>
                                 <div className="lead-meta-v2__item">
                                   <div className="lead-meta-v2__label">Lead Source</div>
@@ -6714,6 +6740,32 @@ const B2BSales = () => {
                       )}
                     </div>
 
+                    {/* B2B Department */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-sitemap text-primary me-1"></i>
+                        B2B Department <span className="text-danger">*</span>
+                      </label>
+                      <select
+                        className={`form-select ${formErrors.b2bDepartment ? 'is-invalid' : ''}`}
+                        name="b2bDepartment"
+                        value={leadFormData.b2bDepartment}
+                        onChange={handleLeadInputChange}
+                      >
+                        <option value="">Select B2B Department</option>
+                        {allB2bDepartments.map((dept) => (
+                          <option key={dept._id} value={dept._id}>
+                            {dept.name}
+                          </option>
+                        ))}
+                      </select>
+                      {formErrors.b2bDepartment && (
+                        <div className="invalid-feedback">
+                          {formErrors.b2bDepartment}
+                        </div>
+                      )}
+                    </div>
+
                     {/* B2B Project */}
                     <div className="col-md-6">
                       <label className="form-label fw-bold">
@@ -6725,49 +6777,23 @@ const B2BSales = () => {
                         name="b2bProject"
                         value={leadFormData.b2bProject}
                         onChange={handleLeadInputChange}
+                        disabled={!leadFormData.b2bDepartment}
                       >
-                        <option value="">Select B2B Project</option>
-                        {b2bProjectOptions.map((project) => (
-                          <option key={project.value} value={project.value}>
-                            {project.label}
+                        <option value="">
+                          {leadFormData.b2bDepartment ? 'Select B2B Project' : 'Select department first'}
+                        </option>
+                        {addLeadProjects.map((proj) => (
+                          <option key={proj._id} value={proj._id}>
+                            {proj.name}
                           </option>
                         ))}
                       </select>
+                      {leadFormData.b2bDepartment && addLeadProjects.length === 0 && (
+                        <small className="text-danger">No projects for this department. Add one in B2B Settings.</small>
+                      )}
                       {formErrors.b2bProject && (
                         <div className="invalid-feedback">
                           {formErrors.b2bProject}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* B2B Department */}
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold">
-                        <i className="fas fa-building text-primary me-1"></i>
-                        B2B Department <span className="text-danger">*</span>
-                      </label>
-                      <select
-                        className={`form-select ${formErrors.b2bDepartment ? 'is-invalid' : ''}`}
-                        name="b2bDepartment"
-                        value={leadFormData.b2bDepartment}
-                        onChange={handleLeadInputChange}
-                        disabled={!leadFormData.b2bProject}
-                      >
-                        <option value="">
-                          {leadFormData.b2bProject ? 'Select B2B Department' : 'Select project first'}
-                        </option>
-                        {addLeadDepartments.map((dept) => (
-                          <option key={dept._id} value={dept._id}>
-                            {dept.name}
-                          </option>
-                        ))}
-                      </select>
-                      {leadFormData.b2bProject && addLeadDepartments.length === 0 && (
-                        <small className="text-danger">No departments for this project. Add one in B2B Settings.</small>
-                      )}
-                      {formErrors.b2bDepartment && (
-                        <div className="invalid-feedback">
-                          {formErrors.b2bDepartment}
                         </div>
                       )}
                     </div>
