@@ -860,6 +860,13 @@ body.foc-mobile-nav-open .floating-side-tabs {
   color: var(--hdr-link-hover) !important;
 }
 
+.site-menu-main button.nav-link-item {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: inline-block;
+}
+
 .site-header.front-header--cyber .nav-item .dropdown-container > span.active_menu {
   color: var(--hdr-accent-1) !important;
   background: transparent !important;

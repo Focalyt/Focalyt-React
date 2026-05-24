@@ -1,38 +1,36 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
 const STYLES = `
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
-
 .ia, .ia *, .ia *::before, .ia *::after { box-sizing: border-box; }
 
 .ia {
-  font-family: 'Inter', sans-serif;
-  --navy: #0d2146;
-  --navy2: #0a2240;
-  --teal: #0e7c6b;
-  --green: #16a34a;
-  --blue: #1565c0;
-  --purple: #6a1f9a;
-  --orange: #e65100;
-  --bg: #fff;
-  --cream: #f1f5f9;
-  --surface: #fff;
-  --brd: #e2e8f0;
-  --t1: #0d2146;
-  --t2: #334155;
-  --t3: #475569;
-  background: #fff;
+  font-family: var(--foc-font-sans);
+  --navy: var(--foc-navy-deep);
+  --navy2: var(--foc-navy-mid);
+  --teal: var(--foc-teal);
+  --green: var(--foc-green);
+  --blue: var(--foc-blue);
+  --purple: var(--foc-purple-dark);
+  --orange: var(--foc-orange);
+  --bg: var(--foc-color-surface);
+  --cream: var(--foc-color-bg-section);
+  --surface: var(--foc-color-surface);
+  --brd: var(--foc-color-border-light);
+  --t1: var(--foc-navy-deep);
+  --t2: var(--foc-color-text-body);
+  --t3: var(--foc-color-text-soft);
+  background: var(--foc-color-surface);
   color: var(--t1);
   overflow-x: hidden;
   overflow: hidden;
   position: relative;
   z-index: 1;
-  border-radius: 20px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.1), 0 2px 8px rgba(15, 23, 42, 0.06);
+  border-radius: var(--foc-radius-xl);
+  border: 1px solid var(--foc-color-border-light);
+  box-shadow: var(--foc-shadow-card);
 }
 
-.ia-wrap { max-width: 1240px; margin: 0 auto; padding: 0 48px; position: relative; z-index: 1; }
+.ia-wrap { max-width: var(--foc-container-max-wide); margin: 0 auto; padding: 0 48px; position: relative; z-index: 1; }
 @media (max-width: 768px) { .ia-wrap { padding: 0 20px; } }
 
 @keyframes iaFadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -60,7 +58,7 @@ const STYLES = `
 .ia .rev.on, .ia .rev-l.on, .ia .rev-r.on { opacity: 1; transform: none; }
 
 .ia-hero {
-  background: #fff;
+  background: var(--foc-color-surface);
   border: none;
   border-bottom: 1px solid var(--brd);
   border-radius: 0;
@@ -74,21 +72,21 @@ const STYLES = `
 .ia-eyebrow-text { font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--teal); }
 .ia-badge {
   display: inline-flex; align-items: center; gap: 8px;
-  background: linear-gradient(135deg, var(--navy), #163565);
-  color: #fff; font-size: 10px; font-weight: 800; letter-spacing: 2px;
+  background: linear-gradient(135deg, var(--navy), var(--foc-navy-badge));
+  color: var(--foc-color-text-inverse); font-size: 10px; font-weight: 800; letter-spacing: 2px;
   text-transform: uppercase; padding: 6px 16px; border-radius: 50px;
   margin-bottom: 16px;
 }
-.ia-h1 { font-family: 'Orbitron', monospace; font-size: clamp(28px, 3.8vw, 48px); font-weight: 900; line-height: 1.08; color: var(--navy); margin-bottom: 8px; }
-.ia-h1-sub { font-family: 'Inter', sans-serif; font-size: clamp(16px, 2vw, 24px); font-weight: 600; color: var(--teal); margin-bottom: 16px; line-height: 1.25; }
+.ia-h1 { font-family: var(--foc-font-display); font-size: clamp(28px, 3.8vw, 48px); font-weight: var(--foc-weight-black); line-height: var(--foc-leading-tight); color: var(--navy); margin-bottom: 8px; }
+.ia-h1-sub { font-family: var(--foc-font-sans); font-size: clamp(16px, 2vw, 24px); font-weight: var(--foc-weight-semibold); color: var(--teal); margin-bottom: 16px; line-height: 1.25; }
 .ia-tags { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
 .ia-tag {
   display: flex; align-items: center; gap: 6px; padding: 5px 12px;
-  background: #fff; border: 1px solid var(--brd); border-radius: 6px;
+  background: var(--foc-color-surface); border: 1px solid var(--brd); border-radius: 6px;
   font-size: 12px; font-weight: 700; color: var(--t2);
 }
 .ia-tag-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--teal); }
-.ia-desc { font-family: 'Inter', sans-serif; font-size: 14px; color: var(--t2); line-height: 1.8; max-width: 480px; margin-bottom: 24px; }
+.ia-desc { font-family: var(--foc-font-sans); font-size: var(--foc-text-sm); color: var(--t2); line-height: 1.8; max-width: 480px; margin-bottom: 24px; }
 .ia-hero-grid { display: grid; grid-template-columns: 1fr auto; gap: 40px;  }
 @media (max-width: 900px) {
   .ia-hero-grid { grid-template-columns: 1fr; }
@@ -101,11 +99,11 @@ const STYLES = `
   background: rgba(14, 124, 107, 0.1); border: 1px solid rgba(14, 124, 107, 0.22);
   display: flex; align-items: center; justify-content: center; font-size: 18px;
 }
-.ia-pillar-title { font-family: 'Orbitron', monospace; font-size: 12px; font-weight: 800; color: var(--navy); margin-bottom: 3px; }
-.ia-pillar-sub { font-family: 'Inter', sans-serif; font-size: 11.5px; color: var(--t3); line-height: 1.5; }
+.ia-pillar-title { font-family: var(--foc-font-display); font-size: var(--foc-text-xs); font-weight: var(--foc-weight-extrabold); color: var(--navy); margin-bottom: 3px; }
+.ia-pillar-sub { font-family: var(--foc-font-sans); font-size: 11.5px; color: var(--t3); line-height: var(--foc-leading-snug); }
 
 .ia-orbit-wrap {
-  background: #fff; border: 1px solid var(--brd); border-radius: 20px;
+  background: var(--foc-color-surface); border: 1px solid var(--brd); border-radius: var(--foc-radius-xl);
   padding: 24px; box-shadow: 0 16px 48px rgba(10, 34, 64, 0.1);
 }
 .ia-orbit { position: relative; width: 220px; height: 220px; margin: 0 auto; }
@@ -114,16 +112,16 @@ const STYLES = `
 }
 .ia-orbit-center {
   position: relative; z-index: 4; width: 76px; height: 76px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--navy), #163565);
+  background: linear-gradient(135deg, var(--navy), var(--foc-navy-badge));
   border: 2px solid var(--teal);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   box-shadow: 0 8px 28px rgba(13, 33, 70, 0.18);
 }
-.ia-orbit-center span:first-child { font-size: 8px; font-weight: 700; color: #7ecfc0; letter-spacing: 1.2px; }
-.ia-orbit-center span:last-child { font-size: 20px; font-weight: 900; color: #fff; line-height: 1; }
+.ia-orbit-center span:first-child { font-size: 8px; font-weight: 700; color: var(--foc-teal-muted); letter-spacing: 1.2px; }
+.ia-orbit-center span:last-child { font-size: 20px; font-weight: 900; color: var(--foc-color-text-inverse); line-height: 1; }
 .ia-orbit-node {
   position: absolute; width: 38px; height: 38px; border-radius: 50%;
-  background: #fff; border: 1.5px solid rgba(14, 124, 107, 0.35);
+  background: var(--foc-color-surface); border: 1.5px solid rgba(14, 124, 107, 0.35);
   display: flex; align-items: center; justify-content: center; font-size: 16px;
   box-shadow: 0 4px 14px rgba(10, 34, 64, 0.1); cursor: default; z-index: 3;
   transition: transform 0.25s ease, border-color 0.25s ease;
@@ -132,7 +130,7 @@ const STYLES = `
 
 .ia-stats { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 16px; }
 .ia-stat {
-  background: #fff; border: 1px solid var(--brd); border-radius: 12px;
+  background: var(--foc-color-surface); border: 1px solid var(--brd); border-radius: 12px;
   padding: 10px 14px; text-align: center; min-width: 72px;
   transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
@@ -143,7 +141,7 @@ const STYLES = `
 .ia-tech-tiles { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
 .ia-tech-tile {
   width: 84px; padding: 12px 8px; border-radius: 12px;
-  background: #fff; border: 1px solid var(--brd); text-align: center;
+  background: var(--foc-color-surface); border: 1px solid var(--brd); text-align: center;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 .ia-tech-tile:hover { transform: translateY(-6px); box-shadow: 0 12px 28px rgba(13, 33, 70, 0.12); border-color: var(--teal); }
@@ -161,34 +159,34 @@ const STYLES = `
 }
 .ia-sec-divider-line { flex: 1; max-width: 90px; height: 2px; background: linear-gradient(90deg, transparent, var(--teal)); }
 .ia-sec-divider-text {
-  font-family: 'Orbitron', monospace;
-  font-size: 12px; font-weight: 800; letter-spacing: 3px;
+  font-family: var(--foc-font-display);
+  font-size: var(--foc-text-xs); font-weight: var(--foc-weight-extrabold); letter-spacing: 3px;
   text-transform: uppercase; color: var(--teal);
 }
 
 .ia-tabs { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
 .ia-tab {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--foc-font-sans);
   display: flex; align-items: center; gap: 8px; padding: 12px 20px;
-  border-radius: 50px; border: 2px solid #dce4f5; background: #fff;
-  color: #4a5568; font-weight: 700; font-size: 13px; cursor: pointer;
+  border-radius: 50px; border: 2px solid var(--foc-border-card); background: var(--foc-color-surface);
+  color: var(--foc-gray-600); font-weight: 700; font-size: 13px; cursor: pointer;
   transition: all 0.25s ease;
 }
-.ia-tab:hover { transform: translateY(-2px); border-color: #b0c4de; }
+.ia-tab:hover { transform: translateY(-2px); border-color: var(--foc-slate-muted); }
 .ia-tab.active {
-  background: linear-gradient(135deg, var(--navy), #163972);
-  color: #fff; border-color: var(--navy);
+  background: linear-gradient(135deg, var(--navy), var(--foc-navy-heading));
+  color: var(--foc-color-text-inverse); border-color: var(--navy);
   box-shadow: 0 8px 24px rgba(13, 33, 70, 0.2);
 }
 
 .ia-panel {
-  background: #fff; border-radius: 20px; border: 1px solid var(--brd);
+  background: var(--foc-color-surface); border-radius: var(--foc-radius-xl); border: 1px solid var(--brd);
   box-shadow: 0 12px 40px rgba(10, 34, 64, 0.08);
   overflow: hidden; display: flex; flex-wrap: wrap;
   animation: iaFadeIn 0.45s ease forwards;
 }
 .ia-panel-side {
-  width: 120px; flex-shrink: 0; background: #f8fafc;
+  width: 120px; flex-shrink: 0; background: var(--foc-color-bg-muted);
   border-right: 1px solid var(--brd);
   display: flex; flex-direction: column; align-items: center;
   justify-content: center; gap: 12px; padding: 20px 10px;
@@ -200,13 +198,13 @@ const STYLES = `
   width: 44px; height: 44px; border-radius: 12px;
   display: flex; align-items: center; justify-content: center; font-size: 22px;
 }
-.ia-panel-title { font-family: 'Orbitron', monospace; font-size: 16px; font-weight: 800; line-height: 1.2; color: var(--navy); }
+.ia-panel-title { font-family: var(--foc-font-display); font-size: 16px; font-weight: 800; line-height: 1.2; color: var(--navy); }
 .ia-panel-title span { color: var(--accent, var(--teal)); }
-.ia-panel-desc { font-family: 'Inter', sans-serif; font-size: 13.5px; color: var(--t3); line-height: 1.75; margin-bottom: 18px; }
+.ia-panel-desc { font-family: var(--foc-font-sans); font-size: 13.5px; color: var(--t3); line-height: 1.75; margin-bottom: 18px; }
 .ia-features { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
 @media (max-width: 560px) { .ia-features { grid-template-columns: 1fr; } }
 .ia-feat {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--foc-font-sans);
   display: flex; align-items: flex-start; gap: 8px;
   font-size: 12.5px; font-weight: 500; color: var(--t2); line-height: 1.4;
 }
@@ -236,21 +234,21 @@ const STYLES = `
   border: 1px solid;
 }
 .ia-benefit-num { font-size: 20px; font-weight: 900; line-height: 1; margin-bottom: 4px; }
-.ia-benefit-lbl { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 500; color: var(--t2); line-height: 1.35; }
+.ia-benefit-lbl { font-family: var(--foc-font-sans); font-size: 11px; font-weight: 500; color: var(--t2); line-height: 1.35; }
 
 .ia-dash-panel {
-  background: #fff; border: 1px solid var(--brd); border-radius: 20px;
+  background: var(--foc-color-surface); border: 1px solid var(--brd); border-radius: var(--foc-radius-xl);
   padding: 32px 28px; box-shadow: 0 12px 40px rgba(10, 34, 64, 0.08);
 }
 .ia-live-badge {
   display: inline-flex; align-items: center; gap: 7px;
   background: rgba(14, 124, 107, 0.08); border: 1px solid rgba(14, 124, 107, 0.22);
-  border-radius: 20px; padding: 6px 14px; font-size: 10px;
+  border-radius: var(--foc-radius-xl); padding: 6px 14px; font-size: 10px;
   color: var(--teal); font-weight: 800; letter-spacing: 1.5px; margin-bottom: 12px;
 }
 .ia-live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); }
-.ia-dash-title { font-family: 'Orbitron', monospace; font-size: clamp(18px, 2.5vw, 26px); font-weight: 800; color: var(--navy); margin-bottom: 8px; text-align: center; }
-.ia-dash-sub { font-family: 'Inter', sans-serif; color: var(--t3); font-size: 13px; text-align: center; margin-bottom: 28px; }
+.ia-dash-title { font-family: var(--foc-font-display); font-size: clamp(18px, 2.5vw, 26px); font-weight: 800; color: var(--navy); margin-bottom: 8px; text-align: center; }
+.ia-dash-sub { font-family: var(--foc-font-sans); color: var(--t3); font-size: 13px; text-align: center; margin-bottom: 28px; }
 .ia-dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }
 .ia-dash-card {
   background: var(--cream); border: 1px solid var(--brd); border-radius: 14px;
@@ -269,14 +267,14 @@ const STYLES = `
 .ia-wave-bars { display: flex; gap: 3px; align-items: flex-end; height: 36px; flex: 1; min-width: 180px; }
 .ia-wave-bar {
   flex: 1; border-radius: 2px;
-  background: linear-gradient(to top, var(--teal), #4dd9c7);
+  background: linear-gradient(to top, var(--teal), var(--foc-teal-bright));
   transition: height 0.7s ease;
   animation: iaWaveBar 0.8s ease-in-out infinite;
 }
 .ia-btn-primary {
   display: inline-flex; align-items: center; gap: 8px; padding: 14px 26px;
   background: linear-gradient(135deg, var(--teal), var(--navy));
-  color: #fff; border: none; border-radius: 10px;
+  color: var(--foc-color-text-inverse); border: none; border-radius: 10px;
   font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
   cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease;
   box-shadow: 0 8px 24px rgba(14, 124, 107, 0.28);
@@ -284,10 +282,10 @@ const STYLES = `
 .ia-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(14, 124, 107, 0.38); }
 .ia-btn-outline {
   display: inline-flex; align-items: center; gap: 8px; padding: 13px 24px;
-  background: #fff; color: var(--navy); border: none; border-radius: 8px;
+  background: var(--foc-color-surface); color: var(--navy); border: none; border-radius: 8px;
   font-size: 12px; font-weight: 700; cursor: pointer; transition: background 0.2s ease, transform 0.2s ease;
 }
-.ia-btn-outline:hover { background: #e8f4f0; transform: translateY(-1px); }
+.ia-btn-outline:hover { background: var(--foc-teal-bg-hover); transform: translateY(-1px); }
 
 .ia-cta {
   background: linear-gradient(135deg, var(--teal) 0%, var(--navy) 100%);
@@ -296,8 +294,8 @@ const STYLES = `
   display: flex; align-items: center; justify-content: space-between;
   gap: 24px; flex-wrap: wrap; margin-bottom: 0;
 }
-.ia-cta-h { font-family: 'Orbitron', monospace; font-size: clamp(18px, 2.4vw, 24px); font-weight: 800; color: #fff; margin-bottom: 8px; line-height: 1.25; }
-.ia-cta-sub { font-family: 'Inter', sans-serif; font-size: 13px; color: rgba(255, 255, 255, 0.7); line-height: 1.6; max-width: 420px; }
+.ia-cta-h { font-family: var(--foc-font-display); font-size: clamp(18px, 2.4vw, 24px); font-weight: 800; color: var(--foc-color-text-inverse); margin-bottom: 8px; line-height: 1.25; }
+.ia-cta-sub { font-family: var(--foc-font-sans); font-size: 13px; color: rgba(255, 255, 255, 0.7); line-height: 1.6; max-width: 420px; }
 .ia-cta-actions { display: flex; flex-wrap: wrap; gap: 12px; flex: 1; justify-content: center; }
 .ia-cta-action {
   display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px;
@@ -307,8 +305,8 @@ const STYLES = `
 }
 .ia-cta-action:hover { background: rgba(255, 255, 255, 0.16); transform: translateY(-2px); }
 .ia-cta-action-ico { font-size: 22px; flex-shrink: 0; }
-.ia-cta-action-title { font-family: 'Orbitron', monospace; font-size: 12px; font-weight: 700; color: #fff; margin-bottom: 4px; }
-.ia-cta-action-sub { font-family: 'Inter', sans-serif; font-size: 10px; color: rgba(255, 255, 255, 0.55); line-height: 1.45; }
+.ia-cta-action-title { font-family: var(--foc-font-display); font-size: 12px; font-weight: 700; color: var(--foc-color-text-inverse); margin-bottom: 4px; }
+.ia-cta-action-sub { font-family: var(--foc-font-sans); font-size: 10px; color: rgba(255, 255, 255, 0.55); line-height: 1.45; }
 @media (max-width: 768px) {
   .ia { border-radius: 16px; }
   .ia-cta { padding: 28px 20px; border-radius: 0 0 16px 16px; }
@@ -459,15 +457,15 @@ function Hero() {
             <Orbit40 />
             <div className="ia-stats">
               <div className="ia-stat">
-                <Counter end={500} suffix="+" color="#0e7c6b" />
+                <Counter end={500} suffix="+" color="var(--foc-teal)" />
                 <div className="ia-stat-lbl">Clients</div>
               </div>
               <div className="ia-stat">
-                <Counter end={99} suffix="%" color="#1565c0" />
+                <Counter end={99} suffix="%" color="var(--foc-blue)" />
                 <div className="ia-stat-lbl">Uptime</div>
               </div>
               <div className="ia-stat">
-                <Counter end={120} suffix="+" color="#16a34a" />
+                <Counter end={120} suffix="+" color="var(--foc-green)" />
                 <div className="ia-stat-lbl">Solutions</div>
               </div>
             </div>
@@ -537,26 +535,26 @@ function Solutions() {
               <span className="pulse" style={{ fontSize: 28 }}>🏭</span>
               <span className="float" style={{ fontSize: 24, animationDelay: "0.6s" }}>📱</span>
             </div>
-            <div className="ia-panel-body" style={{ "--accent": "#0e7c6b" }}>
+            <div className="ia-panel-body" style={{ "--accent": "var(--foc-teal)" }}>
               <div className="ia-panel-head">
                 <div className="ia-panel-ico" style={{ background: "rgba(14,124,107,.12)", border: "1px solid rgba(14,124,107,.25)" }}>📡</div>
                 <div className="ia-panel-title">INDUSTRY <span>IoT SOLUTIONS</span></div>
               </div>
               <p className="ia-panel-desc">Connect machines, devices and systems through IoT to gain actionable insights, improve efficiency and enable predictive operations.</p>
-              <FeatureList features={IOT_FEATURES} accent="#0e7c6b" />
+              <FeatureList features={IOT_FEATURES} accent="var(--foc-teal)" />
             </div>
           </div>
         )}
 
         {active === "energy" && (
           <div className="ia-panel" key="energy">
-            <div className="ia-panel-body" style={{ "--accent": "#16a34a" }}>
+            <div className="ia-panel-body" style={{ "--accent": "var(--foc-green)" }}>
               <div className="ia-panel-head">
                 <div className="ia-panel-ico" style={{ background: "rgba(22,163,74,.12)", border: "1px solid rgba(22,163,74,.25)" }}>🔋</div>
-                <div className="ia-panel-title">ENERGY <span style={{ color: "#16a34a" }}>MONITORING SOLUTIONS</span></div>
+                <div className="ia-panel-title">ENERGY <span style={{ color: "var(--foc-green)" }}>MONITORING SOLUTIONS</span></div>
               </div>
               <p className="ia-panel-desc">Monitor, analyze and optimize energy consumption in real time to reduce costs and achieve sustainability goals.</p>
-              <FeatureList features={ENERGY_FEATURES} accent="#16a34a" />
+              <FeatureList features={ENERGY_FEATURES} accent="var(--foc-green)" />
             </div>
             <div className="ia-panel-side ia-panel-side--right">
               <span className="float" style={{ fontSize: 44 }}>⚡</span>
@@ -571,12 +569,12 @@ function Solutions() {
 }
 
 const BENEFITS = [
-  { emoji: "₹", num: "10–30%", label: "Energy Cost Savings", accent: "#0e7c6b", bg: "rgba(14,124,107,.1)" },
-  { emoji: "📈", num: "20–40%", label: "Operational Efficiency Increase", accent: "#1565c0", bg: "rgba(21,101,192,.1)" },
-  { emoji: "⏱️", num: "Maximize", label: "Equipment Uptime & Productivity", accent: "#6a1f9a", bg: "rgba(106,31,154,.1)" },
-  { emoji: "🛡️", num: "Reduce", label: "Downtime & Maintenance Costs", accent: "#00838f", bg: "rgba(0,131,143,.1)" },
-  { emoji: "🌿", num: "Achieve", label: "Sustainability & ESG Compliance", accent: "#16a34a", bg: "rgba(22,163,74,.1)" },
-  { emoji: "📊", num: "Data-Driven", label: "Decisions for Smarter Growth", accent: "#e65100", bg: "rgba(230,81,0,.1)" },
+  { emoji: "₹", num: "10–30%", label: "Energy Cost Savings", accent: "var(--foc-teal)", bg: "rgba(14,124,107,.1)" },
+  { emoji: "📈", num: "20–40%", label: "Operational Efficiency Increase", accent: "var(--foc-blue)", bg: "rgba(21,101,192,.1)" },
+  { emoji: "⏱️", num: "Maximize", label: "Equipment Uptime & Productivity", accent: "var(--foc-purple-dark)", bg: "rgba(106,31,154,.1)" },
+  { emoji: "🛡️", num: "Reduce", label: "Downtime & Maintenance Costs", accent: "var(--foc-teal-tab)", bg: "rgba(0,131,143,.1)" },
+  { emoji: "🌿", num: "Achieve", label: "Sustainability & ESG Compliance", accent: "var(--foc-green)", bg: "rgba(22,163,74,.1)" },
+  { emoji: "📊", num: "Data-Driven", label: "Decisions for Smarter Growth", accent: "var(--foc-orange)", bg: "rgba(230,81,0,.1)" },
 ];
 
 function Benefits() {
@@ -601,10 +599,10 @@ function Benefits() {
 }
 
 const DASH = {
-  temp:   { label: "🌡️ Machine Temp", unit: "°C",  color: "#0e7c6b", max: 100, vals: [68, 72, 77, 74, 80, 71, 76, 73, 69, 75] },
-  power:  { label: "⚡ Power Usage", unit: " kW", color: "#1565c0", max: 400, vals: [260, 284, 310, 275, 320, 295, 268, 305, 288, 275] },
-  oee:    { label: "📈 OEE Score", unit: "%", color: "#16a34a", max: 100, vals: [82, 87, 91, 85, 93, 88, 84, 90, 86, 89] },
-  alerts: { label: "🔔 Active Alerts", unit: "", color: "#e65100", max: 5, vals: [1, 3, 2, 5, 0, 4, 2, 3, 1, 4] },
+  temp:   { label: "🌡️ Machine Temp", unit: "°C",  color: "var(--foc-teal)", max: 100, vals: [68, 72, 77, 74, 80, 71, 76, 73, 69, 75] },
+  power:  { label: "⚡ Power Usage", unit: " kW", color: "var(--foc-blue)", max: 400, vals: [260, 284, 310, 275, 320, 295, 268, 305, 288, 275] },
+  oee:    { label: "📈 OEE Score", unit: "%", color: "var(--foc-green)", max: 100, vals: [82, 87, 91, 85, 93, 88, 84, 90, 86, 89] },
+  alerts: { label: "🔔 Active Alerts", unit: "", color: "var(--foc-orange)", max: 5, vals: [1, 3, 2, 5, 0, 4, 2, 3, 1, 4] },
 };
 
 // function LiveDashboard() {

@@ -1,28 +1,26 @@
 import { useState, useEffect, useMemo } from "react";
 
 const STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;900&display=swap');
-
-  .fp, .fp *, .fp *::before, .fp *::after { box-sizing: border-box; }
+    .fp, .fp *, .fp *::before, .fp *::after { box-sizing: border-box; }
 
   .fp {
-    --gov:   #1a7a4a;
-    --csr:   #1565c0;
-    --acad:  #6a1f9a;
-    --ind:   #e65100;
-    --navy:  #0d2146;
-    --cream: #f1f5f9;
-    font-family: 'Inter', sans-serif;
-    background: #fff;
+    --gov: var(--foc-green-dark);
+    --csr: var(--foc-blue);
+    --acad: var(--foc-purple-dark);
+    --ind: var(--foc-orange);
+    --navy: var(--foc-navy-deep);
+    --cream: var(--foc-color-bg-section);
+    font-family: var(--foc-font-sans);
+    background: var(--foc-color-surface);
     overflow-x: hidden;
     overflow: hidden;
     position: relative;
     z-index: 1;
-    max-width: 1280px;
+    max-width: var(--foc-container-max-xl);
     margin: 40px auto 48px;
-    border-radius: 20px;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 8px 32px rgba(15, 23, 42, 0.1), 0 2px 8px rgba(15, 23, 42, 0.06);
+    border-radius: var(--foc-radius-xl);
+    border: 1px solid var(--foc-color-border-light);
+    box-shadow: var(--foc-shadow-card);
   }
 
   .fp-sub {
@@ -32,7 +30,7 @@ const STYLES = `
   }
 
   .fp-sub--media {
-    border-top: 1px solid #e2e8f0;
+    border-top: 1px solid var(--foc-color-border-light);
     padding-top: 15px;
     padding-bottom: 56px;
   }
@@ -110,7 +108,7 @@ const STYLES = `
   .fp .arrow-btn { cursor: pointer; transition: all 0.22s ease; }
   .fp .arrow-btn:hover {
     background: var(--navy) !important;
-    color: #fff !important;
+    color: var(--foc-color-text-inverse) !important;
     border-color: var(--navy) !important;
     transform: scale(1.12);
   }
@@ -166,9 +164,9 @@ const STYLES = `
 const PARTNER_CATS = [
   {
     id: "gov",
-    color: "#1a7a4a",
-    bg: "linear-gradient(135deg,#e8f8ef,#c8efda)",
-    iconBg: "linear-gradient(135deg,#1a7a4a,#25a060)",
+    color: "var(--foc-green-dark)",
+    bg: "linear-gradient(135deg,var(--foc-partner-green-bg),var(--foc-partner-green-end))",
+    iconBg: "linear-gradient(135deg,var(--foc-green-dark),var(--foc-green-hover))",
     emoji: "🏛️",
     title: "Government Partners",
     desc: "Working with government bodies and public institutions to empower communities and build a skilled nation.",
@@ -176,7 +174,7 @@ const PARTNER_CATS = [
       [
         { label: "Skill India", color: "#1a5276", emoji: "🎯" },
         { label: "NSDC", color: "#c0392b", emoji: "🌐" },
-        { label: "PMKVY", color: "#1a7a4a", emoji: "📋" },
+        { label: "PMKVY", color: "var(--foc-green-dark)", emoji: "📋" },
       ],
       [
         { label: "NIELIT", color: "#2980b9", emoji: "💻" },
@@ -187,16 +185,16 @@ const PARTNER_CATS = [
   },
   {
     id: "csr",
-    color: "#1565c0",
-    bg: "linear-gradient(135deg,#e3f0ff,#c8e0ff)",
-    iconBg: "linear-gradient(135deg,#1565c0,#1e88e5)",
+    color: "var(--foc-blue)",
+    bg: "linear-gradient(135deg,var(--foc-partner-blue-bg),var(--foc-partner-blue-end))",
+    iconBg: "linear-gradient(135deg,var(--foc-blue),var(--foc-blue-bright))",
     emoji: "💙",
     title: "CSR Partners",
     desc: "Partnering with corporates through CSR initiatives to create sustainable social impact and inclusive growth.",
     logos: [
       [
         { label: "TATA Power", color: "#1a1a2e", emoji: "⚡" },
-        { label: "TCS", color: "#1565c0", emoji: "🖥️" },
+        { label: "TCS", color: "var(--foc-blue)", emoji: "🖥️" },
         { label: "Wipro", color: "#4caf50", emoji: "🌿" },
       ],
       [
@@ -208,9 +206,9 @@ const PARTNER_CATS = [
   },
   {
     id: "acad",
-    color: "#6a1f9a",
-    bg: "linear-gradient(135deg,#f3e8ff,#e5ccff)",
-    iconBg: "linear-gradient(135deg,#6a1f9a,#9c27b0)",
+    color: "var(--foc-purple-dark)",
+    bg: "linear-gradient(135deg,var(--foc-partner-purple-bg),var(--foc-partner-purple-end))",
+    iconBg: "linear-gradient(135deg,var(--foc-purple-dark),var(--foc-purple-bright))",
     emoji: "🎓",
     title: "Academic Partners",
     desc: "Collaborating with schools, colleges, universities and training institutions to promote future-ready education.",
@@ -223,15 +221,15 @@ const PARTNER_CATS = [
       [
         { label: "BITS Pilani", color: "#1a5276", emoji: "⚗️" },
         { label: "IGNOU", color: "#2e7d4f", emoji: "📖" },
-        { label: "NIFT", color: "#6a1f9a", emoji: "🎨" },
+        { label: "NIFT", color: "var(--foc-purple-dark)", emoji: "🎨" },
       ],
     ],
   },
   {
     id: "ind",
-    color: "#e65100",
-    bg: "linear-gradient(135deg,#fff3e0,#ffe0b2)",
-    iconBg: "linear-gradient(135deg,#e65100,#ff7043)",
+    color: "var(--foc-orange)",
+    bg: "linear-gradient(135deg,var(--foc-partner-orange-bg),var(--foc-partner-orange-end))",
+    iconBg: "linear-gradient(135deg,var(--foc-orange),var(--foc-orange-bright))",
     emoji: "🏭",
     title: "Industry Partners",
     desc: "Working with leading industries and organizations to bridge the gap between skills and industry needs.",
@@ -244,7 +242,7 @@ const PARTNER_CATS = [
       [
         { label: "L&T", color: "#1a5276", emoji: "🏗️" },
         { label: "ABB", color: "#c0392b", emoji: "🔌" },
-        { label: "Honeywell", color: "#e65100", emoji: "🌡️" },
+        { label: "Honeywell", color: "var(--foc-orange)", emoji: "🌡️" },
       ],
     ],
   },
@@ -258,30 +256,30 @@ const MEDIA_TABS = [
 ];
 
 const MEDIA_CARDS = [
-  { tab: "social", title: "Skill Training in Action", desc: "Hands-on training for a future ready workforce.", emoji: "📱", tag: "Social Media", accent: "#1a7a4a", img: "🧑‍💻" },
-  { tab: "social", title: "Placement Success", desc: "Connecting talent with meaningful opportunities.", emoji: "🤝", tag: "Placement Drive", accent: "#1565c0", img: "👩‍🎓" },
-  { tab: "social", title: "Digital Campaigns", desc: "Amplifying reach through targeted social campaigns.", emoji: "📣", tag: "Digital", accent: "#1565c0", img: "📣" },
-  { tab: "social", title: "Youth Outreach", desc: "Inspiring young learners through stories and live updates.", emoji: "🌟", tag: "Instagram", accent: "#6a1f9a", img: "📸" },
-  { tab: "awards", title: "Award of Excellence", desc: "Recognized for impact, innovation and excellence.", emoji: "🥇", tag: "Award 2024", accent: "#e65100", img: "🏆" },
-  { tab: "awards", title: "National Skill Honor", desc: "Celebrated for transformative skilling outcomes at scale.", emoji: "🏅", tag: "National Award", accent: "#1a7a4a", img: "🎖️" },
-  { tab: "awards", title: "CSR Impact Recognition", desc: "Honored for measurable CSR and community impact.", emoji: "⭐", tag: "CSR Award", accent: "#1565c0", img: "✨" },
-  { tab: "awards", title: "Innovation in EdTech", desc: "Awarded for technology-led learning and employability.", emoji: "💡", tag: "EdTech 2024", accent: "#6a1f9a", img: "🔬" },
-  { tab: "print", title: "In the News", desc: "Our initiatives featured across leading publications.", emoji: "📰", tag: "Print Media", accent: "#6a1f9a", img: "📄" },
-  { tab: "print", title: "Leading Daily Feature", desc: "Coverage in top newspapers on skills and employment.", emoji: "🗞️", tag: "National Daily", accent: "#1565c0", img: "📰" },
-  { tab: "print", title: "Industry Journal", desc: "Thought leadership on workforce development.", emoji: "📑", tag: "Industry Press", accent: "#e65100", img: "📋" },
-  { tab: "print", title: "Regional Spotlight", desc: "Local media highlighting grassroots training impact.", emoji: "🌍", tag: "Regional Press", accent: "#1a7a4a", img: "🗞️" },
-  { tab: "events", title: "Community Events", desc: "Engaging communities through nationwide skill drives.", emoji: "🌍", tag: "Events", accent: "#1a7a4a", img: "🎪" },
-  { tab: "events", title: "Partner Engagement Summit", desc: "Collaborating with partners to scale impact together.", emoji: "🤝", tag: "Summit", accent: "#1565c0", img: "🎤" },
-  { tab: "events", title: "Nationwide Skill Drive", desc: "Mobilizing trainers and learners across multiple states.", emoji: "🚌", tag: "Skill Drive", accent: "#e65100", img: "🛣️" },
-  { tab: "events", title: "Campus Connect Program", desc: "On-ground engagement with colleges and institutions.", emoji: "🎓", tag: "Campus Event", accent: "#6a1f9a", img: "🏫" },
+  { tab: "social", title: "Skill Training in Action", desc: "Hands-on training for a future ready workforce.", emoji: "📱", tag: "Social Media", accent: "var(--foc-green-dark)", img: "🧑‍💻" },
+  { tab: "social", title: "Placement Success", desc: "Connecting talent with meaningful opportunities.", emoji: "🤝", tag: "Placement Drive", accent: "var(--foc-blue)", img: "👩‍🎓" },
+  { tab: "social", title: "Digital Campaigns", desc: "Amplifying reach through targeted social campaigns.", emoji: "📣", tag: "Digital", accent: "var(--foc-blue)", img: "📣" },
+  { tab: "social", title: "Youth Outreach", desc: "Inspiring young learners through stories and live updates.", emoji: "🌟", tag: "Instagram", accent: "var(--foc-purple-dark)", img: "📸" },
+  { tab: "awards", title: "Award of Excellence", desc: "Recognized for impact, innovation and excellence.", emoji: "🥇", tag: "Award 2024", accent: "var(--foc-orange)", img: "🏆" },
+  { tab: "awards", title: "National Skill Honor", desc: "Celebrated for transformative skilling outcomes at scale.", emoji: "🏅", tag: "National Award", accent: "var(--foc-green-dark)", img: "🎖️" },
+  { tab: "awards", title: "CSR Impact Recognition", desc: "Honored for measurable CSR and community impact.", emoji: "⭐", tag: "CSR Award", accent: "var(--foc-blue)", img: "✨" },
+  { tab: "awards", title: "Innovation in EdTech", desc: "Awarded for technology-led learning and employability.", emoji: "💡", tag: "EdTech 2024", accent: "var(--foc-purple-dark)", img: "🔬" },
+  { tab: "print", title: "In the News", desc: "Our initiatives featured across leading publications.", emoji: "📰", tag: "Print Media", accent: "var(--foc-purple-dark)", img: "📄" },
+  { tab: "print", title: "Leading Daily Feature", desc: "Coverage in top newspapers on skills and employment.", emoji: "🗞️", tag: "National Daily", accent: "var(--foc-blue)", img: "📰" },
+  { tab: "print", title: "Industry Journal", desc: "Thought leadership on workforce development.", emoji: "📑", tag: "Industry Press", accent: "var(--foc-orange)", img: "📋" },
+  { tab: "print", title: "Regional Spotlight", desc: "Local media highlighting grassroots training impact.", emoji: "🌍", tag: "Regional Press", accent: "var(--foc-green-dark)", img: "🗞️" },
+  { tab: "events", title: "Community Events", desc: "Engaging communities through nationwide skill drives.", emoji: "🌍", tag: "Events", accent: "var(--foc-green-dark)", img: "🎪" },
+  { tab: "events", title: "Partner Engagement Summit", desc: "Collaborating with partners to scale impact together.", emoji: "🤝", tag: "Summit", accent: "var(--foc-blue)", img: "🎤" },
+  { tab: "events", title: "Nationwide Skill Drive", desc: "Mobilizing trainers and learners across multiple states.", emoji: "🚌", tag: "Skill Drive", accent: "var(--foc-orange)", img: "🛣️" },
+  { tab: "events", title: "Campus Connect Program", desc: "On-ground engagement with colleges and institutions.", emoji: "🎓", tag: "Campus Event", accent: "var(--foc-purple-dark)", img: "🏫" },
 ];
 
 const MEDIA_STATS = [
-  { emoji: "👥", value: "1M+", label: "People Reached", color: "#1a7a4a", bg: "#e8f8ef" },
-  { emoji: "📣", value: "500+", label: "Media Mentions", color: "#1565c0", bg: "#e3f0ff" },
-  { emoji: "🏆", value: "25+", label: "Awards Received", color: "#6a1f9a", bg: "#f3e8ff" },
-  { emoji: "📰", value: "100+", label: "News Features", color: "#e65100", bg: "#fff3e0" },
-  { emoji: "📅", value: "200+", label: "Events & Campaigns", color: "#1a7a4a", bg: "#e8f8ef" },
+  { emoji: "👥", value: "1M+", label: "People Reached", color: "var(--foc-green-dark)", bg: "var(--foc-partner-green-bg)" },
+  { emoji: "📣", value: "500+", label: "Media Mentions", color: "var(--foc-blue)", bg: "var(--foc-partner-blue-bg)" },
+  { emoji: "🏆", value: "25+", label: "Awards Received", color: "var(--foc-purple-dark)", bg: "var(--foc-partner-purple-bg)" },
+  { emoji: "📰", value: "100+", label: "News Features", color: "var(--foc-orange)", bg: "var(--foc-partner-orange-bg)" },
+  { emoji: "📅", value: "200+", label: "Events & Campaigns", color: "var(--foc-green-dark)", bg: "var(--foc-partner-green-bg)" },
 ];
 
 function Blobs({ colors }) {
@@ -313,7 +311,7 @@ function Blobs({ colors }) {
   );
 }
 
-function SectionHeader({ icon, titleHtml, subtitle, accentColor = "#1a7a4a", noSubtitleMaxWidth = false }) {
+function SectionHeader({ icon, titleHtml, subtitle, accentColor = "var(--foc-green-dark)", noSubtitleMaxWidth = false }) {
   return (
     <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 16, marginBottom: 14 }}>
@@ -354,19 +352,19 @@ function SectionHeader({ icon, titleHtml, subtitle, accentColor = "#1a7a4a", noS
       </div>
       <h2
         style={{
-          fontFamily: "'Orbitron',monospace",
+          fontFamily: 'var(--foc-font-display)',
           fontWeight: 800,
           fontSize: "clamp(28px,4.5vw,52px)",
           lineHeight: 1.1,
-          color: "#0d2146",
+          color: "var(--foc-navy-deep)",
           marginBottom: 14,
         }}
         dangerouslySetInnerHTML={{ __html: titleHtml }}
       />
       <p
         style={{
-          fontFamily: "'Inter', sans-serif",
-          color: "#5a6680",
+          fontFamily: 'var(--foc-font-sans)',
+          color: "var(--foc-text-caption-alt)",
           fontSize: "clamp(13px,1.5vw,16.5px)",
           lineHeight: 1.75,
           margin: "0 auto",
@@ -388,7 +386,7 @@ function LogoChip({ logo }) {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        background: "#fff",
+        background: "var(--foc-color-surface)",
         borderRadius: 14,
         padding: "9px 13px",
         border: `1.5px solid ${logo.color}28`,
@@ -413,7 +411,7 @@ function PartnerCard({ cat, delay = 0 }) {
       style={{
         animationDelay: `${delay}ms`,
         width: "100%",
-        background: "#fff",
+        background: "var(--foc-color-surface)",
         borderRadius: 24,
         border: `2px solid ${cat.color}1a`,
         boxShadow: `0 8px 40px ${cat.color}12`,
@@ -448,10 +446,10 @@ function PartnerCard({ cat, delay = 0 }) {
         >
           {cat.emoji}
         </div>
-        <div style={{ fontFamily: "'Orbitron',monospace", fontWeight: 800, fontSize: 17.5, color: cat.color, marginBottom: 6, textAlign: "center" }}>
+        <div style={{ fontFamily: 'var(--foc-font-display)', fontWeight: 800, fontSize: 17.5, color: cat.color, marginBottom: 6, textAlign: "center" }}>
           {cat.title}
         </div>
-        <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: "#5a6680", textAlign: "center", lineHeight: 1.65, marginBottom: 18, flex: 1 }}>{cat.desc}</p>
+        <p style={{ fontFamily: 'var(--foc-font-sans)', fontSize: 13, color: "var(--foc-text-caption-alt)", textAlign: "center", lineHeight: 1.65, marginBottom: 18, flex: 1 }}>{cat.desc}</p>
         <div style={{ width: "100%", borderRadius: 16, background: cat.bg, padding: "14px 12px 10px", position: "relative", marginBottom: 16 }}>
           <button
             type="button"
@@ -467,7 +465,7 @@ function PartnerCard({ cat, delay = 0 }) {
               height: 30,
               borderRadius: "50%",
               border: `2px solid ${cat.color}44`,
-              background: "#fff",
+              background: "var(--foc-color-surface)",
               color: cat.color,
               fontSize: 15,
               fontWeight: 900,
@@ -499,7 +497,7 @@ function PartnerCard({ cat, delay = 0 }) {
               height: 30,
               borderRadius: "50%",
               border: `2px solid ${cat.color}44`,
-              background: "#fff",
+              background: "var(--foc-color-surface)",
               color: cat.color,
               fontSize: 15,
               fontWeight: 900,
@@ -555,7 +553,7 @@ function PartnerCard({ cat, delay = 0 }) {
               height: 26,
               borderRadius: "50%",
               background: cat.color,
-              color: "#fff",
+              color: "var(--foc-color-surface)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -572,15 +570,15 @@ function PartnerCard({ cat, delay = 0 }) {
 
 function PartnersStrengthSection() {
   const stats = [
-    { emoji: "🤝", value: "150+", label: "Partners", sub: "Across Sectors", color: "#1a7a4a", bg: "#e8f8ef" },
-    { emoji: "🌐", value: "25+", label: "States", sub: "Nationwide", color: "#1565c0", bg: "#e3f0ff" },
-    { emoji: "🎯", value: "Millions", label: "Lives Impacted", sub: "Through Partnerships", color: "#6a1f9a", bg: "#f3e8ff" },
-    { emoji: "⭐", value: "Shared Vision", label: "Sustainable Growth", sub: "Inclusive Future", color: "#e65100", bg: "#fff3e0" },
+    { emoji: "🤝", value: "150+", label: "Partners", sub: "Across Sectors", color: "var(--foc-green-dark)", bg: "var(--foc-partner-green-bg)" },
+    { emoji: "🌐", value: "25+", label: "States", sub: "Nationwide", color: "var(--foc-blue)", bg: "var(--foc-partner-blue-bg)" },
+    { emoji: "🎯", value: "Millions", label: "Lives Impacted", sub: "Through Partnerships", color: "var(--foc-purple-dark)", bg: "var(--foc-partner-purple-bg)" },
+    { emoji: "⭐", value: "Shared Vision", label: "Sustainable Growth", sub: "Inclusive Future", color: "var(--foc-orange)", bg: "var(--foc-partner-orange-bg)" },
   ];
 
   return (
-    <section className="fp-sub" style={{ background: "#fff", position: "relative" }}>
-      <Blobs colors={["#1a7a4a", "#1565c0", "#6a1f9a", "#e65100"]} />
+    <section className="fp-sub" style={{ background: "var(--foc-color-surface)", position: "relative" }}>
+      <Blobs colors={["var(--foc-green-dark)", "var(--foc-blue)", "var(--foc-purple-dark)", "var(--foc-orange)"]} />
       <div
         className="spin-slow"
         style={{
@@ -590,7 +588,7 @@ function PartnersStrengthSection() {
           width: 260,
           height: 260,
           borderRadius: "50%",
-          border: "2.5px dashed #1a7a4a33",
+          border: "2.5px dashed var(--foc-green-dark)33",
           pointerEvents: "none",
           zIndex: 0,
         }}
@@ -604,7 +602,7 @@ function PartnersStrengthSection() {
           width: 200,
           height: 200,
           borderRadius: "50%",
-          border: "2px dashed #1565c033",
+          border: "2px dashed var(--foc-blue)33",
           pointerEvents: "none",
           zIndex: 0,
           animationDirection: "reverse",
@@ -613,9 +611,9 @@ function PartnersStrengthSection() {
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 32px", position: "relative", zIndex: 1 }}>
         <SectionHeader
           icon="🤝"
-          titleHtml={`<span style="color:#0d2146">Our Partners.</span> <span style="color:#1a7a4a">Our Strength.</span>`}
+          titleHtml={`<span style="color:var(--foc-navy-deep)">Our Partners.</span> <span style="color:var(--foc-green-dark)">Our Strength.</span>`}
           subtitle="Collaborating with government, corporates, academia and industry to build skills, create opportunities and drive meaningful impact."
-          accentColor="#1a7a4a"
+          accentColor="var(--foc-green-dark)"
           noSubtitleMaxWidth
         />
         <div className="partner-cards-grid">
@@ -636,7 +634,7 @@ function PartnersStrengthSection() {
         >
           <div
             style={{
-              background: "linear-gradient(135deg,#0d2146,#163565)",
+              background: "linear-gradient(135deg,var(--foc-navy-deep),var(--foc-navy-badge))",
               padding: "28px 28px",
               flex: "0 0 285px",
               minWidth: 240,
@@ -662,9 +660,9 @@ function PartnersStrengthSection() {
               🤝
             </div>
             <div>
-              <div style={{ color: "#fff", fontFamily: "'Orbitron',monospace", fontWeight: 800, fontSize: 18, lineHeight: 1.3 }}>Stronger Together,</div>
-              <div style={{ color: "#4ade80", fontFamily: "'Orbitron',monospace", fontWeight: 800, fontSize: 18 }}>Greater Impact.</div>
-              <p style={{ fontFamily: "'Inter', sans-serif", color: "#8aadcc", fontSize: 12.5, marginTop: 8, lineHeight: 1.6 }}>
+              <div style={{ color: "var(--foc-color-surface)", fontFamily: 'var(--foc-font-display)', fontWeight: 800, fontSize: 18, lineHeight: 1.3 }}>Stronger Together,</div>
+              <div style={{ color: "var(--foc-success-bright)", fontFamily: 'var(--foc-font-display)', fontWeight: 800, fontSize: 18 }}>Greater Impact.</div>
+              <p style={{ fontFamily: 'var(--foc-font-sans)', color: "var(--foc-sky-caption)", fontSize: 12.5, marginTop: 8, lineHeight: 1.6 }}>
                 Our partners drive innovation, create opportunities and transform lives across communities.
               </p>
             </div>
@@ -675,12 +673,12 @@ function PartnersStrengthSection() {
               key={s.label}
               style={{
                 flex: "1 1 150px",
-                background: "#fff",
+                background: "var(--foc-color-surface)",
                 display: "flex",
                 alignItems: "center",
                 gap: 12,
                 padding: "22px 18px",
-                borderLeft: "1.5px solid #edf1f8",
+                borderLeft: "1.5px solid var(--foc-border-ui-alt)",
               }}
             >
               <div
@@ -699,9 +697,9 @@ function PartnersStrengthSection() {
                 {s.emoji}
               </div>
               <div>
-                <div style={{ fontFamily: "'Orbitron',monospace", fontWeight: 800, fontSize: 17.5, color: s.color }}>{s.value}</div>
-                <div style={{ fontWeight: 700, fontSize: 12, color: "#0d2146" }}>{s.label}</div>
-                <div style={{ fontSize: 11, color: "#8896aa" }}>{s.sub}</div>
+                <div style={{ fontFamily: 'var(--foc-font-display)', fontWeight: 800, fontSize: 17.5, color: s.color }}>{s.value}</div>
+                <div style={{ fontWeight: 700, fontSize: 12, color: "var(--foc-navy-deep)" }}>{s.label}</div>
+                <div style={{ fontSize: 11, color: "var(--foc-gray-muted)" }}>{s.sub}</div>
               </div>
             </div>
           ))}
@@ -713,8 +711,8 @@ function PartnersStrengthSection() {
 
 // function OurPartnersSection() {
 //   return (
-//     <section id="partners" style={{ background: "#fff", padding: "72px 0 0", position: "relative", overflow: "hidden" }}>
-//       <Blobs colors={["#1565c0", "#1a7a4a", "#e65100", "#6a1f9a"]} />
+//     <section id="partners" style={{ background: "var(--foc-color-surface)", padding: "72px 0 0", position: "relative", overflow: "hidden" }}>
+//       <Blobs colors={["var(--foc-blue)", "var(--foc-green-dark)", "var(--foc-orange)", "var(--foc-purple-dark)"]} />
 //       {/* <div
 //         style={{
 //           position: "absolute",
@@ -722,15 +720,15 @@ function PartnersStrengthSection() {
 //           left: 0,
 //           right: 0,
 //           height: 5,
-//           background: "linear-gradient(90deg,#1a7a4a,#1565c0,#6a1f9a,#e65100)",
+//           background: "linear-gradient(90deg,var(--foc-green-dark),var(--foc-blue),var(--foc-purple-dark),var(--foc-orange))",
 //         }}
 //       /> */}
 //       {/* <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 32px", position: "relative", zIndex: 1 }}>
 //         <SectionHeader
 //           icon="🤝"
-//           titleHtml={`<span style="color:#0d2146">Our </span><span style="color:#1a7a4a">Partners</span>`}
+//           titleHtml={`<span style="color:var(--foc-navy-deep)">Our </span><span style="color:var(--foc-green-dark)">Partners</span>`}
 //           subtitle="Collaborating with government, corporates, academia and industry to build skills, create opportunities and drive meaningful impact."
-//           accentColor="#1a7a4a"
+//           accentColor="var(--foc-green-dark)"
 //         />
 //         <div className="partner-cards-grid">
 //           {PARTNER_CATS.map((cat, i) => (
@@ -758,7 +756,7 @@ function PartnersStrengthSection() {
 //                 width: 60,
 //                 height: 60,
 //                 borderRadius: "50%",
-//                 background: "linear-gradient(135deg,#e8f8ef,#c8efda)",
+//                 background: "linear-gradient(135deg,var(--foc-partner-green-bg),#c8efda)",
 //                 display: "flex",
 //                 alignItems: "center",
 //                 justifyContent: "center",
@@ -769,22 +767,22 @@ function PartnersStrengthSection() {
 //               👥
 //             </div>
 //             <div>
-//               <div style={{ fontFamily: "'Orbitron',monospace", fontWeight: 800, fontSize: 20, color: "#0d2146" }}>
-//                 Stronger Together, <span style={{ color: "#1a7a4a" }}>Greater Impact</span>
+//               <div style={{ fontFamily: 'var(--foc-font-display)', fontWeight: 800, fontSize: 20, color: "var(--foc-navy-deep)" }}>
+//                 Stronger Together, <span style={{ color: "var(--foc-green-dark)" }}>Greater Impact</span>
 //               </div>
-//               <p style={{ color: "#5a6680", fontSize: 13.5, marginTop: 4 }}>Our partners play a vital role in driving innovation and transforming lives.</p>
+//               <p style={{ color: "var(--foc-text-caption-alt)", fontSize: 13.5, marginTop: 4 }}>Our partners play a vital role in driving innovation and transforming lives.</p>
 //             </div>
 //           </div>
 //           <Link
 //             to="/contact"
 //             className="become-btn"
 //             style={{
-//               background: "linear-gradient(135deg,#1a7a4a,#25a060)",
-//               color: "#fff",
+//               background: "linear-gradient(135deg,var(--foc-green-dark),var(--foc-green-hover))",
+//               color: "var(--foc-color-surface)",
 //               border: "none",
 //               borderRadius: 14,
 //               padding: "15px 32px",
-//               fontFamily: "'Orbitron',monospace",
+//               fontFamily: 'var(--foc-font-display)',
 //               fontWeight: 800,
 //               fontSize: 16,
 //               display: "inline-flex",
@@ -812,7 +810,7 @@ function MediaCard({ card, delay = 0 }) {
         flex: "0 0 268px",
         borderRadius: 22,
         overflow: "hidden",
-        background: "#0d2146",
+        background: "var(--foc-navy-deep)",
         boxShadow: "0 8px 40px rgba(13,33,70,0.18)",
       }}
       onMouseEnter={() => setHov(true)}
@@ -823,7 +821,7 @@ function MediaCard({ card, delay = 0 }) {
           height: 178,
           position: "relative",
           overflow: "hidden",
-          background: `linear-gradient(145deg, #0d2146 10%, ${card.accent}bb 100%)`,
+          background: `linear-gradient(145deg, var(--foc-navy-deep) 10%, ${card.accent}bb 100%)`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -856,7 +854,7 @@ function MediaCard({ card, delay = 0 }) {
             left: 11,
             background: `${card.accent}ee`,
             backdropFilter: "blur(8px)",
-            color: "#fff",
+            color: "var(--foc-color-surface)",
             fontSize: 10.5,
             fontWeight: 800,
             padding: "4px 12px",
@@ -868,8 +866,8 @@ function MediaCard({ card, delay = 0 }) {
         </div>
       </div>
       <div style={{ padding: "17px 19px 19px" }}>
-        <div style={{ fontFamily: "'Orbitron',monospace", fontWeight: 800, fontSize: 15.5, color: "#fff", marginBottom: 6 }}>{card.title}</div>
-        <div style={{ fontFamily: "'Inter', sans-serif", color: "#7aaac8", fontSize: 12.5, lineHeight: 1.55 }}>{card.desc}</div>
+        <div style={{ fontFamily: 'var(--foc-font-display)', fontWeight: 800, fontSize: 15.5, color: "var(--foc-color-surface)", marginBottom: 6 }}>{card.title}</div>
+        <div style={{ fontFamily: 'var(--foc-font-sans)', color: "var(--foc-sky-caption-2)", fontSize: 12.5, lineHeight: 1.55 }}>{card.desc}</div>
         <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 7, color: card.accent, fontWeight: 700, fontSize: 12.5 }}>
           <span>{card.emoji}</span> Explore More
           <div
@@ -921,14 +919,14 @@ function MediaSection() {
   };
 
   return (
-    <section id="media" className="fp-sub fp-sub--media" style={{ background: "#fff", position: "relative" }}>
-      <Blobs colors={["#0d2146", "#1565c0", "#1a7a4a", "#6a1f9a"]} />
+    <section id="media" className="fp-sub fp-sub--media" style={{ background: "var(--foc-color-surface)", position: "relative" }}>
+      <Blobs colors={["var(--foc-navy-deep)", "var(--foc-blue)", "var(--foc-green-dark)", "var(--foc-purple-dark)"]} />
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 32px", position: "relative", zIndex: 1 }}>
         <SectionHeader
           icon="⭐"
-          titleHtml={`<span style="color:#0d2146">Media &amp; </span><span style="color:#1565c0">&nbsp; Recognition</span>`}
+          titleHtml={`<span style="color:var(--foc-navy-deep)">Media &amp; </span><span style="color:var(--foc-blue)">&nbsp; Recognition</span>`}
           subtitle="Celebrating our journey of impact, partnerships, and achievements across platforms and communities."
-          accentColor="#1565c0"
+          accentColor="var(--foc-blue)"
           noSubtitleMaxWidth
         />
         <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 10, marginTop: 36 }}>
@@ -944,10 +942,10 @@ function MediaSection() {
                 gap: 8,
                 padding: "12px 22px",
                 borderRadius: 50,
-                border: activeTab === i ? "2px solid #0d2146" : "2px solid #dce4f5",
-                background: activeTab === i ? "linear-gradient(135deg,#0d2146,#163972)" : "#fff",
-                color: activeTab === i ? "#fff" : "#4a5568",
-                fontFamily: "'Inter', sans-serif",
+                border: activeTab === i ? "2px solid var(--foc-navy-deep)" : "2px solid var(--foc-border-card)",
+                background: activeTab === i ? "linear-gradient(135deg,var(--foc-navy-deep),var(--foc-navy-heading))" : "var(--foc-color-surface)",
+                color: activeTab === i ? "var(--foc-color-surface)" : "var(--foc-gray-600)",
+                fontFamily: 'var(--foc-font-sans)',
                 fontWeight: 700,
                 fontSize: 13.5,
                 boxShadow: activeTab === i ? "0 6px 22px rgba(13,33,70,0.22)" : "0 2px 8px rgba(0,0,0,0.05)",
@@ -972,9 +970,9 @@ function MediaSection() {
               width: 44,
               height: 44,
               borderRadius: "50%",
-              border: "2px solid #dce4f5",
-              background: "#fff",
-              color: "#0d2146",
+              border: "2px solid var(--foc-border-card)",
+              background: "var(--foc-color-surface)",
+              color: "var(--foc-navy-deep)",
               fontSize: 20,
               fontWeight: 700,
               zIndex: 3,
@@ -998,7 +996,7 @@ function MediaSection() {
               }}
             >
               {filteredCards.length === 0 ? (
-                <div style={{ padding: "48px 24px", color: "#5a6680", fontSize: 14, fontWeight: 600 }}>
+                <div style={{ padding: "48px 24px", color: "var(--foc-text-caption-alt)", fontSize: 14, fontWeight: 600 }}>
                   No items in this category yet.
                 </div>
               ) : (
@@ -1022,9 +1020,9 @@ function MediaSection() {
               width: 44,
               height: 44,
               borderRadius: "50%",
-              border: "2px solid #dce4f5",
-              background: "#fff",
-              color: "#0d2146",
+              border: "2px solid var(--foc-border-card)",
+              background: "var(--foc-color-surface)",
+              color: "var(--foc-navy-deep)",
               fontSize: 20,
               fontWeight: 700,
               zIndex: 3,
@@ -1049,7 +1047,7 @@ function MediaSection() {
                   width: i === offset ? 28 : 10,
                   height: 10,
                   borderRadius: 5,
-                  background: i === offset ? "#0d2146" : "#b0c4de",
+                  background: i === offset ? "var(--foc-navy-deep)" : "var(--foc-slate-muted)",
                   cursor: "pointer",
                   transition: "all 0.3s ease",
                   border: "none",
@@ -1065,9 +1063,9 @@ function MediaSection() {
             flexWrap: "wrap",
             justifyContent: "center",
             marginTop: 36,
-            background: "#fff",
+            background: "var(--foc-color-surface)",
             borderRadius: 22,
-            border: "2px solid #e4ebf8",
+            border: "2px solid var(--foc-border-soft)",
             overflow: "hidden",
             boxShadow: "0 8px 40px rgba(13,33,70,0.07)",
           }}
@@ -1082,7 +1080,7 @@ function MediaSection() {
                 alignItems: "center",
                 gap: 13,
                 padding: "22px 22px",
-                borderLeft: i > 0 ? "1.5px solid #edf1f8" : "none",
+                borderLeft: i > 0 ? "1.5px solid var(--foc-border-ui-alt)" : "none",
                 minWidth: 130,
               }}
             >
@@ -1102,8 +1100,8 @@ function MediaSection() {
                 {s.emoji}
               </div>
               <div>
-                <div style={{ fontFamily: "'Orbitron',monospace", fontWeight: 800, fontSize: 20, color: s.color }}>{s.value}</div>
-                <div style={{ fontSize: 12, color: "#5a6680", fontWeight: 600 }}>{s.label}</div>
+                <div style={{ fontFamily: 'var(--foc-font-display)', fontWeight: 800, fontSize: 20, color: s.color }}>{s.value}</div>
+                <div style={{ fontSize: 12, color: "var(--foc-text-caption-alt)", fontWeight: 600 }}>{s.label}</div>
               </div>
             </div>
           ))}

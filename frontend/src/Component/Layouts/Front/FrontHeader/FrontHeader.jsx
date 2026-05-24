@@ -11,13 +11,17 @@ const SUB_TABS = [
   { label: "Events", sectionId: "events", icon: CalendarDays },
   { label: "Courses", sectionId: "future-courses", icon: BookOpen },
   { label: "Jobs", sectionId: "future-jobs", icon: BriefcaseBusiness },
-  // { label: "Social Impact", to: "/socialimpact" },
-  // { label: "Community", to: "/community" },
-  // { label: "Projects", to: "/#projects" },
   { label: "Media", sectionId: "media", icon: Images },
   { label: "Our Reach", sectionId: "our-approach", icon: MapPin },
-  // { label: "Partners", sectionId: "partners" },
 ];
+
+function scrollToHomeSection(sectionId) {
+  const el = document.getElementById(sectionId);
+  if (!el) return;
+  const top = el.getBoundingClientRect().top + window.scrollY - HOME_SECTION_SCROLL_OFFSET;
+  window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  window.history.replaceState(null, "", `/#${sectionId}`);
+}
 
 const FrontHeader = () => {
   const location = useLocation();
@@ -240,12 +244,13 @@ const FrontHeader = () => {
     return path === "/" || path === "/home";
   };
 
-  const scrollToHomeSection = (sectionId) => {
-    const el = document.getElementById(sectionId);
-    if (!el) return;
-    const top = el.getBoundingClientRect().top + window.scrollY - HOME_SECTION_SCROLL_OFFSET;
-    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
-    window.history.replaceState(null, "", `/#${sectionId}`);
+  const handlePartnerWithUs = (e) => {
+    if (isMenuActive) {
+      toggleMenu();
+    }
+    if (isHomePage()) return;
+    e.preventDefault();
+    navigate("/", { state: { openPartnerModal: true } });
   };
 
   const handleSubTabClick = (e, tab) => {
@@ -315,10 +320,26 @@ const FrontHeader = () => {
                       <Link className='nav-link-item drop-trigger' to='/events'>Events</Link>
                     </li> */}
                     <li className="nav-item d-xl-none d-lg-none d-md-none d-sm-block d-block">
-                      <Link className='nav-link-item drop-trigger' to='/contact'>Partner with Us</Link>
+                      <button
+                        type="button"
+                        className="nav-link-item drop-trigger"
+                        data-bs-toggle={isHomePage() ? "modal" : undefined}
+                        data-bs-target={isHomePage() ? "#partnerModal" : undefined}
+                        onClick={handlePartnerWithUs}
+                      >
+                        Partner with Us
+                      </button>
                     </li>
                     <li className="nav-item d-xl-flex d-lg-flex d-md-flex d-sm-none d-none">
-                      <Link className='nav-link-item drop-trigger' to='/contact'>Partner with Us</Link>
+                      <button
+                        type="button"
+                        className="nav-link-item drop-trigger"
+                        data-bs-toggle={isHomePage() ? "modal" : undefined}
+                        data-bs-target={isHomePage() ? "#partnerModal" : undefined}
+                        onClick={handlePartnerWithUs}
+                      >
+                        Partner with Us
+                      </button>
                     </li>
                     
                     {/* Theme Toggle */}

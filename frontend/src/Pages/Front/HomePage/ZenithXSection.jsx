@@ -1,23 +1,83 @@
 import { useState, useEffect, useRef } from "react";
 
 const STYLES = `
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
-
 .zx, .zx *, .zx *::before, .zx *::after { box-sizing: border-box; }
 
 .zx {
-  font-family: 'Inter', sans-serif;
-  background: #f8fafc;
-  color: #111827;
+  font-family: var(--foc-font-sans);
+  background: var(--foc-color-bg-muted);
+  color: var(--foc-color-text-strong);
   overflow-x: hidden;
 }
 
 .zx h1, .zx h2 {
-  font-family: 'Orbitron', monospace;
+  font-family: var(--foc-font-display);
+}
+
+.zx-hero-brand-tag {
+  margin: 10px 0 0;
+  font-size: clamp(10px, 1.2vw, 13px);
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--foc-sky-muted);
+}
+
+.zx-section-head {
+  text-align: center !important;
+  width: 100%;
+}
+
+.zx-section-head h2,
+.zx-section-head p,
+.zx-section-head > div {
+  text-align: center !important;
+  width: 100%;
+}
+
+.zx-hero-headline {
+  font-size: clamp(32px, 5.5vw, 64px);
+  font-weight: 900;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  margin: 0 0 12px;
+  text-align: center !important;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0.2em;
+  width: 100%;
+}
+
+.zx-hero-desc {
+  text-align: center !important;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.zx-hero-headline-ready {
+  color: var(--foc-color-text-inverse);
+}
+
+.zx-brand-inline-zenith {
+  color: var(--foc-teal-light);
+  font-weight: var(--foc-weight-black);
+}
+
+.zx-brand-inline-x {
+  color: var(--foc-lavender);
+  font-weight: var(--foc-weight-black);
+  font-size: 1.1em;
+  text-shadow: var(--foc-shadow-glow-cyan);
 }
 
 .zx button {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--foc-font-sans);
+}
+
+@media (max-width: 1100px) {
+  .zx-core-offerings { grid-template-columns: repeat(2, 1fr) !important; }
 }
 
 @media (max-width: 900px) {
@@ -26,6 +86,10 @@ const STYLES = `
   .zx-programs-2 { grid-template-columns: 1fr !important; }
   .zx-side-by-side { grid-template-columns: 1fr !important; }
   .zx-vision-4 { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+@media (max-width: 600px) {
+  .zx-core-offerings { grid-template-columns: 1fr !important; }
 }
 
 @media (max-width: 520px) {
@@ -44,31 +108,31 @@ const STATS = [
 const SCHOOL_PROGRAMS = [
   {
     icon: "🤖",
-    color: "#7C3AED",
+    color: "var(--foc-purple)",
     title: "Workshops",
     subtitle: "Hands-on sessions on AI, Robotics, IoT, Drones, STEM, Coding & more.",
   },
   {
     icon: "🏅",
-    color: "#EC4899",
+    color: "var(--foc-pink-500)",
     title: "Competitions",
     subtitle: "Poster making, robotics challenges, model making, coding, innovation & many more.",
   },
   {
     icon: "🎮",
-    color: "#0EA5E9",
+    color: "var(--foc-sky-500)",
     title: "PTM & Carnival Tech Zones",
     subtitle: "Interactive display & game stalls, robot demos, IoT zones, drone experience and more.",
   },
   {
     icon: "📅",
-    color: "#10B981",
+    color: "var(--foc-emerald-500)",
     title: "Weekend Workshops",
     subtitle: "Short & exciting weekend programs to explore future technologies and build projects.",
   },
   {
     icon: "🎖️",
-    color: "#F59E0B",
+    color: "var(--foc-color-warning)",
     title: "Recognition & Awards",
     subtitle: "Certificates, trophies, project showcases and recognition for young innovators.",
   },
@@ -77,31 +141,31 @@ const SCHOOL_PROGRAMS = [
 const COLLEGE_PROGRAMS = [
   {
     icon: "🔬",
-    color: "#7C3AED",
+    color: "var(--foc-purple)",
     title: "Workshops & Tech Sessions",
     subtitle: "Deep-dive sessions on AI, Robotics, Cloud, Data, Drones & more.",
   },
   {
     icon: "💻",
-    color: "#EC4899",
+    color: "var(--foc-pink-500)",
     title: "Competitions & Hackathons",
     subtitle: "Hackathons, coding contests, robotics challenges & innovation competitions.",
   },
   {
     icon: "🚀",
-    color: "#0EA5E9",
+    color: "var(--foc-sky-500)",
     title: "Tech Exhibitions & Project Showcase",
     subtitle: "Showcase projects, research, prototypes and innovations to a wider audience.",
   },
   {
     icon: "🤝",
-    color: "#10B981",
+    color: "var(--foc-emerald-500)",
     title: "Industry Connect & Expert Talks",
     subtitle: "Interact with industry experts, attend tech talks and explore future career pathways.",
   },
   {
     icon: "🌟",
-    color: "#F59E0B",
+    color: "var(--foc-color-warning)",
     title: "Weekend & Immersion Programs",
     subtitle: "Short-term weekend programs, bootcamps and specialized learning.",
   },
@@ -167,7 +231,7 @@ function AnimatedCounter({ target, duration = 1500 }) {
 
   const suffix = target.replace(/[\d,]/g, "");
   return (
-    <span ref={ref} style={{ fontFamily: "'Orbitron', monospace" }}>
+    <span ref={ref} style={{ fontFamily: "var(--foc-font-display)" }}>
       {count.toLocaleString()}
       {suffix}
     </span>
@@ -181,8 +245,8 @@ function ProgramCard({ program }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: hovered ? program.color : "#fff",
-        border: `2px solid ${hovered ? program.color : "#e5e7eb"}`,
+        background: hovered ? program.color : "var(--foc-color-surface)",
+        border: `2px solid ${hovered ? program.color : "var(--foc-color-border-ui)"}`,
         borderRadius: 16,
         padding: "24px 20px",
         cursor: "default",
@@ -199,7 +263,7 @@ function ProgramCard({ program }) {
         style={{
           fontSize: 15,
           fontWeight: 700,
-          color: hovered ? "#fff" : "#111827",
+          color: hovered ? "var(--foc-color-surface)" : "var(--foc-color-text-strong)",
           letterSpacing: "-0.01em",
           lineHeight: 1.3,
         }}
@@ -209,13 +273,22 @@ function ProgramCard({ program }) {
       <div
         style={{
           fontSize: 13,
-          color: hovered ? "rgba(255,255,255,0.88)" : "#6b7280",
+          color: hovered ? "rgba(255,255,255,0.88)" : "var(--foc-gray-500)",
           lineHeight: 1.6,
         }}
       >
         {program.subtitle}
       </div>
     </div>
+  );
+}
+
+function ZenithXInline() {
+  return (
+    <>
+      <span className="zx-brand-inline-zenith">Zenith </span>
+      <span className="zx-brand-inline-x">X</span>
+    </>
   );
 }
 
@@ -245,8 +318,8 @@ function CTASection({ dark = false, title, subtitle, actions }) {
     <div
       style={{
         background: dark
-          ? "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%)"
-          : "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+          ? "linear-gradient(135deg, var(--foc-indigo-950) 0%, var(--foc-indigo-900) 50%, var(--foc-purple-900) 100%)"
+          : "linear-gradient(135deg, var(--foc-slate-900) 0%, var(--foc-slate-800) 100%)",
         borderRadius: 24,
         padding: "48px 40px",
         display: "flex",
@@ -264,7 +337,7 @@ function CTASection({ dark = false, title, subtitle, actions }) {
           inset: 0,
           opacity: 0.07,
           backgroundImage:
-            "radial-gradient(circle at 20% 80%, #818cf8 0%, transparent 50%), radial-gradient(circle at 80% 20%, #c084fc 0%, transparent 50%)",
+            "radial-gradient(circle at 20% 80%, var(--foc-indigo-400) 0%, transparent 50%), radial-gradient(circle at 80% 20%, var(--foc-fuchsia-400) 0%, transparent 50%)",
         }}
       />
       <div style={{ position: "relative", zIndex: 1 }}>
@@ -272,7 +345,7 @@ function CTASection({ dark = false, title, subtitle, actions }) {
           style={{
             fontSize: 13,
             fontWeight: 700,
-            color: "#a78bfa",
+            color: "var(--foc-violet-400)",
             letterSpacing: "0.15em",
             textTransform: "uppercase",
             marginBottom: 12,
@@ -284,7 +357,7 @@ function CTASection({ dark = false, title, subtitle, actions }) {
           style={{
             fontSize: "clamp(24px, 3vw, 36px)",
             fontWeight: 800,
-            color: "#fff",
+            color: "var(--foc-color-surface)",
             margin: "0 0 8px",
             letterSpacing: "-0.02em",
           }}
@@ -294,16 +367,7 @@ function CTASection({ dark = false, title, subtitle, actions }) {
               part
             ) : (
               <span key="brand">
-                <span
-                  style={{
-                    background: "linear-gradient(90deg, #a78bfa, #60a5fa)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    backgroundClip: "text",
-                  }}
-                >
-                  Zenith X
-                </span>
+                <ZenithXInline />
                 {part}
               </span>
             )
@@ -320,8 +384,8 @@ function CTASection({ dark = false, title, subtitle, actions }) {
                 fontSize: 14,
                 fontWeight: 700,
                 border: i === 0 ? "none" : "2px solid rgba(255,255,255,0.25)",
-                background: i === 0 ? "linear-gradient(135deg, #7c3aed, #4f46e5)" : "transparent",
-                color: "#fff",
+                background: i === 0 ? "linear-gradient(135deg, var(--foc-purple), var(--foc-indigo-600))" : "transparent",
+                color: "var(--foc-color-surface)",
                 cursor: "pointer",
                 transition: "all 0.2s",
               }}
@@ -345,8 +409,8 @@ export default function ZenithXSection() {
         {/* HERO */}
         <section
           style={{
-            background: "linear-gradient(135deg, #0f0a1e 0%, #1e1b4b 40%, #0c1a3a 100%)",
-            padding: "80px 32px 100px",
+            background: "linear-gradient(135deg, var(--foc-zenith-bg) 0%, var(--foc-indigo-950) 40%, var(--foc-zenith-bg-mid) 100%)",
+            padding: "15px 0",
             position: "relative",
             overflow: "hidden",
           }}
@@ -357,10 +421,11 @@ export default function ZenithXSection() {
               inset: 0,
               opacity: 0.12,
               backgroundImage:
-                "radial-gradient(circle at 15% 85%, #818cf8 0%, transparent 40%), radial-gradient(circle at 85% 15%, #c084fc 0%, transparent 40%), radial-gradient(circle at 50% 50%, #60a5fa 0%, transparent 60%)",
+                "radial-gradient(circle at 15% 85%, var(--foc-indigo-400) 0%, transparent 40%), radial-gradient(circle at 85% 15%, var(--foc-fuchsia-400) 0%, transparent 40%), radial-gradient(circle at 50% 50%, var(--foc-blue-400) 0%, transparent 60%)",
             }}
           />
-          <div style={{ maxWidth: 900, margin: "0 auto", textAlign: "center", position: "relative", zIndex: 1 }}>
+          <div className="container" style={{ position: "relative", zIndex: 1 }}>
+          <div style={{ textAlign: "center" }}>
             <div
               style={{
                 display: "inline-flex",
@@ -372,7 +437,7 @@ export default function ZenithXSection() {
                 padding: "6px 16px",
                 fontSize: 12,
                 fontWeight: 700,
-                color: "#c4b5fd",
+                color: "var(--foc-violet-300)",
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
                 marginBottom: 28,
@@ -380,56 +445,19 @@ export default function ZenithXSection() {
             >
               ✦ Focalyt&apos;s Experiential Learning Ecosystem
             </div>
-            <h1
-              style={{
-                fontSize: "clamp(38px, 6vw, 72px)",
-                fontWeight: 900,
-                color: "#fff",
-                lineHeight: 1.08,
-                letterSpacing: "-0.04em",
-                margin: "0 0 8px",
-              }}
-            >
-              Inspire.{" "}
-              <span
-                style={{
-                  background: "linear-gradient(90deg, #a78bfa 0%, #60a5fa 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}
-              >
-                Innovate.
-              </span>
+            <h1 className="zx-hero-headline">
+              <span className="zx-hero-headline-ready">Future Ready</span>
+              <ZenithXInline />
             </h1>
-            <h1
-              style={{
-                fontSize: "clamp(38px, 6vw, 72px)",
-                fontWeight: 900,
-                color: "#fff",
-                lineHeight: 1.08,
-                letterSpacing: "-0.04em",
-                margin: "0 0 28px",
-              }}
-            >
-              Experience.{" "}
-              <span
-                style={{
-                  background: "linear-gradient(90deg, #f59e0b 0%, #ef4444 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}
-              >
-                Create.
-              </span>
-            </h1>
+            <p className="zx-hero-brand-tag" style={{ margin: "0 0 8px", textAlign: "center" }}>
+              Future Technology Events
+            </p>
             <p
+              className="zx-hero-desc"
               style={{
                 fontSize: 18,
                 color: "rgba(255,255,255,0.65)",
                 lineHeight: 1.7,
-                maxWidth: 640,
                 margin: "0 auto 40px",
                 fontWeight: 400,
               }}
@@ -445,8 +473,8 @@ export default function ZenithXSection() {
                   borderRadius: 14,
                   fontSize: 15,
                   fontWeight: 800,
-                  background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
-                  color: "#fff",
+                  background: "linear-gradient(135deg, var(--foc-purple), var(--foc-indigo-600))",
+                  color: "var(--foc-color-surface)",
                   border: "none",
                   cursor: "pointer",
                   letterSpacing: "-0.01em",
@@ -462,7 +490,7 @@ export default function ZenithXSection() {
                   fontSize: 15,
                   fontWeight: 700,
                   background: "transparent",
-                  color: "#fff",
+                  color: "var(--foc-color-surface)",
                   border: "2px solid rgba(255,255,255,0.25)",
                   cursor: "pointer",
                 }}
@@ -476,7 +504,7 @@ export default function ZenithXSection() {
                 gap: 32,
                 justifyContent: "center",
                 flexWrap: "wrap",
-                marginTop: 56,
+                marginTop: 25,
                 borderTop: "1px solid rgba(255,255,255,0.1)",
                 paddingTop: 40,
               }}
@@ -505,14 +533,14 @@ export default function ZenithXSection() {
               ))}
             </div>
           </div>
+          </div>
         </section>
 
         {/* STATS BAR */}
-        <section style={{ background: "#fff", borderBottom: "1px solid #e5e7eb", padding: "32px" }}>
+        <section style={{ background: "var(--foc-color-surface)", borderBottom: "1px solid var(--foc-color-border-ui)", padding: "32px 0" }}>
+          <div className="container">
           <div
             style={{
-              maxWidth: 1100,
-              margin: "0 auto",
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
               gap: 24,
@@ -522,24 +550,26 @@ export default function ZenithXSection() {
             {STATS.map((s) => (
               <div key={s.label}>
                 <div style={{ fontSize: 28, marginBottom: 4 }}>{s.icon}</div>
-                <div style={{ fontSize: 28, fontWeight: 900, color: "#7c3aed", letterSpacing: "-0.03em" }}>
+                <div style={{ fontSize: 28, fontWeight: 900, color: "var(--foc-purple)", letterSpacing: "-0.03em" }}>
                   <AnimatedCounter target={s.value} />
                 </div>
-                <div style={{ fontSize: 13, color: "#6b7280", fontWeight: 500, marginTop: 2 }}>{s.label}</div>
+                <div style={{ fontSize: 13, color: "var(--foc-gray-500)", fontWeight: 500, marginTop: 2 }}>{s.label}</div>
               </div>
             ))}
+          </div>
           </div>
         </section>
 
         {/* ABOUT */}
-        <section style={{ padding: "80px 32px", maxWidth: 1100, margin: "0 auto" }}>
+        <section style={{ padding: "15px 0" }}>
+          <div className="container">
           <div className="zx-about-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 60, alignItems: "center" }}>
             <div>
               <div
                 style={{
                   fontSize: 12,
                   fontWeight: 700,
-                  color: "#7c3aed",
+                  color: "var(--foc-purple)",
                   letterSpacing: "0.15em",
                   textTransform: "uppercase",
                   marginBottom: 16,
@@ -551,41 +581,41 @@ export default function ZenithXSection() {
                 style={{
                   fontSize: "clamp(28px, 3vw, 42px)",
                   fontWeight: 900,
-                  color: "#111827",
+                  color: "var(--foc-color-text-strong)",
                   letterSpacing: "-0.03em",
                   lineHeight: 1.15,
                   margin: "0 0 20px",
                 }}
               >
-                Where Ideas Meet <span style={{ color: "#7c3aed" }}>Innovation</span>
+                Where Ideas Meet <span style={{ color: "var(--foc-purple)" }}>Innovation</span>
               </h2>
-              <p style={{ fontSize: 16, color: "#4b5563", lineHeight: 1.75, marginBottom: 20 }}>
+              <p style={{ fontSize: 16, color: "var(--foc-color-text-body)", lineHeight: 1.75, marginBottom: 20 }}>
                 Zenith X is Focalyt&apos;s experiential future technology event ecosystem designed to inspire innovation,
                 creativity, practical learning, and technology exposure among students, schools, colleges, and communities.
               </p>
-              <p style={{ fontSize: 16, color: "#4b5563", lineHeight: 1.75, marginBottom: 32 }}>
+              <p style={{ fontSize: 16, color: "var(--foc-color-text-body)", lineHeight: 1.75, marginBottom: 32 }}>
                 Through interactive workshops, competitions, exhibitions, PTM engagement activities, innovation showcases,
                 and experiential learning zones, Zenith X creates exciting opportunities for learners to explore AI, Robotics,
                 IoT, Drones, STEM, and emerging technologies.
               </p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                 {FOCUS_AREAS.map((f) => (
-                  <TagBadge key={f.label} label={`${f.icon} ${f.label}`} color="#7c3aed" />
+                  <TagBadge key={f.label} label={`${f.icon} ${f.label}`} color="var(--foc-purple)" />
                 ))}
               </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               {[
-                { title: "INNOVATE", desc: "Push boundaries with cutting-edge tech projects", color: "#7c3aed", icon: "💡" },
-                { title: "COLLABORATE", desc: "Build teams and forge lasting connections", color: "#0ea5e9", icon: "🤝" },
-                { title: "COMPETE", desc: "Challenge yourself in exciting competitions", color: "#ec4899", icon: "🏆" },
-                { title: "IMPACT", desc: "Create change through technology and innovation", color: "#10b981", icon: "🌟" },
+                { title: "INNOVATE", desc: "Push boundaries with cutting-edge tech projects", color: "var(--foc-purple)", icon: "💡" },
+                { title: "COLLABORATE", desc: "Build teams and forge lasting connections", color: "var(--foc-sky-500)", icon: "🤝" },
+                { title: "COMPETE", desc: "Challenge yourself in exciting competitions", color: "var(--foc-pink-500)", icon: "🏆" },
+                { title: "IMPACT", desc: "Create change through technology and innovation", color: "var(--foc-emerald-500)", icon: "🌟" },
               ].map((card) => (
                 <div
                   key={card.title}
                   style={{
-                    background: "#fff",
-                    border: "1.5px solid #e5e7eb",
+                    background: "var(--foc-color-surface)",
+                    border: "1.5px solid var(--foc-color-border-ui)",
                     borderRadius: 16,
                     padding: "24px 20px",
                     transition: "all 0.2s",
@@ -595,7 +625,7 @@ export default function ZenithXSection() {
                     e.currentTarget.style.transform = "translateY(-3px)";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "#e5e7eb";
+                    e.currentTarget.style.borderColor = "var(--foc-color-border-ui)";
                     e.currentTarget.style.transform = "translateY(0)";
                   }}
                 >
@@ -612,22 +642,23 @@ export default function ZenithXSection() {
                   >
                     {card.title}
                   </div>
-                  <div style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.5 }}>{card.desc}</div>
+                  <div style={{ fontSize: 13, color: "var(--foc-gray-500)", lineHeight: 1.5 }}>{card.desc}</div>
                 </div>
               ))}
             </div>
           </div>
+          </div>
         </section>
 
         {/* PROGRAMS TABS */}
-        <section style={{ background: "#fff", padding: "80px 32px" }}>
-          <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-            <div style={{ textAlign: "center", marginBottom: 48 }}>
+        <section style={{ background: "var(--foc-color-surface)", padding: "15px 0" }}>
+          <div className="container">
+            <div className="zx-section-head" style={{ marginBottom: 48 }}>
               <div
                 style={{
                   fontSize: 12,
                   fontWeight: 700,
-                  color: "#7c3aed",
+                  color: "var(--foc-purple)",
                   letterSpacing: "0.15em",
                   textTransform: "uppercase",
                   marginBottom: 12,
@@ -639,20 +670,21 @@ export default function ZenithXSection() {
                 style={{
                   fontSize: "clamp(28px, 3vw, 40px)",
                   fontWeight: 900,
-                  color: "#111827",
+                  color: "var(--foc-color-text-strong)",
                   letterSpacing: "-0.03em",
                   margin: "0 0 16px",
+                  textAlign: "center",
                 }}
               >
                 Built for Every Learner
               </h2>
-              <p style={{ fontSize: 16, color: "#6b7280", maxWidth: 520, margin: "0 auto" }}>
+              <p style={{ fontSize: 16, color: "var(--foc-gray-500)", margin: "0 auto", textAlign: "center" }}>
                 Tailored experiences from school students to college innovators
               </p>
             </div>
 
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: 48 }}>
-              <div style={{ display: "inline-flex", background: "#f3f4f6", borderRadius: 16, padding: 6, gap: 4 }}>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
+              <div style={{ display: "inline-flex", background: "var(--foc-chip-bg)", borderRadius: 16, padding: 6, gap: 4 }}>
                 {[
                   { key: "schools", label: "🏫 For Schools" },
                   { key: "colleges", label: "🎓 For Colleges" },
@@ -669,8 +701,8 @@ export default function ZenithXSection() {
                       fontWeight: 700,
                       cursor: "pointer",
                       transition: "all 0.25s",
-                      background: activeTab === t.key ? "#7c3aed" : "transparent",
-                      color: activeTab === t.key ? "#fff" : "#6b7280",
+                      background: activeTab === t.key ? "var(--foc-purple)" : "transparent",
+                      color: activeTab === t.key ? "var(--foc-color-surface)" : "var(--foc-gray-500)",
                       boxShadow: activeTab === t.key ? "0 4px 16px rgba(124,58,237,0.3)" : "none",
                     }}
                   >
@@ -682,12 +714,12 @@ export default function ZenithXSection() {
 
             {activeTab === "schools" && (
               <div>
-                <div className="zx-programs-3" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20, marginBottom: 48 }}>
+                <div className="zx-programs-3" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20, marginBottom:20 }}>
                   {SCHOOL_PROGRAMS.slice(0, 3).map((p) => (
                     <ProgramCard key={p.title} program={p} />
                   ))}
                 </div>
-                <div className="zx-programs-2" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 20, marginBottom: 48 }}>
+                <div className="zx-programs-2" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 20, marginBottom: 20 }}>
                   {SCHOOL_PROGRAMS.slice(3).map((p) => (
                     <ProgramCard key={p.title} program={p} />
                   ))}
@@ -696,21 +728,21 @@ export default function ZenithXSection() {
                 <div className="zx-side-by-side" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32 }}>
                   <div
                     style={{
-                      background: "linear-gradient(135deg, #f5f3ff, #ede9fe)",
+                      background: "linear-gradient(135deg, var(--foc-purple-50), var(--foc-purple-100))",
                       borderRadius: 20,
                       padding: 32,
-                      border: "1.5px solid #ddd6fe",
+                      border: "1.5px solid var(--foc-purple-200)",
                     }}
                   >
-                    <div style={{ fontSize: 16, fontWeight: 800, color: "#5b21b6", marginBottom: 16 }}>🎯 Event Highlights</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: "var(--foc-purple-800)", marginBottom: 16 }}>🎯 Event Highlights</div>
                     {SCHOOL_HIGHLIGHTS.map((h) => (
                       <div key={h} style={{ display: "flex", gap: 10, marginBottom: 10, alignItems: "flex-start" }}>
-                        <span style={{ color: "#7c3aed", fontWeight: 900, marginTop: 1 }}>✓</span>
-                        <span style={{ fontSize: 14, color: "#4b5563" }}>{h}</span>
+                        <span style={{ color: "var(--foc-purple)", fontWeight: 900, marginTop: 1 }}>✓</span>
+                        <span style={{ fontSize: 14, color: "var(--foc-color-text-body)" }}>{h}</span>
                       </div>
                     ))}
                     <div style={{ marginTop: 20 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#6d28d9", marginBottom: 10 }}>Perfect for</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--foc-purple-700)", marginBottom: 10 }}>Perfect for</div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                         {["PTMs", "Annual Days", "Science Fairs", "Carnivals", "Exhibitions"].map((l) => (
                           <span
@@ -720,8 +752,8 @@ export default function ZenithXSection() {
                               fontWeight: 600,
                               padding: "4px 12px",
                               borderRadius: 999,
-                              background: "#ede9fe",
-                              color: "#5b21b6",
+                              background: "var(--foc-purple-100)",
+                              color: "var(--foc-purple-800)",
                             }}
                           >
                             {l}
@@ -732,21 +764,21 @@ export default function ZenithXSection() {
                   </div>
                   <div
                     style={{
-                      background: "linear-gradient(135deg, #eff6ff, #dbeafe)",
+                      background: "linear-gradient(135deg, var(--foc-blue-50-alt), var(--foc-blue-50))",
                       borderRadius: 20,
                       padding: 32,
-                      border: "1.5px solid #bfdbfe",
+                      border: "1.5px solid var(--foc-blue-100)",
                     }}
                   >
-                    <div style={{ fontSize: 16, fontWeight: 800, color: "#1d4ed8", marginBottom: 16 }}>📚 Competition Formats</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: "var(--foc-blue-700)", marginBottom: 16 }}>📚 Competition Formats</div>
                     {COMPETITION_FORMATS.map((f) => (
                       <div key={f} style={{ display: "flex", gap: 10, marginBottom: 10, alignItems: "flex-start" }}>
-                        <span style={{ color: "#2563eb", fontWeight: 900, marginTop: 1 }}>→</span>
-                        <span style={{ fontSize: 14, color: "#374151" }}>{f}</span>
+                        <span style={{ color: "var(--foc-blue-600)", fontWeight: 900, marginTop: 1 }}>→</span>
+                        <span style={{ fontSize: 14, color: "var(--foc-color-text-strong)" }}>{f}</span>
                       </div>
                     ))}
                     <div style={{ marginTop: 20 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1d4ed8", marginBottom: 8 }}>Participation Categories</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--foc-blue-700)", marginBottom: 8 }}>Participation Categories</div>
                       {["Junior (Cl. 2–5)", "Middle (Cl. 6–9)", "Senior (Cl. 10–12)"].map((c) => (
                         <span
                           key={c}
@@ -756,8 +788,8 @@ export default function ZenithXSection() {
                             fontWeight: 600,
                             padding: "4px 12px",
                             borderRadius: 999,
-                            background: "#dbeafe",
-                            color: "#1d4ed8",
+                            background: "var(--foc-blue-50)",
+                            color: "var(--foc-blue-700)",
                             marginRight: 6,
                             marginBottom: 6,
                           }}
@@ -773,12 +805,12 @@ export default function ZenithXSection() {
 
             {activeTab === "colleges" && (
               <div>
-                <div className="zx-programs-3" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20, marginBottom: 48 }}>
+                <div className="zx-programs-3" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20, marginBottom: 20 }}>
                   {COLLEGE_PROGRAMS.slice(0, 3).map((p) => (
                     <ProgramCard key={p.title} program={p} />
                   ))}
                 </div>
-                <div className="zx-programs-2" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 20, marginBottom: 48 }}>
+                <div className="zx-programs-2" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 20, marginBottom: 20 }}>
                   {COLLEGE_PROGRAMS.slice(3).map((p) => (
                     <ProgramCard key={p.title} program={p} />
                   ))}
@@ -786,40 +818,40 @@ export default function ZenithXSection() {
                 <div className="zx-side-by-side" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32 }}>
                   <div
                     style={{
-                      background: "linear-gradient(135deg, #f0fdf4, #dcfce7)",
+                      background: "linear-gradient(135deg, var(--foc-green-50-alt), var(--foc-green-50))",
                       borderRadius: 20,
                       padding: 32,
-                      border: "1.5px solid #bbf7d0",
+                      border: "1.5px solid var(--foc-green-100)",
                     }}
                   >
-                    <div style={{ fontSize: 16, fontWeight: 800, color: "#15803d", marginBottom: 16 }}>📈 Event Impact</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: "var(--foc-green-700)", marginBottom: 16 }}>📈 Event Impact</div>
                     {COLLEGE_IMPACT.map((h) => (
                       <div key={h} style={{ display: "flex", gap: 10, marginBottom: 10, alignItems: "flex-start" }}>
-                        <span style={{ color: "#16a34a", fontWeight: 900, marginTop: 1 }}>✓</span>
-                        <span style={{ fontSize: 14, color: "#4b5563" }}>{h}</span>
+                        <span style={{ color: "var(--foc-green)", fontWeight: 900, marginTop: 1 }}>✓</span>
+                        <span style={{ fontSize: 14, color: "var(--foc-color-text-body)" }}>{h}</span>
                       </div>
                     ))}
                   </div>
                   <div
                     style={{
-                      background: "linear-gradient(135deg, #fff7ed, #fed7aa)",
+                      background: "linear-gradient(135deg, var(--foc-orange-50), var(--foc-orange-100))",
                       borderRadius: 20,
                       padding: 32,
-                      border: "1.5px solid #fdba74",
+                      border: "1.5px solid var(--foc-amber-300)",
                     }}
                   >
-                    <div style={{ fontSize: 16, fontWeight: 800, color: "#c2410c", marginBottom: 16 }}>🎓 Ideal For</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: "var(--foc-orange-700)", marginBottom: 16 }}>🎓 Ideal For</div>
                     {["Engineering Colleges", "Universities", "Tech Clubs", "Innovation Cells"].map((i) => (
                       <div key={i} style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-                        <span style={{ color: "#ea580c", fontWeight: 900 }}>→</span>
-                        <span style={{ fontSize: 14, color: "#374151" }}>{i}</span>
+                        <span style={{ color: "var(--foc-orange-600)", fontWeight: 900 }}>→</span>
+                        <span style={{ fontSize: 14, color: "var(--foc-color-text-strong)" }}>{i}</span>
                       </div>
                     ))}
                     <div style={{ marginTop: 16, padding: 16, background: "rgba(255,255,255,0.6)", borderRadius: 12 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#92400e", marginBottom: 4 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--foc-orange-800)", marginBottom: 4 }}>
                         Innovate · Collaborate · Transform
                       </div>
-                      <div style={{ fontSize: 13, color: "#78350f" }}>
+                      <div style={{ fontSize: 13, color: "var(--foc-orange-900)" }}>
                         Empowering higher education with industry-aligned technology experiences
                       </div>
                     </div>
@@ -831,14 +863,14 @@ export default function ZenithXSection() {
         </section>
 
         {/* WORKSHOPS DETAIL */}
-        <section style={{ background: "#f8fafc", padding: "80px 32px" }}>
-          <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-            <div style={{ textAlign: "center", marginBottom: 56 }}>
+        <section style={{ background: "var(--foc-color-bg-muted)", padding: "15px 0" }}>
+          <div className="container">
+            <div className="zx-section-head" style={{ marginBottom: 20 }}>
               <div
                 style={{
                   fontSize: 12,
                   fontWeight: 700,
-                  color: "#7c3aed",
+                  color: "var(--foc-purple)",
                   letterSpacing: "0.15em",
                   textTransform: "uppercase",
                   marginBottom: 12,
@@ -846,17 +878,28 @@ export default function ZenithXSection() {
               >
                 Deep Dive
               </div>
-              <h2 style={{ fontSize: "clamp(26px, 3vw, 38px)", fontWeight: 900, color: "#111827", letterSpacing: "-0.03em", margin: 0 }}>
+              <h2
+                style={{
+                  fontSize: "clamp(26px, 3vw, 38px)",
+                  fontWeight: 900,
+                  color: "var(--foc-color-text-strong)",
+                  letterSpacing: "-0.03em",
+                  margin: 0,
+                  textAlign: "center",
+                }}
+              >
                 Our Core Offerings
               </h2>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 24 }}>
+            <div
+              className="zx-core-offerings"
+              style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}
+            >
               {[
                 {
                   icon: "🤖",
-                  color: "#7c3aed",
-                  bg: "#f5f3ff",
-                  border: "#ddd6fe",
+                  color: "var(--foc-purple)",
+                  border: "var(--foc-purple-200)",
                   title: "Workshops & Hands-On Learning",
                   points: [
                     "Artificial Intelligence & Machine Learning",
@@ -870,9 +913,8 @@ export default function ZenithXSection() {
                 },
                 {
                   icon: "🎮",
-                  color: "#0ea5e9",
-                  bg: "#eff6ff",
-                  border: "#bfdbfe",
+                  color: "var(--foc-sky-500)",
+                  border: "var(--foc-blue-100)",
                   title: "PTM & Carnival Tech Zones",
                   points: [
                     "Robotics Demonstration Stalls",
@@ -886,9 +928,8 @@ export default function ZenithXSection() {
                 },
                 {
                   icon: "📅",
-                  color: "#10b981",
-                  bg: "#f0fdf4",
-                  border: "#bbf7d0",
+                  color: "var(--foc-emerald-500)",
+                  border: "var(--foc-green-100)",
                   title: "Weekend Innovation Workshops",
                   points: [
                     "AI & Robotics Basics",
@@ -902,9 +943,8 @@ export default function ZenithXSection() {
                 },
                 {
                   icon: "🎖️",
-                  color: "#f59e0b",
-                  bg: "#fffbeb",
-                  border: "#fde68a",
+                  color: "var(--foc-color-warning)",
+                  border: "var(--foc-amber-200)",
                   title: "Recognition & Student Engagement",
                   points: [
                     "Participation Certificates",
@@ -920,11 +960,12 @@ export default function ZenithXSection() {
                 <div
                   key={card.title}
                   style={{
-                    background: card.bg,
+                    background: "var(--foc-color-surface)",
                     border: `1.5px solid ${card.border}`,
                     borderRadius: 20,
-                    padding: 28,
+                    padding: 24,
                     transition: "all 0.2s",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = "translateY(-4px)";
@@ -932,7 +973,7 @@ export default function ZenithXSection() {
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "none";
+                    e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.06)";
                   }}
                 >
                   <div style={{ fontSize: 32, marginBottom: 12 }}>{card.icon}</div>
@@ -952,11 +993,11 @@ export default function ZenithXSection() {
                     {card.points.map((p) => (
                       <div key={p} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                         <span style={{ color: card.color, fontWeight: 700, fontSize: 14, marginTop: 1 }}>•</span>
-                        <span style={{ fontSize: 14, color: "#374151" }}>{p}</span>
+                        <span style={{ fontSize: 14, color: "var(--foc-color-text-strong)" }}>{p}</span>
                       </div>
                     ))}
                   </div>
-                  <div style={{ borderTop: `1px solid ${card.border}`, paddingTop: 12, fontSize: 12, color: "#6b7280", lineHeight: 1.6 }}>
+                  <div style={{ borderTop: `1px solid ${card.border}`, paddingTop: 12, fontSize: 12, color: "var(--foc-gray-500)", lineHeight: 1.6 }}>
                     {card.note}
                   </div>
                 </div>
@@ -966,13 +1007,14 @@ export default function ZenithXSection() {
         </section>
 
         {/* VISION SECTION */}
-        <section style={{ background: "#fff", padding: "80px 32px" }}>
-          <div style={{ maxWidth: 900, margin: "0 auto", textAlign: "center" }}>
+        <section style={{ background: "var(--foc-color-surface)", padding: "15px 0" }}>
+          <div className="container">
+          <div className="zx-section-head">
             <div
               style={{
                 fontSize: 12,
                 fontWeight: 700,
-                color: "#7c3aed",
+                color: "var(--foc-purple)",
                 letterSpacing: "0.15em",
                 textTransform: "uppercase",
                 marginBottom: 16,
@@ -984,25 +1026,34 @@ export default function ZenithXSection() {
               style={{
                 fontSize: "clamp(28px, 4vw, 48px)",
                 fontWeight: 900,
-                color: "#111827",
+                color: "var(--foc-color-text-strong)",
                 letterSpacing: "-0.04em",
                 lineHeight: 1.1,
                 margin: "0 0 28px",
+                textAlign: "center",
               }}
             >
               Transforming learning into an engaging{" "}
-              <span style={{ color: "#7c3aed" }}>technology experience</span>
+              <span style={{ color: "var(--foc-purple)" }}>technology experience</span>
             </h2>
-            <p style={{ fontSize: 18, color: "#4b5563", lineHeight: 1.75, maxWidth: 680, margin: "0 auto 56px" }}>
+            <p
+              style={{
+                fontSize: 18,
+                color: "var(--foc-color-text-body)",
+                lineHeight: 1.75,
+                margin: "0 auto 56px",
+                textAlign: "center",
+              }}
+            >
               Zenith X combines innovation, creativity, practical exposure, and experiential participation — helping students
               become confident future-ready innovators and creators.
             </p>
             <div className="zx-vision-4" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
               {[
-                { word: "Inspire", color: "#7c3aed", icon: "✨", desc: "Sparking curiosity in young minds" },
-                { word: "Innovate", color: "#0ea5e9", icon: "💡", desc: "Creating novel solutions together" },
-                { word: "Experience", color: "#10b981", icon: "🚀", desc: "Hands-on learning that sticks" },
-                { word: "Create", color: "#f59e0b", icon: "🎨", desc: "Building the future, today" },
+                { word: "Inspire", color: "var(--foc-purple)", icon: "✨", desc: "Sparking curiosity in young minds" },
+                { word: "Innovate", color: "var(--foc-sky-500)", icon: "💡", desc: "Creating novel solutions together" },
+                { word: "Experience", color: "var(--foc-emerald-500)", icon: "🚀", desc: "Hands-on learning that sticks" },
+                { word: "Create", color: "var(--foc-color-warning)", icon: "🎨", desc: "Building the future, today" },
               ].map((v) => (
                 <div
                   key={v.word}
@@ -1027,27 +1078,28 @@ export default function ZenithXSection() {
                   >
                     {v.word}
                   </div>
-                  <div style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.5 }}>{v.desc}</div>
+                  <div style={{ fontSize: 13, color: "var(--foc-gray-500)", lineHeight: 1.5 }}>{v.desc}</div>
                 </div>
               ))}
             </div>
           </div>
+          </div>
         </section>
 
         {/* CTA — SCHOOLS */}
-        <section style={{ padding: "0 32px 0", maxWidth: 1100, margin: "0 auto" }}>
+        {/* <section style={{ padding: "0 32px 0", maxWidth: 1100, margin: "0 auto" }}>
           <CTASection
             title="Bring Zenith X to Your School"
             subtitle="For Schools & PTMs"
             actions={["Request an Event", "Explore Programs", "Download Brochure", "Contact Us"]}
           />
-        </section>
+        </section> */}
 
         {/* CTA — COLLEGES */}
-        <section style={{ padding: "32px 32px 0", maxWidth: 1100, margin: "0 auto" }}>
+        {/* <section style={{ padding: "32px 32px 0", maxWidth: 1100, margin: "0 auto" }}>
           <div
             style={{
-              background: "linear-gradient(135deg, #0c2340 0%, #0f3460 50%, #0a1628 100%)",
+              background: "linear-gradient(135deg, var(--foc-hero-navy) 0%, var(--foc-hero-navy-mid) 50%, var(--foc-hero-navy-deep) 100%)",
               borderRadius: 24,
               padding: "48px 40px",
               display: "flex",
@@ -1065,7 +1117,7 @@ export default function ZenithXSection() {
                 inset: 0,
                 opacity: 0.1,
                 backgroundImage:
-                  "radial-gradient(circle at 20% 80%, #22d3ee 0%, transparent 50%), radial-gradient(circle at 80% 20%, #6366f1 0%, transparent 50%)",
+                  "radial-gradient(circle at 20% 80%, var(--foc-cyan-400) 0%, transparent 50%), radial-gradient(circle at 80% 20%, var(--foc-indigo-500) 0%, transparent 50%)",
               }}
             />
             <div style={{ position: "relative", zIndex: 1 }}>
@@ -1073,7 +1125,7 @@ export default function ZenithXSection() {
                 style={{
                   fontSize: 13,
                   fontWeight: 700,
-                  color: "#22d3ee",
+                  color: "var(--foc-cyan-400)",
                   letterSpacing: "0.15em",
                   textTransform: "uppercase",
                   marginBottom: 12,
@@ -1085,7 +1137,7 @@ export default function ZenithXSection() {
                 style={{
                   fontSize: "clamp(24px, 3vw, 36px)",
                   fontWeight: 800,
-                  color: "#fff",
+                  color: "var(--foc-color-surface)",
                   margin: "0 0 8px",
                   letterSpacing: "-0.02em",
                 }}
@@ -1093,7 +1145,7 @@ export default function ZenithXSection() {
                 Partner with{" "}
                 <span
                   style={{
-                    background: "linear-gradient(90deg, #22d3ee, #6366f1)",
+                    background: "linear-gradient(90deg, var(--foc-cyan-400), var(--foc-indigo-500))",
                     WebkitBackgroundClip: "text",
                     WebkitTextFillColor: "transparent",
                     backgroundClip: "text",
@@ -1117,8 +1169,8 @@ export default function ZenithXSection() {
                       fontSize: 14,
                       fontWeight: 700,
                       border: i === 3 ? "none" : "2px solid rgba(255,255,255,0.2)",
-                      background: i === 3 ? "linear-gradient(135deg, #22d3ee, #6366f1)" : "transparent",
-                      color: "#fff",
+                      background: i === 3 ? "linear-gradient(135deg, var(--foc-cyan-400), var(--foc-indigo-500))" : "transparent",
+                      color: "var(--foc-color-surface)",
                       cursor: "pointer",
                     }}
                   >
@@ -1128,7 +1180,7 @@ export default function ZenithXSection() {
               </div>
             </div>
           </div>
-        </section>
+        </section> */}
       </div>
     </>
   );
