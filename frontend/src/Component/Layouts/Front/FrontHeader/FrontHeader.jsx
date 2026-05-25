@@ -12,7 +12,7 @@ const SUB_TABS = [
   { label: "Courses", sectionId: "future-courses", icon: BookOpen },
   { label: "Jobs", sectionId: "future-jobs", icon: BriefcaseBusiness },
   { label: "Media", sectionId: "media", icon: Images },
-  { label: "Our Reach", sectionId: "our-approach", icon: MapPin },
+  { label: "Our Reach", sectionId: "geographic-reach", icon: MapPin },
 ];
 
 function scrollToHomeSection(sectionId) {
@@ -393,7 +393,30 @@ const FrontHeader = () => {
             </nav>
 
           </div>
+
+          <div className="container">
+            <nav className="front-subtabs" aria-label="Homepage sections">
+              <div className="front-subtabs__scroller">
+                {SUB_TABS.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <a
+                      key={tab.label}
+                      href={`/#${tab.sectionId}`}
+                      className="front-subtabs__tab"
+                      onClick={(e) => handleSubTabClick(e, tab)}
+                      aria-label={tab.label}
+                    >
+                      <Icon className="front-subtabs__icon" aria-hidden="true" size={14} strokeWidth={2.1} />
+                      <span>{tab.label}</span>
+                    </a>
+                  );
+                })}
+              </div>
+            </nav>
+          </div>
         </header>
+        {/* Floating side tabs — hidden for now
         <nav className="floating-side-tabs" aria-label="Quick links">
           {SUB_TABS.map((tab) => {
             const Icon = tab.icon;
@@ -433,6 +456,7 @@ const FrontHeader = () => {
             );
           })}
         </nav>
+        */}
       </div>
     </>
   );

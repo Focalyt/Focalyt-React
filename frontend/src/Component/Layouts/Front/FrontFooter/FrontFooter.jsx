@@ -29,7 +29,7 @@ const SUB_TABS = [
   { label: "Courses", sectionId: "future-courses", icon: BookOpen },
   { label: "Jobs", sectionId: "future-jobs", icon: BriefcaseBusiness },
   { label: "Media", sectionId: "media", icon: Images },
-  { label: "Our Reach", sectionId: "our-approach", icon: MapPin },
+  { label: "Our Reach", sectionId: "geographic-reach", icon: MapPin },
 ];
 
 const FOOTER_CONTACT = {
