@@ -187,7 +187,7 @@ function Footer() {
           <div className="ftr-grid">
             <div className="ftr-brand-col">
               <Link to="/" className="ftr-brand">
-                <img src="/Assets/public_assets/images/newpage/logo-ft.svg" alt="Focalyt" />
+                <img src="/Assets/images/logo/focalyt_new_logo.png" alt="Focalyt" />
               </Link>
               <ul className="list-social list-social--hvr-black ftr-social">
                 {SOCIAL_LINKS.map((s) => (

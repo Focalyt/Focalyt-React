@@ -5725,7 +5725,7 @@ export default function HomePage() {
         showPartnerSuccessPopup();
       }
     } catch {
-      setPartnerError("Failed to submit. Please try again or email parveen.bansal@focalyt.com.");
+      setPartnerError("Failed to submit. Please try again.");
     } finally {
       setPartnerLoading(false);
     }

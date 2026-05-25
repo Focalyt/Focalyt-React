@@ -478,7 +478,7 @@ router.post('/partner', async (req, res) => {
                             <tbody>
                               <tr>
                                 <td style="background-color:#FC2B5A;color:#ffffff!important" valign="top">
-                                  <img src="${baseUrl}/images/logo/logo.png" alt="Focalyt" style="display: block; margin: 40px auto 0; width: 170px;">
+                                  <img src="${baseUrl}/Assets/images/logo/focalyt_new_logo.png" alt="Focalyt" style="display: block; margin: 40px auto 0; width: 170px;">
                                 </td>
                               </tr>
                               <tr>
@@ -511,7 +511,7 @@ router.post('/partner', async (req, res) => {
     </html>
     `;
 
-    await sendPartnerMail(subject, msg, "parveen.bansal@focalyt.com");
+    await sendPartnerMail(subject, msg, "info@focalyt.com");
 
     return res.status(200).json({ success: true, message: "Partner inquiry sent successfully" });
   } catch (err) {
