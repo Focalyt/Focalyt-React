@@ -347,11 +347,15 @@ export async function updateB2BLeadStatus(
   };
 }
 
+function apiResponseOk(res: Json): boolean {
+  return res.status === true || res.success === true;
+}
+
 export async function fetchB2BUsers(
   token: string,
 ): Promise<{ ok: boolean; items: B2BOption[]; message?: string }> {
   const res = await getJson('/college/users/b2b-users', token);
-  if (res.status === true && Array.isArray(res.data)) {
+  if (apiResponseOk(res) && Array.isArray(res.data)) {
     return {
       ok: true,
       items: (res.data as Json[]).map(row => ({
@@ -508,6 +512,74 @@ export async function fetchB2BLeadLogs(
     logs: [],
     message:
       typeof res.message === 'string' ? res.message : 'Failed to load history',
+  };
+}
+
+export async function referB2BLead(
+  token: string,
+  leadId: string,
+  counselorId: string,
+): Promise<{ ok: boolean; message?: string }> {
+  const res = await postJson(
+    '/college/b2b/refer-lead',
+    { leadId, counselorId },
+    token,
+  );
+  if (res.status === true) {
+    return { ok: true, message: typeof res.message === 'string' ? res.message : undefined };
+  }
+  return {
+    ok: false,
+    message:
+      typeof res.message === 'string' ? res.message : 'Failed to refer lead',
+  };
+}
+
+export async function fetchB2BLeadDocuments(
+  token: string,
+  leadId: string,
+): Promise<{ ok: boolean; documents: B2BLeadDocument[]; message?: string }> {
+  const res = await getJson(`/college/b2b/leads/${leadId}/documents`, token);
+  if (res.status === true && Array.isArray(res.data)) {
+    return { ok: true, documents: res.data as B2BLeadDocument[] };
+  }
+  return {
+    ok: false,
+    documents: [],
+    message:
+      typeof res.message === 'string'
+        ? res.message
+        : 'Failed to load documents',
+  };
+}
+
+export async function fetchB2BLeadCategoryById(
+  token: string,
+  categoryId: string,
+): Promise<{
+  ok: boolean;
+  documents: Array<{ name?: string; required?: boolean }>;
+  message?: string;
+}> {
+  const res = await getJson(
+    `/college/b2b/lead-categories/${categoryId}`,
+    token,
+  );
+  if (res.status === true && res.data && typeof res.data === 'object') {
+    const d = res.data as Json;
+    const docs = Array.isArray(d.documents) ? d.documents : [];
+    return {
+      ok: true,
+      documents: docs as Array<{ name?: string; required?: boolean }>,
+    };
+  }
+  return {
+    ok: false,
+    documents: [],
+    message:
+      typeof res.message === 'string'
+        ? res.message
+        : 'Failed to load lead category',
   };
 }
 

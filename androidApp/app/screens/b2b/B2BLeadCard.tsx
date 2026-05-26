@@ -25,6 +25,10 @@ type Props = {
   onStatusChange: () => void;
   onFollowup: (type: 'Call' | 'Visit') => void;
   onHistory: () => void;
+  onDocuments: () => void;
+  onAddReport: () => void;
+  onViewReport: () => void;
+  onReferLead: () => void;
   onDial: (raw: string | number | undefined) => void;
   onWhatsApp: (raw: string | number | undefined) => void;
 };
@@ -69,18 +73,20 @@ function FollowupSection({
   type,
   onEdit,
   stats,
+  containerStyle,
 }: {
   title: string;
   lead: B2BLead;
   type?: 'Call' | 'Visit';
   onEdit?: () => void;
   stats: { label: string; value: number; bg: string }[];
+  containerStyle?: object;
 }) {
   const dateLabel =
     type != null ? getLeadFollowupDateLabel(lead, type) : null;
 
   return (
-    <View style={styles.followSection}>
+    <View style={[styles.followSection, containerStyle]}>
       <View style={styles.followSectionHead}>
         <Text style={styles.followSectionTitle}>{title}</Text>
         {onEdit ? (
@@ -169,11 +175,35 @@ function LeadActionMenu({
   );
 }
 
+function LeadQuickAction({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: string;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      style={styles.quickActionBtn}
+      onPress={onPress}
+      accessibilityLabel={label}
+    >
+      <Icon name={icon} size={11} color="#fff" solid />
+    </Pressable>
+  );
+}
+
 export function B2BLeadCard({
   lead,
   onStatusChange,
   onFollowup,
   onHistory,
+  onDocuments,
+  onAddReport,
+  onViewReport,
+  onReferLead,
   onDial,
   onWhatsApp,
 }: Props) {
@@ -270,50 +300,71 @@ export function B2BLeadCard({
           </View>
         </View>
 
-        <View style={[styles.topPanel, styles.namePanel]}>
-          <View style={styles.nameRow}>
-            <View style={styles.avatarCircle}>
-              <Icon name="user" size={16} color={HEADER_BG} solid />
-            </View>
-            <View style={styles.nameCol}>
-              <Text style={styles.personName} numberOfLines={1}>
-                {personName}
-              </Text>
-              {businessName ? (
-                <Text style={styles.businessName} numberOfLines={1}>
-                  {businessName}
+        <View style={styles.nameBlockRow}>
+          <View style={[styles.topPanel, styles.namePanel, styles.namePanelMain]}>
+            <View style={styles.nameRow}>
+              <View style={styles.avatarCircle}>
+                <Icon name="user" size={16} color={HEADER_BG} solid />
+              </View>
+              <View style={styles.nameCol}>
+                <Text style={styles.personName} numberOfLines={1}>
+                  {personName}
                 </Text>
+                {businessName ? (
+                  <Text style={styles.businessName} numberOfLines={1}>
+                    {businessName}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+            <View style={styles.contactRow}>
+              <Pressable
+                style={styles.contactItem}
+                onPress={() => lead.mobile && onDial(lead.mobile)}
+                disabled={!lead.mobile}
+                accessibilityLabel="Call"
+              >
+                <View style={[styles.iconActionBtn, styles.phoneIconBtn]}>
+                  <Icon name="phone" size={14} color="#fff" solid />
+                </View>
+                <Text style={styles.phoneText} numberOfLines={1}>
+                  {lead.mobile ? String(lead.mobile) : '—'}
+                </Text>
+              </Pressable>
+              {wa ? (
+                <Pressable
+                  style={styles.contactItem}
+                  onPress={() => onWhatsApp(wa)}
+                  accessibilityLabel="WhatsApp"
+                >
+                  <View style={[styles.iconActionBtn, styles.waIconBtn]}>
+                    <Icon name="whatsapp" size={15} color="#fff" brand />
+                  </View>
+                  <Text style={styles.waNumber} numberOfLines={1}>
+                    {lead.whatsapp
+                      ? String(lead.whatsapp)
+                      : String(lead.mobile)}
+                  </Text>
+                </Pressable>
               ) : null}
             </View>
           </View>
-          <View style={styles.contactRow}>
-            <Pressable
-              style={styles.contactItem}
-              onPress={() => lead.mobile && onDial(lead.mobile)}
-              disabled={!lead.mobile}
-              accessibilityLabel="Call"
-            >
-              <View style={[styles.iconActionBtn, styles.phoneIconBtn]}>
-                <Icon name="phone" size={14} color="#fff" solid />
-              </View>
-              <Text style={styles.phoneText} numberOfLines={1}>
-                {lead.mobile ? String(lead.mobile) : '—'}
-              </Text>
-            </Pressable>
-            {wa ? (
-              <Pressable
-                style={styles.contactItem}
-                onPress={() => onWhatsApp(wa)}
-                accessibilityLabel="WhatsApp"
-              >
-                <View style={[styles.iconActionBtn, styles.waIconBtn]}>
-                  <Icon name="whatsapp" size={15} color="#fff" brand />
-                </View>
-                <Text style={styles.waNumber} numberOfLines={1}>
-                  {lead.whatsapp ? String(lead.whatsapp) : String(lead.mobile)}
-                </Text>
-              </Pressable>
-            ) : null}
+          <View style={styles.metaPills}>
+            <LeadQuickAction
+              icon="share-alt"
+              label="Refer Lead"
+              onPress={onReferLead}
+            />
+            <LeadQuickAction
+              icon="plus"
+              label="Add Lead Report"
+              onPress={onAddReport}
+            />
+            <LeadQuickAction
+              icon="eye"
+              label="View Lead Report"
+              onPress={onViewReport}
+            />
           </View>
         </View>
 
@@ -368,8 +419,13 @@ export function B2BLeadCard({
         <FollowupSection
           title="Documents"
           lead={lead}
+          onEdit={onDocuments}
           stats={[
-            { label: 'Done', value: docBucket === 'done' ? 1 : 0, bg: '#4b5563' },
+            {
+              label: 'Done',
+              value: docBucket === 'done' ? 1 : 0,
+              bg: '#4b5563',
+            },
             {
               label: 'Pending',
               value: docBucket === 'pending' ? 1 : 0,
@@ -605,8 +661,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.9)',
   },
+  nameBlockRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  namePanelMain: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 9,
+    paddingHorizontal: 11,
+  },
   namePanel: {
-    gap: 4,
+    gap: 5,
     marginTop: 0,
   },
   nameRow: {
@@ -650,8 +717,8 @@ const styles = StyleSheet.create({
     gap: 10,
     borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
-    paddingTop: 4,
-    marginTop: 2,
+    paddingTop: 6,
+    marginTop: 3,
   },
   contactItem: {
     flexDirection: 'row',
@@ -691,6 +758,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 6,
     alignItems: 'flex-start',
+  },
+  metaPills: {
+    flexDirection: 'column',
+    gap: 3,
+    flexShrink: 0,
+    justifyContent: 'center',
+  },
+  quickActionBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   followSection: {
     ...glass,

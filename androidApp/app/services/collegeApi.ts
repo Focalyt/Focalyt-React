@@ -1,6 +1,71 @@
-import { API_URL } from '@env';
+import { API_URL, GOOGLE_OAUTH_REDIRECT_URI, WEB_APP_URL } from '@env';
 
 type Json = Record<string, unknown>;
+
+function normalizeWebOrigin(raw: string): string {
+  let base = raw.trim().replace(/^['"]|['"]$/g, '').replace(/\s+/g, '');
+  if (!base) return '';
+  if (!/^https?:\/\//i.test(base)) base = `https://${base}`;
+  return base.replace(/\/+$/, '');
+}
+
+/** College portal origin (React app), NOT the /api base. */
+export function getWebAppBaseSafe(): string | null {
+  const explicit =
+    WEB_APP_URL != null ? normalizeWebOrigin(String(WEB_APP_URL)) : '';
+  if (explicit) return explicit;
+
+  const redirect =
+    GOOGLE_OAUTH_REDIRECT_URI != null
+      ? normalizeWebOrigin(String(GOOGLE_OAUTH_REDIRECT_URI))
+      : '';
+  if (redirect) return redirect;
+
+  const apiBase = getApiBaseSafe();
+  if (!apiBase) return null;
+
+  // API_URL=https://focalyt.com/api → portal at https://focalyt.com
+  if (/\/api$/i.test(apiBase)) {
+    return apiBase.replace(/\/api$/i, '');
+  }
+  return apiBase;
+}
+
+export function buildInstituteWebUrl(
+  pathname: string,
+  query: Record<string, string> = {},
+): string | null {
+  const base = getWebAppBaseSafe();
+  if (!base) return null;
+  const path = pathname.startsWith('/') ? pathname : `/${pathname}`;
+  const qs = Object.entries(query)
+    .filter(([, v]) => v !== '')
+    .map(
+      ([k, v]) =>
+        `${encodeURIComponent(k)}=${encodeURIComponent(v)}`,
+    )
+    .join('&');
+  return qs ? `${base}${path}?${qs}` : `${base}${path}`;
+}
+
+/** Same route as web: /institute/lrp?b2bLeadId=&mode=add */
+export function b2bLrpAddUrl(leadId: string): string | null {
+  if (!leadId) return null;
+  return buildInstituteWebUrl('/institute/lrp', {
+    b2bLeadId: leadId,
+    mode: 'add',
+    embedded: '1',
+  });
+}
+
+/** Same route as web: /institute/lrp-view?b2bLeadId= */
+export function b2bLrpViewUrl(leadId: string): string | null {
+  if (!leadId) return null;
+  return buildInstituteWebUrl('/institute/lrp-view', {
+    b2bLeadId: leadId,
+    embedded: '1',
+  });
+}
 
 export function getApiBaseSafe(): string | null {
   const raw = API_URL != null ? String(API_URL).trim() : '';

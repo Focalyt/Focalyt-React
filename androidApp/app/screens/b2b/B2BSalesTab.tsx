@@ -35,8 +35,12 @@ import {
 } from './B2BCycleFilters';
 import { B2BLeadCard } from './B2BLeadCard';
 import { B2BFollowupModal } from './B2BFollowupModal';
+import { B2BLeadDocumentsModal } from './B2BLeadDocumentsModal';
 import { B2BLeadHistoryModal } from './B2BLeadHistoryModal';
+import { B2BInstituteWebModal } from './B2BInstituteWebModal';
+import { B2BReferLeadModal } from './B2BReferLeadModal';
 import { B2BStatusChangeModal } from './B2BStatusChangeModal';
+import { b2bLrpAddUrl, b2bLrpViewUrl } from '../../services/collegeApi';
 
 function normalizePhoneDigits(raw: string | number | undefined): string {
   if (raw == null || raw === '') return '';
@@ -191,6 +195,12 @@ export function B2BSalesTab() {
     React.useState<'Call' | 'Visit'>('Call');
   const [statusLead, setStatusLead] = React.useState<B2BLead | null>(null);
   const [historyLead, setHistoryLead] = React.useState<B2BLead | null>(null);
+  const [documentsLead, setDocumentsLead] = React.useState<B2BLead | null>(null);
+  const [referLead, setReferLead] = React.useState<B2BLead | null>(null);
+  const [instituteWeb, setInstituteWeb] = React.useState<{
+    title: string;
+    url: string | null;
+  } | null>(null);
   const [showAddLead, setShowAddLead] = React.useState(false);
 
   const loadCounts = React.useCallback(
@@ -753,6 +763,20 @@ export function B2BSalesTab() {
               }}
               onStatusChange={() => setStatusLead(item)}
               onHistory={() => setHistoryLead(item)}
+              onDocuments={() => setDocumentsLead(item)}
+              onReferLead={() => setReferLead(item)}
+              onAddReport={() =>
+                setInstituteWeb({
+                  title: 'Add Lead Report',
+                  url: b2bLrpAddUrl(item._id),
+                })
+              }
+              onViewReport={() =>
+                setInstituteWeb({
+                  title: 'View Lead Report',
+                  url: b2bLrpViewUrl(item._id),
+                })
+              }
             />
           )}
           ListEmptyComponent={
@@ -804,6 +828,29 @@ export function B2BSalesTab() {
         visible={!!historyLead}
         lead={historyLead}
         onClose={() => setHistoryLead(null)}
+      />
+
+      <B2BLeadDocumentsModal
+        visible={!!documentsLead}
+        lead={documentsLead}
+        onClose={() => setDocumentsLead(null)}
+      />
+
+      <B2BReferLeadModal
+        visible={!!referLead}
+        lead={referLead}
+        onClose={() => setReferLead(null)}
+        onSaved={() => {
+          loadLeads('refresh', 1);
+        }}
+      />
+
+      <B2BInstituteWebModal
+        visible={!!instituteWeb}
+        title={instituteWeb?.title ?? ''}
+        url={instituteWeb?.url ?? null}
+        user={user}
+        onClose={() => setInstituteWeb(null)}
       />
 
       <B2BAddLeadModal
