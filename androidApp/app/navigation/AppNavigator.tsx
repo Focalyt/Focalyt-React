@@ -21,7 +21,7 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function homeForRole(role: AuthUser['role']) {
-  if (role === 2) return 'CollegeHome' as const;
+  if (role === 2) return 'B2B' as const;
   if (role === 3) return 'CandidateHome' as const;
   return 'CompanyHome' as const; // role 1 (company) default
 }
@@ -30,6 +30,7 @@ export function AppNavigator({ user }: { user: AuthUser | null }) {
   return (
     <NavigationContainer>
       <Stack.Navigator
+        key={user ? `auth-${user.role}` : 'guest'}
         initialRouteName={initialRouteForUser(user)}
         screenOptions={{ headerShown: false }}
       >
@@ -38,7 +39,11 @@ export function AppNavigator({ user }: { user: AuthUser | null }) {
             <Stack.Screen name="CollegeHome" component={CollegeHomeScreen} />
             <Stack.Screen name="CandidateHome" component={CandidateHomeScreen} />
             <Stack.Screen name="CompanyHome" component={CompanyHomeScreen} />
-            <Stack.Screen name="B2B" component={B2BScreen} />
+            <Stack.Screen
+              name="B2B"
+              component={B2BScreen}
+              initialParams={{ initialTab: 'sales' }}
+            />
           </>
         ) : null}
         <Stack.Screen name="Login" component={LoginScreen} />

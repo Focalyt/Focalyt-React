@@ -1,10 +1,16 @@
 import React from 'react';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useAuth } from '../auth/AuthContext';
+import { clearUser } from '../auth/authStorage';
 import { AppHeader } from '../components/AppHeader';
-import type { B2BInitialTab } from '../navigation/AppNavigator';
+import { SideMenu, type SideMenuSection } from '../components/SideMenu';
+import type { B2BInitialTab, RootStackParamList } from '../navigation/AppNavigator';
+import { buildCollegeSideMenuSections } from '../navigation/collegeSideMenu';
 import { college } from '../theme/college';
-import { B2BDashboardTab } from './b2b/B2BDashboardTab';
-import { B2BFollowUpTab } from './b2b/B2BFollowUpTab';
+// import { B2BDashboardTab } from './b2b/B2BDashboardTab';
+// import { B2BFollowUpTab } from './b2b/B2BFollowUpTab';
 import { B2BSalesTab } from './b2b/B2BSalesTab';
 
 type Tab = B2BInitialTab;
@@ -14,24 +20,69 @@ type Props = {
   route?: { params?: { initialTab?: Tab } };
 };
 
-const TITLE_FOR_TAB: Record<Tab, string> = {
-  dashboard: 'B2B Dashboard',
-  sales: 'B2B Sales',
-  followup: 'B2B Follow-up',
-};
+export function B2BScreen({ navigation: navProp, route }: Props) {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { user, setUser } = useAuth();
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const canGoBack = navigation.canGoBack();
 
-export function B2BScreen({ navigation, route }: Props) {
-  const initialTab: Tab = route?.params?.initialTab ?? 'dashboard';
-  const [tab, setTab] = React.useState<Tab>(initialTab);
+  const _initialTab = route?.params?.initialTab;
+  void _initialTab;
+
+  const openMenu = () => setMenuOpen(true);
+
+  const menuSections: SideMenuSection[] = React.useMemo(
+    () =>
+      buildCollegeSideMenuSections({
+        onB2BSales: () => {
+          navigation.navigate('B2B', { initialTab: 'sales' });
+        },
+        onLogout: async () => {
+          await clearUser();
+          setUser(null);
+        },
+      }),
+    [navigation, setUser],
+  );
 
   return (
     <View style={styles.page}>
       <AppHeader
-        title={TITLE_FOR_TAB[tab]}
-        onBackPress={() => navigation?.goBack?.()}
+        title="B2B Sales"
+        onBackPress={
+          canGoBack
+            ? () => (navProp?.goBack ? navProp.goBack() : navigation.goBack())
+            : undefined
+        }
+        onMenuPress={!canGoBack ? openMenu : undefined}
+        rightSlot={
+          canGoBack ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Open menu"
+              onPress={openMenu}
+              hitSlop={12}
+              style={styles.headerMenuBtn}
+            >
+              <View style={styles.menuBun} />
+              <View style={[styles.menuBun, styles.menuBunMid]} />
+              <View style={styles.menuBun} />
+            </Pressable>
+          ) : null
+        }
       />
 
-      <View style={styles.tabBar}>
+      <SideMenu
+        visible={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        header={{
+          title: user?.name || 'Institute',
+          subtitle: user?.collegeName || (user?.email ?? ''),
+        }}
+        sections={menuSections}
+      />
+
+      {/* <View style={styles.tabBar}>
         <TabButton
           label="Dashboard"
           active={tab === 'dashboard'}
@@ -47,12 +98,12 @@ export function B2BScreen({ navigation, route }: Props) {
           active={tab === 'followup'}
           onPress={() => setTab('followup')}
         />
-      </View>
+      </View> */}
 
       <View style={styles.body}>
-        {tab === 'dashboard' ? <B2BDashboardTab /> : null}
-        {tab === 'sales' ? <B2BSalesTab /> : null}
-        {tab === 'followup' ? <B2BFollowUpTab /> : null}
+        {/* {tab === 'dashboard' ? <B2BDashboardTab /> : null} */}
+        <B2BSalesTab />
+        {/* {tab === 'followup' ? <B2BFollowUpTab /> : null} */}
       </View>
     </View>
   );
@@ -111,5 +162,22 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
+  },
+  headerMenuBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuBun: {
+    width: 18,
+    height: 2,
+    borderRadius: 1.5,
+    backgroundColor: college.text,
+    marginVertical: 2,
+  },
+  menuBunMid: {
+    width: 14,
   },
 });
