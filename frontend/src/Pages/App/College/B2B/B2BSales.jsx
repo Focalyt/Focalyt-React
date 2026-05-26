@@ -626,6 +626,7 @@ const B2BSales = () => {
     b2bDepartment: '',
     b2bProject: '',
     typeOfB2B: '',
+    leadOwner: '',
     leadStatus: '',
     leadSubStatus: '',
     remark: '',
@@ -1719,6 +1720,7 @@ const B2BSales = () => {
       b2bDepartment: '',
       b2bProject: '',
       typeOfB2B: lead?.typeOfB2B?._id || lead?.typeOfB2B || '',
+      leadOwner: lead?.leadOwner?._id || lead?.leadOwner || userData?._id || '',
       leadStatus: '',
       leadSubStatus: '',
       remark: '',
@@ -1735,6 +1737,7 @@ const B2BSales = () => {
       b2bDepartment: '',
       b2bProject: '',
       typeOfB2B: '',
+      leadOwner: '',
       leadStatus: '',
       leadSubStatus: '',
       remark: '',
@@ -1793,6 +1796,10 @@ const B2BSales = () => {
       alert('Please select sub-status');
       return;
     }
+    if (!crossSaleForm.leadOwner) {
+      alert('Please select counsellor');
+      return;
+    }
     try {
       setCrossSaleLoading(true);
       const response = await axios.post(
@@ -1801,6 +1808,7 @@ const B2BSales = () => {
           b2bDepartment: crossSaleForm.b2bDepartment,
           b2bProject: crossSaleForm.b2bProject,
           typeOfB2B: crossSaleForm.typeOfB2B,
+          leadOwner: crossSaleForm.leadOwner || undefined,
           status: crossSaleForm.leadStatus,
           subStatus: crossSaleForm.leadSubStatus,
           remark: crossSaleForm.remark,
@@ -5586,7 +5594,7 @@ const B2BSales = () => {
                   )}
                 </div>
               ) : (
-                <div className="row g-2">
+                <div className="row g-2 mt-3 b2b-leads-list">
                   {leadDisplayGroups.map((group, groupIndex) => {
                     const activeLeadId = activeProjectByGroup[group.rootId] || group.leads[0]?._id;
                     const lead = group.leads.find((l) => String(l._id) === String(activeLeadId)) || group.leads[0];
@@ -8294,14 +8302,35 @@ const B2BSales = () => {
 
   /* Modern Lead Card Styles */
   .lead-card {
+    --lead-card-radius: 20px;
     background: white;
-    border-radius: 16px;
+    border-radius: var(--lead-card-radius);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     border: 1px solid #f0f0f0;
-    overflow: visible;
+    overflow: hidden;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     margin-bottom: 0.5rem;
     position: relative;
+  }
+
+  .lead-card > .lead-project-tabs:first-child {
+    border-radius: var(--lead-card-radius) var(--lead-card-radius) 0 0;
+  }
+
+  .lead-card > .lead-header.lead-header-v2:first-child {
+    border-radius: var(--lead-card-radius) var(--lead-card-radius) 0 0;
+  }
+
+  .lead-card > .lead-header.lead-header-v2:last-child {
+    border-radius: 0 0 var(--lead-card-radius) var(--lead-card-radius);
+  }
+
+  .lead-card > .lead-header.lead-header-v2:first-child:last-child {
+    border-radius: var(--lead-card-radius);
+  }
+
+  .lead-card > .lead-meta-v2:last-child {
+    border-radius: 0 0 var(--lead-card-radius) var(--lead-card-radius);
   }
 
   .lead-card:hover {
@@ -8327,7 +8356,7 @@ const B2BSales = () => {
     padding: 8px 10px;
     position: relative;
     --lead-header-v2-block-h: 92px;
-    overflow: visible;
+    overflow: hidden;
     z-index: 2;
   }
 
@@ -10706,14 +10735,23 @@ position: absolute;
     margin-bottom: 0.5rem !important;
   }
 
+  .b2b-leads-list {
+    margin-top: 1rem !important;
+  }
+
   .lead-project-tabs {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 6px;
-    padding: 8px 12px 0;
-    border-bottom: 1px solid rgba(250, 85, 121, 0.2);
+    padding: 10px 12px 8px;
+    border-bottom: none;
     background: linear-gradient(180deg, #fff9fb 0%, #fff 100%);
+    overflow: hidden;
+  }
+
+  .lead-card > .lead-project-tabs + .lead-header.lead-header-v2 {
+    margin-top: 8px;
   }
   .lead-project-tabs__tab {
     border: 1.5px solid rgba(250, 85, 121, 0.45);
@@ -10750,6 +10788,22 @@ position: absolute;
   .lead-project-tabs__add:hover {
     background: rgba(250, 85, 121, 0.08);
   }
+
+  .cross-sale-modal {
+    max-width: 520px;
+  }
+
+  .cross-sale-modal .modal-content {
+    max-height: min(90vh, 720px);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .cross-sale-modal__body {
+    overflow-y: auto;
+    max-height: calc(90vh - 140px);
+    -webkit-overflow-scrolling: touch;
+  }
 `}</style>
 
       {/* Cross-sale: add lead to another B2B project */}
@@ -10761,9 +10815,9 @@ position: absolute;
             if (e.target === e.currentTarget && !crossSaleLoading) closeCrossSaleModal();
           }}
         >
-          <div className="modal-dialog modal-dialog-centered">
+          <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable cross-sale-modal">
             <div className="modal-content">
-              <div className="modal-header">
+              <div className="modal-header flex-shrink-0">
                 <h5 className="modal-title">
                   Cross Sale — {crossSaleSourceLead.businessName || crossSaleSourceLead.concernPersonName}
                 </h5>
@@ -10774,7 +10828,7 @@ position: absolute;
                   onClick={closeCrossSaleModal}
                 />
               </div>
-              <div className="modal-body">
+              <div className="modal-body cross-sale-modal__body">
                 <p className="text-muted small mb-3">
                   Same business will be added as a new lead in another project. Status, follow-ups, and owner stay separate per project.
                 </p>
@@ -10787,6 +10841,7 @@ position: absolute;
                       b2bDepartment: e.target.value,
                       b2bProject: '',
                       typeOfB2B: '',
+                      leadOwner: crossSaleForm.leadOwner,
                       leadStatus: crossSaleForm.leadStatus,
                       leadSubStatus: crossSaleForm.leadSubStatus,
                       remark: crossSaleForm.remark,
@@ -10830,6 +10885,34 @@ position: absolute;
                       <option key={type._id} value={type._id}>{type.name}</option>
                     ))}
                   </select>
+                </div>
+                <div className="mb-2">
+                  <label className="form-label fw-bold">
+                    <i className="fas fa-user-tie text-primary me-1" aria-hidden="true" />
+                    Counsellor
+                  </label>
+                  <select
+                    className="form-select"
+                    value={crossSaleForm.leadOwner}
+                    onChange={(e) => setCrossSaleForm((p) => ({ ...p, leadOwner: e.target.value }))}
+                    disabled={crossSaleLoading}
+                  >
+                    <option value="">Select Counsellor</option>
+                    {userData?._id &&
+                      !(users || []).some((u) => String(u?._id) === String(userData._id)) && (
+                        <option value={String(userData._id)}>
+                          {userData.name || 'Me'}
+                        </option>
+                      )}
+                    {(users || []).map((user) => (
+                      <option key={user._id} value={user._id}>
+                        {user.name || user.email || 'User'}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="form-text text-muted small">
+                    Owner for the new project lead. Defaults to the current lead owner.
+                  </div>
                 </div>
                 <div className="mb-2">
                   <label className="form-label fw-bold">Lead Status <span className="text-danger">*</span></label>
@@ -10894,7 +10977,7 @@ position: absolute;
                   />
                 </div>
               </div>
-              <div className="modal-footer">
+              <div className="modal-footer flex-shrink-0">
                 <button type="button" className="btn btn-secondary" disabled={crossSaleLoading} onClick={closeCrossSaleModal}>
                   Cancel
                 </button>
@@ -10907,6 +10990,7 @@ position: absolute;
                     || !crossSaleForm.b2bDepartment
                     || !crossSaleForm.b2bProject
                     || !crossSaleForm.typeOfB2B
+                    || !crossSaleForm.leadOwner
                     || !crossSaleForm.leadStatus
                     || !crossSaleForm.leadSubStatus
                   }

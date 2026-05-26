@@ -937,12 +937,12 @@ function CollegeLayout({ children }) {
                       opacity: submenuMaxHeight.salesb2b === '0px' ? 0 : 1
                     }}
                   >
-                    <li className={`nav-item ${location.pathname === '/institute/dashboardb2b' ? 'active' : ''}`}>
+                    {/* <li className={`nav-item ${location.pathname === '/institute/dashboardb2b' ? 'active' : ''}`}>
                       <Link to="/institute/dashboardb2b" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faChartLine} />
                         <span className="menu-title">{t('dashboard')}</span>
                       </Link>
-                    </li>
+                    </li> */}
                     <li className={`nav-item ${location.pathname === '/institute/sales' ? 'active' : ''}`}>
                       <a href="/institute/sales" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faTasks} />
