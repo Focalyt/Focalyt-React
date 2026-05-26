@@ -1622,7 +1622,7 @@ const B2BSales = () => {
         setMyReferLeadsCount(response.data.data?.totalLeads ?? 0);
       }
     } catch (error) {
-      console.error('Error fetching my refer leads count:', error);
+      console.error('Error fetching my referred leads count:', error);
     }
   };
 
@@ -5102,7 +5102,7 @@ const B2BSales = () => {
                           }}
                           onClick={() => handleLeadViewTabChange('myRefer')}
                         >
-                          My Refer Leads ({myReferLeadsCount})
+                          My Referred Leads ({myReferLeadsCount})
                         </button>
                       </div>
                     </div>
