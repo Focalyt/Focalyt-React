@@ -1,22 +1,27 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { BookOpen, BriefcaseBusiness, CalendarDays, FlaskConical, Images, MapPin, Zap } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import "./FrontHeader.css";
 
 const HOME_SECTION_SCROLL_OFFSET = 130;
 
 const SUB_TABS = [
-  { label: "Impact", sectionId: "about" },
-  { label: "Labs", sectionId: "labs" },
-  { label: "Events", sectionId: "events" },
-  { label: "Courses", sectionId: "future-courses" },
-  { label: "Jobs", sectionId: "future-jobs" },
-  // { label: "Social Impact", to: "/socialimpact" },
-  // { label: "Community", to: "/community" },
-  // { label: "Projects", to: "/#projects" },
-  { label: "Media", sectionId: "media" },
-  { label: "Our Reach", sectionId: "our-approach" },
-  // { label: "Partners", sectionId: "partners" },
+  { label: "Impact", sectionId: "about", icon: Zap },
+  { label: "Labs", sectionId: "labs", icon: FlaskConical },
+  { label: "Events", sectionId: "events", icon: CalendarDays },
+  { label: "Courses", sectionId: "future-courses", icon: BookOpen },
+  { label: "Jobs", sectionId: "future-jobs", icon: BriefcaseBusiness },
+  { label: "Media", sectionId: "media", icon: Images },
+  { label: "Our Reach", sectionId: "geographic-reach", icon: MapPin },
 ];
+
+function scrollToHomeSection(sectionId) {
+  const el = document.getElementById(sectionId);
+  if (!el) return;
+  const top = el.getBoundingClientRect().top + window.scrollY - HOME_SECTION_SCROLL_OFFSET;
+  window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  window.history.replaceState(null, "", `/#${sectionId}`);
+}
 
 const FrontHeader = () => {
   const location = useLocation();
@@ -30,6 +35,7 @@ const FrontHeader = () => {
 
   const [isMenuActive, setIsMenuActive] = useState(false);
   const [isDropdownActive, setIsDropdownActive] = useState(false);
+  const [hoveredSubTab, setHoveredSubTab] = useState(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
   const FOC_THEME = "sky-magenta";
@@ -238,17 +244,19 @@ const FrontHeader = () => {
     return path === "/" || path === "/home";
   };
 
-  const scrollToHomeSection = (sectionId) => {
-    const el = document.getElementById(sectionId);
-    if (!el) return;
-    const top = el.getBoundingClientRect().top + window.scrollY - HOME_SECTION_SCROLL_OFFSET;
-    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
-    window.history.replaceState(null, "", `/#${sectionId}`);
+  const handlePartnerWithUs = (e) => {
+    if (isMenuActive) {
+      toggleMenu();
+    }
+    if (isHomePage()) return;
+    e.preventDefault();
+    navigate("/", { state: { openPartnerModal: true } });
   };
 
   const handleSubTabClick = (e, tab) => {
     if (!tab.sectionId) return;
     e.preventDefault();
+    setHoveredSubTab(tab.label);
     if (isHomePage()) {
       scrollToHomeSection(tab.sectionId);
     } else {
@@ -312,10 +320,26 @@ const FrontHeader = () => {
                       <Link className='nav-link-item drop-trigger' to='/events'>Events</Link>
                     </li> */}
                     <li className="nav-item d-xl-none d-lg-none d-md-none d-sm-block d-block">
-                      <Link className='nav-link-item drop-trigger' to='/contact'>Partner with Us</Link>
+                      <button
+                        type="button"
+                        className="nav-link-item drop-trigger"
+                        data-bs-toggle={isHomePage() ? "modal" : undefined}
+                        data-bs-target={isHomePage() ? "#partnerModal" : undefined}
+                        onClick={handlePartnerWithUs}
+                      >
+                        Partner with Us
+                      </button>
                     </li>
                     <li className="nav-item d-xl-flex d-lg-flex d-md-flex d-sm-none d-none">
-                      <Link className='nav-link-item drop-trigger' to='/contact'>Partner with Us</Link>
+                      <button
+                        type="button"
+                        className="nav-link-item drop-trigger"
+                        data-bs-toggle={isHomePage() ? "modal" : undefined}
+                        data-bs-target={isHomePage() ? "#partnerModal" : undefined}
+                        onClick={handlePartnerWithUs}
+                      >
+                        Partner with Us
+                      </button>
                     </li>
                     
                     {/* Theme Toggle */}
@@ -368,28 +392,71 @@ const FrontHeader = () => {
               </div>
             </nav>
 
-            <div className="front-subtabs" aria-label="Quick links">
+          </div>
+
+          <div className="container">
+            <nav className="front-subtabs" aria-label="Homepage sections">
               <div className="front-subtabs__scroller">
-                {SUB_TABS.map((t) =>
-                  t.sectionId ? (
+                {SUB_TABS.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
                     <a
-                      key={t.label}
-                      href={`/#${t.sectionId}`}
+                      key={tab.label}
+                      href={`/#${tab.sectionId}`}
                       className="front-subtabs__tab"
-                      onClick={(e) => handleSubTabClick(e, t)}
+                      onClick={(e) => handleSubTabClick(e, tab)}
+                      aria-label={tab.label}
                     >
-                      {t.label}
+                      <Icon className="front-subtabs__icon" aria-hidden="true" size={14} strokeWidth={2.1} />
+                      <span>{tab.label}</span>
                     </a>
-                  ) : (
-                    <Link key={t.label} className="front-subtabs__tab" to={t.to}>
-                      {t.label}
-                    </Link>
-                  )
-                )}
+                  );
+                })}
               </div>
-            </div>
+            </nav>
           </div>
         </header>
+        {/* Floating side tabs — hidden for now
+        <nav className="floating-side-tabs" aria-label="Quick links">
+          {SUB_TABS.map((tab) => {
+            const Icon = tab.icon;
+            const tabClassName = `fst-tab${hoveredSubTab === tab.label ? " is-hovered" : ""}`;
+
+            return tab.sectionId ? (
+              <a
+                key={tab.label}
+                href={`/#${tab.sectionId}`}
+                className={tabClassName}
+                onClick={(e) => handleSubTabClick(e, tab)}
+                onMouseEnter={() => setHoveredSubTab(tab.label)}
+                onMouseLeave={() => setHoveredSubTab(null)}
+                onFocus={() => setHoveredSubTab(tab.label)}
+                onBlur={() => setHoveredSubTab(null)}
+                onTouchStart={() => setHoveredSubTab(tab.label)}
+                aria-label={tab.label}
+              >
+                <Icon className="fst-icon" aria-hidden="true" size={18} strokeWidth={2.1} />
+                <span className="fst-label">{tab.label}</span>
+              </a>
+            ) : (
+              <Link
+                key={tab.label}
+                className={tabClassName}
+                to={tab.to}
+                onMouseEnter={() => setHoveredSubTab(tab.label)}
+                onMouseLeave={() => setHoveredSubTab(null)}
+                onFocus={() => setHoveredSubTab(tab.label)}
+                onBlur={() => setHoveredSubTab(null)}
+                onTouchStart={() => setHoveredSubTab(tab.label)}
+                aria-label={tab.label}
+              >
+                <Icon className="fst-icon" aria-hidden="true" size={18} strokeWidth={2.1} />
+                <span className="fst-label">{tab.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+        */}
       </div>
     </>
   );

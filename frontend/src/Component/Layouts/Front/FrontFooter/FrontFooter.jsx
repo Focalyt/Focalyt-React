@@ -2,9 +2,35 @@ import React, { useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { faFacebookF, faLinkedinIn, faYoutube, faInstagram } from "@fortawesome/free-brands-svg-icons";
-import { Home, GraduationCap, Briefcase, Share2, MapPin, Phone, Mail } from "lucide-react";
+import {
+  BookOpen,
+  Briefcase,
+  BriefcaseBusiness,
+  CalendarDays,
+  FlaskConical,
+  GraduationCap,
+  Home,
+  Images,
+  Mail,
+  MapPin,
+  Phone,
+  Share2,
+  Zap,
+} from "lucide-react";
 import axios from "axios";
 import "./FrontFooter.css";
+
+const HOME_SECTION_SCROLL_OFFSET = 130;
+
+const SUB_TABS = [
+  { label: "Impact", sectionId: "about", icon: Zap },
+  { label: "Labs", sectionId: "labs", icon: FlaskConical },
+  { label: "Events", sectionId: "events", icon: CalendarDays },
+  { label: "Courses", sectionId: "future-courses", icon: BookOpen },
+  { label: "Jobs", sectionId: "future-jobs", icon: BriefcaseBusiness },
+  { label: "Media", sectionId: "media", icon: Images },
+  { label: "Our Reach", sectionId: "geographic-reach", icon: MapPin },
+];
 
 const FOOTER_CONTACT = {
   address: "SCF 3–4, 2nd Floor, Shiva Complex, Patiala Road, opposite Hyundai Showroom, Swastik Vihar, Zirakpur, Punjab 140603",
@@ -31,6 +57,24 @@ function Footer() {
     if (isHomePage) return;
     e.preventDefault();
     navigate("/", { state: { openPartnerModal: true } });
+  };
+
+  const scrollToHomeSection = (sectionId) => {
+    const el = document.getElementById(sectionId);
+    if (!el) return;
+    const top = el.getBoundingClientRect().top + window.scrollY - HOME_SECTION_SCROLL_OFFSET;
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    window.history.replaceState(null, "", `/#${sectionId}`);
+  };
+
+  const handleSubTabClick = (e, tab) => {
+    if (!tab.sectionId) return;
+    e.preventDefault();
+    if (isHomePage) {
+      scrollToHomeSection(tab.sectionId);
+    } else {
+      navigate(`/#${tab.sectionId}`);
+    }
   };
   const [formData, setFormData] = useState({
     name: "",
@@ -143,7 +187,7 @@ function Footer() {
           <div className="ftr-grid">
             <div className="ftr-brand-col">
               <Link to="/" className="ftr-brand">
-                <img src="/Assets/public_assets/images/newpage/logo-ft.svg" alt="Focalyt" />
+                <img src="/Assets/images/logo/focalyt_new_logo.png" alt="Focalyt" />
               </Link>
               <ul className="list-social list-social--hvr-black ftr-social">
                 {SOCIAL_LINKS.map((s) => (
@@ -209,6 +253,24 @@ function Footer() {
               </button>
             </div>
           </div>
+
+          <nav className="ftr-section-tabs" aria-label="Homepage sections">
+            {SUB_TABS.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <a
+                  key={tab.label}
+                  href={`/#${tab.sectionId}`}
+                  className="ftr-section-tab"
+                  onClick={(e) => handleSubTabClick(e, tab)}
+                  aria-label={tab.label}
+                >
+                  <Icon className="ftr-section-tab-icon" aria-hidden="true" size={16} strokeWidth={2.1} />
+                  <span>{tab.label}</span>
+                </a>
+              );
+            })}
+          </nav>
         </div>
 
         <div className="ftr-bottom">

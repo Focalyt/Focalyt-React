@@ -489,7 +489,7 @@ module.exports.sendMail = async (subject, message, email) => {
     port: 465,
     auth: {
       user: "focalytportal@gmail.com",
-      pass: "mcsmzquieeevemdt",
+      pass: "fbhw naro vtiu hpyf",
     },
     tls: { rejectUnauthorized: false },
   });
@@ -510,6 +510,37 @@ module.exports.sendMail = async (subject, message, email) => {
       // return res.send({status:1})
     }
   });
+};
+
+module.exports.sendPartnerMail = async (subject, message, email) => {
+  const nodemailer = require("nodemailer");
+
+  const transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    secure: true,
+    port: 465,
+    auth: {
+      user: "focalytportal@gmail.com",
+      pass: "fbhw naro vtiu hpyf",
+    },
+    tls: { rejectUnauthorized: false },
+  });
+
+  const mailOptions = {
+    from: "Focalyt Portal<focalytportal@gmail.com>",
+    to: email,
+    subject,
+    html: message,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log("[sendPartnerMail] Email sent:", info.response || info);
+    return info;
+  } catch (error) {
+    console.log("[sendPartnerMail] Error:", error.message);
+    throw error;
+  }
 };
 
 module.exports.generatePassword = async () => {

@@ -1,10 +1,8 @@
-/** Brand / initiative logos for Four Pillars project cards (matches creative artwork) */
 
-const FONT_ORBITRON = "'Orbitron', monospace";
+const FONT_ORBITRON = "Orbitron, sans-serif";
 
 const STYLES = `
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
-.pillar-logos svg text { font-family: 'Orbitron', monospace; }
+.pillar-logos svg text { font-family: var(--foc-font-display); }
 `;
 
 function LogoWrap({ children, bg = "transparent" }) {
@@ -35,7 +33,7 @@ function LogoWrap({ children, bg = "transparent" }) {
   
   export function LogoEsdm() {
     return (
-      <LogoWrap bg="#2e7d32">
+      <LogoWrap bg="var(--foc-green-dark)">
         <rect x="9" y="9" width="16" height="16" rx="2.5" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="1.5" />
         <rect x="12" y="12" width="10" height="10" rx="1.5" fill="rgba(255,255,255,0.2)" />
         <line x1="17" y1="12" x2="17" y2="22" stroke="rgba(255,255,255,0.5)" strokeWidth="0.8" />
@@ -95,7 +93,7 @@ function LogoWrap({ children, bg = "transparent" }) {
   
   export function LogoCoe() {
     return (
-      <LogoWrap bg="#7c3aed">
+      <LogoWrap bg="var(--foc-purple)">
         <circle cx="17" cy="15" r="5.5" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="1.5" />
         <circle cx="17" cy="15" r="2.5" fill="rgba(255,255,255,0.85)" />
         <line x1="17" y1="6.5" x2="17" y2="9.5" stroke="rgba(255,255,255,0.7)" strokeWidth="1.2" strokeLinecap="round" />
@@ -111,7 +109,7 @@ function LogoWrap({ children, bg = "transparent" }) {
   
   export function LogoFtlaas() {
     return (
-      <LogoWrap bg="#0369a1">
+      <LogoWrap bg="var(--foc-blue)">
         <rect x="7" y="10" width="20" height="14" rx="2" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="1.4" />
         <rect x="10" y="13" width="14" height="8" rx="1" fill="rgba(255,255,255,0.18)" />
         <line x1="10" y1="16" x2="24" y2="16" stroke="rgba(255,255,255,0.4)" strokeWidth="0.7" />
@@ -125,21 +123,21 @@ function LogoWrap({ children, bg = "transparent" }) {
   
   export function LogoCollegeInnovation() {
     return (
-      <LogoWrap bg="#4f46e5">
+      <LogoWrap bg="var(--foc-indigo-600)">
         <rect x="8" y="20" width="5" height="8" rx="1" fill="rgba(255,255,255,0.5)" />
         <rect x="14.5" y="15" width="5" height="13" rx="1" fill="rgba(255,255,255,0.7)" />
         <rect x="21" y="10" width="5" height="18" rx="1" fill="rgba(255,255,255,0.9)" />
-        <polyline points="9,19 15,14 21.5,9" fill="none" stroke="#fde68a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx="9" cy="19" r="1.5" fill="#fde68a" />
-        <circle cx="15" cy="14" r="1.5" fill="#fde68a" />
-        <circle cx="21.5" cy="9" r="1.5" fill="#fde68a" />
+        <polyline points="9,19 15,14 21.5,9" fill="none" stroke="var(--foc-amber-200)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="9" cy="19" r="1.5" fill="var(--foc-amber-200)" />
+        <circle cx="15" cy="14" r="1.5" fill="var(--foc-amber-200)" />
+        <circle cx="21.5" cy="9" r="1.5" fill="var(--foc-amber-200)" />
       </LogoWrap>
     );
   }
   
   export function LogoFacultyDev() {
     return (
-      <LogoWrap bg="#0f766e">
+      <LogoWrap bg="var(--foc-teal)">
         <circle cx="17" cy="12" r="4" fill="rgba(255,255,255,0.85)" />
         <path d="M9 27 Q9 20 17 20 Q25 20 25 27" fill="rgba(255,255,255,0.55)" />
         <circle cx="24" cy="20" r="3" fill="rgba(255,255,255,0.7)" />
@@ -151,7 +149,7 @@ function LogoWrap({ children, bg = "transparent" }) {
   
   export function LogoMsmeDigital() {
     return (
-      <LogoWrap bg="#4f46e5">
+      <LogoWrap bg="var(--foc-indigo-600)">
         <rect x="7" y="10" width="20" height="14" rx="2" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="1.4" />
         <rect x="10" y="13" width="14" height="8" rx="1" fill="rgba(255,255,255,0.15)" />
         <line x1="10" y1="16" x2="24" y2="16" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
@@ -165,7 +163,7 @@ function LogoWrap({ children, bg = "transparent" }) {
   
   export function LogoIndustry40() {
     return (
-      <LogoWrap bg="#7c3aed">
+      <LogoWrap bg="var(--foc-purple)">
         <rect x="14" y="22" width="6" height="3" rx="1" fill="rgba(255,255,255,0.8)" />
         <rect x="15.5" y="16" width="3" height="7" rx="1" fill="rgba(255,255,255,0.7)" />
         <rect x="11" y="11" width="8" height="6" rx="2" fill="rgba(255,255,255,0.55)" />
@@ -180,7 +178,7 @@ function LogoWrap({ children, bg = "transparent" }) {
   
   export function LogoLeanZero() {
     return (
-      <LogoWrap bg="#0f766e">
+      <LogoWrap bg="var(--foc-teal)">
         <path d="M17 6 L25 9.5 L25 17 Q25 23 17 27 Q9 23 9 17 L9 9.5 Z" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="1.4" />
         <polyline points="13,16.5 16,19.5 21.5,13" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       </LogoWrap>
@@ -189,7 +187,7 @@ function LogoWrap({ children, bg = "transparent" }) {
   
   export function LogoWorkforceUpskill() {
     return (
-      <LogoWrap bg="#0369a1">
+      <LogoWrap bg="var(--foc-blue)">
         <circle cx="12" cy="11" r="3.5" fill="rgba(255,255,255,0.8)" />
         <circle cx="22" cy="11" r="3.5" fill="rgba(255,255,255,0.6)" />
         <path d="M5 25 Q5 18 12 18 Q17 18 19 21" fill="rgba(255,255,255,0.5)" />
@@ -220,7 +218,7 @@ function LogoWrap({ children, bg = "transparent" }) {
         <text x="9" y="22" fill="white" fontSize="14" fontFamily={FONT_ORBITRON} fontWeight="900">
           P
         </text>
-        <rect width="17" height="34" x="17" rx="8" fill="#2e7d32" />
+        <rect width="17" height="34" x="17" rx="8" fill="var(--foc-green-dark)" />
         <line x1="26" y1="22" x2="26" y2="14" stroke="rgba(255,255,255,0.9)" strokeWidth="1.4" strokeLinecap="round" />
         <path d="M26 18 Q21 15 20 9 Q24 9 26 14Z" fill="rgba(255,255,255,0.85)" />
         <path d="M26 14 Q27 9 31 8 Q31 14 26 18Z" fill="rgba(255,255,255,0.6)" />
@@ -230,7 +228,7 @@ function LogoWrap({ children, bg = "transparent" }) {
   
   export function LogoVrSafety() {
     return (
-      <LogoWrap bg="#1d4ed8">
+      <LogoWrap bg="var(--foc-blue-700)">
         <rect x="7" y="12" width="20" height="12" rx="4" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="1.4" />
         <circle cx="13" cy="18" r="3" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.7)" strokeWidth="1" />
         <circle cx="21" cy="18" r="3" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.7)" strokeWidth="1" />
@@ -243,7 +241,7 @@ function LogoWrap({ children, bg = "transparent" }) {
   
   export function LogoOrganicFarming() {
     return (
-      <LogoWrap bg="#16a34a">
+      <LogoWrap bg="var(--foc-green)">
         <circle cx="12" cy="23" r="4" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="1.4" />
         <circle cx="12" cy="23" r="1.5" fill="rgba(255,255,255,0.6)" />
         <circle cx="23" cy="24" r="3" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="1.2" />
@@ -274,7 +272,7 @@ function LogoWrap({ children, bg = "transparent" }) {
   
   export function LogoGreenEntrepreneurship() {
     return (
-      <LogoWrap bg="#15803d">
+      <LogoWrap bg="var(--foc-green-700)">
         <rect x="7" y="22" width="4" height="6" rx="1" fill="rgba(255,255,255,0.4)" />
         <rect x="13" y="17" width="4" height="11" rx="1" fill="rgba(255,255,255,0.6)" />
         <rect x="19" y="12" width="4" height="16" rx="1" fill="rgba(255,255,255,0.8)" />

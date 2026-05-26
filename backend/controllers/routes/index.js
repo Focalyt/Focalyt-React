@@ -15,7 +15,7 @@ const botTrainingRoutes = require('./ai/botTraining');
 const jobScraperRoutes = require('./ai/jobScraper');
 const leadIntelligenceRoutes = require('./ai/leadIntelligence');
 const chatHistoryRoutes = require('./ai/chatHistory');
-const { sendMail } = require("../../helpers");
+const { sendMail, sendPartnerMail } = require("../../helpers");
 // const companyRoutes = require('./company');
 const candidateRoutes = require('./candidate');
 const corporateRoutes = require('./corporate');
@@ -444,6 +444,79 @@ router.post('/courses', async (req, res) => {
     console.log("error is ", err);
     req.flash("error", err.message || "Something went wrong!");
     return res.send({ status: "failure", error: "Something went wrong!" });
+  }
+});
+
+router.post('/partner', async (req, res) => {
+  try {
+    const { name, organization, state, mobile, email, message } = req.body;
+    console.log("Partner form data:", req.body);
+
+    if (!name || !state || !mobile || !email || !message) {
+      return res.status(400).json({ success: false, error: "Please fill all required fields" });
+    }
+
+    const orgLine = organization ? `<li><span style="line-height:32px;font-size:18px!important;">Organization: ${organization}</span></li>` : "";
+    const subject = "Partner With Us — New Inquiry";
+    const msg = `
+    <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+      </head>
+      <body>
+        <div>
+          <table border="0" cellpadding="0" cellspacing="0" style="width: 100%;">
+            <tbody>
+              <tr>
+                <td align="center">
+                  <table border="0" cellspacing="0" style="width: 600px;">
+                    <tbody>
+                      <tr>
+                        <td align="center" style="font-family:'Manrope',sans-serif!important">
+                          <table border="0" cellspacing="0" cellpadding="0" style="background-color: #F4F3F3; border-radius: 4px; width: 620px;">
+                            <tbody>
+                              <tr>
+                                <td style="background-color:#FC2B5A;color:#ffffff!important" valign="top">
+                                  <img src="${baseUrl}/Assets/images/logo/focalyt_new_logo.png" alt="Focalyt" style="display: block; margin: 40px auto 0; width: 170px;">
+                                </td>
+                              </tr>
+                              <tr>
+                                <td align="left" style="font-family:'Manrope',sans-serif!important">
+                                  <p style="text-align:left;line-height:32px;font-size:18px!important;margin:10px 50px 21px">
+                                    You have received a new Partner With Us inquiry:
+                                  </p>
+                                  <ul style="list-style-type:none;padding-left:0px;margin:20px 50px">
+                                    <li><span style="line-height:32px;font-size:18px!important;">Name: ${name}</span></li>
+                                    ${orgLine}
+                                    <li><span style="line-height:32px;font-size:18px!important;">Mobile: ${mobile}</span></li>
+                                    <li><span style="line-height:32px;font-size:18px!important;">Email: ${email}</span></li>
+                                    <li><span style="line-height:32px;font-size:18px!important;">State: ${state}</span></li>
+                                    <li><span style="line-height:32px;font-size:18px!important;">Message: ${message}</span></li>
+                                  </ul>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </body>
+    </html>
+    `;
+
+    await sendPartnerMail(subject, msg, "info@focalyt.com");
+
+    return res.status(200).json({ success: true, message: "Partner inquiry sent successfully" });
+  } catch (err) {
+    console.error("Partner mail error:", err);
+    return res.status(500).json({ success: false, error: "Something went wrong!" });
   }
 });
 
