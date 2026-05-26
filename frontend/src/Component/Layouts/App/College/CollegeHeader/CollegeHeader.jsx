@@ -152,9 +152,16 @@ const CollegeHeader = ({ toggleSidebar, isSidebarOpen }) => {
             <div className="navbar-collapse" id="navbar-mobile">
               <div className="mr-auto float-left bookmark-wrapper d-flex align-items-center">
                 <ul className="nav navbar-nav">
-                  <li className="nav-item mobile-menu d-xl-none mr-auto">
-                    <a className="nav-link nav-menu-main menu-toggle hidden-xs" href="#" onClick={toggleSidebar}>
-                      <i class="fas fa-bars" style={{color: "white", fontSize: "30px"}}></i>
+                  <li className="nav-item mobile-menu mr-2">
+                    <a
+                      className="nav-link nav-menu-main menu-toggle hidden-xs"
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        toggleSidebar?.();
+                      }}
+                    >
+                      <i className="fas fa-bars" style={{ color: 'white', fontSize: '24px' }} />
                     </a>
                   </li>
                 </ul>

@@ -431,8 +431,14 @@ function CollegeLayout({ children }) {
     return () => document.removeEventListener("click", handleClickOutside);
   }, [isMobile]);
 
+  const notifySidebarResize = useCallback(() => {
+    window.dispatchEvent(new Event('college-sidebar-resize'));
+    setTimeout(() => window.dispatchEvent(new Event('college-sidebar-resize')), 320);
+  }, []);
+
   const handleSidebarToggle = () => {
     setIsSidebarOpen((prev) => !prev);
+    notifySidebarResize();
   };
 
   const handleSidebarClose = () => {
@@ -510,7 +516,8 @@ function CollegeLayout({ children }) {
   // };
 
   const toggleSidebar = () => {
-    setIsSidebarOpen(prev => !prev);
+    setIsSidebarOpen((prev) => !prev);
+    notifySidebarResize();
   };
 
 
@@ -563,23 +570,41 @@ function CollegeLayout({ children }) {
     trainerManagement: '0px'
   });
 
+  const B2B_SETTINGS_SUBMENU_MAX = 280;
+
+  const recalcOpenSubmenuHeights = () => {
+    const newHeights = {};
+    Object.keys(menuRefs).forEach((key) => {
+      const ref = menuRefs[key];
+      if (!ref.current || !openSubmenu[key]) return;
+      let scrollHeight = ref.current.scrollHeight;
+      if (key === 'dropdown') {
+        scrollHeight = Math.min(scrollHeight, B2B_SETTINGS_SUBMENU_MAX);
+      }
+      newHeights[key] = `${scrollHeight}px`;
+    });
+    if (Object.keys(newHeights).length > 0) {
+      setSubmenuMaxHeight((prev) => ({ ...prev, ...newHeights }));
+    }
+  };
+
   useLayoutEffect(() => {
     const newHeights = {};
     Object.keys(menuRefs).forEach((key) => {
       const ref = menuRefs[key];
       if (ref.current) {
         if (openSubmenu[key]) {
-          // Opening: get scrollHeight without breaking transition
-          const scrollHeight = ref.current.scrollHeight;
-          // console.log(`${key} opening - height:`, scrollHeight); 
+          let scrollHeight = ref.current.scrollHeight;
+          if (key === 'dropdown') {
+            scrollHeight = Math.min(scrollHeight, B2B_SETTINGS_SUBMENU_MAX);
+          }
           newHeights[key] = `${scrollHeight}px`;
         } else {
-          // Closing: set current height first, then animate to 0
           const currentHeight = `${ref.current.scrollHeight}px`;
           newHeights[key] = currentHeight;
 
           setTimeout(() => {
-            setSubmenuMaxHeight(prev => ({
+            setSubmenuMaxHeight((prev) => ({
               ...prev,
               [key]: '0px'
             }));
@@ -588,70 +613,16 @@ function CollegeLayout({ children }) {
       }
     });
 
-    // Set the heights for open menus immediately
-    setSubmenuMaxHeight(prev => ({
+    setSubmenuMaxHeight((prev) => ({
       ...prev,
       ...newHeights,
     }));
-  }, [openSubmenu]);
 
-  // Special effect for nested submenus (like dropdown inside settings)
-  useEffect(() => {
-    // When dropdown opens/closes, recalculate both dropdown and settings heights
-    if (openSubmenu.dropdown !== undefined) {
-      const dropdownRef = menuRefs.dropdown;
-      const settingsRef = menuRefs.settings;
-
-      if (dropdownRef.current) {
-        // Force immediate height calculation for dropdown
-        const dropdownHeight = dropdownRef.current.scrollHeight;
-        console.log('Dropdown height:', dropdownHeight, 'Open state:', openSubmenu.dropdown); // Debug log
-        console.log('Current submenuMaxHeight.dropdown:', submenuMaxHeight.dropdown); // Debug log
-
-        setSubmenuMaxHeight(prev => ({
-          ...prev,
-          dropdown: openSubmenu.dropdown ? `${Math.max(dropdownHeight, 80)}px` : '0px'
-        }));
-      }
-
-      if (settingsRef.current && openSubmenu.settings) {
-        setTimeout(() => {
-          const settingsHeight = settingsRef.current.scrollHeight;
-          console.log('Settings height:', settingsHeight); // Debug log
-          setSubmenuMaxHeight(prev => ({
-            ...prev,
-            settings: `${settingsHeight}px`
-          }));
-        }, 100);
-      }
-    }
-  }, [openSubmenu.dropdown]);
-
-  // Additional effect to handle nested submenu height updates
-  useEffect(() => {
-    // Force recalculation of parent menu heights when nested menus change
-    const updateParentHeights = () => {
-      const newHeights = {};
-      Object.keys(menuRefs).forEach((key) => {
-        const ref = menuRefs[key];
-        if (ref.current && openSubmenu[key]) {
-          // Get accurate scrollHeight while maintaining transition
-          const scrollHeight = ref.current.scrollHeight;
-          newHeights[key] = `${scrollHeight}px`;
-        }
+    if (openSubmenu.settings && openSubmenu.dropdown) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(recalcOpenSubmenuHeights);
       });
-
-      if (Object.keys(newHeights).length > 0) {
-        setSubmenuMaxHeight(prev => ({
-          ...prev,
-          ...newHeights,
-        }));
-      }
-    };
-
-    // Use a delay to ensure DOM updates are complete
-    const timeoutId = setTimeout(updateParentHeights, 100);
-    return () => clearTimeout(timeoutId);
+    }
   }, [openSubmenu]);
 
   return (
@@ -688,9 +659,17 @@ function CollegeLayout({ children }) {
                 </Link>
               </li>
               <li className="nav-item nav-toggle" style={{ position: 'absolute', right: '15px', top: '15px' }}>
-                <a className="nav-link modern-nav-toggle pr-0" onClick={toggleSidebar}>
+                <a
+                  className="nav-link modern-nav-toggle pr-0"
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    toggleSidebar();
+                  }}
+                  title={isSidebarOpen ? 'Collapse menu' : 'Expand menu'}
+                >
                   <i className={`icon-x d-block d-xl-none font-medium-4 primary toggle-icon feather ${expanded ? 'icon-disc' : 'icon-circle'}`}></i>
-                  <i className={`toggle-icon icon-disc font-medium-4 d-none d-xl-block collapse-toggle-icon primary feather`}></i>
+                  <i className={`toggle-icon font-medium-4 d-none d-xl-block collapse-toggle-icon primary feather ${isSidebarOpen ? 'icon-circle' : 'icon-disc'}`}></i>
                 </a>
               </li>
             </ul>
@@ -958,12 +937,12 @@ function CollegeLayout({ children }) {
                       opacity: submenuMaxHeight.salesb2b === '0px' ? 0 : 1
                     }}
                   >
-                    <li className={`nav-item ${location.pathname === '/institute/dashboardb2b' ? 'active' : ''}`}>
+                    {/* <li className={`nav-item ${location.pathname === '/institute/dashboardb2b' ? 'active' : ''}`}>
                       <Link to="/institute/dashboardb2b" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faChartLine} />
                         <span className="menu-title">{t('dashboard')}</span>
                       </Link>
-                    </li>
+                    </li> */}
                     <li className={`nav-item ${location.pathname === '/institute/sales' ? 'active' : ''}`}>
                       <a href="/institute/sales" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faTasks} />
@@ -1188,7 +1167,9 @@ function CollegeLayout({ children }) {
                   className="menu-content"
                   style={{
                     maxHeight: submenuMaxHeight.settings,
-                    overflow: 'hidden',
+                    overflowX: 'hidden',
+                    overflowY: openSubmenu.settings ? 'auto' : 'hidden',
+                    WebkitOverflowScrolling: 'touch',
                     transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out',
                     opacity: submenuMaxHeight.settings === '0px' ? 0 : 1
                   }}
@@ -1260,12 +1241,14 @@ function CollegeLayout({ children }) {
                     </a>
                     <ul
                       ref={menuRefs.dropdown}
-                      className="menu-content"
+                      className="menu-content b2b-settings-submenu"
                       style={{
-                        maxHeight: openSubmenu.dropdown ? '700px' : '0px',
-                        overflow: 'hidden',
+                        maxHeight: submenuMaxHeight.dropdown,
+                        overflowX: 'hidden',
+                        overflowY: openSubmenu.dropdown ? 'auto' : 'hidden',
+                        WebkitOverflowScrolling: 'touch',
                         transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out',
-                        opacity: openSubmenu.dropdown ? 1 : 0
+                        opacity: submenuMaxHeight.dropdown === '0px' ? 0 : 1
                       }}
                     >
                       {(permissions?.permission_type === 'Admin' ||
@@ -1278,19 +1261,19 @@ function CollegeLayout({ children }) {
                         </li>
                       )}
                       {(permissions?.permission_type === 'Admin' ||
-                        (permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_edit_b2b_project)) && (
-                        <li className={`nav-item ${location.pathname === '/institute/b2bProject' ? 'active' : ''}`}>
-                          <Link to="/institute/b2bProject" onClick={() => handleSidebarClose()}>
-                            <FontAwesomeIcon icon={faProjectDiagram} />
+                        (permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_edit_b2b_department)) && (
+                        <li className={`nav-item ${location.pathname === '/institute/b2bDepartment' ? 'active' : ''}`}>
+                          <Link to="/institute/b2bDepartment" onClick={() => handleSidebarClose()}>
+                            <FontAwesomeIcon icon={faBuilding} />
                             <span className="menu-title">{t('b2b_department')}</span>
                           </Link>
                         </li>
                       )}
                       {(permissions?.permission_type === 'Admin' ||
-                        (permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_edit_b2b_department)) && (
-                        <li className={`nav-item ${location.pathname === '/institute/b2bDepartment' ? 'active' : ''}`}>
-                          <Link to="/institute/b2bDepartment" onClick={() => handleSidebarClose()}>
-                            <FontAwesomeIcon icon={faBuilding} />
+                        (permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_edit_b2b_project)) && (
+                        <li className={`nav-item ${location.pathname === '/institute/b2bProject' ? 'active' : ''}`}>
+                          <Link to="/institute/b2bProject" onClick={() => handleSidebarClose()}>
+                            <FontAwesomeIcon icon={faProjectDiagram} />
                             <span className="menu-title">{t('b2b_project')}</span>
                           </Link>
                         </li>
@@ -1974,9 +1957,13 @@ function CollegeLayout({ children }) {
   color: #374151 !important;
 }
 
-.nav-item.has-sub.dropdown-settings .menu-content .menu-content {
+.nav-item.has-sub.dropdown-settings .menu-content .menu-content,
+.nav-item.has-sub.dropdown-settings .menu-content .b2b-settings-submenu {
   background-color: #f3f4f6 !important;
   border-left: 2px solid #6b7280;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .nav-item.has-sub.dropdown-settings .menu-content .menu-content .nav-item > a {
@@ -2186,6 +2173,73 @@ span#notification {
           .slide-in {
             animation: slideIn 0.3s ease-out;
           }
+
+/* Desktop: narrow / wide sidebar */
+@media (min-width: 1200px) {
+    .main-menu {
+      transition: width 0.3s ease;
+    }
+
+    .main-menu.expanded {
+      width: 230px !important;
+    }
+
+    .main-menu.collapsed {
+      width: 80px !important;
+    }
+
+    .main-menu.collapsed .navbar-header {
+      width: 80px !important;
+      padding: 10px 0;
+    }
+
+    .main-menu.collapsed .navbar-brand,
+    .main-menu.collapsed .sidebar-footer-logo,
+    .main-menu.collapsed .menu-title,
+    .main-menu.collapsed .menu-content,
+    .main-menu.collapsed .dropdown-arrow,
+    .main-menu.collapsed .chevron-icon,
+    .main-menu.collapsed .badge,
+    .main-menu.collapsed .d-md-none {
+      display: none !important;
+    }
+
+    .main-menu.collapsed .navigation li a {
+      justify-content: center;
+      padding: 12px 0;
+    }
+
+    .main-menu.collapsed .navigation li a svg {
+      margin-right: 0 !important;
+    }
+
+    .main-menu.collapsed .nav-toggle {
+      position: static !important;
+      right: auto !important;
+      top: auto !important;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+    }
+
+    .main-menu.collapsed ~ .vertical-layout .app-content.content {
+      margin-left: 80px !important;
+      transition: margin-left 0.3s ease;
+    }
+
+    .main-menu.expanded ~ .vertical-layout .app-content.content {
+      margin-left: 230px !important;
+      transition: margin-left 0.3s ease;
+    }
+
+    .main-menu.collapsed ~ .vertical-layout .header-navbar.floating-nav {
+      width: calc(100% - 80px - 4.4rem + 0vw) !important;
+    }
+
+    .main-menu.expanded ~ .vertical-layout .header-navbar.floating-nav {
+      width: calc(100% - 230px - 4.4rem + 0vw) !important;
+    }
+  }
 
 @media (max-width: 1199px) {
     .main-menu {

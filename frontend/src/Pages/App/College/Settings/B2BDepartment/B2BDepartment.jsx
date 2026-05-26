@@ -190,7 +190,7 @@ function B2BDepartment() {
                     <div className="row breadcrumbs-top">
                         <div className="col-12">
                             <h3 className="content-header-title float-left mb-0">
-                                {isEditing ? 'Edit B2B Project' : 'Add B2B Project'}
+                                {isEditing ? 'Edit B2B Department' : 'Add B2B Department'}
                             </h3>
                             <div className="breadcrumb-wrapper col-12">
                                 <ol className="breadcrumb">
@@ -198,7 +198,7 @@ function B2BDepartment() {
                                         <a href="/">Home</a>
                                     </li>
                                     <li className="breadcrumb-item active">
-                                        {isEditing ? 'Edit B2B Project' : 'Add B2B Project'}
+                                        {isEditing ? 'Edit B2B Department' : 'Add B2B Department'}
                                     </li>
                                 </ol>
                             </div>
@@ -225,7 +225,7 @@ function B2BDepartment() {
                             <div className="card">
                                 <div className="card-header border border-top-0 border-left-0 border-right-0">
                                     <h4 className="card-title pb-1">
-                                        {isEditing ? 'Edit B2B Project' : 'Add B2B Project'}
+                                        {isEditing ? 'Edit B2B Department' : 'Add B2B Department'}
                                     </h4>
                                 </div>
                                 <div className="card-content">
@@ -242,7 +242,7 @@ function B2BDepartment() {
                                                         name="name"
                                                         value={formData.name}
                                                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                                        placeholder="Enter Project Name"
+                                                        placeholder="Enter Department Name"
                                                         required
                                                         maxLength={50}
                                                         disabled={loading}
@@ -306,7 +306,7 @@ function B2BDepartment() {
                                     <div className="col-xl-8">
                                         <div className="row">
                                             <div className="card-header">
-                                                <h4 className="card-title">All B2B Projects</h4>
+                                                <h4 className="card-title">All B2B Departments</h4>
                                             </div>
                                         </div>
                                     </div>
@@ -317,7 +317,7 @@ function B2BDepartment() {
                                         {loading && b2bDepartments.length === 0 ? (
                                             <div className="text-center p-4">
                                                 <div className="spinner-border text-primary"></div>
-                                                <p className="mt-2">Loading B2B projects...</p>
+                                                <p className="mt-2">Loading B2B departments...</p>
                                             </div>
                                         ) : (
                                             <table className="table table-hover-animation mb-0 table-hover">
@@ -354,7 +354,7 @@ function B2BDepartment() {
                                                                         <button
                                                                             className="btn btn-sm btn-outline-primary"
                                                                             onClick={() => handleEdit(department)}
-                                                                            title="Edit B2B Project"
+                                                                            title="Edit B2B Department"
                                                                             disabled={loading}
                                                                         >
                                                                             <i className="fas fa-edit me-1"></i>
@@ -363,7 +363,7 @@ function B2BDepartment() {
                                                                         <button
                                                                             className="btn btn-sm btn-outline-danger"
                                                                             onClick={() => handleDelete(department._id, department.name)}
-                                                                            title="Delete B2B Project"
+                                                                            title="Delete B2B Department"
                                                                             disabled={loading}
                                                                         >
                                                                             <i className="fas fa-trash me-1"></i>

@@ -97,6 +97,11 @@ function getLeadB2bDepartmentName(lead) {
   ) || '—';
 }
 
+function getLeadGroupRootId(lead) {
+  if (!lead) return '';
+  return String(lead.crossSaleRootId || lead.parentLeadId || lead._id || '');
+}
+
 function buildLeadRemarkSuggestion({ leadFormData, leadCategoryOptions, typeOfB2BOptions }) {
   const business = safeStr(leadFormData?.businessName);
   const city = safeStr(leadFormData?.city);
@@ -406,29 +411,48 @@ const useMainWidth = (dependencies = []) => {// Default fallback
 
   useEffect(() => {
     calculateWidth();
-    // Resize listener
-    const handleResize = () => {
-      setTimeout(calculateWidth, 100);
+
+    const handleResize = () => setTimeout(calculateWidth, 100);
+    const handleSidebarResize = () => {
+      calculateWidth();
+      setTimeout(calculateWidth, 50);
+      setTimeout(calculateWidth, 350);
     };
 
-    // Mutation observer for nav content changes
-    const observer = new MutationObserver(() => {
-      setTimeout(calculateWidth, 50);
-    });
+    let resizeObserver;
+    let mutationObserver;
+
+    const attachObservers = () => {
+      const el = widthRef.current;
+      if (!el) return;
+
+      if (typeof ResizeObserver !== 'undefined' && !resizeObserver) {
+        resizeObserver = new ResizeObserver(() => calculateWidth());
+        resizeObserver.observe(el);
+      }
+
+      if (!mutationObserver) {
+        mutationObserver = new MutationObserver(() => setTimeout(calculateWidth, 50));
+        mutationObserver.observe(el, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+        });
+      }
+    };
 
     window.addEventListener('resize', handleResize);
+    window.addEventListener('college-sidebar-resize', handleSidebarResize);
 
-    if (widthRef.current) {
-      observer.observe(widthRef.current, {
-        childList: true,
-        subtree: true,
-        attributes: true
-      });
-    }
+    attachObservers();
+    const attachTimer = setTimeout(attachObservers, 100);
 
     return () => {
+      clearTimeout(attachTimer);
       window.removeEventListener('resize', handleResize);
-      observer.disconnect();
+      window.removeEventListener('college-sidebar-resize', handleSidebarResize);
+      resizeObserver?.disconnect();
+      mutationObserver?.disconnect();
     };
   }, [calculateWidth]);
 
@@ -437,7 +461,7 @@ const useMainWidth = (dependencies = []) => {// Default fallback
     setTimeout(calculateWidth, 50);
   }, dependencies);
 
-  return { widthRef, width, leftOffset };
+  return { widthRef, width, leftOffset, calculateWidth };
 };
 const useScrollBlur = (navbarHeight = 140) => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -569,7 +593,7 @@ const B2BSales = () => {
       if (res?.data?.status) {
         setShowLeadMetaEditModal(false);
         setMetaEditLead(null);
-        await fetchLeads(selectedStatusFilter, currentPage);
+        await fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
         await fetchStatusCounts();
         await fetchApprovalCounts();
       } else {
@@ -594,6 +618,22 @@ const B2BSales = () => {
   const [mainContentClass, setMainContentClass] = useState('col-12');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [leadDetailsVisible, setLeadDetailsVisible] = useState(null);
+  const [crossSaleCache, setCrossSaleCache] = useState({});
+  const [activeProjectByGroup, setActiveProjectByGroup] = useState({});
+  const [showCrossSaleModal, setShowCrossSaleModal] = useState(false);
+  const [crossSaleSourceLead, setCrossSaleSourceLead] = useState(null);
+  const [crossSaleForm, setCrossSaleForm] = useState({
+    b2bDepartment: '',
+    b2bProject: '',
+    typeOfB2B: '',
+    leadOwner: '',
+    leadStatus: '',
+    leadSubStatus: '',
+    remark: '',
+  });
+  const [crossSaleSubStatuses, setCrossSaleSubStatuses] = useState([]);
+  const [crossSaleSubStatusesLoading, setCrossSaleSubStatusesLoading] = useState(false);
+  const [crossSaleLoading, setCrossSaleLoading] = useState(false);
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(true);
 
   const [viewMode, setViewMode] = useState('grid');
@@ -704,6 +744,8 @@ const B2BSales = () => {
   const [bulkUploadSuccess, setBulkUploadSuccess] = useState(false);
   const [bulkUploadFormData, setBulkUploadFormData] = useState({
     leadCategory: '',
+    b2bDepartment: '',
+    b2bProject: '',
     typeOfB2B: '',
     leadStatus: '',
     leadSubStatus: ''
@@ -979,7 +1021,7 @@ const B2BSales = () => {
 
         alert(`✅ ${followupFormData.followUpType === 'Visit' ? 'Visit' : 'Call'} follow-up saved and scheduled successfully!`);
         // ensure UI updates immediately (even if custom event listener misses)
-        await fetchLeads(selectedStatusFilter, currentPage);
+        await fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
       }
 
       window.dispatchEvent(new CustomEvent('b2b-followup-updated'));
@@ -1475,6 +1517,8 @@ const B2BSales = () => {
   const [leads, setLeads] = useState([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState(null);
+  const [leadViewTab, setLeadViewTab] = useState('all'); // 'all' | 'myRefer'
+  const [myReferLeadsCount, setMyReferLeadsCount] = useState(0);
 
   const [aiLeadIntelById, setAiLeadIntelById] = useState({});
   const [aiLeadIntelLoading, setAiLeadIntelLoading] = useState(false);
@@ -1568,16 +1612,251 @@ const B2BSales = () => {
     return types;
   }, [allTypeOfB2BRaw, filters.b2bDepartment, filters.b2bProject, allB2bProjects]);
 
+  const fetchMyReferLeadsCount = async () => {
+    try {
+      const response = await axios.get(`${backendUrl}/college/b2b/leads/status-count`, {
+        headers: { 'x-auth': token },
+        params: { referredByMe: true }
+      });
+      if (response.data.status) {
+        setMyReferLeadsCount(response.data.data?.totalLeads ?? 0);
+      }
+    } catch (error) {
+      console.error('Error fetching my referred leads count:', error);
+    }
+  };
+
+  const getLeadFetchOverrides = (extra = {}, viewTab = leadViewTab) => {
+    const overrides = { ...extra };
+    if (viewTab === 'myRefer') {
+      overrides.referredByMe = true;
+    }
+    return overrides;
+  };
+
+  const handleLeadViewTabChange = (tab) => {
+    if (tab === leadViewTab) return;
+    setLeadViewTab(tab);
+    setSelectedStatusFilter(null);
+    setSelectedApprovalStatus(null);
+    setCurrentPage(1);
+    const overrides = getLeadFetchOverrides({ approvalStatus: null }, tab);
+    fetchLeads(null, 1, overrides);
+    if (tab === 'all') {
+      fetchStatusCounts();
+      fetchApprovalCounts();
+    }
+  };
+
+  const fetchCrossSaleGroup = useCallback(async (lead) => {
+    if (!lead?._id || !token) return;
+    const rootId = getLeadGroupRootId(lead);
+    if (!rootId) return;
+    try {
+      const response = await axios.get(
+        `${backendUrl}/college/b2b/leads/${lead._id}/cross-sales`,
+        { headers: { 'x-auth': token } }
+      );
+      if (response.data.status) {
+        const groupLeads = response.data.data?.leads || [];
+        setCrossSaleCache((prev) => ({ ...prev, [rootId]: groupLeads }));
+      }
+    } catch (error) {
+      console.error('Error fetching cross-sale group:', error);
+    }
+  }, [backendUrl, token]);
+
+  const leadDisplayGroups = useMemo(() => {
+    const byRoot = new Map();
+    for (const listLead of leads) {
+      const rootId = getLeadGroupRootId(listLead);
+      if (!byRoot.has(rootId)) {
+        byRoot.set(rootId, { rootId, membersFromList: [] });
+      }
+      byRoot.get(rootId).membersFromList.push(listLead);
+    }
+    return Array.from(byRoot.values()).map((group) => {
+      const cached = crossSaleCache[group.rootId];
+      const merged = (cached?.length ? cached : group.membersFromList);
+      const unique = [...new Map(merged.map((l) => [String(l._id), l])).values()];
+      const sorted = unique.sort((a, b) => {
+        const aPrimary = !a.parentLeadId;
+        const bPrimary = !b.parentLeadId;
+        if (aPrimary !== bPrimary) return aPrimary ? -1 : 1;
+        return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+      });
+      return { ...group, leads: sorted };
+    });
+  }, [leads, crossSaleCache]);
+
+  useEffect(() => {
+    if (!leads.length) return;
+    const rootIds = [...new Set(leads.map((l) => getLeadGroupRootId(l)).filter(Boolean))];
+    rootIds.forEach((rootId) => {
+      if (crossSaleCache[rootId]) return;
+      const sample = leads.find((l) => getLeadGroupRootId(l) === rootId);
+      if (sample) fetchCrossSaleGroup(sample);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leads, fetchCrossSaleGroup]);
+
+  const crossSaleProjectOptions = useMemo(() => {
+    if (!crossSaleForm.b2bDepartment) return [];
+    return allB2bProjects.filter(
+      (proj) => String(proj.department?._id || proj.department) === String(crossSaleForm.b2bDepartment)
+    );
+  }, [allB2bProjects, crossSaleForm.b2bDepartment]);
+
+  const crossSaleTypeOptions = useMemo(() => {
+    if (!crossSaleForm.b2bDepartment) return [];
+    return allTypeOfB2BRaw.filter(
+      (type) => String(type.department?._id || type.department) === String(crossSaleForm.b2bDepartment)
+    );
+  }, [allTypeOfB2BRaw, crossSaleForm.b2bDepartment]);
+
+  const openCrossSaleModal = (lead) => {
+    setCrossSaleSourceLead(lead);
+    setCrossSaleForm({
+      b2bDepartment: '',
+      b2bProject: '',
+      typeOfB2B: lead?.typeOfB2B?._id || lead?.typeOfB2B || '',
+      leadOwner: lead?.leadOwner?._id || lead?.leadOwner || userData?._id || '',
+      leadStatus: '',
+      leadSubStatus: '',
+      remark: '',
+    });
+    setCrossSaleSubStatuses([]);
+    setShowCrossSaleModal(true);
+    fetchCrossSaleGroup(lead);
+  };
+
+  const closeCrossSaleModal = () => {
+    setShowCrossSaleModal(false);
+    setCrossSaleSourceLead(null);
+    setCrossSaleForm({
+      b2bDepartment: '',
+      b2bProject: '',
+      typeOfB2B: '',
+      leadOwner: '',
+      leadStatus: '',
+      leadSubStatus: '',
+      remark: '',
+    });
+    setCrossSaleSubStatuses([]);
+    setCrossSaleSubStatusesLoading(false);
+  };
+
+  useEffect(() => {
+    if (!showCrossSaleModal || !crossSaleForm.leadStatus) {
+      if (!crossSaleForm.leadStatus) {
+        setCrossSaleSubStatuses([]);
+        setCrossSaleSubStatusesLoading(false);
+      }
+      return;
+    }
+    let cancelled = false;
+    setCrossSaleSubStatusesLoading(true);
+    axios
+      .get(`${backendUrl}/college/statusB2b/${crossSaleForm.leadStatus}/substatus`, {
+        headers: { 'x-auth': token },
+      })
+      .then((response) => {
+        if (cancelled) return;
+        if (response.data.success) {
+          setCrossSaleSubStatuses(Array.isArray(response.data.data) ? response.data.data : []);
+        } else {
+          setCrossSaleSubStatuses([]);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          console.error('Cross-sale: failed to load sub-statuses', err);
+          setCrossSaleSubStatuses([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCrossSaleSubStatusesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showCrossSaleModal, crossSaleForm.leadStatus, backendUrl, token]);
+
+  const handleCrossSaleSubmit = async () => {
+    if (!crossSaleSourceLead?._id) return;
+    if (!crossSaleForm.b2bDepartment || !crossSaleForm.b2bProject || !crossSaleForm.typeOfB2B) {
+      alert('Please select department, project, and B2B type');
+      return;
+    }
+    if (!crossSaleForm.leadStatus) {
+      alert('Please select lead status');
+      return;
+    }
+    if (!crossSaleForm.leadSubStatus) {
+      alert('Please select sub-status');
+      return;
+    }
+    if (!crossSaleForm.leadOwner) {
+      alert('Please select counsellor');
+      return;
+    }
+    try {
+      setCrossSaleLoading(true);
+      const response = await axios.post(
+        `${backendUrl}/college/b2b/leads/${crossSaleSourceLead._id}/cross-sale`,
+        {
+          b2bDepartment: crossSaleForm.b2bDepartment,
+          b2bProject: crossSaleForm.b2bProject,
+          typeOfB2B: crossSaleForm.typeOfB2B,
+          leadOwner: crossSaleForm.leadOwner || undefined,
+          status: crossSaleForm.leadStatus,
+          subStatus: crossSaleForm.leadSubStatus,
+          remark: crossSaleForm.remark,
+        },
+        { headers: { 'x-auth': token } }
+      );
+      if (response.data.status) {
+        const rootId = getLeadGroupRootId(crossSaleSourceLead);
+        const newLead = response.data.data;
+        setCrossSaleCache((prev) => {
+          const existing = prev[rootId] || [];
+          const merged = [...existing, newLead].filter(
+            (l, i, arr) => arr.findIndex((x) => String(x._id) === String(l._id)) === i
+          );
+          return { ...prev, [rootId]: merged };
+        });
+        setActiveProjectByGroup((prev) => ({
+          ...prev,
+          [rootId]: newLead._id,
+        }));
+        alert('Cross-sale lead added in the new project');
+        closeCrossSaleModal();
+        await fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
+        await fetchCrossSaleGroup(crossSaleSourceLead);
+      } else {
+        alert(response.data.message || 'Failed to add cross-sale');
+      }
+    } catch (error) {
+      console.error('Cross-sale error:', error);
+      alert(error.response?.data?.message || 'Failed to add cross-sale');
+    } finally {
+      setCrossSaleLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchLeads(null, 1);
+    fetchMyReferLeadsCount();
   }, []);
 
   // When a follow-up is saved, refresh the list so dates update per-lead
   useEffect(() => {
     const handler = () => {
-      fetchLeads(selectedStatusFilter, currentPage);
-      fetchStatusCounts();
-      fetchApprovalCounts();
+      fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
+      if (leadViewTab === 'all') {
+        fetchStatusCounts();
+        fetchApprovalCounts();
+      }
     };
     window.addEventListener('b2b-followup-updated', handler);
     return () => window.removeEventListener('b2b-followup-updated', handler);
@@ -1650,14 +1929,9 @@ const B2BSales = () => {
 
   // Handle status card click
   const handleStatusCardClick = (statusId) => {
-    // console.log('🎯 [FRONTEND] Status Card Clicked:', {
-    //   statusId,
-    //   currentFilters: filters,
-    //   leadOwnerFilter: filters.leadOwner
-    // });
     setSelectedStatusFilter(statusId);
     setCurrentPage(1);
-    fetchLeads(statusId, 1);
+    fetchLeads(statusId, 1, getLeadFetchOverrides());
   };
 
   const hasActiveFollowupFilter = Boolean(
@@ -1684,10 +1958,12 @@ const B2BSales = () => {
       || (Array.isArray(f.subStatus) && f.subStatus.length)
       || selectedStatusFilter
       || selectedApprovalStatus
+      || leadViewTab === 'myRefer'
     );
   };
 
   const showAllLeads = () => {
+    setLeadViewTab('all');
     setSelectedStatusFilter(null);
     setSelectedApprovalStatus(null);
     const cleared = {
@@ -1720,7 +1996,7 @@ const B2BSales = () => {
     const next = { ...filters, followUpCallBucket: '', followUpVisitBucket: '' };
     setFilters(next);
     setCurrentPage(1);
-    fetchLeads(null, 1, { ...next, approvalStatus: null });
+    fetchLeads(null, 1, getLeadFetchOverrides({ ...next, approvalStatus: null }));
     fetchStatusCounts(next);
     fetchApprovalCounts();
   };
@@ -1761,6 +2037,9 @@ const B2BSales = () => {
     }
     const approval = eff.approvalStatus ?? selectedApprovalStatus;
     if (approval) params.approvalStatus = approval;
+    if (eff.referredByMe === true || eff.referredByMe === 'true') {
+      params.referredByMe = true;
+    }
     return params;
   };
 
@@ -1777,7 +2056,7 @@ const B2BSales = () => {
     }
     setFilters(next);
     setCurrentPage(1);
-    const overrides = togglingOff ? next : { ...next, approvalStatus: null };
+    const overrides = getLeadFetchOverrides(togglingOff ? next : { ...next, approvalStatus: null });
     fetchLeads(togglingOff ? selectedStatusFilter : null, 1, overrides);
     fetchStatusCounts(next);
     fetchApprovalCounts(next);
@@ -1804,9 +2083,11 @@ const B2BSales = () => {
     }
     setFilters(next);
     setCurrentPage(1);
-    fetchLeads(selectedStatusFilter, 1, next);
-    fetchStatusCounts(next);
-    fetchApprovalCounts(next);
+    fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides(next));
+    if (leadViewTab === 'all') {
+      fetchStatusCounts(next);
+      fetchApprovalCounts(next);
+    }
   };
 
   const renderCycleFilterDropdowns = (mobile = false) => (
@@ -1890,9 +2171,11 @@ const B2BSales = () => {
 
   const applyFilters = (filterOverrides = {}) => {
     setCurrentPage(1);
-    fetchLeads(selectedStatusFilter, 1, filterOverrides);
-    fetchStatusCounts(filterOverrides); // Update status counts with current filters
-    fetchApprovalCounts(filterOverrides);
+    fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides(filterOverrides));
+    if (leadViewTab === 'all') {
+      fetchStatusCounts(filterOverrides);
+      fetchApprovalCounts(filterOverrides);
+    }
   };
 
   const clearFilters = () => {
@@ -1916,9 +2199,11 @@ const B2BSales = () => {
       subStatus: []
     });
     setCurrentPage(1);
-    fetchLeads(selectedStatusFilter, 1);
-    fetchStatusCounts(); // Update status counts after clearing filters
-    fetchApprovalCounts();
+    fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides());
+    if (leadViewTab === 'all') {
+      fetchStatusCounts();
+      fetchApprovalCounts();
+    }
   };
 
   const fetchLeads = async (statusFilter = null, page = 1, filterOverrides = {}) => {
@@ -2093,8 +2378,10 @@ const B2BSales = () => {
   const handleApprovalCardClick = (nextStatus) => {
     setSelectedApprovalStatus(nextStatus);
     setCurrentPage(1);
-    fetchLeads(selectedStatusFilter, 1, { approvalStatus: nextStatus });
-    fetchStatusCounts({ approvalStatus: nextStatus });
+    fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides({ approvalStatus: nextStatus }));
+    if (leadViewTab === 'all') {
+      fetchStatusCounts({ approvalStatus: nextStatus });
+    }
   };
 
   const approveLead = async (lead) => {
@@ -2105,7 +2392,7 @@ const B2BSales = () => {
         { headers: { 'x-auth': token } }
       );
       if (res?.data?.status) {
-        await fetchLeads(selectedStatusFilter, currentPage);
+        await fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
         await fetchStatusCounts();
         await fetchApprovalCounts();
         alert('Lead approved successfully');
@@ -2126,7 +2413,7 @@ const B2BSales = () => {
         { headers: { 'x-auth': token } }
       );
       if (res?.data?.status) {
-        await fetchLeads(selectedStatusFilter, currentPage);
+        await fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
         await fetchStatusCounts();
         await fetchApprovalCounts();
         alert('Lead rejected successfully');
@@ -2288,7 +2575,7 @@ const B2BSales = () => {
 
       if (response.data.status) {
         // Refresh the leads list
-        fetchLeads(selectedStatusFilter, currentPage);
+        fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
 
         // Refresh status counts
         fetchStatusCounts();
@@ -2321,9 +2608,13 @@ const B2BSales = () => {
       mobile: leadFormData.mobile,
       whatsapp: leadFormData.whatsapp,
       landlineNumber: leadFormData.landlineNumber,
-      leadOwner: leadFormData.leadOwner,
       remark: leadFormData.remark
     };
+    if (leadFormData.leadOwner && String(leadFormData.leadOwner).trim()) {
+      leadData.leadOwner = String(leadFormData.leadOwner).trim();
+    } else if (editingLeadId) {
+      leadData.leadOwner = null;
+    }
     if (selectedLocation) {
       leadData.coordinates = {
         type: 'Point',
@@ -2358,7 +2649,7 @@ const B2BSales = () => {
 
         if (response.data.status) {
           alert('Lead updated successfully!');
-          await fetchLeads(selectedStatusFilter, currentPage);
+          await fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
           await fetchStatusCounts();
           await fetchApprovalCounts();
           handleCloseLeadModal();
@@ -2612,10 +2903,33 @@ const B2BSales = () => {
     return () => { cancelled = true; };
   }, [showBulkUploadModal, bulkUploadFormData.leadStatus, backendUrl, token]);
 
+  const bulkUploadProjectOptions = useMemo(() => {
+    if (!bulkUploadFormData.b2bDepartment) return [];
+    return allB2bProjects.filter(
+      (proj) => String(proj.department?._id || proj.department) === String(bulkUploadFormData.b2bDepartment)
+    );
+  }, [allB2bProjects, bulkUploadFormData.b2bDepartment]);
+
+  const bulkUploadTypeOptions = useMemo(() => {
+    if (!bulkUploadFormData.b2bDepartment) return [];
+    return allTypeOfB2BRaw
+      .filter((type) => String(type.department?._id || type.department) === String(bulkUploadFormData.b2bDepartment))
+      .map((type) => ({ value: type._id, label: type.name }));
+  }, [allTypeOfB2BRaw, bulkUploadFormData.b2bDepartment]);
+
   const handleBulkUploadInputChange = (e) => {
     const { name, value } = e.target;
     if (name === 'leadStatus') {
       setBulkUploadFormData((prev) => ({ ...prev, leadStatus: value, leadSubStatus: '' }));
+    } else if (name === 'b2bDepartment') {
+      setBulkUploadFormData((prev) => ({
+        ...prev,
+        b2bDepartment: value,
+        b2bProject: '',
+        typeOfB2B: '',
+      }));
+    } else if (name === 'b2bProject') {
+      setBulkUploadFormData((prev) => ({ ...prev, b2bProject: value, typeOfB2B: '' }));
     } else {
       setBulkUploadFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -2627,6 +2941,8 @@ const B2BSales = () => {
   const validateBulkUploadForm = () => {
     const errors = {};
     if (!bulkUploadFormData.leadCategory) errors.leadCategory = 'Lead source is required';
+    if (!bulkUploadFormData.b2bDepartment) errors.b2bDepartment = 'B2B department is required';
+    if (!bulkUploadFormData.b2bProject) errors.b2bProject = 'B2B project is required';
     if (!bulkUploadFormData.typeOfB2B) errors.typeOfB2B = 'Type of B2B is required';
     if (!bulkUploadFormData.leadStatus) errors.leadStatus = 'Lead status is required';
     if (
@@ -2642,13 +2958,22 @@ const B2BSales = () => {
 
   const isBulkUploadConfigComplete = Boolean(
     bulkUploadFormData.leadCategory &&
+    bulkUploadFormData.b2bDepartment &&
+    bulkUploadFormData.b2bProject &&
     bulkUploadFormData.typeOfB2B &&
     bulkUploadFormData.leadStatus &&
     (bulkUploadSubStatuses.length === 0 || bulkUploadFormData.leadSubStatus)
   );
 
   const openBulkUploadModal = () => {
-    setBulkUploadFormData({ leadCategory: '', typeOfB2B: '', leadStatus: '', leadSubStatus: '' });
+    setBulkUploadFormData({
+      leadCategory: '',
+      b2bDepartment: '',
+      b2bProject: '',
+      typeOfB2B: '',
+      leadStatus: '',
+      leadSubStatus: '',
+    });
     setBulkUploadFormErrors({});
     setBulkUploadSubStatuses([]);
     setBulkUploadFile(null);
@@ -2734,7 +3059,7 @@ const B2BSales = () => {
 
     // Create FormData and append file
     if (!validateBulkUploadForm()) {
-      setBulkUploadMessage('Please select Lead Source, Type of B2B, Lead Status, and Sub Status from the dropdowns above');
+      setBulkUploadMessage('Please complete all required fields above (Lead Source, Department, Project, Type of B2B, Status, Sub Status)');
       setBulkUploadLoading(false);
       return;
     }
@@ -2742,6 +3067,8 @@ const B2BSales = () => {
     const formData = new FormData();
     formData.append('file', selectedFile, selectedFile.name);
     formData.append('leadCategory', bulkUploadFormData.leadCategory);
+    formData.append('b2bDepartment', bulkUploadFormData.b2bDepartment);
+    formData.append('b2bProject', bulkUploadFormData.b2bProject);
     formData.append('typeOfB2B', bulkUploadFormData.typeOfB2B);
     formData.append('leadStatus', bulkUploadFormData.leadStatus);
     if (bulkUploadFormData.leadSubStatus) {
@@ -2767,7 +3094,7 @@ const B2BSales = () => {
         }
 
         // Refresh the leads list and status counts
-        fetchLeads(selectedStatusFilter, currentPage);
+        fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
         fetchStatusCounts();
 
         // Clear file after 3 seconds
@@ -2825,7 +3152,7 @@ const B2BSales = () => {
 
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage);
-    fetchLeads(selectedStatusFilter, newPage);
+    fetchLeads(selectedStatusFilter, newPage, getLeadFetchOverrides());
   };
   useEffect(() => {
     getPaginationPages()
@@ -3239,8 +3566,9 @@ const B2BSales = () => {
             const modified = bulkRes?.data?.data?.modified;
             const okCount = typeof modified === 'number' ? modified : (selectedProfiles?.length || 0);
             alert(`Referred ${okCount} lead(s) successfully!`);
-            await fetchLeads(selectedStatusFilter, currentPage);
+            await fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
             await fetchStatusCounts();
+            await fetchMyReferLeadsCount();
             closePanel();
             return;
           }
@@ -3265,8 +3593,9 @@ const B2BSales = () => {
 
         if (ok > 0) {
           alert(`Referred ${ok} lead(s) successfully${failed ? `, ${failed} failed` : ''}.`);
-          await fetchLeads(selectedStatusFilter, currentPage);
+          await fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
           await fetchStatusCounts();
+          await fetchMyReferLeadsCount();
           closePanel();
           return;
         }
@@ -3284,8 +3613,9 @@ const B2BSales = () => {
 
       if (response?.data?.status) {
         alert('Lead referred successfully!');
-        await fetchLeads(selectedStatusFilter, currentPage);
+        await fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
         await fetchStatusCounts();
+        await fetchMyReferLeadsCount();
         closePanel();
         return;
       }
@@ -4206,12 +4536,13 @@ const B2BSales = () => {
                 zIndex: 11,
                 backgroundColor: '#fff',
                 position: 'fixed',
-
-                width: `${width}px`,
-                left: `${leftOffset}px`,
+                left: leftOffset > 0 ? `${leftOffset}px` : 0,
+                right: !isMobile && isDesktopPanelOpen ? `${panelWidthPx}px` : 0,
+                width: width > 0 && (!isDesktopPanelOpen || isMobile) ? `${width}px` : undefined,
                 boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)',
                 paddingBlock: '10px',
-                paddingInline: '4px'
+                paddingInline: '4px',
+                transition: 'left 0.3s ease, width 0.3s ease, right 0.3s ease'
               }}
             >
               <div className="container-fluid">
@@ -4737,6 +5068,46 @@ const B2BSales = () => {
                 <div className="row">
                   <div className="col-12 mt-1 b2b-crm-dashboard">
                     <div className="b2b-dash-section mt-2">
+                      <span className="b2b-dash-section__label">B2B Leads</span>
+                      <div className="b2b-mobile-hscroll d-flex gap-2 align-items-center pt-1">
+                        <button
+                          type="button"
+                          className="b2b-perf-chip"
+                          style={{
+                            padding: '6px 14px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            borderRadius: '999px',
+                            cursor: 'pointer',
+                            color: leadViewTab === 'all' ? '#fff' : 'rgb(250, 85, 121)',
+                            backgroundColor: leadViewTab === 'all' ? 'rgb(250, 85, 121)' : '#fff',
+                            border: leadViewTab === 'all' ? 'none' : '1.5px solid rgb(250, 85, 121)'
+                          }}
+                          onClick={() => handleLeadViewTabChange('all')}
+                        >
+                          All Leads
+                        </button>
+                        <button
+                          type="button"
+                          className="b2b-perf-chip"
+                          style={{
+                            padding: '6px 14px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            borderRadius: '999px',
+                            cursor: 'pointer',
+                            color: leadViewTab === 'myRefer' ? '#fff' : 'rgb(250, 85, 121)',
+                            backgroundColor: leadViewTab === 'myRefer' ? 'rgb(250, 85, 121)' : '#fff',
+                            border: leadViewTab === 'myRefer' ? 'none' : '1.5px solid rgb(250, 85, 121)'
+                          }}
+                          onClick={() => handleLeadViewTabChange('myRefer')}
+                        >
+                          My Referred Leads ({myReferLeadsCount})
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="b2b-dash-section mt-2">
                       <span className="b2b-dash-section__label">Lead Approval</span>
                       <div className="b2b-mobile-hscroll b2b-mobile-hscroll--approval d-flex gap-2 align-items-stretch pt-1">
                         {[
@@ -5162,6 +5533,9 @@ const B2BSales = () => {
                   {filters.followUpVisitBucket && (
                     <span className="badge rounded-pill text-bg-light border">Visit: {filters.followUpVisitBucket}</span>
                   )}
+                  {leadViewTab === 'myRefer' && (
+                    <span className="badge rounded-pill text-bg-light border">My Refer Leads</span>
+                  )}
                   {selectedStatusFilter && (
                     <span className="badge rounded-pill text-bg-light border">
                       Status: {statusCounts?.find((s) => String(s.statusId) === String(selectedStatusFilter))?.statusName || 'Selected'}
@@ -5195,12 +5569,18 @@ const B2BSales = () => {
                 <div className="text-center py-5">
                   <i className="fas fa-inbox text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
                   <h5 className="mt-3 text-muted">
-                    {hasAnyActiveFilters() ? 'No leads match your filters' : 'No B2B Leads Found'}
+                    {leadViewTab === 'myRefer'
+                      ? 'No referred leads found'
+                      : hasAnyActiveFilters()
+                        ? 'No leads match your filters'
+                        : 'No B2B Leads Found'}
                   </h5>
                   <p className="text-muted mb-3">
-                    {hasAnyActiveFilters()
-                      ? 'Remove filters to see all leads again, or try a different filter.'
-                      : 'Start by adding your first B2B lead using the "Add Lead" button.'}
+                    {leadViewTab === 'myRefer'
+                      ? 'Leads you refer to other counsellors will appear here.'
+                      : hasAnyActiveFilters()
+                        ? 'Remove filters to see all leads again, or try a different filter.'
+                        : 'Start by adding your first B2B lead using the "Add Lead" button.'}
                   </p>
                   {hasAnyActiveFilters() && (
                     <button
@@ -5214,10 +5594,55 @@ const B2BSales = () => {
                   )}
                 </div>
               ) : (
-                <div className="row g-2">
-                  {leads.map((lead, leadIndex) => (
-                    <div key={lead._id || leadIndex} className="col-12">
+                <div className="row g-2 mt-3 b2b-leads-list">
+                  {leadDisplayGroups.map((group, groupIndex) => {
+                    const activeLeadId = activeProjectByGroup[group.rootId] || group.leads[0]?._id;
+                    const lead = group.leads.find((l) => String(l._id) === String(activeLeadId)) || group.leads[0];
+                    if (!lead) return null;
+                    const leadIndex = groupIndex;
+                    return (
+                    <div key={group.rootId || lead._id || groupIndex} className="col-12">
                       <div className={`lead-card ${(bulkMode === 'bulkrefer' && (selectedProfiles || []).includes(lead._id)) ? 'bulk-selected' : ''}`}>
+                        {group.leads.length > 0 && (
+                          <div className="lead-project-tabs" role="tablist" aria-label="B2B projects for this business">
+                            {group.leads.map((projLead) => {
+                              const projId = String(projLead.b2bProject?._id || projLead.b2bProject || '');
+                              const isActive = String(lead._id) === String(projLead._id);
+                              const label = pickFirstNonEmpty(projLead.b2bProject?.name, 'Project');
+                              return (
+                                <button
+                                  key={projLead._id}
+                                  type="button"
+                                  role="tab"
+                                  aria-selected={isActive}
+                                  className={`lead-project-tabs__tab${isActive ? ' lead-project-tabs__tab--active' : ''}${projLead.parentLeadId ? ' lead-project-tabs__tab--cross' : ''}`}
+                                  title={label}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveProjectByGroup((prev) => ({
+                                      ...prev,
+                                      [group.rootId]: projLead._id,
+                                    }));
+                                  }}
+                                >
+                                  {label}
+                                </button>
+                              );
+                            })}
+                            <button
+                              type="button"
+                              className="lead-project-tabs__add"
+                              title="Add to another project (cross-sale)"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openCrossSaleModal(lead);
+                              }}
+                            >
+                              <i className="fas fa-plus" aria-hidden="true" />
+                              <span className="d-none d-md-inline"> Cross Sale</span>
+                            </button>
+                          </div>
+                        )}
                         {/* Card Header */}
                         <div className="lead-header lead-header-v2">
                           <button
@@ -5991,7 +6416,8 @@ const B2BSales = () => {
 
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
@@ -5999,7 +6425,7 @@ const B2BSales = () => {
               <nav aria-label="Page navigation" className="mt-2">
                 <div className="d-flex justify-content-between align-items-center mb-3">
                   <small className="text-muted">
-                    Page {currentPage} of {totalPages} ({leads.length} results)
+                    Page {currentPage} of {totalPages} ({leadDisplayGroups.length} cards / {leads.length} leads)
                   </small>
                 </div>
 
@@ -7224,10 +7650,10 @@ const B2BSales = () => {
                     Instructions:
                   </h6>
                   <ul className="mb-0 small">
-                    <li>Step 1: Select Lead Source, Type of B2B, Lead Status, and Sub Status below.</li>
+                    <li>Step 1: Select Lead Source, B2B Department, B2B Project, Type of B2B, Lead Status, and Sub Status below.</li>
                     <li>Step 2: Upload an Excel file (.xlsx or .xls, max 10MB).</li>
                     <li><strong>Required in Excel:</strong> Business Name, Concern Person Name, Mobile.</li>
-                    <li>All imported leads use your selections above. You do not need Lead Source, Type of B2B, or Status columns in Excel.</li>
+                    <li>All imported leads use your selections above. You do not need those columns in Excel.</li>
                   </ul>
                 </div>
 
@@ -7258,6 +7684,52 @@ const B2BSales = () => {
 
                   <div className="col-md-6">
                     <label className="form-label fw-bold">
+                      <i className="fas fa-sitemap text-primary me-1"></i>
+                      B2B Department <span className="text-danger">*</span>
+                    </label>
+                    <select
+                      className={`form-select ${bulkUploadFormErrors.b2bDepartment ? 'is-invalid' : ''}`}
+                      name="b2bDepartment"
+                      value={bulkUploadFormData.b2bDepartment}
+                      onChange={handleBulkUploadInputChange}
+                      disabled={bulkUploadLoading}
+                    >
+                      <option value="">Select B2B Department</option>
+                      {allB2bDepartments.map((dept) => (
+                        <option key={dept._id} value={dept._id}>{dept.name}</option>
+                      ))}
+                    </select>
+                    {bulkUploadFormErrors.b2bDepartment && (
+                      <div className="invalid-feedback d-block">{bulkUploadFormErrors.b2bDepartment}</div>
+                    )}
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-project-diagram text-primary me-1"></i>
+                      B2B Project <span className="text-danger">*</span>
+                    </label>
+                    <select
+                      className={`form-select ${bulkUploadFormErrors.b2bProject ? 'is-invalid' : ''}`}
+                      name="b2bProject"
+                      value={bulkUploadFormData.b2bProject}
+                      onChange={handleBulkUploadInputChange}
+                      disabled={bulkUploadLoading || !bulkUploadFormData.b2bDepartment}
+                    >
+                      <option value="">
+                        {bulkUploadFormData.b2bDepartment ? 'Select B2B Project' : 'Select department first'}
+                      </option>
+                      {bulkUploadProjectOptions.map((proj) => (
+                        <option key={proj._id} value={proj._id}>{proj.name}</option>
+                      ))}
+                    </select>
+                    {bulkUploadFormErrors.b2bProject && (
+                      <div className="invalid-feedback d-block">{bulkUploadFormErrors.b2bProject}</div>
+                    )}
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
                       <i className="fas fa-building text-primary me-1"></i>
                       Type of B2B <span className="text-danger">*</span>
                     </label>
@@ -7266,10 +7738,12 @@ const B2BSales = () => {
                       name="typeOfB2B"
                       value={bulkUploadFormData.typeOfB2B}
                       onChange={handleBulkUploadInputChange}
-                      disabled={bulkUploadLoading}
+                      disabled={bulkUploadLoading || !bulkUploadFormData.b2bDepartment}
                     >
-                      <option value="">Select B2B Type</option>
-                      {typeOfB2BOptions.filter((type) => type).map((type) => (
+                      <option value="">
+                        {bulkUploadFormData.b2bDepartment ? 'Select B2B Type' : 'Select department first'}
+                      </option>
+                      {bulkUploadTypeOptions.map((type) => (
                         <option key={type.value} value={type.value}>
                           {type.label}
                         </option>
@@ -7353,7 +7827,7 @@ const B2BSales = () => {
                   </label>
                   {!isBulkUploadConfigComplete && (
                     <div className="alert alert-warning py-2 small mb-2">
-                      Complete all four fields above before choosing a file.
+                      Complete all required fields above before choosing a file.
                     </div>
                   )}
                   <div className="input-group">
@@ -7828,14 +8302,35 @@ const B2BSales = () => {
 
   /* Modern Lead Card Styles */
   .lead-card {
+    --lead-card-radius: 20px;
     background: white;
-    border-radius: 16px;
+    border-radius: var(--lead-card-radius);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     border: 1px solid #f0f0f0;
-    overflow: visible;
+    overflow: hidden;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     margin-bottom: 0.5rem;
     position: relative;
+  }
+
+  .lead-card > .lead-project-tabs:first-child {
+    border-radius: var(--lead-card-radius) var(--lead-card-radius) 0 0;
+  }
+
+  .lead-card > .lead-header.lead-header-v2:first-child {
+    border-radius: var(--lead-card-radius) var(--lead-card-radius) 0 0;
+  }
+
+  .lead-card > .lead-header.lead-header-v2:last-child {
+    border-radius: 0 0 var(--lead-card-radius) var(--lead-card-radius);
+  }
+
+  .lead-card > .lead-header.lead-header-v2:first-child:last-child {
+    border-radius: var(--lead-card-radius);
+  }
+
+  .lead-card > .lead-meta-v2:last-child {
+    border-radius: 0 0 var(--lead-card-radius) var(--lead-card-radius);
   }
 
   .lead-card:hover {
@@ -7861,7 +8356,7 @@ const B2BSales = () => {
     padding: 8px 10px;
     position: relative;
     --lead-header-v2-block-h: 92px;
-    overflow: visible;
+    overflow: hidden;
     z-index: 2;
   }
 
@@ -10239,7 +10734,275 @@ position: absolute;
   .card {
     margin-bottom: 0.5rem !important;
   }
+
+  .b2b-leads-list {
+    margin-top: 1rem !important;
+  }
+
+  .lead-project-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 12px 8px;
+    border-bottom: none;
+    background: linear-gradient(180deg, #fff9fb 0%, #fff 100%);
+    overflow: hidden;
+  }
+
+  .lead-card > .lead-project-tabs + .lead-header.lead-header-v2 {
+    margin-top: 8px;
+  }
+  .lead-project-tabs__tab {
+    border: 1.5px solid rgba(250, 85, 121, 0.45);
+    background: #fff;
+    color: rgb(250, 85, 121);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .lead-project-tabs__tab--active {
+    background: rgb(250, 85, 121);
+    color: #fff;
+    border-color: rgb(250, 85, 121);
+  }
+  .lead-project-tabs__tab--cross::after {
+    content: '';
+  }
+  .lead-project-tabs__add {
+    border: 1.5px dashed rgba(250, 85, 121, 0.6);
+    background: transparent;
+    color: rgb(250, 85, 121);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .lead-project-tabs__add:hover {
+    background: rgba(250, 85, 121, 0.08);
+  }
+
+  .cross-sale-modal {
+    max-width: 520px;
+  }
+
+  .cross-sale-modal .modal-content {
+    max-height: min(90vh, 720px);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .cross-sale-modal__body {
+    overflow-y: auto;
+    max-height: calc(90vh - 140px);
+    -webkit-overflow-scrolling: touch;
+  }
 `}</style>
+
+      {/* Cross-sale: add lead to another B2B project */}
+      {showCrossSaleModal && crossSaleSourceLead && (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1066 }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !crossSaleLoading) closeCrossSaleModal();
+          }}
+        >
+          <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable cross-sale-modal">
+            <div className="modal-content">
+              <div className="modal-header flex-shrink-0">
+                <h5 className="modal-title">
+                  Cross Sale — {crossSaleSourceLead.businessName || crossSaleSourceLead.concernPersonName}
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  disabled={crossSaleLoading}
+                  onClick={closeCrossSaleModal}
+                />
+              </div>
+              <div className="modal-body cross-sale-modal__body">
+                <p className="text-muted small mb-3">
+                  Same business will be added as a new lead in another project. Status, follow-ups, and owner stay separate per project.
+                </p>
+                <div className="mb-2">
+                  <label className="form-label fw-bold">B2B Department <span className="text-danger">*</span></label>
+                  <select
+                    className="form-select"
+                    value={crossSaleForm.b2bDepartment}
+                    onChange={(e) => setCrossSaleForm({
+                      b2bDepartment: e.target.value,
+                      b2bProject: '',
+                      typeOfB2B: '',
+                      leadOwner: crossSaleForm.leadOwner,
+                      leadStatus: crossSaleForm.leadStatus,
+                      leadSubStatus: crossSaleForm.leadSubStatus,
+                      remark: crossSaleForm.remark,
+                    })}
+                    disabled={crossSaleLoading}
+                  >
+                    <option value="">Select Department</option>
+                    {allB2bDepartments.map((dept) => (
+                      <option key={dept._id} value={dept._id}>{dept.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="mb-2">
+                  <label className="form-label fw-bold">B2B Project <span className="text-danger">*</span></label>
+                  <select
+                    className="form-select"
+                    value={crossSaleForm.b2bProject}
+                    onChange={(e) => setCrossSaleForm((p) => ({ ...p, b2bProject: e.target.value }))}
+                    disabled={crossSaleLoading || !crossSaleForm.b2bDepartment}
+                  >
+                    <option value="">
+                      {crossSaleForm.b2bDepartment ? 'Select Project' : 'Select department first'}
+                    </option>
+                    {crossSaleProjectOptions.map((proj) => (
+                      <option key={proj._id} value={proj._id}>{proj.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="mb-2">
+                  <label className="form-label fw-bold">Type of B2B <span className="text-danger">*</span></label>
+                  <select
+                    className="form-select"
+                    value={crossSaleForm.typeOfB2B}
+                    onChange={(e) => setCrossSaleForm((p) => ({ ...p, typeOfB2B: e.target.value }))}
+                    disabled={crossSaleLoading || !crossSaleForm.b2bDepartment}
+                  >
+                    <option value="">
+                      {crossSaleForm.b2bDepartment ? 'Select B2B Type' : 'Select department first'}
+                    </option>
+                    {crossSaleTypeOptions.map((type) => (
+                      <option key={type._id} value={type._id}>{type.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="mb-2">
+                  <label className="form-label fw-bold">
+                    <i className="fas fa-user-tie text-primary me-1" aria-hidden="true" />
+                    Counsellor
+                  </label>
+                  <select
+                    className="form-select"
+                    value={crossSaleForm.leadOwner}
+                    onChange={(e) => setCrossSaleForm((p) => ({ ...p, leadOwner: e.target.value }))}
+                    disabled={crossSaleLoading}
+                  >
+                    <option value="">Select Counsellor</option>
+                    {userData?._id &&
+                      !(users || []).some((u) => String(u?._id) === String(userData._id)) && (
+                        <option value={String(userData._id)}>
+                          {userData.name || 'Me'}
+                        </option>
+                      )}
+                    {(users || []).map((user) => (
+                      <option key={user._id} value={user._id}>
+                        {user.name || user.email || 'User'}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="form-text text-muted small">
+                    Owner for the new project lead. Defaults to the current lead owner.
+                  </div>
+                </div>
+                <div className="mb-2">
+                  <label className="form-label fw-bold">Lead Status <span className="text-danger">*</span></label>
+                  <select
+                    className="form-select"
+                    value={crossSaleForm.leadStatus}
+                    onChange={(e) => setCrossSaleForm((p) => ({
+                      ...p,
+                      leadStatus: e.target.value,
+                      leadSubStatus: '',
+                    }))}
+                    disabled={crossSaleLoading}
+                  >
+                    <option value="">Select Lead Status</option>
+                    {[...(statuses || [])]
+                      .sort((a, b) =>
+                        String(a?.name || a?.title || '').localeCompare(
+                          String(b?.name || b?.title || ''),
+                          undefined,
+                          { sensitivity: 'base', numeric: true }
+                        )
+                      )
+                      .map((status) => (
+                        <option key={status._id} value={status._id}>
+                          {status.name || status.title}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div className="mb-2">
+                  <label className="form-label fw-bold">Sub Status <span className="text-danger">*</span></label>
+                  <select
+                    className="form-select"
+                    value={crossSaleForm.leadSubStatus}
+                    onChange={(e) => setCrossSaleForm((p) => ({ ...p, leadSubStatus: e.target.value }))}
+                    disabled={crossSaleLoading || !crossSaleForm.leadStatus || crossSaleSubStatusesLoading}
+                  >
+                    <option value="">
+                      {crossSaleSubStatusesLoading
+                        ? 'Loading sub-statuses...'
+                        : !crossSaleForm.leadStatus
+                          ? 'Select lead status first'
+                          : 'Select sub-status'}
+                    </option>
+                    {crossSaleSubStatuses.map((ss) => (
+                      <option key={ss._id} value={ss._id}>{ss.title}</option>
+                    ))}
+                  </select>
+                  {crossSaleForm.leadStatus && !crossSaleSubStatusesLoading && crossSaleSubStatuses.length === 0 && (
+                    <div className="form-text text-muted small">No sub-statuses for this status.</div>
+                  )}
+                </div>
+                <div className="mb-0">
+                  <label className="form-label fw-bold">Remark (optional)</label>
+                  <textarea
+                    className="form-control"
+                    rows={2}
+                    value={crossSaleForm.remark}
+                    onChange={(e) => setCrossSaleForm((p) => ({ ...p, remark: e.target.value }))}
+                    disabled={crossSaleLoading}
+                    placeholder="Cross-sale note"
+                  />
+                </div>
+              </div>
+              <div className="modal-footer flex-shrink-0">
+                <button type="button" className="btn btn-secondary" disabled={crossSaleLoading} onClick={closeCrossSaleModal}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ background: 'rgb(250, 85, 121)', borderColor: 'rgb(250, 85, 121)' }}
+                  disabled={
+                    crossSaleLoading
+                    || !crossSaleForm.b2bDepartment
+                    || !crossSaleForm.b2bProject
+                    || !crossSaleForm.typeOfB2B
+                    || !crossSaleForm.leadOwner
+                    || !crossSaleForm.leadStatus
+                    || !crossSaleForm.leadSubStatus
+                  }
+                  onClick={handleCrossSaleSubmit}
+                >
+                  {crossSaleLoading ? 'Adding...' : 'Add to Project'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Lead Source / B2B Type edit modal (from lead card) */}
       {showLeadMetaEditModal && (

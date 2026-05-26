@@ -99,6 +99,10 @@ const B2BLeadSchema = new mongoose.Schema({
   leadCategory: { type: ObjectId, ref: 'LeadCategory', required: true },
   b2bProject: { type: ObjectId, ref: 'B2BProject' },
   b2bDepartment: { type: ObjectId, ref: 'B2BDepartment' },
+  /** Root lead id for cross-sale group (same business, multiple projects) */
+  crossSaleRootId: { type: ObjectId, ref: 'B2BLead', index: true },
+  /** Set on cross-sale copies; points to the primary lead in the group */
+  parentLeadId: { type: ObjectId, ref: 'B2BLead', index: true },
   typeOfB2B: { type: ObjectId, ref: 'TypeOfB2B', required: true },
   businessName: { type: String, required: true },
   address: { type: String },  
