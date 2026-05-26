@@ -306,6 +306,16 @@ const STYLES = `
   .oa .oa-subcard:hover { transform: translateY(-6px); box-shadow: 0 16px 40px rgba(13,33,70,0.12); }
 
   .oa .oa-subcard-bar { height: 5px; }
+  .oa .oa-subcard-img-wrap {
+    width: 100%; aspect-ratio: 16 / 10; min-height: 200px; max-height: 260px;
+    background: linear-gradient(135deg, #eef4f8 0%, #e8f4f0 100%);
+    overflow: hidden;
+  }
+  .oa .oa-subcard-img {
+    width: 100%; height: 100%; object-fit: cover; object-position: center center;
+    display: block;
+  }
+  .oa .oa-subcard-img--contain { object-fit: contain; }
   .oa .oa-subcard-head {
     display: flex; align-items: center; gap: 12px; padding: 16px 18px 10px;
   }
@@ -453,25 +463,26 @@ const PILLARS = [
     label: "Training Centers",
     tagline: "Strong Infrastructure. Skilled Futures.",
     overview:
-      "Focalyt develops and operates diverse models of training centers to ensure accessibility, industry relevance, practical learning, and inclusive participation across different geographies and beneficiary groups. We establish training centers through institutional partnerships, industry collaborations, rural outreach models, mobile training solutions, and advanced Centers of Excellence.",
+      "Focalyt develops and operates diverse models of training centers to ensure accessibility, industry relevance, practical learning, and inclusive participation across different geographies and beneficiary groups. We establish training centers through institutional partnerships, industry collaborations, rural outreach models, and mobile training solutions.",
     subcards: [
       {
         num: "01",
         title: "Academic Institution Based Training Centers",
         color: "var(--foc-blue)",
+        img: "/Assets/public_assets/images/homepage/tarining.JPG",
+        imgPosition: "center 35%",
         overview: "Training centers established within schools, colleges, universities, ITIs, and educational institutions to integrate skill development with formal education.",
         features: ["Campus-based skill development labs and classrooms", "Integration with academic ecosystem", "Future technology and employability training", "Easy access for students and youth", "Institutional collaboration model"],
-        advantages: ["Utilizes existing educational infrastructure", "Higher student participation and continuity", "Promotes skill integration with academics", "Cost-effective and scalable model", "Encourages innovation and future-ready learning"],
-        suitable: ["Schools and Colleges", "Universities and ITIs", "Future Technology Labs", "AI, IoT, Robotics, Drone, Coding Programs", "Career readiness initiatives"],
       },
       {
         num: "02",
         title: "Industry Led Training Centers",
         color: "var(--foc-green-dark)",
+        img: "/Assets/public_assets/images/homepage/esdm1.jpg",
+        imgFit: "contain",
+        imgPosition: "center center",
         overview: "Training centers developed in collaboration with industries and employers to provide practical, job-oriented, and placement-linked skill training aligned with market demand.",
         features: ["Industry-aligned curriculum", "Practical and hands-on training", "Real equipment and workplace simulation", "Placement-focused delivery", "Industry expert involvement"],
-        advantages: ["Improves employability and job readiness", "Exposure to real industry practices", "Better placement opportunities", "Strong industry linkage and feedback loop", "Updated training aligned with market trends"],
-        suitable: ["Manufacturing and ESDM", "Telecom and Electronics", "Hospitality and Retail", "Industrial and Technical Training", "Placement-linked government projects"],
       },
       {
         num: "03",
@@ -479,8 +490,6 @@ const PILLARS = [
         color: "var(--foc-orange)",
         overview: "Community-based training centers established close to rural, tribal, aspirational, and underserved regions to improve accessibility and participation.",
         features: ["Local community outreach", "Rural and tribal accessibility", "Women and SHG participation support", "Community engagement driven model", "Livelihood-oriented training delivery"],
-        advantages: ["Reduces travel barriers for beneficiaries", "Encourages participation from rural youth and women", "Supports local livelihoods and community development", "Creates inclusive access to skill training", "Bridges urban-rural opportunity gaps"],
-        suitable: ["Rural and Tribal Communities", "SHG and Livelihood Programs", "Agriculture and Agritech Training", "Environment and Sustainability Programs", "Community Development Initiatives"],
       },
       {
         num: "04",
@@ -488,28 +497,8 @@ const PILLARS = [
         color: "var(--foc-purple-dark)",
         overview: "Mobile training vans equipped with training infrastructure, digital tools, and awareness material to deliver last-mile skilling and outreach in remote and hard-to-reach areas.",
         features: ["Portable and mobile learning setup", "Flexible deployment across locations", "Digital and practical training support", "Awareness and counselling campaigns", "Short-term and need-based training delivery"],
-        advantages: ["Brings training directly to beneficiaries", "Ideal for remote and underserved regions", "Cost-effective outreach solution", "Enables rapid deployment for community initiatives", "Ensures last-mile impact and accessibility"],
-        suitable: ["Rural Outreach Programs", "Awareness Campaigns", "Digital Literacy Initiatives", "Short-Term Skill Programs", "Aspirational District Projects"],
-      },
-      {
-        num: "05",
-        title: "Centers of Excellence (CoE)",
-        color: "var(--foc-teal-tab)",
-        overview: "Advanced training and innovation centers focused on future technologies, high-end skill development, research-oriented learning, and industry-driven innovation ecosystems.",
-        features: ["Advanced technology labs and infrastructure", "Specialized future-ready skill programs", "Industry and institutional collaboration", "Innovation and project-based learning", "High-quality trainer and expert ecosystem"],
-        advantages: ["Creates future-ready workforce", "Promotes innovation, R&D, and applied learning", "Supports emerging technologies and advanced skilling", "Enhances industry-academia collaboration", "Develops specialized talent pipelines"],
-        suitable: ["AI and Data Science", "IoT and Robotics", "Drone Technology", "Industry 4.0", "Advanced Manufacturing", "Future Technology Innovation Programs"],
       },
     ],
-    commit: [
-      "Accessibility across geographies",
-      "Industry relevance and employability",
-      "Inclusion of underserved communities",
-      "Future-ready skill development",
-      "Practical and experiential learning",
-      "Scalable implementation for government and CSR initiatives",
-    ],
-    commitTitle: "Our Training Center Approach",
     closing: "Multiple Models. One Goal — Creating Skilled, Future-Ready Communities.",
     cta: "Partner with Focalyt to build future-ready training centers and transform lives through quality skill development.",
   },
@@ -595,19 +584,13 @@ const PILLARS = [
       "Focalyt follows a structured assessment and certification framework designed to validate learner competencies, ensure industry alignment, and enhance employability outcomes. Our assessment ecosystem focuses on transparent evaluation, practical competency measurement, quality assurance, and industry-recognized certification.",
     subcards: [
       { num: "01", title: "Industry Recognized Certification", color: "var(--foc-green-dark)", emoji: "📜", overview: "Focalyt facilitates industry-recognized certifications that validate technical competencies, practical skills, and employability readiness across multiple sectors and emerging technologies.", features: ["Certifications aligned with industry standards", "Sector Skill Council and institutional certifications", "Co-branded and project-based certifications", "Future-ready technology certifications", "Skill competency and employability validation", "Recognition across industries and sectors"] },
-      { num: "02", title: "Third Party Assessment", color: "var(--foc-blue)", emoji: "✅", overview: "Third-party assessments are conducted through independent assessment agencies, industry experts, and authorized bodies to ensure transparency, objectivity, and quality assurance in the evaluation process.", features: ["Independent and unbiased evaluation process", "Practical and theory-based assessments", "Competency-based skill evaluation", "Standardized assessment methodologies", "Quality monitoring and compliance support", "Sector and job-role aligned evaluation criteria"] },
-      { num: "03", title: "Certification Ceremonies", color: "var(--foc-purple-dark)", emoji: "🎓", overview: "Certification ceremonies are organized to recognize learner achievements, celebrate successful program completion, and motivate candidates toward career growth, employment, entrepreneurship, and lifelong learning.", features: ["Formal certification distribution events", "Participation of industry, institutional, and government stakeholders", "Recognition of learner achievements and performance", "Community and stakeholder engagement", "Motivation and confidence-building initiatives", "Showcase of project outcomes and success stories"] },
+      { num: "02", title: "Certification Ceremonies", color: "var(--foc-purple-dark)", emoji: "🎓", overview: "Certification ceremonies are organized to recognize learner achievements, celebrate successful program completion, and motivate candidates toward career growth, employment, entrepreneurship, and lifelong learning.", features: ["Formal certification distribution events", "Participation of industry, institutional, and government stakeholders", "Recognition of learner achievements and performance", "Community and stakeholder engagement", "Motivation and confidence-building initiatives", "Showcase of project outcomes and success stories"] },
     ],
     blocks: [
       {
         title: "Our Assessment & Certification Approach",
         emoji: "🎯",
         items: ["Transparent and standardized evaluation processes", "Industry relevance and credibility", "Practical competency measurement", "Outcome-oriented certification systems", "Enhanced employability and career readiness", "Quality assurance across programs and geographies"],
-      },
-      {
-        title: "Assessment Methodology",
-        emoji: "📊",
-        items: ["Theory-based evaluation", "Practical skill assessment", "Industry-aligned competency checks", "Continuous performance monitoring", "Third-party validation mechanisms", "Project and application-based evaluation approaches"],
       },
     ],
     impact: ["Validates Skills & Knowledge", "Improves Employability", "Builds Industry Trust & Confidence", "Opens Doors to Better Opportunities", "Encourages Lifelong Learning"],
@@ -712,6 +695,16 @@ function SubCard({ card }) {
   return (
     <div className="oa-subcard">
       <div className="oa-subcard-bar" style={{ background: `linear-gradient(90deg, ${card.color}, ${card.color}88)` }} />
+      {card.img ? (
+        <div className="oa-subcard-img-wrap">
+          <img
+            src={card.img}
+            alt=""
+            className={`oa-subcard-img${card.imgFit === "contain" ? " oa-subcard-img--contain" : ""}`}
+            style={card.imgPosition ? { objectPosition: card.imgPosition } : undefined}
+          />
+        </div>
+      ) : null}
       <div className="oa-subcard-head">
         <div className="oa-subcard-num" style={{ background: card.color }}>
           {card.num}
@@ -727,18 +720,6 @@ function SubCard({ card }) {
           <>
             <h5 style={{ color: card.color }}>Key Features</h5>
             <CheckList items={card.features} color={card.color} />
-          </>
-        )}
-        {card.advantages && (
-          <>
-            <h5 style={{ color: card.color }}>Advantages</h5>
-            <CheckList items={card.advantages} color={card.color} />
-          </>
-        )}
-        {card.suitable && (
-          <>
-            <h5 style={{ color: card.color }}>Suitable For</h5>
-            <CheckList items={card.suitable} color={card.color} />
           </>
         )}
         {card.focus && (
@@ -816,25 +797,7 @@ function PillarPanel({ pillar }) {
           </div>
         )}
 
-        {pillar.commit && (
-          <div className="oa-commit" style={{ borderColor: `${c}33` }}>
-            <h4>{pillar.commitTitle}</h4>
-            <CheckList items={pillar.commit} color={c} />
-            {pillar.delivery && (
-              <>
-                <h4 style={{ marginTop: 18 }}>Trainer Delivery Approach</h4>
-                <p style={{ color: "var(--foc-text-caption-alt)", fontSize: 13.5, marginBottom: 10 }}>Our trainers combine:</p>
-                <CheckList items={pillar.delivery} color={c} />
-              </>
-            )}
-            {pillar.ecosystem && (
-              <>
-                <h4 style={{ marginTop: 18 }}>{pillar.id === "placements" ? "Placement Support Ecosystem" : "Entrepreneurship Support Ecosystem"}</h4>
-                <CheckList items={pillar.ecosystem} color={c} />
-              </>
-            )}
-          </div>
-        )}
+        
 
         {pillar.stats && (
           <div className="oa-grid-4" style={{ marginTop: 8 }}>

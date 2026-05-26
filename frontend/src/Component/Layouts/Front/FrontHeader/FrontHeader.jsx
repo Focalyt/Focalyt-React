@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BookOpen, BriefcaseBusiness, CalendarDays, FlaskConical, Images, MapPin, Zap } from 'lucide-react';
+import { BookOpen, BriefcaseBusiness, CalendarDays, Cog, Compass, FlaskConical, Handshake, Images, MapPin, Sparkles, Zap } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import "./FrontHeader.css";
 
@@ -8,9 +8,13 @@ const HOME_SECTION_SCROLL_OFFSET = 130;
 const SUB_TABS = [
   { label: "Impact", sectionId: "about", icon: Zap },
   { label: "Labs", sectionId: "labs", icon: FlaskConical },
+  { label: "Industry 4.0", sectionId: "industry-automation", icon: Cog },
+  { label: "Zenith X", sectionId: "zenith-x", icon: Sparkles },
   { label: "Events", sectionId: "events", icon: CalendarDays },
   { label: "Courses", sectionId: "future-courses", icon: BookOpen },
   { label: "Jobs", sectionId: "future-jobs", icon: BriefcaseBusiness },
+  { label: "Approach", sectionId: "our-approach", icon: Compass },
+  { label: "Partners", sectionId: "partners", icon: Handshake },
   { label: "Media", sectionId: "media", icon: Images },
   { label: "Our Reach", sectionId: "geographic-reach", icon: MapPin },
 ];

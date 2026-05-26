@@ -2,7 +2,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import FrontLayout from "../../../Component/Layouts/Front/index";
 import { PillarProjectLogo } from "./PillarProjectLogos";
-// import ZenithXSection from "./ZenithXSection";
+import ZenithXSection from "./ZenithXSection";
 import PartnersMediaSection from "./PartnersMediaSection";
 import OurApproachSection from "./OurApproachSection";
 import IndustryAutomationSection from "./IndustryAutomationSection";
@@ -1169,17 +1169,25 @@ const STYLES = `
   outline-offset: 4px;
 }
 .hero-tile-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.12em;
   font-family: var(--foc-font-display);
   font-weight: 900;
   letter-spacing: .10em;
   text-transform: uppercase;
-  font-size: clamp(16px, 1.35vw, 22px);
-  line-height: 1.15;
+  font-size: clamp(15px, 1.25vw, 20px);
+  line-height: 1.1;
   color: var(--text);
   text-shadow: 0 1px 0 color-mix(in srgb, var(--surface) 40%, transparent),
     0 10px 28px color-mix(in srgb, var(--text) 18%, transparent);
 }
-// .hero-tile-text span { display: inline; }
+.hero-tile-line {
+  display: block;
+  white-space: nowrap;
+}
 .hero-tile-text .hero-tile-lower { text-transform: lowercase; }
 .terminal-line {
   font-family: var(--foc-font-display);
@@ -1201,14 +1209,33 @@ const STYLES = `
   position: relative;
 }
 @media(max-width:768px) {
-  .marquee-bar { margin-top: 70px; }
-}
-  .foc-cyber-home .container{
-  padding:0;
+  .marquee-bar {
+    margin-top: 80px;
   }
-.hero-btns{
-    gap: 7px;
-    flex-wrap: wrap;
+  .foc-cyber-home section.hero .marquee-bar {
+    margin-bottom: 18px;
+    padding: 10px 0;
+    border-radius: 0;
+    background: color-mix(in srgb, var(--surface) 92%, var(--bg));
+    box-shadow: 0 1px 0 var(--border) inset;
+  }
+  .foc-cyber-home section.hero .marquee-item {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    padding: 0 14px;
+    gap: 8px;
+  }
+  .foc-cyber-home section.hero .marquee-bar::before,
+  .foc-cyber-home section.hero .marquee-bar::after {
+    width: 48px;
+  }
+}
+.foc-cyber-home .container {
+  padding: 0;
+}
+.hero-btns {
+  gap: 7px;
+  flex-wrap: wrap;
 }
 .marquee-bar::before, .marquee-bar::after {
   content: '';
@@ -3138,6 +3165,7 @@ const STYLES = `
 }
 .foc-cyber-home .ip-proj-logo--wide { width: 52px; height: 40px; }
 .foc-cyber-home .ip-proj-logo svg { width: 100%; height: 100%; display: block; }
+.foc-cyber-home .ip-proj-logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .foc-cyber-home .ip-proj-name { font-size: 14px; font-weight: 700; color: var(--foc-navy-mid); line-height: 1.35; margin: 0; }
 .foc-cyber-home .ip-proj-desc { font-family: var(--foc-font-sans); font-size: 12.5px; color: #3d4f63; line-height: 1.6; margin: 0; }
 .foc-cyber-home .ip-chips {
@@ -3379,9 +3407,9 @@ const STYLES = `
 }
 @media(max-width:768px) {
   .hero-inner, .area-panel, .why-grid, .projects-grid { grid-template-columns: 1fr; }
-  .hero {
+  .foc-cyber-home section.hero {
     min-height: auto;
-    padding: 96px 0 56px;
+    padding: 104px 0 52px;
   }
   .hero .container {
     width: 100%;
@@ -3393,50 +3421,119 @@ const STYLES = `
     gap: 28px;
     align-items: start;
   }
+  .foc-cyber-home section.hero .container {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+  .foc-cyber-home section.hero .hero-inner > div:first-child {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .foc-cyber-home section.hero .hero-topbar {
+    width: 100%;
+    align-items: center;
+    margin-bottom: 14px;
+  }
   .hero-eyebrow {
     max-width: 100%;
-    margin-top: 12px;
-    margin-bottom: 18px;
-    padding: 6px 12px;
-    font-size: 9px;
-    line-height: 1.25;
-    letter-spacing: .08em;
+    width: fit-content;
+    margin-top: 0;
+    margin-bottom: 16px;
+    padding: 8px 14px;
+    font-size: 10px;
+    line-height: 1.35;
+    letter-spacing: 0.06em;
+    border-radius: 999px;
+    justify-content: center;
+    text-align: center;
   }
   .hero-h1 {
-    max-width: 14ch;
-    margin-bottom: 12px;
-    font-size: clamp(28px, 8.2vw, 40px);
-    line-height: 1.04;
-    letter-spacing: .01em;
+    max-width: none;
+    width: 100%;
+    margin-bottom: 18px;
+    font-size: clamp(1.65rem, 7.2vw, 2.35rem);
+    line-height: 1.08;
+    letter-spacing: 0.01em;
+    text-wrap: balance;
   }
   .hero-btns {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-    width: min(100%);
-    margin-top: 14px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    width: 100%;
+    max-width: 360px;
+    margin-top: 4px;
+    margin-left: auto;
+    margin-right: auto;
   }
   .hero-btns .btn-primary {
     width: 100%;
     min-width: 0;
-    min-height: 38px;
+    min-height: 48px;
     justify-content: center;
-    padding: 10px 18px;
-    font-size: 11px;
-    line-height: 1;
+    padding: 12px 20px;
+    font-size: 12px;
+    line-height: 1.2;
+    letter-spacing: 0.07em;
+    border-radius: 14px;
     white-space: nowrap;
+    box-shadow:
+      0 10px 28px color-mix(in srgb, var(--cyan) 28%, transparent),
+      0 6px 18px color-mix(in srgb, var(--red) 18%, transparent);
+  }
+  .hero-btns .btn-primary:active {
+    transform: scale(0.98);
   }
   .hero-right {
-    margin-top: 0;
-    gap: 14px;
+    margin-top: 8px;
+    gap: 16px;
+    align-items: center;
+    width: 100%;
+  }
+  .foc-cyber-home section.hero .hero-kicker {
+    max-width: 320px;
+    line-height: 1.5;
+  }
+  .foc-cyber-home section.hero .hero-right-cta {
+    width: 100%;
+    max-width: 360px;
+    min-height: 48px;
+    justify-content: center;
+    border-radius: 14px;
+    font-size: 12px;
   }
   .hero-tiles-inner {
-    grid-template-columns: 1fr;
-    gap: 14px;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    width: 100%;
   }
   .hero-tiles { gap: 18px; margin-top: 18px; }
   .hero-tile { min-height: 110px; padding: 26px 14px; }
   .labs-grid, .roles-grid { grid-template-columns: repeat(2,1fr); }
+  .lab-card {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 12px;
+    padding: 22px 18px;
+  }
+  .lab-icon-box {
+    margin-bottom: 0;
+    flex-shrink: 0;
+    width: 46px;
+    height: 46px;
+  }
+  .lab-name {
+    flex: 1;
+    min-width: 0;
+    margin-bottom: 0;
+    line-height: 1.3;
+  }
+  .lab-desc {
+    width: 100%;
+  }
   .fftl-snap { grid-template-columns: repeat(2, 1fr); }
   .fftl-snap--cute { gap: 10px; padding: 16px 12px; }
   .fftl-snap--cute .fftl-snap-cell { flex: 1 1 calc(50% - 10px); max-width: none; min-width: 0; padding: 12px 10px; }
@@ -3457,43 +3554,89 @@ const STYLES = `
   .partner-with-grid { grid-template-columns: 1fr; }
 }
 @media(max-width:480px) {
-  .hero {
-    padding-top: 82px;
-    padding-bottom: 44px;
+  .foc-cyber-home section.hero {
+    padding-top: 78px;
+    padding-bottom: 40px;
   }
-  .hero .container {
-    /* padding-left: 24px; */
-    /* padding-right: 24px; */
+  .foc-cyber-home section.hero .container {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .foc-cyber-home section.hero .marquee-bar {
+    margin-bottom: 14px;
+    padding: 9px 0;
+  }
+  .foc-cyber-home section.hero .marquee-item {
+    font-size: 8.5px;
+    padding: 0 12px;
   }
   .hero-topbar {
-    margin-bottom: 12px;
+    margin-bottom: 10px;
   }
   .hero-eyebrow {
-    font-size: 8px;
-    padding: 6px 10px;
+    font-size: 9px;
+    padding: 7px 12px;
+    line-height: 1.3;
   }
   .hero-h1 {
-    max-width: 13.5ch;
-    font-size: clamp(26px, 9vw, 34px);
+    max-width: none;
+    font-size: clamp(1.5rem, 8.5vw, 2rem);
+    margin-bottom: 14px;
+  }
+  .hero-btns {
+    max-width: 100%;
+    gap: 9px;
   }
   .hero-btns .btn-primary {
-    padding: 10px 16px;
-    font-size: 10px;
+    min-height: 46px;
+    padding: 11px 16px;
+    font-size: 11px;
+    border-radius: 12px;
   }
   .hero-kicker {
     font-size: 9px;
     line-height: 1.45;
   }
+  .hero-tiles-inner {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
   .hero-tile {
     min-height: 86px;
     padding: 18px 12px;
+    border-radius: 12px;
   }
   .hero-tile-text {
-    font-size: 13px;
-    letter-spacing: .07em;
+    font-size: clamp(11px, 3.2vw, 13px);
+    letter-spacing: .06em;
   }
   .labs-grid, .roles-grid, .why-grid { grid-template-columns: 1fr; }
   .pillars { grid-template-columns: 1fr; }
+  .lab-card {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 14px;
+    padding: 20px 18px;
+  }
+  .lab-icon-box {
+    margin-bottom: 0;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    font-size: 22px;
+  }
+  .lab-name {
+    flex: 1;
+    min-width: 0;
+    margin-bottom: 0;
+    font-size: 13px;
+    line-height: 1.3;
+  }
+  .lab-desc {
+    width: 100%;
+    margin-top: 2px;
+  }
 }
 
 /* ── Geographic reach map (Leaflet) ── */
@@ -3639,7 +3782,7 @@ const CORE_AREAS = [
     badge: "Skill Development",
     title: "Building Tomorrow's Workforce",
     emoji: "🚀",
-    desc: "Industry-aligned skilling initiatives designed to equip youth, students, and professionals with future-ready capabilities across emerging technologies and high-growth sectors. We collaborate with leading corporates, government bodies, sector skill councils, universities, and academic institutions to deliver scalable, employment-oriented learning programs with measurable socio-economic impact.",
+    desc: "Industry-aligned skilling initiatives designed to equip youth, students and professionals with future-ready capabilities across emerging technologies and high-growth sectors. We collaborate with leading corporates, government bodies, sector skill councils, universities, and academic institutions to deliver scalable, employment-oriented learning programs with measurable socio-economic impact.",
     beneficiaries: ["Final-year college students", "Unemployed youth", "11th and 12th class students", "Rural youth"],
     impact: [
       "Multi-state project implementation",
@@ -3651,13 +3794,13 @@ const CORE_AREAS = [
       {
         icon: "🤖",
         title: "Samsung Innovation Campus (CSR)",
-        desc: "Future technology skilling initiative focused on AI, Big Data, and Coding for university students across North India in collaboration with industry and academic partners — Target: Final-year college students — Coverage: Punjab & Haryana — Impact: Future-ready digital workforce development.",
+        desc: "Future technology skilling initiative focused on AI, Big Data and Coding for university students across North India in collaboration with industry and academic partners — Target: Final-year college students — Coverage: Punjab & Haryana — Impact: Future-ready digital workforce development.",
         img: "/Assets/images/futureready/samsung.jpeg",
       },
       {
         icon: "⚡",
         title: "ESDM Skill Development Program",
-        desc: "Large-scale employability initiative in electronics manufacturing, telecom infrastructure, and digital connectivity sectors under government-led skilling programs — Target: Unemployed youth — Coverage: Multi-state implementation — Impact: Industry-led training and placement opportunities.",
+        desc: "Large-scale employability initiative in electronics manufacturing, telecom infrastructure and digital connectivity sectors under government-led skilling programs — Target: Unemployed youth — Coverage: Multi-state implementation — Impact: Industry-led training and placement opportunities.",
       },
       {
         icon: "🌐",
@@ -3678,7 +3821,7 @@ const CORE_AREAS = [
     badge: "Education Technology",
     title: "Transforming Learning for the Future",
     emoji: "🏫",
-    desc: "Future-focused learning ecosystems designed to equip schools, colleges, and academic institutions with emerging technology exposure, innovation-driven education models, and hands-on experiential learning infrastructure. We partner with educational institutions, CSR organizations, industry leaders, and government stakeholders to create scalable future technology learning environments aligned with next-generation workforce requirements.",
+    desc: "Future-focused learning ecosystems designed to equip schools, colleges and academic institutions with emerging technology exposure, innovation-driven education models, and hands-on experiential learning infrastructure. We partner with educational institutions, CSR organizations, industry leaders, and government stakeholders to create scalable future technology learning environments aligned with next-generation workforce requirements.",
     beneficiaries: [
       "Government school students (Class 11–12)",
       "Schools & colleges in Tier 2 and Tier 3 cities",
@@ -3698,12 +3841,6 @@ const CORE_AREAS = [
         title: "IoT Lab Setup under Ericsson CSR",
         desc: "Technology-enabled innovation labs established in government schools to provide hands-on exposure to IoT, AI, Robotics, and emerging technologies for school students — Target: Government school students (Class 11–12) — Coverage: Delhi NCR — Impact: Digital inclusion and future technology exposure.",
         img: "/Assets/images/futureready/iot_lab.png",
-      },
-      {
-        icon: "🏆",
-        title: "Center of Excellence (CoE) in Emerging Technologies",
-        desc: "Integrated innovation and advanced learning ecosystem for students, faculty, startups, MSMEs, and institutions — developed with premier partners including IIT Ropar for research support, innovation mentorship, and ecosystem development — Impact: Regional hub bridging academia, industry, startups, and government.",
-        img: "/Assets/public_assets/images/homepage/center_of_excellence.jpeg",
       },
       {
         icon: "🔬",
@@ -3782,14 +3919,11 @@ const CORE_AREAS = [
     beneficiaries: [
       "Schools, colleges & ITI students",
       "School students, youth & communities",
-      "SHGs, tribal households & rural communities",
       "Youth, entrepreneurs & rural communities",
     ],
     impact: [
       "Community-driven environmental sustainability initiatives",
       "Environmental awareness among thousands of students & youth",
-      "Promotion of organic farming and sustainable rural livelihoods",
-      "Awareness and adoption of green technologies & sustainable practices",
       "VR-enabled experiential learning for social impact education",
     ],
     items: [
@@ -3802,17 +3936,6 @@ const CORE_AREAS = [
         icon: "🥽",
         title: "VR-Based Road Safety Education Program",
         desc: "Immersive road safety awareness initiative using Virtual Reality (VR) technology to educate students and communities about safe road behavior, traffic awareness, accident prevention, and responsible mobility practices — Target: School students, youth & communities — Coverage: Urban & semi-urban regions — Impact: Behavioral change & road safety awareness.",
-      },
-      {
-        icon: "🌾",
-        title: "Organic Farming & Sustainable Livelihood Initiative",
-        desc: "Community-driven agritech and organic farming initiative empowering Scheduled Tribe communities and Self Help Groups (SHGs) through sustainable agriculture practices, household training, environmental awareness, and livelihood enhancement — Target: SHGs, tribal households & rural communities — Coverage: Uttarakhand — Impact: Organic farming, sustainable livelihoods & rural environmental development.",
-        img: "/Assets/images/futureready/aadigram.jpeg",
-      },
-      {
-        icon: "☀️",
-        title: "Renewable Energy & Solar Awareness Program",
-        desc: "Green energy initiative promoting renewable energy adoption, solar ecosystem awareness, and sustainable energy practices through training, demonstrations, and community engagement programs — Target: Students, youth & rural communities — Coverage: Rural & regional implementation — Impact: Clean energy awareness & sustainable energy adoption.",
       },
       {
         icon: "🌱",
@@ -3877,7 +4000,7 @@ const PILLAR_UI = {
         num: 1,
         name: "Samsung Innovation Campus (CSR)",
         desc: "Future technology skilling focused on AI, Big Data, and Coding for university students across North India in collaboration with industry and academic partners.",
-        img: "/Assets/public_assets/images/homepage/sic.jpg",
+        img: "/Assets/public_assets/images/homepage/sic-main.jpg",
         logoKey: "samsung",
         chips: { target: "Final-year college students", coverage: "Punjab & Haryana", impact: "Future-ready digital workforce" },
       },
@@ -3893,7 +4016,7 @@ const PILLAR_UI = {
         num: 3,
         name: "IoT Training Program for School Students",
         desc: "IoT training for underprivileged Govt. School Students of Class 11–12 for high-growth emerging sector careers through practical, project-oriented training.",
-        img: "/Assets/public_assets/images/homepage/iot.jpeg",
+        img: "/Assets/public_assets/images/homepage/iot.jpg",
         logoKey: "iot",
         chips: { target: "Class 11th & 12th students", coverage: "Delhi-NCR", impact: "Career building in emerging sectors" },
       },
@@ -3901,7 +4024,7 @@ const PILLAR_UI = {
         num: 4,
         name: "Rural Youth Livelihood Program",
         desc: "Vocational and technical skilling enabling rural youth to access sustainable livelihood opportunities in mobile repair and allied sectors.",
-        img: "/Assets/public_assets/images/homepage/esdm.jpeg",
+        img: "/Assets/public_assets/images/homepage/ddugky.png",
         logoKey: "rural-youth",
         chips: { target: "Rural youth", coverage: "Uttarakhand & adjoining regions", impact: "Employment & livelihood generation" },
       },
@@ -3969,14 +4092,6 @@ const PILLAR_UI = {
       },
       {
         num: 2,
-        name: "Center of Excellence (CoE) in Emerging Technologies",
-        desc: "Advanced learning ecosystem for students, faculty & startups with industry-oriented labs, applied research, and incubation support. Developed with IIT Ropar.",
-        img: "/Assets/public_assets/images/homepage/center_of_excellence.jpeg",
-        logoKey: "coe",
-        chips: { target: "Institutions & Faculty", coverage: "Pan India", impact: "Innovation & research" },
-      },
-      {
-        num: 3,
         name: "Future Technology Labs as a Service (FTLaaS)",
         desc: "Affordable subscription-based future technology labs enabling schools and colleges in Tier 2 & 3 cities to access practical learning infrastructure.",
         img: "/Assets/public_assets/images/homepage/fftl_lab.jpg",
@@ -3984,15 +4099,15 @@ const PILLAR_UI = {
         chips: { target: "Schools & Colleges", coverage: "Tier 2 & Tier 3 Cities", impact: "Access to future tech" },
       },
       {
-        num: 4,
+        num: 3,
         name: "Industry-Aligned College Innovation Programs",
         desc: "Skill-integrated practical learning for higher education institutions bridging the gap between academics and industry requirements.",
-        img: "/Assets/public_assets/images/homepage/industry_align.jpeg",
+        img: "/Assets/public_assets/images/homepage/sic.jpeg",
         logoKey: "college-innovation",
         chips: { target: "Colleges & Students", coverage: "Across India", impact: "Industry readiness" },
       },
       {
-        num: 5,
+        num: 4,
         name: "Faculty Development & Innovation Enablement",
         desc: "Capacity-building initiatives empowering educators with emerging technology knowledge, lab operations capability, and experiential teaching methodologies.",
         img: "/Assets/public_assets/images/homepage/Faculty.jpeg",
@@ -4121,11 +4236,9 @@ const PILLAR_UI = {
     focusAreas: [
       { icon: "leaf", text: "Environmental Sustainability & Climate Action" },
       { icon: "school", text: "Green Skills & Sustainability Education" },
-      { icon: "sun", text: "Renewable Energy & Solar Ecosystems" },
       { icon: "recycle", text: "Waste Management & Circular Economy" },
       { icon: "droplet", text: "Water Conservation & Resource Management" },
       { icon: "sprout", text: "Smart Agriculture & Agri-Tech Solutions" },
-      { icon: "tractor", text: "Organic Farming & Sustainable Agriculture" },
       { icon: "car", text: "Green Mobility & EV Awareness" },
       { icon: "glasses", text: "VR-Based Road Safety Education" },
       { icon: "zap", text: "Carbon Reduction & Energy Efficiency" },
@@ -4149,8 +4262,6 @@ const PILLAR_UI = {
     impactSnapshot: [
       { icon: "users", text: "Community-driven environmental sustainability initiatives" },
       { icon: "school", text: "Environmental awareness among thousands of students & youth" },
-      { icon: "tractor", text: "Promotion of organic farming & sustainable rural livelihoods" },
-      { icon: "sun", text: "Focus on renewable energy, conservation & climate resilience" },
       { icon: "handshake", text: "Strong collaboration with CSR, government & sustainability partners" },
       { icon: "glasses", text: "VR-enabled experiential learning for social impact education" },
     ],
@@ -4160,7 +4271,8 @@ const PILLAR_UI = {
         num: 1,
         name: "Panasonic CSR – Harit Umang Program",
         desc: "Large-scale environmental awareness initiative promoting eco-conscious behavior on E-Waste, Plastic Waste, Renewable Energy, and Biodiversity among students and youth.",
-        img: "/Assets/public_assets/images/homepage/Sustainable_Green.jpeg",
+        img: "/Assets/public_assets/images/homepage/walkathon.jpg",
+        logoImg: "/Assets/public_assets/images/homepage/harit-umang.png",
         logoKey: "panasonic-harit",
         chips: { target: "Schools, Colleges & ITI Students", coverage: "North India", impact: "Environmental awareness & youth-led green action" },
       },
@@ -4174,32 +4286,16 @@ const PILLAR_UI = {
       },
       {
         num: 3,
-        name: "Organic Farming & Sustainable Livelihood Initiative",
-        desc: "Community-driven agritech initiative empowering Scheduled Tribe communities and Self Help Groups through sustainable agriculture, household training, and livelihood enhancement programs.",
-        img: "/Assets/public_assets/images/homepage/Organic_Farming.jpeg",
-        logoKey: "organic-farming",
-        chips: { target: "SHGs, Tribal Households & Rural Communities", coverage: "Uttarakhand", impact: "Organic farming & rural development" },
-      },
-      {
-        num: 4,
-        name: "Renewable Energy & Solar Awareness Program",
-        desc: "Green energy initiative promoting renewable energy adoption, solar ecosystem awareness, and sustainable energy practices through training, demonstrations, and community engagement.",
-        img: "/Assets/public_assets/images/homepage/Renewable_Energy&Solar.jpeg",
-        logoKey: "renewable-solar",
-        chips: { target: "Students, youth & rural communities", coverage: "Rural & regional implementation", impact: "Clean energy awareness & adoption" },
-      },
-      {
-        num: 5,
         name: "Sustainable Green Entrepreneurship Program",
         desc: "Innovation-driven initiative supporting green entrepreneurship, eco-friendly livelihood opportunities, sustainable rural enterprises, and environmentally responsible business models.",
-        img: "/Assets/public_assets/images/homepage/Sustainable_Green_Entrepreneurship.jpeg",
+        img: "/Assets/public_assets/images/homepage/biogas.png",
         logoKey: "green-entrepreneurship",
         chips: { target: "Youth, entrepreneurs & rural communities", coverage: "Rural innovation ecosystems", impact: "Sustainable livelihoods & green growth" },
       },
     ],
     impactRow: [
       { val: "Community-driven", lbl: "Sustainability Initiatives" },
-      { val: "1000s+", lbl: "Students & Youth Reached" },
+      { val: "10000+", lbl: "Students & Youth Reached" },
       { val: "Strong", lbl: "CSR & Govt Partnerships" },
       { val: "VR-enabled", lbl: "Experiential Learning" },
     ],
@@ -4438,10 +4534,10 @@ const PROJECTS = [
 ];
 
 const HERO_TILES = [
-  { key: "skills", icon: "⚡", title: "Future Ready Skills" },
-  { key: "schools", icon: "🏫", title: "Future Ready Schools & Colleges" },
-  { key: "msme", icon: "🏭", title: "Future Ready MSMEs" },
-  { key: "env", icon: "🌿", title: "Future Ready Environment" },
+  { key: "skills", icon: "⚡", title: "Future Ready Skills", line1: "Future Ready", line2: "Skills" },
+  { key: "schools", icon: "🏫", title: "Future Ready Schools & Colleges", line1: "Future Ready", line2: "Schools & Colleges" },
+  { key: "msme", icon: "🏭", title: "Future Ready MSMEs", line1: "Future Ready", line2: "MSMEs" },
+  { key: "env", icon: "🌿", title: "Future Ready Environment", line1: "Future Ready", line2: "Environment" },
 ];
 
 const FTLAAS_STYLES = `
@@ -4479,9 +4575,9 @@ const FTLAAS_STYLES = `
 .ftl-btn:hover{transform:translateY(-2px);box-shadow:0 18px 46px rgba(255,45,170,.16);}
 .ftl-btn-lite{background:transparent;color:var(--foc-color-text-body);border:1px solid var(--foc-color-border-light);font-weight:500;}
 .ftl-btn-lite:hover{border-color:var(--foc-brand-deep);color:var(--foc-brand-deep);}
-.ftl-hex-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
-.ftl-hex{border:1px solid var(--foc-color-border-light);border-radius:12px;padding:10px 8px;text-align:center;}
-.ftl-hex-lbl{font-size:10px;font-weight:600;color:var(--foc-slate-500);margin-top:2px;}
+.ftl-hex-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
+.ftl-hex{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid var(--foc-color-border-light);border-radius:12px;padding:8px 6px;text-align:center;}
+.ftl-hex-lbl{font-size:10px;font-weight:600;color:var(--foc-slate-500);margin-top:4px;line-height:1.2;}
 .ftl-inst-tabs{display:flex;gap:8px;margin-bottom:1.25rem;}
 .ftl-inst-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;border:1px solid var(--foc-color-border-light);border-radius:12px;font-family:var(--foc-font-sans);font-size:13px;font-weight:600;color:var(--foc-color-text-subtle);cursor:pointer;background:var(--foc-color-surface);transition:all .15s;}
 .ftl-inst-tab.on{border-color:var(--foc-brand-deep);color:var(--foc-brand-deep);background:var(--foc-purple-50);}
@@ -4489,6 +4585,16 @@ const FTLAAS_STYLES = `
 .ftl-sub-tabs::-webkit-scrollbar{display:none;}
 .ftl-sub-tab{flex-shrink:0;padding:10px 18px;border:none;background:transparent;font-family:var(--foc-font-sans);font-size:12px;font-weight:600;color:var(--foc-color-text-subtle);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;}
 .ftl-sub-tab.on{color:var(--foc-brand-deep);border-bottom-color:var(--foc-brand-deep);}
+.ftl-inst-head{display:flex;align-items:center;justify-content:space-between;gap:1.25rem;margin-bottom:1rem;}
+.ftl-inst-head-main{flex:1;min-width:0;}
+.ftl-inst-head-main h2{font-size:18px;font-weight:700;margin-bottom:.3rem;color:var(--foc-slate-900);line-height:1.25;}
+.ftl-inst-head-main .ftl-sub{margin-bottom:0;}
+.ftl-inst-head-cta{flex-shrink:0;align-self:center;}
+.ftl-inst-head-cta .btn-primary{white-space:nowrap;}
+@media (max-width:768px){
+  .ftl-inst-head{flex-direction:column;align-items:stretch;}
+  .ftl-inst-head-cta{align-self:flex-start;}
+}
 .ftl-main-layout{display:grid;grid-template-columns:1fr 230px;gap:1.25rem;align-items:start;}
 .ftl-grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
 .ftl-grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
@@ -4531,8 +4637,8 @@ const FTLAAS_STYLES = `
 .ftl-cta-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.12);color:#e0d9ff;font-size:10px;padding:3px 9px;border-radius:999px;margin-bottom:6px;}
 .ftl-cta-h{font-size:16px;font-weight:700;color:var(--foc-color-text-inverse);margin-bottom:3px;}
 .ftl-cta-sub{font-size:12px;color:#a8a0e8;}
-@media(max-width:1100px){.ftl-main-layout{grid-template-columns:1fr;}.ftl-snap{position:static;}.ftl-grid-6{grid-template-columns:repeat(3,1fr);}.ftl-hex-grid{grid-template-columns:repeat(2,1fr);}}
-@media(max-width:768px){.ftl{padding:1.25rem 1rem 1.5rem;border-radius:16px;}.ftl-hero-grid{grid-template-columns:1fr;}.ftl-hex-grid{display:none;}.ftl-grid-2{grid-template-columns:1fr;}.ftl-grid-3{grid-template-columns:1fr 1fr;}.ftl-grid-6{grid-template-columns:repeat(2,1fr);}.ftl-inst-tabs{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;scrollbar-width:thin;scrollbar-color:#cbd5e1 transparent;padding-bottom:8px;margin-left:-4px;margin-right:-4px;padding-left:4px;padding-right:4px;}.ftl-inst-tabs::-webkit-scrollbar{height:4px;}.ftl-inst-tabs::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px;}.ftl-inst-tab{flex:0 0 auto;white-space:nowrap;scroll-snap-align:start;padding:11px 14px;font-size:12px;}.ftl-ticker{flex-wrap:wrap;}.ftl-ticker-item{flex:1 1 45%;border:none;border-bottom:1px solid var(--foc-color-border-light);}}
+@media(max-width:1100px){.ftl-main-layout{grid-template-columns:1fr;}.ftl-snap{position:static;}.ftl-grid-6{grid-template-columns:repeat(3,1fr);}.ftl-hex-grid{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:768px){.ftl{padding:0.25rem 1rem 1.5rem;border-radius:16px;}.ftl-hero-grid{grid-template-columns:1fr;}.ftl-hex-grid{grid-template-columns:repeat(3,1fr);max-width:100%;}.ftl-grid-2{grid-template-columns:1fr;}.ftl-grid-3{grid-template-columns:1fr 1fr;}.ftl-grid-6{grid-template-columns:repeat(2,1fr);}.ftl-inst-tabs{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;scrollbar-width:thin;scrollbar-color:#cbd5e1 transparent;padding-bottom:8px;margin-left:-4px;margin-right:-4px;padding-left:4px;padding-right:4px;}.ftl-inst-tabs::-webkit-scrollbar{height:4px;}.ftl-inst-tabs::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px;}.ftl-inst-tab{flex:0 0 auto;white-space:nowrap;scroll-snap-align:start;padding:11px 14px;font-size:12px;}.ftl-ticker{flex-wrap:wrap;}.ftl-ticker-item{flex:1 1 45%;border:none;border-bottom:1px solid var(--foc-color-border-light);}}
 @media(max-width:480px){.ftl-grid-3{grid-template-columns:1fr;}.ftl-grid-6{grid-template-columns:1fr 1fr;}.ftl-process{grid-template-columns:1fr !important;}.ftl-step{border-right:none;border-bottom:1px solid var(--foc-color-bg-section);}}
 `;
 
@@ -4662,7 +4768,11 @@ function FTLaaSSection() {
       <style>{FTLAAS_STYLES}</style>
       <div className="ftl">
       <div className="section-head">
-              <div className="sh2">Future Technology Lab  <span className="red">As a Service(FTLaaS)</span></div>
+              <div className="sh2">
+                Future Technology Lab
+                <br />
+                <span className="red">As a Service (FTLaaS)</span>
+              </div>
               </div>
         <div className="ftl-hero">
           <div className="ftl-badge">✓ Integrated with NEP 2020</div>
@@ -4676,7 +4786,6 @@ function FTLaaSSection() {
               <div className="ftl-row">
                 {/* <button type="button" className="ftl-btn">→ Explore Programs</button> */}
                 {/* <button type="button" className="ftl-btn-lite" data-bs-toggle="modal" data-bs-target="#partnerModal">📅 Book a Demo</button> */}
-                <button type="button" className="btn-primary" data-bs-toggle="modal" data-bs-target="#partnerModal">🤝 Partner With Us</button>
               </div>
             </div>
             <div className="ftl-hex-grid">
@@ -4692,12 +4801,19 @@ function FTLaaSSection() {
           <button type="button" className={`ftl-inst-tab${inst === "college" ? " on" : ""}`} onClick={() => { setInst("college"); setSubTab("overview"); }}>🏛️ FTLaaS for Colleges & Universities</button>
         </div>
 
-        <div style={{ marginBottom: "1rem" }}>
-          <div className={`ftl-badge${isSchool ? "" : " college"}`}>✓ {data.badge}</div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: ".3rem", color: "var(--foc-slate-900)" }}>
-            Future Technology Lab as a Service — <span style={{ color: data.accent }}>{data.title}</span>
-          </h2>
-          <p className="ftl-sub">{data.intro}</p>
+        <div className="ftl-inst-head">
+          <div className="ftl-inst-head-main">
+            <div className={`ftl-badge${isSchool ? "" : " college"}`}>✓ {data.badge}</div>
+            <h2>
+              Future Technology Lab as a Service — <span style={{ color: data.accent }}>{data.title}</span>
+            </h2>
+            <p className="ftl-sub">{data.intro}</p>
+          </div>
+          <div className="ftl-inst-head-cta">
+            <button type="button" className="btn-primary" data-bs-toggle="modal" data-bs-target="#partnerModal">
+              🤝 Partner With Us
+            </button>
+          </div>
         </div>
 
         <div className="ftl-sub-tabs">
@@ -4839,11 +4955,11 @@ const GEOGRAPHIC_COVERAGE_STYLES = `
 .gc-h1{font-family:var(--foc-font-display);font-size:clamp(32px,4.5vw,58px);font-weight:900;line-height:1.05;color:var(--navy);margin-bottom:6px;}
 .gc-h1-sub{font-family:var(--foc-font-display);font-size:clamp(28px,3.8vw,48px);font-weight:900;color:var(--green);margin-bottom:20px;}
 .gc-desc{font-family:var(--foc-font-sans);font-size:15px;color:var(--t2);line-height:1.75;max-width:440px;margin-bottom:28px;}
-.gc-reach-badge{display:flex;align-items:flex-start;gap:14px;background:rgba(14,124,107,.07);border:1px solid rgba(14,124,107,.18);border-radius:12px;padding:16px 20px;max-width:440px;margin-bottom:36px;}
+.gc-reach-badge{display:flex;align-items:flex-start;gap:14px;background:rgba(14,124,107,.07);border:1px solid rgba(14,124,107,.18);border-radius:12px;padding:16px 20px;max-width:440px;}
 .gc-reach-ico{width:44px;height:44px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
 .gc-reach-text{font-size:13px;font-weight:700;color:var(--teal);line-height:1.4;}
-.gc-hero-grid{display:grid;grid-template-columns:1fr 1.1fr;align-items:center;}
-.gc-hero-left{padding-bottom:48px;}
+.gc-hero-grid{display:grid;grid-template-columns:1fr 1.1fr;align-items:start;gap:24px;}
+.gc-hero-left{padding-bottom:0;}
 .gc-map-wrap{position:relative;width:100%;max-width:580px;margin:0 auto;}
 .gc-map-leaflet-wrap{position:relative;border-radius:16px;overflow:hidden;border:1px solid var(--brd);background:#e8f4ff;box-shadow:0 24px 48px rgba(10,34,64,.15);}
 .gc-map-leaflet{width:100%;height:min(52vh,480px);min-height:320px;z-index:0;}
@@ -4867,7 +4983,8 @@ const GEOGRAPHIC_COVERAGE_STYLES = `
 .gc-commit{margin-top:14px;padding:10px 14px;background:rgba(14,124,107,.06);border:1px solid rgba(14,124,107,.14);border-radius:8px;display:flex;gap:10px;align-items:flex-start;}
 .gc-commit span:last-child{font-size:12px;color:var(--t2);line-height:1.5;}
 .gc-section{padding:48px 0 0;}
-.gc-section-head{font-size:14px;font-weight:700;color:var(--navy);letter-spacing:1px;margin-bottom:20px;padding-bottom:10px;border-bottom:2px solid var(--teal);display:inline-block;}
+.gc-reach-section{padding:20px 0 28px;}
+.gc-section-head{font-size:14px;font-weight:700;color:var(--navy);letter-spacing:1px;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid var(--teal);display:inline-block;}
 .gc-reach-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;}
 .gc-reach-card{background:var(--surface);border:1px solid var(--brd);border-radius:12px;padding:18px 12px;text-align:center;transition:.28s;}
 .gc-reach-card:hover{border-color:var(--teal);transform:translateY(-3px);box-shadow:0 8px 20px rgba(14,124,107,.12);}
@@ -5132,47 +5249,22 @@ function GeographicCoverageSection() {
                 </div>
               </div>
             </div>
-          </div>
-        </section>
-
-        <section className="gc-section">
-          <div className="gc-cont">
+            <div className="gc-reach-section">
             <div className="gc-section-head">Our Reach Model</div>
             <div className="gc-reach-grid">
               {GC_REACH_MODEL.map((item) => <div key={item.label} className="gc-reach-card"><div className="gc-reach-card-ico">{item.ico}</div><div className="gc-reach-card-label">{item.label}</div></div>)}
             </div>
-          </div>
-        </section>
-
-        <div className="gc-cont">
-          <div className="gc-quote-banner">
-            <div><div className="gc-quote-mark">"</div><div className="gc-quote-text">From cities to villages, from plains to hills - our commitment reaches <span className="gc-quote-accent">every corner of India.</span></div></div>
-            {[{ ico: "👥", title: "Wider Beneficiary Outreach", sub: "Reaching more lives across geographies" }, { ico: "🚀", title: "Faster Project Deployment", sub: "Agile execution, wherever it's needed" }].map((item) => (
-              <div key={item.title} className="gc-quote-stat"><div className="gc-quote-stat-ico">{item.ico}</div><div className="gc-quote-stat-title">{item.title}</div><div className="gc-quote-stat-sub">{item.sub}</div></div>
-            ))}
-          </div>
-        </div>
-
-        <section className="gc-section">
-          <div className="gc-cont">
-            <div className="gc-section-head">What This Enables</div>
-            <div className="gc-enables-wrap">
-              <div className="gc-enables-grid">
-                {GC_ENABLES.map((item) => <div key={item.title} className="gc-enables-card"><div className="gc-enables-ico">{item.ico}</div><div><div className="gc-enables-title">{item.title}</div><div className="gc-enables-desc">{item.desc}</div></div></div>)}
-              </div>
-              <div className="gc-presence-right">
-                {GC_PSTATS.map((item) => <div key={item.title} className="gc-pstat"><div className="gc-pstat-ico" style={{ background: item.bg }}><span>{item.ico}</span></div><div><div className="gc-pstat-title">{item.title}</div><div className="gc-pstat-sub">{item.sub}</div></div></div>)}
-              </div>
             </div>
           </div>
         </section>
 
-        <div className="gc-cont">
+
+        {/* <div className="gc-cont">
           <div className="gc-bottom-cta">
             <div className="gc-cta-left"><span className="gc-cta-ico">🌐</span><div><div className="gc-cta-h">No boundary limitations.<br />Limitless possibilities.</div><div className="gc-cta-sub">Focalyt is equipped to design, deploy and scale skill development, livelihood, entrepreneurship, education, MSME and community impact programs across India.</div></div></div>
             <button type="button" className="btn-primary gc-cta-btn" data-bs-toggle="modal" data-bs-target="#partnerModal">Partner With Us →</button>
           </div>
-        </div>
+        </div> */}
       </div>
     </>
   );
@@ -5807,21 +5899,16 @@ export default function HomePage() {
                         aria-label={`Open ${t.title}`}
                       >
                         <div className="hero-tile-text">
-                          {t.title
-                            .replace("Future Ready ", "Future Ready\n")
-                            .split("\n")
-                            .map((line, i) => (
-                              <span key={i}>
-                                {t.key === "msme" && line.endsWith("MSMEs")
-                                  ? (
-                                    <>
-                                      {line.slice(0, -1)}
-                                      <span className="hero-tile-lower">s</span>
-                                    </>
-                                  )
-                                  : line}
-                              </span>
-                            ))}
+                          <span className="hero-tile-line">{t.line1}</span>
+                          <span className="hero-tile-line">
+                            {t.key === "msme" ? (
+                              <>
+                                MSME<span className="hero-tile-lower">s</span>
+                              </>
+                            ) : (
+                              t.line2
+                            )}
+                          </span>
                         </div>
                       </button>
                     ))}
@@ -6000,8 +6087,12 @@ export default function HomePage() {
                         </div>
                         <div className="ip-card-info">
                           <div className="ip-proj-top">
-                            <div className={`ip-proj-logo${proj.logoKey === "panasonic-harit" ? " ip-proj-logo--wide" : ""}`}>
-                              <PillarProjectLogo logoKey={proj.logoKey} />
+                            <div className={`ip-proj-logo${!proj.logoImg && proj.logoKey === "panasonic-harit" ? " ip-proj-logo--wide" : ""}`}>
+                              {proj.logoImg ? (
+                                <img src={proj.logoImg} alt="" />
+                              ) : (
+                                <PillarProjectLogo logoKey={proj.logoKey} />
+                              )}
                             </div>
                             <h4 className="ip-proj-name">{proj.name}</h4>
                           </div>
@@ -6135,7 +6226,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* <ZenithXSection /> */}
+        <ZenithXSection />
 
      
 
@@ -8657,10 +8748,10 @@ button.close span {
     padding-right: 12px !important;
   }
 
-  .foc-cyber-home #future-jobs .job-live-card .card-body {
-    padding-left: 14px !important;
-    padding-right: 14px !important;
-  }
+  // .foc-cyber-home #future-jobs .job-live-card .card-body {
+  //   padding-left: 14px !important;
+  //   padding-right: 14px !important;
+  // }
 
   .foc-cyber-home #future-jobs .job-live-card .course-title,
   .foc-cyber-home #future-courses .course-carousel-item .course-card-title {

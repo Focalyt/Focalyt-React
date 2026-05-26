@@ -312,6 +312,31 @@ const STYLES = `
   .ia-cta { padding: 28px 20px; border-radius: 0 0 16px 16px; }
   .ia-panel-side { width: 100%; flex-direction: row; border-right: none; border-bottom: 1px solid var(--brd); }
   .ia-panel-side--right { border-left: none; border-top: 1px solid var(--brd); border-bottom: none; }
+  .ia-tabs {
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    margin-bottom: 20px;
+  }
+  .ia-tabs::-webkit-scrollbar { display: none; }
+  .ia-tab {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    padding: 10px 12px;
+    font-size: 11px;
+    gap: 6px;
+    white-space: nowrap;
+  }
+}
+@media (max-width: 480px) {
+  .ia-tab {
+    padding: 9px 10px;
+    font-size: 10px;
+    gap: 5px;
+  }
 }
 `;
 
