@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -11,6 +12,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { focalytLogo } from '../assets/images';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CollegeInputField } from '../components/CollegeInputField';
 import {
@@ -456,7 +458,12 @@ export function LoginScreen() {
       >
         <View style={styles.card}>
           <View style={styles.logoWrap}>
-            <Text style={styles.logoMark}>Focalyt</Text>
+            <Image
+              source={focalytLogo}
+              style={styles.logoImage}
+              resizeMode="contain"
+              accessibilityLabel="Focalyt logo"
+            />
           </View>
 
           <Text style={styles.title}>Institute Portal</Text>
@@ -691,10 +698,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
-  logoMark: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: college.primary,
+  logoImage: {
+    width: 120,
+    height: 120,
   },
   title: {
     fontSize: 22,

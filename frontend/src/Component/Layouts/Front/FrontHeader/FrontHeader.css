@@ -682,6 +682,26 @@
   position: relative;
   padding: 6px 0 10px;
   border-top: 1px solid color-mix(in srgb, var(--hdr-border) 65%, transparent);
+  overflow: hidden;
+}
+
+.site-header.front-header--cyber .front-subtabs::before,
+.site-header.front-header--cyber .front-subtabs::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 32px;
+  z-index: 2;
+  pointer-events: none;
+}
+.site-header.front-header--cyber .front-subtabs::before {
+  left: 0;
+  background: linear-gradient(90deg, var(--hdr-bg) 25%, transparent);
+}
+.site-header.front-header--cyber .front-subtabs::after {
+  right: 0;
+  background: linear-gradient(-90deg, var(--hdr-bg) 25%, transparent);
 }
 
 .site-header.front-header--cyber .front-subtabs__scroller {
@@ -690,9 +710,12 @@
   align-items: center;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 0 2px;
+  padding: 2px 12px 4px;
   scrollbar-width: none;
-  justify-content: center;
+  justify-content: flex-start;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 12px;
 }
 .site-header.front-header--cyber .front-subtabs__scroller::-webkit-scrollbar {
   display: none;
@@ -700,6 +723,7 @@
 
 .site-header.front-header--cyber .front-subtabs__tab {
   flex: 0 0 auto;
+  scroll-snap-align: start;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1024,13 +1048,40 @@ body.foc-mobile-nav-open .floating-side-tabs {
   .site-header.front-header--cyber .mobile-menu-trigger span:after {
     background-color: var(--hdr-accent-2) !important;
   }
+  .site-header.front-header--cyber > .container:last-of-type {
+    max-width: 100%;
+    padding-left: 0;
+    padding-right: 0;
+    overflow: visible;
+  }
   .site-header.front-header--cyber .front-subtabs {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
     padding: 8px 0 12px;
     background: var(--hdr-bg);
   }
+  .site-header.front-header--cyber .front-subtabs::before,
+  .site-header.front-header--cyber .front-subtabs::after {
+    width: 22px;
+  }
+  .site-header.front-header--cyber .front-subtabs__scroller {
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    width: 100%;
+    padding: 2px 14px 4px;
+    gap: 8px;
+    scroll-padding-inline: 14px;
+  }
   .site-header.front-header--cyber .front-subtabs__tab {
     height: 32px;
-    font-size: 10px;
+    padding: 0 11px;
+    font-size: 9.5px;
+    letter-spacing: 0.1em;
+  }
+  .site-header.front-header--cyber .front-subtabs__icon {
+    width: 13px;
+    height: 13px;
   }
   .floating-side-tabs {
     right: 8px;

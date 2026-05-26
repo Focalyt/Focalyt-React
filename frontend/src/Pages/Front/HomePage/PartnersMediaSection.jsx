@@ -577,7 +577,7 @@ function PartnersStrengthSection() {
   ];
 
   return (
-    <section className="fp-sub" style={{ background: "var(--foc-color-surface)", position: "relative" }}>
+    <section id="partners" className="fp-sub" style={{ background: "var(--foc-color-surface)", position: "relative" }}>
       <Blobs colors={["var(--foc-green-dark)", "var(--foc-blue)", "var(--foc-purple-dark)", "var(--foc-orange)"]} />
       <div
         className="spin-slow"
