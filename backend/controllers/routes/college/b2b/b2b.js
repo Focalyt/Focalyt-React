@@ -76,6 +76,20 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 
 	const isAdminUser = (req) => req.user?.permissions?.permission_type === 'Admin';
 
+	const isReferredByMeQuery = (value) =>
+		value === true || value === 'true' || value === '1';
+
+	const getReferredByMeFilter = (userId) => ({
+		logs: {
+			$elemMatch: {
+				user: mongoose.Types.ObjectId.isValid(String(userId))
+					? new mongoose.Types.ObjectId(String(userId))
+					: userId,
+				action: { $regex: /^Lead referred from/i }
+			}
+		}
+	});
+
 	const VALID_FOLLOWUP_BUCKETS = new Set(['done', 'planned', 'missed']);
 
 	/** Match frontend getFollowupBucket — filter leads by call/visit follow-up bucket */
@@ -202,6 +216,100 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 		return {
 			call: { done: callDone, planned: callPlanned, missed: callMissed },
 			visit: { done: visitDone, planned: visitPlanned, missed: visitMissed },
+		};
+	};
+
+	const getCrossSaleRootId = (lead) => {
+		if (!lead) return null;
+		if (lead.crossSaleRootId) return String(lead.crossSaleRootId);
+		if (lead.parentLeadId) return String(lead.parentLeadId);
+		return String(lead._id);
+	};
+
+	const buildCrossSaleGroupQuery = (rootId) => ({
+		$or: [
+			{ _id: rootId },
+			{ crossSaleRootId: rootId },
+			{ parentLeadId: rootId },
+		],
+	});
+
+	const resolveB2BLeadPipelineStatus = async (req, requestedPipelineStatus, requestedPipelineSubStatus) => {
+		const collegeIdForPipeline = req.user?.college?._id;
+		const pipelineStatusScope = collegeIdForPipeline
+			? {
+				$or: [
+					{ college: collegeIdForPipeline },
+					{ college: null },
+					{ college: { $exists: false } },
+				],
+			}
+			: {
+				$or: [{ college: null }, { college: { $exists: false } }],
+			};
+
+		const titleMatchExpr = (lowerTitle) => ({
+			$expr: {
+				$eq: [{ $toLower: { $trim: { input: '$title' } } }, lowerTitle],
+			},
+		});
+
+		let resolvedStatusId = null;
+		let resolvedSubStatusId = null;
+
+		const rawStatus = requestedPipelineStatus != null ? String(requestedPipelineStatus).trim() : '';
+		if (rawStatus) {
+			let statusDoc = null;
+			if (mongoose.Types.ObjectId.isValid(rawStatus)) {
+				statusDoc = await StatusB2b.findOne({
+					$and: [{ _id: rawStatus }, pipelineStatusScope],
+				});
+			}
+			if (!statusDoc) {
+				const norm = rawStatus.toLowerCase();
+				statusDoc = await StatusB2b.findOne({
+					$and: [titleMatchExpr(norm), pipelineStatusScope],
+				});
+			}
+			if (statusDoc) {
+				resolvedStatusId = statusDoc._id;
+				const subs = statusDoc.substatuses || [];
+				const rawSub = requestedPipelineSubStatus != null ? String(requestedPipelineSubStatus).trim() : '';
+				if (rawSub && mongoose.Types.ObjectId.isValid(rawSub)) {
+					const matchSub = subs.find((s) => String(s._id) === rawSub);
+					if (matchSub) {
+						resolvedSubStatusId = matchSub._id;
+					}
+				}
+				if (!resolvedSubStatusId && subs.length > 0) {
+					resolvedSubStatusId = subs[0]._id;
+				}
+			}
+		}
+
+		const college = await College.findOne({ '_concernPerson._id': req.user._id });
+		let defaultStatusId = null;
+		let defaultSubStatusId = null;
+
+		if (!resolvedStatusId && college) {
+			const untouchStatus = await StatusB2b.findOne({
+				college: college._id,
+				title: { $regex: /^Untouch Leads$/i },
+			});
+			if (untouchStatus) {
+				defaultStatusId = untouchStatus._id;
+				if (untouchStatus.substatuses?.length > 0) {
+					const untouchSubStatus = untouchStatus.substatuses.find(
+						(sub) => sub.title && /^Untouch Leads$/i.test(sub.title)
+					);
+					defaultSubStatusId = untouchSubStatus?._id || untouchStatus.substatuses[0]._id;
+				}
+			}
+		}
+
+		return {
+			statusId: resolvedStatusId || defaultStatusId,
+			subStatusId: resolvedSubStatusId || defaultSubStatusId,
 		};
 	};
 
@@ -1247,8 +1355,11 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 			followUpCallBucket,
 			followUpVisitBucket,
 			documentsStatusIn,
-			approvalStatus
+			approvalStatus,
+			referredByMe
 		} = req.query;
+
+		const referredByMeActive = isReferredByMeQuery(referredByMe);
 
 		// Check if user is Admin - only Admin can view all B2B leads
 		const isAdmin = () => {
@@ -1260,7 +1371,7 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 
 		// Only apply team member filter if user is not Admin
 		// Admin can view all leads, others can only view their team members' leads
-		if (!isAdmin()) {
+		if (!referredByMeActive && !isAdmin()) {
 			let teamMembers = await getAllTeamMembers(req.user._id);
 			// Ownership Conditions for team members
 			ownershipConditions = teamMembers.map(member => ({
@@ -1300,6 +1411,10 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 		// Build filter conditions (follow-up bucket filters applied separately)
 		const filterConditions = [];
 		const followupBucketFilters = [];
+
+		if (referredByMeActive) {
+			filterConditions.push(getReferredByMeFilter(req.user._id));
+		}
 
 		if (followUpCallBucket) {
 			const bucketFilter = await resolveFollowupBucketLeadFilter('call', followUpCallBucket);
@@ -2075,8 +2190,11 @@ router.get('/leads', isCollege, async (req, res) => {
 			followUpCallBucket,
 			followUpVisitBucket,
 			documentsStatusIn,
-			approvalStatus
+			approvalStatus,
+			referredByMe
 		} = req.query;
+
+		const referredByMeActive = isReferredByMeQuery(referredByMe);
 
 		// Check if user is Admin - only Admin can view all B2B leads
 		const isAdmin = () => {
@@ -2099,15 +2217,12 @@ router.get('/leads', isCollege, async (req, res) => {
 
 		// Only apply team member filter if user is not Admin
 		// Admin can view all leads, others can only view their team members' leads
-		if (!isAdmin()) {
+		if (!referredByMeActive && !isAdmin()) {
 			let teamMembers = await getAllTeamMembers(req.user._id);
-			// console.log('👥 [BACKEND] Team Members:', teamMembers.length);
 			// Ownership Conditions for team members
 			ownershipConditions = teamMembers.map(member => ({
 				$or: [{ leadAddedBy: member }, { leadOwner: member }]
 			}));
-		} else {
-			// console.log('👑 [BACKEND] User is Admin - No ownership restrictions');
 		}
 
 		// Search functionality conditions
@@ -2121,10 +2236,6 @@ router.get('/leads', isCollege, async (req, res) => {
 				]
 			}
 			: {};
-
-		// if (search) {
-		// 	console.log('🔎 [BACKEND] Search condition applied:', searchConditions);
-		// }
 
 		// Convert string IDs to ObjectId for MongoDB query
 		const convertToObjectId = (id) => {
@@ -2148,6 +2259,7 @@ router.get('/leads', isCollege, async (req, res) => {
 			$and: [
 				// Ownership condition (only if user doesn't have view all permission)
 				...(ownershipConditions.length > 0 ? [{ $or: ownershipConditions.flatMap(c => c.$or) }] : []),
+				...(referredByMeActive ? [getReferredByMeFilter(req.user._id)] : []),
 				...followupBucketFilters,
 				// Search condition (if search is provided)
 				...(search ? [searchConditions] : []),
@@ -2429,6 +2541,218 @@ router.get('/leads', isCollege, async (req, res) => {
 			status: false,
 			message: 'Failed to retrieve leads',
 			error: error.message
+		});
+	}
+});
+
+// Cross-sale: all project engagements for one business (same root)
+router.get('/leads/:id/cross-sales', isCollege, async (req, res) => {
+	try {
+		const source = await Lead.findById(req.params.id).select('_id parentLeadId crossSaleRootId');
+		if (!source) {
+			return res.status(404).json({ status: false, message: 'Lead not found' });
+		}
+
+		const rootId = getCrossSaleRootId(source);
+		const groupLeads = await applyLeadCorePopulates(
+			Lead.find(buildCrossSaleGroupQuery(rootId))
+		)
+			.populate('status', 'name title substatuses')
+			.populate('leadOwner', 'name email')
+			.populate('leadAddedBy', 'name email')
+			.sort({ createdAt: 1 })
+			.lean();
+
+		res.json({
+			status: true,
+			data: { rootId, leads: groupLeads },
+			message: 'Cross-sale leads retrieved successfully',
+		});
+	} catch (error) {
+		console.error('Error getting cross-sale leads:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to retrieve cross-sale leads',
+			error: error.message,
+		});
+	}
+});
+
+// Cross-sale: add same business to another B2B project
+router.post('/leads/:id/cross-sale', isCollege, async (req, res) => {
+	try {
+		const {
+			b2bDepartment,
+			b2bProject,
+			typeOfB2B,
+			leadCategory,
+			leadOwner,
+			remark,
+			status: requestedPipelineStatus,
+			subStatus: requestedPipelineSubStatus,
+		} = req.body || {};
+		const source = await Lead.findById(req.params.id);
+		if (!source) {
+			return res.status(404).json({ status: false, message: 'Lead not found' });
+		}
+
+		if (!b2bProject || !mongoose.Types.ObjectId.isValid(b2bProject)) {
+			return res.status(400).json({ status: false, message: 'Valid B2B project is required' });
+		}
+		if (!b2bDepartment || !mongoose.Types.ObjectId.isValid(b2bDepartment)) {
+			return res.status(400).json({ status: false, message: 'Valid B2B department is required' });
+		}
+		if (!typeOfB2B || !mongoose.Types.ObjectId.isValid(typeOfB2B)) {
+			return res.status(400).json({ status: false, message: 'Valid B2B type is required' });
+		}
+
+		const projectDoc = await B2BProject.findById(b2bProject);
+		if (!projectDoc) {
+			return res.status(400).json({ status: false, message: 'B2B project not found' });
+		}
+		const departmentDoc = await B2BDepartment.findById(b2bDepartment);
+		if (!departmentDoc) {
+			return res.status(400).json({ status: false, message: 'B2B department not found' });
+		}
+		if (String(projectDoc.department) !== String(b2bDepartment)) {
+			return res.status(400).json({
+				status: false,
+				message: 'Selected project does not belong to the selected department',
+			});
+		}
+
+		const typeDoc = await TypeOfB2B.findById(typeOfB2B);
+		if (!typeDoc) {
+			return res.status(400).json({ status: false, message: 'B2B type not found' });
+		}
+		if (typeDoc.department && String(typeDoc.department) !== String(b2bDepartment)) {
+			return res.status(400).json({
+				status: false,
+				message: 'Selected B2B type does not belong to the selected department',
+			});
+		}
+
+		const rootId = getCrossSaleRootId(source);
+		const existingInProject = await Lead.findOne({
+			...buildCrossSaleGroupQuery(rootId),
+			b2bProject,
+		}).select('_id');
+
+		if (existingInProject) {
+			return res.status(400).json({
+				status: false,
+				message: 'This business already exists in the selected project',
+			});
+		}
+
+		if (!source.crossSaleRootId) {
+			source.crossSaleRootId = source._id;
+			await source.save();
+		}
+
+		let leadOwnerId = source.leadOwner || null;
+		if (leadOwner && String(leadOwner).trim()) {
+			const ownerVal = String(leadOwner).trim();
+			if (mongoose.Types.ObjectId.isValid(ownerVal)) {
+				const owner = await User.findById(ownerVal);
+				if (owner) leadOwnerId = owner._id;
+			}
+		}
+
+		const { statusId: finalStatusId, subStatusId: finalSubStatusId } = await resolveB2BLeadPipelineStatus(
+			req,
+			requestedPipelineStatus,
+			requestedPipelineSubStatus
+		);
+
+		if (requestedPipelineStatus && !finalStatusId) {
+			return res.status(400).json({ status: false, message: 'Invalid lead status' });
+		}
+		if (requestedPipelineSubStatus && !finalSubStatusId) {
+			return res.status(400).json({ status: false, message: 'Invalid sub-status for selected status' });
+		}
+
+		const crossSaleLead = new Lead({
+			leadCategory: leadCategory || source.leadCategory,
+			b2bProject,
+			b2bDepartment,
+			typeOfB2B,
+			businessName: source.businessName,
+			address: source.address,
+			city: source.city,
+			state: source.state,
+			coordinates: source.coordinates,
+			concernPersonName: source.concernPersonName,
+			designation: source.designation,
+			email: source.email,
+			mobile: source.mobile,
+			whatsapp: source.whatsapp,
+			landlineNumber: source.landlineNumber,
+			leadOwner: leadOwnerId,
+			leadAddedBy: req.user._id,
+			remark: remark || source.remark,
+			parentLeadId: rootId,
+			crossSaleRootId: rootId,
+			approval: { status: 'PENDING' },
+			logs: [{
+				user: req.user._id,
+				timestamp: new Date(),
+				action: `Cross-sale added to project "${projectDoc.name}"`,
+				remarks: remark || `Linked from lead ${source._id}`,
+			}],
+		});
+
+		if (finalStatusId) {
+			crossSaleLead.status = finalStatusId;
+			if (finalSubStatusId) {
+				crossSaleLead.subStatus = finalSubStatusId;
+			}
+		}
+
+		const savedLead = await crossSaleLead.save();
+
+		if (savedLead && finalStatusId) {
+			const statusDoc = await StatusB2b.findById(finalStatusId).select('title name');
+			const statusLabel = statusDoc?.title || statusDoc?.name || 'pipeline status';
+			let subLabel = '';
+			if (finalSubStatusId && statusDoc?.substatuses?.length) {
+				const sub = statusDoc.substatuses.find((s) => String(s._id) === String(finalSubStatusId));
+				subLabel = sub?.title ? ` (${sub.title})` : '';
+			}
+			savedLead.logs.push({
+				user: req.user._id,
+				timestamp: new Date(),
+				action: `Lead added with ${statusLabel}${subLabel} (Cross-sale)`,
+				remarks: remark || `Cross-sale in project "${projectDoc.name}"`,
+			});
+			await savedLead.save();
+		}
+
+		source.logs = source.logs || [];
+		source.logs.push({
+			user: req.user._id,
+			timestamp: new Date(),
+			action: `Cross-sale created in project "${projectDoc.name}"`,
+			remarks: `New lead id ${savedLead._id}`,
+		});
+		await source.save();
+
+		const populated = await applyLeadCorePopulates(Lead.findById(savedLead._id))
+			.populate('status', 'name title substatuses')
+			.populate('leadOwner', 'name email')
+			.populate('leadAddedBy', 'name email');
+
+		res.status(201).json({
+			status: true,
+			data: populated,
+			message: 'Cross-sale lead added successfully',
+		});
+	} catch (error) {
+		console.error('Error creating cross-sale lead:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to create cross-sale lead',
+			error: error.message,
 		});
 	}
 });
@@ -3272,10 +3596,30 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 			email: normalizedEmail || undefined,
 			mobile,
 			whatsapp,
-			leadOwner,
 			landlineNumber,
 			remark,
 		};
+
+		if (leadOwner !== undefined) {
+			const ownerRaw = leadOwner != null ? String(leadOwner).trim() : '';
+			if (!ownerRaw) {
+				updatePayload.leadOwner = null;
+			} else if (mongoose.Types.ObjectId.isValid(ownerRaw)) {
+				const owner = await User.findById(ownerRaw);
+				if (!owner) {
+					return res.status(400).json({ status: false, message: 'Lead owner not found' });
+				}
+				updatePayload.leadOwner = owner._id;
+			} else {
+				const owner = await User.findOne({
+					name: { $regex: new RegExp(`^${ownerRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+				});
+				if (!owner) {
+					return res.status(400).json({ status: false, message: 'Lead owner not found' });
+				}
+				updatePayload.leadOwner = owner._id;
+			}
+		}
 
 		if (b2bProject !== undefined) {
 			if (!b2bProject || !mongoose.Types.ObjectId.isValid(b2bProject)) {
@@ -3344,7 +3688,8 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 			{ path: 'b2bProject', select: 'name' },
 			{ path: 'b2bDepartment', select: 'name' },
 			{ path: 'typeOfB2B', select: 'name' },
-			{ path: 'leadAddedBy', select: 'name email' }
+			{ path: 'leadAddedBy', select: 'name email' },
+			{ path: 'leadOwner', select: 'name email' },
 		]);
 
 		res.json({
@@ -3975,6 +4320,12 @@ router.post('/leads/import', isCollege, async (req, res) => {
 			'email': 'email',
 			'leadcategory': 'leadCategory',
 			'leadsource': 'leadCategory',
+			'b2bdepartment': 'b2bDepartment',
+			'b2bdept': 'b2bDepartment',
+			'department': 'b2bDepartment',
+			'b2bproject': 'b2bProject',
+			'project': 'b2bProject',
+			'b2bproj': 'b2bProject',
 			'typeofb2b': 'typeOfB2B',
 			'address': 'address',
 			'city': 'city',
@@ -4112,17 +4463,27 @@ router.post('/leads/import', isCollege, async (req, res) => {
 		}
 
 		let defaultLeadCategoryDoc = null;
+		let defaultB2bDepartmentDoc = null;
+		let defaultB2bProjectDoc = null;
 		let defaultTypeOfB2BDoc = null;
 		let modalStatusId = null;
 		let modalSubStatusId = null;
 
 		const bodyLeadCategory = req.body?.leadCategory ? String(req.body.leadCategory).trim() : '';
+		const bodyB2bDepartment = req.body?.b2bDepartment ? String(req.body.b2bDepartment).trim() : '';
+		const bodyB2bProject = req.body?.b2bProject ? String(req.body.b2bProject).trim() : '';
 		const bodyTypeOfB2B = req.body?.typeOfB2B ? String(req.body.typeOfB2B).trim() : '';
 		const bodyLeadStatus = req.body?.leadStatus ? String(req.body.leadStatus).trim() : '';
 		const bodyLeadSubStatus = req.body?.leadSubStatus ? String(req.body.leadSubStatus).trim() : '';
 
 		if (bodyLeadCategory && mongoose.Types.ObjectId.isValid(bodyLeadCategory)) {
 			defaultLeadCategoryDoc = await LeadCategory.findById(bodyLeadCategory);
+		}
+		if (bodyB2bDepartment && mongoose.Types.ObjectId.isValid(bodyB2bDepartment)) {
+			defaultB2bDepartmentDoc = await B2BDepartment.findById(bodyB2bDepartment);
+		}
+		if (bodyB2bProject && mongoose.Types.ObjectId.isValid(bodyB2bProject)) {
+			defaultB2bProjectDoc = await B2BProject.findById(bodyB2bProject);
 		}
 		if (bodyTypeOfB2B && mongoose.Types.ObjectId.isValid(bodyTypeOfB2B)) {
 			defaultTypeOfB2BDoc = await TypeOfB2B.findById(bodyTypeOfB2B);
@@ -4140,10 +4501,27 @@ router.post('/leads/import', isCollege, async (req, res) => {
 			if (matched) modalSubStatusId = matched._id;
 		}
 
-		if (!defaultLeadCategoryDoc || !defaultTypeOfB2BDoc) {
+		if (!defaultLeadCategoryDoc || !defaultB2bDepartmentDoc || !defaultB2bProjectDoc || !defaultTypeOfB2BDoc) {
 			return res.status(400).json({
 				status: false,
-				message: 'Please select Lead Source and Type of B2B in the upload form before importing.'
+				message: 'Please select Lead Source, B2B Department, B2B Project, and Type of B2B in the upload form before importing.'
+			});
+		}
+
+		if (String(defaultB2bProjectDoc.department) !== String(defaultB2bDepartmentDoc._id)) {
+			return res.status(400).json({
+				status: false,
+				message: 'Selected B2B project does not belong to the selected department.'
+			});
+		}
+
+		if (
+			defaultTypeOfB2BDoc.department &&
+			String(defaultTypeOfB2BDoc.department) !== String(defaultB2bDepartmentDoc._id)
+		) {
+			return res.status(400).json({
+				status: false,
+				message: 'Selected B2B type does not belong to the selected department.'
 			});
 		}
 
@@ -4345,6 +4723,8 @@ router.post('/leads/import', isCollege, async (req, res) => {
 				// Create lead object
 				const leadData = {
 					leadCategory: leadCategory._id,
+					b2bDepartment: defaultB2bDepartmentDoc._id,
+					b2bProject: defaultB2bProjectDoc._id,
 					typeOfB2B: typeOfB2B._id,
 					businessName: row.businessName.trim(),
 					concernPersonName: row.concernPersonName.trim(),
