@@ -1,0 +1,22 @@
+<% if (typeof appDownload !== 'undefined' && appDownload && appDownload.downloadUrl) { %>
+<div class="home-app-download">
+  <div class="home-app-download__icon" aria-hidden="true">
+    <i class="fa-brands fa-android"></i>
+  </div>
+  <div class="home-app-download__text">
+    <span class="home-app-download__title">Download Focalyt Android App</span>
+    <span class="home-app-download__meta">
+      v<%= appDownload.versionName %><% if (appDownload.fileSizeBytes) { %> · <%= (appDownload.fileSizeBytes / (1024 * 1024)).toFixed(1) %> MB<% } %>
+    </span>
+  </div>
+  <a
+    href="<%= appDownload.downloadUrl %>"
+    class="home-app-download__btn"
+    target="_blank"
+    rel="noopener noreferrer"
+    download
+  >
+    <i class="fa-solid fa-download"></i> APK
+  </a>
+</div>
+<% } %>

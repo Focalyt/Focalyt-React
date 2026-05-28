@@ -44,16 +44,23 @@ const educationRoutes = express.Router();
 
 educationRoutes.get("/educationlist", educationlist.educationlist);
 
+async function getLatestAppRelease(platform = "android") {
+  let latest = await AppRelease.findOne({ platform, isActive: true })
+    .sort({ versionCode: -1 })
+    .lean();
+  if (!latest) {
+    latest = await AppRelease.findOne({ platform })
+      .sort({ versionCode: -1 })
+      .lean();
+  }
+  return latest;
+}
+
 // Latest Android APK for download links (no auth) — college login, marketing
 commonRoutes.get("/app/download", async (req, res) => {
   try {
     const platform = String(req.query.platform || "android").toLowerCase();
-    const latest = await AppRelease.findOne({
-      platform,
-      isActive: true,
-    })
-      .sort({ versionCode: -1 })
-      .lean();
+    const latest = await getLatestAppRelease(platform);
 
     if (!latest) {
       return res.json({
@@ -79,6 +86,23 @@ commonRoutes.get("/app/download", async (req, res) => {
       status: false,
       message: err.message || "Failed to fetch app download",
     });
+  }
+});
+
+// Direct APK download redirect (home page, marketing links)
+commonRoutes.get("/app/download/apk", async (req, res) => {
+  try {
+    const platform = String(req.query.platform || "android").toLowerCase();
+    const latest = await getLatestAppRelease(platform);
+    if (!latest?.apkUrl) {
+      return res.status(404).send(
+        "No Android app available. Admin → App Release se APK upload karein.",
+      );
+    }
+    return res.redirect(302, latest.apkUrl);
+  } catch (err) {
+    console.error("App APK redirect error:", err);
+    return res.status(500).send(err.message || "Failed to download app");
   }
 });
 

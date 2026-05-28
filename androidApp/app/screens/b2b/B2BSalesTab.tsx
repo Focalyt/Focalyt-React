@@ -40,7 +40,19 @@ import { B2BLeadHistoryModal } from './B2BLeadHistoryModal';
 import { B2BInstituteWebModal } from './B2BInstituteWebModal';
 import { B2BReferLeadModal } from './B2BReferLeadModal';
 import { B2BStatusChangeModal } from './B2BStatusChangeModal';
+import { B2BCrossSaleModal } from './B2BCrossSaleModal';
 import { b2bLrpAddUrl, b2bLrpViewUrl } from '../../services/collegeApi';
+
+function getLeadGroupRootId(lead: B2BLead): string {
+  return String(lead.crossSaleRootId || lead.parentLeadId || lead._id || '');
+}
+
+function getLeadProjectName(lead: B2BLead): string {
+  const p = lead.b2bProject;
+  if (!p) return 'Project';
+  if (typeof p === 'object') return p.name || 'Project';
+  return 'Project';
+}
 
 function normalizePhoneDigits(raw: string | number | undefined): string {
   if (raw == null || raw === '') return '';
@@ -184,6 +196,12 @@ export function B2BSalesTab() {
   const [approvalLoading, setApprovalLoading] = React.useState(false);
 
   const [leads, setLeads] = React.useState<B2BLead[]>([]);
+  const [crossSaleCache, setCrossSaleCache] = React.useState<
+    Record<string, B2BLead[]>
+  >({});
+  const [activeProjectByGroup, setActiveProjectByGroup] = React.useState<
+    Record<string, string>
+  >({});
   const [page, setPage] = React.useState(1);
   const [totalPages, setTotalPages] = React.useState(1);
   const [loading, setLoading] = React.useState(false);
@@ -195,6 +213,7 @@ export function B2BSalesTab() {
     React.useState<'Call' | 'Visit'>('Call');
   const [statusLead, setStatusLead] = React.useState<B2BLead | null>(null);
   const [historyLead, setHistoryLead] = React.useState<B2BLead | null>(null);
+  const [crossSaleLead, setCrossSaleLead] = React.useState<B2BLead | null>(null);
   const [documentsLead, setDocumentsLead] = React.useState<B2BLead | null>(null);
   const [referLead, setReferLead] = React.useState<B2BLead | null>(null);
   const [instituteWeb, setInstituteWeb] = React.useState<{
@@ -202,6 +221,32 @@ export function B2BSalesTab() {
     url: string | null;
   } | null>(null);
   const [showAddLead, setShowAddLead] = React.useState(false);
+
+  const leadDisplayGroups = React.useMemo(() => {
+    const byRoot = new Map<string, B2BLead[]>();
+    for (const l of leads) {
+      const rootId = getLeadGroupRootId(l);
+      const arr = byRoot.get(rootId) || [];
+      arr.push(l);
+      byRoot.set(rootId, arr);
+    }
+    return Array.from(byRoot.entries()).map(([rootId, members]) => {
+      const cached = crossSaleCache[rootId];
+      const merged = cached?.length ? cached : members;
+      const unique = [
+        ...new Map(merged.map(m => [String(m._id), m])).values(),
+      ];
+      const sorted = unique.sort((a, b) => {
+        const aPrimary = !a.parentLeadId;
+        const bPrimary = !b.parentLeadId;
+        if (aPrimary !== bPrimary) return aPrimary ? -1 : 1;
+        return (
+          new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+        );
+      });
+      return { rootId, leads: sorted };
+    });
+  }, [leads, crossSaleCache]);
 
   const loadCounts = React.useCallback(
     async (
@@ -727,8 +772,8 @@ export function B2BSalesTab() {
         </View>
       ) : (
         <FlatList
-          data={leads}
-          keyExtractor={item => item._id}
+          data={leadDisplayGroups}
+          keyExtractor={g => g.rootId}
           ListHeaderComponent={ListHeader}
           contentContainerStyle={[
             styles.listContent,
@@ -752,33 +797,84 @@ export function B2BSalesTab() {
             }
           }}
           ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-          renderItem={({ item }) => (
-            <B2BLeadCard
-              lead={item}
+          renderItem={({ item: group }) => {
+            const activeId = activeProjectByGroup[group.rootId];
+            const activeLead =
+              group.leads.find(l => String(l._id) === String(activeId)) ||
+              group.leads.find(l => !l.parentLeadId) ||
+              group.leads[0];
+            const activeLeadId = activeLead?._id;
+
+            return (
+              <View style={styles.groupWrap}>
+                {group.leads.length > 1 ? (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.groupTabs}
+                  >
+                    {group.leads.map(l => {
+                      const selected = String(l._id) === String(activeLeadId);
+                      return (
+                        <Pressable
+                          key={l._id}
+                          onPress={() =>
+                            setActiveProjectByGroup(prev => ({
+                              ...prev,
+                              [group.rootId]: l._id,
+                            }))
+                          }
+                          style={[
+                            styles.groupTab,
+                            selected && styles.groupTabActive,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.groupTabText,
+                              selected && styles.groupTabTextActive,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {getLeadProjectName(l)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                ) : null}
+
+                {activeLead ? (
+                  <B2BLeadCard
+                    lead={activeLead}
               onDial={dialNumber}
               onWhatsApp={openWhatsApp}
               onFollowup={type => {
                 setFollowupType(type);
-                setFollowupLead(item);
+                setFollowupLead(activeLead);
               }}
-              onStatusChange={() => setStatusLead(item)}
-              onHistory={() => setHistoryLead(item)}
-              onDocuments={() => setDocumentsLead(item)}
-              onReferLead={() => setReferLead(item)}
+              onStatusChange={() => setStatusLead(activeLead)}
+              onHistory={() => setHistoryLead(activeLead)}
+              onCrossSale={() => setCrossSaleLead(activeLead)}
+              onDocuments={() => setDocumentsLead(activeLead)}
+              onReferLead={() => setReferLead(activeLead)}
               onAddReport={() =>
                 setInstituteWeb({
                   title: 'Add Lead Report',
-                  url: b2bLrpAddUrl(item._id),
+                  url: b2bLrpAddUrl(activeLeadId),
                 })
               }
               onViewReport={() =>
                 setInstituteWeb({
                   title: 'View Lead Report',
-                  url: b2bLrpViewUrl(item._id),
+                  url: b2bLrpViewUrl(activeLeadId),
                 })
               }
-            />
-          )}
+                  />
+                ) : null}
+              </View>
+            );
+          }}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
               <Text style={styles.emptyMsg}>
@@ -828,6 +924,17 @@ export function B2BSalesTab() {
         visible={!!historyLead}
         lead={historyLead}
         onClose={() => setHistoryLead(null)}
+      />
+
+      <B2BCrossSaleModal
+        visible={!!crossSaleLead}
+        lead={crossSaleLead}
+        onClose={() => setCrossSaleLead(null)}
+        onSaved={() => {
+          loadCounts();
+          loadApprovalCounts();
+          loadLeads('refresh', 1);
+        }}
       />
 
       <B2BLeadDocumentsModal
@@ -1149,6 +1256,38 @@ const styles = StyleSheet.create({
   loadingWrap: { paddingVertical: 30, alignItems: 'center' },
   loadingText: { marginTop: 8, color: college.textMuted },
   listContent: { paddingHorizontal: 16, paddingBottom: 24 },
+  groupWrap: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  groupTabs: {
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 6,
+    backgroundColor: '#fff9fb',
+    gap: 8,
+  },
+  groupTab: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: 'rgba(250, 85, 121, 0.35)',
+    maxWidth: 180,
+  },
+  groupTabActive: {
+    backgroundColor: 'rgb(250, 85, 121)',
+    borderColor: 'rgb(250, 85, 121)',
+  },
+  groupTabText: {
+    color: '#0f172a',
+    fontWeight: '800',
+    fontSize: 12,
+  },
+  groupTabTextActive: {
+    color: '#fff',
+  },
   errorBox: {
     backgroundColor: '#fee2e2',
     color: '#b91c1c',

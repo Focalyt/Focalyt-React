@@ -25,7 +25,8 @@ const {
 	Industry,
 	Courses,
 	CourseSectors,
-	Contact, Post , StudentRegistration
+	Contact, Post , StudentRegistration,
+	AppRelease,
 } = require("../../models");
 const Team = require('../../models/team'); // PostSchema import करें
 const bcrypt = require("bcryptjs");
@@ -187,8 +188,29 @@ router.get("/", async (req, res) => {
 				select: "name",
 			},]).sort({ sequence: 1, createdAt: -1 }).skip(perPage * page - perPage).limit(perPage);
 
+		let appDownload = null;
+		try {
+			const latestApp = await AppRelease.findOne({
+				platform: 'android',
+				isActive: true,
+			})
+				.sort({ versionCode: -1 })
+				.lean();
+			if (latestApp?.apkUrl) {
+				appDownload = {
+					downloadUrl: latestApp.apkUrl,
+					versionName: latestApp.versionName,
+					versionCode: latestApp.versionCode,
+					fileSizeBytes: latestApp.fileSizeBytes,
+					releaseNotes: latestApp.releaseNotes || '',
+				};
+			}
+		} catch (appErr) {
+			console.error('Home page app download:', appErr);
+		}
+
 		rePath = res.render(`${req.vPath}/front`, {
-			recentJobs, allQualification, allIndustry, allStates, data, totalPages, page, storageScript: storageScript
+			recentJobs, allQualification, allIndustry, allStates, data, totalPages, page, storageScript: storageScript, appDownload
 		});
 	} catch (err) {
 		const ipAddress = req.header('x-forwarded-for') || req.socket.remoteAddress;

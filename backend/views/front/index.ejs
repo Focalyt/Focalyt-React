@@ -526,6 +526,19 @@
                   <!-- active_menu -->
                   <a class='nav-link-item drop-trigger ' href='/contact'>Contact Us</a>
                 </li>
+                <% if (typeof appDownload !== 'undefined' && appDownload && appDownload.downloadUrl) { %>
+                <li class="nav-item d-xl-flex d-lg-flex d-md-none d-sm-none d-none align-items-center">
+                  <a
+                    href="<%= appDownload.downloadUrl %>"
+                    class="nav-link-item home-app-download-nav"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download
+                  >
+                    <i class="fa-brands fa-android"></i> Download App
+                  </a>
+                </li>
+                <% } %>
                 <li class="nav-item small">
                   <!-- Container for hoverable area -->
                   <div class="dropdown-container">
@@ -628,6 +641,7 @@
               <div class="pt-4 last_cta">
                 <h3 class="color-pink fw-bolder">ALL IN ONE PLACE!</h4>
               </div>
+              <%- include('./partials/appDownload') %>
             </div>
             <!-- CTA's -->
             <div
@@ -817,6 +831,7 @@
               <div class="pt-4 last_cta">
                 <h3 class="color-pink fw-bolder">ALL IN ONE PLACE!</h4>
               </div>
+              <%- include('./partials/appDownload') %>
               <div class="col-xxl-12 mx-auto mt-xxl-5 mt-xl-3 mt-lg-3 mt-md-3 mt-sm-3 mt-3">
                 <div class="row justify-content-start" id="features_cta">
                   <div class="col-xxl-3 col-xl-3 col-lg-3 col-md-3 col-sm-6 col-6 text-center mb-sm-3 mb-3 cta_cols">

@@ -25,6 +25,7 @@ type Props = {
   onStatusChange: () => void;
   onFollowup: (type: 'Call' | 'Visit') => void;
   onHistory: () => void;
+  onCrossSale: () => void;
   onDocuments: () => void;
   onAddReport: () => void;
   onViewReport: () => void;
@@ -123,10 +124,12 @@ function LeadActionMenu({
   visible,
   onClose,
   onHistory,
+  onCrossSale,
 }: {
   visible: boolean;
   onClose: () => void;
   onHistory: () => void;
+  onCrossSale: () => void;
 }) {
   const insets = useSafeAreaInsets();
 
@@ -168,6 +171,20 @@ function LeadActionMenu({
               <Text style={menuStyles.itemLabel}>History</Text>
               <Icon name="chevron-right" size={12} color="#94a3b8" />
             </Pressable>
+
+            <Pressable
+              style={menuStyles.item}
+              onPress={() => {
+                onClose();
+                onCrossSale();
+              }}
+            >
+              <View style={menuStyles.itemIcon}>
+                <Icon name="project-diagram" size={14} color={HEADER_BG} solid />
+              </View>
+              <Text style={menuStyles.itemLabel}>Cross Sale</Text>
+              <Icon name="chevron-right" size={12} color="#94a3b8" />
+            </Pressable>
           </View>
         </Pressable>
       </Pressable>
@@ -200,6 +217,7 @@ export function B2BLeadCard({
   onStatusChange,
   onFollowup,
   onHistory,
+  onCrossSale,
   onDocuments,
   onAddReport,
   onViewReport,
@@ -240,9 +258,14 @@ export function B2BLeadCard({
     return Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
   }, [lead.createdAt]);
 
+  const showProjectTab =
+    typeof projectName === 'string' &&
+    projectName.trim() !== '' &&
+    projectName.trim() !== '—';
+
   return (
     <View style={styles.card}>
-      {projectName !== '—' ? (
+      {showProjectTab ? (
         <View style={styles.projectTabs}>
           <View style={styles.projectTab}>
             <Text style={styles.projectTabText} numberOfLines={1}>
@@ -250,7 +273,9 @@ export function B2BLeadCard({
             </Text>
           </View>
         </View>
-      ) : null}
+      ) : (
+        <View style={styles.projectTabsPlaceholder} />
+      )}
 
       <View style={styles.header}>
         <View style={styles.headerActions}>
@@ -484,6 +509,7 @@ export function B2BLeadCard({
         visible={actionMenuOpen}
         onClose={() => setActionMenuOpen(false)}
         onHistory={onHistory}
+        onCrossSale={onCrossSale}
       />
     </View>
   );
@@ -537,6 +563,12 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   projectTabs: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 8,
+    backgroundColor: '#fff9fb',
+  },
+  projectTabsPlaceholder: {
     paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: 8,

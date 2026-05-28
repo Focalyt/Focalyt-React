@@ -41,6 +41,7 @@ export type B2BLead = {
   leadOwner?: { name?: string };
   leadAddedBy?: { name?: string };
   parentLeadId?: string;
+  crossSaleRootId?: string;
   leadCategory?: {
     _id?: string;
     name?: string;
@@ -642,6 +643,58 @@ export async function fetchB2BApprovalCounts(
       message: e instanceof Error ? e.message : 'Failed to load approval counts',
     };
   }
+}
+
+export async function fetchB2BCrossSales(
+  token: string,
+  leadId: string,
+): Promise<{ ok: boolean; rootId?: string; leads: B2BLead[]; message?: string }> {
+  const res = await getJson(`/college/b2b/leads/${leadId}/cross-sales`, token);
+  if (res.status === true && res.data && typeof res.data === 'object') {
+    const d = res.data as Json;
+    return {
+      ok: true,
+      rootId: typeof d.rootId === 'string' ? d.rootId : undefined,
+      leads: Array.isArray(d.leads) ? (d.leads as B2BLead[]) : [],
+    };
+  }
+  return {
+    ok: false,
+    rootId: undefined,
+    leads: [],
+    message:
+      typeof res.message === 'string'
+        ? res.message
+        : 'Failed to load cross-sales',
+  };
+}
+
+export type B2BCrossSaleCreateBody = {
+  b2bDepartment: string;
+  b2bProject: string;
+  typeOfB2B: string;
+  leadOwner?: string;
+  status?: string;
+  subStatus?: string;
+  remark?: string;
+};
+
+export async function createB2BCrossSale(
+  token: string,
+  leadId: string,
+  body: B2BCrossSaleCreateBody,
+): Promise<{ ok: boolean; lead?: B2BLead; message?: string }> {
+  const res = await postJson(`/college/b2b/leads/${leadId}/cross-sale`, body, token);
+  if (res.status === true && res.data) {
+    return { ok: true, lead: res.data as B2BLead };
+  }
+  return {
+    ok: false,
+    message:
+      typeof res.message === 'string'
+        ? res.message
+        : 'Failed to create cross-sale',
+  };
 }
 
 export type B2BDocumentsBucket = 'done' | 'pending';
