@@ -211,7 +211,7 @@ function Footer() {
                   </li>
                 ))}
               </ul>
-              <div className="ftr-download-card">
+              {/* <div className="ftr-download-card">
                 <h4 className="ftr-download-heading">Download App From</h4>
                 <a
                   className="ftr-playstore-button"
@@ -234,7 +234,7 @@ function Footer() {
                     <span className="ftr-playstore-text-2">Google Play</span>
                   </span>
                 </a>
-              </div>
+              </div> */}
             </div>
 
             <div className="ftr-col">

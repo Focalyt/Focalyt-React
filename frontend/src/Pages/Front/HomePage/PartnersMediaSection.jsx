@@ -1,4 +1,136 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+
+export const GOVT_PARTNERS = [
+  "NSDC",
+  "MeitY",
+  "PMKVY",
+  "HPKVN",
+  "OSDA",
+  "UPSDM",
+  "ESSCZ",
+  "TSSC",
+  "IT-ITES",
+  "BFSI",
+  "THSC",
+  "MEPSC",
+  "ESDM",
+  "Skill Development",
+];
+
+export const CSR_PARTNERS = [
+  "Ericsson",
+  "Panasonic",
+  "Samsung",
+  "Honda",
+  "Brickstone",
+  "TCI",
+  "Hero Motocorp",
+];
+
+export const ACADEMIC_PARTNERS = [
+  "Chandigarh University",
+  "Amity University",
+  "SGT University",
+  "Lovely Professional University",
+  "Rayat Bahra University",
+  "GNM College Ambala",
+  "APIIT SD India",
+];
+
+export const INDUSTRY_PARTNERS = [
+  "Dixon",
+  "Padget",
+  "East Indl Technologies",
+  "Net+",
+  "Fastway",
+  "TXD",
+  "Country Inn & Suites",
+  "Taco Bell",
+  "Barbeque Nation",
+  "Radisson",
+  "Montree Hotel",
+  "Qvolv",
+  "Patanjali",
+  "Bakingo",
+];
+
+const CHIP_COLORS = [
+  "#1a5276",
+  "#c0392b",
+  "var(--foc-green-dark)",
+  "#2980b9",
+  "#7d3c98",
+  "#e67e22",
+  "var(--foc-blue)",
+  "#009999",
+  "var(--foc-purple-dark)",
+  "var(--foc-orange)",
+];
+
+const CHIP_EMOJIS = ["🎯", "🌐", "📋", "💻", "📚", "🔮", "⚡", "🏛️", "🤝", "🏭", "🎓", "⭐"];
+
+const PARTNER_PREVIEW_COUNT = 6;
+
+function partnerToLogo(label, index = 0) {
+  return {
+    label,
+    color: CHIP_COLORS[index % CHIP_COLORS.length],
+    emoji: CHIP_EMOJIS[index % CHIP_EMOJIS.length],
+  };
+}
+
+function partnersToCarouselSlides(names, maxCount = PARTNER_PREVIEW_COUNT, perSlide = 3) {
+  const list = maxCount == null ? names : names.slice(0, maxCount);
+  const logos = list.map((label, i) => partnerToLogo(label, i));
+  const slides = [];
+  for (let i = 0; i < logos.length; i += perSlide) {
+    slides.push(logos.slice(i, i + perSlide));
+  }
+  return slides.length ? slides : [[]];
+}
+
+const PARTNER_CATEGORIES = [
+  {
+    id: "gov",
+    color: "var(--foc-green-dark)",
+    bg: "linear-gradient(135deg,var(--foc-partner-green-bg),var(--foc-partner-green-end))",
+    iconBg: "linear-gradient(135deg,var(--foc-green-dark),var(--foc-green-hover))",
+    emoji: "🏛️",
+    title: "Government Partners",
+    desc: "Working with government bodies and public institutions to empower communities and build a skilled nation.",
+    partners: GOVT_PARTNERS,
+  },
+  {
+    id: "csr",
+    color: "var(--foc-blue)",
+    bg: "linear-gradient(135deg,var(--foc-partner-blue-bg),var(--foc-partner-blue-end))",
+    iconBg: "linear-gradient(135deg,var(--foc-blue),var(--foc-blue-bright))",
+    emoji: "💙",
+    title: "CSR Partners",
+    desc: "Partnering with corporates through CSR initiatives to create sustainable social impact and inclusive growth.",
+    partners: CSR_PARTNERS,
+  },
+  {
+    id: "acad",
+    color: "var(--foc-purple-dark)",
+    bg: "linear-gradient(135deg,var(--foc-partner-purple-bg),var(--foc-partner-purple-end))",
+    iconBg: "linear-gradient(135deg,var(--foc-purple-dark),var(--foc-purple-bright))",
+    emoji: "🎓",
+    title: "Academic Partners",
+    desc: "Collaborating with schools, colleges, universities and training institutions to promote future-ready education.",
+    partners: ACADEMIC_PARTNERS,
+  },
+  {
+    id: "ind",
+    color: "var(--foc-orange)",
+    bg: "linear-gradient(135deg,var(--foc-partner-orange-bg),var(--foc-partner-orange-end))",
+    iconBg: "linear-gradient(135deg,var(--foc-orange),var(--foc-orange-bright))",
+    emoji: "🏭",
+    title: "Industry Partners",
+    desc: "Working with leading industries and organizations to bridge the gap between skills and industry needs.",
+    partners: INDUSTRY_PARTNERS,
+  },
+];
 
 const STYLES = `
     .fp, .fp *, .fp *::before, .fp *::after { box-sizing: border-box; }
@@ -259,94 +391,124 @@ const STYLES = `
       font-size: 9px;
     }
   }
-`;
 
-const PARTNER_CATS = [
-  {
-    id: "gov",
-    color: "var(--foc-green-dark)",
-    bg: "linear-gradient(135deg,var(--foc-partner-green-bg),var(--foc-partner-green-end))",
-    iconBg: "linear-gradient(135deg,var(--foc-green-dark),var(--foc-green-hover))",
-    emoji: "🏛️",
-    title: "Government Partners",
-    desc: "Working with government bodies and public institutions to empower communities and build a skilled nation.",
-    logos: [
-      [
-        { label: "Skill India", color: "#1a5276", emoji: "🎯" },
-        { label: "NSDC", color: "#c0392b", emoji: "🌐" },
-        { label: "PMKVY", color: "var(--foc-green-dark)", emoji: "📋" },
-      ],
-      [
-        { label: "NIELIT", color: "#2980b9", emoji: "💻" },
-        { label: "MSDE", color: "#7d3c98", emoji: "📚" },
-        { label: "NITI Aayog", color: "#e67e22", emoji: "🔮" },
-      ],
-    ],
-  },
-  {
-    id: "csr",
-    color: "var(--foc-blue)",
-    bg: "linear-gradient(135deg,var(--foc-partner-blue-bg),var(--foc-partner-blue-end))",
-    iconBg: "linear-gradient(135deg,var(--foc-blue),var(--foc-blue-bright))",
-    emoji: "💙",
-    title: "CSR Partners",
-    desc: "Partnering with corporates through CSR initiatives to create sustainable social impact and inclusive growth.",
-    logos: [
-      [
-        { label: "TATA Power", color: "#1a1a2e", emoji: "⚡" },
-        { label: "TCS", color: "var(--foc-blue)", emoji: "🖥️" },
-        { label: "Wipro", color: "#4caf50", emoji: "🌿" },
-      ],
-      [
-        { label: "Infosys", color: "#007cc3", emoji: "🔷" },
-        { label: "HCL", color: "#c0392b", emoji: "🚀" },
-        { label: "Tech Mahindra", color: "#d4273a", emoji: "⚙️" },
-      ],
-    ],
-  },
-  {
-    id: "acad",
-    color: "var(--foc-purple-dark)",
-    bg: "linear-gradient(135deg,var(--foc-partner-purple-bg),var(--foc-partner-purple-end))",
-    iconBg: "linear-gradient(135deg,var(--foc-purple-dark),var(--foc-purple-bright))",
-    emoji: "🎓",
-    title: "Academic Partners",
-    desc: "Collaborating with schools, colleges, universities and training institutions to promote future-ready education.",
-    logos: [
-      [
-        { label: "IIT Kanpur", color: "#1a3a6b", emoji: "🔬" },
-        { label: "Amity Univ", color: "#c0392b", emoji: "🏫" },
-        { label: "CU", color: "#8e1a1a", emoji: "🎯" },
-      ],
-      [
-        { label: "BITS Pilani", color: "#1a5276", emoji: "⚗️" },
-        { label: "IGNOU", color: "#2e7d4f", emoji: "📖" },
-        { label: "NIFT", color: "var(--foc-purple-dark)", emoji: "🎨" },
-      ],
-    ],
-  },
-  {
-    id: "ind",
-    color: "var(--foc-orange)",
-    bg: "linear-gradient(135deg,var(--foc-partner-orange-bg),var(--foc-partner-orange-end))",
-    iconBg: "linear-gradient(135deg,var(--foc-orange),var(--foc-orange-bright))",
-    emoji: "🏭",
-    title: "Industry Partners",
-    desc: "Working with leading industries and organizations to bridge the gap between skills and industry needs.",
-    logos: [
-      [
-        { label: "Siemens", color: "#009999", emoji: "⚙️" },
-        { label: "Bosch", color: "#c0392b", emoji: "🔧" },
-        { label: "Infosys", color: "#007cc3", emoji: "💡" },
-      ],
-      [
-        { label: "L&T", color: "#1a5276", emoji: "🏗️" },
-        { label: "ABB", color: "#c0392b", emoji: "🔌" },
-        { label: "Honeywell", color: "var(--foc-orange)", emoji: "🌡️" },
-      ],
-    ],
-  },
-];
+  @keyframes fp-partner-marquee-rtl {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  @keyframes fp-partner-marquee-ltr {
+    from { transform: translateX(-50%); }
+    to { transform: translateX(0); }
+  }
+  .fp .fp-partner-marquee {
+    width: 100%;
+    margin-top: 12px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--foc-color-border-light);
+    background: var(--foc-color-bg-section);
+  }
+  .fp .fp-partner-marquee__track {
+    display: flex;
+    width: max-content;
+    gap: 10px;
+    padding: 10px 14px;
+    animation: fp-partner-marquee-rtl 42s linear infinite;
+  }
+  .fp .fp-partner-marquee[data-dir="ltr"] .fp-partner-marquee__track {
+    animation-name: fp-partner-marquee-ltr;
+  }
+  .fp .fp-partner-marquee__item {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--foc-color-border-light);
+    background: var(--foc-color-surface);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--foc-navy-deep);
+    white-space: nowrap;
+  }
+  .fp .fp-partner-marquee__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.55;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .fp .fp-partner-marquee__track { animation: none !important; flex-wrap: wrap; width: 100%; }
+  }
+
+  .fp .partner-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    width: 100%;
+    margin-bottom: 14px;
+  }
+  @media (max-width: 400px) {
+    .fp .partner-preview-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .fp .partner-all-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    background: rgba(11, 18, 32, 0.55);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 16px;
+  }
+  .fp .partner-all-modal {
+    width: min(560px, 100%);
+    max-height: min(85vh, 640px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--foc-color-surface);
+    border-radius: 20px;
+    border: 1px solid var(--foc-color-border-light);
+    box-shadow: 0 24px 64px rgba(13, 33, 70, 0.22);
+  }
+  .fp .partner-all-modal__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--foc-color-border-light);
+  }
+  .fp .partner-all-modal__title {
+    font-family: var(--foc-font-display);
+    font-weight: 800;
+    font-size: 18px;
+    margin: 0;
+  }
+  .fp .partner-all-modal__close {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--foc-color-border-light);
+    background: var(--foc-color-bg-section);
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+    color: var(--foc-navy-deep);
+  }
+  .fp .partner-all-modal__body {
+    padding: 8px 24px 24px;
+    overflow: visible;
+  }
+  .fp .partner-all-modal .partner-logo-carousel {
+    margin-bottom: 0;
+  }
+`;
 
 const MEDIA_TABS = [
   { id: "social", label: "Social Media", emoji: "📱" },
@@ -517,175 +679,286 @@ function LogoChip({ logo }) {
       }}
     >
       <div style={{ fontSize: 21 }}>{logo.emoji}</div>
-      <div style={{ fontWeight: 800, fontSize: 10.5, color: logo.color, textAlign: "center", letterSpacing: 0.3 }}>{logo.label}</div>
+      <div style={{ fontWeight: 800, fontSize: 10.5, color: logo.color, textAlign: "center", letterSpacing: 0.3, lineHeight: 1.25 }}>{logo.label}</div>
+    </div>
+  );
+}
+
+const PARTNER_CAROUSEL_AUTO_MS = 4000;
+
+function PartnerLogoCarousel({ cat, slides, slide, setSlide, bg, autoPlay = true }) {
+  const total = slides.length;
+  const carouselBg = bg ?? cat.bg;
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    if (!autoPlay || paused || total <= 1) return undefined;
+
+    const prefersReduced =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReduced) return undefined;
+
+    const id = window.setInterval(() => {
+      setSlide((s) => (s + 1) % total);
+    }, PARTNER_CAROUSEL_AUTO_MS);
+
+    return () => window.clearInterval(id);
+  }, [autoPlay, paused, total, setSlide]);
+
+  return (
+    <div
+      className="partner-logo-carousel"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setPaused(false);
+      }}
+      style={{
+        width: "100%",
+        borderRadius: 16,
+        background: carouselBg,
+        padding: "14px 12px 10px",
+        position: "relative",
+        marginBottom: 16,
+      }}
+    >
+      <button
+        type="button"
+        className="arrow-btn partner-arrow-prev"
+        aria-label="Previous partners"
+        onClick={() => setSlide((s) => (s - 1 + total) % total)}
+        style={{
+          position: "absolute",
+          left: -14,
+          top: "50%",
+          transform: "translateY(-50%)",
+          width: 30,
+          height: 30,
+          borderRadius: "50%",
+          border: `2px solid ${cat.color}44`,
+          background: "var(--foc-color-surface)",
+          color: cat.color,
+          fontSize: 15,
+          fontWeight: 900,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: `0 3px 12px ${cat.color}22`,
+          zIndex: 3,
+        }}
+      >
+        ‹
+      </button>
+      <div className="partner-logo-row" style={{ display: "flex", justifyContent: "center", gap: 6, width: "100%", minHeight: 72 }}>
+        {slides[slide]?.map((logo) => (
+          <LogoChip key={logo.label} logo={logo} />
+        ))}
+      </div>
+      <button
+        type="button"
+        className="arrow-btn partner-arrow-next"
+        aria-label="Next partners"
+        onClick={() => setSlide((s) => (s + 1) % total)}
+        style={{
+          position: "absolute",
+          right: -14,
+          top: "50%",
+          transform: "translateY(-50%)",
+          width: 30,
+          height: 30,
+          borderRadius: "50%",
+          border: `2px solid ${cat.color}44`,
+          background: "var(--foc-color-surface)",
+          color: cat.color,
+          fontSize: 15,
+          fontWeight: 900,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: `0 3px 12px ${cat.color}22`,
+          zIndex: 3,
+        }}
+      >
+        ›
+      </button>
+      <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 10 }}>
+        {Array.from({ length: total }).map((_, i) => (
+          <button
+            type="button"
+            key={i}
+            aria-label={`Slide ${i + 1}`}
+            onClick={() => setSlide(i)}
+            style={{
+              width: i === slide ? 24 : 8,
+              height: 8,
+              borderRadius: 4,
+              background: i === slide ? cat.color : `${cat.color}44`,
+              cursor: "pointer",
+              transition: "all 0.3s ease",
+              border: "none",
+              padding: 0,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PartnerAllModal({ cat, open, onClose }) {
+  const [slide, setSlide] = useState(0);
+  const carouselSlides = useMemo(() => partnersToCarouselSlides(cat.partners, null), [cat.partners]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    setSlide(0);
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="partner-all-modal-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="partner-all-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`partner-modal-title-${cat.id}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="partner-all-modal__head">
+          <h3 id={`partner-modal-title-${cat.id}`} className="partner-all-modal__title" style={{ color: cat.color }}>
+            {cat.title}
+          </h3>
+          <button type="button" className="partner-all-modal__close" aria-label="Close" onClick={onClose}>
+            ×
+          </button>
+        </div>
+        <div className="partner-all-modal__body">
+          <PartnerLogoCarousel cat={cat} slides={carouselSlides} slide={slide} setSlide={setSlide} />
+        </div>
+      </div>
     </div>
   );
 }
 
 function PartnerCard({ cat, delay = 0 }) {
+  const [modalOpen, setModalOpen] = useState(false);
   const [slide, setSlide] = useState(0);
-  const total = cat.logos.length;
+  const carouselSlides = useMemo(() => partnersToCarouselSlides(cat.partners), [cat.partners]);
+  const closeModal = useCallback(() => setModalOpen(false), []);
 
   return (
-    <div
-      className="partner-card fade-up"
-      style={{
-        animationDelay: `${delay}ms`,
-        width: "100%",
-        background: "var(--foc-color-surface)",
-        borderRadius: 24,
-        border: `2px solid ${cat.color}1a`,
-        boxShadow: `0 8px 40px ${cat.color}12`,
-        overflow: "visible",
-        display: "flex",
-        flexDirection: "column",
-        position: "relative",
-      }}
-    >
+    <>
       <div
+        className="partner-card fade-up"
         style={{
-          height: 5,
-          borderRadius: "22px 22px 0 0",
-          background: `linear-gradient(90deg, ${cat.color}, ${cat.color}77)`,
+          animationDelay: `${delay}ms`,
+          width: "100%",
+          background: "var(--foc-color-surface)",
+          borderRadius: 24,
+          border: `2px solid ${cat.color}1a`,
+          boxShadow: `0 8px 40px ${cat.color}12`,
+          overflow: "visible",
+          display: "flex",
+          flexDirection: "column",
+          position: "relative",
         }}
-      />
-      <div style={{ padding: "22px 20px 20px", display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
+      >
         <div
-          className="float"
           style={{
-            width: 70,
-            height: 70,
-            borderRadius: "50%",
-            background: cat.iconBg,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 30,
-            marginBottom: 14,
-            boxShadow: `0 10px 32px ${cat.color}44`,
+            height: 5,
+            borderRadius: "22px 22px 0 0",
+            background: `linear-gradient(90deg, ${cat.color}, ${cat.color}77)`,
           }}
-        >
-          {cat.emoji}
-        </div>
-        <div style={{ fontFamily: 'var(--foc-font-display)', fontWeight: 800, fontSize: 17.5, color: cat.color, marginBottom: 6, textAlign: "center" }}>
-          {cat.title}
-        </div>
-        <p style={{ fontFamily: 'var(--foc-font-sans)', fontSize: 13, color: "var(--foc-text-caption-alt)", textAlign: "center", lineHeight: 1.65, marginBottom: 18, flex: 1 }}>{cat.desc}</p>
-        <div className="partner-logo-carousel" style={{ width: "100%", borderRadius: 16, background: cat.bg, padding: "14px 12px 10px", position: "relative", marginBottom: 16 }}>
-          <button
-            type="button"
-            className="arrow-btn partner-arrow-prev"
-            aria-label="Previous partners"
-            onClick={() => setSlide((s) => (s - 1 + total) % total)}
+        />
+        <div style={{ padding: "22px 20px 20px", display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
+          <div
+            className="float"
             style={{
-              position: "absolute",
-              left: -14,
-              top: "50%",
-              transform: "translateY(-50%)",
-              width: 30,
-              height: 30,
+              width: 70,
+              height: 70,
               borderRadius: "50%",
-              border: `2px solid ${cat.color}44`,
-              background: "var(--foc-color-surface)",
-              color: cat.color,
-              fontSize: 15,
-              fontWeight: 900,
+              background: cat.iconBg,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              boxShadow: `0 3px 12px ${cat.color}22`,
-              zIndex: 3,
-            }}
-          >
-            ‹
-          </button>
-          <div className="partner-logo-row" style={{ display: "flex", justifyContent: "center", gap: 6, width: "100%" }}>
-            {cat.logos[slide].map((logo) => (
-              <LogoChip key={logo.label} logo={logo} />
-            ))}
-          </div>
-          <button
-            type="button"
-            className="arrow-btn partner-arrow-next"
-            aria-label="Next partners"
-            onClick={() => setSlide((s) => (s + 1) % total)}
-            style={{
-              position: "absolute",
-              right: -14,
-              top: "50%",
-              transform: "translateY(-50%)",
-              width: 30,
-              height: 30,
-              borderRadius: "50%",
-              border: `2px solid ${cat.color}44`,
-              background: "var(--foc-color-surface)",
-              color: cat.color,
-              fontSize: 15,
-              fontWeight: 900,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: `0 3px 12px ${cat.color}22`,
-              zIndex: 3,
-            }}
-          >
-            ›
-          </button>
-          <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 10 }}>
-            {Array.from({ length: total }).map((_, i) => (
-              <button
-                type="button"
-                key={i}
-                aria-label={`Slide ${i + 1}`}
-                onClick={() => setSlide(i)}
-                style={{
-                  width: i === slide ? 24 : 8,
-                  height: 8,
-                  borderRadius: 4,
-                  background: i === slide ? cat.color : `${cat.color}44`,
-                  cursor: "pointer",
-                  transition: "all 0.3s ease",
-                  border: "none",
-                  padding: 0,
-                }}
-              />
-            ))}
-          </div>
-        </div>
-        <div className="view-btn" style={{ display: "flex", alignItems: "center", gap: 8, color: cat.color, fontWeight: 800, fontSize: 14 }}>
-          <span
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: "50%",
-              background: `${cat.color}18`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 14,
+              fontSize: 30,
+              marginBottom: 14,
+              boxShadow: `0 10px 32px ${cat.color}44`,
             }}
           >
             {cat.emoji}
-          </span>
-          View All Partners
-          <span
+          </div>
+          <div style={{ fontFamily: "var(--foc-font-display)", fontWeight: 800, fontSize: 17.5, color: cat.color, marginBottom: 6, textAlign: "center" }}>
+            {cat.title}
+          </div>
+          <p style={{ fontFamily: "var(--foc-font-sans)", fontSize: 13, color: "var(--foc-text-caption-alt)", textAlign: "center", lineHeight: 1.65, marginBottom: 18, flex: 1 }}>
+            {cat.desc}
+          </p>
+          <PartnerLogoCarousel cat={cat} slides={carouselSlides} slide={slide} setSlide={setSlide} />
+          <button
+            type="button"
+            className="view-btn"
+            onClick={() => setModalOpen(true)}
             style={{
-              width: 26,
-              height: 26,
-              borderRadius: "50%",
-              background: cat.color,
-              color: "var(--foc-color-surface)",
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              fontSize: 13,
+              gap: 8,
+              color: cat.color,
+              fontWeight: 800,
+              fontSize: 14,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: 0,
             }}
           >
-            →
-          </span>
+            <span
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                background: `${cat.color}18`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 14,
+              }}
+            >
+              {cat.emoji}
+            </span>
+            View All Partners
+            <span
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: "50%",
+                background: cat.color,
+                color: "var(--foc-color-surface)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 13,
+              }}
+            >
+              →
+            </span>
+          </button>
         </div>
       </div>
-    </div>
+      <PartnerAllModal cat={cat} open={modalOpen} onClose={closeModal} />
+    </>
   );
 }
 
@@ -738,7 +1011,7 @@ function PartnersStrengthSection() {
           noSubtitleMaxWidth
         />
         <div className="partner-cards-grid">
-          {PARTNER_CATS.map((cat, i) => (
+          {PARTNER_CATEGORIES.map((cat, i) => (
             <PartnerCard key={cat.id} cat={cat} delay={i * 110} />
           ))}
         </div>

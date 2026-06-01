@@ -1,5 +1,6 @@
 const express = require("express");
 const uuid = require('uuid/v1');
+const cron = require('node-cron');
 const { Parser } = require("json2csv");
 
 const { isCollege, isTrainer, auth1, authenti, getAllTeamMembers } = require("../../../helpers");
@@ -47,7 +48,6 @@ const b2bCopyRoutes = require("./b2b/b2b_copy");
 const androidAppRoutes = require("./androidApp");
 const statusB2bRoutes = require("./b2b/statusB2b");
 const placementRoutes = require("./placement");
-const missedFollowupSchedular = require("../../../schedular/missedFollowupSchedular");
 const router = express.Router();
 const moment = require('moment')
 
@@ -431,8 +431,54 @@ const validateAndConvertId = (id) => {
 	}
 };
 
-// B2C followups: mark prior-day planned followups as missed at 12:00 AM IST (see schedular/missedFollowupSchedular.js)
-missedFollowupSchedular();
+// Function to update followups at 11:55 PM IST
+const updateFollowupsToMissed = async () => {
+	try {
+		// Get current time in IST (UTC+5:30)
+		const now = new Date();
+		const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+		const hours = istTime.getUTCHours();
+		const minutes = istTime.getUTCMinutes();
+
+		// Check if current time is exactly 11:55 PM IST
+		if (hours === 23 && minutes === 55) {
+			// Fetch all profiles with 'Planned' followups
+			const profiles = await AppliedCourses.find({
+				'followups.status': 'Planned',
+				'followups.date': { $lte: new Date() }  // Ensure followup date is in the past or current
+			});
+
+			// Loop through profiles to update 'Planned' followups to 'Missed'
+			for (const profile of profiles) {
+				// Map through followups array and update status
+				const updatedFollowups = profile.followups.map(followup => {
+					if (followup.status === 'Planned') {
+						followup.status = 'Missed';  // Change status to 'Missed'
+					}
+					return followup;
+				});
+
+				// Update the followups array and save the changes
+				profile.followups = updatedFollowups;
+
+				// Add log entry for the status change
+				profile.logs.push({
+					user: new mongoose.Types.ObjectId('64ab1234abcd5678ef901234'), // System user ID
+					timestamp: new Date(),
+					action: 'Followup Status Changed',
+					remarks: `Followup status automatically changed from 'Planned' to 'Missed' for date ${followup.date}`
+				});
+
+				await profile.save();
+			}
+		}
+	} catch (error) {
+		console.error('Error updating followups to missed:', error);
+	}
+};
+
+// Schedule the cron job to run at 11:55 PM every day
+cron.schedule('55 23 * * *', updateFollowupsToMissed);  // This will run at 11:55 PM every day
 
 router.route('/')
 	.get(async (req, res) => {
