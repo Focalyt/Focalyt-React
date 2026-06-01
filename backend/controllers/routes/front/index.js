@@ -28,6 +28,7 @@ const {
 	Contact, Post , StudentRegistration
 } = require("../../models");
 const Team = require('../../models/team'); // PostSchema import करें
+const { resolvePublicUrl } = require('../../../helpers/s3Storage');
 const bcrypt = require("bcryptjs");
 const router = express.Router();
 const {
@@ -225,17 +226,28 @@ router.get("/employersTermsofService", (req, res) => {
 	});
 });
 
+function withTeamImageUrls(members) {
+	return members.map((member) => {
+		const doc = member.toObject ? member.toObject() : { ...member };
+		if (doc.image?.fileURL) {
+			doc.image = {
+				...doc.image,
+				fileURL: resolvePublicUrl(doc.image.fileURL),
+			};
+		}
+		return doc;
+	});
+}
+
 router.get("/team", async (req, res) => {
 	const seniorManagement = await Team.find({ status: true, position: "Senior Management" }).sort({ sequence: 1 });
 	const management = await Team.find({ status: true, position: "Management" }).sort({ sequence: 1 });
 	const staff = await Team.find({ status: true, position: "Staff" }).sort({ sequence: 1 });
 
-
-	// **Render `about_us` पेज**
 	return res.json({
-		seniorManagement,
-		management,
-		staff
+		seniorManagement: withTeamImageUrls(seniorManagement),
+		management: withTeamImageUrls(management),
+		staff: withTeamImageUrls(staff),
 	});
 });
 

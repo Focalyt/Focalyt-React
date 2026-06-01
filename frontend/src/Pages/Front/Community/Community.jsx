@@ -10,6 +10,9 @@ import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { resolveMediaUrl } from '../../../utils/resolveMediaUrl';
+
+const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL || '';
 
 const PostText = React.memo(function PostText({ content, postId, isExpanded, onToggleExpand }) {
   const textRef = useRef(null);
@@ -91,6 +94,7 @@ const PostCarousel = React.memo(function PostCarousel({ files, postId }) {
         arrows: true,
         autoplay: true,
         autoplaySpeed: 1500,
+        adaptiveHeight: true,
         responsive: [
           { breakpoint: 1366, settings: { slidesToShow: 1 } },
           { breakpoint: 768, settings: { slidesToShow: 1 } },
@@ -126,28 +130,18 @@ const PostCarousel = React.memo(function PostCarousel({ files, postId }) {
           <div key={index}>
             {file.fileType === "image" ? (
               <img
-                src={file.fileURL}
-                className="d-block w-100"
+                src={resolveMediaUrl(bucketUrl, file.fileURL)}
+                className="d-block w-100 post-media-item"
                 alt={`Slide ${index + 1}`}
-                style={{
-                  height: "400px",
-                  maxHeight: "400px",
-                  objectFit: "contain",
-                }}
               />
             ) : file.fileType === "video" ? (
               <video
-                className="d-block w-100"
+                className="d-block w-100 post-media-item"
                 controls
                 muted
                 playsInline
-                style={{
-                  height: "400px",
-                  maxHeight: "400px",
-                  objectFit: "contain",
-                }}
               >
-                <source src={file.fileURL} type="video/mp4" />
+                <source src={resolveMediaUrl(bucketUrl, file.fileURL)} type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
             ) : null}
@@ -174,8 +168,21 @@ function Community() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute("data-foc-theme", "sky-magenta");
+    root.style.setProperty("--front-layout-bg", "var(--foc-color-bg)");
+    return () => {
+      root.style.removeProperty("--front-layout-bg");
+    };
+  }, []);
+
+  const displayPosts = useMemo(() => {
+    if (filterData !== undefined) return filterData;
+    return posts;
+  }, [filterData, posts]);
 
   const handleFilter = () => {
     if (!startDate || !endDate) {
@@ -329,53 +336,6 @@ function Community() {
     }
   }, []);
 
-  // Alternative approach without using JSZip for browsers that block it
-  const downloadFilesSequentially = (files) => {
-    console.log("Sequential download method for files:", files);
-
-    if (!files || files.length === 0) {
-      alert("No files to download!");
-      return;
-    }
-
-    // Create hidden iframe for downloads to avoid page navigation
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
-
-    let downloadCount = 0;
-
-    const downloadNext = (index) => {
-      if (index >= files.length) {
-        document.body.removeChild(iframe);
-        alert(`Downloaded ${downloadCount} of ${files.length} files`);
-        return;
-      }
-
-      const fileURL = files[index];
-      console.log(`Downloading file ${index + 1}/${files.length}:`, fileURL);
-
-      try {
-        iframe.src = fileURL;
-        downloadCount++;
-
-        // Schedule next download with delay
-        setTimeout(() => downloadNext(index + 1), 1000);
-      } catch (error) {
-        console.error(`Error downloading file ${index + 1}:`, error);
-        // Continue to next file even if current fails
-        setTimeout(() => downloadNext(index + 1), 500);
-      }
-    };
-
-    // Start the download sequence
-    downloadNext(0);
-  };
-
-
-
-
-  // Share handler
   const handleShare = useCallback((postId) => {
     const postUrl = `${window.location.origin}${window.location.pathname}#${postId}`;
 
@@ -403,9 +363,9 @@ function Community() {
   }, []);
 
   const renderedPosts = useMemo(() => {
-    if (!posts || posts.length === 0) return null;
+    if (!displayPosts || displayPosts.length === 0) return null;
 
-    return posts.map((post, index) => {
+    return displayPosts.map((post, index) => {
       const postId = post._id ? `post-${post._id}` : `post-${index}`;
       const isExpanded = !!expandedPosts[postId];
 
@@ -472,7 +432,7 @@ function Community() {
         </div>
       );
     });
-  }, [expandedPosts, handleDownloadAllImages, handleShare, posts, toggleExpand]);
+  }, [displayPosts, expandedPosts, handleDownloadAllImages, handleShare, toggleExpand]);
   useEffect(() => {
     // Handle post scrolling from URL hash on load
     const postId = window.location.hash.substring(1);
@@ -486,104 +446,97 @@ function Community() {
 
   return (
     <FrontLayout>
-      <section className="section-padding-top-40 mt-5">
-        <div className="container-fluid p-0">
-          <div className="mainContentLayout">
-            <div className="d-flex">
-              {!isSidebarOpen && (
+      <div className="foc-cyber-home foc-community-page">
+        <section className="section grid-bg comm-page-section">
+          <div className="comm-container">
+            <div className="section-head">
+              <div className="stag">Updates & Stories</div>
+              <h1 className="sh2">
+                Our <span className="cyan">Community</span>
+              </h1>
+              <div className="section-subline">
+                <p className="s-body">News, success stories, and highlights from Focalyt labs and programs.</p>
                 <button
                   type="button"
-                  className="sidebar-toggle-btn"
-                  onClick={() => setIsSidebarOpen((prev) => !prev)}
+                  className="filter-toggle-btn filter-on-subline"
+                  aria-expanded={isFilterOpen}
+                  aria-label="Open filters"
+                  onClick={() => setIsFilterOpen((prev) => !prev)}
                 >
-                  <span className="sidebar-toggle-icon" />
+                  <FontAwesomeIcon icon={faFilter} />
+                  <span className="filter-toggle-text">Filter</span>
                 </button>
-              )}
-              <div
-                className="filter-section container"
-                style={{ marginTop: "7px", marginBottom: "1.5rem", position: "relative" }}
-              >
-                {!isSidebarOpen && (
+              </div>
+            </div>
+
+            <div className="mainContentLayout">
+              {!isSidebarOpen && (
+                <div className="comm-mobile-bar">
                   <button
                     type="button"
-                    className="filter-toggle-btn"
-                    aria-expanded={isFilterOpen}
-                    aria-label="Open filters"
-                    onClick={() => setIsFilterOpen((prev) => !prev)}
+                    className="sidebar-toggle-btn"
+                    onClick={() => setIsSidebarOpen((prev) => !prev)}
                   >
-                    <FontAwesomeIcon icon={faFilter} />
-                    <span className="filter-toggle-text">Filter</span>
+                    <span className="sidebar-toggle-icon" />
                   </button>
-                )}
-
-                  <div
-                    className={`filter-overlay ${isFilterOpen ? 'open' : ''}`}
-                    onClick={() => setIsFilterOpen(false)}
-                    role="presentation"
-                  />
-
-                  <div className={`filter-drawer ${isFilterOpen ? 'open' : ''}`}>
-                    <div className="filter-drawer-header">
-                      <div className="filter-drawer-title">Filters</div>
-                      <button
-                        type="button"
-                        className="filter-close-btn"
-                        onClick={() => setIsFilterOpen(false)}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  <div className="row align-items-center">
-                    <div className="col-md-3 CaledarSpace">
-                      <label>Start Date:</label>
-                      <DatePicker
-                        selected={startDate}
-                        onChange={(date) => setStartDate(date)}
-                        dateFormat="dd-MM-yyyy"
-                        className="form-control"
-                        placeholderText="Select Start Date"
-                      />
-                    </div>
-                    <div className="col-md-3">
-                      <label>End Date:</label>
-                      <DatePicker
-                        selected={endDate}
-                        onChange={(date) => setEndDate(date)}
-                        dateFormat="dd-MM-yyyy"
-                        className="form-control"
-                        placeholderText="Select End Date"
-                      />
-                    </div>
-                    <div className="col-md-3">
-                      <button
-                        className="btn btn-primary mt-2 w-100 filterBtn"
-                        onClick={() => {
-                          handleFilter();
-                          setIsFilterOpen(false);
-                        }}
-                      >
-                        Filter Posts
-                      </button>
-                    </div>
-                    <div className="col-md-3">
-                      <button
-                        className="btn btn-secondary mt-2 w-100"
-                        onClick={() => {
-                          setStartDate("");
-                          setEndDate("");
-                          setFilterData([]);
-                          setIsFilterOpen(false);
-                        }}
-                      >
-                        Reset Filter
-                      </button>
-                    </div>
-                  </div>
-                  </div>
                 </div>
-           </div>
+              )}
+
+              <div
+                className={`filter-overlay ${isFilterOpen ? 'open' : ''}`}
+                onClick={() => setIsFilterOpen(false)}
+                role="presentation"
+              />
+
+              <div className={`filter-modal ${isFilterOpen ? 'open' : ''}`} role="dialog" aria-modal="true">
+                <div className="filter-modal-header">
+                  <div className="filter-modal-title">Filter Posts</div>
+                  <button type="button" className="filter-close-btn" onClick={() => setIsFilterOpen(false)}>×</button>
+                </div>
+                <div className="filter-modal-body">
+                  <div className="comm-filter-field">
+                    <label className="comm-filter-label">Start Date</label>
+                    <DatePicker
+                      selected={startDate}
+                      onChange={(date) => setStartDate(date)}
+                      dateFormat="dd-MM-yyyy"
+                      className="form-control comm-date-input"
+                      placeholderText="Select Start Date"
+                    />
+                  </div>
+                  <div className="comm-filter-field">
+                    <label className="comm-filter-label">End Date</label>
+                    <DatePicker
+                      selected={endDate}
+                      onChange={(date) => setEndDate(date)}
+                      dateFormat="dd-MM-yyyy"
+                      className="form-control comm-date-input"
+                      placeholderText="Select End Date"
+                    />
+                  </div>
+                  <button
+                    className="btn comm-btn-primary w-100 filterBtn"
+                    onClick={() => { handleFilter(); setIsFilterOpen(false); }}
+                  >
+                    Filter Posts
+                  </button>
+                  <button
+                    type="button"
+                    className="btn comm-btn-reset w-100"
+                    onClick={() => {
+                      setStartDate(null);
+                      setEndDate(null);
+                      setFilterData(undefined);
+                      setIsFilterOpen(false);
+                    }}
+                  >
+                    Reset Filter
+                  </button>
+                </div>
+              </div>
+
             <div className="mainContainer">
-              <div className={`leftSidebar LeftSide  ${isSidebarOpen ? 'open' : ''}`}>
+              <div className={`leftSidebar ${isSidebarOpen ? 'open' : ''}`}>
                 <div className="sidebar">
                   <button
                     type="button"
@@ -661,21 +614,20 @@ function Community() {
                 </div>
               </div>
               <div className="mainBody">
-              
-
                 {renderedPosts ? (
                   renderedPosts
                 ) : (
-                  <div className="col-12 text-center py-5">
-                    <h3 className="text-muted">No posts available.</h3>
-                    <p>Check back later for new content</p>
+                  <div className="comm-empty">
+                    <h3>No posts available</h3>
+                    <p>Check back later for new content.</p>
                   </div>
                 )}
               </div>
             </div>
           </div>
-        </div>
-      </section>
+          </div>
+        </section>
+      </div>
       <style>
         {
           `
@@ -686,19 +638,75 @@ function Community() {
   width: 100%;
 }
 
-.mainContainer { /* changes done*/
+.mainContainer {
   display: flex;
   width: 100%;
-  /* height: 100vh;  Previous fixed height commented for better scroll */
+  height: calc(100vh - 200px);
+  min-height: 480px;
+  overflow: hidden;
+  gap: 18px;
+  align-items: flex-start;
 }
 
-.mainContent {  /* cahnges done*/
-  display: flex;
-  width: 100%;
-  /* height: 100vh;  Previous fixed height commented for better scroll */
-  /* border: 1px solid red;  Old debug border commented */
-  /* margin-top: 80px;  Old layout tweak commented */
+.comm-mobile-bar {
+  display: none;
+  margin-bottom: 8px;
 }
+
+.section-subline {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 100px;
+}
+
+.section-subline .s-body {
+  margin: 0;
+  text-align: center;
+  max-width: 720px;
+  flex: none;
+}
+
+.filter-on-subline {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  flex-shrink: 0;
+}
+
+.leftSidebar {
+  flex-shrink: 0;
+  width: 260px;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(27,167,255,0.35) transparent;
+}
+.leftSidebar::-webkit-scrollbar { width: 4px; }
+.leftSidebar::-webkit-scrollbar-thumb { background: rgba(27,167,255,0.35); border-radius: 999px; }
+
+.mainBody {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background-color: transparent;
+  padding: 0;
+  width: auto;
+  scroll-snap-type: y proximity;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(27,167,255,0.35) transparent;
+}
+.mainBody::-webkit-scrollbar { width: 4px; }
+.mainBody::-webkit-scrollbar-thumb { background: rgba(27,167,255,0.35); border-radius: 999px; }
+
 .section-padding-top-40{
   padding-top: 45px ;
 }
@@ -779,11 +787,11 @@ function Community() {
 }
 
 .sidebar {
-  width: 250px;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   background: white;
   border-right: 1px solid #e5e7eb;
-  overflow-y: auto;
+  overflow-y: visible;
 }
 
 .notification {
@@ -967,74 +975,56 @@ function Community() {
   overflow-y: auto;
   max-height: calc(100vh - 180px);
 }
-.mainBody::-webkit-scrollbar{
-  display: none;
-}
-/* Hide horizontal scrollbar */
-.sidebar-links-section::-webkit-scrollbar {
-  width: 5px;
-}
-
-.sidebar-links-section::-webkit-scrollbar-thumb {
-  background-color: #ccc;
-  border-radius: 10px;
-}
-
-.sidebar-links-section::-webkit-scrollbar-thumb:hover {
-  background-color: #999;
-}
-
-.sidebar-links {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.sidebar-link {
-  padding: 10px 0;
-  font-size: 14px;
-  color: #555;
-  cursor: pointer;
-  transition: color 0.3s ease;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.sidebar-link.active {
-  color: #4070f4;
-  font-weight: bold;
-  border-left: 4px solid #4070f4;
-  padding-left: 16px;
-}
-
-.sidebar-link:hover {
-  color: #4070f4;
-}
-
-/* Main Body */
-.mainBody {
-  flex: 1;
-  background-color: #f8f9fa;
-  padding: 20px;
-  width: 60%;
-  overflow: scroll;
-}
+/* Main Body - scroll handled by .mainBody container */
 
 /* Blog Card */
 .blog--card {
   background-color: #fff;
   border-radius: 10px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-  margin-bottom: 40px;
-  /* padding: 5px 15px; */
+  overflow: visible;
+  margin-bottom: 20px;
+  min-height: auto;
+  height: auto;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.card-content {
+  padding: 0;
+  gap: 0;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+
+.card-image {
+  display: block;
+  overflow: visible;
+}
+
+.card-image .happy_candidates {
+  display: block;
+  overflow: visible;
+}
+
+.post-media-item {
+  width: 100%;
+  height: auto;
+  max-height: calc(100vh - 300px);
+  object-fit: contain;
+  display: block;
 }
 
 /* Header Section */
 .card-header {
   padding: 10px 15px!important;
   color: #fff;
+  position: relative;
+  flex-shrink: 0;
 }
 
 .user_image figure img {
@@ -1163,13 +1153,9 @@ function Community() {
   max-height: 335px;
 }
 
-/* Main Content */
-.card-content {
-  padding: 0px 20px;
-  gap: 20px;
-}
+/* Main Content — layout handled by .card-content flex rules above */
 
-#blog--images .happy_candidate_images img, 
+#blog--images .happy_candidate_images img,
 .blog--images .happy_candidate_images img 
 {
   width: 100%;
@@ -1345,6 +1331,7 @@ function Community() {
   background-color: #f9f9f9;
   border-top: 1px solid #ddd;
   padding-inline: 45px;
+  flex-shrink: 0;
 }
 
 /* Container for the slider */
@@ -1353,23 +1340,31 @@ function Community() {
 /* Container for the slider */
 .postsection {
   position: relative;
-  margin: 15px 0;
-  overflow: hidden;
+  margin: 8px 0 0;
+  overflow: visible;
   border-radius: 8px;
 }
 
-/* Image and Video container styles */
 .postsection .slider_images {
   width: 100%;
-  max-height: 400px;
+  max-height: none;
+  overflow: visible;
+}
+
+.postsection .slider_images .slick-list,
+.postsection .slider_images .slick-track {
+  display: flex;
+  align-items: center;
 }
 
 .postsection .slider_images img,
 .postsection .slider_images video {
   width: 100%;
-  height: 400px;
+  height: auto;
+  max-height: calc(100vh - 300px);
   object-fit: contain;
   margin: 0 auto;
+  display: block;
 }
 
 /* Style the Slick arrows */
@@ -1405,8 +1400,14 @@ function Community() {
   opacity: 1;
 }
 
+.postsection .slick-slide > div {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
 .postsection .slick-dots {
-  bottom: -28px;
+  bottom: -24px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1934,20 +1935,26 @@ video.post-media-item {
 }
 
 .filter-toggle-btn {
-  display: none;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   width: auto;
-  padding: 0 12px;
-  height: 40px;
-  border-radius: 8px;
+  padding: 0 14px;
+  height: 36px;
+  border-radius: 50px;
   border: none;
   background-color: #f3345a;
   color: #ffffff;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  margin-bottom: 12px;
+  margin-left: 0;
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+
+.filter-in-feed {
+  position: relative;
 }
 
 .filter-toggle-text {
@@ -1962,19 +1969,73 @@ video.post-media-item {
 }
 
 .filter-overlay {
-  display: none;
-}
-
-.filter-drawer {
   display: block;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+  z-index: 1045;
 }
 
-.filter-drawer-header {
-  display: none;
+.filter-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.filter-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: min(92vw, 400px);
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.25);
+  padding: 16px;
+  opacity: 0;
+  transform: translate(-50%, -48%) scale(0.98);
+  pointer-events: none;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  z-index: 1050;
+}
+
+.filter-modal.open {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  pointer-events: auto;
+}
+
+.filter-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.filter-modal-title {
+  font-weight: 700;
+  color: #111827;
+  font-size: 16px;
+}
+
+.filter-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .filter-close-btn {
-  display: none;
+  display: inline-flex;
+  border: none;
+  background: transparent;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  color: #4b5563;
 }
 
 .sidebar-toggle-icon {
@@ -2018,111 +2079,60 @@ video.post-media-item {
 }
 
 @media (max-width: 767px) {
-  .CaledarSpace{
-    margin-bottom:10px;
-  }
-  .filter-toggle-btn {
-    display: flex;
-    position: sticky;
-    top: 100px;
-    right: 16px;
-    margin-left: auto;
-    // z-index: 1040;
-  }
-
-  .filter-overlay {
+  .comm-mobile-bar {
     display: block;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.35);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.18s ease;
-    will-change: opacity;
-    z-index: 1045;
   }
 
-  .filter-overlay.open {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  .filter-drawer {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    width: 92vw;
-    max-width: 460px;
-    height: 90vh;
-    overflow: hidden;
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    border-radius: 14px;
-    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.25);
-    padding: 16px;
-    opacity: 0;
-    transform: translate(-50%, -48%) scale(0.98);
-    pointer-events: none;
-    transition: transform 0.2s ease, opacity 0.2s ease;
-    will-change: transform, opacity;
-    z-index: 1050;
-  }
-
-  .filter-drawer.open {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-    pointer-events: auto;
-  }
-
-  .filter-drawer-header {
+  .sidebar-toggle-btn {
     display: flex;
+  }
+
+  .section-subline {
+    padding: 0 0 44px;
+    flex-direction: column;
     align-items: center;
-    justify-content: space-between;
-    padding-bottom: 10px;
-    margin-bottom: 10px;
-    border-bottom: 1px solid #f1f5f9;
+    gap: 10px;
   }
 
-  .filter-drawer-title {
-    font-weight: 700;
-    color: #111827;
-    font-size: 16px;
+  .section-subline .s-body {
+    text-align: center;
+    max-width: 100%;
   }
 
-  .filter-close-btn {
-    display: inline-flex;
-    border: none;
-    background: transparent;
-    font-size: 26px;
-    line-height: 1;
-    cursor: pointer;
-    color: #4b5563;
+  .filter-on-subline {
+    position: static;
+    transform: none;
+    align-self: flex-end;
   }
 
   .mainContainer {
     flex-direction: column;
+    height: auto !important;
+    overflow: visible !important;
     position: relative;
   }
-  
+
+  .mainBody {
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
   .leftSidebar {
-    position: fixed;
+    position: fixed !important;
     top: 0;
-    left: -260px;
-    width: 260px;
-    height: 100vh;
-    min-height: 100vh;
+    left: -280px;
+    width: 280px;
+    height: 100vh !important;
+    overflow-y: auto !important;
     z-index: 1050;
     transition: left 0.3s ease;
   }
-  
+
   .leftSidebar.open {
     left: 0;
   }
 
-  .mainBody {
-    width: 100%;
-  }
-  
   .sidebar {
     width: 100%;
     height: 100%;
@@ -2134,7 +2144,6 @@ video.post-media-item {
     position: sticky;
     top: 100px;
     left: 16px;
-    // z-index: 1040;
   }
 
   .sidebar-close-btn {
@@ -2146,6 +2155,337 @@ video.post-media-item {
           `
         }
       </style>
+
+      <style>{`
+.foc-cyber-home.foc-community-page,
+.foc-cyber-home.foc-community-page * { box-sizing: border-box; }
+.foc-community-page {
+  --cyan: var(--foc-cyan);
+  --red: var(--foc-magenta);
+  --bg: var(--foc-color-bg);
+  --surface: var(--foc-color-surface);
+  --border: rgba(4, 25, 45, .12);
+  --text: var(--foc-color-text);
+  --muted: var(--foc-color-text-muted);
+  --orb1: rgba(27,167,255,.14);
+  --orb2: rgba(255,45,170,.12);
+  --grid-line: rgba(6,20,38,.055);
+  --cyan-soft: rgba(27,167,255,.085);
+  --r: var(--foc-radius-lg);
+  --ease: var(--foc-ease);
+  font-family: var(--foc-font-sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100%;
+  padding-top: 88px;
+  padding-bottom: 40px;
+  position: relative;
+  overflow-x: hidden;
+}
+.foc-community-page .comm-page-section {
+  padding: 12px 0 16px;
+  background: var(--bg) !important;
+  position: relative;
+}
+.foc-community-page .comm-container {
+  max-width: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0 16px;
+  position: relative;
+  z-index: 1;
+}
+.foc-community-page .grid-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 18% 12%, var(--orb1) 0%, transparent 55%),
+    radial-gradient(circle at 82% 28%, var(--orb2) 0%, transparent 60%),
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: auto, auto, 48px 48px, 48px 48px;
+  opacity: .9;
+  pointer-events: none;
+}
+.foc-community-page .section-head { text-align: center; margin-bottom: 10px; }
+.foc-community-page .section-subline {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 100px;
+}
+.foc-community-page .section-subline .s-body {
+  font-size: 15px;
+  color: var(--muted);
+  margin: 0;
+  text-align: center;
+  line-height: 1.7;
+  font-style: italic;
+  max-width: 720px;
+  flex: none;
+}
+.foc-community-page .filter-on-subline {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  flex-shrink: 0;
+}
+.foc-community-page .stag {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--cyan-soft); border: 1px solid var(--border);
+  color: var(--cyan); font-size: 10px; font-weight: 600;
+  letter-spacing: .16em; text-transform: uppercase;
+  padding: 5px 14px; border-radius: 2px; margin-top: 8px; margin-bottom: 14px;
+}
+.foc-community-page .stag::before { content: '//'; color: var(--red); }
+.foc-community-page .sh2 {
+  font-family: var(--foc-font-display), Orbitron, sans-serif;
+  font-size: clamp(24px, 3.5vw, 40px);
+  font-weight: 700; color: var(--text);
+  line-height: 1.1; letter-spacing: .04em; margin: 0;
+}
+.foc-community-page .sh2 .cyan {
+  background: linear-gradient(90deg, var(--cyan), var(--red));
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent; -webkit-text-fill-color: transparent;
+}
+.foc-community-page .filter-modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.foc-community-page .filter-modal-header { border-bottom: 1px solid var(--border); }
+.foc-community-page .filter-modal-title { color: var(--text); }
+.foc-community-page .comm-filter-field { margin-bottom: 0; }
+
+.foc-community-page .comm-filter-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.foc-community-page .comm-date-input,
+.foc-community-page .react-datepicker-wrapper { width: 100%; }
+.foc-community-page .comm-date-input {
+  border: 1px solid var(--border) !important;
+  border-radius: 6px !important;
+  padding: 10px 12px !important;
+  font-size: 14px;
+  background: var(--bg) !important;
+  color: var(--text) !important;
+}
+.foc-community-page .comm-date-input:focus {
+  outline: none;
+  border-color: rgba(27, 167, 255, 0.45) !important;
+  box-shadow: 0 0 0 3px rgba(27, 167, 255, 0.12);
+}
+.foc-community-page .comm-btn-primary,
+.foc-community-page .filterBtn {
+  background: var(--foc-color-cta, #fc2b5a) !important;
+  border: 1px solid var(--foc-color-cta, #fc2b5a) !important;
+  color: #fff !important;
+  border-radius: 50px !important;
+  font-weight: 600;
+  letter-spacing: .04em;
+  padding: 10px 16px !important;
+}
+.foc-community-page .comm-btn-primary:hover,
+.foc-community-page .filterBtn:hover {
+  color: var(--cyan) !important;
+  box-shadow: 0 8px 20px rgba(252, 43, 90, 0.22);
+}
+.foc-community-page .comm-btn-reset {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--muted) !important;
+  border-radius: 50px !important;
+  font-weight: 600;
+  padding: 10px 16px !important;
+}
+.foc-community-page .comm-btn-reset:hover {
+  border-color: var(--cyan) !important;
+  color: var(--cyan) !important;
+}
+.foc-community-page .mainContainer { gap: 18px; align-items: flex-start; width: 100%; }
+.foc-community-page .mainContentLayout { width: 100%; }
+
+/* Theme: sidebar */
+.foc-community-page .sidebar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: 0 10px 28px rgba(27,167,255,0.06);
+  border-right: none;
+}
+.foc-community-page .notification { background: var(--cyan-soft); border-bottom: 1px solid var(--border); }
+.foc-community-page .notification h4 { color: var(--text); }
+.foc-community-page .notification p { color: var(--muted); }
+.foc-community-page .notification .close { color: var(--cyan); }
+.foc-community-page .section { border-bottom: 1px solid var(--border); }
+.foc-community-page .section-titles { color: var(--cyan); }
+.foc-community-page .lab-card,
+.foc-community-page .news-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+.foc-community-page .offer-card.green { background: rgba(27,167,255,0.06); border: 1px solid var(--border); }
+.foc-community-page .offer-card.green strong { color: var(--cyan); }
+.foc-community-page .success-item { color: var(--muted); }
+
+/* Theme: blog cards */
+.foc-community-page .blog--card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: 0 12px 32px rgba(27, 167, 255, 0.06);
+  margin-bottom: 20px;
+  overflow: visible;
+  min-height: auto;
+  height: auto;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.foc-community-page .card-header {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  padding: 16px 18px !important;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  position: relative;
+}
+.foc-community-page .user__name,
+.foc-community-page .blog__title,
+.foc-community-page .text-black { color: var(--text) !important; }
+.foc-community-page .hidden-text,
+.foc-community-page .show-text { color: var(--text); font-size: 14px; line-height: 1.6; }
+.foc-community-page .toggle-more { color: var(--red); font-weight: 600; }
+.foc-community-page .toggle-more:hover { color: var(--cyan); }
+.foc-community-page .card-content {
+  padding: 0 0 12px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+.foc-community-page .card-image {
+  overflow: visible;
+}
+.foc-community-page .postsection .slider_images img,
+.foc-community-page .postsection .slider_images video,
+.foc-community-page .post-media-item {
+  max-height: calc(100vh - 300px);
+  height: auto;
+  width: 100%;
+  object-fit: contain;
+}
+.foc-community-page .interaction-buttons {
+  border-top: 1px solid var(--border);
+  padding: 12px 18px;
+  margin: 0;
+  flex-shrink: 0;
+}
+.foc-community-page .share_link {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.2s var(--ease);
+  gap: 6px;
+}
+.foc-community-page .share_link:hover { color: var(--red); }
+.foc-community-page .user_image figure img {
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--bg);
+}
+.foc-community-page .comm-empty {
+  text-align: center;
+  padding: 48px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  min-height: 100%;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.foc-community-page .comm-empty h3 {
+  font-family: var(--foc-font-display), Orbitron, sans-serif;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.foc-community-page .comm-empty p { color: var(--muted); margin: 0; }
+.foc-community-page .sidebar-toggle-btn,
+.foc-community-page .filter-toggle-btn {
+  background: var(--foc-color-cta, #fc2b5a) !important;
+  border-radius: 50px !important;
+}
+.foc-community-page .carousel-counter {
+  background: rgba(6, 20, 38, 0.72);
+  color: #fff;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.foc-community-page .slick-dots li button:before { color: var(--cyan); }
+.foc-community-page .slick-prev:before,
+.foc-community-page .slick-next:before { color: var(--red); }
+
+/* Desktop: sidebar and body inside fixed-height container */
+@media (min-width: 992px) {
+  .foc-community-page .leftSidebar {
+    width: 280px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(27,167,255,0.4) transparent;
+  }
+  .foc-community-page .leftSidebar::-webkit-scrollbar { width: 5px; }
+  .foc-community-page .leftSidebar::-webkit-scrollbar-thumb {
+    background: rgba(27,167,255,0.35);
+    border-radius: 999px;
+  }
+  .foc-community-page .mainBody { flex: 1; min-width: 0; }
+}
+
+@media (max-width: 991px) {
+  .foc-community-page .comm-toolbar { flex-wrap: wrap; gap: 10px; }
+}
+
+/* Mobile: sidebar overlays, body free-scrolls with page */
+@media (max-width: 767px) {
+  .foc-community-page .leftSidebar {
+    position: fixed !important;
+    top: 0;
+    left: -280px;
+    width: 280px;
+    height: 100vh;
+    max-height: 100vh;
+    z-index: 1050;
+    transition: left 0.28s var(--ease);
+  }
+  .foc-community-page .leftSidebar.open { left: 0 !important; }
+  .foc-community-page .sidebar {
+    height: 100% !important;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+  .foc-community-page .mainContainer {
+    height: auto !important;
+    overflow: visible !important;
+  }
+  .foc-community-page .mainBody {
+    height: auto !important;
+    overflow: visible !important;
+  }
+}
+      `}</style>
     </FrontLayout>
   );
 }

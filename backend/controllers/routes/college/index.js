@@ -1984,7 +1984,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			name, courseType, status, leadStatus,
 			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
 			nextActionFromDate, nextActionToDate,
-			projects, verticals, course, center, counselor, subStatuses
+			projects, verticals, course, center, counselor, subStatuses, batch, registeredByMe,
+			followupStatus
 		} = req.query;
 
 		// console.log("substautes", subStatuses)
@@ -1994,6 +1995,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		let courseArray = [];
 		let centerArray = [];
 		let counselorArray = [];
+		let batchArray = [];
 
 		try {
 			if (projects) projectsArray = JSON.parse(projects);
@@ -2001,6 +2003,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			if (course) courseArray = JSON.parse(course);
 			if (center) centerArray = JSON.parse(center);
 			if (counselor) counselorArray = JSON.parse(counselor);
+			if (batch) batchArray = JSON.parse(batch);
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
@@ -2023,6 +2026,9 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		if (centerArray.length > 0) {
 			teamMembers = [];
 		}
+		if (batchArray.length > 0) {
+			teamMembers = [];
+		}
 		if (name && name.trim() !== '') {
 			teamMembers = [];
 		}
@@ -2038,6 +2044,27 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			);
 		}
 
+		let followupAppliedIds = null;
+		if (followupStatus) {
+			const followupMatch = { status: followupStatus };
+			if (counselorArray.length > 0) {
+				followupMatch.createdBy = { $in: counselorArray.map((id) => new mongoose.Types.ObjectId(id)) };
+			} else if (teamMemberIds.length > 0) {
+				followupMatch.createdBy = { $in: teamMemberIds };
+			}
+			const followupRows = await B2cFollowup.find(followupMatch).select('appliedCourseId').lean();
+			followupAppliedIds = followupRows.map((r) => r.appliedCourseId).filter(Boolean);
+			if (followupAppliedIds.length === 0) {
+				return res.status(200).json({
+					success: true,
+					data: [],
+					totalCount: 0,
+					totalPages: 0,
+					page,
+					limit,
+				});
+			}
+		}
 
 		// Build optimized pipeline with only essential fields
 		const pipeline = buildSimplifiedPipeline({
@@ -2048,7 +2075,9 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				createdFromDate, createdToDate,
 				modifiedFromDate, modifiedToDate,
 				nextActionFromDate, nextActionToDate,
-				projectsArray, verticalsArray, courseArray, centerArray, subStatuses
+				projectsArray, verticalsArray, courseArray, centerArray, batchArray, subStatuses,
+				registeredByMe: registeredByMe || null,
+				followupAppliedIds,
 			},
 			pagination: { skip, limit }
 		});
@@ -2485,13 +2514,18 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 
 
 
-	if (teamMemberIds && teamMemberIds.length > 0) {
+	if (filters.registeredByMe) {
+		baseMatch.registeredBy = new mongoose.Types.ObjectId(filters.registeredByMe);
+	} else if (teamMemberIds && teamMemberIds.length > 0) {
 		baseMatch.$or = [
 			{ registeredBy: { $in: teamMemberIds } },
 			{ counsellor: { $in: teamMemberIds } }
 		];
 	}
 
+	if (filters.followupAppliedIds && filters.followupAppliedIds.length > 0) {
+		baseMatch._id = { $in: filters.followupAppliedIds };
+	}
 
 	// Add date filters
 	if (filters.createdFromDate || filters.createdToDate) {
@@ -2630,6 +2664,9 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 	}
 	if (filters.centerArray && filters.centerArray.length > 0) {
 		additionalFilters['_center'] = { $in: filters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+	}
+	if (filters.batchArray && filters.batchArray.length > 0) {
+		additionalFilters['batch'] = { $in: filters.batchArray.map(id => new mongoose.Types.ObjectId(id)) };
 	}
 
 	// Name search
@@ -2694,7 +2731,9 @@ function buildSimplifiedPipelineWithWhatsApp({ teamMemberIds, college, filters, 
 
 
 
-	if (teamMemberIds && teamMemberIds.length > 0) {
+	if (filters.registeredByMe) {
+		baseMatch.registeredBy = new mongoose.Types.ObjectId(filters.registeredByMe);
+	} else if (teamMemberIds && teamMemberIds.length > 0) {
 		baseMatch.$or = [
 			{ registeredBy: { $in: teamMemberIds } },
 			{ counsellor: { $in: teamMemberIds } }
@@ -2839,6 +2878,9 @@ function buildSimplifiedPipelineWithWhatsApp({ teamMemberIds, college, filters, 
 	}
 	if (filters.centerArray && filters.centerArray.length > 0) {
 		additionalFilters['_center'] = { $in: filters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+	}
+	if (filters.batchArray && filters.batchArray.length > 0) {
+		additionalFilters['batch'] = { $in: filters.batchArray.map(id => new mongoose.Types.ObjectId(id)) };
 	}
 
 	// Name search
@@ -3203,7 +3245,9 @@ function downloadPipeline({ teamMemberIds, college, filters }) {
 
 
 
-	if (teamMemberIds && teamMemberIds.length > 0) {
+	if (filters.registeredByMe) {
+		baseMatch.registeredBy = new mongoose.Types.ObjectId(filters.registeredByMe);
+	} else if (teamMemberIds && teamMemberIds.length > 0) {
 		baseMatch.$or = [
 			{ registeredBy: { $in: teamMemberIds } },
 			{ counsellor: { $in: teamMemberIds } }
@@ -9681,7 +9725,7 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 	try {
 		const user = req.user;
 		let filter = {};
-		const { fromDate, toDate, page = 1, limit = 10, followupStatus, projects, verticals, course, center, counselor } = req.query;
+		const { fromDate, toDate, page = 1, limit = 10, followupStatus, projects, verticals, course, center, counselor, name: searchName } = req.query;
 
 		// Add date validation
 		let from, to;
@@ -9891,8 +9935,28 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 			aggregate.push({ $match: additionalMatches });
 		}
 
-
-
+		if (searchName && String(searchName).trim()) {
+			const escaped = String(searchName).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			const searchRegex = new RegExp(escaped, 'i');
+			aggregate.push({
+				$match: {
+					$or: [
+						{ name: searchRegex },
+						{ email: searchRegex },
+						{ mobile: searchRegex },
+						{
+							$expr: {
+								$regexMatch: {
+									input: { $ifNull: [{ $toString: '$mobile' }, ''] },
+									regex: escaped,
+									options: 'i',
+								},
+							},
+						},
+					],
+				},
+			});
+		}
 
 		const followups = await B2cFollowup.aggregate(aggregate);
 		// const followups = await B2cFollowup.aggregate(aggregate).populate({
@@ -16054,7 +16118,7 @@ router.post('/uploadmedia', isTrainer, async (req, res) => {
 
 			return {
 				name: file.name,
-				url: uploadResult.Location,
+				url: key,
 				size: file.size,
 				uploadedAt: new Date()
 			};

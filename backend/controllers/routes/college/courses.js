@@ -33,6 +33,7 @@ AWS.config.update({
 	region,
 });
 const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
+const { normalizeStorageKey } = require('../../../helpers/s3Storage');
 const allowedVideoExtensions = ['mp4', 'mkv', 'mov', 'avi', 'wmv'];
 const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
 const allowedDocumentExtensions = ['pdf', 'doc', 'docx']; // ✅ PDF aur DOC types allow karein
@@ -88,18 +89,6 @@ const uploadFilesToS3 = async ({ files, folder, courseName, s3, bucketName, allo
 
 	await Promise.all(promises);
 	return uploaded;
-};
-
-const normalizeStorageKey = (value) => {
-	if (!value || typeof value !== 'string') return value;
-	let key = value.trim();
-	const bucketUrl = (process.env.MIPIE_BUCKET_URL || '').replace(/\/$/, '');
-	if (bucketUrl && key.startsWith(bucketUrl)) {
-		key = key.slice(bucketUrl.length).replace(/^\//, '');
-	}
-	const s3Match = key.match(/amazonaws\.com\/(.+)$/i);
-	if (s3Match) key = s3Match[1];
-	return key.replace(/^\//, '');
 };
 
 const normalizeCourseMedia = (body) => {

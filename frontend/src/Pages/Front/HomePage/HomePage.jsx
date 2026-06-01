@@ -2161,7 +2161,6 @@ const STYLES = `
 .event-carousel .course-carousel-track > .event-card:nth-child(4n + 2) { --ev-accent: var(--red); border-radius: 18px 12px 22px 14px; }
 .event-carousel .course-carousel-track > .event-card:nth-child(4n + 3) { --ev-accent: color-mix(in srgb, var(--cyan) 55%, var(--red)); border-radius: 12px 18px 14px 20px; }
 .event-carousel .course-carousel-track > .event-card:nth-child(4n) { --ev-accent: color-mix(in srgb, var(--red) 70%, var(--foc-purple)); border-radius: var(--foc-radius-xl) 14px 16px 18px; }
-
 .course-carousel-btn {
   position: absolute;
   top: 50%;
@@ -5390,16 +5389,6 @@ export default function HomePage() {
   const [callbackLoading, setCallbackLoading] = useState(false);
   const [callbackSuccess, setCallbackSuccess] = useState("");
   const [callbackError, setCallbackError] = useState("");
-  const [partnerForm, setPartnerForm] = useState({
-    name: "",
-    organization: "",
-    state: "",
-    mobile: "",
-    email: "",
-    message: "",
-  });
-  const [partnerLoading, setPartnerLoading] = useState(false);
-  const [partnerError, setPartnerError] = useState("");
   const [jobs, setJobs] = useState([]);
   const [jobsError, setJobsError] = useState("");
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
@@ -5672,10 +5661,8 @@ export default function HomePage() {
 
   const getFullUrl = (filePath) => {
     if (!filePath) return "";
-    // Already contains full bucket URL
-    if (filePath.startsWith(bucketUrl)) return filePath;
-    // Is relative path, so prepend bucket URL
-    return `${bucketUrl}/${filePath}`;
+    if (/^https?:\/\//i.test(filePath) || filePath.startsWith(bucketUrl)) return filePath;
+    return `${bucketUrl}/${String(filePath).replace(/^\//, "")}`;
   };
 
   const pillarUi = PILLAR_UI[activeArea];
@@ -5728,18 +5715,6 @@ export default function HomePage() {
     return () => clearTimeout(timer);
   }, [location.hash]);
 
-  useEffect(() => {
-    if (!location.state?.openPartnerModal) return undefined;
-    const timer = setTimeout(() => {
-      const modalEl = document.getElementById("partnerModal");
-      if (!modalEl) return;
-      const Modal = window.bootstrap?.Modal;
-      if (Modal) Modal.getOrCreateInstance(modalEl).show();
-      navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, { replace: true, state: {} });
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [location.state, location.pathname, location.search, location.hash, navigate]);
-
   const handleCallbackChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -5770,56 +5745,6 @@ export default function HomePage() {
       setCallbackError("Failed to submit. Please try again.");
     } finally {
       setCallbackLoading(false);
-    }
-  };
-
-  const handlePartnerChange = (e) => {
-    const { name, value } = e.target;
-    setPartnerForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const showPartnerSuccessPopup = () => {
-    const partnerModalEl = document.getElementById("partnerModal");
-    const successModalEl = document.getElementById("partnerSuccessModal");
-    const Modal = window.bootstrap?.Modal;
-    if (!Modal || !successModalEl) return;
-
-    if (partnerModalEl) {
-      const partnerModal = Modal.getInstance(partnerModalEl) || Modal.getOrCreateInstance(partnerModalEl);
-      partnerModal.hide();
-    }
-
-    setTimeout(() => {
-      Modal.getOrCreateInstance(successModalEl).show();
-    }, 300);
-  };
-
-  const handlePartnerSubmit = async (e) => {
-    e.preventDefault();
-    setPartnerLoading(true);
-    setPartnerError("");
-
-    const payload = {
-      name: partnerForm.name,
-      organization: partnerForm.organization,
-      state: partnerForm.state,
-      mobile: partnerForm.mobile,
-      email: partnerForm.email,
-      message: partnerForm.message,
-    };
-
-    try {
-      const response = await axios.post(`${backendUrl}/partner`, payload, {
-        headers: { "Content-Type": "application/json" },
-      });
-      if (response.status === 200 || response.status === 201) {
-        setPartnerForm({ name: "", organization: "", state: "", mobile: "", email: "", message: "" });
-        showPartnerSuccessPopup();
-      }
-    } catch {
-      setPartnerError("Failed to submit. Please try again.");
-    } finally {
-      setPartnerLoading(false);
     }
   };
 
@@ -6859,7 +6784,7 @@ export default function HomePage() {
                           </div>
 
                           <div className="event-actions">
-                            <Link to="/event" className="btn-secondary">
+                            <Link to="/events" className="btn-secondary">
                               View Details
                             </Link>
                             <a
@@ -6891,7 +6816,7 @@ export default function HomePage() {
             )}
 
             <div style={{ marginTop: 18, textAlign: "center" }}>
-              <Link to="/event" className="btn-ghost">
+              <Link to="/events" className="btn-ghost">
                 View all events →
               </Link>
             </div>
@@ -7271,7 +7196,7 @@ export default function HomePage() {
                             <img src="/Assets/public_assets/images/verified.png" className="digi verified-badge" alt="" />
                           </div>
                           <img
-                            src={job.jobVideoThumbnail ? `${job.jobVideoThumbnail}` : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
+                            src={job.jobVideoThumbnail ? getFullUrl(job.jobVideoThumbnail) : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
                             className="digi"
                             alt={job.title || job.name || "Job"}
                             onError={(e) => {
@@ -8147,323 +8072,6 @@ button.close span {
   scale: 1.1;
 }
 
-/* Partner modal — matches homepage Sky Magenta theme */
-#partnerModal {
-  --pm-cyan: var(--foc-cyan);
-  --pm-red: var(--foc-magenta);
-  --pm-bg: var(--foc-color-bg);
-  --pm-surface: var(--foc-color-surface);
-  --pm-border: rgba(4, 25, 45, .12);
-  --pm-text: var(--foc-color-text);
-  --pm-muted: var(--foc-color-text-muted);
-  --pm-muted2: var(--foc-color-text-muted-2);
-  --pm-r: 14px;
-  --pm-ease: cubic-bezier(.4,0,.2,1);
-  --pm-shadow: rgba(27,167,255,.18);
-  --pm-shadow-hover: rgba(255,45,170,.16);
-  font-family: var(--foc-font-sans);
-}
-#partnerModal .modal-dialog {
-  max-width: 520px;
-  width: calc(100% - 2rem);
-  max-height: calc(100vh - 2rem);
-  margin: 1rem auto;
-}
-#partnerModal .partner-modal-content {
-  border: 1px solid var(--pm-border);
-  border-radius: var(--pm-r);
-  max-height: calc(100vh - 2rem);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-shadow: 0 18px 46px var(--pm-shadow);
-  background: var(--pm-surface);
-}
-#partnerModal .partner-modal-header {
-  background: linear-gradient(90deg, var(--pm-cyan), var(--pm-red));
-  border: none;
-  padding: 20px 22px 18px;
-  position: relative;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-#partnerModal .partner-modal-header::before,
-#partnerModal .partner-modal-header::after {
-  content: "";
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-  opacity: 0.2;
-}
-#partnerModal .partner-modal-header::before {
-  width: 100px;
-  height: 100px;
-  background: var(--foc-color-surface);
-  top: -40px;
-  right: -16px;
-}
-#partnerModal .partner-modal-header::after {
-  width: 56px;
-  height: 56px;
-  background: var(--pm-cyan);
-  bottom: -24px;
-  left: 10px;
-  opacity: 0.25;
-}
-#partnerModal .partner-modal-header-inner {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  position: relative;
-  z-index: 1;
-}
-#partnerModal .partner-modal-emoji {
-  font-size: 1.75rem;
-  line-height: 1;
-}
-#partnerModal .partner-modal-title {
-  margin: 0;
-  font-family: var(--foc-font-display);
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: var(--foc-color-text-inverse);
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-}
-#partnerModal .partner-modal-tagline {
-  margin: 4px 0 0;
-  font-size: 0.78rem;
-  color: rgba(255,255,255,.9);
-  font-weight: 500;
-  letter-spacing: .02em;
-}
-#partnerModal .partner-modal-close {
-  position: relative;
-  z-index: 2;
-  opacity: 0.92;
-  filter: brightness(0) invert(1);
-  transition: transform 0.2s var(--pm-ease), opacity 0.2s ease;
-}
-#partnerModal .partner-modal-close:hover {
-  transform: scale(1.08);
-  opacity: 1;
-}
-#partnerModal .partner-modal-body {
-  padding: 20px 22px 24px;
-  background: var(--pm-bg);
-  overflow-y: auto;
-  overflow-x: hidden;
-  flex: 1 1 auto;
-  min-height: 0;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(27, 167, 255, 0.45) transparent;
-}
-#partnerModal .partner-modal-body::-webkit-scrollbar {
-  width: 5px;
-}
-#partnerModal .partner-modal-body::-webkit-scrollbar-track {
-  background: transparent;
-}
-#partnerModal .partner-modal-body::-webkit-scrollbar-thumb {
-  background: rgba(27, 167, 255, 0.35);
-  border-radius: 999px;
-}
-#partnerModal .partner-modal-body::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 45, 170, 0.5);
-}
-#partnerModal .partner-modal-body::-webkit-scrollbar-button {
-  display: none;
-  height: 0;
-  width: 0;
-}
-#partnerModal .partner-modal-intro {
-  font-family: var(--foc-font-sans);
-  font-size: 0.85rem;
-  color: var(--pm-muted);
-  line-height: 1.6;
-  margin-bottom: 18px;
-  padding: 10px 12px;
-  background: rgba(27,167,255,.06);
-  border-radius: var(--pm-r);
-  border: 1px solid var(--pm-border);
-}
-#partnerModal .partner-field {
-  margin-bottom: 12px;
-}
-#partnerModal .partner-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--foc-font-sans);
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--pm-muted);
-  margin-bottom: 6px;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-}
-#partnerModal .partner-label svg {
-  color: var(--pm-cyan);
-  flex-shrink: 0;
-}
-#partnerModal #partnerForm input,
-#partnerModal #partnerForm select,
-#partnerModal #partnerForm textarea {
-  width: 100%;
-  border: 1px solid var(--pm-border);
-  border-radius: 4px;
-  padding: 10px 12px;
-  font-size: 0.88rem;
-  font-family: var(--foc-font-sans);
-  background: var(--pm-surface);
-  color: var(--pm-text);
-  transition: border-color 0.2s var(--pm-ease), box-shadow 0.2s var(--pm-ease);
-  height: auto;
-}
-#partnerModal #partnerForm select {
-  cursor: pointer;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231BA7FF' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  padding-right: 36px;
-}
-#partnerModal #partnerForm input::placeholder,
-#partnerModal #partnerForm textarea::placeholder {
-  color: var(--pm-muted2);
-}
-#partnerModal #partnerForm input:focus,
-#partnerModal #partnerForm select:focus,
-#partnerModal #partnerForm textarea:focus {
-  outline: none;
-  border-color: rgba(27,167,255,.45);
-  box-shadow: 0 0 0 3px rgba(27,167,255,.15);
-}
-#partnerModal #partnerForm textarea {
-  resize: vertical;
-  min-height: 96px;
-  margin-bottom: 0;
-}
-#partnerModal .partner-modal-footer {
-  margin-top: 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-}
-#partnerModal .partner-modal-submit {
-  width: 100%;
-  max-width: 280px;
-  padding: 12px 28px;
-  border: none;
-  border-radius: 4px;
-  font-family: var(--foc-font-sans);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--foc-color-text-inverse);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-  background: linear-gradient(90deg, var(--pm-cyan), var(--pm-red));
-  box-shadow: 0 14px 34px var(--pm-shadow);
-  cursor: pointer;
-  transition: transform 0.25s var(--pm-ease), box-shadow 0.25s var(--pm-ease);
-}
-#partnerModal .partner-modal-submit:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 18px 46px var(--pm-shadow-hover);
-}
-#partnerModal .partner-modal-submit:disabled {
-  opacity: 0.7;
-  cursor: wait;
-}
-#partnerModal .partner-modal-success {
-  font-family: var(--foc-font-sans);
-  font-size: 0.85rem;
-  color: var(--pm-text);
-  background: rgba(27,167,255,.08);
-  border: 1px solid rgba(27,167,255,.22);
-  padding: 10px 14px;
-  border-radius: 4px;
-  width: 100%;
-  text-align: center;
-}
-#partnerModal .partner-modal-error {
-  font-family: var(--foc-font-sans);
-  font-size: 0.85rem;
-  color: var(--pm-red);
-  background: rgba(255,45,170,.06);
-  border: 1px solid rgba(255,45,170,.2);
-  padding: 10px 14px;
-  border-radius: 4px;
-  width: 100%;
-  text-align: center;
-}
-#partnerSuccessModal .modal-dialog {
-  max-width: 420px;
-}
-#partnerSuccessModal .partner-success-content {
-  background: var(--pm-bg, #0a0e17);
-  border: 1px solid rgba(27,167,255,.25);
-  border-radius: 12px;
-  overflow: hidden;
-  text-align: center;
-}
-#partnerSuccessModal .partner-success-body {
-  padding: 36px 28px 32px;
-}
-#partnerSuccessModal .partner-success-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: rgba(27,167,255,.12);
-  border: 1px solid rgba(27,167,255,.35);
-  color: #1ba7ff;
-  margin-bottom: 18px;
-}
-#partnerSuccessModal .partner-success-title {
-  font-family: var(--foc-font-sans);
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--pm-text, #e8f4ff);
-  margin-bottom: 10px;
-}
-#partnerSuccessModal .partner-success-message {
-  font-family: var(--foc-font-sans);
-  font-size: 0.95rem;
-  line-height: 1.55;
-  color: rgba(232,244,255,.78);
-  margin-bottom: 24px;
-}
-#partnerSuccessModal .partner-success-close-btn {
-  font-family: var(--foc-font-sans);
-  font-size: 0.9rem;
-  font-weight: 600;
-  padding: 10px 28px;
-  border-radius: 6px;
-  border: none;
-  background: linear-gradient(135deg, #1ba7ff, #0066cc);
-  color: #fff;
-  cursor: pointer;
-}
-#partnerSuccessModal .partner-success-close-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 32px rgba(27,167,255,.25);
-}
-@media (max-width: 576px) {
-  #partnerModal .modal-dialog {
-    margin: 0.75rem auto;
-  }
-  #partnerModal .partner-modal-body {
-    padding: 16px 14px 20px;
-  }
-}
 .newWidth{
   width: 30%!important;
 }
@@ -9498,153 +9106,6 @@ height:15rem;
         </div>
       </div>
 
-      <div className="modal fade" id="partnerModal" tabIndex="-1" aria-labelledby="partnerModalLabel" aria-hidden="true">
-        <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-          <div className="modal-content partner-modal-content">
-            <div className="modal-header partner-modal-header">
-              <div className="partner-modal-header-inner">
-                <span className="partner-modal-emoji" aria-hidden="true">
-                  🤝
-                </span>
-                <div>
-                  <h5 className="partner-modal-title" id="partnerModalLabel">
-                    Partner With Us
-                  </h5>
-                  <p className="partner-modal-tagline">Future-tech partnerships that create real impact</p>
-                </div>
-              </div>
-              <button type="button" className="btn-close partner-modal-close" data-bs-dismiss="modal" aria-label="Close" />
-            </div>
-            <div className="modal-body partner-modal-body">
-              <p className="partner-modal-intro">
-                Share your proposal.
-              </p>
-              <form id="partnerForm" onSubmit={handlePartnerSubmit}>
-                <div className="row g-2">
-                  <div className="col-sm-6 partner-field">
-                    <label className="partner-label" htmlFor="partner-name">
-                      <User size={14} aria-hidden /> Name
-                    </label>
-                    <input
-                      id="partner-name"
-                      type="text"
-                      name="name"
-                      value={partnerForm.name}
-                      onChange={handlePartnerChange}
-                      required
-                      placeholder="Your name"
-                    />
-                  </div>
-                  <div className="col-sm-6 partner-field">
-                    <label className="partner-label" htmlFor="partner-org">
-                      <Building size={14} aria-hidden /> Organization
-                    </label>
-                    <input
-                      id="partner-org"
-                      type="text"
-                      name="organization"
-                      value={partnerForm.organization}
-                      onChange={handlePartnerChange}
-                      placeholder="Company / institution"
-                    />
-                  </div>
-                  <div className="col-sm-6 partner-field">
-                    <label className="partner-label" htmlFor="partner-state">
-                      <MapPin size={14} aria-hidden /> State
-                    </label>
-                    <select
-                      id="partner-state"
-                      name="state"
-                      value={partnerForm.state}
-                      onChange={handlePartnerChange}
-                      required
-                    >
-                      <option value="" disabled>
-                        Pick your state
-                      </option>
-                      {INDIAN_STATES.map((state) => (
-                        <option key={state} value={state}>
-                          {state}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="col-sm-6 partner-field">
-                    <label className="partner-label" htmlFor="partner-mobile">
-                      <Smartphone size={14} aria-hidden /> Phone
-                    </label>
-                    <input
-                      id="partner-mobile"
-                      type="tel"
-                      name="mobile"
-                      value={partnerForm.mobile}
-                      onChange={handlePartnerChange}
-                      required
-                      pattern="[0-9]{10}"
-                      placeholder="10-digit number"
-                    />
-                  </div>
-                  <div className="col-12 partner-field">
-                    <label className="partner-label" htmlFor="partner-email">
-                      <Mail size={14} aria-hidden /> Email
-                    </label>
-                    <input
-                      id="partner-email"
-                      type="email"
-                      name="email"
-                      value={partnerForm.email}
-                      onChange={handlePartnerChange}
-                      required
-                      placeholder="you@company.com"
-                    />
-                  </div>
-                  <div className="col-12 partner-field">
-                    <label className="partner-label" htmlFor="partner-message">
-                      <MessageCircle size={14} aria-hidden /> Message
-                    </label>
-                    <textarea
-                      id="partner-message"
-                      name="message"
-                      value={partnerForm.message}
-                      onChange={handlePartnerChange}
-                      required
-                      rows={4}
-                      placeholder="Tell us about your partnership idea..."
-                    />
-                  </div>
-                </div>
-                <div className="partner-modal-footer">
-                  <button type="submit" className="partner-modal-submit" disabled={partnerLoading}>
-                    {partnerLoading ? "Submitting..." : "Submit →"}
-                  </button>
-                  {partnerError && <p className="partner-modal-error mb-0">{partnerError}</p>}
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="modal fade" id="partnerSuccessModal" tabIndex="-1" aria-labelledby="partnerSuccessModalLabel" aria-hidden="true">
-        <div className="modal-dialog modal-dialog-centered">
-          <div className="modal-content partner-success-content">
-            <div className="partner-success-body">
-              <div className="partner-success-icon" aria-hidden="true">
-                <Check size={32} strokeWidth={2.5} />
-              </div>
-              <h5 className="partner-success-title" id="partnerSuccessModalLabel">
-                Thank you!
-              </h5>
-              <p className="partner-success-message mb-0">
-                We will contact you within three working days.
-              </p>
-              <button type="button" className="partner-success-close-btn" data-bs-dismiss="modal">
-                Got it
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
     </FrontLayout>
   );
 }

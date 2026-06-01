@@ -180,58 +180,98 @@ const MultiSelectCheckbox = ({
 const useNavHeight = (dependencies = []) => {
   const navRef = useRef(null);
   const [navHeight, setNavHeight] = useState(140);
-  const [navWidth, setNavWidth] = useState('100%');
 
-  const calculateHeightAndWidth = useCallback(() => {
-
+  const calculateHeight = useCallback(() => {
     if (navRef.current) {
-      // Calculate Height
       const height = navRef.current.offsetHeight;
-
       if (height > 0) {
         setNavHeight(height);
       }
-
-      // Calculate Width from parent (position-relative container)
-      // const parentContainer = navRef.current.closest('.position-relative');
-      const parentContainer = navRef.current.closest('[class*="col-"]') ||
-        navRef.current.parentElement;
-
-      if (parentContainer) {
-        const parentWidth = parentContainer.offsetWidth;
-
-        if (parentWidth > 0) {
-          setNavWidth(parentWidth + 'px');
-        }
-      }
-    } else {
-      console.log('❌ navRef.current is null');
     }
   }, []);
 
   useEffect(() => {
-    // Calculate immediately and with delays
-    calculateHeightAndWidth();
-    setTimeout(calculateHeightAndWidth, 100);
-    setTimeout(calculateHeightAndWidth, 500);
+    calculateHeight();
+    const handleResize = () => setTimeout(calculateHeight, 100);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [calculateHeight]);
 
-    // Resize listener
-    const handleResize = () => {
-      setTimeout(calculateHeightAndWidth, 100);
+  useEffect(() => {
+    calculateHeight();
+    setTimeout(calculateHeight, 50);
+    setTimeout(calculateHeight, 200);
+  }, dependencies);
+
+  return { navRef, navHeight };
+};
+
+const useMainWidth = (dependencies = []) => {
+  const widthRef = useRef(null);
+  const [width, setWidth] = useState(0);
+  const [leftOffset, setLeftOffset] = useState(0);
+
+  const calculateWidth = useCallback(() => {
+    if (widthRef.current) {
+      const rect = widthRef.current.getBoundingClientRect();
+      setWidth(rect.width);
+      setLeftOffset(rect.left);
+    }
+  }, []);
+
+  useEffect(() => {
+    calculateWidth();
+
+    const handleResize = () => setTimeout(calculateWidth, 100);
+    const handleSidebarResize = () => {
+      calculateWidth();
+      setTimeout(calculateWidth, 50);
+      setTimeout(calculateWidth, 350);
+    };
+
+    let resizeObserver;
+    let mutationObserver;
+
+    const attachObservers = () => {
+      const el = widthRef.current;
+      if (!el) return;
+
+      if (typeof ResizeObserver !== 'undefined' && !resizeObserver) {
+        resizeObserver = new ResizeObserver(() => calculateWidth());
+        resizeObserver.observe(el);
+      }
+
+      if (!mutationObserver) {
+        mutationObserver = new MutationObserver(() => setTimeout(calculateWidth, 50));
+        mutationObserver.observe(el, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+        });
+      }
     };
 
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [calculateHeightAndWidth]);
+    window.addEventListener('college-sidebar-resize', handleSidebarResize);
 
-  // Recalculate when dependencies change
+    attachObservers();
+    const attachTimer = setTimeout(attachObservers, 100);
+
+    return () => {
+      clearTimeout(attachTimer);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('college-sidebar-resize', handleSidebarResize);
+      resizeObserver?.disconnect();
+      mutationObserver?.disconnect();
+    };
+  }, [calculateWidth]);
+
   useEffect(() => {
-    calculateHeightAndWidth();
-    setTimeout(calculateHeightAndWidth, 50);
-    setTimeout(calculateHeightAndWidth, 200);
+    setTimeout(calculateWidth, 50);
+    setTimeout(calculateWidth, 200);
   }, dependencies);
 
-  return { navRef, navHeight, navWidth };
+  return { widthRef, width, leftOffset, calculateWidth };
 };
 const useScrollBlur = (navbarHeight = 140) => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -272,6 +312,35 @@ const useScrollBlur = (navbarHeight = 140) => {
 const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null }) => {
   // Mobile-specific styles
   const mobileStyles = `
+    .kyc-filter-tabs-scroll {
+      overflow-x: auto;
+      overflow-y: visible;
+      flex-wrap: nowrap;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      max-width: 100%;
+    }
+    .kyc-filter-tabs-scroll .btn-group {
+      flex-wrap: nowrap;
+      display: inline-flex;
+    }
+    .kyc-filter-tabs-scroll .position-relative {
+      flex-shrink: 0;
+    }
+    .kyc-search-input-group {
+      max-width: 280px;
+      width: auto;
+      flex: 0 0 auto;
+    }
+    .kyc-search-input-group .form-control {
+      min-width: 0;
+    }
+    .kyc-nav-compact .kyc-search-row {
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: flex-end;
+    }
+
     @media (max-width: 767.98px) {
       .main-tabs-container .d-flex {
         scrollbar-width: none;
@@ -580,10 +649,42 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
   ]);
 
 
-  const { navRef, navHeight, navWidth } = useNavHeight([ekycFilters, showEditPanel, showFollowupPanel, leadHistoryPanel, showWhatsappPanel, mainContentClass, isPanelOpen]);
+  const { navRef, navHeight } = useNavHeight([ekycFilters, showEditPanel, showFollowupPanel, leadHistoryPanel, showWhatsappPanel, mainContentClass, isPanelOpen]);
+  const { widthRef, width, leftOffset, calculateWidth } = useMainWidth([
+    ekycFilters,
+    showEditPanel,
+    showFollowupPanel,
+    leadHistoryPanel,
+    showWhatsappPanel,
+    mainContentClass,
+    isPanelOpen,
+  ]);
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
   const blurIntensity = Math.min(scrollY / 10, 15);
   const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
+  const isNavCompact = Boolean(isPanelOpen) || (width > 0 && width < 1100);
+  const navBarStyle = {
+    zIndex: 11,
+    backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})`,
+    position: 'fixed',
+    width: width > 0 ? `${width}px` : '100%',
+    left: width > 0 ? `${leftOffset}px` : 0,
+    backdropFilter: `blur(${blurIntensity}px)`,
+    WebkitBackdropFilter: `blur(${blurIntensity}px)`,
+    boxShadow: isScrolled
+      ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)'
+      : '0 4px 25px 0 #0000001a',
+    paddingBlock: '10px',
+    transition: 'all 0.3s ease',
+  };
+
+  useEffect(() => {
+    if (isPanelOpen) {
+      calculateWidth();
+      setTimeout(calculateWidth, 50);
+      setTimeout(calculateWidth, 350);
+    }
+  }, [isPanelOpen, calculateWidth]);
 
   // ========================================
   // 🎯 All Admission Filters Configuration
@@ -3347,8 +3448,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
             style={{
               position: 'fixed',
               top: 180,
-              left: 0,
-              right: 0,
+              left: width > 0 ? leftOffset : 0,
+              width: width > 0 ? width : '100%',
               height: `${navHeight + 50}px`,
               background: `linear-gradient(
                 180deg,
@@ -3365,15 +3466,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
               opacity: isScrolled ? 1 : 0
             }}
           />
-          <div className="position-relative" >
-            <nav className="" ref={navRef} style={{
-              zIndex: 11, backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})`, position: 'fixed', width: `${navWidth}`, backdropFilter: `blur(${blurIntensity}px)`,
-              WebkitBackdropFilter: `blur(${blurIntensity}px)`,
-              boxShadow: isScrolled
-                ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)'
-                : '0 4px 25px 0 #0000001a', paddingBlock: '10px',
-              transition: 'all 0.3s ease'
-            }}>
+          <div className={`position-relative ${isNavCompact ? 'kyc-nav-compact' : ''}`} ref={widthRef}>
+            <nav className="kyc-management-nav" ref={navRef} style={navBarStyle}>
               <div className="container-fluid py-2">
                 {/* Mobile Layout - Stack vertically */}
                 <div className="d-md-none" style={{ margin: '15px' }}>
@@ -3420,8 +3514,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                   </div>
 
                   {/* Search and Filter Controls - Mobile */}
-                  <div className="d-flex justify-content-end align-items-center gap-2">
-                    <div className="input-group">
+                  <div className="d-flex justify-content-end align-items-center gap-2 flex-wrap">
+                    <div className="input-group kyc-search-input-group">
                       <input
                         type="text"
                         name="name"
@@ -3453,12 +3547,12 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                   </div>
                 </div>
 
-                {/* Desktop Layout - Original horizontal layout */}
-                <div className="d-none d-lg-block">
+                {/* Desktop Layout - wide screens only, hidden when sidebar/panel open */}
+                <div className={isNavCompact ? 'd-none' : 'd-none d-lg-block'}>
                   <div className="row align-items-center justify-content-between">
                     <div className="col-lg-6">
                       <div className="main-tabs-container" style={{ zIndex: 10, background: '#fff' }}>
-                        <div className="btn-group" role="group" aria-label="eKYC Filters">
+                        <div className="btn-group kyc-filter-tabs-scroll" role="group" aria-label="eKYC Filters">
                           {ekycFilters.map((filter, index) => (
                             <div key={filter._id} className="position-relative d-inline-block me-2">
                               <button
@@ -3497,7 +3591,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
                     <div className="col-lg-6">
                       <div className="d-flex justify-content-end align-items-center gap-2">
-                        <div className="input-group" style={{ maxWidth: '300px' }}>
+                        <div className="input-group kyc-search-input-group">
 
                           <input
                             type="text"
@@ -3539,13 +3633,13 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                   </div>
                 </div>
 
-                {/* Medium screen layout - Stack vertically to prevent overlap */}
-                <div className="d-none d-md-block d-lg-none">
+                {/* Stacked layout - tablets, sidebar open, or narrow content */}
+                <div className={isNavCompact ? 'd-block' : 'd-none d-md-block d-lg-none'}>
                   <div className="row">
                     {/* Filter Tabs */}
                     <div className="col-12 mb-3">
                       <div className="main-tabs-container" style={{ zIndex: 10, background: '#fff' }}>
-                        <div className="d-flex flex-wrap gap-2">
+                        <div className="d-flex flex-wrap gap-2 kyc-filter-tabs-scroll">
                           {ekycFilters.map((filter, index) => (
                             <div key={filter._id} className="position-relative">
                               <button
@@ -3585,8 +3679,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
                     {/* Search and Filter Controls */}
                     <div className="col-12">
-                      <div className="d-flex justify-content-end align-items-center gap-2 flex-wrap">
-                        <div className="input-group" style={{ maxWidth: '250px', minWidth: '200px' }}>
+                      <div className="d-flex justify-content-end align-items-center gap-2 flex-wrap kyc-search-row">
+                        <div className="input-group kyc-search-input-group">
                           <input
                             type="text"
                             name="name"

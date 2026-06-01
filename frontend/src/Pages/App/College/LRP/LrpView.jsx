@@ -81,6 +81,8 @@ function LrpView() {
   const [qaItems, setQaItems] = useState([]);
   const [categoryLabel, setCategoryLabel] = useState("");
   const [typeLabel, setTypeLabel] = useState("");
+  const [deptLabel, setDeptLabel] = useState("");
+  const [projLabel, setProjLabel] = useState("");
   const [meta, setMeta] = useState({
     partnerType: "",
     implementationPartnerName: "",
@@ -124,13 +126,19 @@ function LrpView() {
           const lead = leadJson.data;
           const cat = lead.leadCategory;
           const typ = lead.typeOfB2B;
+          const dept = lead.b2bDepartment;
+          const proj = lead.b2bProject;
           setCategoryLabel(
             cat && typeof cat === "object" ? String(cat.name || cat.title || "").trim() || "—" : "—"
           );
           setTypeLabel(typ && typeof typ === "object" ? String(typ.name || "").trim() || "—" : "—");
+          setDeptLabel(dept && typeof dept === "object" ? String(dept.name || "").trim() || "—" : "—");
+          setProjLabel(proj && typeof proj === "object" ? String(proj.name || "").trim() || "—" : "—");
         } else {
           setCategoryLabel("—");
           setTypeLabel("—");
+          setDeptLabel("—");
+          setProjLabel("—");
         }
 
         if (!lrpRes.ok || !lrpJson?.success || !lrpJson?.data) {
@@ -260,7 +268,9 @@ function LrpView() {
         <>
           <Card number={1} title="Partner & visit">
             <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", alignItems: "flex-start" }}>
-              <FieldRow label="B2B lead category" value={categoryLabel} />
+              <FieldRow label="B2B lead source" value={categoryLabel} />
+              <FieldRow label="B2B department" value={deptLabel} />
+              <FieldRow label="B2B project" value={projLabel} />
               <FieldRow label="B2B type" value={typeLabel} />
               <FieldRow label="Type of partner" value={meta.partnerType} />
               <FieldRow label="Field implementation partner name" value={meta.implementationPartnerName} />

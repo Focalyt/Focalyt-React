@@ -108,7 +108,7 @@ router.post("/add", async (req, res) => {
                 ContentType: file.mimetype,
             };
             const data = await s3.upload(params).promise();
-            return data.Location;
+            return data.Key;
         };
 
 
@@ -282,7 +282,7 @@ router
                     ContentType: file.mimetype,
                 };
                 const data = await s3.upload(params).promise();
-                return data.Location;
+                return data.Key;
             };
 
             // Update media URLs if new files uploaded

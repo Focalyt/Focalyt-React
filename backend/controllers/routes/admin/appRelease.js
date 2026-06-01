@@ -137,9 +137,7 @@ router.post('/upload', async (req, res) => {
       })
       .promise();
 
-    const apkUrl =
-      uploadResult.Location ||
-      `${String(bucketURL).replace(/\/$/, '')}/${key}`;
+    const apkUrl = key;
 
     await AppRelease.updateMany(
       { platform: 'android', isActive: true },

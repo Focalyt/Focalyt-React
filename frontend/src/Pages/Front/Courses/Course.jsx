@@ -1,16 +1,132 @@
-import React, { useState, useEffect, useRef } from 'react';
-import moment from 'moment';
-import axios from 'axios';
-import ReCAPTCHA from "react-google-recaptcha";
-import FrontLayout from '../../../Component/Layouts/Front';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSearch } from '@fortawesome/free-solid-svg-icons';
+import React, { useEffect, useState } from "react";
+import moment from "moment";
+import axios from "axios";
+import { Link } from "react-router-dom";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSearch } from "@fortawesome/free-solid-svg-icons";
+import FrontLayout from "../../../Component/Layouts/Front";
+import { resolveMediaUrl } from "../../../utils/resolveMediaUrl";
+
+const THUMB_FALLBACK = "/Assets/public_assets/images/newjoblisting/course_img.svg";
+
+export function CourseCard({ course, bucketUrl, onPlayVideo, onShare, onRequestCallback }) {
+  const thumb = resolveMediaUrl(bucketUrl, course?.thumbnail) || THUMB_FALLBACK;
+  const videoUrl =
+    course?.videos?.[0] ? resolveMediaUrl(bucketUrl, course.videos[0]) : "";
+  const loc = course?.city ? `${course.city}, ${course.state}` : "NA";
+  const lastDate = course?.lastDateForApply
+    ? moment(course.lastDateForApply).utcOffset("+05:30").format("MMM DD, YYYY")
+    : "NA";
+  const badgeLabel = course?.courseType === "coursejob" ? "Course + Jobs" : "Course";
+  const sectorLabel = Array.isArray(course?.sectorNames)
+    ? course.sectorNames.join(", ")
+    : "";
+
+  return (
+    <div className="course-card">
+      <div className="course-thumb">
+        {videoUrl ? (
+          <button
+            type="button"
+            className="course-thumb-media"
+            data-bs-toggle="modal"
+            data-bs-target="#videoModal"
+            onClick={() => onPlayVideo(videoUrl)}
+            aria-label={`Play video for ${course?.name ?? "course"}`}
+          >
+            <img src={thumb} alt={course?.name ?? "Course"} />
+            <img
+              src="/Assets/public_assets/images/newjoblisting/play.svg"
+              alt=""
+              className="course-thumb-play"
+            />
+          </button>
+        ) : (
+          <img src={thumb} alt={course?.name ?? "Course"} />
+        )}
+        <div className="course-badge">{badgeLabel}</div>
+        {course?.courseFeeType ? (
+          <div className={`course-fee course-fee--${course.courseFeeType.toLowerCase()}`}>
+            {course.courseFeeType}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="course-body">
+        <div className="course-title" title={course?.name}>
+          {course?.name ?? "Course"}
+        </div>
+        {sectorLabel ? (
+          <div className="course-sector" title={sectorLabel}>
+            {sectorLabel}
+          </div>
+        ) : null}
+
+        <div className="course-meta">
+          <div className="m">
+            <strong>Eligibility</strong>
+            <span title={course?.qualification || "N/A"}>{course?.qualification || "N/A"}</span>
+          </div>
+          <div className="m">
+            <strong>Duration</strong>
+            <span>{course?.duration || "N/A"}</span>
+          </div>
+          <div className="m">
+            <strong>Location</strong>
+            <span title={loc}>{loc}</span>
+          </div>
+          <div className="m">
+            <strong>Mode</strong>
+            <span>{course?.trainingMode || "N/A"}</span>
+          </div>
+          <div className="m m--wide">
+            <strong>Last Date to Apply</strong>
+            <span>{lastDate}</span>
+          </div>
+        </div>
+
+        <div className="course-action-btns">
+          <a
+            className="btn cta-callnow btn-bg-color shr--width"
+            href={`/candidate/login?returnUrl=/candidate/course/${course._id}`}
+          >
+            Apply Now
+          </a>
+          <button
+            type="button"
+            className="btn cta-callnow shr--width"
+            onClick={() => onShare(course)}
+          >
+            Share
+          </button>
+        </div>
+        <button
+          type="button"
+          className="btn cta-callnow w-100 course-callback-btn"
+          data-bs-toggle="modal"
+          data-bs-target="#callbackModal"
+          onClick={() => onRequestCallback(course)}
+        >
+          Request for Call Back
+        </button>
+      </div>
+
+      <div className="course_card_footer">
+        <Link to={`/coursedetails/${course._id}`} className="course-learn-more">
+          <span className="learnn">Learn More</span>
+          <img src="/Assets/public_assets/images/link.png" alt="" className="course-learn-more__icon" />
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 function Course() {
   const [courses, setCourses] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [activeFilter, setActiveFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [feeFilter, setFeeFilter] = useState("all");
   const [formData, setFormData] = useState({
     name: "",
     state: "",
@@ -19,16 +135,13 @@ function Course() {
     message: "",
     courseName: "",
     sectorName: "",
-    projectName:"",
-    typeOfProject:""    
+    projectName: "",
+    typeOfProject: "",
   });
-  const [captchaValue, setCaptchaValue] = useState(null);
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-  const recaptchaRef = useRef(null);
   const [videoSrc, setVideoSrc] = useState("");
-  const [feeFilter, setFeeFilter] = useState("all");
 
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -40,1201 +153,705 @@ function Course() {
     "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
     "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands",
     "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Lakshadweep",
-    "Puducherry", "Ladakh", "Jammu and Kashmir"
+    "Puducherry", "Ladakh", "Jammu and Kashmir",
   ];
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute("data-foc-theme", "sky-magenta");
+    root.style.setProperty("--front-layout-bg", "var(--foc-color-bg)");
+    return () => {
+      root.style.removeProperty("--front-layout-bg");
+    };
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const response = await axios.get(`${backendUrl}/courses`);
-        setCourses(response.data.courses);
-        setUniqueSectors(response.data.uniqueSectors);
+        setCourses(response.data.courses ?? []);
+        setUniqueSectors(response.data.uniqueSectors ?? []);
       } catch (error) {
         console.error("Error fetching course data:", error);
       }
     };
     fetchData();
-  }, []);
-
+  }, [backendUrl]);
 
   useEffect(() => {
     const videoModal = document.getElementById("videoModal");
+    const onHidden = () => setVideoSrc("");
     if (videoModal) {
-      videoModal.addEventListener("hidden.bs.modal", () => {
-        setVideoSrc(""); // ✅ Resets video when modal is fully closed
-      });
+      videoModal.addEventListener("hidden.bs.modal", onHidden);
     }
     return () => {
       if (videoModal) {
-        videoModal.removeEventListener("hidden.bs.modal", () => setVideoSrc(""));
+        videoModal.removeEventListener("hidden.bs.modal", onHidden);
       }
     };
   }, []);
 
-
-  const handleFilterClick = (selectedId) => {
-    setActiveFilter(selectedId);
-  };
-
-  const handleFeeFilterClick = (feeType) => {
-    setFeeFilter(feeType); // ✅ Update the selected fee filter (All, Paid, Free)
-  };
-
-  const handleSearchChange = (event) => {
-    setSearchTerm(event.target.value);
-  };
-
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
-
-
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setSuccessMessage("");
     setErrorMessage("");
-
-
-
     try {
-      const response = await axios.post(`${backendUrl}/callback`, {
-        ...formData
-      }, {
-        headers: { "Content-Type": "application/json" }
-      });
-// console.log( "response callback" , response )
+      const response = await axios.post(
+        `${backendUrl}/callback`,
+        { ...formData },
+        { headers: { "Content-Type": "application/json" } }
+      );
       if (response.status === 200 || response.status === 201) {
-        alert("Form submitted successfully!"); // ✅ Alert दिखाएगा
-        window.location.reload(); // ✅ Page Refresh करेगा
-
-
+        setSuccessMessage("Request submitted successfully!");
+        setFormData({
+          name: "",
+          state: "",
+          mobile: "",
+          email: "",
+          message: "",
+          courseName: "",
+          sectorName: "",
+          projectName: "",
+          typeOfProject: "",
+        });
       }
-    } catch (error) {
-      setErrorMessage("Failed to submit the form. Please try again.");
+    } catch {
+      setErrorMessage("Failed to submit. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-
-
-
-  // Filter courses based on selected sector and search term
   const getFilteredCourses = () => {
     if (!Array.isArray(courses)) return [];
-    // Start with all courses
     let filtered = [...courses];
 
-    // Then filter by sector if not "all"
     if (activeFilter !== "all") {
       const sectorId = activeFilter.replace("id_", "");
-      console.log("Filtering by sector ID:", sectorId);
-
-      filtered = filtered.filter(course => {
-        if (!course.sectors || !Array.isArray(course.sectors)) {
-          return false;
-        }
-
-        const hasMatchingSector = course.sectors.some(s => s && s.toString() === sectorId);
-        return hasMatchingSector;
-      });
-
-      console.log("After sector filter, courses count:", filtered.length);
+      filtered = filtered.filter(
+        (course) =>
+          course.sectors &&
+          Array.isArray(course.sectors) &&
+          course.sectors.some((s) => s && s.toString() === sectorId)
+      );
     }
 
-    // Then filter by search term if it exists
-    if (searchTerm && searchTerm.trim() !== "") {
+    if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase().trim();
-      // console.log("Filtering by search term:", term);
-
-      filtered = filtered.filter(course => {
-        const nameMatch = course.name && course.name?.toLowerCase().includes(term);
-        const qualificationMatch = course.qualification && course.qualification?.toLowerCase().includes(term);
-        const durationMatch = course.duration && course.duration?.toLowerCase().includes(term);
-        const cityMatch = course.city && course.city?.toLowerCase().includes(term);
-        const stateMatch = course.state && course.state?.toLowerCase().includes(term);
-        const modeMatch = course.trainingMode && course.trainingMode?.toLowerCase().includes(term);
-        const typeMatch = course.courseType && course.courseType?.toLowerCase().includes(term);
-        const sectorMatch = course.sectorNames && course.sectorNames?.some(name =>
+      filtered = filtered.filter((course) => {
+        const nameMatch = course.name?.toLowerCase().includes(term);
+        const qualificationMatch = course.qualification?.toLowerCase().includes(term);
+        const durationMatch = course.duration?.toLowerCase().includes(term);
+        const cityMatch = course.city?.toLowerCase().includes(term);
+        const stateMatch = course.state?.toLowerCase().includes(term);
+        const modeMatch = course.trainingMode?.toLowerCase().includes(term);
+        const typeMatch = course.courseType?.toLowerCase().includes(term);
+        const sectorMatch = course.sectorNames?.some((name) =>
           name.toLowerCase().includes(term)
         );
-
-        return nameMatch || qualificationMatch || durationMatch || cityMatch ||
-          stateMatch || modeMatch || typeMatch || sectorMatch;
+        return (
+          nameMatch ||
+          qualificationMatch ||
+          durationMatch ||
+          cityMatch ||
+          stateMatch ||
+          modeMatch ||
+          typeMatch ||
+          sectorMatch
+        );
       });
-
-      console.log("After search filter, courses count:", filtered.length);
     }
-    // ✅ Filter by Fee Type (Paid/Free)
+
     if (feeFilter !== "all") {
-      filtered = filtered.filter(course => course.courseFeeType?.toLowerCase() === feeFilter);
+      filtered = filtered.filter(
+        (course) => course.courseFeeType?.toLowerCase() === feeFilter
+      );
     }
 
-    console.log("Final filtered courses count:", filtered.length);
     return filtered;
   };
-  const handleShare = async (course, courseId, courseName, courseThumbnail) => {
-    // Use course detail page URL so WhatsApp/Facebook/Twitter show card with thumbnail, title, description
-    const courseUrl = `${window.location.origin}/coursedetails/${courseId}`;
-    const detailText = course
-      ? [course.duration && `Duration: ${course.duration}`, course.trainingMode && course.trainingMode, course.courseType === 'coursejob' ? 'Course + Jobs' : 'Course'].filter(Boolean).join(' • ')
-      : '';
-    const shareText = detailText ? `${courseName} — ${detailText}` : `Check out this course: ${courseName}`;
+
+  const handleShare = async (course) => {
+    const courseUrl = `${window.location.origin}/coursedetails/${course._id}`;
+    const detailText = [
+      course.duration && `Duration: ${course.duration}`,
+      course.trainingMode,
+      course.courseType === "coursejob" ? "Course + Jobs" : "Course",
+    ]
+      .filter(Boolean)
+      .join(" • ");
+    const shareText = detailText
+      ? `${course.name} — ${detailText}`
+      : `Check out this course: ${course.name}`;
+
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: courseName,
-          text: shareText,
-          url: courseUrl,
-        });
-        console.log("Shared successfully!");
-      } catch (error) {
-        console.error("Error sharing:", error);
-        fallbackCopyText(shareText, courseUrl);
+        await navigator.share({ title: course.name, text: shareText, url: courseUrl });
+      } catch {
+        navigator.clipboard.writeText(`${shareText}\n${courseUrl}`);
+        alert("Course link copied!");
       }
     } else {
-      fallbackCopyText(shareText, courseUrl);
+      navigator.clipboard.writeText(`${shareText}\n${courseUrl}`);
+      alert("Course link copied!");
     }
-  }
+  };
 
-  function fallbackCopyText(shareText, courseUrl) {
-    const fullText = `${shareText}\n${courseUrl}`;
-    navigator.clipboard.writeText(fullText).then(() => {
-      alert("Course link copied! You can paste it anywhere.");
-    }).catch(err => {
-      console.error("Clipboard copy failed:", err);
-    });
-  }
-
-
-
-
+  const handleRequestCallback = (course) => {
+    setFormData((prev) => ({
+      ...prev,
+      courseName: course.name ?? "",
+      sectorName: course.sectorNames ?? "",
+      projectName: course.projectName ?? "",
+      typeOfProject: course.typeOfProject ?? "",
+    }));
+  };
 
   const filteredCourses = getFilteredCourses();
-  console.log("filteredCourses",filteredCourses)
-
-  const chatContainerRef = useRef(null);
-  const bootmBoxRef = useRef(null);
-  const [isChatActive, setIsChatActive] = useState(false);
-
-  const openChatbot = () => {
-    console.log("On click start")
-    const chatContainer = document.getElementById("iframe-box");
-    if (chatContainer) {
-      chatContainer.classList.toggle("active");
-      console.log("class added")
-    } else {
-      console.error("Chat container (iframe-box) not found!");
-    }
-  
-    // Trigger the bootm-box click event to initialize the chat
-    const bootmBox = document.getElementById("bootm-box");
-    if (bootmBox) {
-      bootmBox.click();
-    } else {
-      console.error("Element with ID 'bootm-box' not found!");
-    }}
-    const getFullUrl = (filePath) => {
-      if (!filePath) return "";
-      // Already contains full bucket URL
-      if (filePath.startsWith(bucketUrl)) return filePath;
-      // Is relative path, so prepend bucket URL
-      return `${bucketUrl}/${filePath}`;
-    };
-    
+  const selectedSectorName =
+    activeFilter === "all"
+      ? "All"
+      : uniqueSectors.find((s) => `id_${s._id}` === activeFilter)?.name || "All";
 
   return (
-    <>
-
-      <FrontLayout>
-        <section className="bg_pattern py-xl-5 py-lg-5 py-md-5 py-sm-2 py-2 d-none">
-          {/* Background pattern section - hidden by default (d-none) */}
+    <FrontLayout>
+      <div className="foc-cyber-home hp-theme foc-courses-page">
+        <section className="section grid-bg" id="courses-list">
           <div className="container">
-            {/* Category icons section */}
-            <div className="row">
-              <div className="col-xxl-8 col-xl-8 col-md-8 col-sm-8 col-11 mx-auto">
-                <div className="row justify-content-around" id="features_cta">
-                  <ul className="d-flex justify-content-between overflow-x-auto">
-                    <li className="cta_cols cta_cols_list">
-                      <figure className="figure">
-                        <img className="Sirv image-main" src="/Assets/public_assets/images/newjobicons/agriculture.png" alt="Agriculture" />
-                        <img className="Sirv image-hover" src="/Assets/public_assets/images/newjobicons/agriculture_v.png" alt="Agriculture hover" />
-                      </figure>
-                      <h4 className="head">Agriculture</h4>
-                    </li>
-                    {/* More category items */}
-                  </ul>
+            <div className="section-head">
+              <div className="stag">Future Ready</div>
+              <h1 className="sh2">
+                Live <span className="cyan">Courses</span>
+              </h1>
+              <p className="s-body">Pick a course track and start building job-ready skills.</p>
+            </div>
+
+            <div className="courses-filters">
+              <div className="courses-filters__row">
+                <div className="courses-filters__label">
+                  <span className="courses-filters__tag">Filter by Sector</span>
+                  <span className="courses-filters__active">{selectedSectorName}</span>
+                </div>
+                <div className="courses-search">
+                  <input
+                    type="text"
+                    className="courses-search__input"
+                    placeholder="Search courses..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  <span className="courses-search__icon">
+                    <FontAwesomeIcon icon={faSearch} />
+                  </span>
                 </div>
               </div>
+
+              <div className="courses-filters__chips">
+                <button
+                  type="button"
+                  className={`filter-chip${activeFilter === "all" ? " active" : ""}`}
+                  onClick={() => setActiveFilter("all")}
+                >
+                  All <span className="filter-chip__count">{courses.length}</span>
+                </button>
+                {uniqueSectors.map((sector) => {
+                  const count = courses.filter(
+                    (c) =>
+                      c.sectors?.some((s) => s && s.toString() === sector._id.toString())
+                  ).length;
+                  return (
+                    <button
+                      key={sector._id}
+                      type="button"
+                      className={`filter-chip${activeFilter === `id_${sector._id}` ? " active" : ""}`}
+                      onClick={() => setActiveFilter(`id_${sector._id}`)}
+                    >
+                      {sector.name} <span className="filter-chip__count">{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="courses-filters__fee">
+                <span className="courses-filters__fee-label">Course Type:</span>
+                {["all", "paid", "free"].map((fee) => (
+                  <button
+                    key={fee}
+                    type="button"
+                    className={`filter-chip filter-chip--sm${feeFilter === fee ? " active" : ""}`}
+                    onClick={() => setFeeFilter(fee)}
+                  >
+                    {fee === "all" ? "All" : fee.charAt(0).toUpperCase() + fee.slice(1)}
+                  </button>
+                ))}
+              </div>
             </div>
+
+            {filteredCourses.length > 0 ? (
+              <div className="courses-grid">
+                {filteredCourses.map((course) => (
+                  <CourseCard
+                    key={course._id}
+                    course={course}
+                    bucketUrl={bucketUrl}
+                    onPlayVideo={setVideoSrc}
+                    onShare={handleShare}
+                    onRequestCallback={handleRequestCallback}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="courses-empty">
+                <h3>No courses found</h3>
+                <p>Try adjusting your search or filters.</p>
+              </div>
+            )}
           </div>
         </section>
 
-        {/* Courses Section */}
-        <section className="jobs section-padding-60">
-          <div className="container">
-            <div className="row">
-              <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mx-auto mt-xxl-5 mt-xl-3 mt-lg-3 mt-md-3 mt-sm-3 mt-3">
-                <div className="row my-xl-5 my-lg-5 my-md-3 my-sm-3 my-5 mobileJobs">
-                  <h1 className="text-center text-uppercase jobs-heading pb-4">Select course for your career</h1>
-
-
-
-                  {/* Filter Container */}
-                  <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                    <div className="filter-container">
-                      <div className="filter-headerss">
-                        <div className='row align-items-center justify-content-between'>
-                          <div className='col-md-6 col-12'>
-                            <div className='filter-header'>
-                              <span>▶</span>
-                              <h2 className='fill--sec'>Filter by Sector</h2>
-                            </div>
-
-                          </div>
-
-                          {/* Search Bar */}
-
-                          <div className="col-md-3 col-12">
-                            <div className="search-container">
-                              <input
-                                type="text"
-                                className="form-control search-input"
-                                placeholder="Search courses by Name, Location, Duration, etc."
-                                value={searchTerm}
-                                onChange={handleSearchChange} style={{ background: "transparent", border: "1px solid", paddingLeft: '22px' }}
-                              />
-                              <span className="search-icon">
-                                <FontAwesomeIcon icon={faSearch} />
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                      </div>
-
-                      <div className="filter-buttonss " >
-                        <button
-                          id="all"
-                          className={`filter-button text-uppercase ${activeFilter === "all" ? "active" : ""}`}
-                          onClick={() => handleFilterClick("all")}
-                        >
-                          All
-                          <span className="count">{Array.isArray(courses) ? courses.length : 0}</span>
-
-                          {activeFilter === "all" && <div className="active-indicator"></div>}
-                        </button>
-
-                        {Array.isArray(uniqueSectors) && uniqueSectors.map((sector) => (
-
-
-                          <button
-                            key={sector._id}
-                            id={`id_${sector._id}`}
-                            className={`filter-button text-uppercase ${activeFilter === `id_${sector._id}` ? "active" : ""}`}
-                            onClick={() => handleFilterClick(`id_${sector._id}`)}
-                          >
-                            {sector.name}
-                            <span className="count">
-                              {courses.filter(course =>
-                                course.sectors && Array.isArray(course.sectors) &&
-                                course.sectors.some(s => s && s.toString() === sector._id.toString())
-                              ).length}
-                            </span>
-                            {activeFilter === `id_${sector._id}` && <div className="active-indicator"></div>}
-                          </button>
-                        ))}
-                      </div>
-                      <div className='d-flex align-items-center d-md-none d-sm-block'>
-                        <span className="font-medium text-uppercase me-2">Selected Sector:</span>
-                        <span className="filter-button active text-uppercase">
-                          {activeFilter === "all"
-                            ? "ALL"
-                            : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "ALL"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Selected Sector Display */}
-                  <div className="d-flex justify-content-between gap-3 text-gray-600 mb-4 mt-3">
-                    <div className='sector--select'>
-                      <span className="font-medium text-uppercase me-2">Selected Sector:</span>
-                      <span className="filter-button active text-uppercase">
-                        {activeFilter === "all"
-                          ? "ALL"
-                          : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "ALL"}
-                      </span>
-                    </div>
-                    <div className='d-flex gap-1' ><span className="font-medium text-uppercase align-content-center me-2">Select Course Type:</span>
-                      <button
-                        className={`filter-button text-uppercase ${feeFilter === "all" ? "active" : ""}`}
-                        onClick={() => handleFeeFilterClick("all")}
-                      >
-
-                        ALL
-                      </button>
-                      <button
-                        className={`filter-button text-uppercase ${feeFilter === "paid" ? "active" : ""}`}
-                        onClick={() => handleFeeFilterClick("paid")}
-                      >
-                        Paid
-                      </button>
-                      <button
-                        className={`filter-button text-uppercase ${feeFilter === "free" ? "active" : ""}`}
-                        onClick={() => handleFeeFilterClick("free")}
-                      >
-                        Free
-                      </button>
-
-                    </div>
-                  </div>
-
-                  {/* Course Cards */}
-                  <div className="row mx-auto">
-                    {filteredCourses.length > 0 ? (
-                      filteredCourses.map((course) => (
-                        <div key={course._id} className="col-lg-4 col-md-6 col-sm-12 col-12 pb-4 card-padd">
-                          <div className="card bg-dark courseCard">
-                            <div className="bg-img">
-                              {/* <a
-                              href="#"
-                              data-bs-target="#videoModal"
-                              data-bs-toggle="modal"
-                              data-bs-link={course.videos && course.videos[0] ? `${bucketUrl}/${course.videos[0]}` : ""}
-                              className="pointer img-fluid"
-                            >
-                              <img
-                                src={course.thumbnail
-                                  ? `${bucketUrl}/${course.thumbnail}`
-                                  : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
-                                className="digi"
-                                alt={course.name}
-                              />
-                              <img
-                                src="/Assets/public_assets/images/newjoblisting/play.svg"
-                                alt="Play"
-                                className="group1"
-                              />
-                            </a> */}
-                              <a
-                                href="#"
-                                data-bs-toggle="modal"
-                                data-bs-target="#videoModal"
-                                onClick={(e) => {
-                                  e.preventDefault(); // ✅ Prevents default link behavior
-                                  setVideoSrc(course.videos && course.videos[0] ? getFullUrl(course.videos[0]) : "");
-
-                                }}
-                                className="pointer img-fluid"
-                              >
-                                <img
-                                  src={course.thumbnail ? getFullUrl(course.thumbnail) : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
-                                  className="digi"
-                                  alt={course.name}
-                                />
-                                <img src="/Assets/public_assets/images/newjoblisting/play.svg" alt="Play" className="group1" />
-                              </a>
-
-
-                              <div className="flag"></div>
-                              <div className="right_obj shadow shadow-new">
-                                {course.courseType === 'coursejob' ? 'Course + Jobs' : 'Course'}
-                              </div>
-                            </div>
-
-                            <div className="card-body px-0 pb-0">
-                              <h4
-                                className="text-center text-white fw-bolder mb-2 mx-auto text-capitalize ellipsis"
-                                title={course.name}
-                              >
-                                {course.name}
-                              </h4>
-
-                              <div className="row" id="course_height">
-                                <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                  <div className="col-xxl-10 col-xl-10 col-lg-10 col-md-10 col-sm-10 col-10 mx-auto mb-2">
-                                    <div className="row">
-                                      {/* Eligibility */}
-                                      <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                        <div className="row">
-                                          <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                            <figure className="text-end">
-                                              <img
-                                                src="/Assets/public_assets/images/icons/eligibility.png"
-                                                className="img-fluid new_img p-0"
-                                                draggable="false"
-                                              />
-                                            </figure>
-                                          </div>
-                                          <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-                                            <p className="mb-0 text-white">Eligibility</p>
-                                            <p className="mb-0 text-white">
-                                              <small className="sub_head">({course.qualification})</small>
-                                            </p>
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      {/* Duration */}
-                                      <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                        <div className="row">
-                                          <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                            <figure className="text-end">
-                                              <img
-                                                src="/Assets/public_assets/images/icons/duration.png"
-                                                className="img-fluid new_img p-0"
-                                                draggable="false"
-                                              />
-                                            </figure>
-                                          </div>
-                                          <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-                                            <p className="mb-0 text-white">Duration</p>
-                                            <p className="mb-0 text-white">
-                                              <small className="sub_head">({course.duration})</small>
-                                            </p>
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      {/* Location */}
-                                      <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                        <div className="row">
-                                          <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                            <figure className="text-end">
-                                              <img
-                                                src="/Assets/public_assets/images/icons/location-pin.png"
-                                                className="img-fluid new_img p-0"
-                                                draggable="false"
-                                              />
-                                            </figure>
-                                          </div>
-                                          <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-                                            <p className="mb-0 text-white">Location</p>
-                                            <div className="ellipsis-wrapper">
-                                              <p
-                                                className="mb-0 text-white para_ellipsis"
-                                                title={course.city ? `${course.city}, ${course.state}` : 'NA'}
-                                              >
-                                                <small className="sub_head">
-                                                  {course.city
-                                                    ? `(${course.city}, ${course.state})`
-                                                    : 'NA'}
-                                                </small>
-                                              </p>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      {/* Mode */}
-                                      <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                        <div className="row">
-                                          <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                            <figure className="text-end">
-                                              <img
-                                                src="/Assets/public_assets/images/icons/job-mode.png"
-                                                className="img-fluid new_img p-0"
-                                                draggable="false"
-                                              />
-                                            </figure>
-                                          </div>
-                                          <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-                                            <p className="mb-0 text-white">Mode</p>
-                                            <p className="mb-0 text-white">
-                                              <small className="sub_head">({course.trainingMode})</small>
-                                            </p>
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      {/* Last Date */}
-                                      <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mb-2 text-center">
-                                        <div className="row">
-                                          <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 my-auto">
-                                            <p className="text-white apply_date">Last Date for apply</p>
-                                          </div>
-                                          <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 text-white courses_features ps-0">
-                                            <p className="color-yellow fw-bold">
-                                              {course.lastDateForApply
-                                                ? moment(course.lastDateForApply).utcOffset("+05:30").format('MMM DD YYYY')
-                                                : 'NA'}
-                                            </p>
-                                          </div>
-                                        </div>
-                                      </div>
-
-
-                                      {/* Action Buttons */}
-                                      <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 mb-2 me-2 text-center">
-                                        <a
-                                          className="btn cta-callnow btn-bg-color shr--width"
-                                          href={`/candidate/login?returnUrl=/candidate/course/${course._id}`}
-                                        >
-                                          Apply Now
-                                        </a>
-                                      </div>
-                                      {/* <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
-                                        <a href="https://wa.me/918699017301?text=hi" className="btn cta-callnow shr--width">
-                                          Chat Now
-                                        </a>
-                                      </div> */}
-                                      {/* <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
-                                      <button  onClick={() => openChatbot()}   className="btn cta-callnow shr--width">
-                                          Chat Now
-                                        </button>
-                                      </div>   */}
-                                      
-                                      <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 mb-2 ms-2 text-center">
-                                        <button
-                                          onClick={() => handleShare(course, course._id, course.name, course.thumbnail)} className="btn cta-callnow shr--width">
-                                          {/* <Share2 size={16} className="mr-1" /> */}
-                                          Share
-                                        </button>
-                                      </div>
-                                      <div className="col-xxl-12 col-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                        <div className="row pt-2">
-                                          <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 justify-content-center align-items-center text-center">
-                                            <a href="#" data-bs-toggle="modal" data-bs-target="#callbackModal">
-                                              <span
-                                                className="learnn btn cta-callnow w-100"
-                                                style={{ padding: "10px 14px", cursor: "pointer" }}
-                                                onClick={() => setFormData({ ...formData, courseName: course.name,sectorName:course.sectorNames,projectName:course.projectName,typeOfProject:course.typeOfProject })}
-                                              >
-                                                Request for Call Back
-                                              </span>
-
-                                            </a>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Footer */}
-                              <div className="col-xxl-12 col-12 col-lg-12 col-md-12 col-sm-12 col-12 course_card_footer">
-                                <div className="row py-2">
-                                  <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 justify-content-center align-items-center text-center">
-                                    <a href={`/candidate/login?returnUrl=/candidate/course/${course._id}`}>
-                                      <span className="learnn pt-1 text-white">Learn More</span>
-                                      <img src="/Assets/public_assets/images/link.png" className="align-text-top" />
-                                    </a>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="col-12 text-center py-5">
-                        <h3 className="text-muted">No courses found matching your criteria</h3>
-                        <p>Try adjusting your search or filters to find more courses</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </section>
-
-        {/* Video Modal */}
-        {/* <div className="modal fade" id="videoModal" tabIndex="-1" role="dialog" aria-labelledby="videoModalTitle" aria-hidden="true">
-          <div className="modal-dialog modal-dialog-centered" role="document">
-            <div className="modal-content">
-              <button type="button" className="close" data-bs-dismiss="modal" aria-label="Close">
+        <div className="modal fade event-video-modal" id="videoModal" tabIndex="-1" aria-hidden="true">
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content event-video-modal__content">
+              <button
+                type="button"
+                className="event-video-modal__close"
+                data-bs-dismiss="modal"
+                aria-label="Close"
+              >
                 <span aria-hidden="true">&times;</span>
               </button>
-              <div className="modal-body p-0 text-center embed-responsive">
-                <video id="courseVid" controls autoPlay className="video-fluid text-center">
-                  <source id="videoElement" src="" type="video/mp4" className="img-fluid video-fluid" />
-                  Your browser does not support the video tag.
-                </video>
-              </div>
-            </div>
-          </div>
-        </div> */}
-        {/* Video Modal */}
-        <div className="modal fade" id="videoModal" tabIndex="-1" aria-labelledby="videoModalTitle" aria-hidden="true"
-          onClick={() => setVideoSrc("")}
-        >
-          <div className="modal-dialog modal-dialog-centered" role="document">
-            <div className="modal-content modal-width">
-              <button type="button" className="close" data-bs-dismiss="modal" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-              </button>
-              <div className="modal-body p-0 text-center embed-responsive">
-                <video key={videoSrc} id="courseVid" controls className="video-fluid text-center">
-                  <source src={videoSrc} type="video/mp4" className="img-fluid video-fluid" />
-                  Your browser does not support the video tag.
+              <div className="modal-body p-0">
+                <video key={videoSrc} id="courseVid" controls className="w-100">
+                  <source src={videoSrc} type="video/mp4" />
                 </video>
               </div>
             </div>
           </div>
         </div>
 
-
-
-        {/* Callback Modal */}
         <div className="modal fade" id="callbackModal" tabIndex="-1" aria-labelledby="callbackModalLabel" aria-hidden="true">
-          <div className="modal-dialog modal-dialog-centered newWidth">
-            <div className="modal-content">
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content foc-callback-modal">
               <div className="modal-header">
-                <h5 className="modal-title text-white" id="callbackModalLabel">
+                <h5 className="modal-title" id="callbackModalLabel">
                   Request for Call Back
                 </h5>
-                <button type="button" className="btn-close text-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close" />
               </div>
               <div className="modal-body">
-                <form id="callbackForm" onSubmit={handleSubmit}>
-                  <div className="row mb-3">
-                    <div className="col-md-6 col-6">
+                <form onSubmit={handleSubmit}>
+                  <div className="row g-3 mb-3">
+                    <div className="col-md-6">
                       <label className="form-label">Name</label>
-                      <input type="text" className="form-control" name="name" value={formData.name} onChange={handleChange} required placeholder="Enter your name" />
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleChange}
+                        required
+                        placeholder="Your name"
+                      />
                     </div>
-                    <div className="col-md-6 col-6">
+                    <div className="col-md-6">
                       <label className="form-label">State</label>
-                      <select className="form-control" name="state" value={formData.state} onChange={handleChange} required>
-                        <option value="" disabled>Select your State</option>
-                        {statesList.map((state, index) => (
-                          <option key={index} value={state}>{state}</option>
+                      <select
+                        className="form-control"
+                        name="state"
+                        value={formData.state}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="" disabled>
+                          Select state
+                        </option>
+                        {statesList.map((state) => (
+                          <option key={state} value={state}>
+                            {state}
+                          </option>
                         ))}
                       </select>
                     </div>
-                  </div>
-
-                  <div className="row mb-3">
-                    <div className="col-md-6 col-6">
+                    <div className="col-md-6">
                       <label className="form-label">Contact Number</label>
-                      <input type="tel" className="form-control" name="mobile" value={formData.mobile} onChange={handleChange} required pattern="[0-9]{10}" placeholder="Enter 10-digit mobile number" />
+                      <input
+                        type="tel"
+                        className="form-control"
+                        name="mobile"
+                        value={formData.mobile}
+                        onChange={handleChange}
+                        required
+                        pattern="[0-9]{10}"
+                        placeholder="10-digit mobile"
+                      />
                     </div>
-                    <div className="col-md-6 col-6">
+                    <div className="col-md-6">
                       <label className="form-label">Email</label>
-                      <input type="email" className="form-control" name="email" value={formData.email} onChange={handleChange} required placeholder="Enter your email" />
+                      <input
+                        type="email"
+                        className="form-control"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        required
+                        placeholder="Your email"
+                      />
                     </div>
                   </div>
-
                   <div className="mb-3">
                     <label className="form-label">Message</label>
-                    <textarea className="form-control" name="message" value={formData.message} onChange={handleChange} required placeholder="Enter your message here..."></textarea>
+                    <textarea
+                      className="form-control"
+                      name="message"
+                      value={formData.message}
+                      onChange={handleChange}
+                      required
+                      rows={3}
+                      placeholder="Your message"
+                    />
                   </div>
-
-
-
-                  <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? "Submitting..." : "Submit"}</button>
-                  {successMessage && <p className="text-success">{successMessage}</p>}
-                  {errorMessage && <p className="text-danger">{errorMessage}</p>}
+                  <button type="submit" className="btn btn-primary w-100" disabled={loading}>
+                    {loading ? "Submitting..." : "Submit"}
+                  </button>
+                  {successMessage && <p className="text-success mt-2 mb-0">{successMessage}</p>}
+                  {errorMessage && <p className="text-danger mt-2 mb-0">{errorMessage}</p>}
                 </form>
-                {successMessage && <p className="text-success">{successMessage}</p>}
               </div>
             </div>
           </div>
         </div>
-        <style>
-          {
-            `
-            
-.bg-img {
-    position: relative;
-    border-radius: 11px;
-    border: 1px solid #ffffff;
-    box-shadow: rgb(227, 59, 22, 77%) 0px 0px 0.25em, rgba(24, 86, 201, 0.05) 0px 0.25em 1em;
+      </div>
+
+      <style>{`
+.foc-cyber-home.foc-courses-page, .foc-cyber-home.foc-courses-page * { box-sizing: border-box; }
+.foc-cyber-home.foc-courses-page {
+  --cyan: var(--foc-cyan);
+  --red: var(--foc-magenta);
+  --bg: var(--foc-color-bg);
+  --bg2: var(--foc-color-bg-alt);
+  --surface: var(--foc-color-surface);
+  --surface2: var(--foc-color-surface-2);
+  --border: rgba(4, 25, 45, .12);
+  --text: var(--foc-color-text);
+  --muted: var(--foc-color-text-muted);
+  --muted2: var(--foc-color-text-muted-2);
+  --orb1: rgba(27,167,255,.14);
+  --orb2: rgba(255,45,170,.12);
+  --grid-line: rgba(6,20,38,.055);
+  --cyan-glow: rgba(27,167,255,.22);
+  --cyan-soft: rgba(27,167,255,.085);
+  --r: var(--foc-radius-lg);
+  --ease: var(--foc-ease);
+  font-family: var(--foc-font-sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100%;
+  padding-top: 88px;
+  position: relative;
+  overflow-x: hidden;
 }
-img.group1 {
-    width: 75px !important;
-    height: auto;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+.foc-courses-page > section { padding: 48px 0; background: var(--bg) !important; position: relative; }
+.foc-courses-page .container {
+  max-width: var(--foc-container-max);
+  margin: 0 auto;
+  padding: 0 var(--foc-container-pad);
+  position: relative;
+  z-index: 1;
 }
-.course_card_footer img {
-    width: 20px;
+.foc-courses-page .grid-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 18% 12%, var(--orb1) 0%, transparent 55%),
+    radial-gradient(circle at 82% 28%, var(--orb2) 0%, transparent 60%),
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: auto, auto, 48px 48px, 48px 48px;
+  opacity: .9;
+  pointer-events: none;
 }
-.courses_features p {
-    line-height: normal;
-    font-size: 16px;
+.foc-courses-page .section-head { text-align: center; margin-bottom: 28px; }
+.foc-courses-page .stag {
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--cyan-soft); border: 1px solid var(--border);
+  color: var(--cyan); font-size: 10px; font-weight: 600;
+  letter-spacing: .16em; text-transform: uppercase;
+  padding: 5px 14px; border-radius: 2px; margin-bottom: 14px;
 }
-.color-yellow {
-    color: #FFD542;
+.foc-courses-page .stag::before { content: '//'; color: var(--red); }
+.foc-courses-page .sh2 {
+  font-family: var(--foc-font-display), Orbitron, sans-serif;
+  font-size: clamp(26px, 4vw, 44px);
+  font-weight: 700; color: var(--text);
+  line-height: 1.1; letter-spacing: 0.03em; margin: 0;
 }
-.btn.shr--width{
-  width: 100%;
+.foc-courses-page .sh2 .cyan {
+  background: linear-gradient(90deg, var(--cyan), var(--red));
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent; -webkit-text-fill-color: transparent;
 }
-.btn.cta-callnow {
-    background: #fff;
-    color: #FC2B5A;
-    font-family: inter;
-    border-radius: 50px;
-    font-weight: 500;
-    padding: 10px 4px;
-    width: 120%;
-    font-size: 12px;
-    letter-spacing: 1px;
-    transition: .3s;
-}
-.btn.cta-callnow:hover {
-    transition: .5s;
-    background: #FC2B5A;
-    color: #fff;
-}
-.learnn{
-  padding: 10px 14px;
-}
-.course_card_footer {
-    background: #FC2B5A;
-    border-bottom-left-radius: 10px;
-    border-bottom-right-radius: 10px;
-}
-.jobs h1 {
-    color: #FC2B5A;
-    font-size: 45px;
-    font-weight: 700;
-    font-family: 'INTER', sans-serif;
+.foc-courses-page .s-body {
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  font-size: 15px; color: var(--muted); margin-top: 12px;
+  text-align: center; line-height: 1.75; font-style: italic;
+  margin-left: auto; margin-right: auto;
 }
 
-.courseCard{
-  border-radius: 12px!important;
-    border-bottom-left-radius: 12px;
-    border-bottom-right-radius: 12px;
+.foc-courses-page .courses-filters {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 18px;
+  margin-bottom: 24px;
 }
-video#courseVid {
-    width: 100%;
-    height: 100%;
-    border-radius: 6px;
+.foc-courses-page .courses-filters__row {
+  display: flex; flex-wrap: wrap; gap: 16px;
+  align-items: center; justify-content: space-between;
+  margin-bottom: 14px;
 }
-.smallText{
+.foc-courses-page .courses-filters__tag {
+  font-size: 10px; font-weight: 700; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--cyan); display: block;
+}
+.foc-courses-page .courses-filters__active {
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  font-size: 14px; font-weight: 600; color: var(--text);
+}
+.foc-courses-page .courses-search { position: relative; min-width: 220px; flex: 1; max-width: 360px; }
+.foc-courses-page .courses-search__input {
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  width: 100%; padding: 10px 14px 10px 36px;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: var(--bg); color: var(--text); font-size: 14px;
+}
+.foc-courses-page .courses-search__input:focus {
+  outline: none; border-color: var(--cyan);
+  box-shadow: 0 0 0 3px var(--cyan-soft);
+}
+.foc-courses-page .courses-search__icon {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); font-size: 14px;
+}
+.foc-courses-page .courses-filters__chips,
+.foc-courses-page .courses-filters__fee {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+}
+.foc-courses-page .courses-filters__fee { margin-top: 12px; }
+.foc-courses-page .courses-filters__fee-label {
+  font-size: 11px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--muted2); margin-right: 4px;
+}
+.foc-courses-page .filter-chip {
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  border: 1px solid var(--border); background: var(--bg);
+  color: var(--text); border-radius: 999px;
+  padding: 8px 14px; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: .2s var(--ease);
+  letter-spacing: 0.01em;
+}
+.foc-courses-page .filter-chip--sm { padding: 6px 12px; font-size: 11px; }
+.foc-courses-page .filter-chip.active {
+  background: linear-gradient(90deg, var(--cyan), var(--red));
+  color: var(--foc-color-text-inverse); border-color: transparent;
+}
+.foc-courses-page .filter-chip__count {
+  margin-left: 6px; opacity: .85; font-size: 11px;
+}
+
+.foc-courses-page .courses-grid {
+  display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 8px;
+}
+@media (min-width: 768px) {
+  .foc-courses-page .courses-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1200px) {
+  .foc-courses-page .courses-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+.foc-courses-page .course-card {
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--cr-accent) 22%, var(--border));
+  border-radius: var(--r); overflow: hidden; position: relative;
+  --cr-accent: var(--cyan);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--cr-accent) 12%, rgba(0,0,0,.06));
+  display: flex; flex-direction: column; min-height: 100%;
+  transition: .25s var(--ease);
+  padding: 0;
+}
+.foc-courses-page .course-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 36px color-mix(in srgb, var(--cr-accent) 18%, rgba(0,0,0,.08));
+}
+.foc-courses-page .courses-grid .course-card:nth-child(4n + 1) { --cr-accent: var(--cyan); border-radius: 14px 20px 14px 16px; }
+.foc-courses-page .courses-grid .course-card:nth-child(4n + 2) { --cr-accent: var(--red); border-radius: 18px 12px 22px 14px; }
+.foc-courses-page .courses-grid .course-card:nth-child(4n + 3) { --cr-accent: color-mix(in srgb, var(--cyan) 55%, var(--red)); border-radius: 12px 18px 14px 20px; }
+.foc-courses-page .courses-grid .course-card:nth-child(4n) { --cr-accent: color-mix(in srgb, var(--red) 70%, var(--foc-purple)); border-radius: var(--foc-radius-xl) 14px 16px 18px; }
+.foc-courses-page .course-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+  background: linear-gradient(90deg, var(--cr-accent), color-mix(in srgb, var(--cr-accent) 35%, transparent));
+  z-index: 2; pointer-events: none;
+}
+.foc-courses-page .course-thumb {
+  height: 160px; background: var(--surface2); position: relative; overflow: hidden;
+}
+.foc-courses-page .course-thumb > img,
+.foc-courses-page .course-thumb-media img:first-child {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  filter: saturate(1.03) contrast(1.03);
+}
+.foc-courses-page .course-thumb-media {
+  display: block; width: 100%; height: 100%; padding: 0; border: none;
+  background: transparent; cursor: pointer; position: relative;
+}
+.foc-courses-page .course-thumb-play {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 52px; height: 52px; z-index: 1; pointer-events: none;
+}
+.foc-courses-page .course-thumb::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(11,18,32,.35));
+  pointer-events: none;
+}
+.foc-courses-page .course-badge {
+  position: absolute; right: 12px; top: 12px; z-index: 2;
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+  text-transform: uppercase; padding: 6px 10px; border-radius: 999px;
+  border: 1px solid var(--border); background: rgba(255,255,255,.92); color: var(--text);
+}
+.foc-courses-page .course-fee {
+  position: absolute; left: 12px; bottom: 12px; z-index: 2;
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+  text-transform: uppercase; padding: 6px 10px; border-radius: 999px;
+  background: rgba(255,255,255,.92); border: 1px solid var(--border);
+}
+.foc-courses-page .course-fee--free { color: var(--cyan); border-color: rgba(27,167,255,.28); }
+.foc-courses-page .course-fee--paid { color: var(--red); border-color: rgba(255,45,122,.28); }
+
+.foc-courses-page .course-body {
+  padding: 16px 16px 14px; display: flex; flex-direction: column; gap: 10px; flex: 1;
+}
+.foc-courses-page .course-title {
+  font-family: var(--foc-font-display), Orbitron, sans-serif;
+  font-size: 15px; font-weight: 700;
+  letter-spacing: 0.02em; color: var(--text); line-height: 1.3;
+}
+.foc-courses-page .course-sector {
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  font-size: 12px; color: var(--muted); letter-spacing: 0.01em;
+  line-height: 1.45;
+}
+.foc-courses-page .course-meta {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 2px;
+}
+.foc-courses-page .course-meta .m {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 12px; padding: 10px;
+}
+.foc-courses-page .course-meta .m--wide { grid-column: 1 / -1; }
+.foc-courses-page .course-meta .m strong {
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  display: block; font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--muted2); margin-bottom: 4px;
+}
+.foc-courses-page .course-meta .m span {
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  display: block; font-size: 12px; font-weight: 500; color: var(--text); line-height: 1.4;
+}
+.foc-courses-page .course-action-btns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 4px;
+}
+.foc-courses-page .btn.shr--width { width: 100%; }
+.foc-courses-page .btn.cta-callnow,
+.foc-courses-page .btn.cta-callnow.btn-bg-color {
+  background: var(--foc-color-cta, #fc2b5a);
   color: #fff;
-  background-color: #FC2B5A!important;
-}
-button.close {
-    z-index: 9;
-    background: #fff;
-    border: 2px solid #FC2B5A !important;
-    font-size: 19px;
-    border-radius: 100px;
-    height: 38px;
-    opacity: 1;
-    padding: 0;
-    position: absolute;
-    right: -13px;
-    top: -12px;
-    width: 38px;
-    -webkit-appearance: none;
-    -moz-box-shadow: none;
-    -webkit-box-shadow: none;
-    box-shadow: none;
-    font-weight: 400;
-    transition: .3s;
-    font-weight: 900;
-}
-button.close span {
-    font-size: 30px;
-    line-height: 30px;
-    color: #FC2B5A;
-    font-weight: 400;
-}
-.sector--select{
-  display: flex;
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  border: none;
+  border-radius: 50px;
+  font-weight: 600;
+  padding: 10px 12px;
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  transition: color 0.25s ease;
+  text-decoration: none;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  line-height: 1.25;
+}
+.foc-courses-page .btn.cta-callnow:hover,
+.foc-courses-page .btn.cta-callnow.btn-bg-color:hover {
+  background: var(--foc-color-cta, #fc2b5a);
+  color: var(--cyan, #1ba7ff);
+}
+.foc-courses-page .course-callback-btn {
+  margin-top: 10px;
+}
+.foc-courses-page .course_card_footer {
+  background: var(--foc-color-cta, #fc2b5a);
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+  margin-top: auto;
+  text-align: center;
+  padding: 10px 12px;
+}
+.foc-courses-page .course-learn-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+}
+.foc-courses-page .course-learn-more .learnn {
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.foc-courses-page .course-learn-more__icon {
+  width: 18px;
+  height: auto;
+  display: block;
+}
+.foc-courses-page .courses-empty {
+  text-align: center; padding: 48px 16px; color: var(--muted);
+}
+.foc-courses-page .courses-empty h3 {
+  font-family: var(--foc-font-display); color: var(--text); margin-bottom: 8px;
+}
+.foc-courses-page #courseVid { width: 100%; border-radius: 10px; outline: none; display: block; }
+.foc-courses-page .foc-callback-modal .modal-title { color: var(--text); }
 
+.event-video-modal .event-video-modal__content {
+  position: relative; border: none; background: #000; overflow: visible;
 }
-
-@media only screen and (max-width: 1199px) {
-    .card {
-        width: 100%;
-    }
-    .card-padd {
-        display: flex
-;
-        justify-content: center;
-        padding-left: 0 !important;
-    }
+.event-video-modal .modal-body { padding: 0; }
+.event-video-modal__close {
+  position: absolute; top: 10px; right: 10px; z-index: 20;
+  width: 30px; height: 30px; padding: 0; margin: 0; border: none;
+  border-radius: 50%; background: rgba(255, 255, 255, 0.95); color: #1a1a2e;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2); opacity: 1; float: none;
 }
-@media only screen and (max-width: 768px) {
-.sector--select{
-  display: none;
-}
-  .jobs-heading {
-        font-size: 30px !important;
-    }
-    .card {
-        width: 95% !important;
-    }
-    
-    .jobs-heading {
-        font-size: 22px;
-    }
-}
-@media only screen and (max-width: 700px) {
-    .card {
-        width: 95% !important;
-    }
-}
-@media (max-width: 578px) {
- 
-    .jobs-heading {
-        font-size: 27px !important;
-    }
-}
-@media (max-width: 432px) {
-    .jobs-heading {
-        font-size: 25px !important;
-    }
-}
-@media (max-width: 392px) {
-   
-    .courses_features p{
-        font-size: 14px;
-    }
-}
-@media (max-width: 375px) {
-   
-    
-}
-
-
-/* Course.css */
-
-/* Filter Styles */
-.filter-container {
-    margin: auto;
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
-    margin-bottom: 30px;
-  }
-  
-  .filter-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 16px;
-    color: #6b7280;
-    font-weight: 500;
-  }
-  
-  .filter-buttonss {
-    display: flex;
-    overflow-y: hidden;
-    overflow-x: auto;
-    gap: 12px;
-    /* scrollbar-width: none; */
-    /* -ms-overflow-style: none; */
-    padding-bottom: 8px;
-  } 
-  /* .filter-buttons{
-    
-    scrollbar-width: 1px;
-    -ms-overflow-style: none;
-    padding-bottom: 8px;
-
-    
-  } */
-  
- 
-  /* .filter-buttons::-webkit-scrollbar {
-    display: none;
-  } */
-  .filter-button {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 16px;
-    border-radius: 20px;
-    font-weight: 500;
-    border: 1px solid #e5e7eb;
-    background: white;
-    color: #374151;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    white-space: nowrap;
-  }
-  
-  .filter-button:hover {
-    border-color: #ec4899;
-  }
-  
-  .filter-button.active {
-    background: #ec4899;
-    color: white;
-    transform: scale(1.05);
-  }
-  
-  .count {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    font-size: 12px;
-    border-radius: 50%;
-    background: #f3f4f6;
-    color: #374151;
-  }
-  
-  .filter-button.active .count {
-    background: #db2777;
-    color: white;
-  }
-  
-  .active-indicator {
-    position: absolute;
-    bottom: -6px;
-    left: 50%;
-    transform: translateX(-50%) rotate(45deg);
-    width: 8px;
-    height: 8px;
-    background: #ec4899;
-  }
-  
-  /* Course Card Styles */
-  .courseCard {
-    border-radius: 12px;
-    overflow: hidden;
-    transition: transform 0.3s ease;
-    /* height: 100%; */
-  }
-  
-  .courseCard:hover {
-    transform: translateY(-5px);
-  }
-  
-  .bg-img {
-    position: relative;
-    overflow: hidden;
-  }
-  
-  .bg-img img.digi {
-    width: 100%;
-    height: 200px;
-    object-fit: cover;
-  }
-    
-  .group1 {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 40px;
-    height: 40px;
-    opacity: 0.8;
-    transition: opacity 0.3s ease, transform 0.3s ease;
-  }
-  
-  .bg-img:hover .group1 {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1.1);
-  }
-  
-  .ellipsis {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-  }
-  
-  .para_ellipsis {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-  }
-  
-  .courses_features {
-    font-size: 0.85rem;
-  }
-  
-  .sub_head {
-    opacity: 0.8;
-    font-size: 0.75rem;
-  }
-  
-  .color-yellow {
-    color: #ffc107;
-  }
-  
-  
-  .btn-bg-color {
-    background-color: #ec4899;
-    color: white;
-    border: none;
-  }
-  
-  .btn-bg-color:hover {
-    background-color: #db2777;
-    color: white;
-  }
-  
-  .cta-callnow {
-    font-weight: 500;
-    transition: all 0.3s ease;
-  }
-  
-  .cta-callnow:hover {
-    transform: translateY(-2px);
-  }
-  
-  /* Section Styles */
-  .section-padding-60 {
-    padding: 60px 0;
-  }
-  
-  .jobs-heading {
-    color: #333;
-    font-weight: 700;
-    position: relative;
-  }
-  .search-container{
-    position: relative;
-  }
-  .search-icon {
-    position: absolute;
-    left: 5px;
-    top: 8px;
-    font-size: 16px;
-  }
-  /* .jobs-heading:after {
-    content: '';
-    position: absolute;
-    bottom: 15px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 80px;
-    height: 4px;
-    background-color: #ec4899;
-    border-radius: 2px;
-  }
-   */
-  /* Modal Styles */
-  .modal-content {
-    border: none;
-    border-radius: 12px;
-    /* overflow: hidden; */
-  }
-  
-  .modal-header {
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-  }
-  
-  .modal-footer {
-    border-top: 1px solid rgba(0, 0, 0, 0.1);
-  }
-  
-  .submit_btn {
-    background-color: #ec4899;
-    color: white;
-    border: none;
-    padding: 8px 20px;
-    border-radius: 6px;
-    font-weight: 500;
-    transition: all 0.3s ease;
-  }
-  
-  .submit_btn:hover {
-    background-color: #db2777;
-  }
-.new_img{
-    width: 20px!important;
-}
-.apply_date{
-    font-size: 16px;
-}
-
-#callbackForm input , #callbackForm select{
-  background-color: transparent;
-  padding: 7px 12px;
-  border: 1px solid ;
-  height: 37px;
-}
-#callbackForm textarea{
-  margin-bottom: 20px;
-  border: 1px solid ;
-}
-#callbackForm button{
-  border: 1px solid #fc2b5a;
-  transition: 0.4s ease-in-out;
-}
-#callbackForm button:hover{
-  border: 1px solid #FC2B5A;
-  color: #FC2B5A;
-  font-weight: bold;
-  background: transparent!important;
-  scale: 1.1;
-}
-.newWidth{
-  width: 30%!important;
-}
-.shadow-new{
-  right: 0px!important;
-}
-  .btn-close {
-  --bs-btn-close-bg: url("data:image/svg+xml,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27 fill=%27%23fff%27%3e%3cpath d=%27M.293.293a1 1 0 0 1 1.414 0L8 6.586 14.293.293a1 1 0 1 1 1.414 1.414L9.414 8l6.293 6.293a1 1 0 0 1-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 0 1-1.414-1.414L6.586 8 .293 1.707a1 1 0 0 1 0-1.414%27/%3e%3c/svg%3e");
-}
-
-@media (max-width:992px){
-  .newWidth{
-    width: 100%!important;
-  }
-}
-@media (max-width:768px){
-  .bg-img img.digi {
-    object-fit: fill;
-  }
-}
-            `
-          }
-        </style>
-
-<style>
-  {
-
-    `
-    
-.modal-width{
-width:25rem;
-height:15rem;
-}
-.shadow {
-    box-shadow: 0 .5rem 1rem #00000026 !important;
-    box-shadow: var(--bs-box-shadow) !important;
-}
-.right_obj {
-    background: #fff;
-    border: 1px dashed #ffd542;
-    border-bottom-left-radius: 15px;
-    border-right: 0;
-    box-shadow: .5px 0 2px #0000004d;
-    color: #fc2b5a;
-    font-family: inter;
-    font-weight: 700;
-    outline: 3px solid #fff;
-    padding: 2px 10px;
-    position: absolute;
-    right: 17px;
-    top: 30px;
-    width: -webkit-fit-content;
-    width: fit-content;
-    z-index: 1;
-}
-    .modal-header {
-  background-color: #FC2B5A;
-  border-bottom: none;
-}
-    
-    `
-  }
-</style>
-      </FrontLayout>
-    </>
+.event-video-modal__close span { font-size: 22px; line-height: 1; margin-top: -2px; }
+      `}</style>
+    </FrontLayout>
   );
 }
 

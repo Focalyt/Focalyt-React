@@ -83,7 +83,7 @@ const uploadFilesToS3 = async ({ files, folder, courseName, s3, bucketName, allo
 		};
 
 		return s3.upload(params).promise().then((result) => {
-			uploaded.push(result.Location);
+			uploaded.push(result.Key);
 		});
 	});
 

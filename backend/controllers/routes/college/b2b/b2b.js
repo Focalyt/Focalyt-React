@@ -3270,7 +3270,7 @@ router.post('/leads/:id/documents', isCollege, async (req, res) => {
 		const doc = {
 			name: req.body?.name ? String(req.body.name).trim() : originalName,
 			docType: req.body?.docType ? String(req.body.docType).trim() : '',
-			url: uploaded.Location,
+			url: key,
 			key,
 			status: 'PENDING',
 			remarks: req.body?.remarks ? String(req.body.remarks).trim() : '',

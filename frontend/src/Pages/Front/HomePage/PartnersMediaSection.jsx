@@ -90,6 +90,46 @@ const STYLES = `
   .fp .tab-btn { transition: all 0.25s ease; cursor: pointer; border: none; }
   .fp .tab-btn:hover { transform: translateY(-3px); }
 
+  .fp .media-tabs-row {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 36px;
+  }
+
+  .fp .media-tabs-row .tab-btn {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 768px) {
+    .fp .media-tabs-row {
+      justify-content: flex-start;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scroll-snap-type: x proximity;
+      scrollbar-width: none;
+      margin-top: 28px;
+      margin-left: -16px;
+      margin-right: -16px;
+      padding: 4px 16px 12px;
+      gap: 8px;
+    }
+
+    .fp .media-tabs-row::-webkit-scrollbar {
+      display: none;
+    }
+
+    .fp .media-tabs-row .tab-btn {
+      scroll-snap-align: start;
+      padding: 10px 16px;
+      font-size: 12.5px;
+    }
+  }
+
   .fp .media-card {
     transition: transform 0.38s cubic-bezier(.34,1.56,.64,1), box-shadow 0.38s ease;
     cursor: pointer;
@@ -140,9 +180,69 @@ const STYLES = `
   @media (max-width: 599px) {
     .fp .partner-cards-grid {
       grid-template-columns: 1fr;
-      max-width: 340px;
+      width: 100%;
+      max-width: 100%;
       margin-left: auto;
       margin-right: auto;
+      padding: 0;
+    }
+
+    .fp .partner-card {
+      margin: 0 auto;
+      width: 100%;
+      max-width: 100%;
+    }
+
+    .fp .partner-logo-carousel {
+      padding: 14px 36px 10px !important;
+    }
+
+    .fp .partner-logo-carousel .arrow-btn {
+      left: 6px !important;
+      right: auto;
+      width: 28px !important;
+      height: 28px !important;
+      font-size: 14px !important;
+    }
+
+    .fp .partner-logo-carousel .arrow-btn.partner-arrow-next {
+      left: auto !important;
+      right: 6px !important;
+    }
+
+    .fp .partner-logo-row {
+      justify-content: center;
+      gap: 6px;
+      padding: 0 4px;
+    }
+
+    .fp .partner-logo-row .logo-chip {
+      min-width: 0 !important;
+      flex: 1;
+      max-width: 96px;
+      padding: 8px 6px !important;
+    }
+
+    .fp .partner-logo-row .logo-chip > div:first-child {
+      font-size: 18px !important;
+    }
+
+    .fp .partner-logo-row .logo-chip > div:last-child {
+      font-size: 9px !important;
+    }
+  }
+
+  .fp .fp-section-inner {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 32px;
+    position: relative;
+    z-index: 1;
+  }
+
+  @media (max-width: 768px) {
+    .fp .fp-section-inner {
+      padding: 0 16px;
     }
   }
 
@@ -255,23 +355,44 @@ const MEDIA_TABS = [
   { id: "events", label: "Events & Engagement", emoji: "📅" },
 ];
 
+/** Same image assets as About page — /Assets/public_assets/images/ */
+const ABOUT_MEDIA_ASSET = "/Assets/public_assets/images";
+
 const MEDIA_CARDS = [
-  { tab: "social", title: "Skill Training in Action", desc: "Hands-on training for a future ready workforce.", emoji: "📱", tag: "Social Media", accent: "var(--foc-green-dark)", img: "🧑‍💻" },
-  { tab: "social", title: "Placement Success", desc: "Connecting talent with meaningful opportunities.", emoji: "🤝", tag: "Placement Drive", accent: "var(--foc-blue)", img: "👩‍🎓" },
-  { tab: "social", title: "Digital Campaigns", desc: "Amplifying reach through targeted social campaigns.", emoji: "📣", tag: "Digital", accent: "var(--foc-blue)", img: "📣" },
-  { tab: "social", title: "Youth Outreach", desc: "Inspiring young learners through stories and live updates.", emoji: "🌟", tag: "Instagram", accent: "var(--foc-purple-dark)", img: "📸" },
-  { tab: "awards", title: "Award of Excellence", desc: "Recognized for impact, innovation and excellence.", emoji: "🥇", tag: "Award 2024", accent: "var(--foc-orange)", img: "🏆" },
-  { tab: "awards", title: "National Skill Honor", desc: "Celebrated for transformative skilling outcomes at scale.", emoji: "🏅", tag: "National Award", accent: "var(--foc-green-dark)", img: "🎖️" },
-  { tab: "awards", title: "CSR Impact Recognition", desc: "Honored for measurable CSR and community impact.", emoji: "⭐", tag: "CSR Award", accent: "var(--foc-blue)", img: "✨" },
-  { tab: "awards", title: "Innovation in EdTech", desc: "Awarded for technology-led learning and employability.", emoji: "💡", tag: "EdTech 2024", accent: "var(--foc-purple-dark)", img: "🔬" },
-  { tab: "print", title: "In the News", desc: "Our initiatives featured across leading publications.", emoji: "📰", tag: "Print Media", accent: "var(--foc-purple-dark)", img: "📄" },
-  { tab: "print", title: "Leading Daily Feature", desc: "Coverage in top newspapers on skills and employment.", emoji: "🗞️", tag: "National Daily", accent: "var(--foc-blue)", img: "📰" },
-  { tab: "print", title: "Industry Journal", desc: "Thought leadership on workforce development.", emoji: "📑", tag: "Industry Press", accent: "var(--foc-orange)", img: "📋" },
-  { tab: "print", title: "Regional Spotlight", desc: "Local media highlighting grassroots training impact.", emoji: "🌍", tag: "Regional Press", accent: "var(--foc-green-dark)", img: "🗞️" },
-  { tab: "events", title: "Community Events", desc: "Engaging communities through nationwide skill drives.", emoji: "🌍", tag: "Events", accent: "var(--foc-green-dark)", img: "🎪" },
-  { tab: "events", title: "Partner Engagement Summit", desc: "Collaborating with partners to scale impact together.", emoji: "🤝", tag: "Summit", accent: "var(--foc-blue)", img: "🎤" },
-  { tab: "events", title: "Nationwide Skill Drive", desc: "Mobilizing trainers and learners across multiple states.", emoji: "🚌", tag: "Skill Drive", accent: "var(--foc-orange)", img: "🛣️" },
-  { tab: "events", title: "Campus Connect Program", desc: "On-ground engagement with colleges and institutions.", emoji: "🎓", tag: "Campus Event", accent: "var(--foc-purple-dark)", img: "🏫" },
+  /* Mobilization — About page */
+  { tab: "social", title: "Community Mobilization", desc: "On-ground outreach mobilizing learners for skill programs.", emoji: "📱", tag: "Mobilization", accent: "var(--foc-green-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/MOBILIZATION-1.jpg` },
+  { tab: "social", title: "Skill Drive Outreach", desc: "Connecting youth with training and employment pathways.", emoji: "🤝", tag: "Mobilization", accent: "var(--foc-blue)", imageSrc: `${ABOUT_MEDIA_ASSET}/MOBILIZATION-3.jpg` },
+  { tab: "social", title: "Field Mobilization", desc: "Grassroots campaigns across training geographies.", emoji: "🌟", tag: "Mobilization", accent: "var(--foc-purple-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/MOBILIZATION-4.png` },
+  { tab: "social", title: "Youth Engagement Drive", desc: "Inspiring participation in future-ready skilling.", emoji: "📣", tag: "Mobilization", accent: "var(--foc-orange)", imageSrc: `${ABOUT_MEDIA_ASSET}/MOBILIZATION-5.jpg` },
+  /* Placement — About page */
+  { tab: "social", title: "Placement Success", desc: "Connecting trained talent with meaningful opportunities.", emoji: "👩‍🎓", tag: "Placement", accent: "var(--foc-blue)", imageSrc: `${ABOUT_MEDIA_ASSET}/placement-pic-2.jpg` },
+  { tab: "social", title: "Industry Placements", desc: "Learners placed with partner industries and employers.", emoji: "🏢", tag: "Placement", accent: "var(--foc-green-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/placement-pic-3.jpg` },
+  { tab: "social", title: "Career Outcomes", desc: "Celebrating employment and entrepreneurship milestones.", emoji: "🎯", tag: "Placement", accent: "var(--foc-purple-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/placement-pic-4.jpg` },
+  /* Training facilities — About page */
+  { tab: "social", title: "Training in Action", desc: "Hands-on sessions at Focalyt training centres.", emoji: "🧑‍💻", tag: "Training", accent: "var(--foc-blue)", imageSrc: `${ABOUT_MEDIA_ASSET}/TRAINING-FACILITIES-1.jpg` },
+  { tab: "social", title: "Future-Ready Labs", desc: "State-of-the-art facilities for practical skill building.", emoji: "🔬", tag: "Training", accent: "var(--foc-orange)", imageSrc: `${ABOUT_MEDIA_ASSET}/TRAINING-FACILITIES-2-1.jpg` },
+  /* Awards — About page */
+  { tab: "awards", title: "Awards & Recognition", desc: "Honoured for excellence in skilling and social impact.", emoji: "🏆", tag: "Award", accent: "var(--foc-orange)", imageSrc: `${ABOUT_MEDIA_ASSET}/AWARD-5.png` },
+  { tab: "awards", title: "National Recognition", desc: "Celebrated for transformative outcomes at scale.", emoji: "🥇", tag: "Award", accent: "var(--foc-green-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/AWARD-2.png` },
+  { tab: "awards", title: "Industry Excellence", desc: "Recognized for innovation and workforce development.", emoji: "🏅", tag: "Award", accent: "var(--foc-blue)", imageSrc: `${ABOUT_MEDIA_ASSET}/AWARD-4.png` },
+  { tab: "awards", title: "Impact Achievement", desc: "Acknowledged for measurable community and CSR impact.", emoji: "⭐", tag: "Award", accent: "var(--foc-purple-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/AWARD-3.png` },
+  /* Print media — About Media Coverage section */
+  { tab: "print", title: "Print Media Coverage", desc: "Focalyt initiatives featured in leading publications.", emoji: "📰", tag: "Print Media", accent: "var(--foc-purple-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/NEWSPAPER2.png` },
+  { tab: "print", title: "National Daily Feature", desc: "Coverage on skills, employment and education.", emoji: "🗞️", tag: "Print Media", accent: "var(--foc-blue)", imageSrc: `${ABOUT_MEDIA_ASSET}/NEWSPAPER3.png` },
+  { tab: "print", title: "Press Highlight", desc: "Stories on training, placement and community impact.", emoji: "📄", tag: "Print Media", accent: "var(--foc-orange)", imageSrc: `${ABOUT_MEDIA_ASSET}/NEWSPAPER4.png` },
+  { tab: "print", title: "News Feature", desc: "Our work spotlighted across print media.", emoji: "📑", tag: "Print Media", accent: "var(--foc-green-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/NEWSPAPER5.png` },
+  { tab: "print", title: "Regional Press", desc: "Local media highlighting grassroots training impact.", emoji: "🌍", tag: "Print Media", accent: "var(--foc-blue)", imageSrc: `${ABOUT_MEDIA_ASSET}/NEWSPAPER6.png` },
+  { tab: "print", title: "Media Spotlight", desc: "Continued coverage of Focalyt's nationwide initiatives.", emoji: "📰", tag: "Print Media", accent: "var(--foc-purple-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/NEWSPAPER7.png` },
+  /* Project launches — About page */
+  { tab: "events", title: "BPS Women University Centre", desc: "Inauguration of Focal Skill Training Center at Bhagat Phool Singh Women University.", emoji: "🎓", tag: "Project Launch", accent: "var(--foc-purple-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/DSC_5654.jpg` },
+  { tab: "events", title: "Manesar Training Centre", desc: "Inauguration of Focal Skill Training Center at Manesar, Haryana.", emoji: "🏫", tag: "Project Launch", accent: "var(--foc-blue)", imageSrc: `${ABOUT_MEDIA_ASSET}/Untitled-design.png` },
+  { tab: "events", title: "Skill Van RPL Project", desc: "Launch of 18 Skill Van RPL Project at Lucknow, UP.", emoji: "🚌", tag: "Project Launch", accent: "var(--foc-orange)", imageSrc: `${ABOUT_MEDIA_ASSET}/Untitled-design-2.png` },
+  { tab: "events", title: "Harit Umang — Panasonic", desc: "E-Waste Art Sculpture Inauguration with Panasonic (Harit Umang).", emoji: "♻️", tag: "Project Launch", accent: "var(--foc-green-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/Untitled-design-3.png` },
+  /* Extra curricular — About page */
+  { tab: "events", title: "Extra Curricular Activity", desc: "Engaging learners beyond the classroom.", emoji: "🎪", tag: "Engagement", accent: "var(--foc-green-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/ACTIVITIES-4.jpg` },
+  { tab: "events", title: "Campus Activities", desc: "Building confidence through experiential learning.", emoji: "🤝", tag: "Engagement", accent: "var(--foc-blue)", imageSrc: `${ABOUT_MEDIA_ASSET}/ACTIVITIES-2.jpg` },
+  { tab: "events", title: "Learner Engagement", desc: "Community events that inspire future-ready mindsets.", emoji: "🌟", tag: "Engagement", accent: "var(--foc-orange)", imageSrc: `${ABOUT_MEDIA_ASSET}/ACTIVITIES-1.jpg` },
+  { tab: "events", title: "Youth Programs", desc: "Activities that complement skills training and placement.", emoji: "🎯", tag: "Engagement", accent: "var(--foc-purple-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/ACTIVITIES-3.jpg` },
 ];
 
 const MEDIA_STATS = [
@@ -450,10 +571,10 @@ function PartnerCard({ cat, delay = 0 }) {
           {cat.title}
         </div>
         <p style={{ fontFamily: 'var(--foc-font-sans)', fontSize: 13, color: "var(--foc-text-caption-alt)", textAlign: "center", lineHeight: 1.65, marginBottom: 18, flex: 1 }}>{cat.desc}</p>
-        <div style={{ width: "100%", borderRadius: 16, background: cat.bg, padding: "14px 12px 10px", position: "relative", marginBottom: 16 }}>
+        <div className="partner-logo-carousel" style={{ width: "100%", borderRadius: 16, background: cat.bg, padding: "14px 12px 10px", position: "relative", marginBottom: 16 }}>
           <button
             type="button"
-            className="arrow-btn"
+            className="arrow-btn partner-arrow-prev"
             aria-label="Previous partners"
             onClick={() => setSlide((s) => (s - 1 + total) % total)}
             style={{
@@ -478,14 +599,14 @@ function PartnerCard({ cat, delay = 0 }) {
           >
             ‹
           </button>
-          <div style={{ display: "flex", justifyContent: "center", gap: 6, width: "100%" }}>
+          <div className="partner-logo-row" style={{ display: "flex", justifyContent: "center", gap: 6, width: "100%" }}>
             {cat.logos[slide].map((logo) => (
               <LogoChip key={logo.label} logo={logo} />
             ))}
           </div>
           <button
             type="button"
-            className="arrow-btn"
+            className="arrow-btn partner-arrow-next"
             aria-label="Next partners"
             onClick={() => setSlide((s) => (s + 1) % total)}
             style={{
@@ -608,7 +729,7 @@ function PartnersStrengthSection() {
           animationDirection: "reverse",
         }}
       />
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 32px", position: "relative", zIndex: 1 }}>
+      <div className="fp-section-inner">
         <SectionHeader
           icon="🤝"
           titleHtml={`<span style="color:var(--foc-navy-deep)">Our Partners.</span> <span style="color:var(--foc-green-dark)">Our Strength.</span>`}
@@ -827,26 +948,59 @@ function MediaCard({ card, delay = 0 }) {
           justifyContent: "center",
         }}
       >
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            opacity: 0.09,
-            backgroundImage: `radial-gradient(circle, ${card.accent} 1.5px, transparent 1.5px)`,
-            backgroundSize: "20px 20px",
-          }}
-        />
-        <div
-          style={{
-            fontSize: 74,
-            zIndex: 1,
-            filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.4))",
-            transform: hov ? "scale(1.18) rotate(-8deg)" : "scale(1)",
-            transition: "transform 0.4s cubic-bezier(.34,1.56,.64,1)",
-          }}
-        >
-          {card.img}
-        </div>
+        {card.imageSrc ? (
+          <>
+            <img
+              src={card.imageSrc}
+              alt={card.title}
+              loading="lazy"
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: card.tab === "print" || card.tab === "awards" ? "contain" : "cover",
+                background: card.tab === "print" || card.tab === "awards" ? "var(--foc-color-bg-muted)" : "transparent",
+                padding: card.tab === "print" || card.tab === "awards" ? "8px" : 0,
+                transform: hov ? "scale(1.05)" : "scale(1)",
+                transition: "transform 0.4s cubic-bezier(.34,1.56,.64,1)",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: card.tab === "print" || card.tab === "awards"
+                  ? "linear-gradient(180deg, rgba(6,20,38,.04) 0%, rgba(6,20,38,.18) 100%)"
+                  : "linear-gradient(180deg, rgba(6,20,38,.08) 0%, rgba(6,20,38,.42) 100%)",
+                pointerEvents: "none",
+              }}
+            />
+          </>
+        ) : (
+          <>
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                opacity: 0.09,
+                backgroundImage: `radial-gradient(circle, ${card.accent} 1.5px, transparent 1.5px)`,
+                backgroundSize: "20px 20px",
+              }}
+            />
+            <div
+              style={{
+                fontSize: 74,
+                zIndex: 1,
+                filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.4))",
+                transform: hov ? "scale(1.18) rotate(-8deg)" : "scale(1)",
+                transition: "transform 0.4s cubic-bezier(.34,1.56,.64,1)",
+              }}
+            >
+              {card.img}
+            </div>
+          </>
+        )}
         <div
           style={{
             position: "absolute",
@@ -921,7 +1075,7 @@ function MediaSection() {
   return (
     <section id="media" className="fp-sub fp-sub--media" style={{ background: "var(--foc-color-surface)", position: "relative" }}>
       <Blobs colors={["var(--foc-navy-deep)", "var(--foc-blue)", "var(--foc-green-dark)", "var(--foc-purple-dark)"]} />
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 32px", position: "relative", zIndex: 1 }}>
+      <div className="fp-section-inner">
         <SectionHeader
           icon="⭐"
           titleHtml={`<span style="color:var(--foc-navy-deep)">Media &amp; </span><span style="color:var(--foc-blue)">&nbsp; Recognition</span>`}
@@ -929,7 +1083,7 @@ function MediaSection() {
           accentColor="var(--foc-blue)"
           noSubtitleMaxWidth
         />
-        <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 10, marginTop: 36 }}>
+        <div className="media-tabs-row">
           {MEDIA_TABS.map((t, i) => (
             <button
               key={t.label}

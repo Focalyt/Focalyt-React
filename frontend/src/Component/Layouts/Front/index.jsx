@@ -1,11 +1,17 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import FrontHeader from './FrontHeader/FrontHeader';
 import FrontFooter from './FrontFooter/FrontFooter';
+import PartnerWithUsModal from './PartnerWithUsModal/PartnerWithUsModal';
 import { useLocation } from 'react-router-dom';
 
 const FrontLayout = ({ children }) => {
   const location = useLocation();
   const hideFooter = location.pathname === "/community";
+
+  useEffect(() => {
+    if (location.hash) return;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [location.pathname]);
   return (
     <div className="min-h-screen flex flex-col">
       <FrontHeader/>
@@ -15,6 +21,7 @@ const FrontLayout = ({ children }) => {
       </main>
       {/* <FrontFooter /> */}
       {!hideFooter && <FrontFooter />}
+      <PartnerWithUsModal />
 
       <style>
         {
@@ -22,10 +29,6 @@ const FrontLayout = ({ children }) => {
           @media (max-width: 991px) {
             main {
               overflow-x: hidden;
-              padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
-            }
-            .foc-cyber-home {
-              padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
             }
           }
           @media (max-width: 768px) {

@@ -1251,15 +1251,7 @@ function CollegeLayout({ children }) {
                         opacity: submenuMaxHeight.dropdown === '0px' ? 0 : 1
                       }}
                     >
-                      {(permissions?.permission_type === 'Admin' ||
-                        (permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_edit_lead_type_b2b)) && (
-                        <li className={`nav-item ${location.pathname === '/institute/typeOfB2b' ? 'active' : ''}`}>
-                          <Link to="/institute/typeOfB2b" onClick={() => handleSidebarClose()}>
-                            <FontAwesomeIcon icon={faIndustry} />
-                            <span className="menu-title">{t('type_of_b2b')}</span>
-                          </Link>
-                        </li>
-                      )}
+                      
                       {(permissions?.permission_type === 'Admin' ||
                         (permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_edit_b2b_department)) && (
                         <li className={`nav-item ${location.pathname === '/institute/b2bDepartment' ? 'active' : ''}`}>
@@ -1275,6 +1267,15 @@ function CollegeLayout({ children }) {
                           <Link to="/institute/b2bProject" onClick={() => handleSidebarClose()}>
                             <FontAwesomeIcon icon={faProjectDiagram} />
                             <span className="menu-title">{t('b2b_project')}</span>
+                          </Link>
+                        </li>
+                      )}
+                      {(permissions?.permission_type === 'Admin' ||
+                        (permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_edit_lead_type_b2b)) && (
+                        <li className={`nav-item ${location.pathname === '/institute/typeOfB2b' ? 'active' : ''}`}>
+                          <Link to="/institute/typeOfB2b" onClick={() => handleSidebarClose()}>
+                            <FontAwesomeIcon icon={faIndustry} />
+                            <span className="menu-title">{t('type_of_b2b')}</span>
                           </Link>
                         </li>
                       )}
@@ -1295,6 +1296,7 @@ function CollegeLayout({ children }) {
                       </li>
                     </ul>
                   </li>
+                  
 
                   <li className={`nav-item ${location.pathname === '/institute/dripmarketing' ? 'active' : ''}`}>
                     <Link to="/institute/dripmarketing" onClick={() => handleSidebarClose()}>

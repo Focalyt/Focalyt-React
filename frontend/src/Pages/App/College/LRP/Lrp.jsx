@@ -10,9 +10,25 @@ const readLrpMeta = (items, metaKey) => {
   return it ? String(it.value || "").trim() : "";
 };
 
+const isValidMmDdYyyy = (value) => {
+  const v = String(value || "").trim();
+  if (!v) return false;
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v);
+  if (!m) return false;
+  const mm = Number(m[1]);
+  const dd = Number(m[2]);
+  const yyyy = Number(m[3]);
+  if (yyyy < 1900 || yyyy > 2100) return false;
+  if (mm < 1 || mm > 12) return false;
+  const daysInMonth = new Date(yyyy, mm, 0).getDate();
+  return dd >= 1 && dd <= daysInMonth;
+};
+
 const createInitialForm = () => ({
   b2bLeadId: "",
   leadCategory: "",
+  b2bDepartment: "",
+  b2bProject: "",
   typeOfB2B: "",
   partnerType: "",
   implementationPartnerName: "",
@@ -154,7 +170,19 @@ function Lrp() {
   const [submitting, setSubmitting] = useState(false);
   const [loadingExisting, setLoadingExisting] = useState(false);
   const [leadCategoryOptions, setLeadCategoryOptions] = useState([]);
-  const [typeOfB2BOptions, setTypeOfB2BOptions] = useState([]);
+  const [allB2bDepartments, setAllB2bDepartments] = useState([]);
+  const [allB2bProjects, setAllB2bProjects] = useState([]);
+  const [allTypeOfB2BRaw, setAllTypeOfB2BRaw] = useState([]);
+  const typeOfB2BOptions = useMemo(() => {
+    const raw = Array.isArray(allTypeOfB2BRaw) ? allTypeOfB2BRaw : [];
+    const deptId = String(form.b2bDepartment || "").trim();
+    const filtered = deptId
+      ? raw.filter((t) => String(t?.department?._id || t?.department || "").trim() === deptId)
+      : raw;
+    return filtered
+      .filter((t) => t && t.isActive !== false)
+      .map((t) => ({ value: t._id, label: t.name }));
+  }, [allTypeOfB2BRaw, form.b2bDepartment]);
   const [categoryQuestions, setCategoryQuestions] = useState([]);
   const [leadSourceAnswers, setLeadSourceAnswers] = useState({});
   const [loadingB2bLeadContext, setLoadingB2bLeadContext] = useState(false);
@@ -244,8 +272,14 @@ function Lrp() {
       const token = userData.token;
       if (!backendUrl || !token) return;
       try {
-        const [catRes, typeRes] = await Promise.all([
+        const [catRes, deptRes, projRes, typeRes] = await Promise.all([
           fetch(`${backendUrl}/college/b2b/lead-categories?status=true`, {
+            headers: { "x-auth": token },
+          }),
+          fetch(`${backendUrl}/college/b2b/b2b-departments?status=true`, {
+            headers: { "x-auth": token },
+          }),
+          fetch(`${backendUrl}/college/b2b/b2b-projects?status=true`, {
             headers: { "x-auth": token },
           }),
           fetch(`${backendUrl}/college/b2b/type-of-b2b?status=true`, {
@@ -253,6 +287,8 @@ function Lrp() {
           }),
         ]);
         const catJson = await catRes.json();
+        const deptJson = await deptRes.json();
+        const projJson = await projRes.json();
         const typeJson = await typeRes.json();
         if (catJson.status && Array.isArray(catJson.data)) {
           setLeadCategoryOptions(
@@ -261,13 +297,13 @@ function Lrp() {
               .map((c) => ({ value: c._id, label: c.name || c.title }))
           );
         }
-        if (typeJson.status && Array.isArray(typeJson.data)) {
-          setTypeOfB2BOptions(
-            typeJson.data
-              .filter((t) => t.isActive !== false)
-              .map((t) => ({ value: t._id, label: t.name }))
-          );
+        if (deptJson?.status && Array.isArray(deptJson.data)) {
+          setAllB2bDepartments(deptJson.data.filter((d) => d && d.isActive !== false));
         }
+        if (projJson?.status && Array.isArray(projJson.data)) {
+          setAllB2bProjects(projJson.data.filter((p) => p && p.isActive !== false));
+        }
+        if (typeJson.status && Array.isArray(typeJson.data)) setAllTypeOfB2BRaw(typeJson.data);
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error("[LRP] B2B dropdowns load failed", e);
@@ -319,6 +355,10 @@ function Lrp() {
         const lead = json.data;
         const cat = lead.leadCategory;
         const catId = cat && typeof cat === "object" ? cat._id : cat;
+        const dept = lead.b2bDepartment;
+        const deptId = dept && typeof dept === "object" ? dept._id : dept;
+        const proj = lead.b2bProject;
+        const projId = proj && typeof proj === "object" ? proj._id : proj;
         const typeId = lead.typeOfB2B && typeof lead.typeOfB2B === "object" ? lead.typeOfB2B._id : lead.typeOfB2B;
         const qs = cat && typeof cat === "object" && Array.isArray(cat.questions) ? cat.questions : [];
         setCategoryQuestions(qs.filter((q) => q && String(q.question || "").trim()));
@@ -332,6 +372,8 @@ function Lrp() {
             ...prev,
             b2bLeadId: linkedB2bLeadId,
             leadCategory: catId ? String(catId) : prev.leadCategory,
+            b2bDepartment: deptId ? String(deptId) : prev.b2bDepartment,
+            b2bProject: projId ? String(projId) : prev.b2bProject,
             typeOfB2B: typeId ? String(typeId) : prev.typeOfB2B,
             state: st,
             district: dist,
@@ -470,16 +512,26 @@ function Lrp() {
 
   const isNonEmpty = (v) => String(v || "").trim().length > 0;
 
+  const departmentProjects = useMemo(() => {
+    const deptId = String(form.b2bDepartment || "").trim();
+    if (!deptId) return [];
+    return (allB2bProjects || []).filter(
+      (p) => String(p?.department?._id || p?.department || "").trim() === deptId
+    );
+  }, [allB2bProjects, form.b2bDepartment]);
+
   const getErrorsForStep = (s) => {
     const e = {};
 
     if (s === 1) {
+      if (!isNonEmpty(form.b2bDepartment)) e.b2bDepartment = "Required for B2B lead";
+      if (!isNonEmpty(form.b2bProject)) e.b2bProject = "Required for B2B lead";
       if (!isNonEmpty(form.leadCategory)) e.leadCategory = "Required for B2B lead";
       if (!isNonEmpty(form.typeOfB2B)) e.typeOfB2B = "Required for B2B lead";
       if (!isNonEmpty(form.partnerType)) e.partnerType = "Required";
       if (!isNonEmpty(form.implementationPartnerName)) e.implementationPartnerName = "Required";
       if (!isNonEmpty(form.visitDate)) e.visitDate = "Required";
-      if (!form.geoTaggedPhoto) e.geoTaggedPhoto = "Required";
+      if (isNonEmpty(form.visitDate) && !isValidMmDdYyyy(form.visitDate)) e.visitDate = "Use mm/dd/yyyy";
     }
 
     if (s === 2) {
@@ -712,7 +764,63 @@ function Lrp() {
           <Card number={1} title="Partner & Visit Details">
             <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "flex-end" }}>
               <div style={{ flex: "1 1 240px", minWidth: 220 }}>
-                <label style={lblStyle}>B2B lead category {reqStar}</label>
+                <label style={lblStyle}>B2B department {reqStar}</label>
+                <select
+                  value={form.b2bDepartment}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setForm((prev) => ({
+                      ...prev,
+                      b2bDepartment: next,
+                      b2bProject: "",
+                      typeOfB2B: "",
+                    }));
+                  }}
+                  onBlur={() => markTouched("b2bDepartment")}
+                  disabled={mode === "add" && !!linkedB2bLeadId}
+                  style={{
+                    ...fldStyle,
+                    opacity: mode === "add" && linkedB2bLeadId ? 0.75 : 1,
+                    cursor: mode === "add" && linkedB2bLeadId ? "not-allowed" : "default",
+                  }}
+                >
+                  <option value="">Select department</option>
+                  {allB2bDepartments.map((d) => (
+                    <option key={d._id} value={d._id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+                <FieldError name="b2bDepartment" />
+              </div>
+
+              <div style={{ flex: "1 1 240px", minWidth: 220 }}>
+                <label style={lblStyle}>B2B project {reqStar}</label>
+                <select
+                  value={form.b2bProject}
+                  onChange={(e) => setValue("b2bProject", e.target.value)}
+                  onBlur={() => markTouched("b2bProject")}
+                  disabled={!form.b2bDepartment || (mode === "add" && !!linkedB2bLeadId)}
+                  style={{
+                    ...fldStyle,
+                    opacity: !form.b2bDepartment || (mode === "add" && linkedB2bLeadId) ? 0.75 : 1,
+                    cursor: !form.b2bDepartment || (mode === "add" && linkedB2bLeadId) ? "not-allowed" : "default",
+                  }}
+                >
+                  <option value="">
+                    {form.b2bDepartment ? "Select project" : "Select department first"}
+                  </option>
+                  {departmentProjects.map((p) => (
+                    <option key={p._id} value={p._id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+                <FieldError name="b2bProject" />
+              </div>
+
+              <div style={{ flex: "1 1 240px", minWidth: 220 }}>
+                <label style={lblStyle}>B2B lead source {reqStar}</label>
                 <select
                   value={form.leadCategory}
                   onChange={(e) => setValue("leadCategory", e.target.value)}
@@ -724,7 +832,7 @@ function Lrp() {
                     cursor: mode === "add" && linkedB2bLeadId ? "not-allowed" : "default",
                   }}
                 >
-                  <option value="">Select category</option>
+                  <option value="">Select lead source</option>
                   {leadCategoryOptions.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
@@ -740,14 +848,16 @@ function Lrp() {
                   value={form.typeOfB2B}
                   onChange={(e) => setValue("typeOfB2B", e.target.value)}
                   onBlur={() => markTouched("typeOfB2B")}
-                  disabled={mode === "add" && !!linkedB2bLeadId}
+                  disabled={!form.b2bDepartment || (mode === "add" && !!linkedB2bLeadId)}
                   style={{
                     ...fldStyle,
-                    opacity: mode === "add" && linkedB2bLeadId ? 0.75 : 1,
-                    cursor: mode === "add" && linkedB2bLeadId ? "not-allowed" : "default",
+                    opacity: !form.b2bDepartment || (mode === "add" && linkedB2bLeadId) ? 0.75 : 1,
+                    cursor: !form.b2bDepartment || (mode === "add" && linkedB2bLeadId) ? "not-allowed" : "default",
                   }}
                 >
-                  <option value="">Select type</option>
+                  <option value="">
+                    {form.b2bDepartment ? "Select type" : "Select department first"}
+                  </option>
                   {typeOfB2BOptions.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
@@ -792,17 +902,20 @@ function Lrp() {
               <div style={{ flex: "1 1 220px", minWidth: 200 }}>
                 <label style={lblStyle}>Visit date {reqStar}</label>
                 <input
-                  type="date"
+                  type="text"
                   value={form.visitDate}
                   onChange={(e) => setValue("visitDate", e.target.value)}
                   onBlur={() => markTouched("visitDate")}
+                  placeholder="mm/dd/yyyy"
+                  inputMode="numeric"
+                  autoComplete="off"
                   style={fldStyle}
                 />
                 <FieldError name="visitDate" />
               </div>
 
               <div style={{ flex: "1 1 320px", minWidth: 260 }}>
-                <label style={lblStyle}>Upload geo-tagged photograph (during visit) {reqStar}</label>
+                <label style={lblStyle}>Upload geo-tagged photograph (during visit)</label>
                 <input
                   type="file"
                   accept="image/*"
@@ -816,7 +929,7 @@ function Lrp() {
                 <div style={{ marginTop: 6, fontSize: 12, color: "#64748b" }}>
                   {form.geoTaggedPhoto ? `Selected: ${form.geoTaggedPhoto.name}` : "Upload 1 supported file. Max 100 MB."}
                 </div>
-                <FieldError name="geoTaggedPhoto" />
+                {/* optional */}
               </div>
             </div>
 
