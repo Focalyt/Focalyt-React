@@ -1,12 +1,13 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../auth/AuthContext';
 import { clearUser } from '../auth/authStorage';
 import { AppHeader } from '../components/AppHeader';
-import { SideMenu, type SideMenuSection } from '../components/SideMenu';
+import { SideMenu } from '../components/SideMenu';
 import type { B2BInitialTab } from '../navigation/AppNavigator';
+import { buildCollegeSideMenuSections } from '../navigation/collegeSideMenu';
 import { college } from '../theme/college';
-import { B2BDashboardTab } from './b2b/B2BDashboardTab';
+// import { B2BDashboardTab } from './b2b/B2BDashboardTab';
 
 type Nav = {
   navigate: (route: 'B2B', params?: { initialTab?: B2BInitialTab }) => void;
@@ -16,57 +17,18 @@ export function CollegeHomeScreen({ navigation }: { navigation: Nav }) {
   const { user, setUser } = useAuth();
   const [menuOpen, setMenuOpen] = React.useState(false);
 
-  const sections: SideMenuSection[] = [
-    {
-      title: 'Modules',
-      items: [
-        {
-          id: 'b2b',
-          label: 'B2B',
-          hint: 'Sales, leads & follow-ups',
-          accent: '#10b981',
-          defaultExpanded: true,
-          children: [
-            {
-              id: 'b2b-dashboard',
-              label: 'Dashboard',
-              accent: '#3b82f6',
-              onPress: () =>
-                navigation.navigate('B2B', { initialTab: 'dashboard' }),
-            },
-            {
-              id: 'b2b-sales',
-              label: 'Sales',
-              accent: '#10b981',
-              onPress: () =>
-                navigation.navigate('B2B', { initialTab: 'sales' }),
-            },
-            {
-              id: 'b2b-followup',
-              label: 'Follow-up',
-              accent: '#f59e0b',
-              onPress: () =>
-                navigation.navigate('B2B', { initialTab: 'followup' }),
-            },
-          ],
+  const sections = React.useMemo(
+    () =>
+      buildCollegeSideMenuSections({
+        onB2BSales: () =>
+          navigation.navigate('B2B', { initialTab: 'sales' }),
+        onLogout: async () => {
+          await clearUser();
+          setUser(null);
         },
-      ],
-    },
-    {
-      title: 'Account',
-      items: [
-        {
-          id: 'logout',
-          label: 'Logout',
-          accent: '#ef4444',
-          onPress: async () => {
-            await clearUser();
-            setUser(null);
-          },
-        },
-      ],
-    },
-  ];
+      }),
+    [navigation, setUser],
+  );
 
   return (
     <View style={styles.page}>
@@ -76,7 +38,13 @@ export function CollegeHomeScreen({ navigation }: { navigation: Nav }) {
       />
 
       <View style={styles.body}>
-        <B2BDashboardTab />
+        {/* <B2BDashboardTab /> */}
+        <View style={styles.homePlaceholder}>
+          <Text style={styles.homePlaceholderTitle}>Welcome</Text>
+          <Text style={styles.homePlaceholderText}>
+            B2B Sales ke liye menu se Sales kholo.
+          </Text>
+        </View>
       </View>
 
       <SideMenu
@@ -99,5 +67,22 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
+  },
+  homePlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  homePlaceholderTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: college.text,
+    marginBottom: 8,
+  },
+  homePlaceholderText: {
+    fontSize: 14,
+    color: college.textMuted,
+    textAlign: 'center',
   },
 });

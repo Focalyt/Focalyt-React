@@ -27,6 +27,7 @@ type LeadLike = {
 type Props = {
   visible: boolean;
   lead: LeadLike | null;
+  initialType?: FollowUpType;
   onClose: () => void;
   onSaved?: () => void;
 };
@@ -66,7 +67,13 @@ function isValidHm(s: string) {
   return h >= 0 && h <= 23 && m >= 0 && m <= 59;
 }
 
-export function B2BFollowupModal({ visible, lead, onClose, onSaved }: Props) {
+export function B2BFollowupModal({
+  visible,
+  lead,
+  initialType = 'Call',
+  onClose,
+  onSaved,
+}: Props) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const token = user?.token ?? '';
@@ -84,7 +91,7 @@ export function B2BFollowupModal({ visible, lead, onClose, onSaved }: Props) {
 
   React.useEffect(() => {
     if (visible) {
-      setType('Call');
+      setType(initialType);
       setDate(offsetYmd(1));
       setTime('11:00');
       setRemarks('');
@@ -92,7 +99,7 @@ export function B2BFollowupModal({ visible, lead, onClose, onSaved }: Props) {
       setSaving(false);
       setAddToCalendar(false);
     }
-  }, [visible]);
+  }, [visible, initialType]);
 
   const onSave = async () => {
     if (!lead) return;

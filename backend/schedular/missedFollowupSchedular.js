@@ -8,6 +8,22 @@ const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || 'https://graph.facebook
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_ID;
 const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
 const MISSED_FOLLOWUP_TEMPLATE_NAME = 'missedfollowups';
+const IST_TIMEZONE = 'Asia/Kolkata';
+
+/** Start of today 00:00 in IST — planned followups before this are from a prior day. */
+function getStartOfTodayIST() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: IST_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+
+  const y = parts.find((p) => p.type === 'year').value;
+  const m = parts.find((p) => p.type === 'month').value;
+  const d = parts.find((p) => p.type === 'day').value;
+  return new Date(`${y}-${m}-${d}T00:00:00+05:30`);
+}
 
 // Log template name on module load
 console.log(`[Missed Followup Scheduler] Using WhatsApp template: "${MISSED_FOLLOWUP_TEMPLATE_NAME}"`);
@@ -110,14 +126,14 @@ async function sendWhatsAppTemplateMessage(to, templateName, collegeId, variable
 }
 
 function missedFollowupSchedular() {
-  cron.schedule("* * * * *", async () => {
+  // Every day at 12:00 AM IST — mark yesterday's (and older) planned followups as missed
+  cron.schedule("0 0 * * *", async () => {
     try {
-
-      // console.log('checking missed followups')
+      const startOfTodayIST = getStartOfTodayIST();
 
       const followups = await b2cFollowup.find({
         status: "planned",
-        followupDate: { $lt: new Date() }
+        followupDate: { $lt: startOfTodayIST }
       }).populate({
         path: 'appliedCourseId',
         model: 'AppliedCourses', 
@@ -137,9 +153,11 @@ function missedFollowupSchedular() {
         // console.log(ids, 'ids');
       
         const result = await b2cFollowup.updateMany(
-          { status: "planned", followupDate: { $lt: new Date() } },
+          { status: "planned", followupDate: { $lt: startOfTodayIST } },
           { $set: { status: "missed", statusUpdatedAt: new Date() } }
         );
+
+        console.log(`[Cron] Marked ${result.modifiedCount} planned followup(s) as missed (before ${startOfTodayIST.toISOString()})`);
       
         // console.log(`[Cron] Marked ${ids.length} followups as missed`);
 
@@ -338,7 +356,9 @@ function missedFollowupSchedular() {
     } catch (err) {
       console.error("[Cron] Error updating missed followups:", err);
     }
-  }, { timezone: "Asia/Kolkata" });
+  }, { timezone: IST_TIMEZONE });
+
+  console.log(`[Missed Followup Scheduler] Scheduled daily at 12:00 AM (${IST_TIMEZONE})`);
 }
 
 module.exports = missedFollowupSchedular;

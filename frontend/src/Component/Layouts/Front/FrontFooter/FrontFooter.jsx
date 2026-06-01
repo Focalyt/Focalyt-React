@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import "./FrontFooter.css";
+import AppDownloadBanner from "../../../Front/AppDownloadBanner";
 
 const HOME_SECTION_SCROLL_OFFSET = 130;
 
@@ -200,6 +201,7 @@ function Footer() {
               <Link to="/" className="ftr-brand">
                 <img src="/Assets/images/logo/focalyt_new_logo.png" alt="Focalyt" />
               </Link>
+              <AppDownloadBanner variant="footer" />
               <ul className="list-social list-social--hvr-black ftr-social">
                 {SOCIAL_LINKS.map((s) => (
                   <li key={s.label}>

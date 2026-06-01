@@ -14,7 +14,9 @@ import { useAuth } from '../../auth/AuthContext';
 import {
   B2BOption,
   createB2BLead,
+  fetchB2BDepartments,
   fetchB2BLeadCategories,
+  fetchB2BProjects,
   fetchB2BTypes,
 } from '../../services/b2bApi';
 import { college } from '../../theme/college';
@@ -27,6 +29,8 @@ type Props = {
 
 type FormState = {
   leadCategory: string;
+  b2bDepartment: string;
+  b2bProject: string;
   typeOfB2B: string;
   businessName: string;
   concernPersonName: string;
@@ -42,6 +46,8 @@ type FormState = {
 
 const EMPTY: FormState = {
   leadCategory: '',
+  b2bDepartment: '',
+  b2bProject: '',
   typeOfB2B: '',
   businessName: '',
   concernPersonName: '',
@@ -70,6 +76,8 @@ export function B2BAddLeadModal({ visible, onClose, onSaved }: Props) {
 
   const [form, setForm] = React.useState<FormState>(EMPTY);
   const [categories, setCategories] = React.useState<B2BOption[]>([]);
+  const [departments, setDepartments] = React.useState<B2BOption[]>([]);
+  const [projects, setProjects] = React.useState<B2BOption[]>([]);
   const [types, setTypes] = React.useState<B2BOption[]>([]);
   const [loadingOpts, setLoadingOpts] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
@@ -77,6 +85,20 @@ export function B2BAddLeadModal({ visible, onClose, onSaved }: Props) {
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm(prev => ({ ...prev, [key]: value }));
+
+  const projectOptions = React.useMemo(() => {
+    if (!form.b2bDepartment) return projects;
+    return projects.filter(
+      p => !p.department || String(p.department) === String(form.b2bDepartment),
+    );
+  }, [projects, form.b2bDepartment]);
+
+  const typeOptions = React.useMemo(() => {
+    if (!form.b2bDepartment) return types;
+    return types.filter(
+      t => !t.department || String(t.department) === String(form.b2bDepartment),
+    );
+  }, [types, form.b2bDepartment]);
 
   React.useEffect(() => {
     if (!visible) return;
@@ -88,12 +110,16 @@ export function B2BAddLeadModal({ visible, onClose, onSaved }: Props) {
     (async () => {
       setLoadingOpts(true);
       try {
-        const [catRes, typeRes] = await Promise.all([
+        const [catRes, deptRes, projRes, typeRes] = await Promise.all([
           fetchB2BLeadCategories(token),
+          fetchB2BDepartments(token),
+          fetchB2BProjects(token),
           fetchB2BTypes(token),
         ]);
         if (cancelled) return;
         if (catRes.ok) setCategories(catRes.items);
+        if (deptRes.ok) setDepartments(deptRes.items);
+        if (projRes.ok) setProjects(projRes.items);
         if (typeRes.ok) setTypes(typeRes.items);
       } finally {
         if (!cancelled) setLoadingOpts(false);
@@ -104,12 +130,31 @@ export function B2BAddLeadModal({ visible, onClose, onSaved }: Props) {
     };
   }, [visible, token]);
 
+  React.useEffect(() => {
+    if (!visible || !token || !form.b2bDepartment) return;
+    let cancelled = false;
+    (async () => {
+      const [projRes, typeRes] = await Promise.all([
+        fetchB2BProjects(token, form.b2bDepartment),
+        fetchB2BTypes(token, form.b2bDepartment),
+      ]);
+      if (cancelled) return;
+      if (projRes.ok) setProjects(projRes.items);
+      if (typeRes.ok) setTypes(typeRes.items);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, token, form.b2bDepartment]);
+
   const onSave = async () => {
     if (!token) {
       setError('Login required');
       return;
     }
     if (!form.leadCategory) return setError('Lead source select karo');
+    if (!form.b2bDepartment) return setError('B2B department select karo');
+    if (!form.b2bProject) return setError('B2B project select karo');
     if (!form.typeOfB2B) return setError('B2B type select karo');
     if (!form.businessName.trim()) return setError('Business name daalo');
     if (!form.concernPersonName.trim())
@@ -126,6 +171,8 @@ export function B2BAddLeadModal({ visible, onClose, onSaved }: Props) {
     try {
       const res = await createB2BLead(token, {
         leadCategory: form.leadCategory,
+        b2bDepartment: form.b2bDepartment,
+        b2bProject: form.b2bProject,
         typeOfB2B: form.typeOfB2B,
         businessName: form.businessName.trim(),
         concernPersonName: form.concernPersonName.trim(),
@@ -186,12 +233,48 @@ export function B2BAddLeadModal({ visible, onClose, onSaved }: Props) {
               loading={loadingOpts}
             />
 
+            <Label text="B2B Department *" />
+            <PickerChips
+              options={departments}
+              value={form.b2bDepartment}
+              onChange={v =>
+                setForm(prev => ({
+                  ...prev,
+                  b2bDepartment: v,
+                  b2bProject: '',
+                  typeOfB2B: '',
+                }))
+              }
+              loading={loadingOpts}
+              emptyHint="No departments — add from web settings"
+            />
+
+            <Label text="B2B Project *" />
+            <PickerChips
+              options={projectOptions}
+              value={form.b2bProject}
+              onChange={v => set('b2bProject', v)}
+              loading={loadingOpts && !form.b2bDepartment}
+              disabled={!form.b2bDepartment}
+              emptyHint={
+                form.b2bDepartment
+                  ? 'No projects for this department'
+                  : 'Pehle department select karo'
+              }
+            />
+
             <Label text="Type of B2B *" />
             <PickerChips
-              options={types}
+              options={typeOptions}
               value={form.typeOfB2B}
               onChange={v => set('typeOfB2B', v)}
-              loading={loadingOpts}
+              loading={loadingOpts && !form.b2bDepartment}
+              disabled={!form.b2bDepartment}
+              emptyHint={
+                form.b2bDepartment
+                  ? 'No B2B types for this department'
+                  : 'Pehle department select karo'
+              }
             />
 
             <Label text="Business Name *" />
@@ -360,11 +443,15 @@ function PickerChips({
   value,
   onChange,
   loading,
+  disabled,
+  emptyHint,
 }: {
   options: B2BOption[];
   value: string;
   onChange: (v: string) => void;
   loading?: boolean;
+  disabled?: boolean;
+  emptyHint?: string;
 }) {
   if (loading) {
     return (
@@ -373,8 +460,19 @@ function PickerChips({
       </View>
     );
   }
+  if (disabled) {
+    return (
+      <Text style={styles.muted}>
+        {emptyHint || 'Pehle upar wala field select karo'}
+      </Text>
+    );
+  }
   if (!options.length) {
-    return <Text style={styles.muted}>No options available</Text>;
+    return (
+      <Text style={styles.muted}>
+        {emptyHint || 'No options available'}
+      </Text>
+    );
   }
   return (
     <ScrollView

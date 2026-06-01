@@ -73,6 +73,7 @@ const FieldRow = ({ label, value, children }) => (
 function LrpView() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const isEmbedded = searchParams.get("embedded") === "1";
   const b2bLeadId = useMemo(() => String(searchParams.get("b2bLeadId") || searchParams.get("leadId") || "").trim(), [searchParams]);
 
   const [loading, setLoading] = useState(true);
@@ -187,7 +188,8 @@ function LrpView() {
   const isImageUrl = /^https?:\/\//i.test(geoUrl || "");
 
   return (
-    <div style={{ background: "#f1f5f9", minHeight: "100vh", padding: "20px" }}>
+    <div style={{ background: isEmbedded ? "#ffffff" : "#f1f5f9", minHeight: isEmbedded ? "auto" : "100vh", padding: isEmbedded ? "16px" : "20px" }}>
+      {!isEmbedded && (
       <div
         style={{
           background: "linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)",
@@ -226,6 +228,13 @@ function LrpView() {
           
         </div>
       </div>
+      )}
+
+      {isEmbedded && (
+        <div style={{ marginBottom: 16 }}>
+          <h2 style={{ margin: 0, fontWeight: 800, fontSize: 20, color: "#881337" }}>Lead report</h2>
+        </div>
+      )}
 
       {loading && (
         <div style={{ marginBottom: 14, fontSize: 13, fontWeight: 700, color: "#475569" }}>Loading report…</div>

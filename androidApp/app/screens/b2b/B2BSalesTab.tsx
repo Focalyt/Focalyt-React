@@ -17,25 +17,41 @@ import { useAuth } from '../../auth/AuthContext';
 import {
   B2BApprovalCounts,
   B2BApprovalStatus,
+  B2BFollowupBucket,
+  B2BFollowupDashboardCounts,
   B2BLead,
   B2BStatusCount,
   fetchB2BApprovalCounts,
   fetchB2BLeads,
   fetchB2BStatusCounts,
   getLeadDocumentsBucket,
-  getLeadFollowupBucket,
 } from '../../services/b2bApi';
 import { college } from '../../theme/college';
 import { B2BAddLeadModal } from './B2BAddLeadModal';
+import {
+  B2BCycleFilters,
+  B2BCycleFiltersState,
+  EMPTY_CYCLE_FILTERS,
+} from './B2BCycleFilters';
+import { B2BLeadCard } from './B2BLeadCard';
 import { B2BFollowupModal } from './B2BFollowupModal';
+import { B2BLeadDocumentsModal } from './B2BLeadDocumentsModal';
 import { B2BLeadHistoryModal } from './B2BLeadHistoryModal';
+import { B2BInstituteWebModal } from './B2BInstituteWebModal';
+import { B2BReferLeadModal } from './B2BReferLeadModal';
 import { B2BStatusChangeModal } from './B2BStatusChangeModal';
+import { B2BCrossSaleModal } from './B2BCrossSaleModal';
+import { b2bLrpAddUrl, b2bLrpViewUrl } from '../../services/collegeApi';
 
-function fmtDate(s?: string) {
-  if (!s) return '';
-  const d = new Date(s);
-  if (isNaN(d.getTime())) return '';
-  return d.toLocaleDateString();
+function getLeadGroupRootId(lead: B2BLead): string {
+  return String(lead.crossSaleRootId || lead.parentLeadId || lead._id || '');
+}
+
+function getLeadProjectName(lead: B2BLead): string {
+  const p = lead.b2bProject;
+  if (!p) return 'Project';
+  if (typeof p === 'object') return p.name || 'Project';
+  return 'Project';
 }
 
 function normalizePhoneDigits(raw: string | number | undefined): string {
@@ -89,11 +105,16 @@ async function openWhatsApp(raw: string | number | undefined) {
   }
 }
 
-function whatsappNumber(lead: B2BLead): string | number | undefined {
-  return lead.whatsapp || lead.mobile;
-}
-
 const PERF_ORDER = ['HOT', 'WARM', 'COLD', 'PROSPECT'];
+
+function isCycleFiltersActive(c: B2BCycleFiltersState): boolean {
+  return !!(
+    c.b2bDepartment ||
+    c.b2bProject ||
+    c.typeOfB2B ||
+    c.leadOwner
+  );
+}
 
 function sortPerf(list: B2BStatusCount[]): B2BStatusCount[] {
   const copy = [...list];
@@ -120,6 +141,50 @@ export function B2BSalesTab() {
   const [statusFilter, setStatusFilter] = React.useState<string | null>(null);
   const [approvalFilter, setApprovalFilter] =
     React.useState<B2BApprovalStatus | null>(null);
+  const [cycleFilters, setCycleFilters] =
+    React.useState<B2BCycleFiltersState>(EMPTY_CYCLE_FILTERS);
+  const [followUpCallBucket, setFollowUpCallBucket] = React.useState<
+    B2BFollowupBucket | ''
+  >('');
+  const [followUpVisitBucket, setFollowUpVisitBucket] = React.useState<
+    B2BFollowupBucket | ''
+  >('');
+  const [followupDashboardCounts, setFollowupDashboardCounts] =
+    React.useState<B2BFollowupDashboardCounts>({
+      call: { done: 0, planned: 0, missed: 0 },
+      visit: { done: 0, planned: 0, missed: 0 },
+    });
+
+  const cycleListParams = React.useCallback(
+    (
+      status?: string | null,
+      search?: string,
+      approval?: B2BApprovalStatus | null,
+      cycle?: B2BCycleFiltersState,
+      followup?: {
+        followUpCallBucket?: B2BFollowupBucket | '';
+        followUpVisitBucket?: B2BFollowupBucket | '';
+      },
+    ) => {
+      const c = cycle ?? cycleFilters;
+      const f = followup ?? {
+        followUpCallBucket,
+        followUpVisitBucket,
+      };
+      return {
+        b2bDepartment: c.b2bDepartment || undefined,
+        b2bProject: c.b2bProject || undefined,
+        typeOfB2B: c.typeOfB2B || undefined,
+        leadOwner: c.leadOwner || undefined,
+        search: search || undefined,
+        status: status || undefined,
+        approvalStatus: approval || undefined,
+        followUpCallBucket: f.followUpCallBucket || undefined,
+        followUpVisitBucket: f.followUpVisitBucket || undefined,
+      };
+    },
+    [cycleFilters, followUpCallBucket, followUpVisitBucket],
+  );
 
   const [counts, setCounts] = React.useState<{
     total: number;
@@ -131,6 +196,12 @@ export function B2BSalesTab() {
   const [approvalLoading, setApprovalLoading] = React.useState(false);
 
   const [leads, setLeads] = React.useState<B2BLead[]>([]);
+  const [crossSaleCache, setCrossSaleCache] = React.useState<
+    Record<string, B2BLead[]>
+  >({});
+  const [activeProjectByGroup, setActiveProjectByGroup] = React.useState<
+    Record<string, string>
+  >({});
   const [page, setPage] = React.useState(1);
   const [totalPages, setTotalPages] = React.useState(1);
   const [loading, setLoading] = React.useState(false);
@@ -138,37 +209,105 @@ export function B2BSalesTab() {
   const [loadingMore, setLoadingMore] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [followupLead, setFollowupLead] = React.useState<B2BLead | null>(null);
+  const [followupType, setFollowupType] =
+    React.useState<'Call' | 'Visit'>('Call');
   const [statusLead, setStatusLead] = React.useState<B2BLead | null>(null);
   const [historyLead, setHistoryLead] = React.useState<B2BLead | null>(null);
+  const [crossSaleLead, setCrossSaleLead] = React.useState<B2BLead | null>(null);
+  const [documentsLead, setDocumentsLead] = React.useState<B2BLead | null>(null);
+  const [referLead, setReferLead] = React.useState<B2BLead | null>(null);
+  const [instituteWeb, setInstituteWeb] = React.useState<{
+    title: string;
+    url: string | null;
+  } | null>(null);
   const [showAddLead, setShowAddLead] = React.useState(false);
 
-  const loadCounts = React.useCallback(async () => {
-    if (!token) return;
-    try {
-      const res = await fetchB2BStatusCounts(token);
-      if (res.ok) {
-        setCounts({ total: res.totalLeads, list: res.statusCounts });
-      }
-    } catch {
-      // silent
+  const leadDisplayGroups = React.useMemo(() => {
+    const byRoot = new Map<string, B2BLead[]>();
+    for (const l of leads) {
+      const rootId = getLeadGroupRootId(l);
+      const arr = byRoot.get(rootId) || [];
+      arr.push(l);
+      byRoot.set(rootId, arr);
     }
-  }, [token]);
+    return Array.from(byRoot.entries()).map(([rootId, members]) => {
+      const cached = crossSaleCache[rootId];
+      const merged = cached?.length ? cached : members;
+      const unique = [
+        ...new Map(merged.map(m => [String(m._id), m])).values(),
+      ];
+      const sorted = unique.sort((a, b) => {
+        const aPrimary = !a.parentLeadId;
+        const bPrimary = !b.parentLeadId;
+        if (aPrimary !== bPrimary) return aPrimary ? -1 : 1;
+        return (
+          new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+        );
+      });
+      return { rootId, leads: sorted };
+    });
+  }, [leads, crossSaleCache]);
+
+  const loadCounts = React.useCallback(
+    async (
+      cycleOverride?: B2BCycleFiltersState,
+      followupOverride?: {
+        followUpCallBucket?: B2BFollowupBucket | '';
+        followUpVisitBucket?: B2BFollowupBucket | '';
+      },
+    ) => {
+      if (!token) return;
+      try {
+        const res = await fetchB2BStatusCounts(
+          token,
+          cycleListParams(
+            statusFilter,
+            appliedSearch,
+            approvalFilter,
+            cycleOverride,
+            followupOverride,
+          ),
+        );
+        if (res.ok) {
+          setCounts({ total: res.totalLeads, list: res.statusCounts });
+          setFollowupDashboardCounts(res.followupDashboardCounts);
+        }
+      } catch {
+        // silent
+      }
+    },
+    [token, cycleListParams, statusFilter, appliedSearch, approvalFilter],
+  );
 
   const loadApprovalCounts = React.useCallback(
-    async (statusOverride?: string | null, searchOverride?: string) => {
+    async (
+      statusOverride?: string | null,
+      searchOverride?: string,
+      cycleOverride?: B2BCycleFiltersState,
+      followupOverride?: {
+        followUpCallBucket?: B2BFollowupBucket | '';
+        followUpVisitBucket?: B2BFollowupBucket | '';
+      },
+    ) => {
       if (!token) return;
       setApprovalLoading(true);
       try {
-        const res = await fetchB2BApprovalCounts(token, {
-          status: (statusOverride ?? statusFilter) || undefined,
-          search: (searchOverride ?? appliedSearch) || undefined,
-        });
+        const res = await fetchB2BApprovalCounts(
+          token,
+          cycleListParams(
+            statusOverride ?? statusFilter,
+            searchOverride ?? appliedSearch,
+            approvalFilter,
+            cycleOverride,
+            followupOverride,
+          ),
+        );
         if (res.ok) setApprovalCounts(res.counts);
       } finally {
         setApprovalLoading(false);
       }
     },
-    [token, statusFilter, appliedSearch],
+    [token, statusFilter, appliedSearch, approvalFilter, cycleListParams],
   );
 
   const loadLeads = React.useCallback(
@@ -178,6 +317,11 @@ export function B2BSalesTab() {
       statusOverride?: string | null,
       searchOverride?: string,
       approvalOverride?: B2BApprovalStatus | null,
+      cycleOverride?: B2BCycleFiltersState,
+      followupOverride?: {
+        followUpCallBucket?: B2BFollowupBucket | '';
+        followUpVisitBucket?: B2BFollowupBucket | '';
+      },
     ) => {
       if (!token) {
         setError('Login required');
@@ -189,6 +333,14 @@ export function B2BSalesTab() {
       const q = searchOverride !== undefined ? searchOverride : appliedSearch;
       const approval =
         approvalOverride !== undefined ? approvalOverride : approvalFilter;
+      const cycle = cycleOverride ?? cycleFilters;
+      const listParams = cycleListParams(
+        status,
+        q,
+        approval,
+        cycle,
+        followupOverride,
+      );
 
       if (mode === 'first') setLoading(true);
       else if (mode === 'refresh') setRefreshing(true);
@@ -198,10 +350,8 @@ export function B2BSalesTab() {
       try {
         const res = await fetchB2BLeads(token, {
           page: targetPage,
-          status: status || undefined,
-          search: q || undefined,
-          approvalStatus: approval || undefined,
           limit: 20,
+          ...listParams,
         });
         if (res.ok) {
           setTotalPages(res.totalPages);
@@ -220,8 +370,67 @@ export function B2BSalesTab() {
         setLoadingMore(false);
       }
     },
-    [token, page, statusFilter, appliedSearch, approvalFilter],
+    [token, page, statusFilter, appliedSearch, approvalFilter, cycleFilters, cycleListParams],
   );
+
+  const reloadWithFilters = React.useCallback(
+    (
+      status: string | null,
+      search: string,
+      approval: B2BApprovalStatus | null,
+      cycle: B2BCycleFiltersState,
+      followup: {
+        followUpCallBucket: B2BFollowupBucket | '';
+        followUpVisitBucket: B2BFollowupBucket | '';
+      },
+    ) => {
+      loadCounts(cycle, followup);
+      loadApprovalCounts(status, search, cycle, followup);
+      loadLeads('first', 1, status, search, approval, cycle, followup);
+    },
+    [loadCounts, loadApprovalCounts, loadLeads],
+  );
+
+  const onCycleFiltersChange = (next: B2BCycleFiltersState) => {
+    setCycleFilters(next);
+    reloadWithFilters(statusFilter, appliedSearch, approvalFilter, next, {
+      followUpCallBucket,
+      followUpVisitBucket,
+    });
+  };
+
+  const onFollowupDashClick = (
+    type: 'Call' | 'Visit',
+    bucket: B2BFollowupBucket,
+  ) => {
+    const isVisit = type === 'Visit';
+    const current = isVisit ? followUpVisitBucket : followUpCallBucket;
+    const togglingOff = current === bucket;
+
+    let nextCall = followUpCallBucket;
+    let nextVisit = followUpVisitBucket;
+    if (isVisit) {
+      nextVisit = togglingOff ? '' : bucket;
+      if (!togglingOff) nextCall = '';
+    } else {
+      nextCall = togglingOff ? '' : bucket;
+      if (!togglingOff) nextVisit = '';
+    }
+
+    setFollowUpCallBucket(nextCall);
+    setFollowUpVisitBucket(nextVisit);
+
+    const nextStatus = togglingOff ? statusFilter : null;
+    const nextApproval = togglingOff ? approvalFilter : null;
+    if (!togglingOff) {
+      setStatusFilter(null);
+      setApprovalFilter(null);
+    }
+    reloadWithFilters(nextStatus, appliedSearch, nextApproval, cycleFilters, {
+      followUpCallBucket: nextCall,
+      followUpVisitBucket: nextVisit,
+    });
+  };
 
   React.useEffect(() => {
     loadCounts();
@@ -232,37 +441,87 @@ export function B2BSalesTab() {
 
   const onSelectStatus = (id: string | null) => {
     setStatusFilter(id);
-    loadLeads('first', 1, id, appliedSearch, approvalFilter);
+    loadLeads('first', 1, id, appliedSearch, approvalFilter, cycleFilters, {
+      followUpCallBucket,
+      followUpVisitBucket,
+    });
   };
 
   const onSelectApproval = (status: B2BApprovalStatus | null) => {
     const next = approvalFilter === status ? null : status;
     setApprovalFilter(next);
-    loadLeads('first', 1, statusFilter, appliedSearch, next);
+    loadLeads('first', 1, statusFilter, appliedSearch, next, cycleFilters, {
+      followUpCallBucket,
+      followUpVisitBucket,
+    });
   };
 
   const onSubmitSearch = () => {
     setAppliedSearch(search);
-    loadApprovalCounts(statusFilter, search);
-    loadLeads('first', 1, statusFilter, search, approvalFilter);
+    loadApprovalCounts(statusFilter, search, cycleFilters, {
+      followUpCallBucket,
+      followUpVisitBucket,
+    });
+    loadLeads('first', 1, statusFilter, search, approvalFilter, cycleFilters, {
+      followUpCallBucket,
+      followUpVisitBucket,
+    });
+  };
+
+  const hasAnyActiveFilters = React.useMemo(
+    () =>
+      !!appliedSearch ||
+      !!statusFilter ||
+      !!approvalFilter ||
+      !!followUpCallBucket ||
+      !!followUpVisitBucket ||
+      isCycleFiltersActive(cycleFilters),
+    [
+      appliedSearch,
+      statusFilter,
+      approvalFilter,
+      followUpCallBucket,
+      followUpVisitBucket,
+      cycleFilters,
+    ],
+  );
+
+  const activeStatusName = React.useMemo(() => {
+    if (!statusFilter) return null;
+    const found = counts.list.find(
+      s => s.statusId && String(s.statusId) === String(statusFilter),
+    );
+    return found?.statusName || 'Selected';
+  }, [statusFilter, counts.list]);
+
+  const showAllLeads = () => {
+    const clearedCycle = { ...EMPTY_CYCLE_FILTERS };
+    const clearedFollowup = {
+      followUpCallBucket: '' as const,
+      followUpVisitBucket: '' as const,
+    };
+    setSearch('');
+    setAppliedSearch('');
+    setStatusFilter(null);
+    setApprovalFilter(null);
+    setCycleFilters(clearedCycle);
+    setFollowUpCallBucket('');
+    setFollowUpVisitBucket('');
+    reloadWithFilters(null, '', null, clearedCycle, clearedFollowup);
   };
 
   const dashboardCounts = React.useMemo(() => {
-    const result = {
-      call: { done: 0, planned: 0, missed: 0 },
-      visit: { done: 0, planned: 0, missed: 0 },
-      docs: { done: 0, pending: 0 },
-    };
+    const docs = { done: 0, pending: 0 };
     for (const lead of leads) {
-      const cb = getLeadFollowupBucket(lead, 'Call');
-      if (cb) result.call[cb] += 1;
-      const vb = getLeadFollowupBucket(lead, 'Visit');
-      if (vb) result.visit[vb] += 1;
       const db = getLeadDocumentsBucket(lead);
-      if (db) result.docs[db] += 1;
+      if (db) docs[db] += 1;
     }
-    return result;
-  }, [leads]);
+    return {
+      call: followupDashboardCounts.call,
+      visit: followupDashboardCounts.visit,
+      docs,
+    };
+  }, [leads, followupDashboardCounts]);
 
   const performance = React.useMemo(
     () => sortPerf(counts.list),
@@ -295,6 +554,12 @@ export function B2BSalesTab() {
           <Text style={styles.searchBtnText}>Go</Text>
         </Pressable>
       </View>
+
+      <B2BCycleFilters
+        token={token}
+        value={cycleFilters}
+        onChange={onCycleFiltersChange}
+      />
 
       <Section label="Lead Approval">
         <ScrollView
@@ -386,41 +651,43 @@ export function B2BSalesTab() {
 
       <Section label="Followup Calling">
         <View style={styles.tripleCards}>
-          <SmallStat
-            label="Done"
-            value={dashboardCounts.call.done}
-            bg="#e8a317"
-          />
-          <SmallStat
-            label="Planned"
-            value={dashboardCounts.call.planned}
-            bg="#e8a317"
-          />
-          <SmallStat
-            label="Missed"
-            value={dashboardCounts.call.missed}
-            bg="#e8a317"
-          />
+          {(
+            [
+              { bucket: 'done' as const, label: 'Done' },
+              { bucket: 'planned' as const, label: 'Planned' },
+              { bucket: 'missed' as const, label: 'Missed' },
+            ] as const
+          ).map(row => (
+            <SmallStat
+              key={row.bucket}
+              label={row.label}
+              value={dashboardCounts.call[row.bucket]}
+              bg="#12b3ff"
+              selected={followUpCallBucket === row.bucket}
+              onPress={() => onFollowupDashClick('Call', row.bucket)}
+            />
+          ))}
         </View>
       </Section>
 
       <Section label="Followup Visit">
         <View style={styles.tripleCards}>
-          <SmallStat
-            label="Done"
-            value={dashboardCounts.visit.done}
-            bg="#4b5563"
-          />
-          <SmallStat
-            label="Planned"
-            value={dashboardCounts.visit.planned}
-            bg="#4b5563"
-          />
-          <SmallStat
-            label="Missed"
-            value={dashboardCounts.visit.missed}
-            bg="#4b5563"
-          />
+          {(
+            [
+              { bucket: 'done' as const, label: 'Done' },
+              { bucket: 'planned' as const, label: 'Planned' },
+              { bucket: 'missed' as const, label: 'Missed' },
+            ] as const
+          ).map(row => (
+            <SmallStat
+              key={row.bucket}
+              label={row.label}
+              value={dashboardCounts.visit[row.bucket]}
+              bg="#4b5563"
+              selected={followUpVisitBucket === row.bucket}
+              onPress={() => onFollowupDashClick('Visit', row.bucket)}
+            />
+          ))}
         </View>
       </Section>
 
@@ -439,10 +706,52 @@ export function B2BSalesTab() {
         </View>
       </Section>
 
+      {hasAnyActiveFilters ? (
+        <View style={styles.filtersActiveBar}>
+          <Text style={styles.filtersActiveLabel}>Filters active</Text>
+          <View style={styles.filtersActiveBadges}>
+            {appliedSearch ? (
+              <Text style={styles.filterBadge}>Search: {appliedSearch}</Text>
+            ) : null}
+            {isCycleFiltersActive(cycleFilters) ? (
+              <Text style={styles.filterBadge}>Cycle filters</Text>
+            ) : null}
+            {followUpCallBucket ? (
+              <Text style={styles.filterBadge}>
+                Call: {followUpCallBucket}
+              </Text>
+            ) : null}
+            {followUpVisitBucket ? (
+              <Text style={styles.filterBadge}>
+                Visit: {followUpVisitBucket}
+              </Text>
+            ) : null}
+            {statusFilter ? (
+              <Text style={styles.filterBadge}>
+                Status: {activeStatusName}
+              </Text>
+            ) : null}
+            {approvalFilter ? (
+              <Text style={styles.filterBadge}>
+                Approval: {approvalFilter}
+              </Text>
+            ) : null}
+          </View>
+          <Pressable style={styles.showAllBtn} onPress={showAllLeads}>
+            <Text style={styles.showAllBtnText}>Show all leads</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       <View style={styles.listHeaderBar}>
         <Text style={styles.listHeaderTitle}>
           Leads
           {approvalFilter ? ` · ${approvalFilter}` : ''}
+          {followUpCallBucket
+            ? ` · Call: ${followUpCallBucket}`
+            : followUpVisitBucket
+              ? ` · Visit: ${followUpVisitBucket}`
+              : ''}
         </Text>
         <Text style={styles.listHeaderSub}>{totalAfterFilter} total</Text>
       </View>
@@ -454,17 +763,17 @@ export function B2BSalesTab() {
   return (
     <View style={styles.container}>
       {loading ? (
-        <>
+        <View style={styles.screenPad}>
           {ListHeader}
           <View style={styles.loadingWrap}>
             <ActivityIndicator color={college.primary} />
             <Text style={styles.loadingText}>Loading leads…</Text>
           </View>
-        </>
+        </View>
       ) : (
         <FlatList
-          data={leads}
-          keyExtractor={item => item._id}
+          data={leadDisplayGroups}
+          keyExtractor={g => g.rootId}
           ListHeaderComponent={ListHeader}
           contentContainerStyle={[
             styles.listContent,
@@ -487,17 +796,98 @@ export function B2BSalesTab() {
               loadLeads('more');
             }
           }}
-          ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-          renderItem={({ item }) => (
-            <LeadRow
-              lead={item}
-              onFollowup={() => setFollowupLead(item)}
-              onStatusChange={() => setStatusLead(item)}
-              onHistory={() => setHistoryLead(item)}
-            />
-          )}
+          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+          renderItem={({ item: group }) => {
+            const activeId = activeProjectByGroup[group.rootId];
+            const activeLead =
+              group.leads.find(l => String(l._id) === String(activeId)) ||
+              group.leads.find(l => !l.parentLeadId) ||
+              group.leads[0];
+            const activeLeadId = activeLead?._id;
+
+            return (
+              <View style={styles.groupWrap}>
+                {group.leads.length > 1 ? (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.groupTabs}
+                  >
+                    {group.leads.map(l => {
+                      const selected = String(l._id) === String(activeLeadId);
+                      return (
+                        <Pressable
+                          key={l._id}
+                          onPress={() =>
+                            setActiveProjectByGroup(prev => ({
+                              ...prev,
+                              [group.rootId]: l._id,
+                            }))
+                          }
+                          style={[
+                            styles.groupTab,
+                            selected && styles.groupTabActive,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.groupTabText,
+                              selected && styles.groupTabTextActive,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {getLeadProjectName(l)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                ) : null}
+
+                {activeLead ? (
+                  <B2BLeadCard
+                    lead={activeLead}
+              onDial={dialNumber}
+              onWhatsApp={openWhatsApp}
+              onFollowup={type => {
+                setFollowupType(type);
+                setFollowupLead(activeLead);
+              }}
+              onStatusChange={() => setStatusLead(activeLead)}
+              onHistory={() => setHistoryLead(activeLead)}
+              onCrossSale={() => setCrossSaleLead(activeLead)}
+              onDocuments={() => setDocumentsLead(activeLead)}
+              onReferLead={() => setReferLead(activeLead)}
+              onAddReport={() =>
+                setInstituteWeb({
+                  title: 'Add Lead Report',
+                  url: b2bLrpAddUrl(activeLeadId),
+                })
+              }
+              onViewReport={() =>
+                setInstituteWeb({
+                  title: 'View Lead Report',
+                  url: b2bLrpViewUrl(activeLeadId),
+                })
+              }
+                  />
+                ) : null}
+              </View>
+            );
+          }}
           ListEmptyComponent={
-            <Text style={styles.emptyMsg}>No leads found.</Text>
+            <View style={styles.emptyWrap}>
+              <Text style={styles.emptyMsg}>
+                {hasAnyActiveFilters
+                  ? 'No leads match your filters.'
+                  : 'No leads found.'}
+              </Text>
+              {hasAnyActiveFilters ? (
+                <Pressable style={styles.showAllBtn} onPress={showAllLeads}>
+                  <Text style={styles.showAllBtnText}>Show all leads</Text>
+                </Pressable>
+              ) : null}
+            </View>
           }
           ListFooterComponent={
             loadingMore ? (
@@ -512,6 +902,7 @@ export function B2BSalesTab() {
       <B2BFollowupModal
         visible={!!followupLead}
         lead={followupLead}
+        initialType={followupType}
         onClose={() => setFollowupLead(null)}
         onSaved={() => {
           loadLeads('refresh', 1);
@@ -533,6 +924,40 @@ export function B2BSalesTab() {
         visible={!!historyLead}
         lead={historyLead}
         onClose={() => setHistoryLead(null)}
+      />
+
+      <B2BCrossSaleModal
+        visible={!!crossSaleLead}
+        lead={crossSaleLead}
+        onClose={() => setCrossSaleLead(null)}
+        onSaved={() => {
+          loadCounts();
+          loadApprovalCounts();
+          loadLeads('refresh', 1);
+        }}
+      />
+
+      <B2BLeadDocumentsModal
+        visible={!!documentsLead}
+        lead={documentsLead}
+        onClose={() => setDocumentsLead(null)}
+      />
+
+      <B2BReferLeadModal
+        visible={!!referLead}
+        lead={referLead}
+        onClose={() => setReferLead(null)}
+        onSaved={() => {
+          loadLeads('refresh', 1);
+        }}
+      />
+
+      <B2BInstituteWebModal
+        visible={!!instituteWeb}
+        title={instituteWeb?.title ?? ''}
+        url={instituteWeb?.url ?? null}
+        user={user}
+        onClose={() => setInstituteWeb(null)}
       />
 
       <B2BAddLeadModal
@@ -606,188 +1031,51 @@ function SmallStat({
   label,
   value,
   bg,
+  selected,
+  onPress,
 }: {
   label: string;
   value: number;
   bg: string;
+  selected?: boolean;
+  onPress?: () => void;
 }) {
-  return (
-    <View style={[styles.smallStat, { backgroundColor: bg }]}>
+  const inner = (
+    <>
       <Text style={styles.smallStatLabel}>{label}</Text>
       <View style={styles.smallStatDivider} />
       <Text style={styles.smallStatValue}>
         {String(value).padStart(2, '0')}
       </Text>
-    </View>
+    </>
   );
-}
-
-function LeadRow({
-  lead,
-  onFollowup,
-  onStatusChange,
-  onHistory,
-}: {
-  lead: B2BLead;
-  onFollowup: () => void;
-  onStatusChange: () => void;
-  onHistory: () => void;
-}) {
-  const statusName =
-    lead.status?.title || lead.status?.name || 'Untouch Lead';
-  const approval = lead.approval?.status?.toUpperCase();
-  const approvalColor =
-    approval === 'APPROVED'
-      ? '#10b981'
-      : approval === 'REJECTED'
-        ? '#ef4444'
-        : approval === 'PENDING'
-          ? '#f59e0b'
-          : null;
-
-  const callBucket = getLeadFollowupBucket(lead, 'Call');
-  const visitBucket = getLeadFollowupBucket(lead, 'Visit');
-  const wa = whatsappNumber(lead);
-
-  return (
-    <View style={styles.leadCard}>
-      <View style={styles.leadTopRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.leadTitle}>
-            {lead.businessName || lead.concernPersonName || '—'}
-          </Text>
-          <Text style={styles.leadSub}>
-            {lead.concernPersonName || '—'}
-            {lead.designation ? ` · ${lead.designation}` : ''}
-          </Text>
-          {lead.mobile ? (
-            <Pressable
-              onPress={() => dialNumber(lead.mobile)}
-              hitSlop={6}
-              style={styles.phoneRow}
-              accessibilityRole="button"
-              accessibilityLabel={`Call ${lead.mobile}`}
-            >
-              <Text style={styles.phoneIcon}>📞</Text>
-              <Text style={styles.phoneText}>{String(lead.mobile)}</Text>
-            </Pressable>
-          ) : null}
-          {wa ? (
-            <Pressable
-              onPress={() => openWhatsApp(wa)}
-              hitSlop={6}
-              style={styles.phoneRow}
-              accessibilityRole="button"
-              accessibilityLabel={`WhatsApp ${wa}`}
-            >
-              <Text style={styles.phoneIcon}>💬</Text>
-              <Text style={styles.waText}>
-                {lead.whatsapp ? String(lead.whatsapp) : String(lead.mobile)}
-              </Text>
-            </Pressable>
-          ) : null}
-          {lead.email ? (
-            <Text style={styles.leadMeta}>✉ {lead.email}</Text>
-          ) : null}
-          {lead.leadCategory?.name ? (
-            <Text style={styles.leadMeta}>{lead.leadCategory.name}</Text>
-          ) : null}
-        </View>
-        <View style={{ alignItems: 'flex-end' }}>
-          <Pressable onPress={onStatusChange} style={styles.statusBadge}>
-            <Text style={styles.statusBadgeText} numberOfLines={1}>
-              {statusName}
-            </Text>
-            <Text style={styles.statusBadgeCaret}> ▾</Text>
-          </Pressable>
-          {approvalColor ? (
-            <View
-              style={[styles.approvalBadge, { backgroundColor: approvalColor }]}
-            >
-              <Text style={styles.approvalBadgeText}>{approval}</Text>
-            </View>
-          ) : null}
-          <Text style={styles.leadDate}>{fmtDate(lead.createdAt)}</Text>
-        </View>
-      </View>
-
-      <View style={styles.leadBottomRow}>
-        <View style={styles.followupPills}>
-          <FollowupPill type="Call" bucket={callBucket} />
-          <FollowupPill type="Visit" bucket={visitBucket} />
-        </View>
-      </View>
-
-      <View style={styles.actionBtns}>
-        {lead.mobile ? (
-          <Pressable
-            onPress={() => dialNumber(lead.mobile)}
-            style={styles.callBtn}
-            accessibilityRole="button"
-            accessibilityLabel={`Call ${lead.mobile}`}
-          >
-            <Text style={styles.callBtnText}>📞 Call</Text>
-          </Pressable>
-        ) : null}
-        {wa ? (
-          <Pressable
-            onPress={() => openWhatsApp(wa)}
-            style={styles.waBtn}
-            accessibilityRole="button"
-            accessibilityLabel={`WhatsApp ${wa}`}
-          >
-            <Text style={styles.waBtnText}>WhatsApp</Text>
-          </Pressable>
-        ) : null}
-        <Pressable onPress={onHistory} style={styles.ghostBtn}>
-          <Text style={styles.ghostBtnText}>History</Text>
-        </Pressable>
-        <Pressable onPress={onStatusChange} style={styles.ghostBtn}>
-          <Text style={styles.ghostBtnText}>Status</Text>
-        </Pressable>
-        <Pressable onPress={onFollowup} style={styles.followupBtn}>
-          <Text style={styles.followupBtnText}>+ Follow-up</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
-function FollowupPill({
-  type,
-  bucket,
-}: {
-  type: 'Call' | 'Visit';
-  bucket: 'done' | 'planned' | 'missed' | null;
-}) {
-  if (!bucket) {
+  if (onPress) {
     return (
-      <View style={[styles.fuPill, styles.fuPillIdle]}>
-        <Text style={styles.fuPillText}>{type}: —</Text>
-      </View>
+      <Pressable
+        onPress={onPress}
+        style={[
+          styles.smallStat,
+          { backgroundColor: bg },
+          selected && styles.smallStatSelected,
+        ]}
+      >
+        {inner}
+      </Pressable>
     );
   }
-  const color =
-    bucket === 'done'
-      ? '#10b981'
-      : bucket === 'planned'
-        ? '#3b82f6'
-        : '#ef4444';
   return (
-    <View style={[styles.fuPill, { borderColor: color }]}>
-      <View style={[styles.fuPillDot, { backgroundColor: color }]} />
-      <Text style={[styles.fuPillText, { color }]}>
-        {type}: {bucket}
-      </Text>
-    </View>
+    <View style={[styles.smallStat, { backgroundColor: bg }]}>{inner}</View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fa' },
+  screenPad: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
   searchRow: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 6,
     gap: 8,
@@ -813,7 +1101,6 @@ const styles = StyleSheet.create({
   searchBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
   section: {
-    marginHorizontal: 16,
     marginTop: 16,
     paddingHorizontal: 7,
     paddingTop: 14,
@@ -890,6 +1177,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  smallStatSelected: {
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.85)',
+  },
   smallStatLabel: {
     color: '#fff',
     fontSize: 10,
@@ -903,11 +1194,55 @@ const styles = StyleSheet.create({
   },
   smallStatValue: { color: '#fff', fontSize: 14, fontWeight: '800' },
 
+  filtersActiveBar: {
+    marginTop: 12,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: '#fff5f7',
+    borderWidth: 1,
+    borderColor: 'rgba(250, 85, 121, 0.25)',
+    gap: 8,
+  },
+  filtersActiveLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: college.textMuted,
+  },
+  filtersActiveBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  filterBadge: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: college.text,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    overflow: 'hidden',
+  },
+  showAllBtn: {
+    alignSelf: 'flex-start',
+    borderWidth: 1.5,
+    borderColor: '#ef4444',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  showAllBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ef4444',
+  },
+
   listHeaderBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    paddingHorizontal: 16,
     marginTop: 18,
     marginBottom: 8,
   },
@@ -921,168 +1256,47 @@ const styles = StyleSheet.create({
   loadingWrap: { paddingVertical: 30, alignItems: 'center' },
   loadingText: { marginTop: 8, color: college.textMuted },
   listContent: { paddingHorizontal: 16, paddingBottom: 24 },
-  leadCard: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 12,
-    elevation: 1,
-    marginHorizontal: 0,
+  groupWrap: {
+    borderRadius: 20,
+    overflow: 'hidden',
   },
-  leadTopRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-  },
-  leadBottomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 10,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f3f5',
-    gap: 8,
-  },
-  followupPills: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    flex: 1,
-  },
-  fuPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-    borderWidth: 1,
-    backgroundColor: '#fff',
-  },
-  fuPillIdle: { borderColor: college.border },
-  fuPillDot: { width: 6, height: 6, borderRadius: 3 },
-  fuPillText: { fontSize: 10, fontWeight: '700', color: college.textMuted },
-  followupBtn: {
-    backgroundColor: college.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
-  },
-  followupBtnText: {
-    color: '#fff',
-    fontWeight: '800',
-    fontSize: 11,
-    letterSpacing: 0.3,
-  },
-  leadTitle: { fontSize: 14, fontWeight: '700', color: college.text },
-  leadSub: { fontSize: 12, color: college.textMuted, marginTop: 2 },
-  leadMeta: { fontSize: 11, color: college.textMuted, marginTop: 2 },
-  leadDate: { fontSize: 11, color: college.textMuted, marginTop: 4 },
-  statusBadge: {
-    backgroundColor: college.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-    maxWidth: 150,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  statusBadgeCaret: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '900',
-  },
-  actionBtns: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 8,
-    justifyContent: 'flex-end',
-  },
-  callBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: '#10b981',
-  },
-  callBtnText: {
-    color: '#fff',
-    fontWeight: '800',
-    fontSize: 11,
-    letterSpacing: 0.3,
-  },
-  phoneRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-    alignSelf: 'flex-start',
-  },
-  phoneIcon: { fontSize: 11 },
-  phoneText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#10b981',
-    textDecorationLine: 'underline',
-  },
-  waText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#25D366',
-    textDecorationLine: 'underline',
-  },
-  waBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: '#25D366',
-  },
-  waBtnText: {
-    color: '#fff',
-    fontWeight: '800',
-    fontSize: 11,
-    letterSpacing: 0.3,
-  },
-  ghostBtn: {
+  groupTabs: {
     paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingTop: 8,
+    paddingBottom: 6,
+    backgroundColor: '#fff9fb',
+    gap: 8,
+  },
+  groupTab: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     borderRadius: 999,
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: college.primary,
-    backgroundColor: '#fff',
+    borderColor: 'rgba(250, 85, 121, 0.35)',
+    maxWidth: 180,
   },
-  ghostBtnText: {
-    color: college.primary,
-    fontWeight: '700',
-    fontSize: 11,
-    letterSpacing: 0.3,
+  groupTabActive: {
+    backgroundColor: 'rgb(250, 85, 121)',
+    borderColor: 'rgb(250, 85, 121)',
   },
-  approvalBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 999,
-    marginTop: 4,
-  },
-  approvalBadgeText: {
-    color: '#fff',
-    fontSize: 9,
+  groupTabText: {
+    color: '#0f172a',
     fontWeight: '800',
-    letterSpacing: 0.3,
+    fontSize: 12,
+  },
+  groupTabTextActive: {
+    color: '#fff',
   },
   errorBox: {
     backgroundColor: '#fee2e2',
     color: '#b91c1c',
     padding: 8,
     borderRadius: 6,
-    marginHorizontal: 16,
     marginBottom: 8,
     fontSize: 12,
   },
+  emptyWrap: { alignItems: 'center', paddingVertical: 24, gap: 12 },
   emptyMsg: {
     color: college.textMuted,
     fontSize: 13,
