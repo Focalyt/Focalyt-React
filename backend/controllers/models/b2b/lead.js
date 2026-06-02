@@ -164,8 +164,15 @@ const B2BLeadSchema = new mongoose.Schema({
 B2BLeadSchema.statics.normalizeApproval = normalizeB2BApproval;
 B2BLeadSchema.statics.approvalNeedsRepair = approvalNeedsRepair;
 
+B2BLeadSchema.pre('validate', function(next) {
+  if (!this.approval || typeof this.approval !== 'object' || approvalNeedsRepair(this.approval)) {
+    this.approval = normalizeB2BApproval(this.approval);
+  }
+  next();
+});
+
 B2BLeadSchema.pre('save', function(next) {
-  if (this.approval && approvalNeedsRepair(this.approval)) {
+  if (!this.approval || typeof this.approval !== 'object' || approvalNeedsRepair(this.approval)) {
     this.approval = normalizeB2BApproval(this.approval);
   }
   next();

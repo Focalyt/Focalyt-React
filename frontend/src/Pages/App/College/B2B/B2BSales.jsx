@@ -541,6 +541,25 @@ const B2BSales = () => {
     updatedPermission()
   }, [])
 
+  useEffect(() => {
+    try {
+      const storedToken = sessionStorage.getItem('googleAuthToken');
+      if (!storedToken) return;
+      const parsedToken = JSON.parse(storedToken);
+      if (!parsedToken || !parsedToken.accessToken) return;
+
+      setUserData((prev) => {
+        if (prev?.googleAuthToken?.accessToken) return prev;
+        const next = { ...(prev || {}), googleAuthToken: parsedToken };
+        try {
+          sessionStorage.setItem('user', JSON.stringify(next));
+        } catch (_) { }
+        return next;
+      });
+    } catch (_) {
+    }
+  }, []);
+
   // Console: logged-in institute user and all permissions (for debugging)
   useEffect(() => {
     if (permissions != null && userData?._id) {
@@ -895,6 +914,7 @@ const B2BSales = () => {
         googleAuthToken: refreshToken.data
       }
       sessionStorage.setItem('googleAuthToken', JSON.stringify(refreshToken.data));
+      sessionStorage.setItem('user', JSON.stringify(user));
 
       setUserData(user);
 
@@ -2584,13 +2604,29 @@ const B2BSales = () => {
       });
 
       if (response.data.status) {
-        // Refresh the leads list
-        fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
+        const updatedLead = response?.data?.data || null;
 
-        // Refresh status counts
+        if (updatedLead && updatedLead._id) {
+          setLeads((prev) => {
+            const next = Array.isArray(prev) ? prev.map((l) => (l?._id === updatedLead._id ? updatedLead : l)) : prev;
+
+            // If user is filtering by a specific status, and the lead moved out of it, remove it.
+            const filterId = selectedStatusFilter ? String(selectedStatusFilter) : '';
+            const leadStatusId = updatedLead?.status?._id ? String(updatedLead.status._id) : (updatedLead?.status ? String(updatedLead.status) : '');
+            if (filterId && leadStatusId && filterId !== leadStatusId) {
+              return next.filter((l) => l?._id !== updatedLead._id);
+            }
+            return next;
+          });
+        }
+
+        // Also update selectedProfile if it is this lead
+        setSelectedProfile((prev) => (prev?._id === leadId && updatedLead ? updatedLead : prev));
+
+        // Refresh the leads list + counts in background (source of truth)
+        fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
         fetchStatusCounts();
 
-        // Close the panel
         closePanel();
       } else {
         alert(response.data.message || 'Failed to update lead status');

@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import FrontLayout from "../../../Component/Layouts/Front/index";
 import { PillarProjectLogo } from "./PillarProjectLogos";
 import ZenithXSection from "./ZenithXSection";
-import PartnersMediaSection, { ACADEMIC_PARTNERS, CSR_PARTNERS, GOVT_PARTNERS } from "./PartnersMediaSection";
+import PartnersMediaSection, { ACADEMIC_PARTNERS, CSR_PARTNERS, GOVT_PARTNERS, getPartnerLabel } from "./PartnersMediaSection";
 import OurApproachSection from "./OurApproachSection";
 import IndustryAutomationSection from "./IndustryAutomationSection";
 import { EventCard } from "../Event/Event";
@@ -5689,7 +5689,7 @@ const MARQUEE = [
   "Industry 4.0",
 ];
 
-const SIC_PARTNERS = ACADEMIC_PARTNERS;
+const SIC_PARTNERS = ACADEMIC_PARTNERS.map(getPartnerLabel);
 
 /** Partner-with-us section — narrative aligned with company profile / pillars on site. */
 const PARTNER_PROFILE_HIGHLIGHTS = [

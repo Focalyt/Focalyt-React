@@ -52,6 +52,11 @@
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+.foc-app-download__btn *,
+.foc-app-download__btn i {
+  color: #fff !important;
+}
+
 .foc-app-download__btn:hover {
   color: #fff !important;
   transform: translateY(-1px);

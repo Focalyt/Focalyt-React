@@ -1,45 +1,61 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 
+const PARTNER_LOGO_BASE = "/Assets/public_assets/images/partners-logo";
+
 export const GOVT_PARTNERS = [
-  "NSDC",
+  { label: "NSDC", imageSrc: `${PARTNER_LOGO_BASE}/nsdc.jpg` },
   "MeitY",
-  "PMKVY",
-  "HPKVN",
-  "OSDA",
-  "UPSDM",
-  "ESSCZ",
-  "TSSC",
+  { label: "PMKVY", imageSrc: `${PARTNER_LOGO_BASE}/pmkvy.svg` },
+  { label: "HPKVN", imageSrc: `${PARTNER_LOGO_BASE}/hpkvn.png` },
+  { label: "OSDA", imageSrc: `${PARTNER_LOGO_BASE}/osda.png` },
+  { label: "UPSDM", imageSrc: `${PARTNER_LOGO_BASE}/upsdm.png` },
+  { label: "ESSCI", imageSrc: `${PARTNER_LOGO_BASE}/essci_registered_logo.png` },
+  { label: "Telecom Sector Skill Council (TSSC)", imageSrc: `${PARTNER_LOGO_BASE}/telecom_sector_skill_council.png` },
   "IT-ITES",
-  "BFSI",
-  "THSC",
+  { label: "BFSI", imageSrc: `${PARTNER_LOGO_BASE}/bfsi.png` },
+  { label: "Tourism & Hospitality Skill Council (THSC)", imageSrc: `${PARTNER_LOGO_BASE}/thsc.png` },
   "MEPSC",
   "ESDM",
-  "Skill Development",
+  { label: "Skill India", imageSrc: `${PARTNER_LOGO_BASE}/skill-india-logo.jpg` },
 ];
 
 export const CSR_PARTNERS = [
   "Ericsson",
-  "Panasonic",
-  "Samsung",
-  "Honda",
-  "Brickstone",
+  { label: "Panasonic", imageSrc: `${PARTNER_LOGO_BASE}/panasonic.svg` },
+  { label: "Samsung", imageSrc: `${PARTNER_LOGO_BASE}/samsung.png` },
+  { label: "Honda", imageSrc: `${PARTNER_LOGO_BASE}/honda.png` },
+  { label: "Bridgestone Solutions", imageSrc: `${PARTNER_LOGO_BASE}/bridgestone-solutions.svg` },
   "TCI",
   "Hero Motocorp",
 ];
 
 export const ACADEMIC_PARTNERS = [
-  "Chandigarh University",
-  "Amity University",
-  "SGT University",
-  "Lovely Professional University",
-  "Rayat Bahra University",
-  "GNM College Ambala",
-  "APIIT SD India",
+  { label: "Chandigarh University", imageSrc: `${PARTNER_LOGO_BASE}/cu_logo.png` },
+  { label: "Amity University", imageSrc: `${PARTNER_LOGO_BASE}/amity-logo.png` },
+  { label: "SGT University", imageSrc: `${PARTNER_LOGO_BASE}/sgt_logo.png` },
+  { label: "Lovely Professional University", imageSrc: `${PARTNER_LOGO_BASE}/lpu_logo.png` },
+  { label: "Rayat-Bahra University", imageSrc: `${PARTNER_LOGO_BASE}/rayat_bahra_logo.png` },
+  { label: "GNM College, Ambala", imageSrc: `${PARTNER_LOGO_BASE}/GMN_logo.png` },
+  { label: "APIIT SD India", imageSrc: `${PARTNER_LOGO_BASE}/Apiit_logo.png` },
+  { label: "Central University of Haryana", imageSrc: `${PARTNER_LOGO_BASE}/cuh_logo.png` },
+  { label: "SIET Nilokheri", imageSrc: `${PARTNER_LOGO_BASE}/Siet_logo.png` },
+  { label: "KVA DAV College for Women", imageSrc: `${PARTNER_LOGO_BASE}/KVA_DAV_logo.png` },
+  { label: "Government College for Women, Ambala", imageSrc: `${PARTNER_LOGO_BASE}/Gcw_logo.png` },
+  { label: "Rao Birender Singh College", imageSrc: `${PARTNER_LOGO_BASE}/Rao_birender_Logo.png` },
+  { label: "Asia-Pacific Institute of Management & Technology", imageSrc: `${PARTNER_LOGO_BASE}/aimt_logo.png` },
+  { label: "Punjab State Aeronautical Engineering College", imageSrc: `${PARTNER_LOGO_BASE}/psaec_logo.png` },
+  { label: "Ch. Chiranjil Lal Government College", imageSrc: `${PARTNER_LOGO_BASE}/chiranji_lal_logo.png` },
+  { label: "St. Andrew's Institute of Technology & Management", imageSrc: `${PARTNER_LOGO_BASE}/St_andrew_logo.png` },
+  { label: "NIT Kurukshetra", imageSrc: `${PARTNER_LOGO_BASE}/Nit_logo.png` },
 ];
 
+export function getPartnerLabel(partner) {
+  return typeof partner === "string" ? partner : partner.label;
+}
+
 export const INDUSTRY_PARTNERS = [
-  "Dixon",
-  "Padget",
+  { label: "Dixon", imageSrc: `${PARTNER_LOGO_BASE}/dixon.webp` },
+  { label: "Padget Technologies", imageSrc: `${PARTNER_LOGO_BASE}/Padget-Logo.png` },
   "East Indl Technologies",
   "Net+",
   "Fastway",
@@ -50,7 +66,7 @@ export const INDUSTRY_PARTNERS = [
   "Radisson",
   "Montree Hotel",
   "Qvolv",
-  "Patanjali",
+  { label: "Patanjali", imageSrc: `${PARTNER_LOGO_BASE}/patanjali.svg` },
   "Bakingo",
 ];
 
@@ -79,9 +95,21 @@ function partnerToLogo(label, index = 0) {
   };
 }
 
-function partnersToCarouselSlides(names, maxCount = PARTNER_PREVIEW_COUNT, perSlide = 3) {
-  const list = maxCount == null ? names : names.slice(0, maxCount);
-  const logos = list.map((label, i) => partnerToLogo(label, i));
+function normalizePartner(partner, index = 0) {
+  if (typeof partner === "string") {
+    return partnerToLogo(partner, index);
+  }
+  return {
+    label: partner.label,
+    imageSrc: partner.imageSrc,
+    color: CHIP_COLORS[index % CHIP_COLORS.length],
+    emoji: CHIP_EMOJIS[index % CHIP_EMOJIS.length],
+  };
+}
+
+function partnersToCarouselSlides(partners, maxCount = PARTNER_PREVIEW_COUNT, perSlide = 3) {
+  const list = maxCount == null ? partners : partners.slice(0, maxCount);
+  const logos = list.map((partner, i) => normalizePartner(partner, i));
   const slides = [];
   for (let i = 0; i < logos.length; i += perSlide) {
     slides.push(logos.slice(i, i + perSlide));
@@ -217,6 +245,63 @@ const STYLES = `
   .fp .logo-chip:hover {
     transform: scale(1.1) rotate(-2deg);
     box-shadow: 0 6px 22px rgba(0,0,0,0.16) !important;
+  }
+
+  .fp .logo-chip--image {
+    min-width: 88px;
+    padding: 8px 10px 7px;
+  }
+
+  .fp .logo-chip__img {
+    width: 100%;
+    max-width: 76px;
+    height: 46px;
+    object-fit: contain;
+    display: block;
+  }
+
+  .fp .logo-chip__label {
+    font-weight: 800;
+    font-size: 10.5px;
+    text-align: center;
+    letter-spacing: 0.3px;
+    line-height: 1.25;
+  }
+
+  .fp .logo-chip__label--image {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--foc-navy-deep);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fp .partner-card .partner-logo-carousel:not(.partner-logo-carousel--modal) .logo-chip--image {
+    min-width: 0;
+    flex: 1 1 0;
+    width: 0;
+    padding: 8px 5px 6px;
+    gap: 5px;
+    min-height: 90px;
+  }
+
+  .fp .partner-card .partner-logo-carousel:not(.partner-logo-carousel--modal) .logo-chip__img {
+    height: 36px;
+    max-height: 36px;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .fp .partner-card .partner-logo-carousel:not(.partner-logo-carousel--modal) .logo-chip__label--image {
+    font-size: 8px;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    text-overflow: unset;
+    line-height: 1.25;
   }
 
   .fp .tab-btn { transition: all 0.25s ease; cursor: pointer; border: none; }
@@ -461,9 +546,23 @@ const STYLES = `
     background: rgba(11, 18, 32, 0.55);
     backdrop-filter: blur(4px);
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
-    padding: 20px 16px;
+    padding: 200px 16px 20px;
+  }
+  @media (max-width: 991px) {
+    .fp .partner-all-modal-backdrop {
+      padding-top: 120px;
+      margin-top:60px
+    }
+  }
+  @media (max-width: 575px) {
+    .fp .partner-all-modal-backdrop {
+      padding-top: 88px;
+      padding-left: 12px;
+      padding-right: 12px;
+      margin-top:60px
+    }
   }
   .fp .partner-all-modal {
     width: min(560px, 100%);
@@ -507,6 +606,130 @@ const STYLES = `
   }
   .fp .partner-all-modal .partner-logo-carousel {
     margin-bottom: 0;
+  }
+
+  .fp .partner-all-modal--gallery {
+    width: min(920px, 96vw);
+    max-height: min(90vh, 720px);
+  }
+
+  .fp .partner-all-modal__subtitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--foc-text-caption-alt);
+    margin: 4px 0 0;
+  }
+
+  .fp .partner-modal-gallery {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    max-height: min(58vh, 520px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 6px 4px 10px;
+    scrollbar-width: thin;
+  }
+
+  .fp .partner-modal-gallery__item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 18px 14px 14px;
+    background: var(--foc-color-surface);
+    border: 1px solid var(--foc-color-border-light);
+    border-radius: 16px;
+    box-shadow: 0 4px 18px rgba(13, 33, 70, 0.07);
+    text-align: center;
+    min-height: 130px;
+  }
+
+  .fp .partner-modal-gallery__img {
+    width: 100%;
+    max-width: 160px;
+    height: 80px;
+    object-fit: contain;
+    object-position: center;
+    display: block;
+  }
+
+  .fp .partner-modal-gallery__name {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.45;
+    color: var(--foc-navy-deep);
+    width: 100%;
+    word-break: break-word;
+    hyphens: auto;
+  }
+
+  @media (max-width: 720px) {
+    .fp .partner-modal-gallery {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .fp .partner-modal-gallery__img {
+      height: 64px;
+    }
+    .fp .partner-modal-gallery__name {
+      font-size: 11px;
+    }
+  }
+
+  .fp .partner-all-modal--carousel {
+    width: min(680px, 96vw);
+  }
+
+  .fp .partner-logo-carousel--modal {
+    background: var(--foc-color-bg-section) !important;
+    padding: 20px 52px 14px !important;
+    border: 1px solid var(--foc-color-border-light);
+  }
+
+  .fp .partner-logo-carousel--modal .partner-logo-row {
+    gap: 16px;
+    min-height: 140px;
+    align-items: stretch;
+  }
+
+  .fp .partner-logo-carousel--modal .logo-chip--image {
+    min-width: 0;
+    flex: 1 1 0;
+    max-width: none;
+    width: 0;
+    padding: 16px 14px 12px;
+    gap: 10px;
+    height: auto;
+    min-height: 130px;
+    border-radius: 14px;
+  }
+
+  .fp .partner-logo-carousel--modal .logo-chip__img {
+    max-width: 100%;
+    width: 100%;
+    height: 72px;
+    max-height: 72px;
+    min-height: 72px;
+  }
+
+  .fp .partner-logo-carousel--modal .logo-chip__label--image {
+    font-size: 11px;
+    white-space: normal;
+    display: block;
+    overflow: visible;
+    text-overflow: unset;
+    line-height: 1.4;
+    -webkit-line-clamp: unset;
+    -webkit-box-orient: unset;
+  }
+
+  .fp .partner-logo-carousel--modal .arrow-btn {
+    width: 38px !important;
+    height: 38px !important;
+    font-size: 18px !important;
   }
 `;
 
@@ -661,9 +884,11 @@ function SectionHeader({ icon, titleHtml, subtitle, accentColor = "var(--foc-gre
 }
 
 function LogoChip({ logo }) {
+  const hasImage = Boolean(logo.imageSrc);
+
   return (
     <div
-      className="logo-chip"
+      className={`logo-chip${hasImage ? " logo-chip--image" : ""}`}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -678,17 +903,47 @@ function LogoChip({ logo }) {
         gap: 5,
       }}
     >
-      <div style={{ fontSize: 21 }}>{logo.emoji}</div>
-      <div style={{ fontWeight: 800, fontSize: 10.5, color: logo.color, textAlign: "center", letterSpacing: 0.3, lineHeight: 1.25 }}>{logo.label}</div>
+      {hasImage ? (
+        <img src={logo.imageSrc} alt={logo.label} className="logo-chip__img" loading="lazy" />
+      ) : (
+        <div style={{ fontSize: 21 }}>{logo.emoji}</div>
+      )}
+      <div
+        className={`logo-chip__label${hasImage ? " logo-chip__label--image" : ""}`}
+        style={hasImage ? undefined : { color: logo.color }}
+        title={logo.label}
+      >
+        {logo.label}
+      </div>
     </div>
   );
 }
 
 const PARTNER_CAROUSEL_AUTO_MS = 4000;
 
-function PartnerLogoCarousel({ cat, slides, slide, setSlide, bg, autoPlay = true }) {
+function PartnerLogoGallery({ partners }) {
+  const logos = useMemo(() => partners.map((p, i) => normalizePartner(p, i)), [partners]);
+
+  return (
+    <div className="partner-modal-gallery" role="list">
+      {logos.map((logo) => (
+        <article key={logo.label} className="partner-modal-gallery__item" role="listitem">
+          {logo.imageSrc ? (
+            <img src={logo.imageSrc} alt="" className="partner-modal-gallery__img" loading="lazy" />
+          ) : (
+            <span style={{ fontSize: 32 }}>{logo.emoji}</span>
+          )}
+          <p className="partner-modal-gallery__name">{logo.label}</p>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function PartnerLogoCarousel({ cat, slides, slide, setSlide, bg, autoPlay = true, variant = "card" }) {
   const total = slides.length;
   const carouselBg = bg ?? cat.bg;
+  const isModal = variant === "modal";
   const [paused, setPaused] = useState(false);
 
   useEffect(() => {
@@ -708,7 +963,7 @@ function PartnerLogoCarousel({ cat, slides, slide, setSlide, bg, autoPlay = true
 
   return (
     <div
-      className="partner-logo-carousel"
+      className={`partner-logo-carousel${isModal ? " partner-logo-carousel--modal" : ""}`}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocusCapture={() => setPaused(true)}
@@ -718,10 +973,11 @@ function PartnerLogoCarousel({ cat, slides, slide, setSlide, bg, autoPlay = true
       style={{
         width: "100%",
         borderRadius: 16,
-        background: carouselBg,
-        padding: "14px 12px 10px",
+        background: isModal ? "var(--foc-color-bg-section)" : carouselBg,
+        padding: isModal ? "20px 52px 14px" : "14px 12px 10px",
         position: "relative",
-        marginBottom: 16,
+        marginBottom: isModal ? 0 : 16,
+        border: isModal ? "1px solid var(--foc-color-border-light)" : undefined,
       }}
     >
       <button
@@ -751,7 +1007,16 @@ function PartnerLogoCarousel({ cat, slides, slide, setSlide, bg, autoPlay = true
       >
         ‹
       </button>
-      <div className="partner-logo-row" style={{ display: "flex", justifyContent: "center", gap: 6, width: "100%", minHeight: 72 }}>
+      <div
+        className="partner-logo-row"
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: isModal ? 16 : 6,
+          width: "100%",
+          minHeight: isModal ? 140 : 72,
+        }}
+      >
         {slides[slide]?.map((logo) => (
           <LogoChip key={logo.label} logo={logo} />
         ))}
@@ -808,12 +1073,8 @@ function PartnerLogoCarousel({ cat, slides, slide, setSlide, bg, autoPlay = true
 }
 
 function PartnerAllModal({ cat, open, onClose }) {
-  const [slide, setSlide] = useState(0);
-  const carouselSlides = useMemo(() => partnersToCarouselSlides(cat.partners, null), [cat.partners]);
-
   useEffect(() => {
     if (!open) return undefined;
-    setSlide(0);
     const onKey = (e) => {
       if (e.key === "Escape") onClose();
     };
@@ -830,22 +1091,25 @@ function PartnerAllModal({ cat, open, onClose }) {
   return (
     <div className="partner-all-modal-backdrop" role="presentation" onClick={onClose}>
       <div
-        className="partner-all-modal"
+        className="partner-all-modal partner-all-modal--gallery"
         role="dialog"
         aria-modal="true"
         aria-labelledby={`partner-modal-title-${cat.id}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="partner-all-modal__head">
-          <h3 id={`partner-modal-title-${cat.id}`} className="partner-all-modal__title" style={{ color: cat.color }}>
-            {cat.title}
-          </h3>
+          <div>
+            <h3 id={`partner-modal-title-${cat.id}`} className="partner-all-modal__title" style={{ color: cat.color }}>
+              {cat.title}
+            </h3>
+            <p className="partner-all-modal__subtitle">{cat.partners.length} partners</p>
+          </div>
           <button type="button" className="partner-all-modal__close" aria-label="Close" onClick={onClose}>
             ×
           </button>
         </div>
         <div className="partner-all-modal__body">
-          <PartnerLogoCarousel cat={cat} slides={carouselSlides} slide={slide} setSlide={setSlide} />
+          <PartnerLogoGallery partners={cat.partners} />
         </div>
       </div>
     </div>
@@ -855,7 +1119,10 @@ function PartnerAllModal({ cat, open, onClose }) {
 function PartnerCard({ cat, delay = 0 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [slide, setSlide] = useState(0);
-  const carouselSlides = useMemo(() => partnersToCarouselSlides(cat.partners), [cat.partners]);
+  const carouselSlides = useMemo(
+    () => partnersToCarouselSlides(cat.partners, PARTNER_PREVIEW_COUNT, 3),
+    [cat.partners]
+  );
   const closeModal = useCallback(() => setModalOpen(false), []);
 
   return (
@@ -1295,6 +1562,7 @@ function MediaCard({ card, delay = 0 }) {
       <div style={{ padding: "17px 19px 19px" }}>
         <div style={{ fontFamily: 'var(--foc-font-display)', fontWeight: 800, fontSize: 15.5, color: "var(--foc-color-surface)", marginBottom: 6 }}>{card.title}</div>
         <div style={{ fontFamily: 'var(--foc-font-sans)', color: "var(--foc-sky-caption-2)", fontSize: 12.5, lineHeight: 1.55 }}>{card.desc}</div>
+        {/*
         <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 7, color: card.accent, fontWeight: 700, fontSize: 12.5 }}>
           <span>{card.emoji}</span> Explore More
           <div
@@ -1314,6 +1582,7 @@ function MediaCard({ card, delay = 0 }) {
             →
           </div>
         </div>
+        */}
       </div>
     </div>
   );

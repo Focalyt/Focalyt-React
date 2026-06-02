@@ -3379,6 +3379,9 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			});
 		}
 
+		if (typeof Lead.normalizeApproval === 'function') {
+			lead.approval = Lead.normalizeApproval(lead.approval);
+		}
 		// Check if user is Admin - Admin can update any lead
 		const isAdmin = () => {
 			const permissionType = req.user.permissions?.permission_type;
@@ -3827,6 +3830,9 @@ router.post('/leads/:id/followup', isCollege, async (req, res) => {
 			});
 		}
 
+		if (typeof Lead.normalizeApproval === 'function') {
+			lead.approval = Lead.normalizeApproval(lead.approval);
+		}
 		// Combine date and time
 		const [hours, minutes] = scheduledTime.split(':');
 		// If scheduledDate is yyyy-mm-dd, treat it as local date (avoid UTC shift)
