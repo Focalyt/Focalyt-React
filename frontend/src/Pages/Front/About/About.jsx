@@ -208,10 +208,10 @@ function About() {
 
   const stats = [
     { icon: "👥", num: "25+", label: "States Presence" },
-    { icon: "🎓", num: "1000+", label: "Schools & Colleges" },
-    { icon: "👨‍🎓", num: "10 Lakh+", label: "Learners Trained" },
-    { icon: "🤝", num: "150+", label: "CSR & Govt. Partners" },
-    { icon: "🏢", num: "500+", label: "Industry Partners" },
+    { icon: "🎓", num: "500+", label: "Schools & Colleges" },
+    { icon: "👨‍🎓", num: "50,000+", label: "Learners Trained" },
+    { icon: "🤝", num: "50+", label: "CSR & Govt. Partners" },
+    { icon: "🏢", num: "50+", label: "Industry Partners" },
     { icon: "📈", num: "50+", label: "Future-Tech Labs" },
   ];
 
@@ -889,7 +889,7 @@ function About() {
 }
 .ab-stat { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .ab-stat-icon { font-size: 1.4rem; margin-bottom: 4px; }
-.ab-stat-num { font-family: var(--foc-font-display); font-size: var(--foc-text-xl); font-weight: var(--foc-weight-extrabold); color: var(--foc-color-text-strong); }
+.ab-stat-num { font-family: var(--foc-font-display); font-size: var(--foc-text-xl); font-weight: var(--foc-weight-extrabold); color: var(--foc-color-text-strong); white-space: nowrap; }
 .ab-stat-lbl { font-size: var(--foc-text-xs); color: var(--foc-color-text-muted); line-height: 1.3; }
 
 /* ECO CTA */
@@ -952,7 +952,7 @@ function About() {
   font-size: 15px;
   color: #5a6a8a;
   line-height: 1.7;
-  max-width: 640px;
+  // max-width: 640px;
   margin: 0 auto;
 }
 
