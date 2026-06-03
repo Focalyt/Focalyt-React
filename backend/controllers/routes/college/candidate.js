@@ -1287,7 +1287,11 @@ router.post('/upload-profile-pic/:filename', [isCollege], async (req, res) => {
 		const { mobile } = req.body
 		const ext = name.split('.').pop();
 		const { filename } = req.params
-		let userId = await Candidate.findOne({ mobile: mobile }).select('_id')
+		const candidate = await Candidate.findOne({ mobile: mobile }).select('_id');
+		if (!candidate) {
+			return res.send({ status: false, message: 'Candidate not found' });
+		}
+		const userId = candidate._id.toString();
 		const key = `uploads/${userId}/${filename}/${uuid()}.${ext}`;
 		if (!mimetypes.includes(ext.toLowerCase())) throw new InvalidParameterError('File type not supported!');
 

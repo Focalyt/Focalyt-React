@@ -5,6 +5,7 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
@@ -4959,7 +4960,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     <div className="resume-profile-section">
                                                       {profile._candidate?.personalInfo?.image ? (
                                                         <img
-                                                          src={`${profile._candidate?.personalInfo?.image}`}
+                                                          src={resolveMediaUrl(DOC_BUCKET_URL, profile._candidate.personalInfo.image)}
                                                           alt="Profile"
                                                           className="resume-profile-image"
                                                         />

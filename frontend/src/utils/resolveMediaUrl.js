@@ -1,3 +1,8 @@
+const normalizeStorageKey = (path) =>
+  String(path)
+    .trim()
+    .replace(/\{\s*_id:\s*new ObjectId\('([a-f0-9]{24})'\)\s*\}/gi, '$1');
+
 /**
  * Resolve a stored S3 key (or legacy full URL) to a browser-loadable URL.
  * @param {string} bucketUrl - REACT_APP_MIPIE_BUCKET_URL
@@ -5,7 +10,7 @@
  */
 export function resolveMediaUrl(bucketUrl, path) {
   if (!path || typeof path !== 'string') return '';
-  const trimmed = path.trim();
+  const trimmed = normalizeStorageKey(path);
   if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith('blob:')) {
     return trimmed;
   }

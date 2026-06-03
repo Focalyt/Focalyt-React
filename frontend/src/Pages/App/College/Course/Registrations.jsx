@@ -10,6 +10,7 @@ import { toast } from 'react-toastify';
 import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/googleOAuth';
 
 import useWebsocket from '../../../../utils/websocket';
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
@@ -12821,7 +12822,7 @@ useEffect(() => {
                                               <div className="resume-profile-section">
                                                 {profile._candidate?.personalInfo?.image ? (
                                                   <img
-                                                    src={`${profile._candidate?.personalInfo?.image}`}
+                                                    src={resolveMediaUrl(bucketUrl, profile._candidate.personalInfo.image)}
                                                     alt="Profile"
                                                     className="resume-profile-image"
                                                   />

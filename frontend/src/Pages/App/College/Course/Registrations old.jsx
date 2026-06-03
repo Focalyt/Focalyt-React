@@ -13504,16 +13504,21 @@ useEffect(() => {
                                             </div>
                                             <div className="lead-strip-v3__contact-line lead-strip-v3__contact-line--followup" title="Next Follow-up">
                                               <i className="fas fa-calendar-alt" aria-hidden="true"></i>
-                                              <span>
+                                              <div className="lead-strip-v3__fu-wrap">
                                                 {(() => {
                                                   const call = getProfileFollowupDateLabel(profile, 'Call');
                                                   const visit = getProfileFollowupDateLabel(profile, 'Visit');
-                                                  if (call !== '—' && visit !== '—') return `FU: ${call} • ${visit}`;
-                                                  if (call !== '—') return `FU: ${call}`;
-                                                  if (visit !== '—') return `FU: ${visit}`;
-                                                  return 'FU: —';
+                                                  if (call === '—' && visit === '—') {
+                                                    return <span className="lead-strip-v3__fu-line">FU: —</span>;
+                                                  }
+                                                  return (
+                                                    <>
+                                                      {call !== '—' && <span className="lead-strip-v3__fu-line">Call: {call}</span>}
+                                                      {visit !== '—' && <span className="lead-strip-v3__fu-line">Visit: {visit}</span>}
+                                                    </>
+                                                  );
                                                 })()}
-                                              </span>
+                                              </div>
                                             </div>
                                           </div>
                                         </div>
@@ -24160,8 +24165,8 @@ padding:12px;
         .lead-strip-v3{
           display: flex;
           align-items: stretch;
-          gap: 8px;
-          padding: 10px;
+          gap: 6px;
+          padding: 8px;
           background: linear-gradient(145deg, #0b5ed7 0%, #1aa3ff 55%, #2dd4ff 100%);
           flex-wrap: nowrap;
           overflow-x: auto;
@@ -24175,9 +24180,10 @@ padding:12px;
           min-width: 160px;
           background: linear-gradient(145deg, #0b5ed7 0%, #1aa3ff 55%, #2dd4ff 100%);
           border-radius: 14px;
-          padding: 12px;
+          padding: 8px;
           color: #fff;
           box-shadow: 0 4px 14px rgba(11, 94, 215, 0.25);
+          overflow: hidden;
         }
 
         .lead-strip-v3__profile-edit{
@@ -24201,9 +24207,9 @@ padding:12px;
         .lead-strip-v3__profile-top{
           display: flex;
           align-items: flex-start;
-          gap: 8px;
-          margin-bottom: 10px;
-          padding-top: 4px;
+          gap: 6px;
+          margin-bottom: 6px;
+          padding-top: 2px;
         }
 
         .lead-strip-v3__check{ display: inline-flex; margin-top: 4px; }
@@ -24216,7 +24222,7 @@ padding:12px;
           flex-direction: row;
           align-items: center;
           text-align: left;
-          gap: 8px;
+          gap: 6px;
         }
 
         .lead-strip-v3__avatar{
@@ -24302,14 +24308,14 @@ padding:12px;
         .lead-strip-v3__contact{
           display: flex;
           flex-direction: column;
-          gap: 6px;
+          gap: 4px;
         }
 
         .lead-strip-v3__contact-line{
           display: flex;
           align-items: center;
-          gap: 8px;
-          font-size: 11px;
+          gap: 6px;
+          font-size: 10px;
           font-weight: 600;
           min-width: 0;
         }
@@ -24331,14 +24337,36 @@ padding:12px;
 
         .lead-strip-v3__contact-line--phone{
           background: rgba(0,0,0,0.12);
-          border-radius: 8px;
-          padding: 5px 8px;
+          border-radius: 6px;
+          padding: 3px 6px;
         }
 
         .lead-strip-v3__contact-line--followup{
           background: rgba(0,0,0,0.10);
-          border-radius: 8px;
-          padding: 5px 8px;
+          border-radius: 6px;
+          padding: 3px 6px;
+          align-items: flex-start;
+        }
+
+        .lead-strip-v3__contact-line--followup i{
+          margin-top: 1px;
+        }
+
+        .lead-strip-v3__fu-wrap{
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 1px;
+        }
+
+        .lead-strip-v3__fu-line{
+          display: block;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          line-height: 1.25;
+          font-size: 10px;
         }
 
         .lead-strip-v3__wa{
