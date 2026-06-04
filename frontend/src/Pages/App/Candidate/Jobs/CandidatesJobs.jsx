@@ -193,6 +193,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import moment from 'moment';
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 const CandidatesJobs = () => {
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
@@ -233,7 +234,7 @@ const CandidatesJobs = () => {
 
 
   const handleVideoClick = (videoUrl) => {
-    setVideoSrc(videoUrl);
+    setVideoSrc(resolveMediaUrl(bucketUrl, videoUrl));
     setTimeout(() => {
       if (videoRef.current) {
         videoRef.current.load();
@@ -1012,7 +1013,7 @@ const CandidatesJobs = () => {
                           className="video-bttn position-relative d-block"
                         >
                           <img
-                            src={job.jobVideoThumbnail || "/Assets/images/pages/video_thum1.png"}
+                            src={job.jobVideoThumbnail ? resolveMediaUrl(bucketUrl, job.jobVideoThumbnail) : "/Assets/images/pages/video_thum1.png"}
                             className="video_thum img-fluid"
                             alt="Job Thumbnail"
                           />
@@ -2435,7 +2436,7 @@ input.star:checked ~ .rev-box {
     z-index: 1;
     margin-left: -20px;
     margin-top: -20px;
-    /* background-image: url(../images/icon-play.png); */
+    background-image: url(/Assets/images/icon-play.png);
     background-size: contain;
     display: block;
     width: 44px;

@@ -1,32 +1,33 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 
 const PARTNER_LOGO_BASE = "/Assets/public_assets/images/partners-logo";
+const HOMEPAGE_PARTNER_IMG = "/Assets/public_assets/images/homepage";
 
 export const GOVT_PARTNERS = [
   { label: "NSDC", imageSrc: `${PARTNER_LOGO_BASE}/nsdc.jpg` },
   "MeitY",
   { label: "PMKVY", imageSrc: `${PARTNER_LOGO_BASE}/pmkvy.svg` },
-  { label: "HPKVN", imageSrc: `${PARTNER_LOGO_BASE}/hpkvn.png` },
+  { label: "HPKVN", imageSrc: `${HOMEPAGE_PARTNER_IMG}/hpkvn.png` },
   { label: "OSDA", imageSrc: `${PARTNER_LOGO_BASE}/osda.png` },
   { label: "UPSDM", imageSrc: `${PARTNER_LOGO_BASE}/upsdm.png` },
   { label: "ESSCI", imageSrc: `${PARTNER_LOGO_BASE}/essci_registered_logo.png` },
   { label: "Telecom Sector Skill Council (TSSC)", imageSrc: `${PARTNER_LOGO_BASE}/telecom_sector_skill_council.png` },
   "IT-ITES",
-  { label: "BFSI", imageSrc: `${PARTNER_LOGO_BASE}/bfsi.png` },
+  { label: "BFSI", imageSrc: `${HOMEPAGE_PARTNER_IMG}/bfsi.png` },
   { label: "Tourism & Hospitality Skill Council (THSC)", imageSrc: `${PARTNER_LOGO_BASE}/thsc.png` },
-  "MEPSC",
+  { label: "MEPSC", imageSrc: `${HOMEPAGE_PARTNER_IMG}/mepsc.png` },
   "ESDM",
   { label: "Skill India", imageSrc: `${PARTNER_LOGO_BASE}/skill-india-logo.jpg` },
 ];
 
 export const CSR_PARTNERS = [
-  "Ericsson",
+  { label: "Ericsson", imageSrc: `${HOMEPAGE_PARTNER_IMG}/ericsson.png` },
   { label: "Panasonic", imageSrc: `${PARTNER_LOGO_BASE}/panasonic.svg` },
   { label: "Samsung", imageSrc: `${PARTNER_LOGO_BASE}/samsung.png` },
   { label: "Honda", imageSrc: `${PARTNER_LOGO_BASE}/honda.png` },
   { label: "Bridgestone Solutions", imageSrc: `${PARTNER_LOGO_BASE}/bridgestone-solutions.svg` },
-  "TCI",
-  "Hero Motocorp",
+  { label: "TCI Express", imageSrc: `${HOMEPAGE_PARTNER_IMG}/tci.png` },
+  { label: "Hero MotoCorp", imageSrc: `${HOMEPAGE_PARTNER_IMG}/hero_motocorp.png` },
 ];
 
 export const ACADEMIC_PARTNERS = [
@@ -54,18 +55,18 @@ export function getPartnerLabel(partner) {
 }
 
 export const INDUSTRY_PARTNERS = [
-  { label: "Dixon", imageSrc: `${PARTNER_LOGO_BASE}/dixon.webp` },
-  { label: "Padget Technologies", imageSrc: `${PARTNER_LOGO_BASE}/Padget-Logo.png` },
-  "East Indl Technologies",
-  "Net+",
-  "Fastway",
-  "TXD",
-  "Country Inn & Suites",
-  "Taco Bell",
-  "Barbeque Nation",
+  { label: "Dixon", imageSrc: `${HOMEPAGE_PARTNER_IMG}/dixon.png` },
+  { label: "Padget Technologies", imageSrc: `${HOMEPAGE_PARTNER_IMG}/padget.png` },
+  { label: "East India Technologies", imageSrc: `${HOMEPAGE_PARTNER_IMG}/east_india_technologies.png` },
+  { label: "Net+ Broadband", imageSrc: `${HOMEPAGE_PARTNER_IMG}/net+.png` },
+  { label: "Fastway", imageSrc: `${HOMEPAGE_PARTNER_IMG}/fastway.png` },
+  { label: "TXD", imageSrc: `${HOMEPAGE_PARTNER_IMG}/txd.png` },
+  { label: "Country Inn & Suites", imageSrc: `${HOMEPAGE_PARTNER_IMG}/country_inn_logo.png` },
+  { label: "Taco Bell", imageSrc: `${HOMEPAGE_PARTNER_IMG}/taco_bell.png` },
+  { label: "Barbeque Nation", imageSrc: `${HOMEPAGE_PARTNER_IMG}/barbeque.png` },
   "Radisson",
   "Montree Hotel",
-  "Qvolv",
+  { label: "Qvolv", imageSrc: `${HOMEPAGE_PARTNER_IMG}/qvolv.png` },
   { label: "Patanjali", imageSrc: `${PARTNER_LOGO_BASE}/patanjali.svg` },
   "Bakingo",
 ];

@@ -142,6 +142,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import moment from 'moment';
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 
 const AppliedJobs = () => {
@@ -149,6 +150,7 @@ const AppliedJobs = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
 
   useEffect(() => {
     fetchAppliedJobs();
@@ -276,7 +278,7 @@ const AppliedJobs = () => {
                               <div className="job-single-head border-0 pb-0">
                                 <div className="job-thumb my-auto">
                                   <img
-                                    src={company.logo ? `${process.env.REACT_APP_MIPIE_BUCKET_URL}/${company.logo}` : '/Assets/images/logo90.png'}
+                                    src={company.logo ? resolveMediaUrl(bucketUrl, company.logo) : '/Assets/images/logo90.png'}
                                     className="p-1"
                                     alt="Company Logo"
                                   />
@@ -397,7 +399,7 @@ const AppliedJobs = () => {
                               <div className="job-single-head border-0 pb-0">
                                 <div className="job-thumb my-auto">
                                   <img
-                                    src={company.logo ? `${process.env.REACT_APP_MIPIE_BUCKET_URL}/${company.logo}` : '/Assets/images/logo90.png'}
+                                    src={company.logo ? resolveMediaUrl(bucketUrl, company.logo) : '/Assets/images/logo90.png'}
                                     className="p-1"
                                     alt="Company Logo"
                                   />

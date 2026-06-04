@@ -4482,6 +4482,7 @@ const PILLAR_UI = {
         name: "IoT Lab Setup under Ericsson CSR",
         desc: "Technology-enabled innovation labs in government schools for hands-on exposure to IoT, AI, Robotics, and emerging technologies for school students.",
         img: "/Assets/public_assets/images/homepage/iot_lab.jpeg",
+        logoImg: "/Assets/public_assets/images/homepage/ericsson.png",
         logoKey: "ericsson",
         chips: { target: "Govt. school students", coverage: "Delhi NCR", impact: "Future tech exposure" },
       },

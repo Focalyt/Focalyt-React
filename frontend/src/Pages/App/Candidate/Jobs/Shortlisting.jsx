@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import moment from 'moment';
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 
 const Shortlisting = () => {
+  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const [hiringStatus, setHiringStatus] = useState([]);
   const [cities, setCities] = useState([]);
   const [pagination, setPagination] = useState({
@@ -136,7 +138,7 @@ const Shortlisting = () => {
   // Helper function to get company logo URL
   const getCompanyLogoUrl = (hiring) => {
     if (hiring.company?.logo) {
-      return `${process.env.REACT_APP_BUCKET_URL}/${hiring.company.logo}`;
+      return resolveMediaUrl(bucketUrl, hiring.company.logo);
     }
     return '/Assets/images/logo90.png';
   };

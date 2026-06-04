@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import DatePicker from 'react-date-picker';
 
 import 'react-date-picker/dist/DatePicker.css';
@@ -9,35 +9,47 @@ import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
+const isObjectIdLike = (value) => {
+  if (value == null) return false;
+  if (typeof value === 'object') return false;
+  return /^[a-f0-9]{24}$/i.test(String(value).trim());
+};
+
+const labelFromRefField = (field) => {
+  if (field == null || field === '') return '';
+  if (typeof field === 'object') return field.name || field.title || field.label || '';
+  if (isObjectIdLike(field)) return '';
+  return String(field).trim();
+};
+
+const getResumeSummary = (candidate) => {
+  const summary = candidate?.personalInfo?.professionalSummary || candidate?.personalInfo?.summary || '';
+  return typeof summary === 'string' ? summary.trim() : '';
+};
+
+const getVisibleSkills = (skills = []) =>
+  skills.filter((skill) => (typeof skill === 'string' ? skill.trim() : skill?.skillName?.trim()));
+
+const getSkillLabel = (skill) => (typeof skill === 'string' ? skill : skill?.skillName || '');
+
+const getVisibleProjects = (projects = []) =>
+  projects.filter((proj) => proj?.projectName?.trim() || proj?.description?.trim());
+
+const getVisibleCertifications = (certs = []) =>
+  certs.filter((cert) => cert?.certificateName?.trim() || cert?.name?.trim());
+
+const getInterestLabel = (interest) => {
+  if (typeof interest === 'string') return interest;
+  if (interest && typeof interest === 'object') return interest.name || interest.title || interest.interest || '';
+  return '';
+};
+
+const getQualificationTitle = (edu) =>
+  labelFromRefField(edu?.education) || labelFromRefField(edu?.course) || '';
+
 const DOC_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
 
-const DOC_COURSE_PREFIX = /^Documents for course\/?/i;
-
-const normalizeDocStorageKey = (fileUrl) => {
-  if (!fileUrl) return '';
-  let key = String(fileUrl).trim();
-  if (key.startsWith('blob:')) return key;
-  if (key.startsWith('http://') || key.startsWith('https://')) {
-    const bucketBase = DOC_BUCKET_URL.replace(/\/$/, '');
-    if (bucketBase && key.startsWith(bucketBase)) {
-      key = key.slice(bucketBase.length);
-    } else {
-      const s3Match = key.match(/amazonaws\.com\/(.+)$/i);
-      if (s3Match) key = decodeURIComponent(s3Match[1]);
-      else return key;
-    }
-  }
-  return key.replace(/^\//, '').replace(DOC_COURSE_PREFIX, '');
-};
-
-const getDocFileUrl = (fileUrl) => {
-  const key = normalizeDocStorageKey(fileUrl);
-  if (!key) return '';
-  if (key.startsWith('blob:') || key.startsWith('http://') || key.startsWith('https://')) {
-    return key;
-  }
-  return `${DOC_BUCKET_URL}/${key}`;
-};
+const getDocFileUrl = (fileUrl) => resolveMediaUrl(DOC_BUCKET_URL, fileUrl);
 
 const MultiSelectCheckbox = ({
   title,
@@ -313,20 +325,28 @@ const useScrollBlur = (navbarHeight = 140) => {
 const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null }) => {
   // Mobile-specific styles
   const mobileStyles = `
-    .kyc-filter-tabs-scroll {
-      overflow-x: auto;
-      overflow-y: visible;
-      flex-wrap: nowrap;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: thin;
+    .kyc-filter-tabs-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      overflow: visible;
       max-width: 100%;
     }
-    .kyc-filter-tabs-scroll .btn-group {
-      flex-wrap: nowrap;
-      display: inline-flex;
-    }
-    .kyc-filter-tabs-scroll .position-relative {
+    .kyc-filter-tabs-wrap .position-relative {
       flex-shrink: 0;
+    }
+    @media (max-width: 575.98px) {
+      .kyc-filter-tabs--mobile-scroll {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        padding-bottom: 4px;
+      }
+    }
+    .lead-list-body,
+    .lead-list-body .card-content {
+      overflow-anchor: none;
     }
     .kyc-search-input-group {
       max-width: 280px;
@@ -2438,9 +2458,28 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
 
 
-  const toggleLeadDetails = (profileIndex) => {
-    setLeadDetailsVisible(prev => prev === profileIndex ? null : profileIndex);
+  const leadCardRefs = useRef({});
+  const scrollToLeadIdRef = useRef(null);
+
+  const toggleLeadDetails = (profile) => {
+    const profileId = profile?._id;
+    if (!profileId) return;
+    setLeadDetailsVisible((prev) => {
+      const next = prev === profileId ? null : profileId;
+      if (next) scrollToLeadIdRef.current = next;
+      return next;
+    });
   };
+
+  useLayoutEffect(() => {
+    const id = scrollToLeadIdRef.current;
+    if (!id || leadDetailsVisible !== id) return;
+    const el = leadCardRefs.current[id];
+    if (el) {
+      el.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+    }
+    scrollToLeadIdRef.current = null;
+  }, [leadDetailsVisible]);
 
   const closeleadHistoryPanel = () => {
     setLeadHistoryPanel(false)
@@ -3553,7 +3592,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                   <div className="row align-items-center justify-content-between">
                     <div className="col-lg-6">
                       <div className="main-tabs-container" style={{ zIndex: 10, background: '#fff' }}>
-                        <div className="btn-group kyc-filter-tabs-scroll" role="group" aria-label="eKYC Filters">
+                        <div className="kyc-filter-tabs-wrap" role="group" aria-label="eKYC Filters">
                           {ekycFilters.map((filter, index) => (
                             <div key={filter._id} className="position-relative d-inline-block me-2">
                               <button
@@ -3640,7 +3679,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                     {/* Filter Tabs */}
                     <div className="col-12 mb-3">
                       <div className="main-tabs-container" style={{ zIndex: 10, background: '#fff' }}>
-                        <div className="d-flex flex-wrap gap-2 kyc-filter-tabs-scroll">
+                        <div className={`d-flex flex-wrap gap-2 kyc-filter-tabs-wrap ${isMobile ? 'kyc-filter-tabs--mobile-scroll' : ''}`}>
                           {ekycFilters.map((filter, index) => (
                             <div key={filter._id} className="position-relative">
                               <button
@@ -4129,7 +4168,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
 
           {/* Main Content */}
-          <div className="content-body" style={{ marginTop: `${navHeight + 10}px` }}>
+          <div className="content-body lead-list-body" style={{ marginTop: `${navHeight + 10}px` }}>
             <section className="list-view">
               <div className='row'>
                 <div>
@@ -4150,7 +4189,16 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                           <>
                             {allProfiles && allProfiles.length > 0 ? (
                               allProfiles.map((profile, profileIndex) => (
-                                <div className={`card-content transition-col mb-2`} key={profileIndex}>
+                                <div
+                                  className={`card-content transition-col mb-2`}
+                                  key={profile._id || profileIndex}
+                                  ref={(el) => {
+                                    const id = profile._id;
+                                    if (!id) return;
+                                    if (el) leadCardRefs.current[id] = el;
+                                    else delete leadCardRefs.current[id];
+                                  }}
+                                >
                                   {/* Profile Header Card */}
                                   <div className="card border-0 shadow-sm mb-0 mt-2">
                                     <div className="card-body px-1 py-0 my-2">
@@ -4443,9 +4491,10 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
                                                 <button
                                         className="btn btn-sm btn-outline-secondary border-0"
-                                        onClick={() => toggleLeadDetails(profileIndex)}
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => toggleLeadDetails(profile)}
                                       >
-                                        {leadDetailsVisible === profileIndex ? (
+                                        {leadDetailsVisible === profile._id ? (
                                           <i className="fas fa-chevron-up"></i>
                                         ) : (
                                           <i className="fas fa-chevron-down"></i>
@@ -4648,12 +4697,13 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
                                             <button
                                               className="btn btn-sm btn-outline-secondary border-0"
+                                              onMouseDown={(e) => e.preventDefault()}
                                               onClick={() => {
-                                                toggleLeadDetails(profileIndex)
+                                                toggleLeadDetails(profile)
                                                 setSelectedProfile(profile)
                                               }}
                                             >
-                                              {leadDetailsVisible === profileIndex ? (
+                                              {leadDetailsVisible === profile._id ? (
                                                 <i className="fas fa-chevron-up"></i>
                                               ) : (
                                                 <i className="fas fa-chevron-down"></i>
@@ -4682,8 +4732,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                       </ul>
                                     </div>
 
-                                    {/* Tab Content - Only show if leadDetailsVisible is true */}
-                                    {leadDetailsVisible === profileIndex && (
+                                    {leadDetailsVisible === profile._id && (
                                       isLoadingProfilesData ? (
                                         <div className="text-center">
                                           <div className="spinner-border" role="status">
@@ -5020,15 +5069,17 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
                                                     <div className="resume-summary">
                                                       <h2 className="resume-section-title">Professional Summary <i className="fa fa-clock-o" aria-hidden="true" style={{ fontSize: "16px" }}></i> </h2>
-                                                      <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
+                                                      <p className={getResumeSummary(profile._candidate) ? '' : 'resume-empty-hint'}>
+                                                        {getResumeSummary(profile._candidate) || 'No summary provided'}
+                                                      </p>
                                                     </div>
                                                   </div>
 
                                                   <div className="resume-document-body">
                                                     <div className="resume-column resume-left-column">
-                                                      {profile._candidate?.isExperienced === false ? (
-                                                        <div className="resume-section">
-                                                          <h2 className="resume-section-title">Work Experience</h2>
+                                                      <div className="resume-section">
+                                                        <h2 className="resume-section-title">Work Experience</h2>
+                                                        {profile._candidate?.isExperienced === false ? (
                                                           <div className="resume-experience-item">
                                                             <div className="resume-item-header">
                                                               <h3 className="resume-item-title">Fresher</h3>
@@ -5037,45 +5088,42 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                               <p>Looking for opportunities to start my career</p>
                                                             </div>
                                                           </div>
-                                                        </div>
-                                                      ) : (
-                                                        profile._candidate?.experiences && profile._candidate.experiences.length > 0 && (
-                                                          <div className="resume-section">
-                                                            <h2 className="resume-section-title">Work Experience</h2>
-                                                            {profile._candidate.experiences.map((exp, index) => (
-                                                              <div className="resume-experience-item" key={`resume-exp-${index}`}>
-                                                                <div className="resume-item-header">
-                                                                  {exp.jobTitle && (
-                                                                    <h3 className="resume-item-title">{exp.jobTitle}</h3>
-                                                                  )}
-                                                                  {exp.companyName && (
-                                                                    <p className="resume-item-subtitle">{exp.companyName}</p>
-                                                                  )}
-                                                                  {(exp.from || exp.to || exp.currentlyWorking) && (
-                                                                    <p className="resume-item-period">
-                                                                      {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                        ) : profile._candidate?.experiences?.length > 0 ? (
+                                                          profile._candidate.experiences.map((exp, index) => (
+                                                            <div className="resume-experience-item" key={`resume-exp-${index}`}>
+                                                              <div className="resume-item-header">
+                                                                {exp.jobTitle && (
+                                                                  <h3 className="resume-item-title">{exp.jobTitle}</h3>
+                                                                )}
+                                                                {exp.companyName && (
+                                                                  <p className="resume-item-subtitle">{exp.companyName}</p>
+                                                                )}
+                                                                {(exp.from || exp.to || exp.currentlyWorking) && (
+                                                                  <p className="resume-item-period">
+                                                                    {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                                      year: 'numeric',
+                                                                      month: 'short',
+                                                                    }) : 'Start Date'}
+                                                                    {" - "}
+                                                                    {exp.currentlyWorking ? 'Present' :
+                                                                      exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
                                                                         year: 'numeric',
                                                                         month: 'short',
-                                                                      }) : 'Start Date'}
-                                                                      {" - "}
-                                                                      {exp.currentlyWorking ? 'Present' :
-                                                                        exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
-                                                                          year: 'numeric',
-                                                                          month: 'short',
-                                                                        }) : 'End Date'}
-                                                                    </p>
-                                                                  )}
-                                                                </div>
-                                                                {exp.jobDescription && (
-                                                                  <div className="resume-item-content">
-                                                                    <p>{exp.jobDescription}</p>
-                                                                  </div>
+                                                                      }) : 'End Date'}
+                                                                  </p>
                                                                 )}
                                                               </div>
-                                                            ))}
-                                                          </div>
-                                                        )
-                                                      )}
+                                                              {exp.jobDescription && (
+                                                                <div className="resume-item-content">
+                                                                  <p>{exp.jobDescription}</p>
+                                                                </div>
+                                                              )}
+                                                            </div>
+                                                          ))
+                                                        ) : (
+                                                          <p className="resume-empty-hint">No work experience added</p>
+                                                        )}
+                                                      </div>
 
                                                       {profile._candidate?.qualifications && profile._candidate.qualifications.length > 0 && (
                                                         <div className="resume-section">
@@ -5083,11 +5131,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                           {profile._candidate.qualifications.map((edu, index) => (
                                                             <div className="resume-education-item" key={`resume-edu-${index}`}>
                                                               <div className="resume-item-header">
-                                                                {edu.education && (
-                                                                  <h3 className="resume-item-title">{edu.education}</h3>
-                                                                )}
-                                                                {edu.course && (
-                                                                  <h3 className="resume-item-title">{edu.course}</h3>
+                                                                {getQualificationTitle(edu) && (
+                                                                  <h3 className="resume-item-title">{getQualificationTitle(edu)}</h3>
                                                                 )}
                                                                 {edu.universityName && (
                                                                   <p className="resume-item-subtitle">{edu.universityName}</p>
@@ -5113,14 +5158,14 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     </div>
 
                                                     <div className="resume-column resume-right-column">
-                                                      {profile._candidate?.personalInfo?.skills && profile._candidate.personalInfo.skills.length > 0 && (
+                                                      {getVisibleSkills(profile._candidate?.personalInfo?.skills).length > 0 && (
                                                         <div className="resume-section">
                                                           <h2 className="resume-section-title">Skills</h2>
                                                           <div className="resume-skills-list">
-                                                            {profile._candidate.personalInfo.skills.map((skill, index) => (
+                                                            {getVisibleSkills(profile._candidate.personalInfo.skills).map((skill, index) => (
                                                               <div className="resume-skill-item" key={`resume-skill-${index}`}>
-                                                                <div className="resume-skill-name">{skill.skillName || (typeof skill === 'string' ? skill : 'Skill')}</div>
-                                                                {skill.skillPercent && (
+                                                                <div className="resume-skill-name">{getSkillLabel(skill)}</div>
+                                                                {Number(skill?.skillPercent) > 0 && (
                                                                   <div className="resume-skill-bar-container">
                                                                     <div
                                                                       className="resume-skill-bar"
@@ -5158,11 +5203,11 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                         </div>
                                                       )}
 
-                                                      {profile._candidate?.personalInfo?.certifications && profile._candidate.personalInfo.certifications.length > 0 && (
+                                                      {getVisibleCertifications(profile._candidate?.personalInfo?.certifications).length > 0 && (
                                                         <div className="resume-section">
                                                           <h2 className="resume-section-title">Certifications</h2>
                                                           <ul className="resume-certifications-list">
-                                                            {profile._candidate.personalInfo.certifications.map((cert, index) => (
+                                                            {getVisibleCertifications(profile._candidate.personalInfo.certifications).map((cert, index) => (
                                                               <li key={`resume-cert-${index}`} className="resume-certification-item">
                                                                 <strong>{cert.certificateName || cert.name || 'Certification'}</strong>
                                                                 {cert.orgName && (
@@ -5185,14 +5230,14 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                         </div>
                                                       )}
 
-                                                      {profile._candidate?.personalInfo?.projects && profile._candidate.personalInfo.projects.length > 0 && (
+                                                      {getVisibleProjects(profile._candidate?.personalInfo?.projects).length > 0 && (
                                                         <div className="resume-section">
                                                           <h2 className="resume-section-title">Projects</h2>
-                                                          {profile._candidate.personalInfo.projects.map((proj, index) => (
+                                                          {getVisibleProjects(profile._candidate.personalInfo.projects).map((proj, index) => (
                                                             <div className="resume-project-item" key={`resume-proj-${index}`}>
                                                               <div className="resume-item-header">
                                                                 <h3 className="resume-project-title">
-                                                                  {proj.projectName || 'Project'}
+                                                                  {proj.projectName}
                                                                   {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
                                                                 </h3>
                                                               </div>
@@ -5210,11 +5255,15 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                         <div className="resume-section">
                                                           <h2 className="resume-section-title">Interests</h2>
                                                           <div className="resume-interests-tags">
-                                                            {profile._candidate.personalInfo.interest.map((interest, index) => (
+                                                            {profile._candidate.personalInfo.interest.map((interest, index) => {
+                                                              const label = getInterestLabel(interest);
+                                                              if (!label) return null;
+                                                              return (
                                                               <span className="resume-interest-tag" key={`resume-interest-${index}`}>
-                                                                {interest}
+                                                                {label}
                                                               </span>
-                                                            ))}
+                                                              );
+                                                            })}
                                                           </div>
                                                         </div>
                                                       )}
@@ -6737,6 +6786,26 @@ background: #fd2b5a;
           background: #f8f9fa;
           padding: 15px;
           border-radius: 8px;
+        }
+
+        .resume-summary p,
+        .resume-empty-hint,
+        .resume-item-content,
+        .resume-item-content p {
+          font-size: 14px;
+          line-height: 1.5;
+          color: #444;
+        }
+
+        .resume-empty-hint {
+          font-style: italic;
+          color: #666;
+          margin: 0;
+        }
+
+        .resume-document .resume-contact-item span {
+          font-size: 14px;
+          color: #444;
         }
 
         .resume-section-title {

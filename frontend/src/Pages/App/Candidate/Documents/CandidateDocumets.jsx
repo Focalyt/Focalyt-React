@@ -2,7 +2,10 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import {Link} from "react-router-dom";
 import CandidateLayout from "../../../../Component/Layouts/App/Candidates";
+import { resolveMediaUrl } from "../../../../utils/resolveMediaUrl";
+
 const CandidateDocumets = ({ candidate, documents }) => {
+  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
 
   const [documentData, setDocumentData] = useState({
     AdditionalDocuments: [],
@@ -161,7 +164,7 @@ const CandidateDocumets = ({ candidate, documents }) => {
                         </label>
                         {documentData[name] ? (
                           <div>
-                            <a href={`${process.env.MIPIE_BUCKET_URL}/${documentData[name]}`} target="_blank" rel="noopener noreferrer">Uploaded {label}</a>
+                            <a href={resolveMediaUrl(bucketUrl, documentData[name])} target="_blank" rel="noopener noreferrer">Uploaded {label}</a>
                             <button className="btn btn-danger btn-sm ml-2" onClick={() => deleteDocument(name, documents._id)}>Remove</button>
                           </div>
                         ) : (

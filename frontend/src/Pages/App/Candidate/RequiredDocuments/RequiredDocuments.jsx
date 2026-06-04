@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import moment from 'moment';
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 const RequiredDocuments = () => {
   const [mergedDocs, setMergedDocs] = useState([]);
@@ -9,6 +10,7 @@ const RequiredDocuments = () => {
 
   const [selectedFiles, setSelectedFiles] = useState({});
    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   
    const { courseId } = useParams(); // ✅ Get courseId from URL path
  
@@ -289,7 +291,12 @@ const RequiredDocuments = () => {
                                 <td>{index + 1}</td>
                                 <td>{moment(upload.uploadedAt).format('DD/MM/YYYY HH:mm:ss')}</td>
                                 <td>
-                                  <a href={upload.fileUrl} target="_blank" rel="noreferrer" className="btn btn-primary">
+                                  <a
+                                    href={resolveMediaUrl(bucketUrl, upload.fileUrl)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="btn btn-primary"
+                                  >
                                     VIEW
                                   </a>
                                 </td>

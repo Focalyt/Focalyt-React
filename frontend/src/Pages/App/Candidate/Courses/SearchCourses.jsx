@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import moment from "moment";
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 const SearchCourses = () => {
   const [courses, setCourses] = useState([]);
@@ -33,12 +34,11 @@ const SearchCourses = () => {
   // ✅ Get course thumbnail image
   const getCourseImageUrl = (course) => {
     if (!course.thumbnail) return "/Assets/public_assets/images/newjoblisting/course_img.svg";
-    if (course.thumbnail.includes(bucketUrl)) return course.thumbnail;
-    return `${bucketUrl}/${course.thumbnail}`;
+    return resolveMediaUrl(bucketUrl, course.thumbnail);
   };
 
   const handleVideoClick = (videoUrl) => {
-    setVideoSrc(videoUrl);
+    setVideoSrc(resolveMediaUrl(bucketUrl, videoUrl));
     if (videoRef.current) {
       videoRef.current.load();
       videoRef.current.play();
@@ -140,11 +140,7 @@ const SearchCourses = () => {
                       data-bs-target="#videoModal"
                       onClick={(e) => {
                         e.preventDefault();
-                        handleVideoClick(
-                          course.videos && course.videos[0]
-                            ? `${bucketUrl}/${course.videos[0]}`
-                            : ""
-                        );
+                        handleVideoClick(course.videos?.[0] || "");
                       }}
                       className="video-bttn position-relative d-block"
                     >

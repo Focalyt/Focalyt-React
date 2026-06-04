@@ -11392,6 +11392,40 @@ router.get("/generate-application-form/:id", async (req, res) => {
 
 		const dobFormatted = formatDate(data._candidate.dob);
 
+		const normalizeS3Key = (imagePath) => {
+			let key = String(imagePath).trim();
+			if (/^https?:\/\//i.test(key)) {
+				try {
+					const url = new URL(key);
+					key = decodeURIComponent(url.pathname.replace(/^\//, ''));
+				} catch (_) { /* keep original */ }
+			}
+			return key.replace(/^\//, '');
+		};
+
+		const getProfileImageDataUri = async (imagePath) => {
+			const key = normalizeS3Key(imagePath);
+			if (!key) return null;
+			try {
+				const s3Object = await s3.getObject({ Bucket: bucketName, Key: key }).promise();
+				const ext = key.split('.').pop()?.toLowerCase() || 'jpeg';
+				const mimeByExt = {
+					jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+					gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp',
+				};
+				const contentType = s3Object.ContentType || mimeByExt[ext] || 'image/jpeg';
+				return `data:${contentType};base64,${s3Object.Body.toString('base64')}`;
+			} catch (err) {
+				console.error('Admission form: failed to load profile image from S3:', key, err.message);
+				return null;
+			}
+		};
+
+		const profileImageDataUri = await getProfileImageDataUri(data._candidate.personalInfo.image);
+		const profilePhotoTag = profileImageDataUri
+			? `<img class="photo-img" src="${profileImageDataUri}" alt="Profile" />`
+			: '<div class="photo-placeholder">Photo</div>';
+
 		const logoPath = path.join(__dirname, '../../../controllers/public/public_assets/images/newpage/logo-ha.svg');
 		const logoBase64 = fs.readFileSync(logoPath, { encoding: 'base64' });
 		const imgTag = `<img src="data:image/svg+xml;base64,${logoBase64}" />`;
@@ -11403,203 +11437,174 @@ router.get("/generate-application-form/:id", async (req, res) => {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Application Form ${fy}</title>
     <style>
+        @page {
+            size: A4;
+            margin: 5mm;
+        }
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-			
         }
-        
-        body {
+        html, body {
             font-family: Arial, sans-serif;
-            background-color:rgb(255, 255, 255);
-            padding: 0px;
-            height: 297mm;
-            width: 210mm;
-            min-width: 210mm;
-            min-height: 297mm;
-
+            background-color: #fff;
+            font-size: 12px;
+            line-height: 1.35;
+            width: 100%;
         }
-        
         .form-container {
-            max-width: 800px;
-            margin: 0 auto;
+            width: 100%;
+            min-height: 287mm;
             background-color: white;
-            border: 2px solid #ddd;
-            padding: 5px;
+            border: 1px solid #ccc;
+            padding: 4px;
         }
-        
+        .form-section {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
         .header {
             background-color: #4a5a8a;
             color: white;
-            padding: 5px;
+            padding: 8px 12px;
             font-weight: bold;
-            font-size: 20px;
-            position: relative;
+            font-size: 18px;
         }
-        
         .header-info {
-            padding: 15px;
+            padding: 10px 12px 12px;
             border-bottom: 1px solid #ddd;
         }
-        
         .header-info table {
             width: 100%;
             border-collapse: collapse;
         }
-        
         .header-info td {
-            padding: 4px 0;
-            font-size: 15px;
+            padding: 3px 0;
+            font-size: 13px;
+            line-height: 1.4;
         }
-        
         .header-info .label {
             font-weight: bold;
-            width: 180px;
+            width: 170px;
         }
-        
-        .logo {
-            position: absolute;
-            right: 20px;
-            top: 50%;
-            transform: translateY(-50%);
-        }
-        
-        .logo img {
-            height: 40px;
-            width: auto;
-        }
-        
         .section-header {
             background-color: #4a5a8a;
             color: white;
-            padding: 10px 15px;
+            padding: 7px 12px;
             font-weight: bold;
-            font-size: 14px;
-            margin-top: 0;
+            font-size: 13px;
         }
-        
         .section-content {
-            padding: 15px;
+            padding: 10px 12px 12px;
             position: relative;
         }
-        
         .details-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 15px;
         }
-        
         .details-table td {
-            padding: 6px 5px;
+            padding: 5px 6px;
             font-size: 12px;
             border-bottom: 1px solid #eee;
             vertical-align: top;
+            line-height: 1.35;
         }
-        
         .details-table .label {
             font-weight: bold;
-            width: 140px;
+            width: 130px;
         }
-        
         .details-table .value {
-            padding-left: 10px;
+            padding-left: 8px;
         }
-        
         .photo-section {
             position: absolute;
-            right: 15px;
-            top: 15px;
+            right: 12px;
+            top: 10px;
         }
-        
         .photo-placeholder {
-            width: 100px;
-            height: 120px;
+            width: 105px;
+            height: 125px;
             border: 2px solid #ccc;
             background-color: #f9f9f9;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 12px;
+            font-size: 11px;
             color: #666;
         }
-        
         .photo-img {
-            width: 100px;
-            height: 120px;
+            width: 105px;
+            height: 125px;
             border: 2px solid #ccc;
             object-fit: cover;
         }
-        
         .address-row {
             display: flex;
-            gap: 30px;
+            gap: 20px;
         }
-        
         .address-col {
             flex: 1;
         }
-        
         .documents-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
         }
-        
         .documents-table th,
         .documents-table td {
             border: 1px solid #ddd;
-            padding: 10px;
+            padding: 7px 10px;
             text-align: left;
             font-size: 12px;
+            line-height: 1.3;
+            vertical-align: middle;
         }
-        
         .documents-table th {
             background-color: #f5f5f5;
             font-weight: bold;
         }
-        
-        .document-link {
-            color: #0066cc;
-            text-decoration: underline;
-            font-size: 11px;
-        }
-        
         .declaration-content {
             font-size: 12px;
-            line-height: 1.4;
+            line-height: 1.45;
             text-align: justify;
         }
-        
-        .signature-section {
-            margin-top: 30px;
-            text-align: right;
+        .declaration-content p {
+            margin: 0;
         }
-        
+        .signature-section {
+            margin-top: 16px;
+            text-align: right;
+            flex-shrink: 0;
+        }
         .signature-name {
             font-weight: bold;
-            margin-top: 20px;
+            font-size: 13px;
+            margin-top: 4px;
         }
-        
         .clear {
             clear: both;
         }
-        
         .personal-details-content {
-            margin-right: 120px;
+            margin-right: 118px;
+            min-height: 125px;
         }
-        .div-1 , .div-2 {
-            width:50%
+        .div-1, .div-2 {
+            width: 50%;
         }
-        .div-2{
-            padding: 50px;
-        }
-        .section-1st{
+        .div-2 {
+            padding: 12px 16px;
             display: flex;
             align-items: center;
+            justify-content: center;
         }
-
-        
+        .div-2 img {
+            max-height: 48px;
+            width: auto;
+        }
+        .section-1st {
+            display: flex;
+            align-items: stretch;
+        }
     </style>
 </head>
 <body>
@@ -11649,12 +11654,7 @@ router.get("/generate-application-form/:id", async (req, res) => {
         
         <div class="section-content">
             <div class="photo-section">
-                <div class="photo-placeholder">
-				${data._candidate?.personalInfo?.image
-				? `<img class="photo-img" src="${data._candidate.personalInfo.image}" />`
-				: `<div class="photo-placeholder">Photo</div>`}
-				  
-                </div>
+                ${profilePhotoTag}
             </div>
             
             <div class="personal-details-content">
@@ -11730,13 +11730,13 @@ router.get("/generate-application-form/:id", async (req, res) => {
                     </table>
                 </div>
             </div>
-        </div>     
-       
+        </div>
         
         <!-- Documents Upload -->
 
 		${isDocsRequired ?
-				`   <div class="section-header">
+				`<div class="form-section">
+        <div class="section-header">
             DOCUMENTS UPLOAD
         </div>
         
@@ -11759,10 +11759,10 @@ router.get("/generate-application-form/:id", async (req, res) => {
 </tbody>
             </table>
         </div>
+        </div>
 		` : ''}
-        
 
-        
+        <div class="form-section">
         <!-- Declaration -->
         <div class="section-header">
             DECLARATION
@@ -11777,6 +11777,7 @@ router.get("/generate-application-form/:id", async (req, res) => {
                 </div>
             </div>
         </div>
+        </div>
     </div>
 </body>
 </html>
@@ -11788,11 +11789,13 @@ router.get("/generate-application-form/:id", async (req, res) => {
 		});
 
 		const page = await browser.newPage();
+		await page.emulateMediaType('print');
 		await page.setContent(htmlContent, { waitUntil: "networkidle0" });
 
 		const pdfBuffer = await page.pdf({
 			format: "A4",
 			printBackground: true,
+			margin: { top: '5mm', right: '5mm', bottom: '5mm', left: '5mm' },
 		});
 
 		await browser.close();

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import DatePicker from 'react-date-picker';
 
 import 'react-date-picker/dist/DatePicker.css';
@@ -8,6 +8,46 @@ import axios from 'axios'
 import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
+const isObjectIdLike = (value) => {
+  if (value == null) return false;
+  if (typeof value === 'object') return false;
+  return /^[a-f0-9]{24}$/i.test(String(value).trim());
+};
+
+const labelFromRefField = (field) => {
+  if (field == null || field === '') return '';
+  if (typeof field === 'object') return field.name || field.title || field.label || '';
+  if (isObjectIdLike(field)) return '';
+  return String(field).trim();
+};
+
+const getResumeSummary = (candidate) => {
+  const summary = candidate?.personalInfo?.professionalSummary || candidate?.personalInfo?.summary || '';
+  return typeof summary === 'string' ? summary.trim() : '';
+};
+
+const getVisibleSkills = (skills = []) =>
+  skills.filter((skill) => (typeof skill === 'string' ? skill.trim() : skill?.skillName?.trim()));
+
+const getSkillLabel = (skill) => (typeof skill === 'string' ? skill : skill?.skillName || '');
+
+const getVisibleProjects = (projects = []) =>
+  projects.filter((proj) => proj?.projectName?.trim() || proj?.description?.trim());
+
+const getVisibleCertifications = (certs = []) =>
+  certs.filter((cert) => cert?.certificateName?.trim() || cert?.name?.trim());
+
+const getInterestLabel = (interest) => {
+  if (typeof interest === 'string') return interest;
+  if (interest && typeof interest === 'object') return interest.name || interest.title || interest.interest || '';
+  return '';
+};
+
+const getQualificationTitle = (edu) =>
+  labelFromRefField(edu?.education) || labelFromRefField(edu?.course) || '';
+
+const DOC_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
+const getDocFileUrl = (fileUrl) => resolveMediaUrl(DOC_BUCKET_URL, fileUrl);
 
 // Add this at the top of the file, after imports
 const RejectionForm = React.memo(({ onConfirm, onCancel }) => {
@@ -690,21 +730,23 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
   }, [isPanelOpen, calculateWidth]);
 
   const admissionNavStyles = `
-    .admission-filter-tabs-scroll {
+    .admission-filter-tabs {
       display: flex;
-      flex-wrap: nowrap;
-      overflow-x: auto;
+      flex-wrap: wrap;
       gap: 0.35rem;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: thin;
+      overflow: visible;
       max-width: 100%;
-      padding-bottom: 4px;
+      margin: 0;
+      padding: 0;
+      border: 0;
     }
-    .admission-filter-tabs-scroll .nav-item {
+    .admission-filter-tabs .nav-item {
       flex-shrink: 0;
     }
-    .admission-filter-tabs-scroll .btn {
+    .admission-filter-tabs .btn {
       white-space: nowrap;
+      font-size: 0.8125rem;
+      padding: 0.35rem 0.65rem;
     }
     .admission-search-input-group {
       max-width: 280px;
@@ -714,21 +756,25 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
     .admission-search-input-group .form-control {
       min-width: 0;
     }
-    .admission-nav-compact .admission-nav-toolbar {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 0.75rem;
-    }
-    .admission-nav-compact .admission-nav-filters,
-    .admission-nav-compact .admission-nav-actions {
-      width: 100%;
-      max-width: 100%;
-    }
-    .admission-nav-compact .admission-nav-actions {
+    .admission-nav-actions-row {
       display: flex;
       justify-content: flex-end;
-      flex-wrap: wrap;
+      align-items: center;
       gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    @media (max-width: 575.98px) {
+      .admission-filter-tabs--mobile-scroll {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        padding-bottom: 4px;
+      }
+    }
+    .lead-list-body,
+    .lead-list-body .card-content {
+      overflow-anchor: none;
     }
   `;
   // open model for upload documents 
@@ -1689,9 +1735,28 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
     }
   };
 
-  const toggleLeadDetails = (profileIndex) => {
-    setLeadDetailsVisible(prev => prev === profileIndex ? null : profileIndex);
+  const leadCardRefs = useRef({});
+  const scrollToLeadIdRef = useRef(null);
+
+  const toggleLeadDetails = (profile) => {
+    const profileId = profile?._id;
+    if (!profileId) return;
+    setLeadDetailsVisible((prev) => {
+      const next = prev === profileId ? null : profileId;
+      if (next) scrollToLeadIdRef.current = next;
+      return next;
+    });
   };
+
+  useLayoutEffect(() => {
+    const id = scrollToLeadIdRef.current;
+    if (!id || leadDetailsVisible !== id) return;
+    const el = leadCardRefs.current[id];
+    if (el) {
+      el.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+    }
+    scrollToLeadIdRef.current = null;
+  }, [leadDetailsVisible]);
 
   const closeleadHistoryPanel = () => {
     setLeadHistoryPanel(false)
@@ -1874,7 +1939,7 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
       setDocumentRotation(0);
     }, []);
 
-    const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+    const fileUrl = getDocFileUrl(latestUpload?.fileUrl || selectedDocument?.fileUrl);
     const fileType = fileUrl ? getFileType(fileUrl) : null;
 
     const handleRejectClick = useCallback(() => {
@@ -1897,7 +1962,7 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
     // Helper function to render document preview thumbnail using iframe/img
     const renderDocumentThumbnail = (upload, isSmall = true) => {
-      const fileUrl = upload?.fileUrl;
+      const fileUrl = getDocFileUrl(upload?.fileUrl);
       if (!fileUrl) {
         return (
           <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
@@ -2062,7 +2127,7 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                       console.log('selectedDocument:', selectedDocument);
                       console.log('latestUpload:', latestUpload);
 
-                      const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+                      const fileUrl = getDocFileUrl(latestUpload?.fileUrl || selectedDocument?.fileUrl);
                       const hasDocument = fileUrl ||
                         (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
 
@@ -2217,7 +2282,7 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                           {upload.fileUrl && (
                             <div className="history-actions" style={{ marginTop: '8px' }}>
                               <a
-                                href={upload.fileUrl}
+                                href={getDocFileUrl(upload.fileUrl)}
                                 download
                                 className="btn btn-sm btn-outline-primary"
                                 target="_blank"
@@ -2548,62 +2613,128 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
           >
             <nav ref={navRef} className="admission-list-nav" style={navBarStyle}>
               <div className="container-fluid py-2">
-                <div className="row admission-nav-toolbar align-items-center justify-content-between g-2">
-                  <div className={`${isNavCompact ? 'col-12' : 'col-lg-7 col-md-12'} admission-nav-filters`}>
-                    <div className="main-tabs-container">
-                      <ul className="nav nav-tabs nav-tabs-main border-0 admission-filter-tabs-scroll">
-
-                        {getCurrentFilters().map((filter, index) => (
-                          <li className="nav-item" key={filter._id || index}>
-                            <button
-                              className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
-                              onClick={() => handleCrmFilterClick(filter._id, index)}
-                            >
-                              {filter.name}
-                              <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
-                                ({filter.count})
-                              </span>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
+                {/* Desktop: filters left + search right (same row, no horizontal scroll) */}
+                <div className={isNavCompact ? 'd-none' : 'd-none d-lg-block'}>
+                  <div className="row align-items-center justify-content-between g-2">
+                    <div className="col-lg-7">
+                      <div className="main-tabs-container">
+                        <ul className="nav nav-tabs nav-tabs-main border-0 admission-filter-tabs">
+                          {getCurrentFilters().map((filter, index) => (
+                            <li className="nav-item" key={filter._id || index}>
+                              <button
+                                type="button"
+                                className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
+                                onClick={() => handleCrmFilterClick(filter._id, index)}
+                              >
+                                {filter.name}
+                                <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
+                                  ({filter.count})
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
-                  </div>
-
-                  <div className={`${isNavCompact ? 'col-12' : 'col-lg-5 col-md-12'} admission-nav-actions`}>
-                    <div className="d-flex justify-content-end align-items-center gap-2 flex-wrap">
-                      <div className="input-group admission-search-input-group">
-                        <input
-                          type="text"
-                          name="name"
-                          className="form-control border-start-0 m-0"
-                          placeholder="Quick search..."
-                          value={filterData.name}
-                          onChange={handleFilterChange}
-                        />
+                    <div className="col-lg-5">
+                      <div className="admission-nav-actions-row">
+                        <div className="input-group admission-search-input-group">
+                          <input
+                            type="text"
+                            name="name"
+                            className="form-control border-start-0 m-0"
+                            placeholder="Quick search..."
+                            value={filterData.name}
+                            onChange={handleFilterChange}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => fetchProfileData()}
+                            className="btn btn-outline-primary"
+                            style={{ whiteSpace: 'nowrap' }}
+                          >
+                            <i className="fas fa-search me-1"></i>
+                            Search
+                          </button>
+                        </div>
                         <button
-                          onClick={() => fetchProfileData()}
-                          className="btn btn-outline-primary"
+                          type="button"
+                          onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+                          className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
                           style={{ whiteSpace: 'nowrap' }}
                         >
-                          <i className="fas fa-search me-1"></i>
-                          Search
+                          <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
+                          Filters
+                          {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
+                            <span className="bg-light text-dark ms-1">
+                              {Object.values(filterData).filter(val => val && val !== 'true').length}
+                            </span>
+                          )}
                         </button>
                       </div>
+                    </div>
+                  </div>
+                </div>
 
-                      <button
-                        onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
-                        className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
-                        style={{ whiteSpace: 'nowrap' }}
-                      >
-                        <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
-                        Filters
-                        {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
-                          <span className="bg-light text-dark ms-1">
-                            {Object.values(filterData).filter(val => val && val !== 'true').length}
-                          </span>
-                        )}
-                      </button>
+                {/* Tablet / narrow / panel open: stacked, wrap tabs (no scrollbar on md+) */}
+                <div className={isNavCompact ? 'd-block' : 'd-block d-lg-none'}>
+                  <div className="row g-2">
+                    <div className="col-12">
+                      <div className="main-tabs-container">
+                        <ul className={`nav nav-tabs nav-tabs-main border-0 admission-filter-tabs ${isMobile ? 'admission-filter-tabs--mobile-scroll' : ''}`}>
+                          {getCurrentFilters().map((filter, index) => (
+                            <li className="nav-item" key={filter._id || index}>
+                              <button
+                                type="button"
+                                className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
+                                onClick={() => handleCrmFilterClick(filter._id, index)}
+                              >
+                                {filter.name}
+                                <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
+                                  ({filter.count})
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                    <div className="col-12">
+                      <div className="admission-nav-actions-row">
+                        <div className="input-group admission-search-input-group">
+                          <input
+                            type="text"
+                            name="name"
+                            className="form-control border-start-0 m-0"
+                            placeholder="Quick search..."
+                            value={filterData.name}
+                            onChange={handleFilterChange}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => fetchProfileData()}
+                            className="btn btn-outline-primary"
+                            style={{ whiteSpace: 'nowrap' }}
+                          >
+                            <i className="fas fa-search me-1"></i>
+                            Search
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+                          className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
+                          style={{ whiteSpace: 'nowrap' }}
+                        >
+                          <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
+                          Filters
+                          {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
+                            <span className="bg-light text-dark ms-1">
+                              {Object.values(filterData).filter(val => val && val !== 'true').length}
+                            </span>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -3018,7 +3149,7 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
           )}
 
           {/* Main Content */}
-          <div className="content-body" style={{ marginTop: `${navHeight + 10}px` }}>
+          <div className="content-body lead-list-body" style={{ marginTop: `${navHeight + 10}px` }}>
             <section className="list-view">
               <div className='row'>
                 <div>
@@ -3037,7 +3168,16 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                         ) : (<>
                           {allProfiles && allProfiles.length > 0 ? (
                             allProfiles.map((profile, profileIndex) => (
-                              <div className={`card-content transition-col mb-2`} key={profileIndex}>
+                              <div
+                                className={`card-content transition-col mb-2`}
+                                key={profile._id || profileIndex}
+                                ref={(el) => {
+                                  const id = profile._id;
+                                  if (!id) return;
+                                  if (el) leadCardRefs.current[id] = el;
+                                  else delete leadCardRefs.current[id];
+                                }}
+                              >
                                 {/* Profile Header Card */}
                                 <div className="card border-0 shadow-sm mb-0 mt-2">
                                   <div className="card-body px-1 py-0 my-2">
@@ -3266,9 +3406,10 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
                                               <button
                                                 className="btn btn-sm btn-outline-secondary border-0"
-                                                onClick={() => setLeadDetailsVisible(profileIndex)}
+                                                onMouseDown={(e) => e.preventDefault()}
+                                                onClick={() => toggleLeadDetails(profile)}
                                               >
-                                                {leadDetailsVisible === profileIndex ? (
+                                                {leadDetailsVisible === profile._id ? (
                                                   <i className="fas fa-chevron-up"></i>
                                                 ) : (
                                                   <i className="fas fa-chevron-down"></i>
@@ -3467,9 +3608,10 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
                                           <button
                                             className="btn btn-sm btn-outline-secondary border-0"
-                                            onClick={() => setLeadDetailsVisible(profileIndex)}
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={() => toggleLeadDetails(profile)}
                                           >
-                                            {leadDetailsVisible === profileIndex ? (
+                                            {leadDetailsVisible === profile._id ? (
                                               <i className="fas fa-chevron-up"></i>
                                             ) : (
                                               <i className="fas fa-chevron-down"></i>
@@ -3632,9 +3774,10 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
                                           <button
                                             className="btn btn-sm btn-outline-secondary border-0"
-                                            onClick={() => toggleLeadDetails(profileIndex)}
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={() => toggleLeadDetails(profile)}
                                           >
-                                            {leadDetailsVisible === profileIndex ? (
+                                            {leadDetailsVisible === profile._id ? (
                                               <i className="fas fa-chevron-up"></i>
                                             ) : (
                                               <i className="fas fa-chevron-down"></i>
@@ -3663,8 +3806,7 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                     </ul>
                                   </div>
 
-                                  {/* Tab Content - Only show if leadDetailsVisible is true */}
-                                  {leadDetailsVisible === profileIndex && (
+                                  {leadDetailsVisible === profile._id && (
                                     <div className="tab-content">
                                       {/* Lead Details Tab */}
                                       {(activeTab[profileIndex] || 0) === 0 && (
@@ -3985,15 +4127,17 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
                                                 <div className="resume-summary">
                                                   <h2 className="resume-section-title">Professional Summary <i className="fa fa-clock-o" aria-hidden="true" style={{ fontSize: "16px" }}></i> </h2>
-                                                  <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
+                                                  <p className={getResumeSummary(profile._candidate) ? '' : 'resume-empty-hint'}>
+                                                    {getResumeSummary(profile._candidate) || 'No summary provided'}
+                                                  </p>
                                                 </div>
                                               </div>
 
                                               <div className="resume-document-body">
                                                 <div className="resume-column resume-left-column">
-                                                  {profile._candidate?.isExperienced === false ? (
-                                                    <div className="resume-section">
-                                                      <h2 className="resume-section-title">Work Experience</h2>
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Work Experience</h2>
+                                                    {profile._candidate?.isExperienced === false ? (
                                                       <div className="resume-experience-item">
                                                         <div className="resume-item-header">
                                                           <h3 className="resume-item-title">Fresher</h3>
@@ -4002,45 +4146,42 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                           <p>Looking for opportunities to start my career</p>
                                                         </div>
                                                       </div>
-                                                    </div>
-                                                  ) : (
-                                                    profile._candidate?.experiences && profile._candidate.experiences.length > 0 && (
-                                                      <div className="resume-section">
-                                                        <h2 className="resume-section-title">Work Experience</h2>
-                                                        {profile._candidate.experiences.map((exp, index) => (
-                                                          <div className="resume-experience-item" key={`resume-exp-${index}`}>
-                                                            <div className="resume-item-header">
-                                                              {exp.jobTitle && (
-                                                                <h3 className="resume-item-title">{exp.jobTitle}</h3>
-                                                              )}
-                                                              {exp.companyName && (
-                                                                <p className="resume-item-subtitle">{exp.companyName}</p>
-                                                              )}
-                                                              {(exp.from || exp.to || exp.currentlyWorking) && (
-                                                                <p className="resume-item-period">
-                                                                  {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                    ) : profile._candidate?.experiences?.length > 0 ? (
+                                                      profile._candidate.experiences.map((exp, index) => (
+                                                        <div className="resume-experience-item" key={`resume-exp-${index}`}>
+                                                          <div className="resume-item-header">
+                                                            {exp.jobTitle && (
+                                                              <h3 className="resume-item-title">{exp.jobTitle}</h3>
+                                                            )}
+                                                            {exp.companyName && (
+                                                              <p className="resume-item-subtitle">{exp.companyName}</p>
+                                                            )}
+                                                            {(exp.from || exp.to || exp.currentlyWorking) && (
+                                                              <p className="resume-item-period">
+                                                                {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                                  year: 'numeric',
+                                                                  month: 'short',
+                                                                }) : 'Start Date'}
+                                                                {" - "}
+                                                                {exp.currentlyWorking ? 'Present' :
+                                                                  exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
                                                                     year: 'numeric',
                                                                     month: 'short',
-                                                                  }) : 'Start Date'}
-                                                                  {" - "}
-                                                                  {exp.currentlyWorking ? 'Present' :
-                                                                    exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
-                                                                      year: 'numeric',
-                                                                      month: 'short',
-                                                                    }) : 'End Date'}
-                                                                </p>
-                                                              )}
-                                                            </div>
-                                                            {exp.jobDescription && (
-                                                              <div className="resume-item-content">
-                                                                <p>{exp.jobDescription}</p>
-                                                              </div>
+                                                                  }) : 'End Date'}
+                                                              </p>
                                                             )}
                                                           </div>
-                                                        ))}
-                                                      </div>
-                                                    )
-                                                  )}
+                                                          {exp.jobDescription && (
+                                                            <div className="resume-item-content">
+                                                              <p>{exp.jobDescription}</p>
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      ))
+                                                    ) : (
+                                                      <p className="resume-empty-hint">No work experience added</p>
+                                                    )}
+                                                  </div>
 
                                                   {profile._candidate?.qualifications && profile._candidate.qualifications.length > 0 && (
                                                     <div className="resume-section">
@@ -4048,11 +4189,8 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                       {profile._candidate.qualifications.map((edu, index) => (
                                                         <div className="resume-education-item" key={`resume-edu-${index}`}>
                                                           <div className="resume-item-header">
-                                                            {edu.education && (
-                                                              <h3 className="resume-item-title">{edu.education}</h3>
-                                                            )}
-                                                            {edu.course && (
-                                                              <h3 className="resume-item-title">{edu.course}</h3>
+                                                            {getQualificationTitle(edu) && (
+                                                              <h3 className="resume-item-title">{getQualificationTitle(edu)}</h3>
                                                             )}
                                                             {edu.universityName && (
                                                               <p className="resume-item-subtitle">{edu.universityName}</p>
@@ -4078,14 +4216,14 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                 </div>
 
                                                 <div className="resume-column resume-right-column">
-                                                  {profile._candidate?.personalInfo?.skills && profile._candidate.personalInfo.skills.length > 0 && (
+                                                  {getVisibleSkills(profile._candidate?.personalInfo?.skills).length > 0 && (
                                                     <div className="resume-section">
                                                       <h2 className="resume-section-title">Skills</h2>
                                                       <div className="resume-skills-list">
-                                                        {profile._candidate.personalInfo.skills.map((skill, index) => (
+                                                        {getVisibleSkills(profile._candidate.personalInfo.skills).map((skill, index) => (
                                                           <div className="resume-skill-item" key={`resume-skill-${index}`}>
-                                                            <div className="resume-skill-name">{skill.skillName || skill}</div>
-                                                            {skill.skillPercent && (
+                                                            <div className="resume-skill-name">{getSkillLabel(skill)}</div>
+                                                            {Number(skill?.skillPercent) > 0 && (
                                                               <div className="resume-skill-bar-container">
                                                                 <div
                                                                   className="resume-skill-bar"
@@ -4106,7 +4244,7 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                       <div className="resume-languages-list">
                                                         {profile._candidate.personalInfo.languages.map((lang, index) => (
                                                           <div className="resume-language-item" key={`resume-lang-${index}`}>
-                                                            <div className="resume-language-name">{lang.name || lang.lname || lang}</div>
+                                                            <div className="resume-language-name">{lang?.name || lang?.lname || (typeof lang === 'string' ? lang : 'Language')}</div>
                                                             {lang.level && (
                                                               <div className="resume-language-level">
                                                                 {[1, 2, 3, 4, 5].map(dot => (
@@ -4123,11 +4261,11 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     </div>
                                                   )}
 
-                                                  {profile._candidate?.personalInfo?.certifications && profile._candidate.personalInfo.certifications.length > 0 && (
+                                                  {getVisibleCertifications(profile._candidate?.personalInfo?.certifications).length > 0 && (
                                                     <div className="resume-section">
                                                       <h2 className="resume-section-title">Certifications</h2>
                                                       <ul className="resume-certifications-list">
-                                                        {profile._candidate.personalInfo.certifications.map((cert, index) => (
+                                                        {getVisibleCertifications(profile._candidate.personalInfo.certifications).map((cert, index) => (
                                                           <li key={`resume-cert-${index}`} className="resume-certification-item">
                                                             <strong>{cert.certificateName || cert.name}</strong>
                                                             {cert.orgName && (
@@ -4150,14 +4288,14 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     </div>
                                                   )}
 
-                                                  {profile._candidate?.personalInfo?.projects && profile._candidate.personalInfo.projects.length > 0 && (
+                                                  {getVisibleProjects(profile._candidate?.personalInfo?.projects).length > 0 && (
                                                     <div className="resume-section">
                                                       <h2 className="resume-section-title">Projects</h2>
-                                                      {profile._candidate.personalInfo.projects.map((proj, index) => (
+                                                      {getVisibleProjects(profile._candidate.personalInfo.projects).map((proj, index) => (
                                                         <div className="resume-project-item" key={`resume-proj-${index}`}>
                                                           <div className="resume-item-header">
                                                             <h3 className="resume-project-title">
-                                                              {proj.projectName || 'Project'}
+                                                              {proj.projectName}
                                                               {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
                                                             </h3>
                                                           </div>
@@ -4175,11 +4313,15 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                     <div className="resume-section">
                                                       <h2 className="resume-section-title">Interests</h2>
                                                       <div className="resume-interests-tags">
-                                                        {profile._candidate.personalInfo.interest.map((interest, index) => (
+                                                        {profile._candidate.personalInfo.interest.map((interest, index) => {
+                                                          const label = getInterestLabel(interest);
+                                                          if (!label) return null;
+                                                          return (
                                                           <span className="resume-interest-tag" key={`resume-interest-${index}`}>
-                                                            {interest}
+                                                            {label}
                                                           </span>
-                                                        ))}
+                                                          );
+                                                        })}
                                                       </div>
                                                     </div>
                                                   )}
@@ -4469,7 +4611,7 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
                                                             {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
                                                               <>
                                                                 {(() => {
-                                                                  const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
+                                                                  const fileUrl = getDocFileUrl(latestUpload?.fileUrl || doc.fileUrl);
                                                                   const fileType = getFileType(fileUrl);
 
                                                                   if (fileType === 'image') {
@@ -5460,6 +5602,26 @@ background: #fd2b5a;
           background: #f8f9fa;
           padding: 15px;
           border-radius: 8px;
+        }
+
+        .resume-summary p,
+        .resume-empty-hint,
+        .resume-item-content,
+        .resume-item-content p {
+          font-size: 14px;
+          line-height: 1.5;
+          color: #444;
+        }
+
+        .resume-empty-hint {
+          font-style: italic;
+          color: #666;
+          margin: 0;
+        }
+
+        .resume-document .resume-contact-item span {
+          font-size: 14px;
+          color: #444;
         }
 
         .resume-section-title {

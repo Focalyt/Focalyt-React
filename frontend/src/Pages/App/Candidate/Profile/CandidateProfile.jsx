@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import html2pdf from 'html2pdf.js';
 import { parseAddressComponents, getCoordinates, isValidPlace } from "../../../../utils/addressUtils";
+import { resolveMediaUrl } from "../../../../utils/resolveMediaUrl";
 
 const CandidateProfile = () => {
   // State for resume data
@@ -115,7 +116,7 @@ const CandidateProfile = () => {
 
       // Get the latest resume URL
       const latestResume = resumeArray[resumeArray.length - 1];
-      const url = latestResume.url;
+      const url = resolveMediaUrl(bucketUrl, latestResume.url);
       
       setResumeUrl(url);
       setShowResumeViewer(true);
@@ -1502,7 +1503,7 @@ const CandidateProfile = () => {
               <div className="profile-image-container">
                 <div className="profile-image">
                   {profileData?.personalInfo?.image ? (
-                    <img src={profileData.personalInfo.image} alt="Profile" />
+                    <img src={resolveMediaUrl(bucketUrl, profileData.personalInfo.image)} alt="Profile" />
                   ) : (
                     <div className="profile-placeholder">
                       <i className="bi bi-person"></i>
@@ -3042,7 +3043,7 @@ const CandidateProfile = () => {
                         </div>
 
                         <div className="recording-actions">
-                          <audio controls src={recording.url} className="audio-player"></audio>
+                          <audio controls src={resolveMediaUrl(bucketUrl, recording.url)} className="audio-player"></audio>
 
                           <button
                             className="delete-recording"
@@ -3415,7 +3416,7 @@ const CandidateProfile = () => {
                       </div>
 
                       <div className="recording-actions">
-                        <audio controls src={recording.url} className="audio-player"></audio>
+                        <audio controls src={resolveMediaUrl(bucketUrl, recording.url)} className="audio-player"></audio>
 
                         <button
                           className="delete-recording"
@@ -3457,7 +3458,7 @@ const CandidateProfile = () => {
                   <div className="resume-profile-section">
                     {user?.image ? (
                       <img
-                        src={`${bucketUrl}/${user.image}`}
+                        src={resolveMediaUrl(bucketUrl, user.image)}
                         alt="Profile"
                         className="resume-profile-image"
                       />

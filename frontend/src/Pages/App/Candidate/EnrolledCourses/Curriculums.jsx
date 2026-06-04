@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 
 import Assignment from '../Assignment/Assignment';
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 function Enrolled() {
     const { courseId } = useParams();
@@ -33,13 +34,7 @@ function Enrolled() {
     useEffect(() => {
         fetchCourseDetails();
     }, [courseId]);
-    const getFullUrl = (filePath) => {
-        if (!filePath) return "";
-        // Already contains full bucket URL
-        if (filePath.startsWith(bucketUrl)) return filePath;
-        // Is relative path, so prepend bucket URL
-        return `${bucketUrl}/${filePath}`;
-      };
+    const getFullUrl = (filePath) => resolveMediaUrl(bucketUrl, filePath);
     const fetchCourseDetails = async () => {
         try {
             setLoading(true);
@@ -130,7 +125,7 @@ const fetchCurriculum = async () => {
 
     // Media Viewer Functions
     const openMediaViewer = (media, type) => {
-        setViewerMedia({ ...media, type });
+        setViewerMedia({ ...media, url: getFullUrl(media.url), type });
         setShowMediaViewer(true);
     };
 
@@ -396,7 +391,7 @@ const fetchCurriculum = async () => {
                                                                                                     <div key={idx} className="media-item small video-container">
                                                                                                         <video
                                                                                                             controls
-                                                                                                            src={video.url}
+                                                                                                            src={getFullUrl(video.url)}
                                                                                                             className="embedded-video"
                                                                                                             preload="metadata"
                                                                                                         >
@@ -414,7 +409,7 @@ const fetchCurriculum = async () => {
                                                                                                         title="Click to view full image"
                                                                                                     >
                                                                                                         <img
-                                                                                                            src={image.url}
+                                                                                                            src={getFullUrl(image.url)}
                                                                                                             alt={image.name || `Image ${idx + 1}`}
                                                                                                             className="embedded-image"
                                                                                                             loading="lazy"
@@ -431,7 +426,7 @@ const fetchCurriculum = async () => {
                                                                                                         title="Click to view full PDF"
                                                                                                     >
                                                                                                         <iframe
-                                                                                                            src={pdf.url}
+                                                                                                            src={getFullUrl(pdf.url)}
                                                                                                             title={pdf.name || `PDF ${idx + 1}`}
                                                                                                             className="embedded-pdf"
                                                                                                             style={{ pointerEvents: 'none' }}
@@ -474,7 +469,7 @@ const fetchCurriculum = async () => {
                                                                                                                     <div key={idx} className="media-item small video-container">
                                                                                                                         <video
                                                                                                                             controls
-                                                                                                                            src={video.url}
+                                                                                                                            src={getFullUrl(video.url)}
                                                                                                                             className="embedded-video"
                                                                                                                             preload="metadata"
                                                                                                                         />
@@ -484,7 +479,7 @@ const fetchCurriculum = async () => {
                                                                                                                 {subTopic.media.images?.map((image, idx) => (
                                                                                                                     <div key={idx} className="media-item small image-container">
                                                                                                                         <img
-                                                                                                                            src={image.url}
+                                                                                                                            src={getFullUrl(image.url)}
                                                                                                                             alt={image.name || `Image ${idx + 1}`}
                                                                                                                             className="embedded-image"
                                                                                                                             loading="lazy"
@@ -495,7 +490,7 @@ const fetchCurriculum = async () => {
                                                                                                                 {subTopic.media.pdfs?.map((pdf, idx) => (
                                                                                                                     <div key={idx} className="media-item small pdf-container">
                                                                                                                         <iframe
-                                                                                                                            src={pdf.url}
+                                                                                                                            src={getFullUrl(pdf.url)}
                                                                                                                             title={pdf.name || `PDF ${idx + 1}`}
                                                                                                                             className="embedded-pdf"
                                                                                                                         />
@@ -797,7 +792,7 @@ const fetchCurriculum = async () => {
                                 <h6 className="card-subtitle mb-3">Instructor</h6>
                                 <div className="d-flex align-items-center">
                                     <img
-                                            src={course.instructor.profilePicture ? `${bucketUrl}/${course.instructor.profilePicture}` : "https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=200"}
+                                            src={course.instructor.profilePicture ? getFullUrl(course.instructor.profilePicture) : "https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=200"}
                                             alt={course.instructor.name || 'Instructor'}
                                         className="rounded-circle me-3"
                                         style={{width: '48px', height: '48px', objectFit: 'cover'}}

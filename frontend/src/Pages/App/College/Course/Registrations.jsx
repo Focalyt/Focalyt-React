@@ -14,6 +14,44 @@ import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
+const isObjectIdLike = (value) => {
+  if (value == null) return false;
+  if (typeof value === 'object') return false;
+  return /^[a-f0-9]{24}$/i.test(String(value).trim());
+};
+
+const labelFromRefField = (field) => {
+  if (field == null || field === '') return '';
+  if (typeof field === 'object') return field.name || field.title || field.label || '';
+  if (isObjectIdLike(field)) return '';
+  return String(field).trim();
+};
+
+const getResumeSummary = (candidate) => {
+  const summary = candidate?.personalInfo?.professionalSummary || candidate?.personalInfo?.summary || '';
+  return typeof summary === 'string' ? summary.trim() : '';
+};
+
+const getVisibleSkills = (skills = []) =>
+  skills.filter((skill) => (typeof skill === 'string' ? skill.trim() : skill?.skillName?.trim()));
+
+const getSkillLabel = (skill) => (typeof skill === 'string' ? skill : skill?.skillName || '');
+
+const getVisibleProjects = (projects = []) =>
+  projects.filter((proj) => proj?.projectName?.trim() || proj?.description?.trim());
+
+const getVisibleCertifications = (certs = []) =>
+  certs.filter((cert) => cert?.certificateName?.trim() || cert?.name?.trim());
+
+const getInterestLabel = (interest) => {
+  if (typeof interest === 'string') return isObjectIdLike(interest) ? '' : interest;
+  if (interest && typeof interest === 'object') return interest.name || interest.title || interest.interest || '';
+  return '';
+};
+
+const getQualificationTitle = (edu) =>
+  labelFromRefField(edu?.education) || labelFromRefField(edu?.course) || '';
+
 const DOC_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
 
 const DOC_COURSE_PREFIX = /^Documents for course\/?/i;
@@ -12884,7 +12922,9 @@ useEffect(() => {
 
                                               <div className="resume-summary">
                                                 <h2 className="resume-section-title">Professional Summary</h2>
-                                                <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
+                                                <p className={getResumeSummary(profile._candidate) ? '' : 'resume-empty-hint'}>
+                                                  {getResumeSummary(profile._candidate) || 'No summary provided'}
+                                                </p>
                                               </div>
                                             </div>
 
@@ -12950,11 +12990,8 @@ useEffect(() => {
                                                     {profile._candidate.qualifications.map((edu, index) => (
                                                       <div className="resume-education-item" key={`resume-edu-${index}`}>
                                                         <div className="resume-item-header">
-                                                          {edu.education && (
-                                                            <h3 className="resume-item-title">{edu.education}</h3>
-                                                          )}
-                                                          {edu.course && (
-                                                            <h3 className="resume-item-title">{edu.course}</h3>
+                                                          {getQualificationTitle(edu) && (
+                                                            <h3 className="resume-item-title">{getQualificationTitle(edu)}</h3>
                                                           )}
                                                           {edu.universityName && (
                                                             <p className="resume-item-subtitle">{edu.universityName}</p>
@@ -12982,14 +13019,14 @@ useEffect(() => {
 
                                               <div className="resume-column resume-right-column">
 
-                                                {profile._candidate?.personalInfo?.skills?.length > 0 && (
+                                                {getVisibleSkills(profile._candidate?.personalInfo?.skills).length > 0 && (
                                                   <div className="resume-section">
                                                     <h2 className="resume-section-title">Skills</h2>
                                                     <div className="resume-skills-list">
-                                                      {profile._candidate?.personalInfo?.skills?.map((skill, index) => (
+                                                      {getVisibleSkills(profile._candidate.personalInfo.skills).map((skill, index) => (
                                                         <div className="resume-skill-item" key={`resume-skill-${index}`}>
-                                                          <div className="resume-skill-name">{skill?.skillName || 'Skill'}</div>
-                                                          {skill?.skillPercent && (
+                                                          <div className="resume-skill-name">{getSkillLabel(skill)}</div>
+                                                          {Number(skill?.skillPercent) > 0 && (
                                                             <div className="resume-skill-bar-container">
                                                               <div
                                                                 className="resume-skill-bar"
@@ -13030,11 +13067,11 @@ useEffect(() => {
                                                 )}
 
 
-                                                {profile._candidate?.personalInfo?.certifications?.length > 0 && (
+                                                {getVisibleCertifications(profile._candidate?.personalInfo?.certifications).length > 0 && (
                                                   <div className="resume-section">
                                                     <h2 className="resume-section-title">Certifications</h2>
                                                     <ul className="resume-certifications-list">
-                                                      {profile._candidate.personalInfo.certifications.map((cert, index) => (
+                                                      {getVisibleCertifications(profile._candidate.personalInfo.certifications).map((cert, index) => (
                                                         <li key={`resume-cert-${index}`} className="resume-certification-item">
                                                           <strong>{cert.certificateName || cert.name}</strong>
                                                           {cert.orgName && (
@@ -13058,14 +13095,14 @@ useEffect(() => {
                                                 )}
 
 
-                                                {profile._candidate?.personalInfo?.projects?.length > 0 && (
+                                                {getVisibleProjects(profile._candidate?.personalInfo?.projects).length > 0 && (
                                                   <div className="resume-section">
                                                     <h2 className="resume-section-title">Projects</h2>
-                                                    {profile._candidate.personalInfo.projects.map((proj, index) => (
+                                                    {getVisibleProjects(profile._candidate.personalInfo.projects).map((proj, index) => (
                                                       <div className="resume-project-item" key={`resume-proj-${index}`}>
                                                         <div className="resume-item-header">
                                                           <h3 className="resume-project-title">
-                                                            {proj.projectName || 'Project'}
+                                                            {proj.projectName}
                                                             {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
                                                           </h3>
                                                         </div>
@@ -13084,11 +13121,15 @@ useEffect(() => {
                                                   <div className="resume-section">
                                                     <h2 className="resume-section-title">Interests</h2>
                                                     <div className="resume-interests-tags">
-                                                      {profile._candidate.personalInfo.interest.map((interest, index) => (
+                                                      {profile._candidate.personalInfo.interest.map((interest, index) => {
+                                                        const label = getInterestLabel(interest);
+                                                        if (!label) return null;
+                                                        return (
                                                         <span className="resume-interest-tag" key={`resume-interest-${index}`}>
-                                                          {interest}
+                                                          {label}
                                                         </span>
-                                                      ))}
+                                                        );
+                                                      })}
                                                     </div>
                                                   </div>
                                                 )}
