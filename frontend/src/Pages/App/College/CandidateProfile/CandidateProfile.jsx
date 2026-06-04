@@ -1,11 +1,16 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import axios from 'axios';
 import html2pdf from 'html2pdf.js';
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
-const CandidateProfile = forwardRef((props, ref) => {
+const MEDIA_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
+
+const CandidateProfile = forwardRef(({ onProfileImageUpdated, bucketUrl: bucketUrlProp }, ref) => {
 
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
     const token = userData.token;
+    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+    const mediaBucketUrl = (bucketUrlProp || MEDIA_BUCKET_URL || '').replace(/\/$/, '');
     // State for resume data
     const [user, setUser] = useState({});
     const [voiceIntroduction, setVoiceIntroduction] = useState(false);
@@ -103,6 +108,16 @@ const CandidateProfile = forwardRef((props, ref) => {
     const [uploadDate, setUploadDate] = useState("");
     const [showResumeViewer, setShowResumeViewer] = useState(false);
     const [resumeUrl, setResumeUrl] = useState('');
+    const [profileImageVersion, setProfileImageVersion] = useState(0);
+
+    const getProfileImageSrc = (imageKey) => {
+        if (!imageKey) return '';
+        const url = resolveMediaUrl(mediaBucketUrl, imageKey);
+        if (!url || !/^https?:\/\//i.test(url)) return url;
+        return profileImageVersion
+            ? `${url}${url.includes('?') ? '&' : '?'}v=${profileImageVersion}`
+            : url;
+    };
     const viewResume = () => {
         try {
             // Get the resume URL from local storage or from your state
@@ -115,7 +130,7 @@ const CandidateProfile = forwardRef((props, ref) => {
 
             // Construct the URL to view the resume
             // This assumes your bucket URL is already set in environment variables
-            const url = `${bucketUrl}/${resumeKey}`;
+            const url = resolveMediaUrl(mediaBucketUrl, resumeKey);
             setResumeUrl(url);
             setShowResumeViewer(true);
         } catch (error) {
@@ -186,9 +201,6 @@ const CandidateProfile = forwardRef((props, ref) => {
     };
 
 
-    // Backend URL
-    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-    const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
     const uploadCV = async (file, filename) => {
         try {
             const token = localStorage.getItem('token');
@@ -248,18 +260,22 @@ const CandidateProfile = forwardRef((props, ref) => {
             console.log('res for profile pic', res.data)
 
             if (res.data.status) {
-                alert('Profile picture updated successfully')
+                const imageKey = res.data.data?.Key || res.data.data?.Location || '';
+                alert('Profile picture updated successfully');
+                setProfileImageVersion(Date.now());
                 setProfileData(prev => ({
                     ...prev,
                     personalInfo: {
                         ...(prev.personalInfo || {}),
-                        image: res.data.data.Location
-                    }
+                        image: imageKey,
+                    },
                 }));
-                // window.location.reload();
-
-                console.log('file uploaded on s3')
-
+                setUser(prev => ({
+                    ...prev,
+                    image: imageKey,
+                }));
+                onProfileImageUpdated?.(imageKey);
+                console.log('file uploaded on s3');
             }
         } catch (err) {
             console.error("Upload failed:", err);
@@ -1278,6 +1294,7 @@ const CandidateProfile = forwardRef((props, ref) => {
                 // Set candidate data
                 const candidate = data.candidate;
                 if (candidate) {
+                    setProfileImageVersion(0);
                     setProfileData(candidate);
                     // Map backend data to frontend state
                     setUser({
@@ -1456,7 +1473,7 @@ const CandidateProfile = forwardRef((props, ref) => {
                             <div className="profile-image-container">
                                 <div className="profile-image">
                                     {profileData?.personalInfo?.image ? (
-                                        <img src={profileData.personalInfo.image} alt="Profile" />
+                                        <img src={getProfileImageSrc(profileData.personalInfo.image)} alt="Profile" />
                                     ) : (
                                         <div className="profile-placeholder">
                                             <i className="bi bi-person"></i>
@@ -3256,7 +3273,7 @@ const CandidateProfile = forwardRef((props, ref) => {
                                     <div className="resume-profile-section">
                                         {user?.image ? (
                                             <img
-                                                src={`${bucketUrl}/${user.image}`}
+                                                src={getProfileImageSrc(user.image)}
                                                 alt="Profile"
                                                 className="resume-profile-image"
                                             />

@@ -9,6 +9,7 @@ import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
 
+const DOC_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
 
 // Add this at the top of the file, after imports
 const RejectionForm = React.memo(({ onConfirm, onCancel }) => {
@@ -853,6 +854,26 @@ const CRMDashboard = (profile) => {
                 setSelectedProfile(null)
             }
         }
+    };
+
+    const handleProfileImageUpdated = (imageKey) => {
+        if (!selectedProfile?._id || !imageKey) return;
+        const mergeImage = (profile) => ({
+            ...profile,
+            _candidate: {
+                ...profile._candidate,
+                personalInfo: {
+                    ...(profile._candidate?.personalInfo || {}),
+                    image: imageKey,
+                },
+            },
+        });
+        setAllProfiles(prevProfiles =>
+            prevProfiles.map(profile =>
+                profile._id === selectedProfile._id ? mergeImage(profile) : profile
+            )
+        );
+        setSelectedProfile(prev => (prev?._id === selectedProfile._id ? mergeImage(prev) : prev));
     };
 
 
@@ -1732,7 +1753,7 @@ const CRMDashboard = (profile) => {
                                     <button type="button" className="btn-close" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}></button>
                                 </div>
                                 <div className="modal-body">
-                                    <CandidateProfile ref={candidateRef} />
+                                    <CandidateProfile ref={candidateRef} bucketUrl={DOC_BUCKET_URL} onProfileImageUpdated={handleProfileImageUpdated} />
                                 </div>
                                 <div className="modal-footer">
                                     <button type="button" className="btn btn-secondary" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}>Close</button>

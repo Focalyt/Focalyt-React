@@ -1306,7 +1306,11 @@ router.post('/upload-profile-pic/:filename', [isCollege], async (req, res) => {
 
 
 
-		const updatedProfile = await Candidate.findOneAndUpdate({ mobile: mobile }, { $set: { personalInfo: { image: url.Key } } }, { new: true })
+		const updatedProfile = await Candidate.findOneAndUpdate(
+			{ mobile: mobile },
+			{ $set: { 'personalInfo.image': url.Key } },
+			{ new: true }
+		);
 
 		let newData = {
 			Key: url.Key,
