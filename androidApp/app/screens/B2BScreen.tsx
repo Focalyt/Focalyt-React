@@ -3,11 +3,10 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../auth/AuthContext';
-import { clearUser } from '../auth/authStorage';
 import { AppHeader } from '../components/AppHeader';
-import { SideMenu, type SideMenuSection } from '../components/SideMenu';
+import { SideMenu } from '../components/SideMenu';
 import type { B2BInitialTab, RootStackParamList } from '../navigation/AppNavigator';
-import { buildCollegeSideMenuSections } from '../navigation/collegeSideMenu';
+import { useCollegeSideMenu } from '../navigation/useCollegeSideMenu';
 import { college } from '../theme/college';
 // import { B2BDashboardTab } from './b2b/B2BDashboardTab';
 // import { B2BFollowUpTab } from './b2b/B2BFollowUpTab';
@@ -22,28 +21,14 @@ type Props = {
 
 export function B2BScreen({ navigation: navProp, route }: Props) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { user, setUser } = useAuth();
-  const [menuOpen, setMenuOpen] = React.useState(false);
+  const { user } = useAuth();
+  const { menuSections, menuOpen, setMenuOpen } = useCollegeSideMenu();
   const canGoBack = navigation.canGoBack();
 
   const _initialTab = route?.params?.initialTab;
   void _initialTab;
 
   const openMenu = () => setMenuOpen(true);
-
-  const menuSections: SideMenuSection[] = React.useMemo(
-    () =>
-      buildCollegeSideMenuSections({
-        onB2BSales: () => {
-          navigation.navigate('B2B', { initialTab: 'sales' });
-        },
-        onLogout: async () => {
-          await clearUser();
-          setUser(null);
-        },
-      }),
-    [navigation, setUser],
-  );
 
   return (
     <View style={styles.page}>

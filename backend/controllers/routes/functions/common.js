@@ -147,9 +147,13 @@ module.exports.sendOtp = async (req, res) => {
       return res.send({ status: false, message: 'User disabled' });
     }
 
-    // Now we have user, and we can access user.mobile to send OTP
-    const mobile = user.mobile;
-
+    const mobile = String(user.mobile || '').replace(/\D/g, '');
+    if (!/^\d{10}$/.test(mobile)) {
+      return res.send({
+        status: false,
+        message: 'Valid mobile number not found on this account. Contact admin.',
+      });
+    }
 
     const auth = authKey;
     const template = templateId
@@ -758,13 +762,24 @@ module.exports.loginAsCollege = async (req, res) => {
       };
 
       // Extract isDefaultAdmin from _concernPerson
-      const concernPersonData = college._concernPerson.find(p => p.id.toString() === userId.toString());
+      const concernPersonData = college._concernPerson.find(
+        p => p._id.toString() === userId.toString(),
+      );
       const isDefaultAdmin = concernPersonData?.isDefaultAdmin || false;
 
       const token = await user.generateAuthToken();
 
       userData = {
-        _id: user._id, name: user.name, role: 2, email: user.email, mobile: user.mobile, collegeName: college.name, collegeId: college._id, token, isDefaultAdmin
+        _id: user._id,
+        name: user.name,
+        role: 2,
+        email: user.email,
+        mobile: user.mobile,
+        collegeName: college.name,
+        collegeId: college._id,
+        token,
+        isDefaultAdmin,
+        permissions: user.permissions,
       };
       return res.json({ status: true, message: "Login successful", userData });
     } else {

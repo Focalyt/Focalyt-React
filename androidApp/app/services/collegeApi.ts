@@ -1,4 +1,5 @@
 import { API_URL, GOOGLE_OAUTH_REDIRECT_URI, WEB_APP_URL } from '@env';
+import { getJson } from './apiClient';
 
 type Json = Record<string, unknown>;
 
@@ -93,9 +94,72 @@ export function apiErrorMessage(data: Json): string | undefined {
   return typeof m === 'string' ? m : undefined;
 }
 
+/** 10-digit mobile, or email — strips +91 / spaces from phone input. */
+export function normalizeOtpUserInput(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed.includes('@')) return trimmed.toLowerCase();
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+  if (digits.length === 11 && digits.startsWith('0')) return digits.slice(1);
+  return digits.length === 10 ? digits : trimmed;
+}
+
+/** Paths under express `router.use('/api', apiRoutes)` when API_URL ends with `/api`. */
+function resolveApiPath(pathname: string): string {
+  const path = pathname.startsWith('/') ? pathname : `/${pathname}`;
+  const base = requireBase();
+  if (/\/api$/i.test(base) && path.startsWith('/api/')) {
+    return path.slice(4);
+  }
+  return path;
+}
+
 async function postJson(pathname: string, body: Json): Promise<Json> {
   const base = requireBase();
-  const url = `${base}${pathname.startsWith('/') ? pathname : `/${pathname}`}`;
+  const path = resolveApiPath(pathname);
+  const url = `${base}${path}`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Network error';
+    throw new Error(msg);
+  }
+  const text = await res.text();
+  let data: Json = {};
+  if (text) {
+    try {
+      data = JSON.parse(text) as Json;
+    } catch {
+      const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      if (/cannot post/i.test(plain) || res.status === 404) {
+        throw new Error(
+          'OTP service unavailable. Server update required — contact support.',
+        );
+      }
+      throw new Error(plain.slice(0, 200) || 'Invalid response from server');
+    }
+  }
+  if (!res.ok && data.status !== true) {
+    throw new Error(apiErrorMessage(data) || `Request failed (${res.status})`);
+  }
+  return data;
+}
+
+async function postPortalJson(pathname: string, body: Json): Promise<Json> {
+  const portal = getWebAppBaseSafe();
+  if (!portal) {
+    throw new Error('Set API_URL or WEB_APP_URL in androidApp/.env');
+  }
+  const path = pathname.startsWith('/') ? pathname : `/${pathname}`;
+  const url = `${portal}${path}`;
   let res: Response;
   try {
     res = await fetch(url, {
@@ -122,11 +186,15 @@ async function postJson(pathname: string, body: Json): Promise<Json> {
   return data;
 }
 
+export async function fetchCollegePermissions(token: string): Promise<Json> {
+  return getJson('/college/permission', token);
+}
+
 export async function collegePasswordLogin(
   userInput: string,
   password: string,
 ): Promise<Json> {
-  return postJson('/college/login', {
+  return postPortalJson('/college/login', {
     userInput,
     password,
     module: 'college',
@@ -137,11 +205,13 @@ export async function collegeOtpVerifyLogin(
   userInput: string,
   otp: string,
 ): Promise<Json> {
-  return postJson('/api/otpCollegeLogin', { userInput, otp });
+  const input = normalizeOtpUserInput(userInput);
+  return postJson('/api/otpCollegeLogin', { userInput: input, otp });
 }
 
 export async function collegeSendOtp(userInput: string): Promise<Json> {
-  return postJson('/api/sendOtp', { userInput, module: 'college' });
+  const input = normalizeOtpUserInput(userInput);
+  return postJson('/api/sendOtp', { userInput: input, module: 'college' });
 }
 
 export async function collegeVerifyOtpReset(

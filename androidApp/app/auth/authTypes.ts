@@ -13,6 +13,16 @@ export type GoogleAuthToken = {
   picture?: string;
 };
 
+export type CustomPermissions = {
+  can_view_leads_b2b?: boolean;
+  can_view_leads?: boolean;
+};
+
+export type UserPermissions = {
+  permission_type?: string;
+  custom_permissions?: CustomPermissions;
+};
+
 export type AuthUser = {
   _id: string;
   name?: string;
@@ -23,7 +33,7 @@ export type AuthUser = {
   collegeName?: string;
   collegeId?: string;
   isDefaultAdmin?: boolean;
-  permissions?: unknown;
+  permissions?: UserPermissions;
   googleAuthToken?: GoogleAuthToken;
 };
 

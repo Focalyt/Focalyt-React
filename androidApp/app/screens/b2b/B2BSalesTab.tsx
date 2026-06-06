@@ -807,7 +807,7 @@ export function B2BSalesTab() {
 
             return (
               <View style={styles.groupWrap}>
-                {group.leads.length > 1 ? (
+                <View style={styles.groupTabsRow}>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -836,13 +836,24 @@ export function B2BSalesTab() {
                             ]}
                             numberOfLines={1}
                           >
-                            {getLeadProjectName(l)}
+                            {getLeadProjectName(l) || 'Project'}
                           </Text>
                         </Pressable>
                       );
                     })}
+
+                    <Pressable
+                      style={styles.groupCrossSaleChip}
+                      onPress={() => activeLead && setCrossSaleLead(activeLead)}
+                      disabled={!activeLead}
+                      accessibilityLabel="Add cross sale"
+                    >
+                      <Text style={styles.groupCrossSaleChipText} numberOfLines={1}>
+                        + Cross Sale
+                      </Text>
+                    </Pressable>
                   </ScrollView>
-                ) : null}
+                </View>
 
                 {activeLead ? (
                   <B2BLeadCard
@@ -1260,11 +1271,18 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
   },
-  groupTabs: {
-    paddingHorizontal: 10,
+  groupTabsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff9fb',
+    paddingLeft: 10,
+    paddingRight: 10,
     paddingTop: 8,
     paddingBottom: 6,
-    backgroundColor: '#fff9fb',
+    gap: 8,
+  },
+  groupTabs: {
+    paddingRight: 8,
     gap: 8,
   },
   groupTab: {
@@ -1287,6 +1305,21 @@ const styles = StyleSheet.create({
   },
   groupTabTextActive: {
     color: '#fff',
+  },
+  groupCrossSaleChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: 'rgb(250, 85, 121)',
+    maxWidth: 180,
+  },
+  groupCrossSaleChipText: {
+    color: 'rgb(250, 85, 121)',
+    fontWeight: '900',
+    fontSize: 12,
   },
   errorBox: {
     backgroundColor: '#fee2e2',

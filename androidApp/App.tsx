@@ -2,7 +2,8 @@ import React from 'react';
 import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './app/auth/AuthContext';
-import { loadUser } from './app/auth/authStorage';
+import { loadUser, saveUser } from './app/auth/authStorage';
+import { refreshUserPermissions } from './app/auth/refreshUserPermissions';
 import { AppNavigator } from './app/navigation/AppNavigator';
 import { AppVersionGate } from './app/components/AppVersionGate';
 import type { AuthUser } from './app/auth/authTypes';
@@ -13,7 +14,11 @@ export default function App() {
 
   React.useEffect(() => {
     (async () => {
-      const u = await loadUser();
+      let u = await loadUser();
+      if (u) {
+        u = await refreshUserPermissions(u);
+        await saveUser(u);
+      }
       setInitialUser(u);
       setBooting(false);
     })();

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { normalizeAuthUser } from './normalizeAuthUser';
 import type { AuthUser } from './authTypes';
 
 const KEY = 'user';
@@ -7,7 +8,7 @@ export async function loadUser(): Promise<AuthUser | null> {
   const raw = await AsyncStorage.getItem(KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as AuthUser;
+    return normalizeAuthUser(JSON.parse(raw));
   } catch {
     return null;
   }
