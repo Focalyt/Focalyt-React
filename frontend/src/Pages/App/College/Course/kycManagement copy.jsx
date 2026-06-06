@@ -1,12 +1,55 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import DatePicker from 'react-date-picker';
 
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
+
+const isObjectIdLike = (value) => {
+  if (value == null) return false;
+  if (typeof value === 'object') return false;
+  return /^[a-f0-9]{24}$/i.test(String(value).trim());
+};
+
+const labelFromRefField = (field) => {
+  if (field == null || field === '') return '';
+  if (typeof field === 'object') return field.name || field.title || field.label || '';
+  if (isObjectIdLike(field)) return '';
+  return String(field).trim();
+};
+
+const getResumeSummary = (candidate) => {
+  const summary = candidate?.personalInfo?.professionalSummary || candidate?.personalInfo?.summary || '';
+  return typeof summary === 'string' ? summary.trim() : '';
+};
+
+const getVisibleSkills = (skills = []) =>
+  skills.filter((skill) => (typeof skill === 'string' ? skill.trim() : skill?.skillName?.trim()));
+
+const getSkillLabel = (skill) => (typeof skill === 'string' ? skill : skill?.skillName || '');
+
+const getVisibleProjects = (projects = []) =>
+  projects.filter((proj) => proj?.projectName?.trim() || proj?.description?.trim());
+
+const getVisibleCertifications = (certs = []) =>
+  certs.filter((cert) => cert?.certificateName?.trim() || cert?.name?.trim());
+
+const getInterestLabel = (interest) => {
+  if (typeof interest === 'string') return interest;
+  if (interest && typeof interest === 'object') return interest.name || interest.title || interest.interest || '';
+  return '';
+};
+
+const getQualificationTitle = (edu) =>
+  labelFromRefField(edu?.education) || labelFromRefField(edu?.course) || '';
+
+const DOC_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
+
+const getDocFileUrl = (fileUrl) => resolveMediaUrl(DOC_BUCKET_URL, fileUrl);
 
 const MultiSelectCheckbox = ({
   title,
@@ -17,6 +60,15 @@ const MultiSelectCheckbox = ({
   isOpen,
   onToggle
 }) => {
+
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchTerm('');
+    }
+  }, [isOpen])
+
   const handleCheckboxChange = (value) => {
     const newValues = selectedValues.includes(value)
       ? selectedValues.filter(v => v !== value)
@@ -24,6 +76,12 @@ const MultiSelectCheckbox = ({
     onChange(newValues);
   };
 
+  // Filter options based on search term
+  const filteredOptions = [...options]
+    .sort((a, b) => (a?.label || '').localeCompare((b?.label || ''), undefined, { sensitivity: 'base' }))
+    .filter(option =>
+      (option?.label || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
   // Get display text for selected items
   const getDisplayText = () => {
     if (selectedValues.length === 0) {
@@ -41,6 +99,12 @@ const MultiSelectCheckbox = ({
       return `${selectedValues.length} items selected`;
     }
   };
+
+  const [openModalId, setOpenModalId] = useState(null);
+
+
+
+
 
   return (
     <div className="multi-select-container-new">
@@ -77,6 +141,8 @@ const MultiSelectCheckbox = ({
                   type="text"
                   className="form-control"
                   placeholder={`Search ${title.toLowerCase()}...`}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
@@ -84,7 +150,7 @@ const MultiSelectCheckbox = ({
 
             {/* Options List */}
             <div className="options-list-new">
-              {options.map((option) => (
+              {filteredOptions.map((option) => (
                 <label key={option.value} className="option-item-new">
                   <input
                     type="checkbox"
@@ -100,10 +166,10 @@ const MultiSelectCheckbox = ({
                 </label>
               ))}
 
-              {options.length === 0 && (
+              {filteredOptions.length === 0 && (
                 <div className="no-options">
                   <i className="fas fa-info-circle me-2"></i>
-                  No {title.toLowerCase()} available
+                  {searchTerm ? `No ${title.toLowerCase()} found for "${searchTerm}"` : `No ${title.toLowerCase()} available`}
                 </div>
               )}
             </div>
@@ -112,7 +178,8 @@ const MultiSelectCheckbox = ({
             {selectedValues.length > 0 && (
               <div className="options-footer">
                 <small className="text-muted">
-                  {selectedValues.length} of {options.length} selected
+                  {selectedValues.length} of {filteredOptions.length} selected
+                  {searchTerm && ` (filtered from ${options.length} total)`}
                 </small>
               </div>
             )}
@@ -123,528 +190,101 @@ const MultiSelectCheckbox = ({
   );
 };
 
-const DocumentModal = memo(({
-  showDocumentModal,
-  selectedDocument,
-  closeDocumentModal,
-  updateDocumentStatus,
-  getFileType
-}) => {
-  const [showRejectionForm, setShowRejectionForm] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState('');
-  const [documentZoom, setDocumentZoom] = useState(1);
-  const [documentRotation, setDocumentRotation] = useState(0);
-  const getStatusBadgeClass = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'pending': return 'text-dark';
-      case 'verified': return 'text-sucess';
-      case 'rejected': return 'text-danger';
-      default: return 'text-secondary';
-    }
-  };
-  const latestUpload = useMemo(() => {
-    if (!selectedDocument) return null;
-    return selectedDocument.uploads && selectedDocument.uploads.length > 0
-      ? selectedDocument.uploads[selectedDocument.uploads.length - 1]
-      : (selectedDocument.fileUrl && selectedDocument.status !== "Not Uploaded" ? selectedDocument : null);
-  }, [selectedDocument]);
-
-  const handleZoomIn = useCallback(() => {
-    setDocumentZoom(prev => Math.min(prev + 0.1, 2));
-  }, []);
-
-  const handleZoomOut = useCallback(() => {
-    setDocumentZoom(prev => Math.max(prev - 0.1, 0.5));
-  }, []);
-
-  const handleRotate = useCallback(() => {
-    setDocumentRotation(prev => (prev + 90) % 360);
-  }, []);
-
-  const handleReset = useCallback(() => {
-    setDocumentZoom(1);
-    setDocumentRotation(0);
-  }, []);
-
-  const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
-  const fileType = fileUrl ? getFileType(fileUrl) : null;
-
-  const handleRejectClick = useCallback(() => {
-    setShowRejectionForm(true);
-  }, []);
-
-  const handleCancelRejection = useCallback(() => {
-    setShowRejectionForm(false);
-    setRejectionReason('');
-  }, []);
-
-  const handleConfirmRejection = useCallback(() => {
-    if (rejectionReason.trim()) {
-      updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Rejected', rejectionReason);
-      handleCancelRejection();
-    }
-  }, [latestUpload, selectedDocument, rejectionReason, updateDocumentStatus, handleCancelRejection]);
-
-  if (!showDocumentModal || !selectedDocument) return null;
-
-  // Fixed renderDocumentThumbnail - removed setCurrentPreviewUpload calls
-  const renderDocumentThumbnail = (upload, isSmall = true) => {
-    const fileUrl = upload?.fileUrl;
-    if (!fileUrl) {
-      return (
-        <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: '#f8f9fa',
-          border: '1px solid #dee2e6',
-          borderRadius: '4px',
-          width: isSmall ? '100%' : '150px',
-          height: isSmall ? 'auto' : '100px',
-          minHeight: '50px',
-          fontSize: isSmall ? '16px' : '24px',
-          color: '#6c757d'
-        }}>
-          📄
-        </div>
-      );
-    }
-
-    const fileType = getFileType(fileUrl);
-
-    if (fileType === 'image') {
-      return (
-        <img
-          src={fileUrl}
-          alt="Document Preview"
-          className={`document-thumbnail ${isSmall ? 'small' : ''}`}
-          style={{
-            width: isSmall ? '100%' : '150px',
-            height: 'auto',
-            maxWidth: '100%',
-            objectFit: 'contain',
-            borderRadius: '4px',
-            border: '1px solid #dee2e6',
-            backgroundColor: '#f8f9fa',
-            display: 'block',
-            // Remove cursor pointer to indicate it's not clickable
-            cursor: 'default'
-          }}
-        // Remove onClick handler
-        />
-      );
-    } else if (fileType === 'pdf') {
-      return (
-        <div style={{
-          position: 'relative',
-          overflow: 'visible',
-          width: isSmall ? '100%' : '150px',
-          height: 'auto'
-        }}>
-          <iframe
-            src={fileUrl + '#navpanes=0&toolbar=0'}
-            className={`document-thumbnail pdf-thumbnail ${isSmall ? 'small' : ''}`}
-            style={{
-              width: '100%',
-              height: isSmall ? 'auto' : '100px',
-              minHeight: isSmall ? '300px' : '100px',
-              border: '1px solid #dee2e6',
-              borderRadius: '4px',
-              backgroundColor: '#f8f9fa',
-              // Disable pointer events to prevent clicks
-              pointerEvents: 'none'
-            }}
-            title="Document"
-            scrolling={isSmall ? 'auto' : 'no'}
-          />
-          {!isSmall && (
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 123, 255, 0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#007bff',
-              fontSize: '24px',
-              borderRadius: '4px',
-              // Remove cursor pointer
-              cursor: 'default',
-              // Disable pointer events
-              pointerEvents: 'none'
-            }}>
-              {fileType === 'document' ? '📄' :
-                fileType === 'spreadsheet' ? '📊' : '📁'}
-            </div>
-          )}
-        </div>
-      );
-    }
-  };
-
-  return (
-    <div className="document-modal-overlay" onClick={closeDocumentModal}>
-      <div className="document-modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>{selectedDocument.Name} Verification</h3>
-          <button className="close-btn" onClick={closeDocumentModal}>&times;</button>
-        </div>
-
-        <div className="modal-body">
-          <div className="document-preview-section">
-            <div className="document-preview-container" style={{ height: 'auto' }}>
-              {(latestUpload?.fileUrl || selectedDocument?.fileUrl ||
-                (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads")) ? (
-                <>
-                  {(() => {
-                    console.log('selectedDocument:', selectedDocument);
-                    console.log('latestUpload:', latestUpload);
-
-                    const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
-                    const hasDocument = fileUrl ||
-                      (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
-
-                    console.log('fileUrl:', fileUrl);
-                    console.log('hasDocument:', hasDocument);
-
-                    if (hasDocument) {
-                      // If we have a file URL, show the appropriate viewer
-                      if (fileUrl) {
-                        const fileType = getFileType(fileUrl);
-
-                        if (fileType === 'image') {
-                          return (
-                            <img
-                              src={fileUrl}
-                              alt="Document Preview"
-                              style={{
-                                transform: `scale(${documentZoom}) rotate(${documentRotation}deg)`,
-                                transition: 'transform 0.3s ease',
-                                maxWidth: '100%',
-                                objectFit: 'contain'
-                              }}
-                            />
-                          );
-                        } else if (fileType === 'pdf') {
-                          return (
-                            <div className="pdf-viewer" style={{ width: '100%', height: '780px' }}>
-                              <iframe
-                                src={fileUrl + '#navpanes=0&toolbar=0'}
-                                width="100%"
-                                height="100%"
-                                style={{
-                                  border: 'none',
-                                  transform: `scale(${documentZoom})`,
-                                  transformOrigin: 'top left',
-                                  transition: 'transform 0.3s ease'
-                                }}
-                                title="PDF Document"
-                              />
-                            </div>
-                          );
-                        } else {
-                          return (
-                            <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
-                              <div style={{ fontSize: '60px', marginBottom: '20px' }}>
-                                {fileType === 'document' ? '📄' :
-                                  fileType === 'spreadsheet' ? '📊' : '📁'}
-                              </div>
-                              <h4>Document Preview</h4>
-                              <p>Click download to view this file</p>
-                              {fileUrl ? (
-                                <a
-                                  href={fileUrl}
-                                  download
-                                  className="btn btn-primary"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  <i className="fas fa-download me-2"></i>
-                                  Download & View
-                                </a>
-                              ) : (
-                                <button
-                                  className="btn btn-secondary"
-                                  disabled
-                                  title="File URL not available"
-                                >
-                                  <i className="fas fa-download me-2"></i>
-                                  File Not Available
-                                </button>
-                              )}
-                            </div>
-                          );
-                        }
-                      } else {
-                        // Document exists but no file URL - show document uploaded message
-                        return (
-                          <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
-                            <div style={{ fontSize: '60px', marginBottom: '20px' }}>📄</div>
-                            <h4>Document Uploaded</h4>
-                            <p>Document is available for verification</p>
-                            <p><strong>Status:</strong> {selectedDocument?.status}</p>
-                          </div>
-                        );
-                      }
-                    } else {
-                      return (
-                        <div className="no-document">
-                          <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
-                          <p>No document uploaded</p>
-                        </div>
-                      );
-                    }
-                  })()}
-                  {fileUrl && (
-                    <div className="preview-controls">
-                      <button className="control-btn" onClick={handleZoomIn}>
-                        <i className="fas fa-search-plus"></i>
-                      </button>
-                      <button className="control-btn" onClick={handleZoomOut}>
-                        <i className="fas fa-search-minus"></i>
-                      </button>
-                      <button className="control-btn" onClick={handleRotate}>
-                        <i className="fas fa-redo"></i>
-                      </button>
-                      <button className="control-btn" onClick={handleReset}>
-                        <i className="fas fa-compress"></i>
-                      </button>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="no-document">
-                  <i className="fas fa-file-times fa-3x text-muted mb-3"></i>
-                  <p>No document uploaded</p>
-                </div>
-              )}
-            </div>
-
-            {/* document preview container  */}
-
-            {selectedDocument.uploads && selectedDocument.uploads.length > 0 && (
-              <div className="info-card mt-4">
-                <h4>Document History</h4>
-                <div className="document-history">
-                  {selectedDocument.uploads && selectedDocument.uploads.map((upload, index) => (
-                    <div key={index} className="history-item" style={{
-                      display: 'block',
-                      padding: '12px',
-                      marginBottom: '8px',
-                      backgroundColor: '#f8f9fa',
-                      borderRadius: '8px',
-                      border: '1px solid #e9ecef'
-                    }}>
-                      {/* Document Preview Thumbnail using iframe/img */}
-                      <div className="history-preview" style={{ marginRight: '0px' }}>
-                        {renderDocumentThumbnail(upload, true)}
-                      </div>
-
-                      {/* Document Info */}
-                      <div className="history-info" style={{ flex: 1 }}>
-                        {/* <div className="history-date" style={{
-                          fontSize: '14px',
-                          fontWeight: '500',
-                          color: '#495057',
-                          marginBottom: '4px'
-                        }}>
-                          {formatDate(upload.uploadedAt)}
-                        </div> */}
-                        <div className="history-status">
-                          <span className={`${getStatusBadgeClass(upload.status)}`} style={{
-                            fontSize: '12px',
-                            padding: '4px 8px'
-                          }}>
-                            {upload.status}
-                          </span>
-                        </div>
-                        {upload.fileUrl && (
-                          <div className="history-actions" style={{ marginTop: '8px' }}>
-                            <a
-                              href={upload.fileUrl}
-                              download
-                              className="btn btn-sm btn-outline-primary"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{
-                                fontSize: '11px',
-                                padding: '2px 8px',
-                                textDecoration: 'none'
-                              }}
-                            >
-                              <i className="fas fa-download me-1"></i>
-                              Download
-                            </a>
-                            {/* <button
-                              className="btn btn-sm btn-outline-secondary ms-2"
-                              style={{
-                                fontSize: '11px',
-                                padding: '2px 8px'
-                              }}
-                              onClick={() => {
-                                
-                                setCurrentPreviewUpload(upload);
-                              }}
-                            >
-                              <i className="fas fa-eye me-1"></i>
-                              Preview
-                            </button> */}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="document-info-section">
-            <div className="info-card">
-              <h4>Document Information</h4>
-              <div className="info-row">
-                <strong>Document Name:</strong> {selectedDocument.Name}
-              </div>
-              <div className="info-row">
-                <strong>Upload Date:</strong> {(latestUpload?.uploadedAt || selectedDocument?.uploadedAt) ?
-                  new Date(latestUpload?.uploadedAt || selectedDocument?.uploadedAt).toLocaleDateString('en-GB', {
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric'
-                  }) : 'N/A'}
-              </div>
-              <div className="info-row">
-                <strong>Status:</strong>
-                <span className={`${getStatusBadgeClass(latestUpload?.status || selectedDocument?.status)} ms-2`}>
-                  {latestUpload?.status || selectedDocument?.status || 'No Uploads'}
-                </span>
-              </div>
-            </div>
-
-
-
-
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-});
 const useNavHeight = (dependencies = []) => {
   const navRef = useRef(null);
-  const [navHeight, setNavHeight] = useState(140); // Default fallback
-  const widthRef = useRef(null);
-  const [width, setWidth] = useState(0);
+  const [navHeight, setNavHeight] = useState(140);
 
   const calculateHeight = useCallback(() => {
     if (navRef.current) {
       const height = navRef.current.offsetHeight;
-      setNavHeight(height);
-      
+      if (height > 0) {
+        setNavHeight(height);
+      }
     }
   }, []);
-
-  const calculateWidth = useCallback(() => {
-
-    if (widthRef.current) {
-      const width = widthRef.current.offsetWidth;
-      setWidth(width);
-      
-    }
-  }, []);
-
 
   useEffect(() => {
-    // Initial calculation
     calculateHeight();
-    calculateWidth();
-    // Resize listener
-    const handleResize = () => {
-      setTimeout(calculateHeight, 100);
-      setTimeout(calculateWidth, 100);
-    };
-
-    // Mutation observer for nav content changes
-    const observer = new MutationObserver(() => {
-      setTimeout(calculateHeight, 50);
-      setTimeout(calculateWidth, 50);
-    });
-
+    const handleResize = () => setTimeout(calculateHeight, 100);
     window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [calculateHeight]);
 
-    if (navRef.current) {
-      observer.observe(navRef.current, {
-        childList: true,
-        subtree: true,
-        attributes: true
-      });
-    }
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      observer.disconnect();
-    };
-  }, [calculateHeight, calculateWidth]);
-
-  // Recalculate when dependencies change
   useEffect(() => {
+    calculateHeight();
     setTimeout(calculateHeight, 50);
-    setTimeout(calculateWidth, 50);
+    setTimeout(calculateHeight, 200);
   }, dependencies);
 
-  return { navRef, navHeight, calculateHeight, width };
+  return { navRef, navHeight };
 };
-const useMainWidth = (dependencies = []) => {// Default fallback
+
+const useMainWidth = (dependencies = []) => {
   const widthRef = useRef(null);
   const [width, setWidth] = useState(0);
+  const [leftOffset, setLeftOffset] = useState(0);
 
   const calculateWidth = useCallback(() => {
-
     if (widthRef.current) {
-      const width = widthRef.current.offsetWidth;
-      setWidth(width);
+      const rect = widthRef.current.getBoundingClientRect();
+      setWidth(rect.width);
+      setLeftOffset(rect.left);
     }
   }, []);
 
-
   useEffect(() => {
     calculateWidth();
-    // Resize listener
-    const handleResize = () => {
-      setTimeout(calculateWidth, 100);
+
+    const handleResize = () => setTimeout(calculateWidth, 100);
+    const handleSidebarResize = () => {
+      calculateWidth();
+      setTimeout(calculateWidth, 50);
+      setTimeout(calculateWidth, 350);
     };
 
-    // Mutation observer for nav content changes
-    const observer = new MutationObserver(() => {
-      setTimeout(calculateWidth, 50);
-    });
+    let resizeObserver;
+    let mutationObserver;
+
+    const attachObservers = () => {
+      const el = widthRef.current;
+      if (!el) return;
+
+      if (typeof ResizeObserver !== 'undefined' && !resizeObserver) {
+        resizeObserver = new ResizeObserver(() => calculateWidth());
+        resizeObserver.observe(el);
+      }
+
+      if (!mutationObserver) {
+        mutationObserver = new MutationObserver(() => setTimeout(calculateWidth, 50));
+        mutationObserver.observe(el, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+        });
+      }
+    };
 
     window.addEventListener('resize', handleResize);
+    window.addEventListener('college-sidebar-resize', handleSidebarResize);
 
-    if (widthRef.current) {
-      observer.observe(widthRef.current, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['class']
-      });
-    }
+    attachObservers();
+    const attachTimer = setTimeout(attachObservers, 100);
 
     return () => {
+      clearTimeout(attachTimer);
       window.removeEventListener('resize', handleResize);
-      observer.disconnect();
+      window.removeEventListener('college-sidebar-resize', handleSidebarResize);
+      resizeObserver?.disconnect();
+      mutationObserver?.disconnect();
     };
   }, [calculateWidth]);
 
-  // Recalculate when dependencies change
   useEffect(() => {
-    setTimeout(calculateWidth, 100);
+    setTimeout(calculateWidth, 50);
+    setTimeout(calculateWidth, 200);
   }, dependencies);
 
-  return { widthRef, width };
+  return { widthRef, width, leftOffset, calculateWidth };
 };
 const useScrollBlur = (navbarHeight = 140) => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -682,16 +322,195 @@ const useScrollBlur = (navbarHeight = 140) => {
 
   return { isScrolled, scrollY, contentRef };
 };
-const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
+const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null }) => {
+  // Mobile-specific styles
+  const mobileStyles = `
+    .kyc-filter-tabs-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      overflow: visible;
+      max-width: 100%;
+    }
+    .kyc-filter-tabs-wrap .position-relative {
+      flex-shrink: 0;
+    }
+    @media (max-width: 575.98px) {
+      .kyc-filter-tabs--mobile-scroll {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        padding-bottom: 4px;
+      }
+    }
+    .lead-list-body,
+    .lead-list-body .card-content {
+      overflow-anchor: none;
+    }
+    .kyc-search-input-group {
+      max-width: 280px;
+      width: auto;
+      flex: 0 0 auto;
+    }
+    .kyc-search-input-group .form-control {
+      min-width: 0;
+    }
+    .kyc-nav-compact .kyc-search-row {
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: flex-end;
+    }
 
+    @media (max-width: 767.98px) {
+      .main-tabs-container .d-flex {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        padding-bottom: 8px;
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      .main-tabs-container .d-flex::-webkit-scrollbar {
+        display: none;
+      }
+      
+      .main-tabs-container .btn {
+        min-height: 44px;
+        padding: 8px 12px;
+        font-size: 14px;
+        touch-action: manipulation;
+        border-radius: 8px;
+        margin-right: 8px;
+      }
+      
+      .main-tabs-container .btn i {
+        font-size: 12px;
+      }
+      
+      .input-group .form-control {
+        min-height: 44px;
+        font-size: 16px;
+        border-radius: 8px;
+      }
+      
+      .input-group .btn {
+        min-height: 44px;
+        padding: 8px 16px;
+        border-radius: 0 8px 8px 0;
+      }
+      
+      .w-100.btn {
+        min-height: 44px;
+        padding: 12px 16px;
+        font-size: 16px;
+        border-radius: 8px;
+      }
+      
+      .milestoneResponsive {
+        font-size: 10px !important;
+        padding: 2px 4px !important;
+        top: -8px !important;
+        border-radius: 4px !important;
+      }
+      
+      .milestoneResponsive span {
+        font-size: 10px !important;
+        margin-left: 2px !important;
+      }
+      
+      /* Improve touch targets */
+      .btn-group .btn {
+        min-width: 44px;
+        min-height: 44px;
+      }
+      
+      /* Better spacing for mobile */
+      .d-flex.flex-column.gap-2 {
+        gap: 12px !important;
+      }
+      
+      .mb-3 {
+        margin-bottom: 16px !important;
+      }
+      
+      /* Container adjustments for mobile */
+      .container-fluid {
+        padding-left: 12px;
+        padding-right: 12px;
+      }
+      
+      /* Navbar adjustments */
+      .position-relative nav {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+      }
+      
+      /* Better button spacing */
+      .flex-shrink-0 {
+        flex-shrink: 0;
+      }
+      
+      /* Improve text readability on small screens */
+      .btn-sm {
+        font-size: 13px;
+        line-height: 1.2;
+      }
+      
+      /* Better badge positioning */
+      .badge {
+        font-size: 11px;
+        padding: 4px 6px;
+      }
+    }
+    
+    /* Extra small devices (phones, less than 576px) */
+    @media (max-width: 575.98px) {
+      .main-tabs-container .btn {
+        padding: 6px 8px;
+        font-size: 12px;
+        min-height: 40px;
+      }
+      
+      .main-tabs-container .btn i {
+        font-size: 10px;
+      }
+      
+      .input-group .form-control {
+        min-height: 40px;
+        font-size: 14px;
+      }
+      
+      .input-group .btn {
+        min-height: 40px;
+        padding: 6px 12px;
+      }
+      
+      .w-100.btn {
+        min-height: 40px;
+        padding: 10px 12px;
+        font-size: 14px;
+      }
+      
+      .container-fluid {
+        padding-left: 8px;
+        padding-right: 8px;
+      }
+      
+      .position-relative nav {
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+      }
+    }
+  `;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const user = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
   const [setPreVerification, showSetPreVerification] = useState(false);
   const [showPanel, setShowPanel] = useState('')
-
+  const [branches, setBranches] = useState([]);
+  const [selectedBranch, setSelectedBranch] = useState('');
+  const [showBranchModal, setShowBranchModal] = useState(false);
   const candidateRef = useRef();
 
   const fetchProfile = (id) => {
@@ -702,30 +521,23 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
     }
   };
 
-  // useEffect(() => {
-  //   const handleClickOutside = (event) => {
-  //     // Check if click is outside any multi-select dropdown
-  //     const isMultiSelectClick = event.target.closest('.multi-select-container-new');
+  const [permissions, setPermissions] = useState();
 
-  //     if (!isMultiSelectClick) {
-  //       // Close all dropdowns
-  //       setDropdownStates(prev =>
-  //         Object.keys(prev).reduce((acc, key) => {
-  //           acc[key] = false;
-  //           return acc;
-  //         }, {})
-  //       );
-  //     }
-  //   };
+  useEffect(() => {
+    updatedPermission()
+  }, [])
 
-  //   // Add event listener
-  //   document.addEventListener('mousedown', handleClickOutside);
+  const updatedPermission = async () => {
 
-  //   // Cleanup
-  //   return () => {
-  //     document.removeEventListener('mousedown', handleClickOutside);
-  //   };
-  // }, []);
+    const respose = await axios.get(`${backendUrl}/college/permission`, {
+      headers: { 'x-auth': token }
+    });
+    if (respose.data.status) {
+
+      setPermissions(respose.data.permissions);
+    }
+  }
+
 
   // const handleSaveCV = async () => {
   //   if (candidateRef.current) {
@@ -760,6 +572,26 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
         setSelectedProfile(null)
       }
     }
+  };
+
+  const handleProfileImageUpdated = (imageKey) => {
+    if (!selectedProfile?._id || !imageKey) return;
+    const mergeImage = (profile) => ({
+      ...profile,
+      _candidate: {
+        ...profile._candidate,
+        personalInfo: {
+          ...(profile._candidate?.personalInfo || {}),
+          image: imageKey,
+        },
+      },
+    });
+    setAllProfiles(prevProfiles =>
+      prevProfiles.map(profile =>
+        profile._id === selectedProfile._id ? mergeImage(profile) : profile
+      )
+    );
+    setSelectedProfile(prev => (prev?._id === selectedProfile._id ? mergeImage(prev) : prev));
   };
   // ========================================
   // 🎯 Main Tab State
@@ -807,7 +639,12 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
   const [uploadedByUser, setUploadedByUser] = useState(null);
   const [isLoadingUserDetails, setIsLoadingUserDetails] = useState(false);
   const [userDetailsError, setUserDetailsError] = useState(false);
+  const [kycMarkingProfileId, setKycMarkingProfileId] = useState(null);
 
+  //course history
+  const [courseHistory, setCourseHistory] = useState([]);
+  const [jobHistory, setJobHistory] = useState([]);
+  const [selectedDate, setSelectedDate] = useState('');
   // Static document data for demonstration
   useEffect(() => {
     // Initialize circular progress
@@ -844,19 +681,34 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
   // 🎯 eKYC Filters Configuration   {(activeTab[profileIndex] || 0) === 3 && (
   // ========================================
   const [ekycFilters, setEkycFilters] = useState([
-    { _id: 'pendingEkyc', name: 'kyc Pending', count: 0, milestone: '' },
+    { _id: 'pendingEkyc', name: 'Pending for Documents', count: 0, milestone: '' },
+    { _id: 'pendingDocumentVerification', name: 'Pending for Verification', count: 0, milestone: '' },
     { _id: 'rejectedDocs', name: 'Reject Documents', count: 0, milestone: '' },
-    { _id: 'doneEkyc', name: 'kyc Verified', count: 0, milestone: 'Ekyc Done' },
-    { _id: 'placementVerification', name: 'Placement Verification', count: 0, milestone: '' },
+    { _id: 'doneEkyc', name: 'Center Verified', count: 0, milestone: 'Ekyc Done' },
     { _id: 'All', name: 'All', count: 0, milestone: '' }
 
   ]);
 
 
-  const { navRef, navHeight, navWidth } = useNavHeight([ekycFilters, showEditPanel, showFollowupPanel, leadHistoryPanel, showWhatsappPanel, mainContentClass, isPanelOpen]);
+  const { navRef, navHeight } = useNavHeight([ekycFilters, showEditPanel, showFollowupPanel, leadHistoryPanel, showWhatsappPanel, mainContentClass, isPanelOpen]);
+  const { widthRef, width, leftOffset, calculateWidth } = useMainWidth([
+    ekycFilters,
+    showEditPanel,
+    showFollowupPanel,
+    leadHistoryPanel,
+    showWhatsappPanel,
+    mainContentClass,
+    isPanelOpen,
+  ]);
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
   const blurIntensity = Math.min(scrollY / 10, 15);
-  const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
+  useEffect(() => {
+    if (isPanelOpen) {
+      calculateWidth();
+      setTimeout(calculateWidth, 50);
+      setTimeout(calculateWidth, 350);
+    }
+  }, [isPanelOpen, calculateWidth]);
 
   // ========================================
   // 🎯 All Admission Filters Configuration
@@ -907,6 +759,74 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
   const [courseOptions, setCourseOptions] = useState([]);
   const [centerOptions, setCenterOptions] = useState([]);
   const [counselorOptions, setCounselorOptions] = useState([]);
+  const [batchOptions, setBatchOptions] = useState([]);
+  const [allCoursesMeta, setAllCoursesMeta] = useState([]);
+  const [cycleFilters, setCycleFilters] = useState({
+    department: '',
+    project: '',
+    center: '',
+    course: '',
+    batch: '',
+  });
+
+  const cycleProjectOptions = useMemo(() => {
+    if (!cycleFilters.department) return projectOptions;
+    const projectIds = new Set(
+      allCoursesMeta
+        .filter((c) => String(c.vertical?._id || c.vertical) === String(cycleFilters.department))
+        .map((c) => String(c.project?._id || c.project))
+    );
+    return projectOptions.filter((p) => projectIds.has(String(p.value)));
+  }, [cycleFilters.department, projectOptions, allCoursesMeta]);
+
+  const cycleCourseOptions = useMemo(() => {
+    let list = courseOptions;
+    if (cycleFilters.department) {
+      const ids = new Set(
+        allCoursesMeta
+          .filter((c) => String(c.vertical?._id || c.vertical) === String(cycleFilters.department))
+          .map((c) => String(c._id))
+      );
+      list = list.filter((c) => ids.has(String(c.value)));
+    }
+    if (cycleFilters.project) {
+      const ids = new Set(
+        allCoursesMeta
+          .filter((c) => String(c.project?._id || c.project) === String(cycleFilters.project))
+          .map((c) => String(c._id))
+      );
+      list = list.filter((c) => ids.has(String(c.value)));
+    }
+    return list;
+  }, [cycleFilters.department, cycleFilters.project, courseOptions, allCoursesMeta]);
+
+  const docDashCounts = useMemo(() => {
+    let done = 0;
+    let pending = 0;
+    allProfiles.forEach((p) => {
+      const total = Number(p?.docCounts?.totalRequired ?? 0);
+      const uploaded = Number(p?.docCounts?.uploadedCount ?? 0);
+      if (total <= 0) return;
+      if (uploaded >= total) done += 1;
+      else pending += 1;
+    });
+    return { done, pending };
+  }, [allProfiles]);
+
+  const kycSummaryCards = useMemo(() => {
+    const pendingDoc = ekycFilters.find((f) => f._id === 'pendingEkyc')?.count ?? 0;
+    const pendingVerify = ekycFilters.find((f) => f._id === 'pendingDocumentVerification')?.count ?? 0;
+    const verified = ekycFilters.find((f) => f._id === 'doneEkyc')?.count ?? 0;
+    const rejected = ekycFilters.find((f) => f._id === 'rejectedDocs')?.count ?? 0;
+    const total = ekycFilters.find((f) => f._id === 'All')?.count ?? 0;
+    return [
+      { key: 'total', label: 'Total', value: total, bg: '#5b4fc9' },
+      { key: 'pendingDoc', label: 'Pending Docs', value: pendingDoc, bg: '#f59e0b' },
+      { key: 'pendingVerify', label: 'Pending Verify', value: pendingVerify, bg: '#12b3ff' },
+      { key: 'verified', label: 'Verified', value: verified, bg: '#10b981' },
+      { key: 'rejected', label: 'Rejected', value: rejected, bg: '#ef4444' },
+    ];
+  }, [ekycFilters]);
 
   // Fetch filter options from backend API on mount
   useEffect(() => {
@@ -922,8 +842,32 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
           setVerticalOptions(res.data.verticals.map(v => ({ value: v._id, label: v.name })));
           setProjectOptions(res.data.projects.map(p => ({ value: p._id, label: p.name })));
           setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
-          setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
-          setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
+          try {
+            const centersRes = await axios.get(`${backendUrl}/college/list_all_centers`, {
+              headers: { 'x-auth': token }
+            });
+            if (centersRes.data.success && centersRes.data.data) {
+              setCenterOptions(centersRes.data.data.map(c => ({ value: c._id, label: c.name })));
+            } else {
+              setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
+            }
+          } catch {
+            setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
+          }
+          const activeCounselors = (res.data.counselors || []).filter(
+            (c) => c?.status === true || c?.status === 'active'
+          );
+          setCounselorOptions(activeCounselors.map(c => ({ value: c._id, label: c.name })));
+        }
+        try {
+          const coursesMetaRes = await axios.get(`${backendUrl}/college/all_courses`, {
+            headers: { 'x-auth': token }
+          });
+          if (coursesMetaRes.data?.success) {
+            setAllCoursesMeta(coursesMetaRes.data.data || []);
+          }
+        } catch (metaErr) {
+          console.error('Failed to fetch courses meta:', metaErr);
         }
       } catch (err) {
         console.error('Failed to fetch filter options:', err);
@@ -931,6 +875,31 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
     };
     fetchFilterOptions();
   }, []);
+
+  useEffect(() => {
+    const fetchBatches = async () => {
+      try {
+        const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
+        const authToken = userData.token;
+        const apiUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+        const params = new URLSearchParams();
+        if (cycleFilters.center) params.set('centerId', cycleFilters.center);
+        if (cycleFilters.course) params.set('courseId', cycleFilters.course);
+        const res = await axios.get(`${apiUrl}/college/get_batches?${params.toString()}`, {
+          headers: { 'x-auth': authToken }
+        });
+        if (res.data?.success) {
+          setBatchOptions((res.data.data || []).map((b) => ({ value: b._id, label: b.name })));
+        } else {
+          setBatchOptions([]);
+        }
+      } catch (err) {
+        console.error('Failed to fetch batches:', err);
+        setBatchOptions([]);
+      }
+    };
+    fetchBatches();
+  }, [cycleFilters.center, cycleFilters.course]);
 
 
 
@@ -942,7 +911,155 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
   const [questionAnswers, setQuestionAnswers] = useState([]);
   const [isLoadingAnswers, setIsLoadingAnswers] = useState(false);
   const [currentPreVerificationProfile, setCurrentPreVerificationProfile] = useState(null);
+  const [visitDates, setVisitDates] = useState([]);
+
+  const [preVerificationQuestions, setPreVerificationQuestions] = useState([]);
+  const [isLoadingPreVerificationQuestions, setIsLoadingPreVerificationQuestions] = useState(false);
+  // Question rejection reason modal state
+  const [showQuestionRejectionModal, setShowQuestionRejectionModal] = useState(false);
+  const [questionRejectionReason, setQuestionRejectionReason] = useState('');
+  const [pendingQuestionRejection, setPendingQuestionRejection] = useState(null);
   // Function to fetch existing question answers
+  const openPreVerificationModal = async (profile) => {
+    setSelectedProfile(profile);
+    showSetPreVerification(true);
+    // Fetch existing question answers if any
+    await fetchQuestionAnswers(profile._id);
+  };
+
+  const fetchPreVerificationQuestions = async () => {
+    try {
+      setIsLoadingPreVerificationQuestions(true);
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+
+      const response = await axios.get(
+        `${backendUrl}/college/candidate/preVerification/questions`,
+        {
+          headers: { "x-auth": token },
+        }
+      );
+
+      if (response.data.status && Array.isArray(response.data.data)) {
+        setPreVerificationQuestions(response.data.data);
+      } else {
+        setPreVerificationQuestions([]);
+      }
+    } catch (error) {
+      console.error("Error fetching pre‑verification questions:", error);
+      setPreVerificationQuestions([]);
+    } finally {
+      setIsLoadingPreVerificationQuestions(false);
+    }
+  };
+
+  // Handle question rejection with reason
+  const handleQuestionRejection = (questionNumber, questionText) => {
+    setPendingQuestionRejection({ questionNumber, questionText });
+    setShowQuestionRejectionModal(true);
+  };
+
+  // Confirm question rejection with reason
+  const confirmQuestionRejection = () => {
+    if (!questionRejectionReason.trim()) {
+      alert('Please enter a rejection reason');
+      return;
+    }
+
+    // Update the form data with rejection and reason
+    setQuestionFormData(prev => ({
+      ...prev,
+      [`q${pendingQuestionRejection.questionNumber}`]: 'Rejected',
+      [`q${pendingQuestionRejection.questionNumber}_reason`]: questionRejectionReason
+    }));
+
+    // Close modal and reset
+    setShowQuestionRejectionModal(false);
+    setQuestionRejectionReason('');
+    setPendingQuestionRejection(null);
+  };
+
+  // Cancel question rejection
+  const cancelQuestionRejection = () => {
+    setShowQuestionRejectionModal(false);
+    setQuestionRejectionReason('');
+    setPendingQuestionRejection(null);
+  };
+
+  // Visit Calendar Functions
+  const saveVisitDate = async (appliedCourseId, visitDate, visitType) => {
+    try {
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+
+      const response = await axios.post(`${backendUrl}/college/candidate/visit-calendar`, {
+        appliedCourseId,
+        visitDate,
+        visitType
+      }, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.status) {
+        console.log('Visit date saved successfully:', response.data);
+        return response.data;
+      } else {
+        console.error('Error saving visit date:', response.data.message);
+        return null;
+      }
+    } catch (error) {
+      console.error('Error saving visit date:', error);
+      return null;
+    }
+  };
+
+  const getVisitDates = async (appliedCourseId) => {
+    try {
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+
+      const response = await axios.get(`${backendUrl}/college/candidate/visit-calendar/${appliedCourseId}`, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.status) {
+        console.log('Visit dates fetched successfully:', response.data.data);
+        return response.data.data;
+      } else {
+        console.error('Error fetching visit dates:', response.data.message);
+        return [];
+      }
+    } catch (error) {
+      console.error('Error fetching visit dates:', error);
+      return [];
+    }
+  };
+
+  const updateVisitStatus = async (visitId, status, remarks) => {
+    try {
+      const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+      const token = userData.token;
+
+      const response = await axios.put(`${backendUrl}/college/candidate/visit-calendar/${visitId}`, {
+        status,
+        remarks
+      }, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.status) {
+        console.log('Visit status updated successfully:', response.data);
+        return response.data;
+      } else {
+        console.error('Error updating visit status:', response.data.message);
+        return null;
+      }
+    } catch (error) {
+      console.error('Error updating visit status:', error);
+      return null;
+    }
+  };
+
   const fetchQuestionAnswers = async (appliedcourseId) => {
     try {
 
@@ -959,55 +1076,109 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
 
       if (response.data.status && response.data.data) {
         const existingData = response.data.data.responses;
+        const visitDates = response.data.data.visitDates || [];
 
-          console.log('existingData', existingData)
+        console.log('existingData', existingData)
+        console.log('visitDates', visitDates)
 
         setQuestionAnswers(existingData);
-    
+
+        const formData = {};
+        const sortedQuestions = (preVerificationQuestions || [])
+          .filter((q) => q.isActive !== false)
+          .sort((a, b) => (a.order || 0) - (b.order || 0));
+        sortedQuestions.forEach((q, index) => {
+          const match = existingData.find((qa) => qa.question === q.questionText);
+          if (match) {
+            formData[`q${index + 1}`] = match.answer;
+            if (match.rejectionReason) {
+              formData[`q${index + 1}_reason`] = match.rejectionReason;
+            }
+          }
+        });
+
+        setQuestionFormData(formData);
+
+        // Store visit dates in state for later use
+        setVisitDates(visitDates);
+
       } else {
         setQuestionFormData({});
         setQuestionAnswers([]);
+        setVisitDates([]);
       }
     } catch (error) {
       console.log('No existing question answers found or error:', error);
       setQuestionFormData({});
       setQuestionAnswers([]);
+      setVisitDates([]);
     } finally {
       setIsLoadingAnswers(false);
     }
   };
 
+  useEffect(() => {
+    fetchPreVerificationQuestions();
+  }, []);
+
   const QuestionAnswer = async () => {
     try {
       setIsSubmittingAnswers(true);
 
-      console.log(questionFormData, 'questionFormData')
-      console.log(selectedProfile, 'selectedProfile')
       const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
       const token = userData.token;
       if (!token) {
         alert("Authentication token not found. Please login again.");
         return;
       }
-      // Transform questionFormData into responses array format
+
+      if (!preVerificationQuestions.length) {
+        alert("Pre‑verification questions are not loaded. Please try again.");
+        return;
+      }
+
+      const sortedQuestions = preVerificationQuestions
+        .filter((q) => q.isActive !== false)
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+      const isVisitTypeQuestion = (q) => {
+        if (q.type === 'visit') return true;
+        const opts = Array.isArray(q.options) ? q.options : [];
+        return opts.length >= 2 &&
+          opts.some((o) => /visit/i.test(String(o))) &&
+          opts.some((o) => /joining/i.test(String(o))) &&
+          opts.some((o) => /both/i.test(String(o)));
+      };
+      const visitQuestionIndex = sortedQuestions.findIndex(isVisitTypeQuestion);
+
+      // Validation for visit date when user has answered the visit-type question
+      const visitAnswerKey = visitQuestionIndex >= 0 ? `q${visitQuestionIndex + 1}` : null;
+      if (visitAnswerKey && questionFormData[visitAnswerKey] && !selectedDate) {
+        alert('Please select a date');
+        setIsSubmittingAnswers(false);
+        return;
+      }
+
       const responses = [];
-      const questions = [
-        "Is the Candidate Aware of the Course",
-        "Is the Candidate Aware from the Course Curriculum",
-        "Currently Work Status",
-        "Is Candidate Interested for Course",
-        "Is Candidate Ready for Course",
-        "Is Candidate Ready for Course Fee",
-        "Is Candidate Ready for Course Duration"
-      ];
+      const questions = sortedQuestions.map((q) => q.questionText);
+
+      const existingAnswersMap = {};
+      questionAnswers.forEach(qa => {
+        existingAnswersMap[qa.question] = qa.answer;
+      });
 
       questions.forEach((question, index) => {
-        const answer = questionFormData[`q${index + 1}`];
+        const fieldKey = `q${index + 1}`;
+        const newAnswer = questionFormData[fieldKey];
+        const existingAnswer = existingAnswersMap[question];
+        const answer = newAnswer || existingAnswer;
+
         if (answer) {
-          responses.push({
-            question: question,
-            answer: answer
-          });
+          const responseObj = { question, answer };
+          if (answer === 'Rejected') {
+            const rejectionReason = questionFormData[`${fieldKey}_reason`];
+            if (rejectionReason) responseObj.rejectionReason = rejectionReason;
+          }
+          responses.push(responseObj);
         }
       });
 
@@ -1021,29 +1192,154 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
         return;
       }
 
-      const response = await axios.post(`${backendUrl}/college/candidate/questionAnswer`, {
-        appliedcourse: selectedProfile._id,
-        responses: responses
-      }, {
-        headers: { 'x-auth': token }
-      });
-      console.log("responnse", response)
-      if (response.data.status) {
-        alert("Pre-verification questions submitted successfully!");
-        showSetPreVerification(false);
-        setQuestionFormData({}); // Reset form
-      } else {
-        alert("Error: " + response.data.message);
+
+      const qaResponse = await axios.post(
+        `${backendUrl}/college/candidate/questionAnswer`,
+        {
+          appliedcourse: selectedProfile._id,
+          responses,
+          visitDate: selectedDate
+        },
+        { headers: { 'x-auth': token } }
+      );
+
+      if (!qaResponse.data.status) {
+        alert("Error: " + qaResponse.data.message);
+        return;
       }
 
-      console.log(response, 'response');
+
+      const visitType = visitAnswerKey ? questionFormData[visitAnswerKey] : null;
+      if (visitAnswerKey && visitType && selectedDate) {
+        const formData = {
+          appliedCourseId: selectedProfile._id,
+          visitDate: selectedDate,
+          visitType: visitType
+        };
+        await axios.post(
+          `${backendUrl}/college/candidate/visit-calendar`,
+          formData,
+          { headers: { 'x-auth': token, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // 4️⃣ Handle responses
+      alert("Pre-verification & visit scheduled successfully!");
+      showSetPreVerification(false);
+      setQuestionFormData({});
+      setSelectedDate('');
+      setQuestionAnswers(responses);
+
     } catch (error) {
-      console.log(error, 'error');
-      alert("Error submitting pre-verification questions. Please try again.");
+      console.error(error);
+      alert("Error occurred while submitting data.");
     } finally {
+      if (selectedProfile?._id) {
+        fetchQuestionAnswers(selectedProfile._id);
+      }
       setIsSubmittingAnswers(false);
     }
-  }
+  };
+
+
+
+
+  // const QuestionAnswer = async () => {
+  //   try {
+  //     setIsSubmittingAnswers(true);
+
+  //     console.log(questionFormData, 'questionFormData')
+  //     console.log(selectedProfile, 'selectedProfile')
+  //     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
+  //     const token = userData.token;
+  //     if (!token) {
+  //       alert("Authentication token not found. Please login again.");
+  //       return;
+  //     }
+
+  //     // Transform questionFormData into responses array format
+  //     const responses = [];
+  //     const questions = [
+  //       "Is the Candidate Aware of the Course",
+  //       "Is the Candidate Aware of the Course and practicle Module ?",
+  //       "Currently Work Status / Not Working Status",
+  //       "Is Candidate Interested for Course Completion?",
+  //       "If we offered a job outside Odisha, would you be interested in the placement?",
+  //       "Parent Confirmation",
+  //       "Recommendation from Placement",
+  //       "Confirm DOB",
+  //       "Are you Going to Attend Center for Physical Counselling"
+  //     ];
+
+  //     // Create a map of existing answers for easy lookup
+  //     const existingAnswersMap = {};
+  //     questionAnswers.forEach(qa => {
+  //       existingAnswersMap[qa.question] = qa.answer;
+  //     });
+
+  //     questions.forEach((question, index) => {
+  //       // Check if there's a new answer in the form
+  //       const newAnswer = questionFormData[`q${index + 1}`];
+  //       // Check if there's an existing answer
+  //       const existingAnswer = existingAnswersMap[question];
+
+  //       // Use new answer if available, otherwise use existing answer
+  //       const answer = newAnswer || existingAnswer;
+
+  //       if (answer) {
+  //         const responseObj = {
+  //           question: question,
+  //           answer: answer
+  //         };
+
+  //         // If answer is "Rejected", include the rejection reason
+  //         if (answer === 'Rejected') {
+  //           const rejectionReason = questionFormData[`q${index + 1}_reason`];
+  //           if (rejectionReason) {
+  //             responseObj.rejectionReason = rejectionReason;
+  //           }
+  //         }
+
+  //         responses.push(responseObj);
+  //       }
+  //     });
+
+  //     if (!selectedProfile || !selectedProfile._id) {
+  //       alert("No profile selected. Please try again.");
+  //       return;
+  //     }
+
+  //     if (responses.length === 0) {
+  //       alert("Please answer at least one question before submitting.");
+  //       return;
+  //     }
+
+  //     const response = await axios.post(`${backendUrl}/college/candidate/questionAnswer`, {
+  //       appliedcourse: selectedProfile._id,
+  //       responses: responses
+  //     }, {
+  //       headers: { 'x-auth': token }
+  //     });
+  //     console.log("responnse", response)
+  //     if (response.data.status) {
+  //       alert("Pre-verification questions submitted successfully!");
+  //       showSetPreVerification(false);
+  //       setQuestionFormData({}); // Reset form
+  //       // Update the questionAnswers state with the new responses
+  //       setQuestionAnswers(responses);
+  //     } else {
+  //       alert("Error: " + response.data.message);
+  //     }
+
+  //     console.log(response, 'response');
+  //   } catch (error) {
+  //     console.log(error, 'error');
+  //     alert("Error submitting pre-verification questions. Please try again.");
+  //   } finally {
+  //     fetchQuestionAnswers(selectedProfile._id);
+  //     setIsSubmittingAnswers(false);
+  //   }
+  // }
 
   useEffect(() => {
     if (selectedProfile) {
@@ -1196,6 +1492,51 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
     }
   };
 
+  useEffect(() => {
+    fetchCourseHistory();
+  }, [selectedProfile]);
+
+  useEffect(() => {
+    fetchJobHistory();
+  }, [selectedProfile]);
+
+  const fetchCourseHistory = async () => {
+    try {
+
+      if (!selectedProfile) {
+        return;
+      }
+      setCourseHistory([]);
+      const response = await axios.get(`${backendUrl}/college/candidate/appliedCourses/${selectedProfile._candidate._id}`, {
+        headers: { 'x-auth': token }
+      });
+      // console.log("response", response);
+      if (response.data && response.data.courses) {
+        setCourseHistory(response.data.courses);
+      }
+    } catch (error) {
+      console.log("error", error);
+    }
+  }
+
+  const fetchJobHistory = async () => {
+    try {
+
+      if (!selectedProfile) {
+        return;
+      }
+      setJobHistory([]);
+      const response = await axios.get(`${backendUrl}/college/candidate/appliedJobs/${selectedProfile._candidate._id}`, {
+        headers: { 'x-auth': token }
+      });
+      console.log("response", response);
+      if (response.data && response.data.jobs) {
+        setJobHistory(response.data.jobs);
+      }
+    } catch (error) {
+      console.log("error", error);
+    }
+  }
 
   // Simulate file upload with progress
   const handleFileUpload = async () => {
@@ -1231,7 +1572,7 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
 
         // Optionally refresh data here
         closeUploadModal();
-        fetchProfileData()
+        // fetchProfileData()
       } else {
         alert('Failed to upload file');
       }
@@ -1320,12 +1661,26 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
       );
 
       if (response.data.success) {
-        // If KYC was updated, show a success message
-        if (response.data.kycUpdated) {
-          alert('All documents verified! KYC status has been updated.');
-        } else {
-          alert(`Document ${status.toLowerCase()} successfully!`);
+        let msg = `Document ${status.toLowerCase()} successfully!`;
+        if (response.data.documentVerifiedWhatsAppSent) {
+          msg += ' All mandatory documents are verified; document_verified WhatsApp was sent to the student.';
+        } else if (response.data.documentVerifiedWhatsAppSkippedNoPhone && status === 'Verified') {
+          msg += ' All mandatory documents are verified, but WhatsApp was not sent (no mobile/WhatsApp on profile).';
+        } else if (response.data.documentVerifiedWhatsAppError) {
+          msg += ` All mandatory documents are verified, but WhatsApp failed: ${response.data.documentVerifiedWhatsAppError}`;
+        } else if (response.data.allMandatoryDocsVerified && status === 'Verified') {
+          msg += ' All mandatory documents are now verified.';
         }
+        if (status === 'Rejected') {
+          if (response.data.documentRejectedWhatsAppSent) {
+            msg += ' document_rejected_ WhatsApp was sent to the student.';
+          } else if (response.data.documentRejectedWhatsAppSkippedNoPhone) {
+            msg += ' WhatsApp was not sent (no mobile/WhatsApp on profile).';
+          } else if (response.data.documentRejectedWhatsAppError) {
+            msg += ` WhatsApp failed: ${response.data.documentRejectedWhatsAppError}`;
+          }
+        }
+        alert(msg);
 
         // Refresh the profile data
         await fetchProfileData();
@@ -1336,6 +1691,45 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
     } catch (error) {
       console.error('Error updating document status:', error);
       alert('Failed to update document status');
+    }
+  };
+
+  const handleMarkKycDone = async (profile) => {
+    if (!profile || !profile._id) return;
+    if (profile.kyc === true) {
+      alert('KYC is already marked as done for this candidate.');
+      return;
+    }
+    if (!window.confirm('Mark KYC as done for this candidate? All mandatory documents must be verified.')) {
+      return;
+    }
+    setKycMarkingProfileId(profile._id);
+    try {
+      const course = profile._course;
+      const mandatoryFromCourse = (course?.docsRequired || []).filter(
+        (d) => d.mandatory === true && d.status !== false
+      );
+      const rawUploads = profile.uploadedDocs || [];
+
+      const response = await axios.post(
+        `${backendUrl}/college/kycDone/${profile._id}`,
+        {},
+        { headers: { 'x-auth': token } }
+      );
+      if (response.data.success) {
+        alert('KYC marked as done successfully.');
+        await fetchProfileData();
+      } else {
+        // console.warn('[KYC mark done] success:false', response.data);
+        alert(response.data.message || 'Failed to mark KYC done');
+      }
+    } catch (error) {
+      const errData = error.response?.data;
+      const msg = errData?.message || error.message || 'Failed to mark KYC done';
+           
+      alert(msg);
+    } finally {
+      setKycMarkingProfileId(null);
     }
   };
 
@@ -1400,32 +1794,31 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
 
 
   const handleCrmFilterClick = (filter, index) => {
+    // 0: Pending for Documents, 1: Pending for Verification, 2: Reject Documents, 3: Verified, 4: All
     if (index === 0) {
-      setFilterData({
-        ...filterData,
-        kyc: false,
-      })
+      setFilterData(prev => ({ ...prev, kyc: false }));
       setActiveCrmFilter(index);
       return;
     }
     if (index === 1) {
-      // Filter profiles where kyc is true
-      setFilterData({
-        ...filterData,
-        kyc: true,
-      })
-      setActiveCrmFilter(index);
-      return;
-    } else if (index === 2) {
-      setFilterData({
-        ...filterData,
-        kyc: 'all',
-      })
+      setFilterData(prev => ({ ...prev, kyc: false })); // Pending for Verification = not yet verified
       setActiveCrmFilter(index);
       return;
     }
+    if (index === 2) {
+      setFilterData(prev => ({ ...prev, kyc: 'all' }));
+      setActiveCrmFilter(index);
+      return;
+    }
+    if (index === 3) {
+      // Verified tab - only kyc done
+      setFilterData(prev => ({ ...prev, kyc: true }));
+      setActiveCrmFilter(index);
+      return;
+    }
+    // index === 4: All
+    setFilterData(prev => ({ ...prev, kyc: 'all' }));
     setActiveCrmFilter(index);
-
   };
 
   // Filter state from Registration component
@@ -1901,9 +2294,20 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
         }
 
         // Send PUT request to backend API
-        const response = await axios.put(
-          `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
-          data,
+        // const response = await axios.put(
+        //   `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
+        //   data,
+        //   {
+        //     headers: {
+        //       'x-auth': token,
+        //       'Content-Type': 'application/json'
+        //     }
+        //   }
+        // );
+
+        const response = await axios.post(
+          `${backendUrl}/college/b2c-set-followups`,
+          { appliedCourseId: selectedProfile._id, followupDate: followupDateTime, remarks: remarks },
           {
             headers: {
               'x-auth': token,
@@ -1911,6 +2315,7 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
             }
           }
         );
+
 
         console.log('API response:', response.data);
 
@@ -1955,7 +2360,75 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
     }
   };
 
+  const getBranches = async (profile) => {
+    // Check if profile and course exist
+    if (!profile || !profile._course || !profile._course._id) {
+      alert('Profile or course information is missing. Cannot fetch branches.');
+      return;
+    }
 
+    const courseId = profile._course._id;
+    const response = await axios.get(`${backendUrl}/college/courses/get-branches?courseId=${courseId}`, {
+      headers: {
+        'x-auth': token,
+        'Content-Type': 'multipart/form-data',
+      }
+    });
+    if (response.data.status) {
+      setBranches(response.data);
+      setSelectedBranch('');
+    } else {
+      alert('Failed to fetch branches');
+    }
+  }
+
+  const updateBranch = async (profile, selectedBranchId) => {
+    if (!selectedBranchId) {
+      alert('Please select a branch first');
+      return;
+    }
+
+    const profileId = profile._id;
+
+    try {
+      const response = await axios.put(`${backendUrl}/college/courses/update-branch/${profileId}`, {
+        centerId: selectedBranchId
+      }, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'application/json',
+        }
+      });
+      if (response.data.success) {
+        alert('Branch updated successfully!');
+        // Optionally refresh the data or close modal
+        setShowBranchModal(false);
+
+        // const selectedBranchDetails = branches.data?.find(branch => branch._id === selectedBranchId);
+        // setAllProfiles(prevProfiles => 
+        //   prevProfiles.map(p => 
+        //     p._id === profile._id 
+        //       ? {
+        //           ...p,
+        //           _center: selectedBranchDetails || { _id: selectedBranchId, name: 'Updated Branch' }
+        //         }
+        //       : p
+        //   )
+        // );
+
+        setSelectedBranch('');
+
+
+
+        await fetchProfileData();
+      } else {
+        alert('Failed to update branch');
+      }
+    } catch (error) {
+      console.error('Error updating branch:', error);
+      alert('Failed to update branch: ' + (error.response?.data?.message || error.message));
+    }
+  }
 
 
   useEffect(() => {
@@ -1978,7 +2451,7 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
         page: page.toString(),
         ...(filters.name && { name: filters.name }),
         ...(filters.courseType && { courseType: filters.courseType }),
-        ...(filters.kyc && { kyc: filters.kyc }),
+        ...(filters.kyc !== undefined && filters.kyc !== 'all' && { kyc: String(filters.kyc) }),
         ...(filters.status && filters.status !== 'true' && { status: filters.status }),
         ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
         ...(filters.sector && { sector: filters.sector }),
@@ -1989,10 +2462,11 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
         ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
         ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
         // Multi-select filters
-        ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
-        ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
-        ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
-        ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
+        ...(cycleFilters.project ? { projects: JSON.stringify([cycleFilters.project]) } : formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+        ...(cycleFilters.department ? { verticals: JSON.stringify([cycleFilters.department]) } : formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+        ...(cycleFilters.course ? { course: JSON.stringify([cycleFilters.course]) } : formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
+        ...(cycleFilters.center ? { center: JSON.stringify([cycleFilters.center]) } : formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
+        ...(cycleFilters.batch ? { batch: JSON.stringify([cycleFilters.batch]) } : {}),
         ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
       });
 
@@ -2008,10 +2482,10 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
         const { crmFilterCounts } = response.data;
 
         const filter = [
-          { _id: 'pendingEkyc', name: 'kyc Pending', count: crmFilterCounts.pendingKyc, milestone: '' },
+          { _id: 'pendingEkyc', name: 'Pending for Documents', count: crmFilterCounts.pendingKyc, milestone: '' },
+          { _id: 'pendingDocumentVerification', name: 'Pending for Verification', count: 0, milestone: '' },
           { _id: 'rejectedDocs', name: 'Reject Documents', count: 0, milestone: '' },
-          { _id: 'doneEkyc', name: 'kyc Verified', count: crmFilterCounts.doneKyc, milestone: 'kyc Done' },
-          { _id: 'placementVerification', name: 'Placement Verification', count: crmFilterCounts.placementVerification, milestone: '' },
+          { _id: 'doneEkyc', name: 'Verified', count: crmFilterCounts.doneKyc, milestone: 'kyc Done' },
           { _id: 'All', name: 'All', count: crmFilterCounts.all, milestone: '' }
         ];
 
@@ -2046,12 +2520,13 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
     setShowPopup(prev => prev === profileIndex ? null : profileIndex);
   };
 
-  const handleTabClick = (profileIndex, tabIndex) => {
+  const handleTabClick = (profileIndex, tabIndex, profile) => {
+    setSelectedProfile(profile)
     setActiveTab(prevTabs => ({
       ...prevTabs,
       [profileIndex]: tabIndex
     }));
-    
+
     // If Pre Verification tab is clicked (index 5), fetch the data for this specific candidate
     if (tabIndex === 5) {
       const currentProfile = allProfiles[profileIndex];
@@ -2101,9 +2576,28 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
 
 
 
-  const toggleLeadDetails = (profileIndex) => {
-    setLeadDetailsVisible(prev => prev === profileIndex ? null : profileIndex);
+  const leadCardRefs = useRef({});
+  const scrollToLeadIdRef = useRef(null);
+
+  const toggleLeadDetails = (profile) => {
+    const profileId = profile?._id;
+    if (!profileId) return;
+    setLeadDetailsVisible((prev) => {
+      const next = prev === profileId ? null : profileId;
+      if (next) scrollToLeadIdRef.current = next;
+      return next;
+    });
   };
+
+  useLayoutEffect(() => {
+    const id = scrollToLeadIdRef.current;
+    if (!id || leadDetailsVisible !== id) return;
+    const el = leadCardRefs.current[id];
+    if (el) {
+      el.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+    }
+    scrollToLeadIdRef.current = null;
+  }, [leadDetailsVisible]);
 
   const closeleadHistoryPanel = () => {
     setLeadHistoryPanel(false)
@@ -2237,7 +2731,7 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
     }
   };
 
-  // Function to fetch user details when document modal opens
+  // Function to fetch u Apply Filtersser details when document modal opens
   const fetchUserDetailsForDocument = async (document) => {
     if (!document) return;
 
@@ -2285,6 +2779,10 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
     const [rejectionReason, setRejectionReason] = useState('');
     const [documentZoom, setDocumentZoom] = useState(1);
     const [documentRotation, setDocumentRotation] = useState(0);
+    const [isPanning, setIsPanning] = useState(false);
+    const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+    const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+    const [accumulatedPan, setAccumulatedPan] = useState({ x: 0, y: 0 });
 
     const latestUpload = useMemo(() => {
       if (!selectedDocument) return null;
@@ -2310,9 +2808,11 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
     const handleReset = useCallback(() => {
       setDocumentZoom(1);
       setDocumentRotation(0);
+      setPanOffset({ x: 0, y: 0 });
+      setAccumulatedPan({ x: 0, y: 0 });
     }, []);
 
-    const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+    const fileUrl = getDocFileUrl(latestUpload?.fileUrl || selectedDocument?.fileUrl);
     const fileType = fileUrl ? getFileType(fileUrl) : null;
 
     const handleRejectClick = useCallback(() => {
@@ -2336,7 +2836,7 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
     // Helper function to render document preview thumbnail using iframe/img
     // यदि आप बिल्कुल auto height चाहते हैं (बिना किसी limit के):
     const renderDocumentThumbnail = (upload, isSmall = true) => {
-      const fileUrl = upload?.fileUrl;
+      const fileUrl = getDocFileUrl(upload?.fileUrl);
       if (!fileUrl) {
         return (
           <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
@@ -2507,7 +3007,44 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
 
           <div className="modal-body">
             <div className="document-preview-section">
-              <div className="document-preview-container" style={{ height: 'auto' }}>
+              <div
+                className="document-preview-container"
+                style={{
+                  height: 'auto',
+                  cursor: isPanning ? 'grabbing' : documentZoom > 1 ? 'grab' : 'default',
+                  overflow: 'hidden',
+                  position: 'relative'
+                }}
+                onWheel={(e) => {
+                  if (e.ctrlKey) {
+                    e.preventDefault();
+                    const delta = -Math.sign(e.deltaY) * 0.1;
+                    const next = Math.min(3, Math.max(0.5, documentZoom + delta));
+                    setDocumentZoom(next);
+                  }
+                }}
+                onMouseDown={(e) => {
+                  if (documentZoom <= 1) return;
+                  setIsPanning(true);
+                  setPanStart({ x: e.clientX, y: e.clientY });
+                }}
+                onMouseMove={(e) => {
+                  if (!isPanning) return;
+                  setPanOffset({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
+                }}
+                onMouseUp={() => {
+                  if (!isPanning) return;
+                  setIsPanning(false);
+                  setAccumulatedPan(prev => ({ x: prev.x + panOffset.x, y: prev.y + panOffset.y }));
+                  setPanOffset({ x: 0, y: 0 });
+                }}
+                onMouseLeave={() => {
+                  if (!isPanning) return;
+                  setIsPanning(false);
+                  setAccumulatedPan(prev => ({ x: prev.x + panOffset.x, y: prev.y + panOffset.y }));
+                  setPanOffset({ x: 0, y: 0 });
+                }}
+              >
                 {(latestUpload?.fileUrl || selectedDocument?.fileUrl ||
                   (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads")) ? (
                   <>
@@ -2515,7 +3052,7 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                       console.log('selectedDocument:', selectedDocument);
                       console.log('latestUpload:', latestUpload);
 
-                      const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+                      const fileUrl = getDocFileUrl(latestUpload?.fileUrl || selectedDocument?.fileUrl);
                       const hasDocument = fileUrl ||
                         (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
 
@@ -2533,28 +3070,37 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                 src={fileUrl}
                                 alt="Document Preview"
                                 style={{
-                                  transform: `scale(${documentZoom}) rotate(${documentRotation}deg)`,
-                                  transition: 'transform 0.3s ease',
+                                  transform: `translate(${accumulatedPan.x + panOffset.x}px, ${accumulatedPan.y + panOffset.y}px) scale(${documentZoom}) rotate(${documentRotation}deg)`,
+                                  transition: isPanning ? 'none' : 'transform 0.15s ease',
                                   maxWidth: '100%',
-                                  objectFit: 'contain'
+                                  maxHeight: '100%',
+                                  objectFit: 'contain',
+                                  userSelect: 'none',
+                                  pointerEvents: 'none'
                                 }}
+                                draggable={false}
                               />
                             );
                           } else if (fileType === 'pdf') {
                             return (
-                              <div className="pdf-viewer" style={{ width: '100%', height: '780px' }}>
-                                <iframe
-                                  src={fileUrl + '#navpanes=0&toolbar=0'}
-                                  width="100%"
-                                  height="100%"
+                              <div className="pdf-viewer" style={{ width: '100%', height: '780px', overflow: 'hidden', position: 'relative' }}>
+                                <div
                                   style={{
-                                    border: 'none',
-                                    transform: `scale(${documentZoom})`,
-                                    transformOrigin: 'top left',
-                                    transition: 'transform 0.3s ease'
+                                    width: '100%',
+                                    height: '100%',
+                                    transform: `translate(${accumulatedPan.x + panOffset.x}px, ${accumulatedPan.y + panOffset.y}px) scale(${documentZoom})`,
+                                    transformOrigin: 'center center',
+                                    transition: isPanning ? 'none' : 'transform 0.15s ease'
                                   }}
-                                  title="PDF Document"
-                                />
+                                >
+                                  <iframe
+                                    src={fileUrl + '#navpanes=0&toolbar=0'}
+                                    width="100%"
+                                    height="100%"
+                                    style={{ border: 'none', pointerEvents: 'none' }}
+                                    title="PDF Document"
+                                  />
+                                </div>
                               </div>
                             );
                           } else {
@@ -2669,7 +3215,7 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                           {upload.fileUrl && (
                             <div className="history-actions" style={{ marginTop: '8px' }}>
                               <a
-                                href={upload.fileUrl}
+                                href={getDocFileUrl(upload.fileUrl)}
                                 download
                                 className="btn btn-sm btn-outline-primary"
                                 target="_blank"
@@ -2753,49 +3299,57 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
               </div>
 
               {/* Document Actions */}
-              {(latestUpload?.status || selectedDocument?.status) === 'Pending' && (
-                <div className="document-actions mt-4">
-                  {!showRejectionForm ? (
-                    <div className="action-buttons">
-                      <button
-                        className="btn btn-success me-2"
-                        onClick={() => updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Verified')}
-                      >
-                        <i className="fas fa-check"></i> Approve Document
-                      </button>
-                      <button
-                        className="btn btn-danger"
-                        onClick={handleRejectClick}
-                      >
-                        <i className="fas fa-times"></i> Reject Document
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="rejection-form" style={{ display: 'block', marginTop: '20px' }}>
-                      <textarea
-                        value={rejectionReason}
-                        onChange={(e) => setRejectionReason(e.target.value)}
-                        placeholder="Please provide a detailed reason for rejection..."
-                        rows="8"
-                        className="form-control mb-3"
-                      />
-                      <div className="d-flex gap-2">
+
+
+              {
+                (
+                  (permissions?.custom_permissions?.can_verify_reject_kyc && permissions?.permission_type === 'Custom') ||
+                  permissions?.permission_type === 'Admin'
+                )
+                && (latestUpload?.status || selectedDocument?.status) === 'Pending' && (
+                  <div className="document-actions mt-4">
+                    {!showRejectionForm ? (
+                      <div className="action-buttons">
+                        <button
+                          className="btn btn-success me-2"
+                          onClick={() => updateDocumentStatus(latestUpload?._id || selectedDocument?._id, 'Verified')}
+                        >
+                          <i className="fas fa-check"></i> Approve Document
+                        </button>
                         <button
                           className="btn btn-danger"
-                          onClick={handleConfirmRejection}
+                          onClick={handleRejectClick}
                         >
-                          Confirm Rejection
-                        </button>
-                        <button
-                          className="btn btn-secondary"
-                          onClick={handleCancelRejection}
-                        >
-                          Cancel
+                          <i className="fas fa-times"></i> Reject Document
                         </button>
                       </div>
-                    </div>
-                  )}
-                </div>)}
+                    ) : (
+                      <div className="rejection-form" style={{ display: 'block', marginTop: '20px' }}>
+                        <textarea
+                          value={rejectionReason}
+                          onChange={(e) => setRejectionReason(e.target.value)}
+                          placeholder="Please provide a detailed reason for rejection..."
+                          rows="8"
+                          className="form-control mb-3"
+                        />
+                        <div className="d-flex gap-2">
+                          <button
+                            className="btn btn-danger"
+                            onClick={handleConfirmRejection}
+                          >
+                            Confirm Rejection
+                          </button>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={handleCancelRejection}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>)}
+
 
 
             </div>
@@ -2927,6 +3481,34 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
     );
   };
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const isMultiSelectClick = event.target.closest('.multi-select-container-new');
+      const isAnyModalOpen = showDocumentModal || showUploadModal || openModalId !== null || showEditPanel || showFollowupPanel || showWhatsappPanel;
+
+      if (isAnyModalOpen) {
+        return; // Do nothing if any modal is open
+      }
+
+      if (!isMultiSelectClick) {
+        setDropdownStates(prev =>
+          Object.keys(prev).reduce((acc, key) => {
+            acc[key] = false;
+            return acc;
+          }, {})
+        );
+      }
+    };
+
+    // Add event listener
+    document.addEventListener('mousedown', handleClickOutside);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showDocumentModal, showUploadModal, openModalId, showEditPanel, showFollowupPanel, showWhatsappPanel]); // Add modal states to dependencies
+
   const scrollLeft = () => {
     const container = document.querySelector('.scrollable-content');
     if (container) {
@@ -3011,16 +3593,1181 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
     }
   };
 
+  const handleCycleFilterChange = (key, value) => {
+    let next = { ...cycleFilters, [key]: value };
+    if (key === 'department') {
+      next = { department: value, project: '', center: '', course: '', batch: '' };
+    } else if (key === 'project') {
+      next = { ...cycleFilters, project: value, center: '', course: '', batch: '' };
+    } else if (key === 'center') {
+      next = { ...cycleFilters, center: value, batch: '' };
+    } else if (key === 'course') {
+      next = { ...cycleFilters, course: value, batch: '' };
+    } else if (key === 'batch') {
+      next = { ...cycleFilters, batch: value };
+    }
+    setCycleFilters(next);
+    setCurrentPage(1);
+    fetchProfileData(filterData, 1);
+  };
+
+  const renderCycleFilterDropdowns = (mobile = false) => (
+    <div className={`b2b-cycle-filters${mobile ? ' b2b-cycle-filters--mobile' : ''}`}>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="kyc-filter-department">
+          <i className="fas fa-sitemap" aria-hidden="true" /> Department
+        </label>
+        <select
+          id="kyc-filter-department"
+          className="b2b-cycle-filters__select"
+          value={cycleFilters.department || ''}
+          onChange={(e) => handleCycleFilterChange('department', e.target.value)}
+        >
+          <option value="">All</option>
+          {verticalOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="kyc-filter-project">
+          <i className="fas fa-project-diagram" aria-hidden="true" /> Project
+        </label>
+        <select
+          id="kyc-filter-project"
+          className="b2b-cycle-filters__select"
+          value={cycleFilters.project || ''}
+          onChange={(e) => handleCycleFilterChange('project', e.target.value)}
+        >
+          <option value="">All</option>
+          {cycleProjectOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="kyc-filter-center">
+          <i className="fas fa-building" aria-hidden="true" /> Center
+        </label>
+        <select
+          id="kyc-filter-center"
+          className="b2b-cycle-filters__select"
+          value={cycleFilters.center || ''}
+          onChange={(e) => handleCycleFilterChange('center', e.target.value)}
+        >
+          <option value="">All</option>
+          {centerOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="kyc-filter-course">
+          <i className="fas fa-graduation-cap" aria-hidden="true" /> Course
+        </label>
+        <select
+          id="kyc-filter-course"
+          className="b2b-cycle-filters__select"
+          value={cycleFilters.course || ''}
+          onChange={(e) => handleCycleFilterChange('course', e.target.value)}
+        >
+          <option value="">All</option>
+          {cycleCourseOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="kyc-filter-batch">
+          <i className="fas fa-users" aria-hidden="true" /> Batch
+        </label>
+        <select
+          id="kyc-filter-batch"
+          className="b2b-cycle-filters__select"
+          value={cycleFilters.batch || ''}
+          onChange={(e) => handleCycleFilterChange('batch', e.target.value)}
+        >
+          <option value="">All</option>
+          {batchOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+
+  const renderKycNavSearchToolbar = () => (
+    <div className="adm-cycle-toolbar__inner d-flex align-items-center gap-2 ms-md-auto flex-wrap">
+      <div className="position-relative adm-cycle-search">
+        <input
+          type="text"
+          name="name"
+          className="form-control form-control-sm"
+          placeholder="Quick search..."
+          value={filterData.name}
+          onChange={handleFilterChange}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') fetchProfileData();
+          }}
+          style={{
+            width: isMobile ? '100%' : '200px',
+            minWidth: '140px',
+            paddingRight: '30px',
+            paddingLeft: '12px',
+            paddingTop: '8px',
+            paddingBottom: '8px',
+            backgroundColor: '#ffffff',
+            border: '1.5px solid #ced4da',
+            fontSize: '13px',
+            borderRadius: '6px',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+          }}
+        />
+        {filterData.name && (
+          <button
+            type="button"
+            className="btn btn-sm position-absolute"
+            onClick={() => {
+              const cleared = { ...filterData, name: '' };
+              setFilterData(cleared);
+              fetchProfileData(cleared, 1);
+            }}
+            style={{
+              right: '2px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              padding: '2px 6px',
+              backgroundColor: '#dc3545',
+              border: 'none',
+              color: 'white',
+              borderRadius: '50%',
+              width: '20px',
+              height: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <i className="fas fa-times" style={{ fontSize: '8px' }}></i>
+          </button>
+        )}
+      </div>
+      <button
+        type="button"
+        className="btn btn-sm btn-primary adm-cycle-action-btn adm-cycle-action-btn--search"
+        onClick={() => fetchProfileData()}
+        style={{
+          background: 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)',
+          borderColor: 'rgb(250, 85, 121)',
+          color: 'white',
+          fontWeight: '500',
+          padding: '8px 16px',
+          borderRadius: '6px',
+          fontSize: '13px',
+        }}
+      >
+        <i className="fas fa-search me-1"></i>
+        <span className="adm-cycle-action-text">Search</span>
+      </button>
+      <button
+        type="button"
+        className={`btn btn-sm adm-cycle-action-btn adm-cycle-action-btn--filters ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-secondary'}`}
+        onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+        style={{
+          background: !isFilterCollapsed ? 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)' : '#ffffff',
+          color: !isFilterCollapsed ? '#ffffff' : 'rgb(250, 85, 121)',
+          fontWeight: '500',
+          padding: '8px 16px',
+          borderRadius: '6px',
+          fontSize: '13px',
+          borderWidth: '1.5px',
+          borderColor: 'rgb(250, 85, 121)',
+        }}
+      >
+        <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
+        <span className="adm-cycle-action-text">{isMobile ? 'Filters' : 'More'}</span>
+      </button>
+    </div>
+  );
+
+  const renderKycDashboard = () => (
+    <div className="col-12 b2b-crm-dashboard px-0">
+      <div className="b2b-dash-section mt-2">
+        <span className="b2b-dash-section__label">eKYC Status</span>
+        <div className="b2b-mobile-hscroll b2b-mobile-hscroll--chips d-flex gap-2 align-items-center pt-1 flex-wrap">
+          {ekycFilters.map((filter, index) => {
+            const isActive = activeCrmFilter === index;
+            return (
+              <button
+                key={filter._id || index}
+                type="button"
+                className="b2b-perf-chip"
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  borderRadius: '999px',
+                  cursor: 'pointer',
+                  color: isActive ? '#fff' : 'rgb(250, 85, 121)',
+                  backgroundColor: isActive ? 'rgb(250, 85, 121)' : '#fff',
+                  border: isActive ? 'none' : '1.5px solid rgb(250, 85, 121)',
+                }}
+                onClick={() => handleCrmFilterClick(filter, index)}
+              >
+                {filter.name} ({filter.count})
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="row g-2 mt-2 align-items-stretch b2b-kyc-summary-row">
+        <div className="col-12 col-lg-8 b2b-kyc-summary-row__col">
+          <div className="b2b-dash-section h-100">
+            <span className="b2b-dash-section__label">KYC Summary</span>
+            <div className="b2b-mobile-hscroll b2b-mobile-hscroll--approval d-flex flex-nowrap gap-2 align-items-stretch pt-1">
+              {kycSummaryCards.map((row) => (
+                <div
+                  key={row.key}
+                  className="b2b-dash-stat-card b2b-dash-stat-card--lead text-center text-white flex-shrink-0"
+                  style={{ background: row.bg }}
+                >
+                  <div className="b2b-dash-stat-card__label">{row.label}</div>
+                  <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                  <div className="b2b-dash-stat-card__value text-white">
+                    {String(row.value).padStart(2, '0')}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="col-12 col-lg-4 b2b-kyc-summary-row__col">
+          <div className="b2b-dash-section h-100">
+            <span className="b2b-dash-section__label">Documents</span>
+            <div className="d-flex flex-nowrap gap-2 pt-1">
+              {[
+                { label: 'Done', value: docDashCounts.done, bg: '#4b5563' },
+                { label: 'Pending', value: docDashCounts.pending, bg: '#4b5563' },
+              ].map((row) => (
+                <div
+                  key={row.label}
+                  className="b2b-dash-stat-card text-center text-white flex-grow-1 flex-shrink-0"
+                  style={{ background: row.bg, minWidth: '84px' }}
+                >
+                  <div className="b2b-dash-stat-card__label">{row.label}</div>
+                  <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                  <div className="b2b-dash-stat-card__value text-white">
+                    {String(row.value).padStart(2, '0')}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const openProfileDocumentsTab = (profileIndex, profile) => {
+    setSelectedProfile(profile);
+    if (leadDetailsVisible !== profile._id) {
+      toggleLeadDetails(profile);
+    }
+    handleTabClick(profileIndex, 4, profile);
+  };
+
+  const renderKycLeadActionsMenu = (profile, onClose) => {
+    const canAdminKyc =
+      (permissions?.custom_permissions?.can_verify_reject_kyc && permissions?.permission_type === 'Custom') ||
+      permissions?.permission_type === 'Admin';
+
+    return (
+      <div className="lead-strip-v3__actions-menu">
+        {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
+          <button
+            type="button"
+            className="lead-strip-v3__actions-item"
+            onClick={() => {
+              onClose();
+              handleMoveToAdmission(profile);
+            }}
+          >
+            <i className="fas fa-arrow-right text-primary" aria-hidden="true"></i>
+            Move to Admission
+          </button>
+        )}
+        {canAdminKyc && (
+          <>
+            <button
+              type="button"
+              className="lead-strip-v3__actions-item"
+              onClick={() => {
+                onClose();
+                handleMarkDropout(profile);
+              }}
+            >
+              <i className="fas fa-user-slash text-danger" aria-hidden="true"></i>
+              Mark Dropout
+            </button>
+            <button
+              type="button"
+              className="lead-strip-v3__actions-item"
+              onClick={() => {
+                onClose();
+                openPanel('SetFollowup', profile);
+              }}
+            >
+              <i className="fas fa-calendar text-warning" aria-hidden="true"></i>
+              Set Followup
+            </button>
+            <button
+              type="button"
+              className="lead-strip-v3__actions-item"
+              onClick={() => {
+                onClose();
+                handleFetchCandidate(profile);
+              }}
+            >
+              <i className="fas fa-user-edit text-info" aria-hidden="true"></i>
+              Edit Profile
+            </button>
+            <button
+              type="button"
+              className="lead-strip-v3__actions-item"
+              onClick={() => {
+                onClose();
+                setSelectedProfile(profile);
+                getBranches(profile);
+                setShowBranchModal(true);
+              }}
+            >
+              <i className="fas fa-building text-success" aria-hidden="true"></i>
+              Change Branch
+            </button>
+            <button
+              type="button"
+              className="lead-strip-v3__actions-item"
+              onClick={() => {
+                onClose();
+                openPreVerificationModal(profile);
+              }}
+            >
+              <i className="fas fa-clipboard-check text-primary" aria-hidden="true"></i>
+              Add Pre Verification
+            </button>
+          </>
+        )}
+        <button
+          type="button"
+          className="lead-strip-v3__actions-item"
+          onClick={() => {
+            onClose();
+            openPanel('leadHistory', profile);
+          }}
+        >
+          <i className="fas fa-history text-secondary" aria-hidden="true"></i>
+          History List
+        </button>
+      </div>
+    );
+  };
+
+  const renderKycLeadActionsDropdown = (profile, profileIndex) => {
+    if (showPopup !== profileIndex) return null;
+
+    if (isMobile) {
+      return (
+        <>
+          <div
+            className="lead-strip-v3__actions-backdrop lead-strip-v3__actions-backdrop--mobile"
+            onClick={() => setShowPopup(null)}
+            aria-hidden="true"
+          />
+          <div className="kyc-lead-actions-sheet" role="menu">
+            {renderKycLeadActionsMenu(profile, () => setShowPopup(null))}
+          </div>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <div
+          className="lead-strip-v3__actions-backdrop"
+          onClick={() => setShowPopup(null)}
+          aria-hidden="true"
+        />
+        <div className="lead-strip-v3__actions-dropdown is-open" role="menu">
+          {renderKycLeadActionsMenu(profile, () => setShowPopup(null))}
+        </div>
+      </>
+    );
+  };
+
+  const renderKycLeadStrip = (profile, profileIndex) => {
+    const docTotal = Number(profile?.docCounts?.totalRequired ?? 0);
+    const docDone = Number(profile?.docCounts?.uploadedCount ?? 0);
+    const docPending = Math.max(0, docTotal - docDone);
+    const uploadPct = docTotal > 0 ? profile.docCounts.uploadPercentage : 'NA';
+    const kycLabel = profile.kyc === true ? 'Verified' : docTotal > 0 ? 'Pending' : '—';
+    const kycPillClass = profile.kyc === true ? 'approved' : 'pending';
+
+    return (
+      <div className="lead-strip-v3 kyc-lead-strip-v3">
+        <div className="kyc-lead-strip-v3__content">
+        <div className="lead-strip-v3__profile">
+          {/* <button
+            type="button"
+            className="lead-strip-v3__profile-edit"
+            aria-label="Edit profile"
+            title="Edit Profile"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleFetchCandidate(profile);
+            }}
+          >
+            <i className="fas fa-pen" aria-hidden="true"></i>
+          </button> */}
+          <div className="lead-strip-v3__profile-top">
+            <div className="lead-strip-v3__profile-main">
+              <div className="lead-strip-v3__avatar" aria-hidden="true">
+                <i className="fas fa-user" aria-hidden="true"></i>
+              </div>
+              <div className="lead-strip-v3__name text-capitalize" title={profile._candidate?.name || ''}>
+                {profile._candidate?.name || '—'}
+              </div>
+            </div>
+            <div className="lead-strip-v3__doc" title="Docs completion">
+              <div className="circular-progress-container" data-percent={uploadPct}>
+                <svg width="36" height="36">
+                  <circle className="circle-bg" cx="18" cy="18" r="14"></circle>
+                  <circle className="circle-progress" cx="18" cy="18" r="14"></circle>
+                </svg>
+                <div className="progress-text"></div>
+              </div>
+            </div>
+          </div>
+          <div className="lead-strip-v3__contact">
+            <div className="lead-strip-v3__contact-line" title={profile._candidate?.email || ''}>
+              <i className="fas fa-envelope" aria-hidden="true"></i>
+              <span>{profile._candidate?.email || '—'}</span>
+            </div>
+            <div className="lead-strip-v3__contact-line lead-strip-v3__contact-line--phone">
+              <i className="fas fa-phone" aria-hidden="true"></i>
+              <span>{profile._candidate?.mobile || '—'}</span>
+              {/* <button
+                type="button"
+                className="lead-strip-v3__wa"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  openPanel('Whatsapp', profile);
+                }}
+                title="WhatsApp"
+                aria-label="WhatsApp"
+              >
+                <i className="fab fa-whatsapp" aria-hidden="true"></i>
+              </button> */}
+            </div>
+          </div>
+        </div>
+
+        <div className="lead-strip-v3__panel lead-strip-v3__panel--approval">
+          <div className="lead-strip-v3__approval-block">
+            <div className="lead-strip-v3__panel-head lead-strip-v3__panel-head--approval">
+              <span className="lead-strip-v3__panel-title">
+                <i className="fas fa-id-card" aria-hidden="true"></i> KYC Status
+              </span>
+            </div>
+            <div className="lead-strip-v3__approval-row">
+              <span className={`lead-strip-v3__approval-pill lead-strip-v3__approval-pill--${kycPillClass}`}>
+                {kycLabel}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="lead-strip-v3__kyc-done-btn"
+              disabled={profile.kyc === true || kycMarkingProfileId === profile._id}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleMarkKycDone(profile);
+              }}
+            >
+              {kycMarkingProfileId === profile._id ? (
+                <>
+                  <i className="fas fa-spinner fa-spin me-1" aria-hidden="true"></i>
+                  Marking…
+                </>
+              ) : (
+                'Mark KYC Done'
+              )}
+            </button>
+          </div>
+        </div>
+
+        <div className="lead-strip-v3__panel lead-strip-v3__panel--docs">
+          <div className="lead-strip-v3__panel-head">
+            <span className="lead-strip-v3__panel-title">
+              <i className="fas fa-folder-open" aria-hidden="true"></i> Documents
+            </span>
+          </div>
+          <div className="lead-strip-v3__stat-row lead-strip-v3__stat-row--docs">
+            <div className="lead-strip-v3__stat" style={{ background: '#4b5563', color: '#fff' }}>
+              <span className="lead-strip-v3__stat-label">Done</span>
+              <span className="lead-strip-v3__stat-val">{String(docDone).padStart(2, '0')}</span>
+            </div>
+            <div className="lead-strip-v3__stat" style={{ background: '#4b5563', color: '#fff' }}>
+              <span className="lead-strip-v3__stat-label">Pending</span>
+              <span className="lead-strip-v3__stat-val">{String(docPending).padStart(2, '0')}</span>
+            </div>
+          </div>
+        </div>
+        </div>
+
+        <div className="lead-strip-v3__head-actions lead-strip-v3__head-actions--corner kyc-lead-strip-v3__actions">
+          <div className="lead-strip-v3__actions-wrap">
+            <button
+              type="button"
+              className="lead-strip-v3__icon-btn"
+              title="More actions"
+              aria-label="More actions"
+              aria-expanded={showPopup === profileIndex}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                togglePopup(profileIndex);
+              }}
+            >
+              <i className="fas fa-ellipsis-v" aria-hidden="true"></i>
+            </button>
+            {renderKycLeadActionsDropdown(profile, profileIndex)}
+          </div>
+          <button
+            type="button"
+            className="lead-strip-v3__icon-btn lead-strip-v3__icon-btn--collapse"
+            title={leadDetailsVisible === profile._id ? 'Collapse' : 'Expand'}
+            aria-label={leadDetailsVisible === profile._id ? 'Collapse lead' : 'Expand lead'}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              toggleLeadDetails(profile);
+              setSelectedProfile(profile);
+            }}
+          >
+            <i className={leadDetailsVisible === profile._id ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="container-fluid">
-       <div className="row">
+      <div>
+      <style>
+        {`
+          .adm-cycle-header-nav {
+            border-bottom: 1px solid #eee;
+          }
+          .adm-cycle-toolbar__outer,
+          .adm-cycle-toolbar__inner {
+            min-width: 0;
+          }
+          .adm-cycle-search {
+            min-width: 180px;
+          }
+          .adm-cycle-action-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            min-height: 36px;
+          }
+          .kyc-lead-card.lead-card {
+            display: flex;
+            width: 100%;
+            background: linear-gradient(180deg, #eef6fc 0%, #f8fbff 100%);
+            border-radius: 16px;
+            border: 2px solid #b6d9f7;
+            box-shadow: 0 6px 20px rgba(11, 94, 215, 0.1);
+            padding: 10px;
+            overflow: visible;
+            margin-bottom: 0.75rem;
+          }
+          .kyc-lead-card.lead-card:hover {
+            transform: none;
+            box-shadow: 0 8px 24px rgba(11, 94, 215, 0.14);
+          }
+          .kyc-lead-card .lead-strip-v3 {
+            display: flex;
+            flex: 1 1 auto;
+            width: 100%;
+            margin: 0;
+          }
+          .b2b-cycle-filters{
+            display: flex;
+            // flex-wrap: wrap;
+            align-items: flex-end;
+            justify-content: flex-end;
+            gap: 8px 12px;
+            max-width: 100%;
+          }
+          .b2b-cycle-filters__item{
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            min-width: 0;
+          }
+          .b2b-cycle-filters__label{
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #6b7280;
+            margin: 0;
+            line-height: 1.2;
+            white-space: nowrap;
+          }
+          .b2b-cycle-filters__label i{
+            margin-right: 4px;
+            color: rgb(250, 85, 121);
+            font-size: 9px;
+          }
+          .b2b-cycle-filters__select{
+            font-size: 12px;
+            font-weight: 500;
+            padding: 6px 28px 6px 10px;
+            height: 34px;
+            min-width: 120px;
+            max-width: 155px;
+            border: 1.5px solid #e8eaed;
+            border-radius: 8px;
+            background-color: #f9fafb;
+            color: #1f2937;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16'%3E%3Cpath fill='%236b7280' d='M4.427 6.427l3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 6H4.604a.25.25 0 0 0-.177.427z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 9px center;
+          }
+          .b2b-crm-dashboard .b2b-dash-section {
+            position: relative;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 5px 7px 5px;
+            background: #fff;
+          }
+          .b2b-crm-dashboard .b2b-dash-section__label {
+            position: absolute;
+            top: -10px;
+            left: 12px;
+            padding: 0 6px;
+            background: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            color: #333;
+          }
+          .b2b-crm-dashboard .b2b-dash-stat-card {
+            border-radius: 8px;
+            padding: 5px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 45px;
+            cursor: pointer;
+          }
+          .b2b-crm-dashboard .b2b-dash-stat-card--lead {
+            flex: 1 1 96px;
+            min-width: 50px;
+            max-width: 90px;
+          }
+          .b2b-crm-dashboard .b2b-dash-stat-card__label {
+            font-size: 11px;
+            font-weight: 600;
+            margin: 0;
+          }
+          .b2b-crm-dashboard .b2b-dash-stat-card__divider {
+            width: 72%;
+            height: 1px;
+            margin: 8px 0;
+            background: rgba(255, 255, 255, 0.95);
+          }
+          .b2b-crm-dashboard .b2b-dash-stat-card__value {
+            font-size: 15px;
+            font-weight: 700;
+          }
+          .b2b-crm-dashboard .b2b-mobile-hscroll {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+          }
+          .b2b-kyc-summary-row {
+            flex-wrap: nowrap;
+          }
+          @media (min-width: 992px) {
+            .b2b-kyc-summary-row > .b2b-kyc-summary-row__col:first-child {
+              flex: 1 1 0;
+              min-width: 0;
+              max-width: 66.666%;
+            }
+            .b2b-kyc-summary-row > .b2b-kyc-summary-row__col:last-child {
+              flex: 0 0 33.333%;
+              max-width: 33.333%;
+            }
+          }
+          @media (max-width: 991.98px) {
+            .b2b-kyc-summary-row {
+              flex-wrap: nowrap;
+              overflow-x: auto;
+              -webkit-overflow-scrolling: touch;
+            }
+            .b2b-kyc-summary-row__col {
+              flex: 0 0 min(92vw, 520px);
+              max-width: min(92vw, 520px);
+            }
+          }
+          .kyc-lead-strip-v3.lead-strip-v3 {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            align-items: stretch;
+            justify-content: flex-start;
+            gap: 8px;
+            width: 100%;
+            padding: 0;
+            background: transparent;
+            overflow: visible;
+          }
+          .kyc-lead-strip-v3__content {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            align-items: stretch;
+            justify-content: flex-start;
+            gap: 8px;
+            flex: 1 1 auto;
+            min-width: 0;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+          }
+          .kyc-lead-strip-v3__actions.lead-strip-v3__head-actions--corner {
+            display: flex;
+            flex: 0 0 auto;
+            align-items: center;
+            justify-content: center;
+            align-self: center;
+            gap: 6px;
+            margin-left: auto;
+            padding: 6px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+            z-index: 3;
+          }
+          .kyc-lead-strip-v3__actions .lead-strip-v3__actions-wrap {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow: visible;
+          }
+          .kyc-lead-strip-v3__actions {
+            overflow: visible;
+          }
+          .lead-strip-v3__actions-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 1040;
+            background: transparent;
+          }
+          .lead-strip-v3__actions-backdrop--mobile {
+            background: rgba(0, 0, 0, 0.45);
+          }
+          .kyc-lead-strip-v3__actions .lead-strip-v3__actions-dropdown {
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            left: auto;
+            z-index: 1050;
+            min-width: 190px;
+            max-width: 220px;
+          }
+          .lead-strip-v3__actions-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding: 6px;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+          }
+          .lead-strip-v3__actions-item {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #334155;
+            text-align: left;
+            cursor: pointer;
+            white-space: nowrap;
+          }
+          .lead-strip-v3__actions-item:hover {
+            background: #f8fafc;
+          }
+          .lead-strip-v3__actions-item i {
+            width: 14px;
+            text-align: center;
+            flex-shrink: 0;
+            font-size: 12px;
+          }
+          .kyc-lead-actions-sheet {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1051;
+            padding: 12px 12px 24px;
+            background: #fff;
+            border-radius: 16px 16px 0 0;
+            box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.18);
+            max-height: 70vh;
+            overflow-y: auto;
+          }
+          .kyc-lead-actions-sheet .lead-strip-v3__actions-menu {
+            border: none;
+            box-shadow: none;
+            padding: 4px 0;
+          }
+          .kyc-lead-actions-sheet .lead-strip-v3__actions-item {
+            padding: 14px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            border-radius: 0;
+            white-space: normal;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__profile {
+            flex: 0 1 clamp(200px, 28vw, 280px);
+            min-width: 200px;
+            background: linear-gradient(145deg, #0b5ed7 0%, #1aa3ff 55%, #2dd4ff 100%);
+            border-radius: 14px;
+            padding: 10px;
+            color: #fff;
+            position: relative;
+            box-shadow: 0 4px 14px rgba(11, 94, 215, 0.22);
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__profile-edit {
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            width: 22px;
+            height: 22px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.9);
+            background: #fff;
+            color: #0b5ed7;
+            font-size: 10px;
+            z-index: 2;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__profile-top {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding-top: 4px;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__profile-main {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 0;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__avatar {
+            width: 22px;
+            height: 22px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.95);
+            color: #0b5ed7;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            flex-shrink: 0;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__name {
+            font-size: 15px;
+            font-weight: 800;
+            line-height: 1.2;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__doc {
+            flex-shrink: 0;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__doc .circular-progress-container {
+            width: 36px;
+            height: 36px;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__doc .progress-text {
+            font-size: 9px;
+            font-weight: 800;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__contact {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-top: 8px;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__contact-line {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            min-width: 0;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__contact-line span {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__contact-line--phone {
+            background: rgba(0,0,0,0.14);
+            border-radius: 8px;
+            padding: 4px 8px;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__wa {
+            width: 28px;
+            height: 28px;
+            min-width: 28px;
+            border: none;
+            border-radius: 8px;
+            background: #25d366;
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            cursor: pointer;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__panel {
+            flex: 1 1 140px;
+            min-width: 130px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 10px 10px 8px;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__panel--approval {
+            flex: 0 1 clamp(130px, 14vw, 160px);
+            min-width: 125px;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__panel--docs {
+            flex: 0 1 clamp(150px, 16vw, 190px);
+            min-width: 140px;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__panel-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__panel-title {
+            font-size: 12px;
+            font-weight: 800;
+            color: #1e293b;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__panel-title i {
+            color: #3b82f6;
+            font-size: 12px;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__approval-row {
+            display: flex;
+            align-items: center;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__approval-pill {
+            border-radius: 999px;
+            padding: 4px 12px;
+            font-size: 11px;
+            font-weight: 800;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__approval-pill--pending {
+            background: #ffedd5;
+            color: #c2410c;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__approval-pill--approved {
+            background: #d1fae5;
+            color: #047857;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__kyc-done-btn {
+            width: 100%;
+            margin-top: auto;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 12px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fc567b, #fc2b5a);
+            color: #fff;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(252, 43, 90, 0.35);
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__kyc-done-btn:disabled {
+            background: #86efac;
+            color: #166534;
+            cursor: not-allowed;
+            box-shadow: none;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__stat-row--docs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-top: auto;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__stat {
+            border-radius: 10px;
+            padding: 8px 6px;
+            min-height: 48px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__stat-label {
+            font-size: 10px;
+            font-weight: 800;
+            line-height: 1.1;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__stat-val {
+            font-size: 16px;
+            font-weight: 900;
+            line-height: 1;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__head-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__icon-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            color: #475569;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            padding: 0;
+          }
+          .kyc-lead-strip-v3 .lead-strip-v3__icon-btn--collapse {
+            background: #1e293b;
+            color: #fff;
+            border-color: #1e293b;
+          }
+          @media (max-width: 768px) {
+            .kyc-lead-strip-v3.lead-strip-v3 {
+              flex-direction: row;
+              flex-wrap: nowrap;
+              align-items: stretch;
+            }
+            .kyc-lead-strip-v3__content {
+              flex-direction: row;
+              flex-wrap: nowrap;
+              overflow-x: auto;
+            }
+            .kyc-lead-strip-v3 .lead-strip-v3__profile {
+              flex: 0 1 clamp(180px, 55vw, 240px);
+              min-width: 160px;
+            }
+            .kyc-lead-strip-v3 .lead-strip-v3__panel {
+              flex: 0 1 auto;
+              min-width: 120px;
+            }
+            .kyc-lead-strip-v3__actions.lead-strip-v3__head-actions--corner {
+              flex-direction: column;
+              align-self: center;
+              margin-left: auto;
+            }
+          }
+          @media (max-width: 767.98px) {
+            .adm-cycle-header-nav {
+              left: 8px;
+              right: 8px;
+              width: auto !important;
+              padding: 10px 10px 12px !important;
+              border: 1px solid #eef0f4;
+              border-top: 0;
+              border-radius: 0 0 12px 12px;
+              box-shadow: 0 8px 24px rgba(15, 23, 42, 0.10) !important;
+            }
+            .adm-cycle-mobile-title {
+              margin-bottom: 0 !important;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 10px;
+              min-width: 0;
+            }
+            .adm-cycle-toolbar__inner {
+              display: grid !important;
+              grid-template-columns: minmax(0, 1fr) auto auto;
+              align-items: center;
+              gap: 8px !important;
+              margin-left: 0 !important;
+              width: 100%;
+            }
+            .adm-cycle-search .form-control {
+              width: 100% !important;
+              min-width: 0 !important;
+              height: 38px;
+              font-size: 13px !important;
+            }
+            .content-body.marginTopMobile {
+              margin-top: calc(var(--adm-cycle-nav-height, 180px) + 10px) !important;
+            }
+          }
+        `}
+      </style>
+      <style>{mobileStyles}</style>
+
+      <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
-          {/* Header */}
           <div
             className="content-blur-overlay"
             style={{
               position: 'fixed',
-              top: 180,
+              top: 0,
               left: 0,
               right: 0,
               height: `${navHeight + 50}px`,
@@ -3039,101 +4786,63 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
               opacity: isScrolled ? 1 : 0
             }}
           />
-          <div className="position-relative" >
-            <nav className="" ref={navRef} style={{
-              zIndex: 11, backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})`, position: 'fixed', width: `${navWidth}`, backdropFilter: `blur(${blurIntensity}px)`,
-              WebkitBackdropFilter: `blur(${blurIntensity}px)`,
-              boxShadow: isScrolled
-                ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)'
-                : '0 4px 25px 0 #0000001a', paddingBlock: '10px',
-              transition: 'all 0.3s ease'
-            }}>
-              <div className="container-fluid py-2">
-                <div className="row align-items-center justify-content-between">
-                  <div className="col-md-6 d-md-block d-sm-none">
-                    <div className="main-tabs-container" style={{ zIndex: 10, background: '#fff' }}>
-                      <div className="btn-group" role="group" aria-label="eKYC Filters">
-                        {ekycFilters.map((filter, index) => (
-                          <div key={filter._id} className="position-relative d-inline-block me-2">
-                            <button
-                              className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
-                              onClick={() => handleCrmFilterClick(filter, index)}
-                            >
-                              <i className={`fas ${filter._id === 'pendingEkyc' ? 'fa-clock' : filter._id === 'doneEkyc' ? 'fa-check-circle' : 'fa-list'} me-1`}></i>
-                              {filter.name}
-                              <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>({filter.count})</span>
-                            </button>
-                            {filter.milestone && (
-                              <span
-                                className="bg-success d-flex align-items-center milestoneResponsive"
-                                style={{
-                                  fontSize: '0.75rem',
-                                  color: 'white',
-                                  verticalAlign: 'middle',
-                                  padding: '0.25em 0.5em',
-                                  transform: 'translate(15%, -100%)',
-                                  position: 'absolute',
-                                  borderRadius: '3px',
-                                  top: '-10px',
-                                  left: '50%',
-                                  zIndex: 1
-                                }}
-                                title={`Milestone: ${filter.milestone}`}
-                              >
-                                🚩 <span style={{ marginLeft: '4px', fontSize: '12px', whiteSpace: 'nowrap' }}>{filter.milestone}</span>
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+          <div className="position-relative" ref={widthRef}>
+            <nav
+              ref={navRef}
+              className="adm-cycle-header-nav b2b-cycle-header-nav"
+              style={{
+                zIndex: 11,
+                backgroundColor: '#fff',
+                position: 'fixed',
+                width: width > 0 ? `${width}px` : '100%',
+                left: width > 0 ? `${leftOffset}px` : 0,
+                boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)',
+                paddingBlock: '10px',
+                paddingInline: '4px',
+                transition: 'all 0.3s ease',
+              }}
+            >
+              <div className="container-fluid">
+                <div className="row align-items-center gy-2">
+                  {/* <div className="col-md-4 col-xl-3 d-none d-md-block">
+                    <h5 className="fw-bold text-dark mb-1" style={{ fontSize: '1.1rem' }}>KYC Management</h5>
+                    <nav aria-label="breadcrumb">
+                      <ol className="breadcrumb mb-0 small">
+                        <li className="breadcrumb-item">
+                          <a href="/institute/dashboard" className="text-decoration-none">Home</a>
+                        </li>
+                        <li className="breadcrumb-item active">KYC Management</li>
+                      </ol>
+                    </nav>
+                  </div> */}
+
+                  <div className="col-12 d-md-none mb-1 adm-cycle-mobile-title">
+                    <h5 className="fw-bold text-dark mb-1" style={{ fontSize: '1.1rem' }}>KYC Management</h5>
+                    <nav aria-label="breadcrumb">
+                      <ol className="breadcrumb mb-0 small">
+                        <li className="breadcrumb-item">
+                          <a href="/institute/dashboard" className="text-decoration-none">Home</a>
+                        </li>
+                        <li className="breadcrumb-item active">KYC</li>
+                      </ol>
+                    </nav>
                   </div>
 
-                  <div className="col-md-6">
-                    <div className="d-flex justify-content-end align-items-center gap-2">
-                      <div className="input-group" style={{ maxWidth: '300px' }}>
+                  <div className="col-md-8 col-xl-9 d-none d-md-flex justify-content-end align-items-center">
+                    {renderCycleFilterDropdowns()}
+                  </div>
 
-                        <input
-                          type="text"
-                          name="name"
-                          className="form-control border-start-0 m-0"
-                          placeholder="Quick search..."
-                          value={filterData.name}
-                          onChange={handleFilterChange}
-                        />
-                        <button
-                          onClick={() => fetchProfileData()}
-                          className={`btn btn-outline-primary`}
-                          style={{ whiteSpace: 'nowrap' }}
-                        >
-                          <i className={`fas fa-search me-1`}></i>
-                          Search
+                  <div className="col-12 d-md-none adm-cycle-mobile-filter-wrap">
+                    {renderCycleFilterDropdowns(true)}
+                  </div>
 
-                        </button>
-                      </div>
-
-
-                      <button
-                        onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
-                        className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
-                        style={{ whiteSpace: 'nowrap' }}
-                      >
-                        <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
-                        Filters
-                        {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
-                          <span className="bg-light text-dark ms-1">
-                            {Object.values(filterData).filter(val => val && val !== 'true').length}
-                          </span>
-                        )}
-                      </button>
-
-
+                  <div className="col-12 mt-1 pt-1 border-top adm-cycle-toolbar" style={{ borderColor: '#eee' }}>
+                    <div className="adm-cycle-toolbar__outer d-flex flex-wrap gap-2 align-items-center justify-content-between">
+                      {renderKycNavSearchToolbar()}
                     </div>
                   </div>
                 </div>
               </div>
-
-
             </nav>
           </div>
           {!isFilterCollapsed && (
@@ -3163,7 +4872,7 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                       </div>
                       <div className="d-flex align-items-center gap-2">
                         <button
-                          className="btn btn-sm btn-outline-danger"
+                          className="btn btn-sm btn-outline-danger CButton"
                           onClick={clearAllFilters}
                         >
                           <i className="fas fa-times-circle me-1"></i>
@@ -3327,12 +5036,12 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                           {/* Clear button */}
                           <div className="mt-2">
                             <button
-                              className="btn btn-sm btn-outline-danger w-100"
+                              className="btn btn-sm btn-outline-danger w-100 CButton"
                               onClick={() => clearDateFilter('created')}
                               disabled={!filterData.createdFromDate && !filterData.createdToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear Created Date
+                              Clear
                             </button>
                           </div>
                         </div>
@@ -3389,12 +5098,12 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                           {/* Clear button */}
                           <div className="mt-2">
                             <button
-                              className="btn btn-sm btn-outline-danger w-100"
+                              className="btn btn-sm btn-outline-danger w-100 CButton"
                               onClick={() => clearDateFilter('modified')}
                               disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear Modified Date
+                              Clear
                             </button>
                           </div>
                         </div>
@@ -3420,7 +5129,7 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                 maxDate={filterData.nextActionToDate}
                               />
                             </div>
-                            <div className="col-6">
+                            <div className="col-6 lastDatepicker">
                               <label className="form-label small">To Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
@@ -3450,12 +5159,12 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                           {/* Clear button */}
                           <div className="mt-2">
                             <button
-                              className="btn btn-sm btn-outline-danger w-100"
+                              className="btn btn-sm btn-outline-danger w-100 CButton"
                               onClick={() => clearDateFilter('nextAction')}
                               disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear Next Action Date
+                              Clear
                             </button>
                           </div>
                         </div>
@@ -3543,11 +5252,19 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
 
 
           {/* Main Content */}
-          <div className="content-body" style={{ marginTop: `${navHeight + 10}px` }}>
+          <div
+            className="content-body marginTopMobile lead-list-body"
+            style={{
+              '--adm-cycle-nav-height': `${navHeight}px`,
+              marginTop: `${navHeight + 10}px`,
+              transition: 'margin-top 0.2s ease-in-out',
+            }}
+          >
             <section className="list-view">
-              <div className='row'>
+              <div className="row">
+                {renderKycDashboard()}
                 <div>
-                  <div className="col-12 rounded equal-height-2 coloumn-2">
+                  <div className="col-12 rounded equal-height-2 coloumn-2 mt-3">
                     <div className="card px-3">
                       <div className="row" id="crm-main-row">
                         {isLoadingProfiles && (
@@ -3564,17 +5281,26 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                           <>
                             {allProfiles && allProfiles.length > 0 ? (
                               allProfiles.map((profile, profileIndex) => (
-                                <div className={`card-content transition-col mb-2`} key={profileIndex}>
-                                  {/* Profile Header Card */}
-                                  <div className="card border-0 shadow-sm mb-0 mt-2">
-                                    <div className="card-body px-1 py-0 my-2">
+                                <div
+                                  className={`card-content transition-col mb-2`}
+                                  key={profile._id || profileIndex}
+                                  ref={(el) => {
+                                    const id = profile._id;
+                                    if (!id) return;
+                                    if (el) leadCardRefs.current[id] = el;
+                                    else delete leadCardRefs.current[id];
+                                  }}
+                                >
+                                  <div className="lead-card kyc-lead-card mb-0 mt-2">
+                                    {renderKycLeadStrip(profile, profileIndex)}
+                                    <div className="d-none card-body px-1 py-0 my-2">
                                       <div className="row align-items-center justify-content-between">
                                         <div className="col-md-7">
                                           <div className="d-flex align-items-center">
-                                            <div className="form-check me-3">
+                                            <div className="form-check me-md-3 me-sm-1 me-1">
                                               <input className="form-check-input" type="checkbox" />
                                             </div>
-                                            <div className="me-3">
+                                            <div className="me-md-3 me-md-1 me-1">
                                               <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
                                                 <svg width="40" height="40">
                                                   <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
@@ -3587,214 +5313,292 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                               <h6 className="mb-0 fw-bold">{profile._candidate?.name || 'Your Name'}</h6>
                                               <small className="text-muted">{profile._candidate?.mobile || 'Mobile Number'}</small>
                                             </div>
-                                            <div style={{ marginLeft: '15px' }}>
-                                              <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
+                                            <div className='pendingkyc'>
+                                              <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px', marginBottom: '0.35rem' }}>
                                                 <i className="fas fa-phone"></i>
                                               </button>
-                                              <img
+
+                                              <button
+                                                className='btn btn-outline-primary btn-sm border-0'
+                                                title='Mark KYC Done'
+                                                style={{
+                                                  fontSize: '20px',
+                                                  marginBottom: '0.35rem',
+                                                  backgroundColor: profile.kyc === true ? '#90EE90' : '#fc2b5a',
+                                                  color: profile.kyc === true ? '#1a5f1a' : 'white'
+                                                }}
+                                                disabled={profile.kyc === true || kycMarkingProfileId === profile._id}
+                                                onClick={() => handleMarkKycDone(profile)}
+                                              >
+                                                {kycMarkingProfileId === profile._id ? (
+                                                  <><i className="fas fa-spinner fa-spin me-1"></i> Marking...</>
+                                                ) : (
+                                                  <><i className="fas fa-check"></i> Mark KYC Done</>
+                                                )}
+                                              </button>
+                                              {/* <img
                                                 src="/Assets/public_assets/images/kyc_done.png"
                                                 alt="ekyc done"
+                                                className='ekycimg'
                                                 style={{ width: 100, height: 'auto', display: profile.kyc === true || profile?.docCounts?.totalRequired === 0 ? 'inline-block' : 'none' }}
                                               />
                                               <img
                                                 src="/Assets/public_assets/images/ekyc_pending.png"
                                                 alt="ekyc pending"
+                                                className='ekycimg'
                                                 style={{ width: 100, height: 'auto', display: profile.kyc === false && profile?.docCounts?.totalRequired > 0 ? 'inline-block' : 'none' }}
-                                              />
+                                              /> */}
                                             </div>
 
                                             {profile.batch && (
                                               <div style={{ marginLeft: '15px', backgroundColor: 'green', padding: '5px', borderRadius: '5px' }}>
 
-                                                <h5 style={{ fontWeight: 'bold', color: 'white' }}>Batch Assigned</h5>
+                                                <h5 style={{ fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap' }}>Batch Assigned</h5>
 
                                               </div>
                                             )}
-                                          </div>
-                                        </div>
-
-                                        <div className="col-md-2 text-end d-md-none d-sm-block d-block">
-                                          <div className="btn-group">
-                                            <div style={{ position: "relative", display: "inline-block" }}>
-                                              <button
-                                                className="btn btn-sm btn-outline-secondary border-0"
-                                                onClick={() => togglePopup(profileIndex)}
-                                                aria-label="Options"
-                                              >
-                                                <i className="fas fa-ellipsis-v"></i>
-                                              </button>
-
-                                              {showPopup === profileIndex && (
-                                                <div
-                                                  onClick={() => setShowPopup(null)}
-                                                  style={{
-                                                    position: "fixed",
-                                                    top: 0,
-                                                    left: 0,
-                                                    width: "100vw",
-                                                    height: "100vh",
-                                                    backgroundColor: "transparent",
-                                                    zIndex: 8,
-                                                  }}
-                                                ></div>
-                                              )}
-
-                                              <div
-                                                style={{
-                                                  position: "absolute",
-                                                  top: "28px",
-                                                  right: "-100px",
-                                                  width: "170px",
-                                                  backgroundColor: "white",
-                                                  border: "1px solid #ddd",
-                                                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                                  borderRadius: "4px",
-                                                  padding: "8px 0",
-                                                  zIndex: 9,
-                                                  transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
-                                                  transition: "transform 0.3s ease-in-out",
-                                                  pointerEvents: showPopup ? "auto" : "none",
-                                                  display: showPopup === profileIndex ? "block" : "none"
-                                                }}
-                                              >
-                                                {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
+                                            <div className="col-md-2 text-end d-md-none d-sm-block d-block">
+                                              <div className="btn-group">
+                                                <div style={{ position: "relative", display: "inline-block" }}>
                                                   <button
-                                                    className="dropdown-item"
-                                                    style={{
-                                                      width: "100%",
-                                                      padding: "8px 16px",
-                                                      border: "none",
-                                                      background: "none",
-                                                      textAlign: "left",
-                                                      cursor: "pointer",
-                                                      fontSize: "12px",
-                                                      fontWeight: "600"
-                                                    }}
-                                                    onClick={() => handleMoveToAdmission(profile)}
+                                                    className="btn btn-sm btn-outline-secondary border-0"
+                                                    onClick={() => togglePopup(profileIndex)}
+                                                    aria-label="Options"
                                                   >
-                                                    Move to Admission
-                                                  </button>)}
-                                                <button
-                                                  className="dropdown-item"
-                                                  style={{
-                                                    width: "100%",
-                                                    padding: "8px 16px",
-                                                    border: "none",
-                                                    background: "none",
-                                                    textAlign: "left",
-                                                    cursor: "pointer",
-                                                    fontSize: "12px",
-                                                    fontWeight: "600"
-                                                  }}
-                                                  onClick={() => handleMarkDropout(profile)}
-                                                >
-                                                  Mark Dropout
-                                                </button>
-                                                <button
-                                                  className="dropdown-item"
-                                                  style={{
-                                                    width: "100%",
-                                                    padding: "8px 16px",
-                                                    border: "none",
-                                                    background: "none",
-                                                    textAlign: "left",
-                                                    cursor: "pointer",
-                                                    fontSize: "12px",
-                                                    fontWeight: "600"
-                                                  }}
-                                                  // onClick={() => {
-                                                  //   openleadHistoryPanel(profile);
-                                                  //   console.log('selectedProfile', profile);
-                                                  // }}
-                                                  onClick={() => {
-                                                    setShowPopup(null)
-                                                    openPanel('leadHistory', profile)
-                                                  }}
-                                                >
-                                                  History List
-                                                </button>
-                                                <button
-                                                  className="dropdown-item"
-                                                  style={{
-                                                    width: "100%",
-                                                    padding: "8px 16px",
-                                                    border: "none",
-                                                    background: "none",
-                                                    textAlign: "left",
-                                                    cursor: "pointer",
-                                                    fontSize: "12px",
-                                                    fontWeight: "600"
-                                                  }}
-                                                  // onClick={() => {
-                                                  //   openEditPanel(profile, 'SetFollowup');
-                                                  //   console.log('selectedProfile', profile);
-                                                  // }}
-                                                  onClick={() => {
-                                                    setShowPopup(null)
-                                                    openPanel('SetFollowup', profile)
-                                                  }}
-                                                >
-                                                  Set Followup
-                                                </button>
-                                                <button
-                                                  className="dropdown-item"
-                                                  style={{
-                                                    width: "100%",
-                                                    padding: "8px 16px",
-                                                    border: "none",
-                                                    background: "none",
-                                                    textAlign: "left",
-                                                    cursor: "pointer",
-                                                    fontSize: "12px",
-                                                    fontWeight: "600"
-                                                  }}
-                                                  onClick={() => {
-                                                    handleFetchCandidate(profile);
-                                                    console.log('selectedProfile', profile);
-                                                  }}
-                                                >
-                                                  Edit Profile
-                                                </button>
-                                                <button
-                                                  className="dropdown-item"
-                                                  style={{
-                                                    width: "100%",
-                                                    padding: "8px 16px",
-                                                    border: "none",
-                                                    background: "none",
-                                                    textAlign: "left",
-                                                    cursor: "pointer",
-                                                    fontSize: "12px",
-                                                    fontWeight: "600",
-                                                    textWrap: "auto"
-                                                  }}
-                                                  onClick={() => {
-                                                    setSelectedProfile(profile)
-                                                    showSetPreVerification(true)
-                                                    // Fetch existing question answers if any
+                                                    <i className="fas fa-ellipsis-v"></i>
+                                                  </button>
 
-                                                  }}
-                                                >
-                                                  Add Pre Verification
-                                                </button>
+                                                  {/* Mobile Bottom Sheet Modal */}
+                                                  {showPopup === profileIndex && (
+                                                    <>
+                                                      {/* Backdrop */}
+                                                      <div
+                                                        onClick={() => setShowPopup(null)}
+                                                        style={{
+                                                          position: "fixed",
+                                                          top: 0,
+                                                          left: 0,
+                                                          width: "100vw",
+                                                          height: "100vh",
+                                                          backgroundColor: "rgba(0, 0, 0, 0.5)",
+                                                          zIndex: 9998,
+                                                          animation: "fadeIn 0.3s ease"
+                                                        }}
+                                                      ></div>
+
+                                                      {/* Bottom Sheet */}
+                                                      <div
+                                                        style={{
+                                                          position: "fixed",
+                                                          bottom: 0,
+                                                          left: 0,
+                                                          right: 0,
+                                                          backgroundColor: "white",
+                                                          borderRadius: "20px 20px 0 0",
+                                                          boxShadow: "0 -4px 20px rgba(0,0,0,0.25)",
+                                                          zIndex: 9999,
+                                                          animation: "slideUpMobile 0.3s ease",
+                                                          maxHeight: "80vh",
+                                                          overflowY: "auto",
+                                                          padding: "20px 0"
+                                                        }}
+                                                      >
+                                                        {/* Handle Bar */}
+                                                        <div style={{
+                                                          width: "40px",
+                                                          height: "4px",
+                                                          backgroundColor: "#ddd",
+                                                          borderRadius: "2px",
+                                                          margin: "0 auto 20px",
+                                                        }}></div>
+
+                                                        {/* Menu Items */}
+                                                        <div
+                                                          style={{
+                                                            padding: "0 20px"
+                                                          }}
+                                                        >
+                                                          {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
+                                                            <button
+                                                              className="dropdown-item"
+                                                              style={{
+                                                                width: "100%",
+                                                                padding: "16px 0",
+                                                                border: "none",
+                                                                background: "none",
+                                                                textAlign: "left",
+                                                                cursor: "pointer",
+                                                                fontSize: "15px",
+                                                                fontWeight: "500",
+                                                                borderBottom: "1px solid #f0f0f0",
+                                                                color: "#333"
+                                                              }}
+                                                              onClick={() => {
+                                                                setShowPopup(null);
+                                                                handleMoveToAdmission(profile);
+                                                              }}
+                                                            >
+                                                              Move to Admission
+                                                            </button>
+                                                          )}
+
+                                                          {((permissions?.custom_permissions?.can_verify_reject_kyc && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                                                            <>
+                                                              <button
+                                                                className="dropdown-item"
+                                                                style={{
+                                                                  width: "100%",
+                                                                  padding: "16px 0",
+                                                                  border: "none",
+                                                                  background: "none",
+                                                                  textAlign: "left",
+                                                                  cursor: "pointer",
+                                                                  fontSize: "15px",
+                                                                  fontWeight: "500",
+                                                                  borderBottom: "1px solid #f0f0f0",
+                                                                  color: "#333"
+                                                                }}
+                                                                onClick={() => {
+                                                                  setShowPopup(null);
+                                                                  handleMarkDropout(profile);
+                                                                }}
+                                                              >
+                                                                Mark Dropout
+                                                              </button>
+                                                              <button
+                                                                className="dropdown-item"
+                                                                style={{
+                                                                  width: "100%",
+                                                                  padding: "16px 0",
+                                                                  border: "none",
+                                                                  background: "none",
+                                                                  textAlign: "left",
+                                                                  cursor: "pointer",
+                                                                  fontSize: "15px",
+                                                                  fontWeight: "500",
+                                                                  borderBottom: "1px solid #f0f0f0",
+                                                                  color: "#333"
+                                                                }}
+                                                                onClick={() => {
+                                                                  setShowPopup(null);
+                                                                  openPanel('SetFollowup', profile);
+                                                                }}
+                                                              >
+                                                                Set Followup
+                                                              </button>
+                                                              <button
+                                                                className="dropdown-item"
+                                                                style={{
+                                                                  width: "100%",
+                                                                  padding: "16px 0",
+                                                                  border: "none",
+                                                                  background: "none",
+                                                                  textAlign: "left",
+                                                                  cursor: "pointer",
+                                                                  fontSize: "15px",
+                                                                  fontWeight: "500",
+                                                                  borderBottom: "1px solid #f0f0f0",
+                                                                  color: "#333"
+                                                                }}
+                                                                onClick={() => {
+                                                                  setShowPopup(null);
+                                                                  handleFetchCandidate(profile);
+                                                                }}
+                                                              >
+                                                                Edit Profile
+                                                              </button>
+                                                              {/* Change Branch */}
+                                                              <button
+                                                                className="dropdown-item"
+                                                                style={{
+                                                                  width: "100%",
+                                                                  padding: "16px 0",
+                                                                  border: "none",
+                                                                  background: "none",
+                                                                  textAlign: "left",
+                                                                  cursor: "pointer",
+                                                                  fontSize: "15px",
+                                                                  fontWeight: "500",
+                                                                  borderBottom: "1px solid #f0f0f0",
+                                                                  color: "#333"
+                                                                }}
+                                                                onClick={() => {
+                                                                  setSelectedProfile(profile);
+                                                                  getBranches(profile);
+                                                                  setShowBranchModal(true);
+                                                                  setShowPopup(null);
+                                                                }}
+                                                              >
+                                                                <span className="fw-medium">Change Branch</span>
+                                                              </button>
+                                                              <button
+                                                                className="dropdown-item"
+                                                                style={{
+                                                                  width: "100%",
+                                                                  padding: "16px 0",
+                                                                  border: "none",
+                                                                  background: "none",
+                                                                  textAlign: "left",
+                                                                  cursor: "pointer",
+                                                                  fontSize: "15px",
+                                                                  fontWeight: "500",
+                                                                  borderBottom: "1px solid #f0f0f0",
+                                                                  color: "#333"
+                                                                }}
+                                                                onClick={() => {
+                                                                  setShowPopup(null);
+                                                                  openPreVerificationModal(profile);
+                                                                }}
+                                                              >
+                                                                Add Pre Verification
+                                                              </button>
+
+                                                            </>
+                                                          )}
+                                                          <button
+                                                            className="dropdown-item"
+                                                            style={{
+                                                              width: "100%",
+                                                              padding: "16px 0",
+                                                              border: "none",
+                                                              background: "none",
+                                                              textAlign: "left",
+                                                              cursor: "pointer",
+                                                              fontSize: "15px",
+                                                              fontWeight: "500",
+                                                              color: "#333"
+                                                            }}
+                                                            onClick={() => {
+                                                              setShowPopup(null);
+                                                              openPanel('leadHistory', profile);
+                                                            }}
+                                                          >
+                                                            History List
+                                                          </button>
+                                                        </div>
+                                                      </div>
+                                                    </>
+                                                  )}
+                                                </div>
+
+                                                <button
+                                        className="btn btn-sm btn-outline-secondary border-0"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => toggleLeadDetails(profile)}
+                                      >
+                                        {leadDetailsVisible === profile._id ? (
+                                          <i className="fas fa-chevron-up"></i>
+                                        ) : (
+                                          <i className="fas fa-chevron-down"></i>
+                                        )}
+                                      </button>
                                               </div>
                                             </div>
 
-                                            <button
-                                              className="btn btn-sm btn-outline-secondary border-0"
-                                              onClick={() => {
-                                                setLeadDetailsVisible(profileIndex)
-                                                setSelectedProfile(profile)
-                                              }}
-                                            >
-                                              {leadDetailsVisible === profileIndex ? (
-                                                <i className="fas fa-chevron-up"></i>
-                                              ) : (
-                                                <i className="fas fa-chevron-down"></i>
-                                              )}
-                                            </button>
                                           </div>
                                         </div>
+
+
 
                                         <div className="col-md-2 text-end d-md-block d-sm-none d-none">
                                           <div className="btn-group">
@@ -3857,22 +5661,108 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                                   >
                                                     Move to Admission
                                                   </button>)}
-                                                <button
-                                                  className="dropdown-item"
-                                                  style={{
-                                                    width: "100%",
-                                                    padding: "8px 16px",
-                                                    border: "none",
-                                                    background: "none",
-                                                    textAlign: "left",
-                                                    cursor: "pointer",
-                                                    fontSize: "12px",
-                                                    fontWeight: "600"
-                                                  }}
-                                                  onClick={() => handleMarkDropout(profile)}
-                                                >
-                                                  Mark Dropout
-                                                </button>
+
+                                                {((permissions?.custom_permissions?.can_verify_reject_kyc && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                                                  <>
+                                                    <button
+                                                      className="dropdown-item"
+                                                      style={{
+                                                        width: "100%",
+                                                        padding: "8px 16px",
+                                                        border: "none",
+                                                        background: "none",
+                                                        textAlign: "left",
+                                                        cursor: "pointer",
+                                                        fontSize: "12px",
+                                                        fontWeight: "600"
+                                                      }}
+                                                      onClick={() => handleMarkDropout(profile)}
+                                                    >
+                                                      Mark Dropout
+                                                    </button>
+
+                                                    <button
+                                                      className="dropdown-item"
+                                                      style={{
+                                                        width: "100%",
+                                                        padding: "8px 16px",
+                                                        border: "none",
+                                                        background: "none",
+                                                        textAlign: "left",
+                                                        cursor: "pointer",
+                                                        fontSize: "12px",
+                                                        fontWeight: "600"
+                                                      }}
+                                                      // onClick={() => {
+                                                      //   openEditPanel(profile, 'SetFollowup');
+                                                      //   console.log('selectedProfile', profile);
+                                                      // }}
+                                                      onClick={() => {
+                                                        setShowPopup(null)
+                                                        openPanel('SetFollowup', profile)
+                                                      }}
+                                                    >
+                                                      Set Followup
+                                                    </button>
+                                                    <button
+                                                      className="dropdown-item"
+                                                      style={{
+                                                        width: "100%",
+                                                        padding: "8px 16px",
+                                                        border: "none",
+                                                        background: "none",
+                                                        textAlign: "left",
+                                                        cursor: "pointer",
+                                                        fontSize: "12px",
+                                                        fontWeight: "600"
+                                                      }}
+                                                      onClick={() => {
+                                                        handleFetchCandidate(profile);
+                                                        console.log('selectedProfile', profile);
+                                                      }}
+                                                    >
+                                                      Edit Profile
+                                                    </button>
+                                                    <button
+                                                      className="dropdown-item"
+                                                      style={{
+                                                        width: "100%",
+                                                        padding: "8px 16px",
+                                                        border: "none",
+                                                        background: "none",
+                                                        textAlign: "left",
+                                                        cursor: "pointer",
+                                                        fontSize: "12px",
+                                                        fontWeight: "600"
+                                                      }}
+                                                      onClick={() => {
+                                                        setSelectedProfile(profile);
+                                                        getBranches(profile);
+                                                        setShowBranchModal(true);
+                                                        setShowPopup(null);
+                                                      }}
+                                                    >
+                                                      Change Branch
+                                                    </button>
+                                                    <button
+                                                      className="dropdown-item"
+                                                      style={{
+                                                        width: "100%",
+                                                        padding: "8px 16px",
+                                                        border: "none",
+                                                        background: "none",
+                                                        textAlign: "left",
+                                                        cursor: "pointer",
+                                                        fontSize: "12px",
+                                                        fontWeight: "600",
+                                                        textWrap: "auto"
+                                                      }}
+                                                      onClick={() => openPreVerificationModal(profile)}
+                                                    >
+                                                      Add Pre Verification
+                                                    </button>
+                                                  </>)}
+
                                                 <button
                                                   className="dropdown-item"
                                                   style={{
@@ -3894,81 +5784,18 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                                 >
                                                   History List
                                                 </button>
-                                                <button
-                                                  className="dropdown-item"
-                                                  style={{
-                                                    width: "100%",
-                                                    padding: "8px 16px",
-                                                    border: "none",
-                                                    background: "none",
-                                                    textAlign: "left",
-                                                    cursor: "pointer",
-                                                    fontSize: "12px",
-                                                    fontWeight: "600"
-                                                  }}
-                                                  // onClick={() => {
-                                                  //   openEditPanel(profile, 'SetFollowup');
-                                                  //   console.log('selectedProfile', profile);
-                                                  // }}
-                                                  onClick={() => {
-                                                    setShowPopup(null)
-                                                    openPanel('SetFollowup', profile)
-                                                  }}
-                                                >
-                                                  Set Followup
-                                                </button>
-                                                <button
-                                                  className="dropdown-item"
-                                                  style={{
-                                                    width: "100%",
-                                                    padding: "8px 16px",
-                                                    border: "none",
-                                                    background: "none",
-                                                    textAlign: "left",
-                                                    cursor: "pointer",
-                                                    fontSize: "12px",
-                                                    fontWeight: "600"
-                                                  }}
-                                                  onClick={() => {
-                                                    handleFetchCandidate(profile);
-                                                    console.log('selectedProfile', profile);
-                                                  }}
-                                                >
-                                                  Edit Profile
-                                                </button>
-                                                <button
-                                                  className="dropdown-item"
-                                                  style={{
-                                                    width: "100%",
-                                                    padding: "8px 16px",
-                                                    border: "none",
-                                                    background: "none",
-                                                    textAlign: "left",
-                                                    cursor: "pointer",
-                                                    fontSize: "12px",
-                                                    fontWeight: "600",
-                                                    textWrap: "auto"
-                                                  }}
-                                                  onClick={() => {
-                                                    setSelectedProfile(profile)
-                                                    showSetPreVerification(true)
-                                                    // Fetch existing question answers if any
-
-                                                  }}
-                                                >
-                                                  Add Pre Verification
-                                                </button>
                                               </div>
                                             </div>
 
                                             <button
                                               className="btn btn-sm btn-outline-secondary border-0"
+                                              onMouseDown={(e) => e.preventDefault()}
                                               onClick={() => {
-                                                toggleLeadDetails(profileIndex)
+                                                toggleLeadDetails(profile)
                                                 setSelectedProfile(profile)
                                               }}
                                             >
-                                              {leadDetailsVisible === profileIndex ? (
+                                              {leadDetailsVisible === profile._id ? (
                                                 <i className="fas fa-chevron-up"></i>
                                               ) : (
                                                 <i className="fas fa-chevron-down"></i>
@@ -3988,7 +5815,7 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                           <li className="nav-item" key={tabIndex}>
                                             <button
                                               className={`nav-link ${(activeTab[profileIndex] || 0) === tabIndex ? 'active' : ''}`}
-                                              onClick={() => handleTabClick(profileIndex, tabIndex)}
+                                              onClick={() => handleTabClick(profileIndex, tabIndex, profile)}
                                             >
                                               {tab}
                                             </button>
@@ -3997,8 +5824,7 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                       </ul>
                                     </div>
 
-                                    {/* Tab Content - Only show if leadDetailsVisible is true */}
-                                    {leadDetailsVisible === profileIndex && (
+                                    {leadDetailsVisible === profile._id && (
                                       isLoadingProfilesData ? (
                                         <div className="text-center">
                                           <div className="spinner-border" role="status">
@@ -4144,12 +5970,12 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                                           </div>
                                                           <div className="info-group">
                                                             <div className="info-label">LEAD MODIFICATION By</div>
-                                                            <div className="info-value">Mar 21, 2025 3:32 PM</div>
+                                                            <div className="info-value">{profile.logs?.length ? profile.logs[profile.logs.length - 1]?.user?.name || '' : ''}</div>
                                                           </div>
                                                           <div className="col-xl- col-3">
                                                             <div className="info-group">
                                                               <div className="info-label">Counsellor Name</div>
-                                                              <div className="info-value"> {profile.leadAssignment && profile.leadAssignment.length > 0 ? profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A' : 'N/A'}</div>
+                                                              <div className="info-value"> {profile.counsellor?.name || 'N/A'}</div>
                                                             </div>
                                                           </div>
                                                         </div>
@@ -4199,22 +6025,20 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                                           <div className="info-group">
                                                             <div className="info-label">NEXT ACTION DATE</div>
                                                             <div className="info-value">
-                                                              {profile.followups.length > 0
-                                                                ? (() => {
-                                                                  const dateObj = new Date(profile.followups[profile.followups.length - 1].date);
-                                                                  const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                                    day: '2-digit',
-                                                                    month: 'short',
-                                                                    year: 'numeric',
-                                                                  }).replace(/ /g, '/');
-                                                                  const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                                    hour: '2-digit',
-                                                                    minute: '2-digit',
-                                                                    hour12: true,
-                                                                  });
-                                                                  return `${datePart}, ${timePart}`;
-                                                                })()
-                                                                : 'N/A'}
+                                                              {profile.followup?.followupDate ? (() => {
+                                                                const dateObj = new Date(profile.followup?.followupDate);
+                                                                const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                                  day: '2-digit',
+                                                                  month: 'short',
+                                                                  year: 'numeric',
+                                                                }).replace(/ /g, '-');
+                                                                const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                                  hour: '2-digit',
+                                                                  minute: '2-digit',
+                                                                  hour12: true,
+                                                                });
+                                                                return `${datePart}, ${timePart}`;
+                                                              })() : 'N/A'}
                                                             </div>
 
                                                           </div>
@@ -4250,7 +6074,8 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                                         <div className="col-xl- col-3">
                                                           <div className="info-group">
                                                             <div className="info-label">Counsellor Name</div>
-                                                            <div className="info-value"> {profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div>
+                                                            {/* <div className="info-value"> {profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div> */}
+                                                            <div className="info-value"> {profile.counsellor?.name || 'N/A'}</div>
                                                           </div>
                                                         </div>
                                                         <div className="col-xl- col-3">
@@ -4276,7 +6101,7 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                                     <div className="resume-profile-section">
                                                       {profile._candidate?.personalInfo?.image ? (
                                                         <img
-                                                          src={`${profile._candidate?.personalInfo?.image}`}
+                                                          src={resolveMediaUrl(DOC_BUCKET_URL, profile._candidate.personalInfo.image)}
                                                           alt="Profile"
                                                           className="resume-profile-image"
                                                         />
@@ -4336,15 +6161,17 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
 
                                                     <div className="resume-summary">
                                                       <h2 className="resume-section-title">Professional Summary <i className="fa fa-clock-o" aria-hidden="true" style={{ fontSize: "16px" }}></i> </h2>
-                                                      <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
+                                                      <p className={getResumeSummary(profile._candidate) ? '' : 'resume-empty-hint'}>
+                                                        {getResumeSummary(profile._candidate) || 'No summary provided'}
+                                                      </p>
                                                     </div>
                                                   </div>
 
                                                   <div className="resume-document-body">
                                                     <div className="resume-column resume-left-column">
-                                                      {profile._candidate?.isExperienced === false ? (
-                                                        <div className="resume-section">
-                                                          <h2 className="resume-section-title">Work Experience</h2>
+                                                      <div className="resume-section">
+                                                        <h2 className="resume-section-title">Work Experience</h2>
+                                                        {profile._candidate?.isExperienced === false ? (
                                                           <div className="resume-experience-item">
                                                             <div className="resume-item-header">
                                                               <h3 className="resume-item-title">Fresher</h3>
@@ -4353,45 +6180,42 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                                               <p>Looking for opportunities to start my career</p>
                                                             </div>
                                                           </div>
-                                                        </div>
-                                                      ) : (
-                                                        profile._candidate?.experiences && profile._candidate.experiences.length > 0 && (
-                                                          <div className="resume-section">
-                                                            <h2 className="resume-section-title">Work Experience</h2>
-                                                            {profile._candidate.experiences.map((exp, index) => (
-                                                              <div className="resume-experience-item" key={`resume-exp-${index}`}>
-                                                                <div className="resume-item-header">
-                                                                  {exp.jobTitle && (
-                                                                    <h3 className="resume-item-title">{exp.jobTitle}</h3>
-                                                                  )}
-                                                                  {exp.companyName && (
-                                                                    <p className="resume-item-subtitle">{exp.companyName}</p>
-                                                                  )}
-                                                                  {(exp.from || exp.to || exp.currentlyWorking) && (
-                                                                    <p className="resume-item-period">
-                                                                      {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                        ) : profile._candidate?.experiences?.length > 0 ? (
+                                                          profile._candidate.experiences.map((exp, index) => (
+                                                            <div className="resume-experience-item" key={`resume-exp-${index}`}>
+                                                              <div className="resume-item-header">
+                                                                {exp.jobTitle && (
+                                                                  <h3 className="resume-item-title">{exp.jobTitle}</h3>
+                                                                )}
+                                                                {exp.companyName && (
+                                                                  <p className="resume-item-subtitle">{exp.companyName}</p>
+                                                                )}
+                                                                {(exp.from || exp.to || exp.currentlyWorking) && (
+                                                                  <p className="resume-item-period">
+                                                                    {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                                      year: 'numeric',
+                                                                      month: 'short',
+                                                                    }) : 'Start Date'}
+                                                                    {" - "}
+                                                                    {exp.currentlyWorking ? 'Present' :
+                                                                      exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
                                                                         year: 'numeric',
                                                                         month: 'short',
-                                                                      }) : 'Start Date'}
-                                                                      {" - "}
-                                                                      {exp.currentlyWorking ? 'Present' :
-                                                                        exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
-                                                                          year: 'numeric',
-                                                                          month: 'short',
-                                                                        }) : 'End Date'}
-                                                                    </p>
-                                                                  )}
-                                                                </div>
-                                                                {exp.jobDescription && (
-                                                                  <div className="resume-item-content">
-                                                                    <p>{exp.jobDescription}</p>
-                                                                  </div>
+                                                                      }) : 'End Date'}
+                                                                  </p>
                                                                 )}
                                                               </div>
-                                                            ))}
-                                                          </div>
-                                                        )
-                                                      )}
+                                                              {exp.jobDescription && (
+                                                                <div className="resume-item-content">
+                                                                  <p>{exp.jobDescription}</p>
+                                                                </div>
+                                                              )}
+                                                            </div>
+                                                          ))
+                                                        ) : (
+                                                          <p className="resume-empty-hint">No work experience added</p>
+                                                        )}
+                                                      </div>
 
                                                       {profile._candidate?.qualifications && profile._candidate.qualifications.length > 0 && (
                                                         <div className="resume-section">
@@ -4399,11 +6223,8 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                                           {profile._candidate.qualifications.map((edu, index) => (
                                                             <div className="resume-education-item" key={`resume-edu-${index}`}>
                                                               <div className="resume-item-header">
-                                                                {edu.education && (
-                                                                  <h3 className="resume-item-title">{edu.education}</h3>
-                                                                )}
-                                                                {edu.course && (
-                                                                  <h3 className="resume-item-title">{edu.course}</h3>
+                                                                {getQualificationTitle(edu) && (
+                                                                  <h3 className="resume-item-title">{getQualificationTitle(edu)}</h3>
                                                                 )}
                                                                 {edu.universityName && (
                                                                   <p className="resume-item-subtitle">{edu.universityName}</p>
@@ -4429,14 +6250,14 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                                     </div>
 
                                                     <div className="resume-column resume-right-column">
-                                                      {profile._candidate?.personalInfo?.skills && profile._candidate.personalInfo.skills.length > 0 && (
+                                                      {getVisibleSkills(profile._candidate?.personalInfo?.skills).length > 0 && (
                                                         <div className="resume-section">
                                                           <h2 className="resume-section-title">Skills</h2>
                                                           <div className="resume-skills-list">
-                                                            {profile._candidate.personalInfo.skills.map((skill, index) => (
+                                                            {getVisibleSkills(profile._candidate.personalInfo.skills).map((skill, index) => (
                                                               <div className="resume-skill-item" key={`resume-skill-${index}`}>
-                                                                <div className="resume-skill-name">{skill.skillName || (typeof skill === 'string' ? skill : 'Skill')}</div>
-                                                                {skill.skillPercent && (
+                                                                <div className="resume-skill-name">{getSkillLabel(skill)}</div>
+                                                                {Number(skill?.skillPercent) > 0 && (
                                                                   <div className="resume-skill-bar-container">
                                                                     <div
                                                                       className="resume-skill-bar"
@@ -4474,11 +6295,11 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                                         </div>
                                                       )}
 
-                                                      {profile._candidate?.personalInfo?.certifications && profile._candidate.personalInfo.certifications.length > 0 && (
+                                                      {getVisibleCertifications(profile._candidate?.personalInfo?.certifications).length > 0 && (
                                                         <div className="resume-section">
                                                           <h2 className="resume-section-title">Certifications</h2>
                                                           <ul className="resume-certifications-list">
-                                                            {profile._candidate.personalInfo.certifications.map((cert, index) => (
+                                                            {getVisibleCertifications(profile._candidate.personalInfo.certifications).map((cert, index) => (
                                                               <li key={`resume-cert-${index}`} className="resume-certification-item">
                                                                 <strong>{cert.certificateName || cert.name || 'Certification'}</strong>
                                                                 {cert.orgName && (
@@ -4501,14 +6322,14 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                                         </div>
                                                       )}
 
-                                                      {profile._candidate?.personalInfo?.projects && profile._candidate.personalInfo.projects.length > 0 && (
+                                                      {getVisibleProjects(profile._candidate?.personalInfo?.projects).length > 0 && (
                                                         <div className="resume-section">
                                                           <h2 className="resume-section-title">Projects</h2>
-                                                          {profile._candidate.personalInfo.projects.map((proj, index) => (
+                                                          {getVisibleProjects(profile._candidate.personalInfo.projects).map((proj, index) => (
                                                             <div className="resume-project-item" key={`resume-proj-${index}`}>
                                                               <div className="resume-item-header">
                                                                 <h3 className="resume-project-title">
-                                                                  {proj.projectName || 'Project'}
+                                                                  {proj.projectName}
                                                                   {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
                                                                 </h3>
                                                               </div>
@@ -4526,11 +6347,15 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                                         <div className="resume-section">
                                                           <h2 className="resume-section-title">Interests</h2>
                                                           <div className="resume-interests-tags">
-                                                            {profile._candidate.personalInfo.interest.map((interest, index) => (
+                                                            {profile._candidate.personalInfo.interest.map((interest, index) => {
+                                                              const label = getInterestLabel(interest);
+                                                              if (!label) return null;
+                                                              return (
                                                               <span className="resume-interest-tag" key={`resume-interest-${index}`}>
-                                                                {interest}
+                                                                {label}
                                                               </span>
-                                                            ))}
+                                                              );
+                                                            })}
                                                           </div>
                                                         </div>
                                                       )}
@@ -4559,25 +6384,31 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                                         <th>S.No</th>
                                                         <th>Company Name</th>
                                                         <th>Position</th>
-                                                        <th>Duration</th>
+                                                        {/* <th>Duration</th>
                                                         <th>Location</th>
-                                                        <th>Status</th>
+                                                        <th>Status</th> */}
                                                       </tr>
                                                     </thead>
                                                     <tbody>
-                                                      {experiences.map((job, index) => (
-                                                        <tr key={index}>
-                                                          <td>{index + 1}</td>
-                                                          <td>{job.companyName}</td>
-                                                          <td>{job.jobTitle}</td>
-                                                          <td>
-                                                            {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
-                                                            {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
-                                                          </td>
-                                                          <td>Remote</td>
-                                                          <td><span className="text-success">Completed</span></td>
+                                                      {jobHistory?.length > 0 ? (
+                                                        jobHistory?.map((job, index) => (
+                                                          <tr key={index}>
+                                                            <td>{index + 1}</td>
+                                                            <td>{job._job.displayCompanyName}</td>
+                                                            <td>{job._job.title}</td>
+                                                            {/* <td>
+                                                                  {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
+                                                                  {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
+                                                                </td>
+                                                                <td>Remote</td>
+                                                                <td><span className="text-success">Completed</span></td> */}
+                                                          </tr>
+                                                        ))
+                                                      ) : (
+                                                        <tr>
+                                                          <td colSpan={6} className="text-center">No job history available</td>
                                                         </tr>
-                                                      ))}
+                                                      )}
                                                     </tbody>
                                                   </table>
                                                 </div>
@@ -4587,6 +6418,7 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
 
                                           {/* Course History Tab */}
                                           {(activeTab[profileIndex] || 0) === 3 && (
+
                                             <div className="tab-pane active" id="course-history">
                                               <div className="section-card">
                                                 <div className="table-responsive">
@@ -4602,8 +6434,8 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                                       </tr>
                                                     </thead>
                                                     <tbody>
-                                                      {profile?._candidate?._appliedCourses && profile._candidate._appliedCourses.length > 0 ? (
-                                                        profile._candidate._appliedCourses.map((course, index) => (
+                                                      {courseHistory?.length > 0 ? (
+                                                        courseHistory?.map((course, index) => (
                                                           <tr key={index}>
                                                             <td>{index + 1}</td>
                                                             <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
@@ -4658,66 +6490,66 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                                         return (
                                                           <>
                                                             <div className="stat-card total-docs">
-                                                              <div className="stat-icon">
+                                                              <div className="stat-icon d-md-block d-sm-none d-none">
                                                                 <i className="fas fa-file-alt"></i>
                                                               </div>
                                                               <div className="stat-info">
                                                                 <h4>{backendCounts.totalRequired || 0}</h4>
                                                                 <p>Total Required</p>
                                                               </div>
-                                                              <div className="stat-trend">
+                                                              <div className="stat-trend d-md-block d-sm-none d-none">
                                                                 <i className="fas fa-list"></i>
                                                               </div>
                                                             </div>
 
                                                             <div className="stat-card uploaded-docs">
-                                                              <div className="stat-icon">
+                                                              <div className="stat-icon d-md-block d-sm-none d-none">
                                                                 <i className="fas fa-cloud-upload-alt"></i>
                                                               </div>
                                                               <div className="stat-info">
                                                                 <h4>{backendCounts.uploadedCount || 0}</h4>
                                                                 <p>Uploaded</p>
                                                               </div>
-                                                              <div className="stat-trend">
+                                                              <div className="stat-trend d-md-block d-sm-none d-none">
                                                                 <i className="fas fa-arrow-up"></i>
                                                               </div>
                                                             </div>
 
                                                             <div className="stat-card pending-docs">
-                                                              <div className="stat-icon">
+                                                              <div className="stat-icon d-md-block d-sm-none d-none">
                                                                 <i className="fas fa-clock"></i>
                                                               </div>
                                                               <div className="stat-info">
                                                                 <h4>{backendCounts.pendingVerificationCount || 0}</h4>
                                                                 <p>Pending Review</p>
                                                               </div>
-                                                              <div className="stat-trend">
+                                                              <div className="stat-trend d-md-block d-sm-none d-none">
                                                                 <i className="fas fa-exclamation-triangle"></i>
                                                               </div>
                                                             </div>
 
                                                             <div className="stat-card verified-docs">
-                                                              <div className="stat-icon">
+                                                              <div className="stat-icon d-md-block d-sm-none d-none">
                                                                 <i className="fas fa-check-circle"></i>
                                                               </div>
                                                               <div className="stat-info">
                                                                 <h4>{backendCounts.verifiedCount || 0}</h4>
                                                                 <p>Approved</p>
                                                               </div>
-                                                              <div className="stat-trend">
+                                                              <div className="stat-trend d-md-block d-sm-none d-none">
                                                                 <i className="fas fa-thumbs-up"></i>
                                                               </div>
                                                             </div>
 
                                                             <div className="stat-card rejected-docs">
-                                                              <div className="stat-icon">
+                                                              <div className="stat-icon d-md-block d-sm-none d-none">
                                                                 <i className="fas fa-times-circle"></i>
                                                               </div>
                                                               <div className="stat-info">
                                                                 <h4>{backendCounts.RejectedCount || 0}</h4>
                                                                 <p>Rejected</p>
                                                               </div>
-                                                              <div className="stat-trend">
+                                                              <div className="stat-trend d-md-block d-sm-none d-none">
                                                                 <i className="fas fa-arrow-down"></i>
                                                               </div>
                                                             </div>
@@ -4809,7 +6641,7 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                                                 {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
                                                                   <>
                                                                     {(() => {
-                                                                      const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
+                                                                      const fileUrl = getDocFileUrl(latestUpload?.fileUrl || doc.fileUrl);
                                                                       const fileType = getFileType(fileUrl);
 
                                                                       if (fileType === 'image') {
@@ -4975,7 +6807,7 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                                         <div className="col-xl-8 col-lg-8 col-md-8 col-sm-8 col-8 my-auto">
                                                           <h4 className="card-title mb-0" id="wrapping-bottom">Pre Verification</h4>
                                                         </div>
-                                                       
+
                                                       </div>
                                                     </div>
 
@@ -5011,6 +6843,38 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                                                         }`}>
                                                                         {item.answer}
                                                                       </span>
+                                                                      {(item.answer === 'Rejected') && item.rejectionReason && (
+                                                                        <div className="mt-2 p-2 bg-light border rounded">
+                                                                          <small className="text-danger fw-bold">Rejection Reason:</small>
+                                                                          <div className="mt-1 text-muted">{item.rejectionReason}</div>
+                                                                        </div>
+                                                                      )}
+                                                                      {(item.answer === 'Visit' || item.answer === 'Joining' || item.answer === 'Both') && (item.visitDate || (visitDates && visitDates.length > 0)) && (
+                                                                        <div className="mt-2 p-2 bg-light border rounded">
+                                                                          <small className="text-primary fw-bold">Visit Date:</small>
+                                                                          <div className="mt-1">
+                                                                            {item.visitDate ? (
+                                                                              <div className="d-flex align-items-center gap-2">
+                                                                                <i className="fas fa-calendar-alt text-primary"></i>
+                                                                                <span>{new Date(item.visitDate).toLocaleDateString()}</span>
+                                                                                <span className={`badge bg-${item.answer === 'Visit' ? 'primary' : item.answer === 'Joining' ? 'success' : 'info'}`}>
+                                                                                  {item.answer}
+                                                                                </span>
+                                                                              </div>
+                                                                            ) : (
+                                                                              visitDates.map((visit, visitIndex) => (
+                                                                                <div key={visit._id || visitIndex} className="d-flex align-items-center gap-2">
+                                                                                  <i className="fas fa-calendar-alt text-primary"></i>
+                                                                                  <span>{new Date(visit.visitDate).toLocaleDateString()}</span>
+                                                                                  <span className={`badge bg-${visit.visitType === 'Visit' ? 'primary' : visit.visitType === 'Joining' ? 'success' : 'info'}`}>
+                                                                                    {visit.visitType}
+                                                                                  </span>
+                                                                                </div>
+                                                                              ))
+                                                                            )}
+                                                                          </div>
+                                                                        </div>
+                                                                      )}
                                                                     </div>
                                                                   </td>
                                                                 </tr>
@@ -5025,7 +6889,7 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                                                             <i className="fas fa-info-circle fa-3x mb-3"></i>
                                                             <h5>No Pre-Verification Data Found</h5>
                                                             <p>Pre-verification questions have not been answered yet.</p>
-                                                            
+
                                                           </div>
                                                         </div>
                                                       )}
@@ -5130,7 +6994,7 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                   <button type="button" className="btn-close" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}></button>
                 </div>
                 <div className="modal-body">
-                  <CandidateProfile ref={candidateRef} />
+                  <CandidateProfile ref={candidateRef} bucketUrl={DOC_BUCKET_URL} onProfileImageUpdated={handleProfileImageUpdated} />
                 </div>
                 <div className="modal-footer">
                   <button type="button" className="btn btn-secondary" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}>Close</button>
@@ -5176,168 +7040,106 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td className="s-no">1</td>
-                        <td className="question">Is the Candidate Aware of the Course</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q1_select"
-                                className="form-select"
-                                value={questionFormData.q1}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q1: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">2</td>
-                        <td className="question">Is the Candidate Aware from the Course Curriculum</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q2_select"
-                                className="form-select"
-                                value={questionFormData.q2}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q2: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">3</td>
-                        <td className="question">Currently Work Status</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q3_select"
-                                className="form-select"
-                                value={questionFormData.q3}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q3: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Working">Working</option>
-                                <option value="Not Working">Not Working</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">4</td>
-                        <td className="question">Is Candidate Interested for Course</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q4_select"
-                                className="form-select"
-                                value={questionFormData.q4}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q4: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">5</td>
-                        <td className="question">If we offered a job outside Odisha, would you be</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q5_select"
-                                className="form-select"
-                                value={questionFormData.q5}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q5: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">6</td>
-                        <td className="question">Parent Confirmation</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q6_select"
-                                className="form-select"
-                                value={questionFormData.q6}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q6: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                                <option value="Not sure">Not Sure</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="s-no">7</td>
-                        <td className="question">Recommendation from Placement</td>
-                        <td>
-                          <div className="checkbox-group">
-                            <div className="select-option">
-                              <select
-                                name="q7_select"
-                                className="form-select"
-                                value={questionFormData.q7}
-                                onChange={(e) => setQuestionFormData({ ...questionFormData, q7: e.target.value })}
-                              >
-                                <option value="">Select Option</option>
-                                <option value="Selected">Selected</option>
-                                <option value="Rejected">Rejected</option>
-                              </select>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
+                      {isLoadingPreVerificationQuestions ? (
+                        <tr>
+                          <td colSpan={3} className="text-center py-3 text-muted">
+                            Loading questions...
+                          </td>
+                        </tr>
+                      ) : (() => {
+                        const sortedQuestions = (preVerificationQuestions || [])
+                          .filter((q) => q.isActive !== false)
+                          .sort((a, b) => (a.order || 0) - (b.order || 0));
+                        if (sortedQuestions.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={3} className="text-center py-3 text-muted">
+                                No pre-verification questions configured. Add questions in Pre Verification settings.
+                              </td>
+                            </tr>
+                          );
+                        }
+                        return sortedQuestions.map((q, index) => {
+                          const fieldKey = `q${index + 1}`;
+                          const options = Array.isArray(q.options) ? q.options : [];
+                          const hasRejected = options.some((opt) => String(opt).toLowerCase() === 'rejected');
+                          const isVisitType = q.type === 'visit' || (
+                            options.length >= 2 &&
+                            options.some((o) => /visit/i.test(String(o))) &&
+                            options.some((o) => /joining/i.test(String(o))) &&
+                            options.some((o) => /both/i.test(String(o)))
+                          );
+                          return (
+                            <tr key={q._id || index}>
+                              <td className="s-no">{index + 1}</td>
+                              <td className="question">{q.questionText}</td>
+                              <td>
+                                <div className="checkbox-group">
+                                  <div className="select-option">
+                                    <select
+                                      name={`${fieldKey}_select`}
+                                      className="form-select"
+                                      value={questionFormData[fieldKey] ?? ''}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (hasRejected && val === 'Rejected') {
+                                          handleQuestionRejection(index + 1, q.questionText);
+                                        } else {
+                                          setQuestionFormData((prev) => ({ ...prev, [fieldKey]: val }));
+                                        }
+                                      }}
+                                    >
+                                      <option value="">Select Option</option>
+                                      {options.map((opt, i) => (
+                                        <option key={i} value={String(opt).trim()}>
+                                          {String(opt).trim()}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    {isVisitType && questionFormData[fieldKey] && (
+                                      <div className="date-field mt-2">
+                                        <label className="form-label">Select Date:</label>
+                                        <input
+                                          type="date"
+                                          className="form-control"
+                                          value={selectedDate}
+                                          onChange={(e) => setSelectedDate(e.target.value)}
+                                          required
+                                        />
+                                      </div>
+                                    )}
+                                    {hasRejected && questionFormData[fieldKey] === 'Rejected' && questionFormData[`${fieldKey}_reason`] && (
+                                      <div className="mt-2 p-2 bg-light border rounded">
+                                        <small className="text-danger fw-bold">Rejection Reason:</small>
+                                        <div className="mt-1 text-muted">{questionFormData[`${fieldKey}_reason`]}</div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
                     </tbody>
-                    <button
-                      onClick={QuestionAnswer}
-                      className="btn btn-primary"
-                      disabled={isLoadingQuestionAnswers || isSubmittingAnswers}
-                    >
-                      {isSubmittingAnswers ? (
-                        <>
-                          <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                          Submitting...
-                        </>
-                      ) : (
-                        'Submit'
-                      )}
-                    </button>
                   </table>
+                <div className="modal-footer border-0 pt-2">
+                  <button
+                    type="button"
+                    onClick={QuestionAnswer}
+                    className="btn btn-primary"
+                    disabled={isLoadingQuestionAnswers || isSubmittingAnswers || isLoadingPreVerificationQuestions}
+                  >
+                    {isSubmittingAnswers ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Submitting...
+                      </>
+                    ) : (
+                      'Submit'
+                    )}
+                  </button>
+                </div>
                 </div>
               </div>
 
@@ -5346,11 +7148,92 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
         </div>
       )}
 
+      {/* Question Rejection Reason Modal */}
+      {showQuestionRejectionModal && (
+        <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Enter Rejection Reason</h5>
+                <button type="button" className="btn-close" onClick={cancelQuestionRejection}></button>
+              </div>
+              <div className="modal-body">
+                <p className="mb-3">
+                  <strong>Question:</strong> {pendingQuestionRejection?.questionText}
+                </p>
+                <div className="mb-3">
+                  <label htmlFor="rejectionReason" className="form-label">Rejection Reason *</label>
+                  <textarea
+                    id="rejectionReason"
+                    className="form-control"
+                    rows="4"
+                    placeholder="Please provide a detailed reason for rejection..."
+                    value={questionRejectionReason}
+                    onChange={(e) => setQuestionRejectionReason(e.target.value)}
+                  ></textarea>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={cancelQuestionRejection}>
+                  Cancel
+                </button>
+                <button type="button" className="btn btn-danger" onClick={confirmQuestionRejection}>
+                  Confirm Rejection
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+        {showBranchModal && (
+                              <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                                <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+                                  <div className="modal-content">
+                                    <div className="modal-header">
+                                      <h1 className="modal-title fs-5">Select Branch</h1>
+                                      <button type="button" className="btn-close" onClick={() => setShowBranchModal(false)}></button>
+                                    </div>
+                                    <div className="modal-body">
+                                      <div className="position-relative">
+                                        <select
+                                          className="form-select border-0 shadow-sm"
+                                          id="course"
+                                          value={selectedBranch}
+                                          onChange={(e) => setSelectedBranch(e.target.value)}
+                                          style={{
+                                            height: '48px',
+                                            padding: '12px 16px',
+                                            backgroundColor: '#f8f9fa',
+                                            borderRadius: '8px',
+                                            fontSize: '14px',
+                                            transition: 'all 0.3s ease',
+                                            border: '1px solid #e9ecef',
+
+                                          }}
+
+                                        >
+                                          <option value="">Select Branch</option>
+                                          {branches && branches.data && branches.data.length > 0 && branches.data.map((branch, index) => (
+                                            <option key={branch._id || index} value={branch._id}>
+                                              {branch.name}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
 
 
-
-
-
+                                    </div>
+                                    <div className="modal-footer">
+                                      <button type="button" className="btn btn-secondary" onClick={() => {
+                                        setShowBranchModal(false);
+                                        setSelectedBranch('');
+                                      }}>Close</button>
+                                      <button type="button" className="btn btn-primary" onClick={() => updateBranch(selectedProfile, selectedBranch)}>Save Branch</button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
 
       <style>
         {`
@@ -5358,11 +7241,9 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
         html body .content .content-wrapper {
           padding: calc(0.9rem - 0.1rem) 1.2rem
         }
-.modal-header {
-    background-color: #fc2b5a;
-    border-bottom: none;
-    color: #fff;
-}
+          .pendingkyc{
+          margin-left:15px;
+          }
 
         .bg-gradient-primary {
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -5375,10 +7256,6 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
         .nav-pills-sm .nav-link {
           padding: 0.375rem 0.75rem;
           font-size: 0.875rem;
-        }
-
-        .sticky-top {
-          position: sticky !important;
         }
 
         .btn-group .btn {
@@ -5625,9 +7502,9 @@ const KYCManagement = ({ openPanel = null, isPanelOpen = null }) => {
             border-radius: 10px;
           }
 
-          .btn-group {
-            flex-wrap: wrap;
-          }
+          // .btn-group {
+          //   flex-wrap: wrap;
+          // }
           
           .btn-group .btn {
             margin-bottom: 0.25rem;
@@ -6003,6 +7880,26 @@ background: #fd2b5a;
           border-radius: 8px;
         }
 
+        .resume-summary p,
+        .resume-empty-hint,
+        .resume-item-content,
+        .resume-item-content p {
+          font-size: 14px;
+          line-height: 1.5;
+          color: #444;
+        }
+
+        .resume-empty-hint {
+          font-style: italic;
+          color: #666;
+          margin: 0;
+        }
+
+        .resume-document .resume-contact-item span {
+          font-size: 14px;
+          color: #444;
+        }
+
         .resume-section-title {
           font-size: 18px;
           font-weight: bold;
@@ -6173,6 +8070,12 @@ background: #fd2b5a;
         }
 
         @media (max-width: 768px) {
+          html body .content .content-wrapper{
+            padding: 1.8rem 0.9rem 0 !important;
+          }
+          .stat-card{
+          padding:0.5rem;
+          }
           .resume-document-body {
             flex-direction: column;
           }
@@ -6442,10 +8345,6 @@ background: #fd2b5a;
 @media (max-width: 576px) {
 
 
-    .btn-group {
-        flex-wrap: wrap;
-    }
-
     .input-group {
         max-width: 100% !important;
         margin-bottom: 0.5rem;
@@ -6655,7 +8554,7 @@ background: #fd2b5a;
 }
 
 .action-btn {
-    background: none;
+    // background: none;
     border: none;
     cursor: pointer;
     padding: 5px 8px;
@@ -6704,6 +8603,20 @@ background: #fd2b5a;
 /* Document Modal Styles - Add these to your existing <style jsx> section */
 
 .document-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    backdrop-filter: blur(5px);
+}
+
+.upload-modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -7393,7 +9306,14 @@ background: #fd2b5a;
     font-size: 1.5rem;
     color: white;
 }
-
+.stat-icon i{
+display:flex;
+width:100%;
+height:100%;
+justify-content: center;
+align-items: center;
+text-align: center;
+}
 .total-docs .stat-icon {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
@@ -7450,7 +9370,31 @@ background: #fd2b5a;
 .filter-tabs {
     display: flex;
     gap: 1rem;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #888 #f1f1f1;
+    padding-bottom: 0.5rem;
+}
+
+.filter-tabs::-webkit-scrollbar {
+    height: 6px;
+}
+
+.filter-tabs::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.filter-tabs::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+.filter-tabs::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }
 
 .filter-btn {
@@ -7744,7 +9688,10 @@ background: #fd2b5a;
     }
 
     .stats-grid {
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+    }
+    .stat-card{
+    padding: 0.5rem
     }
 
     .documents-grid-enhanced {
@@ -7752,7 +9699,14 @@ background: #fd2b5a;
     }
 
     .filter-tabs {
-        justify-content: center;
+        justify-content: flex-start;
+        gap: 0.75rem;
+    }
+    
+    .filter-btn {
+        flex-shrink: 0;
+        white-space: nowrap;
+        padding: 0.75rem 0.5rem;
     }
 
     .document-header {
@@ -7825,28 +9779,25 @@ background: #fd2b5a;
     }
   }
 
-        .stickyBreakpoints {
-          position: sticky;
-          top: 20px;
-          z-index: 11;
-        }
-          .site-header--sticky--register--panels {
-    top: 258px;
-    z-index: 10;
-}
-           #editFollowupPanel {
-    max-height: calc(100vh - 220px); /* Adjust based on your header height */
-    overflow-y: auto;
-    overflow-x: hidden;
-    scrollbar-width: thin; /* For Firefox */
-    scrollbar-color: #cbd5e0 #f7fafc; /* For Firefox */
-}
+         
 @media (min-width: 992px) {
-    .site-header--sticky--register--panels:not(.mobile-sticky-enable) {
+    .site-header--sticky--admission--post:not(.mobile-sticky-enable) {
         position: fixed !important;
         transition: 0.4s;
+        /* position: absolute !important; */
+        /* min-height: 200px; */
         background: white;
-    }
+        left:20%;
+        right:3%;
+        }
+        .site-header--sticky--admission--post--panel:not(.mobile-sticky-enable) {
+        position: fixed !important;
+        transition: 0.4s;
+        /* position: absolute !important; */
+        /* min-height: 200px; */
+        background: white;
+        
+        }
         }
         .react-date-picker__wrapper {
           border: none;
@@ -7869,7 +9820,6 @@ background: #fd2b5a;
 
         /* Main Tabs Styling */
         .main-tabs-container {
-          border-bottom: 1px solid #dee2e6;
           margin-bottom: 0;
         }
 
@@ -7882,8 +9832,7 @@ background: #fd2b5a;
           border: none;
           color: #6c757d;
           font-weight: 600;
-          font-size: 16px;
-          padding: 15px 25px;
+          font-size: 14px;
           border-bottom: 3px solid transparent;
           transition: all 0.3s ease;
           display: flex;
@@ -8180,17 +10129,7 @@ background: #fd2b5a;
            🎯 NEW: Responsive Design (ADD THESE STYLES)
            ======================================== */
         /* Responsive Design */
-        @media(max-width:1920px) {
-          .stickyBreakpoints {
-            top: 20%
-          }
-        }
-
-        @media(max-width:1400px) {
-          .stickyBreakpoints {
-            top: 17%
-          }
-        }
+      
 
         @media(max-width: 768px) {
           .mbResponsive{        
@@ -8212,7 +10151,72 @@ background: #fd2b5a;
             padding: 1px 6px;
           }
           .content-body{
-          margin-top: 30px!important;
+          margin-top: 250px!important;
+          }
+          .pendingkyc{
+          margin-left:5px;
+          }
+          .ekycimg{
+          width:75px!important
+          }
+          
+          .card-header {
+            position: relative;
+            overflow: visible;
+          }
+          
+          /* Scroll Indicator - Right Side Gradient */
+          .card-header::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 30px;
+            background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.95));
+            pointer-events: none;
+            z-index: 2;
+          }
+          
+          .nav.nav-pills {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            padding-bottom: 10px !important;
+            padding-right: 30px !important;
+            margin-bottom: 0 !important;
+            scroll-behavior: smooth;
+            scroll-snap-type: x proximity;
+          }
+          
+          .nav.nav-pills::-webkit-scrollbar {
+            display: none;
+          }
+          
+          .nav.nav-pills .nav-item {
+            flex: 0 0 auto !important;
+            white-space: nowrap !important;
+            margin-right: 8px;
+            scroll-snap-align: start;
+          }
+          
+          .nav.nav-pills .nav-link {
+            white-space: nowrap !important;
+            padding: 10px 16px !important;
+            font-size: 13px !important;
+            border-radius: 20px !important;
+            min-width: fit-content !important;
+            display: inline-block !important;
+            transition: all 0.3s ease;
+          }
+          
+          .nav.nav-pills .nav-link.active {
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(253, 43, 90, 0.3);
           }
         }
 
@@ -8414,6 +10418,9 @@ background: #fd2b5a;
 }
 
 @media (max-width: 768px) {
+html body .content .content-wrapper{
+padding: 1.0rem 1.2rem 0;
+}
   .document-history .history-preview iframe.pdf-thumbnail {
     height: 50vh !important;
     min-height: 300px;
@@ -8744,9 +10751,21 @@ background: #fd2b5a;
 .multi-select-loading .dropdown-arrow {
   animation: spin 1s linear infinite;
 }
+.firstDatepicker .react-calendar {
+    width: 250px !important;
+    height: min-content !important;
+    transform: translateX(0px)!important;
+}
+.lastDatepicker .react-calendar {
+    width: 250px !important;
+    height: min-content !important;
+    transform: translateX(-110px)!important;
+
+}
 .react-calendar{
-width:min-content !important;
+// width:min-content !important;
 height:min-content !important;
+    width: 250px !important;
 }
 @media (max-width: 768px) {
   .multi-select-options-new {
@@ -8784,2529 +10803,17 @@ height:min-content !important;
               }
 }
 
-    
+   
             `
         }
-
-      </style>
-      <style> {
-        ` .bg-gradient-primary {
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          }
-
-          .transition-all {
-              transition: all 0.3s ease;
-          }
-
-          .nav-pills-sm .nav-link {
-              padding: 0.375rem 0.75rem;
-              font-size: 0.875rem;
-          }
-
-          .sticky-top {
-              position: sticky !important;
-          }
-
-          .btn-group .btn {
-              border-radius: 0.375rem;
-          }
-
-          .btn-group .btn:not(:last-child) {
-              margin-right: 0.25rem;
-          }
-
-          .card {
-              transition: box-shadow 0.15s ease-in-out;
-          }
-
-
-          .text-truncate {
-              overflow: hidden;
-              text-overflow: ellipsis;
-              white-space: nowrap;
-          }
-
-          .circular-progress-container {
-              position: relative;
-              width: 40px;
-              height: 40px;
-          }
-
-          .circular-progress-container svg {
-              transform: rotate(-90deg);
-          }
-
-          .circle-bg {
-              fill: none;
-              stroke: #e6e6e6;
-              stroke-width: 4;
-          }
-
-          .circle-progress {
-              fill: none;
-              stroke: #FC2B5A;
-              stroke-width: 4;
-              stroke-linecap: round;
-              transition: stroke-dashoffset 0.5s ease;
-          }
-
-          .circular-progress-container .progress-text {
-              position: absolute;
-              top: 50%;
-              left: 50%;
-              transform: translate(-50%, -50%);
-              font-size: 10px;
-              color: #333;
-          }
-
-          .contact-row {
-              border: 1px solid #e0e0e0;
-              border-radius: 2px;
-              padding: 10px 15px;
-              background-color: #fff;
-          }
-
-          .userCheckbox {
-              display: flex;
-              align-items: center;
-              gap: 20px;
-          }
-
-          .contact-checkbox {
-              display: flex;
-              align-items: center;
-          }
-
-          .contact-name {
-              font-weight: 500;
-              margin-bottom: 0;
-          }
-
-          .contact-number {
-              color: #888;
-              font-size: 0.85rem;
-          }
-
-          .transition-col {
-              transition: all 0.3s ease-in-out;
-          }
-
-          .leadsStatus {
-              width: 100%;
-              border-bottom: 1px solid #e0e0e0;
-          }
-
-          .leadsDetails {
-              display: flex;
-              list-style: none;
-              margin: 0;
-              padding: 0;
-              overflow-x: auto;
-              white-space: nowrap;
-          }
-
-          .leadsDetails .status {
-              padding: 12px 16px;
-              font-size: 14px;
-              color: #555;
-              cursor: pointer;
-              position: relative;
-              transition: all 0.2s ease;
-          }
-
-          .leadsDetails .status:hover {
-              color: #000;
-          }
-
-          .leadsDetails .status.active {
-              color: #333;
-              font-weight: 500;
-          }
-
-          .leadsDetails .status.active::after {
-              content: '';
-              position: absolute;
-              bottom: -1px;
-              left: 0;
-              width: 100%;
-              height: 2px;
-              background-color: #007bff;
-          }
-
-          .tab-pane {
-              display: none;
-          }
-
-          .tab-pane.active {
-              display: block;
-          }
-
-          .info-section {
-              background: #f8f9fa;
-              border-radius: 8px;
-              padding: 20px;
-              margin-bottom: 20px;
-          }
-
-          .section-title {
-              color: #495057;
-              font-weight: 600;
-              margin-bottom: 15px;
-              padding-bottom: 10px;
-              border-bottom: 2px solid #dee2e6;
-          }
-
-
-          .tab-pane {
-              padding: 0;
-              position: relative;
-          }
-
-          .scrollable-container {
-              display: none;
-          }
-
-          .desktop-view {
-              display: block;
-          }
-
-          .scroll-arrow {
-              display: none;
-              position: absolute;
-              top: 50%;
-              transform: translateY(-50%);
-              width: 30px;
-              height: 30px;
-              background: rgba(255, 255, 255, 0.9);
-              border-radius: 50%;
-              align-items: center;
-              justify-content: center;
-              cursor: pointer;
-              z-index: 9;
-              box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-              border: 1px solid #eaeaea;
-          }
-
-          .scroll-left {
-              left: 5px;
-          }
-
-          .scroll-right {
-              right: 5px;
-          }
-
-          .document-preview-icon {
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              height: 100%;
-          }
-
-
-
-          .whatsapp-chat {
-              height: 100%;
-              min-width: 300px;
-              box-shadow: 0px 4px 5px rgba(0, 0, 0, 0.12), 0px 1px 10px rgba(0, 0, 0, 0.12), 0px 2px 4px rgba(0, 0, 0, 0.2);
-              display: flex;
-              flex-direction: column;
-          }
-
-          .right-side-panel {
-              background: #ffffff !important;
-              box-shadow: 0px 4px 5px rgba(0, 0, 0, 0.12), 0px 1px 10px rgba(0, 0, 0, 0.12), 0px 2px 4px rgba(0, 0, 0, 0.04);
-              width: 100%;
-              height: 73dvh;
-          }
-
-          .whatsapp-chat .topbar-container {
-              background-color: #fff;
-              padding: 8px 16px;
-              display: flex;
-              /* height: 8%; */
-              min-height: 43px;
-              align-items: center;
-              position: relative;
-              justify-content: space-between;
-          }
-
-          .whatsapp-chat .topbar-container .left-topbar {
-              display: flex;
-              align-items: center;
-              justify-content: flex-start;
-              cursor: pointer;
-          }
-
-          .whatsapp-chat .topbar-container .left-topbar .img-container {
-              margin-right: 12px;
-          }
-
-          .whatsapp-chat .topbar-container .left-topbar .selected-number {
-              font-size: 12px;
-              color: #393939;
-          }
-
-          .small-avatar {
-              background: #f17e33;
-              width: 32px;
-              height: 32px;
-              border-radius: 50%;
-              color: white;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              text-transform: uppercase;
-              font-size: 14px;
-          }
-
-          .whatsapp-chat .chat-view {
-              background: #E6DDD4;
-              flex: 1;
-              position: relative;
-          }
-
-          .whatsapp-chat .chat-view .chat-container {
-              list-style-type: none;
-              padding: 18px 10px;
-              position: absolute;
-              bottom: 0;
-              display: flex;
-              flex-direction: column;
-              padding-right: 15px;
-              overflow-x: hidden;
-              max-height: 100%;
-              margin-bottom: 0px;
-              padding-bottom: 12px;
-              overflow-y: scroll;
-              width: 100%;
-          }
-
-          .whatsapp-chat .chat-view .counselor-msg-container {
-              display: flex;
-              flex-direction: column;
-              align-items: end;
-          }
-
-          .whatsapp-chat .chat-view .chat-container .chatgroupdate {
-              width: 92px;
-              height: 24px;
-              background: #DCF3FB;
-              border-radius: 4px;
-              margin-top: 51px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              margin-left: auto;
-              margin-right: auto;
-          }
-
-          .whatsapp-chat .chat-view .chat-container .chatgroupdate span {
-              font-size: 13px;
-              color: #393939;
-          }
-
-          .whatsapp-chat .chat-view .counselor-msg {
-              float: right;
-              background: #D8FFC0;
-              padding-right: 0;
-          }
-
-          .whatsapp-chat .chat-view .macro {
-              margin-top: 12px;
-              max-width: 92%;
-              border-radius: 4px;
-              padding: 8px;
-              display: flex;
-              padding-bottom: 2px;
-              min-width: 22%;
-              transform: scale(0);
-              animation: message 0.15s ease-out 0s forwards;
-          }
-
-          @keyframes message {
-              to {
-                  transform: scale(1);
-              }
-          }
-
-          .whatsapp-chat .chat-view .text-r {
-              float: right;
-          }
-
-          .whatsapp-chat .chat-view .text {
-              width: 100%;
-              display: flex;
-              flex-direction: column;
-              color: #4A4A4A;
-              font-size: 12px;
-          }
-
-          .whatsapp-chat .chat-view .student-messages {
-              color: #F17E33;
-          }
-
-          .whatsapp-chat .chat-view .message-header-name {
-              font-weight: 600;
-              font-size: 12px;
-              line-height: 18px;
-              color: #F17E33;
-              position: relative;
-              bottom: 4px;
-              opacity: 0.9;
-          }
-
-          .whatsapp-chat .chat-view .text-message {
-              width: 100%;
-              margin-top: 0;
-              margin-bottom: 2px;
-              line-height: 16px;
-              font-size: 12px;
-              word-break: break-word;
-          }
-
-          .whatsapp-chat .chat-view pre {
-              white-space: pre-wrap;
-              padding: unset !important;
-              font-size: unset !important;
-              line-height: normal !important;
-              color: #4A4A4A !important;
-              overflow: unset !important;
-              background-color: transparent !important;
-              border: none !important;
-              border-radius: unset !important;
-              font-family: unset !important;
-          }
-
-          .whatsapp-chat .footer-container {
-              background-color: #F5F6F6;
-              box-shadow: 0px -2px 4px rgba(0, 0, 0, 0.09);
-              padding: 0;
-              height: auto;
-              align-items: center;
-              border: none !important;
-          }
-
-          .whatsapp-chat .footer-container .footer-box {
-              padding: 16px;
-              background: #F5F6F6;
-              border-radius: 6px;
-          }
-
-          .whatsapp-chat .footer-container .footer-box .message-container {
-              color: black;
-              position: relative;
-              height: 40px;
-          }
-
-          .whatsapp-chat .footer-container .footer-box .message-container .message-input {
-              background: #FFFFFF;
-              border-radius: 6px 6px 0 0 !important;
-              width: 100%;
-              min-height: 36px;
-              padding: 0px 12px;
-              font-size: 12px;
-              resize: none;
-              position: absolute;
-              bottom: 0px;
-              line-height: 20px;
-              padding-top: 8px;
-              border: #fff;
-          }
-
-          .whatsapp-chat .footer-container .footer-box .divider {
-              border: 1px solid #D8D8D8;
-              margin-bottom: 0.8px !important;
-              margin-top: -0.8px !important;
-          }
-
-          .whatsapp-chat .footer-container .footer-box .message-container-input {
-              display: flex;
-              background: #FFFFFF;
-              height: 32px;
-              border-radius: 0 0 6px 6px !important;
-              justify-content: space-between;
-          }
-
-          .whatsapp-chat .footer-container .footer-box .message-container-input .left-footer {
-              display: flex;
-              justify-content: flex-start;
-              align-items: center;
-          }
-
-          .whatsapp-chat .footer-container .footer-box .message-container-input .left-footer .margin-bottom-5 {
-              margin-bottom: 5px;
-              margin-right: 15px;
-              margin-left: 10px;
-          }
-
-          .whatsapp-chat .footer-container .footer-box .message-container-input .left-footer .margin-right-10 {
-              margin-right: 10px;
-          }
-
-          .input-template {
-              margin-bottom: 5px;
-              margin-left: 15px;
-          }
-
-          .whatsapp-chat .footer-container .footer-box .message-container-input .right-footer .send-button {
-              border-radius: 50%;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              width: 32px;
-              height: 32px;
-              color: #666;
-          }
-
-          .whatsapp-chat .footer-container .footer-box .message-container-input .left-footer .fileUploadIcon {
-              cursor: pointer;
-              color: #666;
-              transform: translateY(15px);
-          }
-
-          .sessionExpiredMsg {
-              background: #fff3cd;
-              border: 1px solid #ffeaa7;
-              border-radius: 4px;
-              padding: 8px 12px;
-              margin: 10px 0;
-              font-size: 12px;
-              color: #856404;
-              text-align: center;
-          }
-
-          .followUp {
-              font-size: 13px;
-              font-weight: 500;
-              padding-left: 10px;
-          }
-
-          .section-card {
-              padding: 5px;
-              border-radius: 8px;
-          }
-
-          .section-title {
-              color: #333;
-              font-weight: 600;
-              margin-bottom: 20px;
-              padding-bottom: 10px;
-              border-bottom: 2px solid #f0f0f0;
-          }
-
-          .nav-pills .nav-link.active {
-              background: #fd2b5a;
-          }
-
-          .resume-document {
-              max-width: 1200px;
-              margin: 0 auto;
-              background: white;
-              padding: 20px;
-              box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-              border-radius: 8px;
-          }
-
-          .resume-document-header {
-              margin-bottom: 30px;
-          }
-
-          .resume-profile-section {
-              display: flex;
-              align-items: center;
-              margin-bottom: 20px;
-          }
-
-          .resume-profile-placeholder {
-              width: 100px;
-              height: 100px;
-              border-radius: 50%;
-              background: #f0f0f0;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              margin-right: 20px;
-              font-size: 40px;
-              color: #999;
-          }
-
-          .resume-profile-image {
-              width: 100px;
-              height: 100px;
-              border-radius: 50%;
-              object-fit: cover;
-              margin-right: 20px;
-          }
-
-          .resume-header-content {
-              flex: 1;
-          }
-
-          .resume-name {
-              font-size: 28px;
-              font-weight: bold;
-              margin-bottom: 5px;
-              color: #333;
-          }
-
-          .resume-title {
-              font-size: 16px;
-              color: #666;
-              margin-bottom: 10px;
-          }
-
-          .resume-contact-details {
-              display: flex;
-              flex-wrap: wrap;
-              gap: 15px;
-          }
-
-          .resume-contact-item {
-              display: flex;
-              align-items: center;
-              gap: 5px;
-              font-size: 14px;
-              color: #555;
-          }
-
-          .resume-summary {
-              background: #f8f9fa;
-              padding: 15px;
-              border-radius: 8px;
-          }
-
-          .resume-section-title {
-              font-size: 18px;
-              font-weight: bold;
-              color: #333;
-              margin-bottom: 15px;
-              border-bottom: 2px solid #007bff;
-              padding-bottom: 5px;
-          }
-
-          .resume-document-body {
-              display: flex;
-              gap: 30px;
-          }
-
-          .resume-column {
-              flex: 1;
-          }
-
-          .resume-section {
-              margin-bottom: 25px;
-          }
-
-          .resume-experience-item,
-          .resume-education-item,
-          .resume-project-item {
-              margin-bottom: 20px;
-              padding-bottom: 15px;
-              border-bottom: 1px solid #eee;
-          }
-
-          .resume-item-header {
-              margin-bottom: 10px;
-          }
-
-          .resume-item-title {
-              font-size: 16px;
-              font-weight: bold;
-              color: #333;
-              margin-bottom: 5px;
-          }
-
-          .resume-item-subtitle {
-              font-size: 14px;
-              color: #666;
-              margin-bottom: 3px;
-          }
-
-          .resume-item-period {
-              font-size: 13px;
-              color: #888;
-              font-style: italic;
-          }
-
-          .resume-item-content {
-              font-size: 14px;
-              color: #555;
-              line-height: 1.5;
-          }
-
-          .resume-skills-list {
-              display: flex;
-              flex-direction: column;
-              gap: 10px;
-          }
-
-          .resume-skill-item {
-              display: flex;
-              align-items: center;
-              gap: 10px;
-          }
-
-          .resume-skill-name {
-              flex: 1;
-              font-size: 14px;
-              color: #333;
-          }
-
-          .resume-skill-bar-container {
-              flex: 2;
-              height: 8px;
-              background: #e0e0e0;
-              border-radius: 4px;
-              overflow: hidden;
-          }
-
-          .resume-skill-bar {
-              height: 100%;
-              background: #007bff;
-              border-radius: 4px;
-          }
-
-          .resume-languages-list {
-              display: flex;
-              flex-direction: column;
-              gap: 10px;
-          }
-
-          .resume-language-item {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-          }
-
-          .resume-language-name {
-              font-size: 14px;
-              color: #333;
-          }
-
-          .resume-language-level {
-              display: flex;
-              gap: 3px;
-          }
-
-          .resume-level-dot {
-              width: 8px;
-              height: 8px;
-              border-radius: 50%;
-              background: #e0e0e0;
-          }
-
-          .resume-level-dot.filled {
-              background: #007bff;
-          }
-
-          .resume-certifications-list {
-              list-style: none;
-              padding: 0;
-          }
-
-          .resume-certification-item {
-              margin-bottom: 10px;
-              font-size: 14px;
-              color: #333;
-          }
-
-          .resume-cert-org {
-              color: #666;
-          }
-
-          .resume-cert-date {
-              color: #888;
-              font-style: italic;
-          }
-
-          .resume-interests-tags {
-              display: flex;
-              flex-wrap: wrap;
-              gap: 8px;
-          }
-
-          .resume-interest-tag {
-              background: #f0f0f0;
-              padding: 5px 10px;
-              border-radius: 15px;
-              font-size: 12px;
-              color: #333;
-          }
-
-          .resume-declaration {
-              margin-top: 30px;
-              padding-top: 20px;
-              border-top: 1px solid #eee;
-          }
-
-          .highlight-text {
-              color: #007bff;
-              font-weight: bold;
-          }
-
-
-
-          /* WhatsApp Panel Mobile Styles */
-          .whatsapp-chat {
-              height: 100%;
-              display: flex;
-              flex-direction: column;
-          }
-
-          .topbar-container {
-              flex-shrink: 0;
-              padding: 1rem;
-              border-bottom: 1px solid #e0e0e0;
-              background-color: #f8f9fa;
-          }
-
-          .left-topbar {
-              display: flex;
-              align-items: center;
-              gap: 1rem;
-          }
-
-          .small-avatar {
-              width: 40px;
-              height: 40px;
-              border-radius: 50%;
-              background-color: #007bff;
-              color: white;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-weight: bold;
-          }
-
-          .lead-name {
-              font-weight: 600;
-              font-size: 1rem;
-          }
-
-          .selected-number {
-              color: #666;
-              font-size: 0.9rem;
-          }
-
-          .right-topbar {
-              display: flex;
-              align-items: center;
-              gap: 0.5rem;
-              margin-top: 0.5rem;
-          }
-
-          .chat-view {
-              flex: 1;
-              overflow-y: auto;
-              padding: 1rem;
-              background-color: #f0f0f0;
-          }
-
-          .chat-container {
-              list-style: none;
-              padding: 0;
-              margin: 0;
-          }
-
-          .counselor-msg-container {
-              margin-bottom: 1.5rem;
-          }
-
-          .chatgroupdate {
-              text-align: center;
-              margin-bottom: 1rem;
-          }
-
-          .chatgroupdate span {
-              background-color: #e3f2fd;
-              padding: 0.25rem 0.75rem;
-              border-radius: 1rem;
-              font-size: 0.8rem;
-              color: #666;
-          }
-
-          .counselor-msg {
-              background-color: #dcf8c6;
-              padding: 0.75rem;
-              border-radius: 0.5rem;
-              margin-bottom: 0.5rem;
-              max-width: 80%;
-              margin-left: auto;
-          }
-
-          .text-message {
-              white-space: pre-wrap;
-              margin: 0;
-              font-family: inherit;
-          }
-
-          .message-header-name {
-              font-weight: 600;
-              color: #1976d2;
-          }
-
-          .student-messages {
-              color: #2e7d32;
-          }
-
-          .messageTime {
-              font-size: 0.75rem;
-              color: #666;
-              display: block;
-              text-align: right;
-          }
-
-          .sessionExpiredMsg {
-              text-align: center;
-              padding: 1rem;
-              background-color: #fff3cd;
-              border: 1px solid #ffeaa7;
-              border-radius: 0.5rem;
-              margin-top: 1rem;
-              color: #856404;
-          }
-
-          .footer-container {
-              flex-shrink: 0;
-              border-top: 1px solid #e0e0e0;
-              background-color: white;
-          }
-
-          .footer-box {
-              padding: 1rem;
-          }
-
-          .message-container {
-              margin-bottom: 0.5rem;
-          }
-
-          .message-input {
-              width: 100%;
-              border: 1px solid #ddd;
-              border-radius: 0.5rem;
-              padding: 0.5rem;
-              resize: none;
-              background-color: #f8f9fa;
-          }
-
-          .disabled-style {
-              opacity: 0.6;
-          }
-
-          .divider {
-              margin: 0.5rem 0;
-              border-color: #e0e0e0;
-          }
-
-          .message-container-input {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-          }
-
-          .bgcolor {
-              background-color: #f1f2f6 !important;
-          }
-
-          .left-footer {
-              display: flex;
-              align-items: center;
-              gap: 0.5rem;
-          }
-
-          .margin-right-10 {
-              margin-right: 10px;
-          }
-
-          .margin-bottom-5 {
-              margin-bottom: 5px;
-          }
-
-          .margin-horizontal-4 {
-              margin: 0 4px;
-          }
-
-          .margin-horizontal-5 {
-              margin: 0 5px;
-          }
-
-          .fileUploadIcon {
-              width: 20px;
-              height: 20px;
-              opacity: 0;
-              position: absolute;
-              cursor: pointer;
-          }
-
-          .input-template {
-              cursor: pointer;
-          }
-
-          .send-button {
-              text-decoration: none;
-          }
-
-          .send-img {
-              width: 20px;
-              height: 20px;
-          }
-
-          #whatsappPanel {
-              height: 73dvh;
-          }
-
-          .info-group {
-              padding: 8px;
-          }
-
-          /* Responsive adjustments */
-
-
-          /* Add this to your existing style tag or CSS file */
-          .react-date-picker__wrapper {
-              border: 1px solid #ced4da !important;
-              border-radius: 0.375rem !important;
-          }
-
-          .react-date-picker__inputGroup input {
-              border: none !important;
-              outline: none !important;
-          }
-
-          .react-date-picker__clear-button {
-              display: none !important;
-          }
-
-          .react-date-picker__calendar-button {
-              padding: 4px !important;
-          }
-
-          /* Additional styling for better appearance */
-          .react-date-picker__inputGroup {
-              width: 100%;
-              white-space: nowrap;
-              background: transparent;
-              border: none;
-          }
-
-          .react-date-picker__wrapper {
-              background: white !important;
-          }
-
-
-          .no-scroll {
-              overflow: hidden;
-          }
-
-
-          .doc-iframe {
-              transform-origin: top left;
-              transition: transform 0.3s ease;
-              width: 100%;
-              height: 100%;
-              overflow: hidden;
-          }
-
-          .admin-document-panel {
-              margin: 20px;
-              background-color: white;
-              border-radius: 8px;
-              box-shadow: var(--shadow);
-              overflow: hidden;
-          }
-
-          .panel-header {
-              padding: 20px;
-              border-bottom: 1px solid var(--border-color);
-              display: flex;
-              flex-wrap: wrap;
-              justify-content: space-between;
-              align-items: center;
-              gap: 15px;
-              background-color: #4a6fdc;
-              color: white;
-          }
-
-          .panel-header h2 {
-              color: white;
-              font-size: 1.5rem;
-              margin: 0;
-          }
-
-          .user-selector {
-              padding: 8px 12px;
-              border: 1px solid var(--border-color);
-              border-radius: 4px;
-              font-size: 14px;
-              min-width: 200px;
-          }
-
-          .candidate-info {
-              background-color: #e9f0fd;
-              padding: 20px;
-              border-radius: 6px;
-              margin: 20px;
-              display: flex;
-              align-items: center;
-              box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-          }
-
-          .candidate-avatar {
-              width: 70px;
-              height: 70px;
-              border-radius: 50%;
-              background-color: #4a6fdc;
-              color: white;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              font-weight: bold;
-              font-size: 24px;
-              margin-right: 20px;
-          }
-
-          .candidate-details {
-              flex-grow: 1;
-          }
-
-          .candidate-details h3 {
-              margin: 0 0 5px 0;
-              font-size: 22px;
-              color: #333;
-          }
-
-          .candidate-details p {
-              margin: 0 0 5px 0;
-              color: #555;
-          }
-
-          .candidate-stats {
-              display: flex;
-              margin-top: 15px;
-              flex-wrap: wrap;
-              gap: 15px;
-          }
-
-          .stat-box {
-              background: white;
-              border-radius: 4px;
-              padding: 10px 15px;
-              min-width: 120px;
-              text-align: center;
-              box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-          }
-
-          .stat-box h4 {
-              margin: 0 0 5px 0;
-              font-size: 14px;
-              color: #666;
-          }
-
-          .stat-box p {
-              margin: 0;
-              font-size: 20px;
-              font-weight: bold;
-          }
-
-          .document-list {
-              overflow-x: auto;
-              margin: 0 20px 20px 20px;
-          }
-
-          .document-table {
-              width: 100%;
-              border-collapse: collapse;
-          }
-
-          .document-table th {
-              background-color: var(--gray-light);
-              padding: 12px 15px;
-              text-align: left;
-              font-weight: 600;
-              color: #444;
-              border-bottom: 2px solid var(--border-color);
-              white-space: nowrap;
-          }
-
-
-
-          .document-table tbody tr:hover {
-              background-color: #f8f9fa;
-          }
-
-          .document-table td {
-              padding: 12px 15px;
-              vertical-align: middle;
-          }
-
-          .status-badges {
-              display: inline-block;
-              padding: 5px 10px;
-              border-radius: 4px;
-              font-size: 12px;
-              font-weight: 600;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-          }
-
-          .status-pending {
-              background-color: #fff3cd;
-              color: #856404;
-          }
-
-          .status-approved {
-              background-color: #d4edda;
-              color: #155724;
-          }
-
-          .status-rejected {
-              background-color: #f8d7da;
-              color: #721c24;
-          }
-
-          .action-btn {
-              background: none;
-              border: none;
-              cursor: pointer;
-              padding: 5px 8px;
-              border-radius: 4px;
-              transition: background-color 0.2s;
-          }
-
-          .view-btn {
-              color: var(--primary-color);
-          }
-
-          .view-btn:hover {
-              background-color: rgba(74, 111, 220, 0.1);
-          }
-
-          .approve-btn {
-              color: var(--success-color);
-              background-color: #d4edda;
-              border: none;
-              border-radius: 4px;
-              padding: 8px 12px;
-              cursor: pointer;
-              font-weight: 600;
-              transition: all 0.2s;
-          }
-
-          .approve-btn:hover {
-              background-color: #c3e6cb;
-          }
-
-          .reject-btn {
-              color: var(--danger-color);
-              background-color: #f8d7da;
-              border: none;
-              border-radius: 4px;
-              padding: 8px 12px;
-              cursor: pointer;
-              font-weight: 600;
-              transition: all 0.2s;
-          }
-
-          .reject-btn:hover {
-              background-color: #f5c6cb;
-          }
-
-          .document-modal-overlay {
-              position: fixed;
-              top: 0;
-              left: 0;
-              width: 100vw;
-              height: 100vh;
-              background-color: rgba(0, 0, 0, 0.7);
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              z-index: 9999;
-              backdrop-filter: blur(5px);
-          }
-
-          .document-modal-content {
-              background: white;
-              border-radius: 12px;
-              width: 70%;
-              max-height: 90vh;
-              overflow: hidden;
-              box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
-              display: flex;
-              flex-direction: column;
-              animation: modalSlideIn 0.3s ease-out;
-          }
-
-          @keyframes modalSlideIn {
-              from {
-                  opacity: 0;
-                  transform: scale(0.9) translateY(-20px);
-              }
-
-              to {
-                  opacity: 1;
-                  transform: scale(1) translateY(0);
-              }
-          }
-
-          .document-modal-content .modal-header {
-              padding: 1.5rem 2rem;
-              border-bottom: 1px solid #e9ecef;
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-              color: white;
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-          }
-
-          .document-modal-content .modal-header h3 {
-              margin: 0;
-              font-size: 1.25rem;
-              font-weight: 600;
-              color: white;
-          }
-
-          .document-modal-content .close-btn {
-              background: none;
-              border: none;
-              color: white;
-              font-size: 1.5rem;
-              cursor: pointer;
-              padding: 0;
-              width: 30px;
-              height: 30px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              border-radius: 50%;
-              transition: background-color 0.2s;
-          }
-
-          .document-modal-content .close-btn:hover {
-              background-color: rgba(255, 255, 255, 0.2);
-          }
-
-          .document-modal-content .modal-body {
-              padding: 2rem;
-              display: flex;
-              gap: 2rem;
-              overflow-y: auto;
-          }
-
-          .document-preview-section {
-              flex: 2;
-              min-width: 400px;
-          }
-
-          .document-preview-container {
-              background: #f8f9fa;
-              border-radius: 8px;
-              height: 500px;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              position: relative;
-              border: 2px dashed #dee2e6;
-          }
-
-          .document-preview-container img {
-              max-width: 100%;
-              max-height: 90%;
-              object-fit: contain;
-              border-radius: 4px;
-              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-          }
-
-          .preview-controls {
-              position: absolute;
-              bottom: 0px;
-              left: 50%;
-              transform: translateX(-50%);
-              display: flex;
-              gap: 10px;
-              background: rgba(255, 255, 255, 0.9);
-              padding: 10px 15px;
-              border-radius: 25px;
-              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-          }
-
-          .control-btn {
-              background: #007bff;
-              color: white;
-              border: none;
-              padding: 8px 12px;
-              border-radius: 20px;
-              cursor: pointer;
-              font-size: 0.85rem;
-              display: flex;
-              align-items: center;
-              gap: 5px;
-              transition: all 0.2s;
-          }
-
-          .control-btn:hover {
-              background: #0056b3;
-              transform: translateY(-1px);
-          }
-
-          .no-document {
-              text-align: center;
-              color: #6c757d;
-          }
-
-          .document-info-section {
-              flex: 1;
-              /* min-width: 300px; */
-          }
-
-          .info-card {
-              background: #f8f9fa;
-              border-radius: 8px;
-              padding: 1.5rem;
-              margin-bottom: 1.5rem;
-              border: 1px solid #e9ecef;
-          }
-
-          .info-card h4 {
-              margin: 0 0 1rem 0;
-              color: #495057;
-              font-size: 1.1rem;
-              font-weight: 600;
-              border-bottom: 2px solid #007bff;
-              padding-bottom: 0.5rem;
-          }
-
-          .info-row {
-              margin-bottom: 0.75rem;
-              display: flex;
-              align-items: center;
-              gap: 0.5rem;
-          }
-
-          .info-row strong {
-              color: #495057;
-              min-width: 120px;
-          }
-
-          .verification-section {
-              margin-top: 1.5rem;
-          }
-
-          .verification-steps {
-              margin: 0;
-              padding-left: 1.5rem;
-          }
-
-          .verification-steps li {
-              margin-bottom: 0.5rem;
-              color: #6c757d;
-              line-height: 1.5;
-          }
-
-          .action-buttons {
-              margin-top: 1.5rem;
-              display: flex;
-              gap: 10px;
-          }
-
-          .action-buttons .btn {
-              padding: 10px 20px;
-              border-radius: 6px;
-              font-weight: 500;
-              display: flex;
-              align-items: center;
-              gap: 8px;
-              transition: all 0.2s;
-          }
-
-          .rejection-form {
-              background: #fff3cd;
-              border: 1px solid #ffeaa7;
-              border-radius: 8px;
-              padding: 1.5rem;
-              margin-top: 1.5rem;
-          }
-
-          .rejection-form h4 {
-              color: #856404;
-              margin: 0 0 1rem 0;
-          }
-
-          .rejection-form textarea {
-              width: 100%;
-              min-height: 100px !important;
-              padding: 10px;
-              border: 1px solid #ffeaa7;
-              border-radius: 4px;
-              resize: vertical;
-          }
-
-          /* .document-history {
-    overflow-y: auto;
-} */
-
-          .history-item {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              padding: 0.75rem 0;
-              border-bottom: 1px solid #e9ecef;
-          }
-
-          .history-item:last-child {
-              border-bottom: none;
-          }
-
-          .history-date {
-              font-size: 0.9rem;
-              color: #6c757d;
-              position: absolute;
-              top: 20px;
-              right: 20px;
-          }
-
-          .history-status {
-              font-size: 0.85rem;
-              font-weight: 500;
-              position: absolute;
-              top: 10px
-          }
-
-
-
-
-          .m-c {
-              background-color: white;
-              border-radius: 8px;
-              width: 90%;
-              max-width: 1000px;
-              max-height: 90vh;
-              overflow: hidden;
-              display: flex;
-              flex-direction: column;
-              box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-          }
-
-          .m-h {
-              padding: 15px 20px;
-              border-bottom: 1px solid var(--border-color);
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              background-color: #f8f9fa;
-          }
-
-          .close-btn {
-              background: none;
-              border: none;
-              font-size: 1.5rem;
-              cursor: pointer;
-              color: #777;
-          }
-
-          .m-b {
-              padding: 20px;
-              display: flex;
-              gap: 20px;
-              flex-wrap: wrap;
-              overflow-y: auto;
-          }
-
-          .document-preview {
-              flex: 2;
-              min-width: 400px;
-              background-color: var(--gray-light);
-              border-radius: 4px;
-              height: 500px;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              position: relative;
-              flex-direction: column;
-
-          }
-
-          .document-preview img {
-              width: 100%;
-              max-width: 100%;
-              max-height: 100%;
-              object-fit: contain;
-          }
-
-          .preview-controls {
-              text-align: center;
-              background-color: rgba(255, 255, 255, 0.8);
-              padding: 8px;
-              border-radius: 4px;
-          }
-
-          .preview-controls button {
-              background-color: #4a6fdc;
-              color: white;
-              border: none;
-              padding: 5px 10px;
-              border-radius: 4px;
-              margin: 0 5px;
-              cursor: pointer;
-          }
-
-          .document-info {
-              flex: 1;
-              min-width: 300px;
-          }
-
-          .info-section {
-              background-color: #f8f9fa;
-              border-radius: 6px;
-              padding: 15px;
-              margin-bottom: 20px;
-          }
-
-          .info-section h4 {
-              margin-top: 0;
-              margin-bottom: 10px;
-              color: #4a6fdc;
-              border-bottom: 1px solid #e0e0e0;
-              padding-bottom: 8px;
-          }
-
-          .document-info p {
-              margin-bottom: 10px;
-          }
-
-          .document-history {
-              margin-top: 20px;
-          }
-
-          .history-item {
-              margin-bottom: 10px;
-              padding-bottom: 10px;
-              border-bottom: 1px dashed #e0e0e0;
-          }
-
-          .history-item:last-child {
-              border-bottom: none;
-          }
-
-          .history-item .date {
-              font-size: 12px;
-              color: #777;
-          }
-
-          .modal-actions {
-              margin-top: 30px;
-              display: flex;
-              flex-wrap: wrap;
-              gap: 10px;
-          }
-
-          .rejection-form {
-              margin-top: 20px;
-              display: none;
-              background-color: #f8f9fa;
-              padding: 15px;
-              border-radius: 6px;
-              border-left: 4px solid #dc3545;
-          }
-
-          .rejection-form h4 {
-              margin-top: 0;
-              color: #721c24;
-          }
-
-          .rejection-form textarea {
-              width: 100%;
-              padding: 10px;
-              border: 1px solid var(--border-color);
-              border-radius: 4px;
-              margin-bottom: 10px;
-              min-height: 100px;
-              resize: vertical;
-          }
-
-          .rejection-form button {
-              margin-right: 10px;
-          }
-
-          .filter-bar {
-              margin: 0 20px 20px 20px;
-              display: flex;
-              flex-wrap: wrap;
-              gap: 15px;
-              padding: 15px;
-              background-color: #f8f9fa;
-              border-radius: 6px;
-              align-items: center;
-          }
-
-          .filter-label {
-              font-weight: 600;
-              color: #555;
-          }
-
-          .filter-select {
-              padding: 8px 12px;
-              border: 1px solid var(--border-color);
-              border-radius: 4px;
-              min-width: 150px;
-          }
-
-
-          .page-btn {
-              background-color: white;
-              border: 1px solid var(--border-color);
-              border-radius: 4px;
-              padding: 5px 10px;
-              cursor: pointer;
-              transition: all 0.2s;
-          }
-
-          .page-btn:hover,
-          .page-btn.active {
-              background-color: #4a6fdc;
-              color: white;
-          }
-
-          /* Document History Container */
-          .document-history {
-              width: 100%;
-              max-height: 1000px;
-              height: auto !important;
-              padding: 0;
-              position: relative;
-          }
-
-          /* History Item Styling */
-          .document-history .history-item {
-              display: block !important;
-              padding: 15px;
-              margin-bottom: 15px;
-              background-color: #f8f9fa;
-              border-radius: 12px;
-              border: 1px solid #e9ecef;
-              transition: all 0.3s ease;
-              overflow: hidden;
-          }
-
-          .document-history .history-item:hover {
-              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-              transform: translateY(-2px);
-              border-color: #007bff;
-          }
-
-          /* History Preview Container */
-          .document-history .history-preview {
-              margin-bottom: 15px;
-              width: 100%;
-              overflow: visible;
-          }
-
-          /* Auto Height for All Document Types */
-          .document-history .history-preview img {
-              width: 100% !important;
-              height: auto !important;
-              max-width: 100%;
-              object-fit: contain;
-              border-radius: 8px;
-              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-              background-color: #fff;
-              cursor: pointer;
-              transition: transform 0.3s ease;
-          }
-
-          .document-history .history-preview img:hover {
-              transform: scale(1.02);
-          }
-
-          /* PDF Auto Height */
-          .document-history .history-preview iframe.pdf-thumbnail {
-              width: 100% !important;
-              height: fit-content !important;
-              min-height: 750px;
-              border-radius: 8px;
-              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-              background-color: #fff;
-              cursor: pointer;
-          }
-
-          /* History Info Section */
-          .document-history .history-info {
-              padding-top: 15px;
-              border-top: 2px solid #e9ecef;
-              margin-top: 10px;
-          }
-
-
-          .enhanced-documents-panel {
-              background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-              min-height: 100vh;
-              padding: 1.5rem;
-              border-radius: 15px;
-          }
-
-          .candidate-header-section {
-              margin-bottom: 2rem;
-          }
-
-          .candidate-info-card {
-              background: white;
-              border-radius: 20px;
-              padding: 2rem;
-              box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-              display: flex;
-              align-items: center;
-              gap: 2rem;
-              position: relative;
-              overflow: hidden;
-          }
-
-          .candidate-info-card::before {
-              content: '';
-              position: absolute;
-              top: 0;
-              left: 0;
-              right: 0;
-              height: 4px;
-              background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
-          }
-
-          .candidate-avatar-large {
-              width: 80px;
-              height: 80px;
-              border-radius: 50%;
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-              color: white;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-size: 2rem;
-              font-weight: bold;
-              box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
-          }
-
-          .candidate-details h3 {
-              margin: 0 0 0.5rem 0;
-              color: #333;
-              font-size: 1.5rem;
-              font-weight: 700;
-          }
-
-          .contact-details {
-              display: flex;
-              flex-direction: column;
-              gap: 0.5rem;
-          }
-
-          .contact-details span {
-              color: #666;
-              font-size: 0.9rem;
-              display: flex;
-              align-items: center;
-              gap: 0.5rem;
-          }
-
-          .completion-ring {
-              margin-left: auto;
-              position: relative;
-          }
-
-          .circular-progress {
-              position: relative;
-          }
-
-          .percentage-text {
-              position: absolute;
-              top: 50%;
-              left: 50%;
-              transform: translate(-50%, -50%);
-              text-align: center;
-          }
-
-          .percentage {
-              display: block;
-              font-size: 1.2rem;
-              font-weight: bold;
-              color: #4facfe;
-          }
-
-          .label {
-              font-size: 0.7rem;
-              color: #666;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-          }
-
-          .progress-bar {
-              transition: stroke-dasharray 1s ease-in-out;
-          }
-
-          .stats-grid {
-              display: grid;
-              grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-              gap: 1.5rem;
-              margin-bottom: 2rem;
-          }
-
-          .stat-card {
-              background: white;
-              border-radius: 15px;
-              padding: 1.5rem;
-              box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-              display: flex;
-              align-items: center;
-              gap: 1rem;
-              transition: all 0.3s ease;
-              position: relative;
-              overflow: hidden;
-          }
-
-          .stat-card::before {
-              content: '';
-              position: absolute;
-              top: 0;
-              left: 0;
-              right: 0;
-              height: 3px;
-              transition: all 0.3s ease;
-          }
-
-          .stat-card.total-docs::before {
-              background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-          }
-
-          .stat-card.uploaded-docs::before {
-              background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
-          }
-
-          .stat-card.pending-docs::before {
-              background: linear-gradient(90deg, #fa709a 0%, #fee140 100%);
-          }
-
-          .stat-card.verified-docs::before {
-              background: linear-gradient(90deg, #a8edea 0%, #fed6e3 100%);
-          }
-
-          .stat-card.rejected-docs::before {
-              background: linear-gradient(90deg, #ff9a9e 0%, #fecfef 100%);
-          }
-
-          .stat-card:hover {
-              transform: translateY(-5px);
-              box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-          }
-
-          .stat-icon {
-              width: 50px;
-              height: 50px;
-              border-radius: 10px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-size: 1.5rem;
-              color: white;
-          }
-
-          .total-docs .stat-icon {
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          }
-
-          .uploaded-docs .stat-icon {
-              background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-          }
-
-          .pending-docs .stat-icon {
-              background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-          }
-
-          .verified-docs .stat-icon {
-              background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
-          }
-
-          .rejected-docs .stat-icon {
-              background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
-          }
-
-          .stat-info h4 {
-              margin: 0;
-              font-size: 1.8rem;
-              font-weight: bold;
-              color: #333;
-          }
-
-          .stat-info p {
-              margin: 0;
-              color: #666;
-              font-size: 0.9rem;
-          }
-
-          .stat-trend {
-              margin-left: auto;
-              font-size: 1.2rem;
-              color: #4facfe;
-          }
-
-          .filter-section-enhanced {
-              background: white;
-              border-radius: 15px;
-              padding: 1.5rem;
-              margin-bottom: 2rem;
-              box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-          }
-
-          .filter-title {
-              margin: 0 0 1rem 0;
-              color: #333;
-              font-weight: 600;
-          }
-
-          .filter-tabs {
-              display: flex;
-              gap: 1rem;
-              flex-wrap: wrap;
-          }
-
-          .filter-btn {
-              background: #f8f9fa;
-              border: 2px solid transparent;
-              border-radius: 25px;
-              padding: 0.75rem 1.5rem;
-              color: #666;
-              font-weight: 600;
-              cursor: pointer;
-              transition: all 0.3s ease;
-              display: flex;
-              align-items: center;
-              gap: 0.5rem;
-              position: relative;
-          }
-
-          .filter-btn .badges {
-              background: #dee2e6;
-              color: #495057;
-              border-radius: 10px;
-              padding: 0.25rem 0.5rem;
-              font-size: 0.75rem;
-              margin-left: 0.5rem;
-          }
-
-          .filter-btn:hover {
-              background: #e9ecef;
-              transform: translateY(-2px);
-          }
-
-          .filter-btn.active {
-              background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-              color: white;
-              border-color: #4facfe;
-              box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
-          }
-
-          .filter-btn.active .badges {
-              background: rgba(255, 255, 255, 0.2);
-              color: #fc2b5a;
-          }
-
-          .filter-btn.pending.active {
-              background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-              box-shadow: 0 5px 15px rgba(250, 112, 154, 0.4);
-          }
-
-          .filter-btn.verified.active {
-              background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
-              color: #2d7d32;
-              box-shadow: 0 5px 15px rgba(168, 237, 234, 0.4);
-          }
-
-          .filter-btn.rejected.active {
-              background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
-              color: #c62828;
-              box-shadow: 0 5px 15px rgba(255, 154, 158, 0.4);
-          }
-
-          .documents-grid-enhanced {
-              display: grid;
-              grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-              gap: 2rem;
-          }
-
-          .document-card-enhanced {
-              background: white;
-              border-radius: 20px;
-              overflow: hidden;
-              box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-              transition: all 0.3s ease;
-              position: relative;
-          }
-
-          .document-card-enhanced:hover {
-              transform: translateY(-10px);
-              box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
-          }
-
-          .document-image-container {
-              position: relative;
-              height: 200px;
-              overflow: hidden;
-              background: #f8f9fa;
-          }
-
-          .document-image {
-              width: 100%;
-              height: 100%;
-              object-fit: cover;
-              transition: transform 0.3s ease;
-          }
-
-          .document-card-enhanced:hover .document-image {
-              transform: scale(1.05);
-          }
-
-          .image-overlay {
-              position: absolute;
-              top: 0;
-              left: 0;
-              right: 0;
-              bottom: 0;
-              background: rgba(0, 0, 0, 0.7);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              opacity: 0;
-              transition: opacity 0.3s ease;
-          }
-
-          .document-card-enhanced:hover .image-overlay {
-              opacity: 1;
-          }
-
-          .preview-btn {
-              background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-              border: none;
-              border-radius: 25px;
-              padding: 0.75rem 1.5rem;
-              color: white;
-              font-weight: 600;
-              cursor: pointer;
-              display: flex;
-              align-items: center;
-              gap: 0.5rem;
-              transition: all 0.3s ease;
-              box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
-          }
-
-          .preview-btn:hover {
-              transform: translateY(-2px);
-              box-shadow: 0 10px 25px rgba(79, 172, 254, 0.6);
-          }
-
-          .no-document-placeholder {
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              height: 100%;
-              color: #ccc;
-              font-size: 3rem;
-          }
-
-          .no-document-placeholder p {
-              margin-top: 1rem;
-              font-size: 1rem;
-              color: #999;
-          }
-
-          .status-badges-overlay {
-              position: absolute;
-              top: 15px;
-              right: 15px;
-          }
-
-          .status-badges-new {
-              display: inline-flex;
-              align-items: center;
-              gap: 0.5rem;
-              padding: 0.5rem 1rem;
-              border-radius: 20px;
-              font-size: 0.8rem;
-              font-weight: 600;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-              box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-          }
-
-          .status-badges-new.pending {
-              background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-              color: white;
-          }
-
-          .status-badges-new.verified {
-              background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
-              color: #2d7d32;
-          }
-
-          .status-badges-new.rejected {
-              background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
-              color: #c62828;
-          }
-
-          .status-badges-new.not-uploaded {
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-              color: white;
-          }
-
-          .document-info-section {
-              padding: 1.5rem;
-          }
-
-          .document-header {
-              display: flex;
-              justify-content: space-between;
-              align-items: flex-start;
-              margin-bottom: 1rem;
-          }
-
-          .document-title {
-              margin: 0;
-              color: #333;
-              font-size: 0.9rem;
-              font-weight: 700;
-              flex: 1;
-          }
-
-          .document-actions {
-              margin-left: 1rem;
-          }
-
-          .action-btn {
-              border: none;
-              border-radius: 20px;
-              padding: 0.5rem 1rem;
-              font-size: 0.8rem;
-              font-weight: 600;
-              cursor: pointer;
-              display: flex;
-              align-items: center;
-              gap: 0.5rem;
-              transition: all 0.3s ease;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-          }
-
-          .upload-btn {
-              background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-              color: white;
-              box-shadow: 0 3px 10px rgba(250, 112, 154, 0.4);
-          }
-
-          .verify-btn {
-              background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
-              color: #c62828;
-              box-shadow: 0 3px 10px rgba(255, 154, 158, 0.4);
-          }
-
-          .view-btn {
-              background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-              color: white;
-              box-shadow: 0 3px 10px rgba(79, 172, 254, 0.4);
-          }
-
-          .action-btn:hover {
-              transform: translateY(-2px);
-              box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-          }
-
-          .document-meta {
-              display: flex;
-              gap: 1rem;
-              flex-wrap: wrap;
-          }
-
-          .meta-item {
-              display: flex;
-              align-items: center;
-              gap: 0.5rem;
-              color: #666;
-              font-size: 0.9rem;
-          }
-
-          .meta-text {
-              color: #333;
-          }
-
-          /* Responsive Design */
-
-          .react-date-picker__calendar.react-date-picker__calendar--open {
-              inset: 0 !important;
-              width: 300px !important;
-          }
-
-          
-          .site-header--sticky--register:not(.mobile-sticky-enable) {
-    /* position: absolute !important; */
-    top: 97px;
-    z-index: 10;
-}
-    .breadcrumb-item a, .card-body a {
-    color: #fc2b5a;
-}
-
-          @media (max-width: 1200px) {
-              .document-history .history-preview iframe.pdf-thumbnail {
-                  height: auto !important;
-                  max-height: 600px;
-              }
-          }
-@media (min-width: 992px) {
-    .site-header--sticky--register:not(.mobile-sticky-enable) {
-        position: fixed !important;
-        transition: 0.4s;
-        background: white;
-    }
-}
-          @media (max-width: 768px) {
-
-              .enhanced-documents-panel {
-                  padding: 1rem;
-              }
-
-              .candidate-info-card {
-                  flex-direction: column;
-                  text-align: center;
-                  gap: 1rem;
-              }
-
-              .completion-ring {
-                  margin-left: 0;
-              }
-
-              .stats-grid {
-                  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-              }
-
-              .documents-grid-enhanced {
-                  grid-template-columns: 1fr;
-              }
-
-              .filter-tabs {
-                  justify-content: center;
-              }
-
-              .document-header {
-                  flex-direction: column;
-                  gap: 1rem;
-              }
-
-              .document-actions {
-                  margin-left: 0;
-                  align-self: stretch;
-              }
-
-              .action-btn {
-                  width: 100%;
-                  justify-content: center;
-              }
-
-              .document-history .history-preview iframe.pdf-thumbnail {
-                  height: 50vh !important;
-                  min-height: 300px;
-                  max-height: 500px;
-              }
-
-              .document-history .history-item {
-                  padding: 12px;
-                  margin-bottom: 12px;
-              }
-
-              .scrollable-container {
-                  display: block;
-                  width: 100%;
-                  overflow: hidden;
-                  padding: 10px 0;
-              }
-
-              .desktop-view {
-                  display: none;
-              }
-
-              .scrollable-content {
-                  display: flex;
-                  overflow-x: auto;
-                  scroll-snap-type: x mandatory;
-                  -webkit-overflow-scrolling: touch;
-                  scrollbar-width: thin;
-                  scroll-behavior: smooth;
-                  padding: 10px 0;
-              }
-
-              .info-card {
-                  flex: 0 0 auto;
-                  scroll-snap-align: start;
-                  margin-right: 15px;
-                  padding: 15px;
-                  border-radius: 8px;
-                  border: 1px solid #eaeaea;
-                  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-                  background: #fff;
-              }
-
-              .scroll-arrow {
-                  display: flex;
-              }
-
-              .scrollable-content::-webkit-scrollbar {
-                  height: 4px;
-              }
-
-              .scrollable-content::-webkit-scrollbar-track {
-                  background: #f1f1f1;
-              }
-
-              .scrollable-content::-webkit-scrollbar-thumb {
-                  background: #888;
-                  border-radius: 10px;
-              }
-
-              .btn-group {
-                  flex-wrap: wrap;
-              }
-
-              .btn-group .btn {
-                  margin-bottom: 0.25rem;
-              }
-
-              .resume-document-body {
-                  flex-direction: column;
-              }
-
-              .resume-profile-section {
-                  flex-direction: column;
-                  text-align: center;
-              }
-
-              .resume-contact-details {
-                  justify-content: center;
-              }
-
-              .info-group {
-                  border: none;
-              }
-
-              .info-card {
-
-                  flex: 0 0 auto;
-                  scroll-snap-align: start;
-                  margin-right: 15px;
-                  padding: 15px;
-                  border-radius: 8px;
-                  border: 1px solid #eaeaea;
-                  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-                  background: #fff;
-              }
-
-              .input-height {
-                  height: 40px;
-              }
-
-              .whatsapp-chat {
-                  height: 90vh;
-              }
-
-
-              .nav-pills {
-                  flex-wrap: wrap;
-              }
-
-              .nav-pills .nav-link {
-                  font-size: 0.9rem;
-                  padding: 0.5rem 0.75rem;
-              }
-
-              .document-modal-content {
-                  width: 98%;
-                  margin: 1rem;
-                  max-height: 95vh;
-              }
-
-              .document-modal-content .modal-body {
-                  flex-direction: column;
-                  padding: 1rem;
-                  gap: 1rem;
-              }
-
-              .document-preview-section {
-                  min-width: auto;
-                  overflow-y: auto;
-              }
-
-              .document-preview-container {
-                  height: 300px;
-              }
-
-              .document-info-section {
-                  min-width: auto;
-              }
-              .admissionMobileResponsive{
-              padding: 0;
-              }
-              .mobileResponsive{
-              padding: 0;
-              }
-              .content-body{
-               margin-top: 30px!important;
-              }
-              .nav-tabs-main{
-                  white-space: nowrap;
-                  flex-wrap: nowrap;
-                  overflow: scroll;
-                  scrollbar-width: none;
-                  -ms-overflow-style: none;
-                  &::-webkit-scrollbar {
-                    display: none;
-                  }
-              }
-              .nav-tabs-main > li > button{
-              padding: 15px 9px;
-              }
-          }
-
-          @media (max-width: 576px) {
-
-
-              .btn-group {
-                  flex-wrap: wrap;
-              }
-
-              .input-group {
-                  max-width: 100% !important;
-                  margin-bottom: 0.5rem;
-              }
-          }
-
-
-          @media (max-width: 480px) {
-
-              .document-history .history-preview iframe,
-              .document-history .history-preview img {
-                  max-height: 300px;
-                  min-height: 150px;
-              }
-
-              .document-history .history-preview iframe.pdf-thumbnail {
-                  height: 40vh !important;
-                  min-height: 200px;
-              }
-          }
-
-          `
-      }
 
       </style>
 
       <style>
         {
+
           `
+          
           input[type="text"], 
 input[type="email"], 
 input[type="number"],
@@ -11315,67 +10822,6 @@ input[type="date"],
 select {
   background-color: transparent !important;
   border: var(--bs-border-width) solid var(--bs-border-color);
-}
-.card {
-    margin-bottom: 2.2rem;
-    border: none;
-    border-radius: 0.5rem;
-    box-shadow: 0px 4px 25px 0px rgba(0, 0, 0, 0.1);
-    transition: all .3sease-in-out;
-}
-.card {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    word-wrap: break-word;
-    background-color: #fff;
-    background-clip: border-box;
-    border: 1px solid rgba(34, 41, 47, 0.125);
-    border-radius: 0.5rem;
-}
-.bg-intext {
-    background-color: #FC2B5A;
-}
-.new-bg-text {
-    background-color: #FC2B5A !important;
-    border-top-right-radius: 0px !important;
-    border-bottom-right-radius: 0px !important;
-}
-.float-left {
-    float: left !important;
-}
-/* .breadcrumb .breadcrumb-item+.breadcrumb-item:before {
-    content: "\e847";
-    font-family: 'feather';
-    color: #626262;
-} */
-.breadcrumb .breadcrumb-item+.breadcrumb-item:before {
-    content: "\f105"; /* Arrow Right */
-  font-family: "Font Awesome 6 Free";
-  font-weight: 900; /* Solid icons = 900, Regular = 400 */
-  color: #626262;
-}
-.breadcrumb-item+.breadcrumb-item::before {
-    display: inline-block;
-    padding-right: 0.5rem;
-    color: #b8c2cc;
-    content: "/";
-}
-.breadcrumb .breadcrumb-item+.breadcrumb-item {
-    padding-left: 0;
-}
-.breadcrumb {
-    font-size: 1rem;
-    font-family: "Montserrat", Helvetica, Arial, serif;
-    background-color: transparent;
-    padding: 0.5rem 0 0.5rem 1rem !important;
-    border-left: 1px solid #d6dce1;
-    border-radius: 0;
-}
-.breadcrumbs-top .breadcrumb {
-    margin: 0;
-    padding: 0;
 }
 
 .breadcrumb>li+li::before {
@@ -11406,107 +10852,6 @@ label {
 
 }
 
-/* Floating Audio Button */
-.floating-audio-btn {
-position: absolute;
-bottom: 0px;
-right: 20px;
-background-color: #fc2b5a;
-color: white;
-width: 130px;
-height: 45px;
-border-radius: 40px;
-display: flex;
-align-items: center;
-justify-content: center;
-gap: 8px;
-cursor: pointer;
-box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-z-index: 100;
-transition: all 0.2s;
-}
-
-.floating-audio-btn:hover {
-transform: translateY(-3px);
-box-shadow: 0 6px 15px rgba(0, 0, 0, 0.25);
-}
-
-.floating-audio-btn i {
-font-size: 18px;
-}
-
-/* Recording Modal Styles */
-.recording-modal-overlay {
-position: fixed;
-top: 0;
-left: 0;
-right: 0;
-bottom: 0;
-background-color: rgba(0, 0, 0, 0.5);
-display: flex;
-align-items: center;
-justify-content: center;
-z-index: 1000;
-}
-
-.recording-modal {
-background-color: white;
-border-radius: 10px;
-width: 90%;
-max-width: 600px;
-max-height: 90vh;
-overflow: hidden;
-display: flex;
-flex-direction: column;
-box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-}
-
-.recording-modal .modal-header {
-display: flex;
-justify-content: space-between;
-align-items: center;
-padding: 15px 20px;
-border-bottom: 1px solid #eee;
-}
-
-.recording-modal .modal-header h5 {
-font-size: 18px;
-margin: 0;
-font-weight: 600;
-}
-
-.recording-modal .close-modal {
-background: none;
-border: none;
-color: #555;
-cursor: pointer;
-font-size: 18px;
-}
-
-.recording-modal .modal-body {
-padding: 20px;
-flex: 1;
-overflow-y: auto;
-}
-
-.recording-modal .modal-footer {
-padding: 15px 20px;
-border-top: 1px solid #eee;
-text-align: right;
-}
-
-.btn-done {
-background-color: #fc2b5a;
-color: white;
-border: none;
-padding: 8px 20px;
-border-radius: 4px;
-cursor: pointer;
-}
-
-.btn-done:hover {
-background-color: #e6255c;
-}
 
 /* The remaining recording controls and recording items
 can use the same CSS you already have */
@@ -12126,6 +11471,47 @@ animation: pulse 1.5s infinite;
 0% { transform: scale(1); }
 50% { transform: scale(1.05); }
 100% { transform: scale(1); }
+}
+
+/* Mobile Bottom Sheet Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUpMobile {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Mobile Bottom Sheet Dropdown Item Hover/Active Effects */
+@media (max-width: 768px) {
+  .dropdown-item:active {
+    background-color: #f5f5f5 !important;
+    transform: scale(0.98);
+  }
+  
+  .dropdown-item:hover {
+    background-color: #f9f9f9 !important;
+  }
+  
+  /* Improve touch targets on mobile */
+  .dropdown-item {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    transition: all 0.2s ease;
+  }
 }
 
 .recordings-list {
@@ -12814,8 +12200,16 @@ max-width: 600px;
     z-index: 10000 !important;
   }
 
-  
-          `
+ .new-modal-content {
+    width: 1000px !important;
+    transform: translateX(25%);
+}         
+.modal-header {
+    background-color: #fc2b5a;
+    border-bottom: none;
+    color: #fff;
+} 
+`
         }
       </style>
       <style>
@@ -13017,7 +12411,10 @@ max-width: 600px;
 
         /* Responsive design */
         @media (max-width: 768px) {
-
+ .new-modal-content {
+    width: 100%!important;
+    transform: translateX(0);
+} 
             .verification-table {
                 font-size: 14px;
             }
@@ -13064,6 +12461,43 @@ max-width: 600px;
           `
         }
       </style>
+      <style>
+        {
+          `
+          @media (min-width:768px){
+          .penddingBtn{
+                  font-size: 10px !important;
+                  max-width: min-content;
+          }
+                  html body .content .content-wrapper {
+    margin-top: 3rem;
+    padding: 1.8rem 2.2rem 0;
+}
+                  
+          }
+          @media (max-width: 768px){
+          .CButton{ font-size:12px; padding:2px; 
+          white-space: nowrap;}
+          html body .content .content-wrapper {
+    margin-top: 2rem;
+    padding: 1.8rem 1.2rem 0;
+}
+          }
+@media (max-width: 768px) {
+    .small {
+         display: block !important; 
+    }
+         .CourseType{
+        font-size: 13px;
+        text-wrap: auto;
+        white-space: nowrap;
+        margin-bottom:8px;
+}
+}
+          `
+        }
+      </style>
+      </div>
     </div>
   );
 };

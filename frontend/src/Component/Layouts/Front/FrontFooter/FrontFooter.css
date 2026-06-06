@@ -132,15 +132,23 @@
 .footer-v2.footer-padding-default.footer-l02 a,
 .footer-v2.footer-padding-default.footer-l02 .footer-list a {
   color: var(--ftr-muted) !important;
+  color: #fff;
   font-family: 'Orbitron', sans-serif;
 }
 .footer-v2.footer-padding-default.footer-l02 a:hover,
 .footer-v2.footer-padding-default.footer-l02 .footer-list a:hover {
   color: var(--ftr-accent-1) !important;
+  color: #fff;
 }
 
 .footer-v2.footer-padding-default.footer-l02 .ftr-download-card .ftr-playstore-button,
 .footer-v2.footer-padding-default.footer-l02 .ftr-download-card .ftr-playstore-button:hover {
+  color: #ffffff !important;
+}
+
+.footer-v2.footer-padding-default.footer-l02 .foc-app-download__btn,
+.footer-v2.footer-padding-default.footer-l02 .foc-app-download__btn:hover,
+.footer-v2.footer-padding-default.footer-l02 .foc-app-download__btn i {
   color: #ffffff !important;
 }
 

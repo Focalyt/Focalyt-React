@@ -103,7 +103,22 @@
   font-size: 0.75rem;
 }
 
-.foc-app-download--footer .foc-app-download__btn {
+.foc-app-download.foc-app-download--footer .foc-app-download__btn {
   padding: 8px 14px;
   font-size: 0.82rem;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff;
+}
+
+.foc-app-download.foc-app-download--footer .foc-app-download__btn:hover,
+.foc-app-download.foc-app-download--footer .foc-app-download__btn:focus,
+.foc-app-download.foc-app-download--footer .foc-app-download__btn:visited {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff;
+}
+
+.foc-app-download.foc-app-download--footer .foc-app-download__btn *,
+.foc-app-download.foc-app-download--footer .foc-app-download__btn i {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff;
 }

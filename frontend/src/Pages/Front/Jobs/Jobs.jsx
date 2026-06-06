@@ -1850,6 +1850,8 @@ Provide analysis in clear format.`;
         <style>{`
 .foc-cyber-home.foc-courses-page, .foc-cyber-home.foc-courses-page * { box-sizing: border-box; }
 .foc-cyber-home.foc-courses-page {
+  --home-card-cta: var(--foc-navy-deep, #0d2146);
+  --home-card-cta-hover: var(--foc-navy-badge, #163565);
   --cyan: var(--foc-cyan);
   --red: var(--foc-magenta);
   --bg: var(--foc-color-bg);
@@ -1989,11 +1991,11 @@ Provide analysis in clear format.`;
 @media (min-width: 1200px) { .foc-courses-page .courses-grid { grid-template-columns: repeat(3, 1fr); } }
 
 .foc-jobs-page .job-card-body {
-  padding: 16px 16px 14px;
+  padding: 12px 12px 8px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  flex: 1;
+  gap: 6px;
+  flex: 0 1 auto;
   text-align: center;
 }
 .foc-jobs-page .job-card-title {
@@ -2050,7 +2052,7 @@ Provide analysis in clear format.`;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 4px 2px 8px;
+  padding: 2px 2px 4px;
   text-align: left;
 }
 .foc-jobs-page .job-card-deadline__label {
@@ -2157,22 +2159,43 @@ Provide analysis in clear format.`;
 .foc-courses-page .course-badge { position: absolute; right: 12px; top: 12px; z-index: 2; font-size: 10px; font-weight: 600; text-transform: uppercase; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border); background: rgba(255,255,255,.92); color: var(--text); }
 .foc-courses-page .course-fee { position: absolute; left: 12px; bottom: 12px; z-index: 2; font-size: 10px; font-weight: 600; padding: 6px 10px; border-radius: 999px; background: rgba(255,255,255,.92); border: 1px solid var(--border); }
 .foc-courses-page .course-fee--paid { color: var(--red); border-color: rgba(255,45,122,.28); }
-.foc-courses-page .course-body { padding: 16px 16px 14px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.foc-courses-page .course-body { padding: 12px 12px 8px; display: flex; flex-direction: column; gap: 8px; flex: 0 1 auto; }
 .foc-courses-page .course-title { font-family: var(--foc-font-display), Orbitron, sans-serif; font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.foc-courses-page .course-sector { font-size: 12px; color: var(--muted); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.foc-courses-page .course-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 2px; }
-.foc-courses-page .course-meta .m { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
-.foc-courses-page .course-meta .m--wide { grid-column: 1 / -1; }
+.foc-courses-page .course-sector { font-size: 12px; color: var(--muted); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.foc-courses-page .course-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 0; }
+.foc-courses-page .course-meta .m { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 8px; }
+.foc-courses-page .course-meta .m--wide {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.foc-courses-page .course-meta .m--wide strong {
+  display: inline;
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+.foc-courses-page .course-meta .m--wide span {
+  display: inline;
+  text-align: right;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .foc-courses-page .course-meta .m strong { display: block; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted2); margin-bottom: 4px; }
 .foc-courses-page .course-meta .m span { display: block; font-size: 12px; font-weight: 500; color: var(--text); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.foc-courses-page .course-action-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+.foc-courses-page .course-action-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px; }
 .foc-courses-page .btn.shr--width { width: 100%; }
-.foc-courses-page .btn.cta-callnow, .foc-courses-page .btn.cta-callnow.btn-bg-color { background: var(--foc-color-cta, #fc2b5a); color: #fff; border: none; border-radius: 50px; font-weight: 600; padding: 10px 12px; font-size: 13px; transition: color 0.25s ease; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
-.foc-courses-page .btn.cta-callnow:hover, .foc-courses-page .btn.cta-callnow.btn-bg-color:hover { background: var(--foc-color-cta, #fc2b5a); color: var(--cyan, #1ba7ff); }
-.foc-courses-page .course-callback-btn { margin-top: 10px; }
-.foc-courses-page .course_card_footer { background: var(--foc-color-cta, #fc2b5a); border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; margin-top: auto; text-align: center; padding: 10px 12px; }
+.foc-courses-page .btn.cta-callnow, .foc-courses-page .btn.cta-callnow.btn-bg-color { background: var(--home-card-cta); color: #fff; border: 1px solid var(--home-card-cta); border-radius: 50px; font-weight: 600; padding: 8px 10px; font-size: 12px; transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; width: 100%; }
+.foc-courses-page .btn.cta-callnow:not(.btn-bg-color) { background: #fff; color: var(--home-card-cta); }
+.foc-courses-page .btn.cta-callnow:hover, .foc-courses-page .btn.cta-callnow.btn-bg-color:hover { background: var(--home-card-cta-hover); border-color: var(--home-card-cta-hover); color: #fff; }
+.foc-courses-page .course-callback-btn { margin-top: 6px; padding: 8px 10px; }
+.foc-courses-page .course_card_footer { background: var(--home-card-cta); border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; margin-top: 0; text-align: center; padding: 8px 10px; }
 .foc-courses-page .course-learn-more { display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; }
-.foc-courses-page .course-learn-more .learnn { color: #fff; font-size: 14px; font-weight: 600; }
+.foc-courses-page .course-learn-more .learnn { color: #fff; font-size: 13px; font-weight: 600; padding: 4px 0; }
 .foc-courses-page .course-learn-more__icon { width: 18px; height: auto; display: block; }
 .foc-courses-page .courses-empty { text-align: center; padding: 48px 16px; color: var(--muted); }
 .foc-courses-page .courses-empty h3 { font-family: var(--foc-font-display), Orbitron, sans-serif; color: var(--text); margin-bottom: 8px; }
@@ -2300,36 +2323,41 @@ img.group1 {
 .btn.shr--width{
   width: 100%;
 }
-.btn.cta-callnow {
+.foc-jobs-page .btn.cta-callnow {
     background: #fff;
-    color: #FC2B5A;
-    font-family: inter;
+    color: var(--home-card-cta, #0d2146);
+    font-family: var(--foc-font-sans), Inter, sans-serif;
+    border: 1px solid var(--home-card-cta, #0d2146);
     border-radius: 50px;
-    font-weight: 500;
-    padding: 10px 4px;
-    width: 120%;
+    font-weight: 600;
+    padding: 8px 10px;
+    width: 100%;
     font-size: 12px;
-    letter-spacing: 1px;
-    transition: .3s;
+    letter-spacing: 0.02em;
+    transition: .2s;
 }
-.btn.cta-callnow:hover {
-    transition: .5s;
-    background: #FC2B5A;
+.foc-jobs-page .btn.cta-callnow.btn-bg-color {
+    background: var(--home-card-cta, #0d2146);
     color: #fff;
 }
-.learnn{
-  padding: 10px 14px;
+.foc-jobs-page .btn.cta-callnow:hover {
+    background: var(--home-card-cta-hover, #163565);
+    border-color: var(--home-card-cta-hover, #163565);
+    color: #fff;
 }
-.course_card_footer {
-    background: #FC2B5A;
+.foc-jobs-page .learnn {
+  padding: 4px 0;
+}
+.foc-jobs-page .course_card_footer {
+    background: var(--home-card-cta, #0d2146);
     border-bottom-left-radius: 10px;
     border-bottom-right-radius: 10px;
 }
-.jobs h1 {
-    color: #FC2B5A;
+.foc-jobs-page .jobs h1 {
+    color: var(--home-card-cta, #0d2146);
     font-size: 45px;
     font-weight: 700;
-    font-family: 'INTER', sans-serif;
+    font-family: var(--foc-font-display), Inter, sans-serif;
 }
 
 .courseCard{

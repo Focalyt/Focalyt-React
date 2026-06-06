@@ -13434,7 +13434,7 @@ useEffect(() => {
                                     return (
                                       <>
                                         <div className="lead-strip-v3__profile">
-                                          {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                                          {/* {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
                                             <button
                                               type="button"
                                               className="lead-strip-v3__profile-edit"
@@ -13448,7 +13448,7 @@ useEffect(() => {
                                             >
                                               <i className="fas fa-pen" aria-hidden="true"></i>
                                             </button>
-                                          )}
+                                          )} */}
                                           <div className="lead-strip-v3__profile-top">
                                             <label className="lead-strip-v3__check" title="Select">
                                               <input

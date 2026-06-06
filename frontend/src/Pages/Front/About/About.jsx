@@ -467,10 +467,8 @@ function About() {
                         <img
                           src={photoSrc}
                           alt={f.name}
-                          width={480}
-                          height={320}
                           loading="eager"
-                          decoding="async"
+                          decoding="sync"
                           draggable={false}
                         />
                       ) : (
@@ -513,22 +511,23 @@ function About() {
                 const desc = m.description || m.desc;
                 return (
                   <div className="ab-core-card" key={m._id || m.name || i}>
-                    <div className="ab-core-avatar">
-                      {hasPhoto ? (
-                        <img
-                          src={teamPhotoUrl(m.image.fileURL)}
-                          alt={m.name}
-                          width={176}
-                          height={176}
-                          loading="lazy"
-                          decoding="async"
-                          draggable={false}
-                        />
-                      ) : (
-                        <div className="ab-core-placeholder">
-                          <span role="img" aria-hidden="true">{m.icon || "👤"}</span>
-                        </div>
-                      )}
+                    <div className="ab-core-avatar-wrap">
+                      <div
+                        className="ab-core-avatar"
+                        role="img"
+                        aria-label={m.name}
+                        style={
+                          hasPhoto
+                            ? { backgroundImage: `url("${teamPhotoUrl(m.image.fileURL)}")` }
+                            : undefined
+                        }
+                      >
+                        {!hasPhoto ? (
+                          <div className="ab-core-placeholder">
+                            <span role="img" aria-hidden="true">{m.icon || "👤"}</span>
+                          </div>
+                        ) : null}
+                      </div>
                       <div className="ab-core-star" aria-hidden="true">⭐</div>
                     </div>
                     <p className="ab-core-name">{toDisplayName(m.name)}</p>
@@ -1005,15 +1004,13 @@ function About() {
   background: #e8eef8;
 }
 .ab-founder-photo-area img {
-  width: 100%;
-  height: 100%;
-  max-width: none;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 100%;
+  max-width: none !important;
   object-fit: cover;
   object-position: center 12%;
   display: block;
-  image-rendering: auto;
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
 }
 .ab-founder-placeholder-bg {
   width: 100%;
@@ -1133,7 +1130,7 @@ function About() {
 /* Core Grid — team section */
 .ab-core-grid--team {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-bottom: 36px;
 }
@@ -1154,24 +1151,23 @@ function About() {
 .ab-core-grid--team .ab-core-card:hover {
   box-shadow: 0 14px 32px rgba(11,31,75,.12);
 }
-.ab-core-avatar {
+.ab-core-avatar-wrap {
   position: relative;
+  width: 128px;
+  height: 128px;
   margin-bottom: 12px;
-  width: 96px;
-  height: 96px;
   flex-shrink: 0;
 }
-.ab-core-avatar img {
-  width: 96px;
-  height: 96px;
+.ab-core-avatar {
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
-  object-fit: cover;
-  object-position: center 15%;
+  overflow: hidden;
   border: 3px solid #e8f0fe;
-  display: block;
-  image-rendering: auto;
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
+  background-color: #e8eef8;
+  background-size: cover;
+  background-position: center 15%;
+  background-repeat: no-repeat;
 }
 .ab-core-star {
   position: absolute;
@@ -1184,10 +1180,8 @@ function About() {
   font-size: 9px;
 }
 .ab-core-placeholder {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  border: 3px solid #e8f0fe;
+  width: 100%;
+  height: 100%;
   background: linear-gradient(135deg, #e8f4ff, #f0e8ff);
   display: flex;
   align-items: center;

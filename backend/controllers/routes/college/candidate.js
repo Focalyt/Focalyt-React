@@ -2511,15 +2511,24 @@ router.get('/calendar-visit-data', [isCollege], async (req, res) => {
 				.filter(Boolean);
 		}
 
-		// B2C CRM follow-ups (same college, date range)
+		// B2C CRM follow-ups (same college, date range) — only assigned counsellor sees their rows
 		const rangeFilter =
 			startDate && endDate
 				? { followupDate: { $gte: new Date(startDate), $lte: new Date(endDate) } }
 				: {};
-		const b2cFollowups = await B2cFollowup.find({
+		const counsellorUserId = req.user?._id;
+		const b2cFollowupMatch = {
 			collegeId,
 			...rangeFilter,
-		}).populate({
+		};
+		if (counsellorUserId) {
+			b2cFollowupMatch.$or = [
+				{ counsellorId: counsellorUserId },
+				{ counsellorId: null, createdBy: counsellorUserId },
+				{ counsellorId: { $exists: false }, createdBy: counsellorUserId },
+			];
+		}
+		const b2cFollowups = await B2cFollowup.find(b2cFollowupMatch).populate({
 			path: 'appliedCourseId',
 			model: 'AppliedCourses',
 			populate: [
@@ -2564,6 +2573,7 @@ router.get('/calendar-visit-data', [isCollege], async (req, res) => {
 				return {
 					id: f._id,
 					sourceType: 'b2c_followup',
+					counsellorId: f.counsellorId || f.createdBy || null,
 					googleCalendarEventId: f.googleCalendarEventId || null,
 					title: `${candidate?.name || 'Unknown'} — B2C Follow-up`,
 					start: f.followupDate,
@@ -2573,7 +2583,7 @@ router.get('/calendar-visit-data', [isCollege], async (req, res) => {
 					status: f.status,
 					appliedCourseId: ac._id,
 					candidateName: candidate?.name || 'Unknown',
-					candidateMobile: candidate?.mobile || 'Unknown',
+					candidateMobile: candidate?.mobile || '',
 					candidateEmail: candidate?.email || 'Unknown',
 					courseName: course?.name || 'Unknown Course',
 					centerName: center?.name || 'Unknown Center',

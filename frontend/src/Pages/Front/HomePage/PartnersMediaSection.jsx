@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import PartnerWithFocalytSection from "./PartnerWithFocalytSection";
 
 const PARTNER_LOGO_BASE = "/Assets/public_assets/images/partners-logo";
 const HOMEPAGE_PARTNER_IMG = "/Assets/public_assets/images/homepage";
@@ -1815,6 +1816,7 @@ export default function PartnersMediaSection() {
       <div className="fp" id="partners-media">
         <PartnersStrengthSection />
         {/* <OurPartnersSection /> */}
+        <PartnerWithFocalytSection />
         <MediaSection />
       </div>
     </>

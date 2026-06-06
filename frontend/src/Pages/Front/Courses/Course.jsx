@@ -530,6 +530,8 @@ function Course() {
       <style>{`
 .foc-cyber-home.foc-courses-page, .foc-cyber-home.foc-courses-page * { box-sizing: border-box; }
 .foc-cyber-home.foc-courses-page {
+  --home-card-cta: var(--foc-navy-deep, #0d2146);
+  --home-card-cta-hover: var(--foc-navy-badge, #163565);
   --cyan: var(--foc-cyan);
   --red: var(--foc-magenta);
   --bg: var(--foc-color-bg);
@@ -738,26 +740,54 @@ function Course() {
 .foc-courses-page .course-fee--paid { color: var(--red); border-color: rgba(255,45,122,.28); }
 
 .foc-courses-page .course-body {
-  padding: 16px 16px 14px; display: flex; flex-direction: column; gap: 10px; flex: 1;
+  padding: 12px 12px 8px; display: flex; flex-direction: column; gap: 8px; flex: 0 1 auto;
 }
 .foc-courses-page .course-title {
   font-family: var(--foc-font-display), Orbitron, sans-serif;
   font-size: 15px; font-weight: 700;
   letter-spacing: 0.02em; color: var(--text); line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 .foc-courses-page .course-sector {
   font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
   font-size: 12px; color: var(--muted); letter-spacing: 0.01em;
   line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 .foc-courses-page .course-meta {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 2px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 0;
 }
 .foc-courses-page .course-meta .m {
   background: var(--bg); border: 1px solid var(--border);
-  border-radius: 12px; padding: 10px;
+  border-radius: 12px; padding: 8px;
 }
-.foc-courses-page .course-meta .m--wide { grid-column: 1 / -1; }
+.foc-courses-page .course-meta .m--wide {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.foc-courses-page .course-meta .m--wide strong {
+  display: inline;
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+.foc-courses-page .course-meta .m--wide span {
+  display: inline;
+  text-align: right;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .foc-courses-page .course-meta .m strong {
   font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
   display: block; font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
@@ -770,23 +800,23 @@ function Course() {
 .foc-courses-page .course-action-btns {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 4px;
+  gap: 8px;
+  margin-top: 2px;
 }
 .foc-courses-page .btn.shr--width { width: 100%; }
 .foc-courses-page .btn.cta-callnow,
 .foc-courses-page .btn.cta-callnow.btn-bg-color {
-  background: var(--foc-color-cta, #fc2b5a);
+  background: var(--home-card-cta);
   color: #fff;
   font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
-  border: none;
+  border: 1px solid var(--home-card-cta);
   border-radius: 50px;
   font-weight: 600;
-  padding: 10px 12px;
-  font-size: 13px;
+  padding: 8px 10px;
+  font-size: 12px;
   letter-spacing: 0;
   text-transform: none;
-  transition: color 0.25s ease;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -794,21 +824,27 @@ function Course() {
   cursor: pointer;
   line-height: 1.25;
 }
+.foc-courses-page .btn.cta-callnow:not(.btn-bg-color) {
+  background: #fff;
+  color: var(--home-card-cta);
+}
 .foc-courses-page .btn.cta-callnow:hover,
 .foc-courses-page .btn.cta-callnow.btn-bg-color:hover {
-  background: var(--foc-color-cta, #fc2b5a);
-  color: var(--cyan, #1ba7ff);
+  background: var(--home-card-cta-hover);
+  border-color: var(--home-card-cta-hover);
+  color: #fff;
 }
 .foc-courses-page .course-callback-btn {
-  margin-top: 10px;
+  margin-top: 6px;
+  padding: 8px 10px;
 }
 .foc-courses-page .course_card_footer {
-  background: var(--foc-color-cta, #fc2b5a);
+  background: var(--home-card-cta);
   border-bottom-left-radius: 12px;
   border-bottom-right-radius: 12px;
-  margin-top: auto;
+  margin-top: 0;
   text-align: center;
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
 .foc-courses-page .course-learn-more {
   display: inline-flex;
@@ -820,9 +856,10 @@ function Course() {
 .foc-courses-page .course-learn-more .learnn {
   font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
   color: #fff;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.01em;
+  padding: 4px 0;
 }
 .foc-courses-page .course-learn-more__icon {
   width: 18px;

@@ -1952,10 +1952,11 @@ const STYLES = `
   color: var(--cyan);
 }
 .event-body {
-  padding: 16px 16px 14px;
+  padding: 12px 12px 8px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+  flex: 0 1 auto;
 }
 .event-title {
   font-family: var(--foc-font-display);
@@ -1974,14 +1975,14 @@ const STYLES = `
 .event-meta {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 2px;
+  gap: 8px;
+  margin-top: 0;
 }
 .event-meta .m {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 10px 10px;
+  padding: 8px;
 }
 .event-meta .m strong {
   display: block;
@@ -2010,12 +2011,21 @@ const STYLES = `
 #events .event-actions .btn-primary {
   display: block;
   width: 100%;
-  border-radius: 12px;
+  border-radius: 50px;
   font-family: var(--foc-font-sans);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0;
-  padding: 10px 12px;
+  padding: 8px 10px;
+  background: var(--home-card-cta, var(--foc-navy-deep, #0d2146)) !important;
+  border: 1px solid var(--home-card-cta, var(--foc-navy-deep, #0d2146)) !important;
+  box-shadow: none !important;
+  text-shadow: none;
+}
+#events .event-actions .btn-primary:hover {
+  background: var(--home-card-cta-hover, var(--foc-navy-badge, #163565)) !important;
+  border-color: var(--home-card-cta-hover, var(--foc-navy-badge, #163565)) !important;
+  transform: none;
 }
 #events .event-actions .btn-primary.disabled {
   opacity: 0.55;
@@ -2056,7 +2066,7 @@ const STYLES = `
   box-shadow: 0 10px 28px color-mix(in srgb, var(--cr-accent) 12%, rgba(0,0,0,.06));
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  height: 100%;
   padding: 0;
   transition: .25s var(--ease);
 }
@@ -2152,11 +2162,11 @@ const STYLES = `
 #future-courses .course-fee--free { color: var(--cyan); border-color: rgba(27,167,255,.28); }
 #future-courses .course-fee--paid { color: var(--red); border-color: rgba(255,45,122,.28); }
 #future-courses .course-body {
-  padding: 16px 16px 14px;
+  padding: 12px 12px 8px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  flex: 1;
+  gap: 8px;
+  flex: 0 1 auto;
 }
 #future-courses .course-title {
   font-family: var(--foc-font-display);
@@ -2165,25 +2175,53 @@ const STYLES = `
   letter-spacing: 0.02em;
   color: var(--text);
   line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 #future-courses .course-sector {
   font-size: 12px;
   color: var(--muted);
   line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 #future-courses .course-meta {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 2px;
+  gap: 8px;
+  margin-top: 0;
 }
 #future-courses .course-meta .m {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 10px;
+  padding: 8px;
 }
-#future-courses .course-meta .m--wide { grid-column: 1 / -1; }
+#future-courses .course-meta .m--wide {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+#future-courses .course-meta .m--wide strong {
+  display: inline;
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+#future-courses .course-meta .m--wide span {
+  display: inline;
+  text-align: right;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 #future-courses .course-meta .m strong {
   display: block;
   font-size: 10px;
@@ -2203,19 +2241,19 @@ const STYLES = `
 #future-courses .course-action-btns {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 4px;
+  gap: 8px;
+  margin-top: 2px;
 }
 #future-courses .btn.shr--width { width: 100%; }
 #future-courses .btn.cta-callnow,
 #future-courses .btn.cta-callnow.btn-bg-color {
-  background: var(--foc-color-cta, #fc2b5a);
+  background: var(--home-card-cta, var(--foc-navy-deep, #0d2146));
   color: #fff;
-  border: none;
+  border: 1px solid var(--home-card-cta, var(--foc-navy-deep, #0d2146));
   border-radius: 50px;
   font-weight: 600;
-  padding: 10px 12px;
-  font-size: 13px;
+  padding: 8px 10px;
+  font-size: 12px;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -2223,19 +2261,24 @@ const STYLES = `
   cursor: pointer;
   line-height: 1.25;
 }
+#future-courses .btn.cta-callnow:not(.btn-bg-color) {
+  background: #fff;
+  color: var(--home-card-cta, var(--foc-navy-deep, #0d2146));
+}
 #future-courses .btn.cta-callnow:hover,
 #future-courses .btn.cta-callnow.btn-bg-color:hover {
-  background: var(--foc-color-cta, #fc2b5a);
-  color: var(--cyan, #1ba7ff);
+  background: var(--home-card-cta-hover, var(--foc-navy-badge, #163565));
+  border-color: var(--home-card-cta-hover, var(--foc-navy-badge, #163565));
+  color: #fff;
 }
-#future-courses .course-callback-btn { margin-top: 10px; }
+#future-courses .course-callback-btn { margin-top: 6px; padding: 8px 10px; }
 #future-courses .course_card_footer {
-  background: var(--foc-color-cta, #fc2b5a);
+  background: var(--home-card-cta, var(--foc-navy-deep, #0d2146));
   border-bottom-left-radius: 12px;
   border-bottom-right-radius: 12px;
-  margin-top: auto;
+  margin-top: 0;
   text-align: center;
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
 #future-courses .course-learn-more {
   display: inline-flex;
@@ -2246,8 +2289,9 @@ const STYLES = `
 }
 #future-courses .course-learn-more .learnn {
   color: #fff;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
+  padding: 4px 0;
 }
 #future-courses .course-learn-more__icon {
   width: 18px;
@@ -2368,11 +2412,11 @@ const STYLES = `
   color: var(--text);
 }
 #future-jobs .job-card-body {
-  padding: 16px 16px 14px;
+  padding: 12px 12px 8px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  flex: 1;
+  gap: 6px;
+  flex: 0 1 auto;
   text-align: center;
 }
 #future-jobs .job-card-title {
@@ -2429,7 +2473,7 @@ const STYLES = `
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 4px 2px 8px;
+  padding: 2px 2px 4px;
   text-align: left;
 }
 #future-jobs .job-card-deadline__label {
@@ -2445,19 +2489,19 @@ const STYLES = `
 #future-jobs .course-action-btns {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 4px;
+  gap: 8px;
+  margin-top: 2px;
 }
 #future-jobs .btn.shr--width { width: 100%; }
 #future-jobs .btn.cta-callnow,
 #future-jobs .btn.cta-callnow.btn-bg-color {
-  background: var(--foc-color-cta, #fc2b5a);
+  background: var(--home-card-cta, var(--foc-navy-deep, #0d2146));
   color: #fff;
-  border: none;
+  border: 1px solid var(--home-card-cta, var(--foc-navy-deep, #0d2146));
   border-radius: 50px;
   font-weight: 600;
-  padding: 10px 12px;
-  font-size: 13px;
+  padding: 8px 10px;
+  font-size: 12px;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -2465,18 +2509,23 @@ const STYLES = `
   cursor: pointer;
   line-height: 1.25;
 }
+#future-jobs .btn.cta-callnow:not(.btn-bg-color) {
+  background: #fff;
+  color: var(--home-card-cta, var(--foc-navy-deep, #0d2146));
+}
 #future-jobs .btn.cta-callnow:hover,
 #future-jobs .btn.cta-callnow.btn-bg-color:hover {
-  background: var(--foc-color-cta, #fc2b5a);
-  color: var(--cyan, #1ba7ff);
+  background: var(--home-card-cta-hover, var(--foc-navy-badge, #163565));
+  border-color: var(--home-card-cta-hover, var(--foc-navy-badge, #163565));
+  color: #fff;
 }
 #future-jobs .course_card_footer {
-  background: var(--foc-color-cta, #fc2b5a);
+  background: var(--home-card-cta, var(--foc-navy-deep, #0d2146));
   border-bottom-left-radius: 12px;
   border-bottom-right-radius: 12px;
-  margin-top: auto;
+  margin-top: 0;
   text-align: center;
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
 #future-jobs .course-learn-more {
   display: inline-flex;
@@ -2487,13 +2536,21 @@ const STYLES = `
 }
 #future-jobs .course-learn-more .learnn {
   color: #fff;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
+  padding: 4px 0;
 }
 #future-jobs .course-learn-more__icon {
   width: 18px;
   height: auto;
   display: block;
+}
+
+.foc-cyber-home #future-courses,
+.foc-cyber-home #future-jobs,
+.foc-cyber-home #events {
+  --home-card-cta: var(--foc-navy-deep, #0d2146);
+  --home-card-cta-hover: var(--foc-navy-badge, #163565);
 }
 
 .course-carousel {
@@ -2507,7 +2564,7 @@ const STYLES = `
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
-  padding: 8px 4px 18px;
+  padding: 4px 4px 12px;
   margin: 0 -4px;
 }
 .course-carousel-viewport::-webkit-scrollbar {
@@ -7102,6 +7159,7 @@ export default function HomePage() {
 
         <OurApproachSection />
 
+
         <PartnersMediaSection />
 
         <section className="section section-alt" id="geographic-reach">
@@ -7279,28 +7337,18 @@ img.group1 {
 .btn.shr--width{
   width: 100%;
 }
-.btn.cta-callnow {
-    background: var(--foc-color-surface);
-    color: var(--foc-color-cta);
-    font-family: var(--foc-font-display);
-    border-radius: 50px;
-    font-weight: 500;
-    padding: 10px 4px;
-    width: 120%;
-    font-size: 12px;
-    letter-spacing: 1px;
-    transition: .3s;
+.foc-cyber-home #future-courses .btn.cta-callnow,
+.foc-cyber-home #future-jobs .btn.cta-callnow {
+    width: 100%;
+    letter-spacing: 0.02em;
 }
-.btn.cta-callnow:hover {
-    transition: .5s;
-    background: var(--foc-color-cta);
-    color: var(--foc-color-text-inverse);
+.foc-cyber-home #future-courses .learnn,
+.foc-cyber-home #future-jobs .learnn {
+  padding: 4px 0;
 }
-.learnn{
-  padding: 10px 14px;
-}
-.course_card_footer {
-    background: var(--foc-color-cta);
+.foc-cyber-home #future-courses .course_card_footer,
+.foc-cyber-home #future-jobs .course_card_footer {
+    background: var(--home-card-cta, var(--foc-navy-deep, #0d2146));
     border-bottom-left-radius: 10px;
     border-bottom-right-radius: 10px;
 }
@@ -7996,30 +8044,25 @@ button.close span {
 
 .foc-cyber-home #future-jobs .job-action .btn.cta-callnow {
   width: 100% !important;
-  min-height: 38px;
+  min-height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 9px 12px;
-  border: 1px solid rgba(252,43,90,.9);
+  padding: 8px 10px;
+  border: 1px solid var(--home-card-cta, var(--foc-navy-deep, #0d2146));
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .foc-cyber-home #future-jobs .job-action .btn-bg-color {
-  background: var(--foc-color-cta) !important;
+  background: var(--home-card-cta, var(--foc-navy-deep, #0d2146)) !important;
   color: var(--foc-color-text-inverse) !important;
 }
 
 .foc-cyber-home #future-jobs .job-action .btn.cta-callnow:not(.btn-bg-color) {
   background: rgba(255,255,255,.96);
-}
-
-.foc-cyber-home #future-jobs .course_card_footer {
-   background: var(--foc-color-cta);
-    border-bottom-left-radius: 10px;
-    border-bottom-right-radius: 10px;
+  color: var(--home-card-cta, var(--foc-navy-deep, #0d2146)) !important;
 }
 
 .foc-cyber-home #future-jobs .course_card_footer a {
@@ -8032,8 +8075,8 @@ button.close span {
 }
 
 .foc-cyber-home #future-jobs .course_card_footer .learnn {
-  padding: 8px 0;
-  font-weight: 800;
+  padding: 4px 0;
+  font-weight: 700;
   letter-spacing: .03em;
 }
 

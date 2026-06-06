@@ -10395,7 +10395,8 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			verticals,
 			course,
 			center,
-			counselor
+			counselor,
+			batch
 		} = req.query;
 		// Parse multi-select filter values
 
@@ -10405,12 +10406,14 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		let courseArray = [];
 		let centerArray = [];
 		let counselorArray = [];
+		let batchArray = [];
 		try {
 			if (projects) projectsArray = JSON.parse(projects);
 			if (verticals) verticalsArray = JSON.parse(verticals);
 			if (course) courseArray = JSON.parse(course);
 			if (center) centerArray = JSON.parse(center);
 			if (counselor) counselorArray = JSON.parse(counselor);
+			if (batch) batchArray = JSON.parse(batch);
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
@@ -10428,6 +10431,10 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		}
 
 		if (centerArray.length > 0) {
+			teamMembers = [];
+		}
+
+		if (batchArray.length > 0) {
 			teamMembers = [];
 		}
 
@@ -10524,6 +10531,9 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		// Apply center filter early for better performance
 		if (centerArray.length > 0) {
 			baseMatchStage._center = { $in: centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+		if (batchArray.length > 0) {
+			baseMatchStage.batch = { $in: batchArray.map(id => new mongoose.Types.ObjectId(id)) };
 		}
 		aggregationPipeline.push({ $match: baseMatchStage });
 		aggregationPipeline.push(
