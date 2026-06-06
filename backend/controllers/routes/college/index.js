@@ -1,5 +1,6 @@
 const express = require("express");
 const uuid = require('uuid/v1');
+const cron = require('node-cron');
 const { Parser } = require("json2csv");
 
 const { isCollege, isTrainer, auth1, authenti, getAllTeamMembers } = require("../../../helpers");
@@ -47,7 +48,6 @@ const b2bCopyRoutes = require("./b2b/b2b_copy");
 const androidAppRoutes = require("./androidApp");
 const statusB2bRoutes = require("./b2b/statusB2b");
 const placementRoutes = require("./placement");
-const missedFollowupSchedular = require("../../../schedular/missedFollowupSchedular");
 const router = express.Router();
 const moment = require('moment')
 
@@ -431,8 +431,54 @@ const validateAndConvertId = (id) => {
 	}
 };
 
-// B2C followups: mark prior-day planned followups as missed at 12:00 AM IST (see schedular/missedFollowupSchedular.js)
-missedFollowupSchedular();
+// Function to update followups at 11:55 PM IST
+const updateFollowupsToMissed = async () => {
+	try {
+		// Get current time in IST (UTC+5:30)
+		const now = new Date();
+		const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+		const hours = istTime.getUTCHours();
+		const minutes = istTime.getUTCMinutes();
+
+		// Check if current time is exactly 11:55 PM IST
+		if (hours === 23 && minutes === 55) {
+			// Fetch all profiles with 'Planned' followups
+			const profiles = await AppliedCourses.find({
+				'followups.status': 'Planned',
+				'followups.date': { $lte: new Date() }  // Ensure followup date is in the past or current
+			});
+
+			// Loop through profiles to update 'Planned' followups to 'Missed'
+			for (const profile of profiles) {
+				// Map through followups array and update status
+				const updatedFollowups = profile.followups.map(followup => {
+					if (followup.status === 'Planned') {
+						followup.status = 'Missed';  // Change status to 'Missed'
+					}
+					return followup;
+				});
+
+				// Update the followups array and save the changes
+				profile.followups = updatedFollowups;
+
+				// Add log entry for the status change
+				profile.logs.push({
+					user: new mongoose.Types.ObjectId('64ab1234abcd5678ef901234'), // System user ID
+					timestamp: new Date(),
+					action: 'Followup Status Changed',
+					remarks: `Followup status automatically changed from 'Planned' to 'Missed' for date ${followup.date}`
+				});
+
+				await profile.save();
+			}
+		}
+	} catch (error) {
+		console.error('Error updating followups to missed:', error);
+	}
+};
+
+// Schedule the cron job to run at 11:55 PM every day
+cron.schedule('55 23 * * *', updateFollowupsToMissed);  // This will run at 11:55 PM every day
 
 router.route('/')
 	.get(async (req, res) => {
@@ -1938,7 +1984,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			name, courseType, status, leadStatus,
 			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
 			nextActionFromDate, nextActionToDate,
-			projects, verticals, course, center, counselor, subStatuses
+			projects, verticals, course, center, counselor, subStatuses, batch, registeredByMe,
+			followupStatus
 		} = req.query;
 
 		// console.log("substautes", subStatuses)
@@ -1948,6 +1995,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		let courseArray = [];
 		let centerArray = [];
 		let counselorArray = [];
+		let batchArray = [];
 
 		try {
 			if (projects) projectsArray = JSON.parse(projects);
@@ -1955,6 +2003,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			if (course) courseArray = JSON.parse(course);
 			if (center) centerArray = JSON.parse(center);
 			if (counselor) counselorArray = JSON.parse(counselor);
+			if (batch) batchArray = JSON.parse(batch);
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
@@ -1977,6 +2026,9 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		if (centerArray.length > 0) {
 			teamMembers = [];
 		}
+		if (batchArray.length > 0) {
+			teamMembers = [];
+		}
 		if (name && name.trim() !== '') {
 			teamMembers = [];
 		}
@@ -1992,6 +2044,27 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			);
 		}
 
+		let followupAppliedIds = null;
+		if (followupStatus) {
+			const followupMatch = { status: followupStatus };
+			if (counselorArray.length > 0) {
+				followupMatch.createdBy = { $in: counselorArray.map((id) => new mongoose.Types.ObjectId(id)) };
+			} else if (teamMemberIds.length > 0) {
+				followupMatch.createdBy = { $in: teamMemberIds };
+			}
+			const followupRows = await B2cFollowup.find(followupMatch).select('appliedCourseId').lean();
+			followupAppliedIds = followupRows.map((r) => r.appliedCourseId).filter(Boolean);
+			if (followupAppliedIds.length === 0) {
+				return res.status(200).json({
+					success: true,
+					data: [],
+					totalCount: 0,
+					totalPages: 0,
+					page,
+					limit,
+				});
+			}
+		}
 
 		// Build optimized pipeline with only essential fields
 		const pipeline = buildSimplifiedPipeline({
@@ -2002,7 +2075,9 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				createdFromDate, createdToDate,
 				modifiedFromDate, modifiedToDate,
 				nextActionFromDate, nextActionToDate,
-				projectsArray, verticalsArray, courseArray, centerArray, subStatuses
+				projectsArray, verticalsArray, courseArray, centerArray, batchArray, subStatuses,
+				registeredByMe: registeredByMe || null,
+				followupAppliedIds,
 			},
 			pagination: { skip, limit }
 		});
@@ -2439,13 +2514,18 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 
 
 
-	if (teamMemberIds && teamMemberIds.length > 0) {
+	if (filters.registeredByMe) {
+		baseMatch.registeredBy = new mongoose.Types.ObjectId(filters.registeredByMe);
+	} else if (teamMemberIds && teamMemberIds.length > 0) {
 		baseMatch.$or = [
 			{ registeredBy: { $in: teamMemberIds } },
 			{ counsellor: { $in: teamMemberIds } }
 		];
 	}
 
+	if (filters.followupAppliedIds && filters.followupAppliedIds.length > 0) {
+		baseMatch._id = { $in: filters.followupAppliedIds };
+	}
 
 	// Add date filters
 	if (filters.createdFromDate || filters.createdToDate) {
@@ -2584,6 +2664,9 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 	}
 	if (filters.centerArray && filters.centerArray.length > 0) {
 		additionalFilters['_center'] = { $in: filters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+	}
+	if (filters.batchArray && filters.batchArray.length > 0) {
+		additionalFilters['batch'] = { $in: filters.batchArray.map(id => new mongoose.Types.ObjectId(id)) };
 	}
 
 	// Name search
@@ -2648,7 +2731,9 @@ function buildSimplifiedPipelineWithWhatsApp({ teamMemberIds, college, filters, 
 
 
 
-	if (teamMemberIds && teamMemberIds.length > 0) {
+	if (filters.registeredByMe) {
+		baseMatch.registeredBy = new mongoose.Types.ObjectId(filters.registeredByMe);
+	} else if (teamMemberIds && teamMemberIds.length > 0) {
 		baseMatch.$or = [
 			{ registeredBy: { $in: teamMemberIds } },
 			{ counsellor: { $in: teamMemberIds } }
@@ -2793,6 +2878,9 @@ function buildSimplifiedPipelineWithWhatsApp({ teamMemberIds, college, filters, 
 	}
 	if (filters.centerArray && filters.centerArray.length > 0) {
 		additionalFilters['_center'] = { $in: filters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+	}
+	if (filters.batchArray && filters.batchArray.length > 0) {
+		additionalFilters['batch'] = { $in: filters.batchArray.map(id => new mongoose.Types.ObjectId(id)) };
 	}
 
 	// Name search
@@ -3157,7 +3245,9 @@ function downloadPipeline({ teamMemberIds, college, filters }) {
 
 
 
-	if (teamMemberIds && teamMemberIds.length > 0) {
+	if (filters.registeredByMe) {
+		baseMatch.registeredBy = new mongoose.Types.ObjectId(filters.registeredByMe);
+	} else if (teamMemberIds && teamMemberIds.length > 0) {
 		baseMatch.$or = [
 			{ registeredBy: { $in: teamMemberIds } },
 			{ counsellor: { $in: teamMemberIds } }
@@ -9635,7 +9725,7 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 	try {
 		const user = req.user;
 		let filter = {};
-		const { fromDate, toDate, page = 1, limit = 10, followupStatus, projects, verticals, course, center, counselor } = req.query;
+		const { fromDate, toDate, page = 1, limit = 10, followupStatus, projects, verticals, course, center, counselor, name: searchName } = req.query;
 
 		// Add date validation
 		let from, to;
@@ -9845,8 +9935,28 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 			aggregate.push({ $match: additionalMatches });
 		}
 
-
-
+		if (searchName && String(searchName).trim()) {
+			const escaped = String(searchName).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			const searchRegex = new RegExp(escaped, 'i');
+			aggregate.push({
+				$match: {
+					$or: [
+						{ name: searchRegex },
+						{ email: searchRegex },
+						{ mobile: searchRegex },
+						{
+							$expr: {
+								$regexMatch: {
+									input: { $ifNull: [{ $toString: '$mobile' }, ''] },
+									regex: escaped,
+									options: 'i',
+								},
+							},
+						},
+					],
+				},
+			});
+		}
 
 		const followups = await B2cFollowup.aggregate(aggregate);
 		// const followups = await B2cFollowup.aggregate(aggregate).populate({
@@ -10285,7 +10395,8 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			verticals,
 			course,
 			center,
-			counselor
+			counselor,
+			batch
 		} = req.query;
 		// Parse multi-select filter values
 
@@ -10295,12 +10406,14 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		let courseArray = [];
 		let centerArray = [];
 		let counselorArray = [];
+		let batchArray = [];
 		try {
 			if (projects) projectsArray = JSON.parse(projects);
 			if (verticals) verticalsArray = JSON.parse(verticals);
 			if (course) courseArray = JSON.parse(course);
 			if (center) centerArray = JSON.parse(center);
 			if (counselor) counselorArray = JSON.parse(counselor);
+			if (batch) batchArray = JSON.parse(batch);
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
@@ -10318,6 +10431,10 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		}
 
 		if (centerArray.length > 0) {
+			teamMembers = [];
+		}
+
+		if (batchArray.length > 0) {
 			teamMembers = [];
 		}
 
@@ -10414,6 +10531,9 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		// Apply center filter early for better performance
 		if (centerArray.length > 0) {
 			baseMatchStage._center = { $in: centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+		if (batchArray.length > 0) {
+			baseMatchStage.batch = { $in: batchArray.map(id => new mongoose.Types.ObjectId(id)) };
 		}
 		aggregationPipeline.push({ $match: baseMatchStage });
 		aggregationPipeline.push(
@@ -11282,6 +11402,40 @@ router.get("/generate-application-form/:id", async (req, res) => {
 
 		const dobFormatted = formatDate(data._candidate.dob);
 
+		const normalizeS3Key = (imagePath) => {
+			let key = String(imagePath).trim();
+			if (/^https?:\/\//i.test(key)) {
+				try {
+					const url = new URL(key);
+					key = decodeURIComponent(url.pathname.replace(/^\//, ''));
+				} catch (_) { /* keep original */ }
+			}
+			return key.replace(/^\//, '');
+		};
+
+		const getProfileImageDataUri = async (imagePath) => {
+			const key = normalizeS3Key(imagePath);
+			if (!key) return null;
+			try {
+				const s3Object = await s3.getObject({ Bucket: bucketName, Key: key }).promise();
+				const ext = key.split('.').pop()?.toLowerCase() || 'jpeg';
+				const mimeByExt = {
+					jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+					gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp',
+				};
+				const contentType = s3Object.ContentType || mimeByExt[ext] || 'image/jpeg';
+				return `data:${contentType};base64,${s3Object.Body.toString('base64')}`;
+			} catch (err) {
+				console.error('Admission form: failed to load profile image from S3:', key, err.message);
+				return null;
+			}
+		};
+
+		const profileImageDataUri = await getProfileImageDataUri(data._candidate.personalInfo.image);
+		const profilePhotoTag = profileImageDataUri
+			? `<img class="photo-img" src="${profileImageDataUri}" alt="Profile" />`
+			: '<div class="photo-placeholder">Photo</div>';
+
 		const logoPath = path.join(__dirname, '../../../controllers/public/public_assets/images/newpage/logo-ha.svg');
 		const logoBase64 = fs.readFileSync(logoPath, { encoding: 'base64' });
 		const imgTag = `<img src="data:image/svg+xml;base64,${logoBase64}" />`;
@@ -11293,203 +11447,174 @@ router.get("/generate-application-form/:id", async (req, res) => {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Application Form ${fy}</title>
     <style>
+        @page {
+            size: A4;
+            margin: 5mm;
+        }
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-			
         }
-        
-        body {
+        html, body {
             font-family: Arial, sans-serif;
-            background-color:rgb(255, 255, 255);
-            padding: 0px;
-            height: 297mm;
-            width: 210mm;
-            min-width: 210mm;
-            min-height: 297mm;
-
+            background-color: #fff;
+            font-size: 12px;
+            line-height: 1.35;
+            width: 100%;
         }
-        
         .form-container {
-            max-width: 800px;
-            margin: 0 auto;
+            width: 100%;
+            min-height: 287mm;
             background-color: white;
-            border: 2px solid #ddd;
-            padding: 5px;
+            border: 1px solid #ccc;
+            padding: 4px;
         }
-        
+        .form-section {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
         .header {
             background-color: #4a5a8a;
             color: white;
-            padding: 5px;
+            padding: 8px 12px;
             font-weight: bold;
-            font-size: 20px;
-            position: relative;
+            font-size: 18px;
         }
-        
         .header-info {
-            padding: 15px;
+            padding: 10px 12px 12px;
             border-bottom: 1px solid #ddd;
         }
-        
         .header-info table {
             width: 100%;
             border-collapse: collapse;
         }
-        
         .header-info td {
-            padding: 4px 0;
-            font-size: 15px;
+            padding: 3px 0;
+            font-size: 13px;
+            line-height: 1.4;
         }
-        
         .header-info .label {
             font-weight: bold;
-            width: 180px;
+            width: 170px;
         }
-        
-        .logo {
-            position: absolute;
-            right: 20px;
-            top: 50%;
-            transform: translateY(-50%);
-        }
-        
-        .logo img {
-            height: 40px;
-            width: auto;
-        }
-        
         .section-header {
             background-color: #4a5a8a;
             color: white;
-            padding: 10px 15px;
+            padding: 7px 12px;
             font-weight: bold;
-            font-size: 14px;
-            margin-top: 0;
+            font-size: 13px;
         }
-        
         .section-content {
-            padding: 15px;
+            padding: 10px 12px 12px;
             position: relative;
         }
-        
         .details-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 15px;
         }
-        
         .details-table td {
-            padding: 6px 5px;
+            padding: 5px 6px;
             font-size: 12px;
             border-bottom: 1px solid #eee;
             vertical-align: top;
+            line-height: 1.35;
         }
-        
         .details-table .label {
             font-weight: bold;
-            width: 140px;
+            width: 130px;
         }
-        
         .details-table .value {
-            padding-left: 10px;
+            padding-left: 8px;
         }
-        
         .photo-section {
             position: absolute;
-            right: 15px;
-            top: 15px;
+            right: 12px;
+            top: 10px;
         }
-        
         .photo-placeholder {
-            width: 100px;
-            height: 120px;
+            width: 105px;
+            height: 125px;
             border: 2px solid #ccc;
             background-color: #f9f9f9;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 12px;
+            font-size: 11px;
             color: #666;
         }
-        
         .photo-img {
-            width: 100px;
-            height: 120px;
+            width: 105px;
+            height: 125px;
             border: 2px solid #ccc;
             object-fit: cover;
         }
-        
         .address-row {
             display: flex;
-            gap: 30px;
+            gap: 20px;
         }
-        
         .address-col {
             flex: 1;
         }
-        
         .documents-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
         }
-        
         .documents-table th,
         .documents-table td {
             border: 1px solid #ddd;
-            padding: 10px;
+            padding: 7px 10px;
             text-align: left;
             font-size: 12px;
+            line-height: 1.3;
+            vertical-align: middle;
         }
-        
         .documents-table th {
             background-color: #f5f5f5;
             font-weight: bold;
         }
-        
-        .document-link {
-            color: #0066cc;
-            text-decoration: underline;
-            font-size: 11px;
-        }
-        
         .declaration-content {
             font-size: 12px;
-            line-height: 1.4;
+            line-height: 1.45;
             text-align: justify;
         }
-        
-        .signature-section {
-            margin-top: 30px;
-            text-align: right;
+        .declaration-content p {
+            margin: 0;
         }
-        
+        .signature-section {
+            margin-top: 16px;
+            text-align: right;
+            flex-shrink: 0;
+        }
         .signature-name {
             font-weight: bold;
-            margin-top: 20px;
+            font-size: 13px;
+            margin-top: 4px;
         }
-        
         .clear {
             clear: both;
         }
-        
         .personal-details-content {
-            margin-right: 120px;
+            margin-right: 118px;
+            min-height: 125px;
         }
-        .div-1 , .div-2 {
-            width:50%
+        .div-1, .div-2 {
+            width: 50%;
         }
-        .div-2{
-            padding: 50px;
-        }
-        .section-1st{
+        .div-2 {
+            padding: 12px 16px;
             display: flex;
             align-items: center;
+            justify-content: center;
         }
-
-        
+        .div-2 img {
+            max-height: 48px;
+            width: auto;
+        }
+        .section-1st {
+            display: flex;
+            align-items: stretch;
+        }
     </style>
 </head>
 <body>
@@ -11539,12 +11664,7 @@ router.get("/generate-application-form/:id", async (req, res) => {
         
         <div class="section-content">
             <div class="photo-section">
-                <div class="photo-placeholder">
-				${data._candidate?.personalInfo?.image
-				? `<img class="photo-img" src="${data._candidate.personalInfo.image}" />`
-				: `<div class="photo-placeholder">Photo</div>`}
-				  
-                </div>
+                ${profilePhotoTag}
             </div>
             
             <div class="personal-details-content">
@@ -11620,13 +11740,13 @@ router.get("/generate-application-form/:id", async (req, res) => {
                     </table>
                 </div>
             </div>
-        </div>     
-       
+        </div>
         
         <!-- Documents Upload -->
 
 		${isDocsRequired ?
-				`   <div class="section-header">
+				`<div class="form-section">
+        <div class="section-header">
             DOCUMENTS UPLOAD
         </div>
         
@@ -11649,10 +11769,10 @@ router.get("/generate-application-form/:id", async (req, res) => {
 </tbody>
             </table>
         </div>
+        </div>
 		` : ''}
-        
 
-        
+        <div class="form-section">
         <!-- Declaration -->
         <div class="section-header">
             DECLARATION
@@ -11667,6 +11787,7 @@ router.get("/generate-application-form/:id", async (req, res) => {
                 </div>
             </div>
         </div>
+        </div>
     </div>
 </body>
 </html>
@@ -11678,11 +11799,13 @@ router.get("/generate-application-form/:id", async (req, res) => {
 		});
 
 		const page = await browser.newPage();
+		await page.emulateMediaType('print');
 		await page.setContent(htmlContent, { waitUntil: "networkidle0" });
 
 		const pdfBuffer = await page.pdf({
 			format: "A4",
 			printBackground: true,
+			margin: { top: '5mm', right: '5mm', bottom: '5mm', left: '5mm' },
 		});
 
 		await browser.close();
@@ -16008,7 +16131,7 @@ router.post('/uploadmedia', isTrainer, async (req, res) => {
 
 			return {
 				name: file.name,
-				url: uploadResult.Location,
+				url: key,
 				size: file.size,
 				uploadedAt: new Date()
 			};

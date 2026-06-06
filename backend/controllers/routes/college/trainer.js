@@ -142,7 +142,7 @@ router.post('/addTrainer', isCollege, uploadTrainerFiles, async (req, res) => {
                 fs.unlinkSync(file.path);
             }
             
-            return uploadResult.Location;
+            return uploadResult.Key;
         };
 
         // Upload CV if provided
@@ -320,7 +320,7 @@ router.put('/update/:id', isCollege, uploadTrainerFiles, async (req, res) => {
                 fs.unlinkSync(file.path);
             }
             
-            return uploadResult.Location;
+            return uploadResult.Key;
         };
 
         // Upload CV if provided

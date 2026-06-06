@@ -27,6 +27,7 @@ const { authChat } = require("../../helpers");
 const { updateSpreadSheetRequestCallValues,updateSpreadSheetCarrerValues,updateSpreadSheetLabLeadsValues } = require("./services/googleservice");
 const moment = require("moment");
 const {uploadSinglefile} = require('./functions/images')
+const { resolvePublicUrl } = require('../../helpers/s3Storage');
 const AppliedCourses = require('../models/appliedCourses');
 const commonFunc = require('./functions/common');
 
@@ -656,7 +657,8 @@ router.post('/career', async (req, res) => {
     const cvFile = req.files?.cv;
     if (!cvFile) return res.status(400).send("CV file missing");
 
-    const cvUrl = await uploadSinglefile(cvFile); // 👈 Here is the S3 upload
+    const cvKey = await uploadSinglefile(cvFile); // S3 object key stored; public URL for email/sheet
+    const cvUrl = resolvePublicUrl(cvKey);
 
     function capitalizeWords(str) {
       if (!str) return '';

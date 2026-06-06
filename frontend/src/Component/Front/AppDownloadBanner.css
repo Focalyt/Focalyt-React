@@ -52,6 +52,11 @@
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+.foc-app-download__btn *,
+.foc-app-download__btn i {
+  color: #fff !important;
+}
+
 .foc-app-download__btn:hover {
   color: #fff !important;
   transform: translateY(-1px);
@@ -98,7 +103,22 @@
   font-size: 0.75rem;
 }
 
-.foc-app-download--footer .foc-app-download__btn {
+.foc-app-download.foc-app-download--footer .foc-app-download__btn {
   padding: 8px 14px;
   font-size: 0.82rem;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff;
+}
+
+.foc-app-download.foc-app-download--footer .foc-app-download__btn:hover,
+.foc-app-download.foc-app-download--footer .foc-app-download__btn:focus,
+.foc-app-download.foc-app-download--footer .foc-app-download__btn:visited {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff;
+}
+
+.foc-app-download.foc-app-download--footer .foc-app-download__btn *,
+.foc-app-download.foc-app-download--footer .foc-app-download__btn i {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff;
 }

@@ -1,4 +1,166 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import PartnerWithFocalytSection from "./PartnerWithFocalytSection";
+
+const PARTNER_LOGO_BASE = "/Assets/public_assets/images/partners-logo";
+const HOMEPAGE_PARTNER_IMG = "/Assets/public_assets/images/homepage";
+
+export const GOVT_PARTNERS = [
+  { label: "NSDC", imageSrc: `${PARTNER_LOGO_BASE}/nsdc.jpg` },
+  "MeitY",
+  { label: "PMKVY", imageSrc: `${PARTNER_LOGO_BASE}/pmkvy.svg` },
+  { label: "HPKVN", imageSrc: `${HOMEPAGE_PARTNER_IMG}/hpkvn.png` },
+  { label: "OSDA", imageSrc: `${PARTNER_LOGO_BASE}/osda.png` },
+  { label: "UPSDM", imageSrc: `${PARTNER_LOGO_BASE}/upsdm.png` },
+  { label: "ESSCI", imageSrc: `${PARTNER_LOGO_BASE}/essci_registered_logo.png` },
+  { label: "Telecom Sector Skill Council (TSSC)", imageSrc: `${PARTNER_LOGO_BASE}/telecom_sector_skill_council.png` },
+  "IT-ITES",
+  { label: "BFSI", imageSrc: `${HOMEPAGE_PARTNER_IMG}/bfsi.png` },
+  { label: "Tourism & Hospitality Skill Council (THSC)", imageSrc: `${PARTNER_LOGO_BASE}/thsc.png` },
+  { label: "MEPSC", imageSrc: `${HOMEPAGE_PARTNER_IMG}/mepsc.png` },
+  "ESDM",
+  { label: "Skill India", imageSrc: `${PARTNER_LOGO_BASE}/skill-india-logo.jpg` },
+];
+
+export const CSR_PARTNERS = [
+  { label: "Ericsson", imageSrc: `${HOMEPAGE_PARTNER_IMG}/ericsson.png` },
+  { label: "Panasonic", imageSrc: `${PARTNER_LOGO_BASE}/panasonic.svg` },
+  { label: "Samsung", imageSrc: `${PARTNER_LOGO_BASE}/samsung.png` },
+  { label: "Honda", imageSrc: `${PARTNER_LOGO_BASE}/honda.png` },
+  { label: "Bridgestone Solutions", imageSrc: `${PARTNER_LOGO_BASE}/bridgestone-solutions.svg` },
+  { label: "TCI Express", imageSrc: `${HOMEPAGE_PARTNER_IMG}/tci.png` },
+  { label: "Hero MotoCorp", imageSrc: `${HOMEPAGE_PARTNER_IMG}/hero_motocorp.png` },
+];
+
+export const ACADEMIC_PARTNERS = [
+  { label: "Chandigarh University", imageSrc: `${PARTNER_LOGO_BASE}/cu_logo.png` },
+  { label: "Amity University", imageSrc: `${PARTNER_LOGO_BASE}/amity-logo.png` },
+  { label: "SGT University", imageSrc: `${PARTNER_LOGO_BASE}/sgt_logo.png` },
+  { label: "Lovely Professional University", imageSrc: `${PARTNER_LOGO_BASE}/lpu_logo.png` },
+  { label: "Rayat-Bahra University", imageSrc: `${PARTNER_LOGO_BASE}/rayat_bahra_logo.png` },
+  { label: "GNM College, Ambala", imageSrc: `${PARTNER_LOGO_BASE}/GMN_logo.png` },
+  { label: "APIIT SD India", imageSrc: `${PARTNER_LOGO_BASE}/Apiit_logo.png` },
+  { label: "Central University of Haryana", imageSrc: `${PARTNER_LOGO_BASE}/cuh_logo.png` },
+  { label: "SIET Nilokheri", imageSrc: `${PARTNER_LOGO_BASE}/Siet_logo.png` },
+  { label: "KVA DAV College for Women", imageSrc: `${PARTNER_LOGO_BASE}/KVA_DAV_logo.png` },
+  { label: "Government College for Women, Ambala", imageSrc: `${PARTNER_LOGO_BASE}/Gcw_logo.png` },
+  { label: "Rao Birender Singh College", imageSrc: `${PARTNER_LOGO_BASE}/Rao_birender_Logo.png` },
+  { label: "Asia-Pacific Institute of Management & Technology", imageSrc: `${PARTNER_LOGO_BASE}/aimt_logo.png` },
+  { label: "Punjab State Aeronautical Engineering College", imageSrc: `${PARTNER_LOGO_BASE}/psaec_logo.png` },
+  { label: "Ch. Chiranjil Lal Government College", imageSrc: `${PARTNER_LOGO_BASE}/chiranji_lal_logo.png` },
+  { label: "St. Andrew's Institute of Technology & Management", imageSrc: `${PARTNER_LOGO_BASE}/St_andrew_logo.png` },
+  { label: "NIT Kurukshetra", imageSrc: `${PARTNER_LOGO_BASE}/Nit_logo.png` },
+];
+
+export function getPartnerLabel(partner) {
+  return typeof partner === "string" ? partner : partner.label;
+}
+
+export const INDUSTRY_PARTNERS = [
+  { label: "Dixon", imageSrc: `${HOMEPAGE_PARTNER_IMG}/dixon.png` },
+  { label: "Padget Technologies", imageSrc: `${HOMEPAGE_PARTNER_IMG}/padget.png` },
+  { label: "East India Technologies", imageSrc: `${HOMEPAGE_PARTNER_IMG}/east_india_technologies.png` },
+  { label: "Net+ Broadband", imageSrc: `${HOMEPAGE_PARTNER_IMG}/net+.png` },
+  { label: "Fastway", imageSrc: `${HOMEPAGE_PARTNER_IMG}/fastway.png` },
+  { label: "TXD", imageSrc: `${HOMEPAGE_PARTNER_IMG}/txd.png` },
+  { label: "Country Inn & Suites", imageSrc: `${HOMEPAGE_PARTNER_IMG}/country_inn_logo.png` },
+  { label: "Taco Bell", imageSrc: `${HOMEPAGE_PARTNER_IMG}/taco_bell.png` },
+  { label: "Barbeque Nation", imageSrc: `${HOMEPAGE_PARTNER_IMG}/barbeque.png` },
+  "Radisson",
+  "Montree Hotel",
+  { label: "Qvolv", imageSrc: `${HOMEPAGE_PARTNER_IMG}/qvolv.png` },
+  { label: "Patanjali", imageSrc: `${PARTNER_LOGO_BASE}/patanjali.svg` },
+  "Bakingo",
+];
+
+const CHIP_COLORS = [
+  "#1a5276",
+  "#c0392b",
+  "var(--foc-green-dark)",
+  "#2980b9",
+  "#7d3c98",
+  "#e67e22",
+  "var(--foc-blue)",
+  "#009999",
+  "var(--foc-purple-dark)",
+  "var(--foc-orange)",
+];
+
+const CHIP_EMOJIS = ["🎯", "🌐", "📋", "💻", "📚", "🔮", "⚡", "🏛️", "🤝", "🏭", "🎓", "⭐"];
+
+const PARTNER_PREVIEW_COUNT = 6;
+
+function partnerToLogo(label, index = 0) {
+  return {
+    label,
+    color: CHIP_COLORS[index % CHIP_COLORS.length],
+    emoji: CHIP_EMOJIS[index % CHIP_EMOJIS.length],
+  };
+}
+
+function normalizePartner(partner, index = 0) {
+  if (typeof partner === "string") {
+    return partnerToLogo(partner, index);
+  }
+  return {
+    label: partner.label,
+    imageSrc: partner.imageSrc,
+    color: CHIP_COLORS[index % CHIP_COLORS.length],
+    emoji: CHIP_EMOJIS[index % CHIP_EMOJIS.length],
+  };
+}
+
+function partnersToCarouselSlides(partners, maxCount = PARTNER_PREVIEW_COUNT, perSlide = 3) {
+  const list = maxCount == null ? partners : partners.slice(0, maxCount);
+  const logos = list.map((partner, i) => normalizePartner(partner, i));
+  const slides = [];
+  for (let i = 0; i < logos.length; i += perSlide) {
+    slides.push(logos.slice(i, i + perSlide));
+  }
+  return slides.length ? slides : [[]];
+}
+
+const PARTNER_CATEGORIES = [
+  {
+    id: "gov",
+    color: "var(--foc-green-dark)",
+    bg: "linear-gradient(135deg,var(--foc-partner-green-bg),var(--foc-partner-green-end))",
+    iconBg: "linear-gradient(135deg,var(--foc-green-dark),var(--foc-green-hover))",
+    emoji: "🏛️",
+    title: "Government Partners",
+    desc: "Working with government bodies and public institutions to empower communities and build a skilled nation.",
+    partners: GOVT_PARTNERS,
+  },
+  {
+    id: "csr",
+    color: "var(--foc-blue)",
+    bg: "linear-gradient(135deg,var(--foc-partner-blue-bg),var(--foc-partner-blue-end))",
+    iconBg: "linear-gradient(135deg,var(--foc-blue),var(--foc-blue-bright))",
+    emoji: "💙",
+    title: "CSR Partners",
+    desc: "Partnering with corporates through CSR initiatives to create sustainable social impact and inclusive growth.",
+    partners: CSR_PARTNERS,
+  },
+  {
+    id: "acad",
+    color: "var(--foc-purple-dark)",
+    bg: "linear-gradient(135deg,var(--foc-partner-purple-bg),var(--foc-partner-purple-end))",
+    iconBg: "linear-gradient(135deg,var(--foc-purple-dark),var(--foc-purple-bright))",
+    emoji: "🎓",
+    title: "Academic Partners",
+    desc: "Collaborating with schools, colleges, universities and training institutions to promote future-ready education.",
+    partners: ACADEMIC_PARTNERS,
+  },
+  {
+    id: "ind",
+    color: "var(--foc-orange)",
+    bg: "linear-gradient(135deg,var(--foc-partner-orange-bg),var(--foc-partner-orange-end))",
+    iconBg: "linear-gradient(135deg,var(--foc-orange),var(--foc-orange-bright))",
+    emoji: "🏭",
+    title: "Industry Partners",
+    desc: "Working with leading industries and organizations to bridge the gap between skills and industry needs.",
+    partners: INDUSTRY_PARTNERS,
+  },
+];
 
 const STYLES = `
     .fp, .fp *, .fp *::before, .fp *::after { box-sizing: border-box; }
@@ -87,8 +249,105 @@ const STYLES = `
     box-shadow: 0 6px 22px rgba(0,0,0,0.16) !important;
   }
 
+  .fp .logo-chip--image {
+    min-width: 88px;
+    padding: 8px 10px 7px;
+  }
+
+  .fp .logo-chip__img {
+    width: 100%;
+    max-width: 76px;
+    height: 46px;
+    object-fit: contain;
+    display: block;
+  }
+
+  .fp .logo-chip__label {
+    font-weight: 800;
+    font-size: 10.5px;
+    text-align: center;
+    letter-spacing: 0.3px;
+    line-height: 1.25;
+  }
+
+  .fp .logo-chip__label--image {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--foc-navy-deep);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fp .partner-card .partner-logo-carousel:not(.partner-logo-carousel--modal) .logo-chip--image {
+    min-width: 0;
+    flex: 1 1 0;
+    width: 0;
+    padding: 8px 5px 6px;
+    gap: 5px;
+    min-height: 90px;
+  }
+
+  .fp .partner-card .partner-logo-carousel:not(.partner-logo-carousel--modal) .logo-chip__img {
+    height: 36px;
+    max-height: 36px;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .fp .partner-card .partner-logo-carousel:not(.partner-logo-carousel--modal) .logo-chip__label--image {
+    font-size: 8px;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    text-overflow: unset;
+    line-height: 1.25;
+  }
+
   .fp .tab-btn { transition: all 0.25s ease; cursor: pointer; border: none; }
   .fp .tab-btn:hover { transform: translateY(-3px); }
+
+  .fp .media-tabs-row {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 36px;
+  }
+
+  .fp .media-tabs-row .tab-btn {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 768px) {
+    .fp .media-tabs-row {
+      justify-content: flex-start;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scroll-snap-type: x proximity;
+      scrollbar-width: none;
+      margin-top: 28px;
+      margin-left: -16px;
+      margin-right: -16px;
+      padding: 4px 16px 12px;
+      gap: 8px;
+    }
+
+    .fp .media-tabs-row::-webkit-scrollbar {
+      display: none;
+    }
+
+    .fp .media-tabs-row .tab-btn {
+      scroll-snap-align: start;
+      padding: 10px 16px;
+      font-size: 12.5px;
+    }
+  }
 
   .fp .media-card {
     transition: transform 0.38s cubic-bezier(.34,1.56,.64,1), box-shadow 0.38s ease;
@@ -140,9 +399,69 @@ const STYLES = `
   @media (max-width: 599px) {
     .fp .partner-cards-grid {
       grid-template-columns: 1fr;
-      max-width: 340px;
+      width: 100%;
+      max-width: 100%;
       margin-left: auto;
       margin-right: auto;
+      padding: 0;
+    }
+
+    .fp .partner-card {
+      margin: 0 auto;
+      width: 100%;
+      max-width: 100%;
+    }
+
+    .fp .partner-logo-carousel {
+      padding: 14px 36px 10px !important;
+    }
+
+    .fp .partner-logo-carousel .arrow-btn {
+      left: 6px !important;
+      right: auto;
+      width: 28px !important;
+      height: 28px !important;
+      font-size: 14px !important;
+    }
+
+    .fp .partner-logo-carousel .arrow-btn.partner-arrow-next {
+      left: auto !important;
+      right: 6px !important;
+    }
+
+    .fp .partner-logo-row {
+      justify-content: center;
+      gap: 6px;
+      padding: 0 4px;
+    }
+
+    .fp .partner-logo-row .logo-chip {
+      min-width: 0 !important;
+      flex: 1;
+      max-width: 96px;
+      padding: 8px 6px !important;
+    }
+
+    .fp .partner-logo-row .logo-chip > div:first-child {
+      font-size: 18px !important;
+    }
+
+    .fp .partner-logo-row .logo-chip > div:last-child {
+      font-size: 9px !important;
+    }
+  }
+
+  .fp .fp-section-inner {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 32px;
+    position: relative;
+    z-index: 1;
+  }
+
+  @media (max-width: 768px) {
+    .fp .fp-section-inner {
+      padding: 0 16px;
     }
   }
 
@@ -159,94 +478,262 @@ const STYLES = `
       font-size: 9px;
     }
   }
-`;
 
-const PARTNER_CATS = [
-  {
-    id: "gov",
-    color: "var(--foc-green-dark)",
-    bg: "linear-gradient(135deg,var(--foc-partner-green-bg),var(--foc-partner-green-end))",
-    iconBg: "linear-gradient(135deg,var(--foc-green-dark),var(--foc-green-hover))",
-    emoji: "🏛️",
-    title: "Government Partners",
-    desc: "Working with government bodies and public institutions to empower communities and build a skilled nation.",
-    logos: [
-      [
-        { label: "Skill India", color: "#1a5276", emoji: "🎯" },
-        { label: "NSDC", color: "#c0392b", emoji: "🌐" },
-        { label: "PMKVY", color: "var(--foc-green-dark)", emoji: "📋" },
-      ],
-      [
-        { label: "NIELIT", color: "#2980b9", emoji: "💻" },
-        { label: "MSDE", color: "#7d3c98", emoji: "📚" },
-        { label: "NITI Aayog", color: "#e67e22", emoji: "🔮" },
-      ],
-    ],
-  },
-  {
-    id: "csr",
-    color: "var(--foc-blue)",
-    bg: "linear-gradient(135deg,var(--foc-partner-blue-bg),var(--foc-partner-blue-end))",
-    iconBg: "linear-gradient(135deg,var(--foc-blue),var(--foc-blue-bright))",
-    emoji: "💙",
-    title: "CSR Partners",
-    desc: "Partnering with corporates through CSR initiatives to create sustainable social impact and inclusive growth.",
-    logos: [
-      [
-        { label: "TATA Power", color: "#1a1a2e", emoji: "⚡" },
-        { label: "TCS", color: "var(--foc-blue)", emoji: "🖥️" },
-        { label: "Wipro", color: "#4caf50", emoji: "🌿" },
-      ],
-      [
-        { label: "Infosys", color: "#007cc3", emoji: "🔷" },
-        { label: "HCL", color: "#c0392b", emoji: "🚀" },
-        { label: "Tech Mahindra", color: "#d4273a", emoji: "⚙️" },
-      ],
-    ],
-  },
-  {
-    id: "acad",
-    color: "var(--foc-purple-dark)",
-    bg: "linear-gradient(135deg,var(--foc-partner-purple-bg),var(--foc-partner-purple-end))",
-    iconBg: "linear-gradient(135deg,var(--foc-purple-dark),var(--foc-purple-bright))",
-    emoji: "🎓",
-    title: "Academic Partners",
-    desc: "Collaborating with schools, colleges, universities and training institutions to promote future-ready education.",
-    logos: [
-      [
-        { label: "IIT Kanpur", color: "#1a3a6b", emoji: "🔬" },
-        { label: "Amity Univ", color: "#c0392b", emoji: "🏫" },
-        { label: "CU", color: "#8e1a1a", emoji: "🎯" },
-      ],
-      [
-        { label: "BITS Pilani", color: "#1a5276", emoji: "⚗️" },
-        { label: "IGNOU", color: "#2e7d4f", emoji: "📖" },
-        { label: "NIFT", color: "var(--foc-purple-dark)", emoji: "🎨" },
-      ],
-    ],
-  },
-  {
-    id: "ind",
-    color: "var(--foc-orange)",
-    bg: "linear-gradient(135deg,var(--foc-partner-orange-bg),var(--foc-partner-orange-end))",
-    iconBg: "linear-gradient(135deg,var(--foc-orange),var(--foc-orange-bright))",
-    emoji: "🏭",
-    title: "Industry Partners",
-    desc: "Working with leading industries and organizations to bridge the gap between skills and industry needs.",
-    logos: [
-      [
-        { label: "Siemens", color: "#009999", emoji: "⚙️" },
-        { label: "Bosch", color: "#c0392b", emoji: "🔧" },
-        { label: "Infosys", color: "#007cc3", emoji: "💡" },
-      ],
-      [
-        { label: "L&T", color: "#1a5276", emoji: "🏗️" },
-        { label: "ABB", color: "#c0392b", emoji: "🔌" },
-        { label: "Honeywell", color: "var(--foc-orange)", emoji: "🌡️" },
-      ],
-    ],
-  },
-];
+  @keyframes fp-partner-marquee-rtl {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  @keyframes fp-partner-marquee-ltr {
+    from { transform: translateX(-50%); }
+    to { transform: translateX(0); }
+  }
+  .fp .fp-partner-marquee {
+    width: 100%;
+    margin-top: 12px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--foc-color-border-light);
+    background: var(--foc-color-bg-section);
+  }
+  .fp .fp-partner-marquee__track {
+    display: flex;
+    width: max-content;
+    gap: 10px;
+    padding: 10px 14px;
+    animation: fp-partner-marquee-rtl 42s linear infinite;
+  }
+  .fp .fp-partner-marquee[data-dir="ltr"] .fp-partner-marquee__track {
+    animation-name: fp-partner-marquee-ltr;
+  }
+  .fp .fp-partner-marquee__item {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--foc-color-border-light);
+    background: var(--foc-color-surface);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--foc-navy-deep);
+    white-space: nowrap;
+  }
+  .fp .fp-partner-marquee__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.55;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .fp .fp-partner-marquee__track { animation: none !important; flex-wrap: wrap; width: 100%; }
+  }
+
+  .fp .partner-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    width: 100%;
+    margin-bottom: 14px;
+  }
+  @media (max-width: 400px) {
+    .fp .partner-preview-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .fp .partner-all-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    background: rgba(11, 18, 32, 0.55);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 200px 16px 20px;
+  }
+  @media (max-width: 991px) {
+    .fp .partner-all-modal-backdrop {
+      padding-top: 120px;
+      margin-top:60px
+    }
+  }
+  @media (max-width: 575px) {
+    .fp .partner-all-modal-backdrop {
+      padding-top: 88px;
+      padding-left: 12px;
+      padding-right: 12px;
+      margin-top:60px
+    }
+  }
+  .fp .partner-all-modal {
+    width: min(560px, 100%);
+    max-height: min(85vh, 640px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--foc-color-surface);
+    border-radius: 20px;
+    border: 1px solid var(--foc-color-border-light);
+    box-shadow: 0 24px 64px rgba(13, 33, 70, 0.22);
+  }
+  .fp .partner-all-modal__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--foc-color-border-light);
+  }
+  .fp .partner-all-modal__title {
+    font-family: var(--foc-font-display);
+    font-weight: 800;
+    font-size: 18px;
+    margin: 0;
+  }
+  .fp .partner-all-modal__close {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--foc-color-border-light);
+    background: var(--foc-color-bg-section);
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+    color: var(--foc-navy-deep);
+  }
+  .fp .partner-all-modal__body {
+    padding: 8px 24px 24px;
+    overflow: visible;
+  }
+  .fp .partner-all-modal .partner-logo-carousel {
+    margin-bottom: 0;
+  }
+
+  .fp .partner-all-modal--gallery {
+    width: min(920px, 96vw);
+    max-height: min(90vh, 720px);
+  }
+
+  .fp .partner-all-modal__subtitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--foc-text-caption-alt);
+    margin: 4px 0 0;
+  }
+
+  .fp .partner-modal-gallery {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    max-height: min(58vh, 520px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 6px 4px 10px;
+    scrollbar-width: thin;
+  }
+
+  .fp .partner-modal-gallery__item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 18px 14px 14px;
+    background: var(--foc-color-surface);
+    border: 1px solid var(--foc-color-border-light);
+    border-radius: 16px;
+    box-shadow: 0 4px 18px rgba(13, 33, 70, 0.07);
+    text-align: center;
+    min-height: 130px;
+  }
+
+  .fp .partner-modal-gallery__img {
+    width: 100%;
+    max-width: 160px;
+    height: 80px;
+    object-fit: contain;
+    object-position: center;
+    display: block;
+  }
+
+  .fp .partner-modal-gallery__name {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.45;
+    color: var(--foc-navy-deep);
+    width: 100%;
+    word-break: break-word;
+    hyphens: auto;
+  }
+
+  @media (max-width: 720px) {
+    .fp .partner-modal-gallery {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .fp .partner-modal-gallery__img {
+      height: 64px;
+    }
+    .fp .partner-modal-gallery__name {
+      font-size: 11px;
+    }
+  }
+
+  .fp .partner-all-modal--carousel {
+    width: min(680px, 96vw);
+  }
+
+  .fp .partner-logo-carousel--modal {
+    background: var(--foc-color-bg-section) !important;
+    padding: 20px 52px 14px !important;
+    border: 1px solid var(--foc-color-border-light);
+  }
+
+  .fp .partner-logo-carousel--modal .partner-logo-row {
+    gap: 16px;
+    min-height: 140px;
+    align-items: stretch;
+  }
+
+  .fp .partner-logo-carousel--modal .logo-chip--image {
+    min-width: 0;
+    flex: 1 1 0;
+    max-width: none;
+    width: 0;
+    padding: 16px 14px 12px;
+    gap: 10px;
+    height: auto;
+    min-height: 130px;
+    border-radius: 14px;
+  }
+
+  .fp .partner-logo-carousel--modal .logo-chip__img {
+    max-width: 100%;
+    width: 100%;
+    height: 72px;
+    max-height: 72px;
+    min-height: 72px;
+  }
+
+  .fp .partner-logo-carousel--modal .logo-chip__label--image {
+    font-size: 11px;
+    white-space: normal;
+    display: block;
+    overflow: visible;
+    text-overflow: unset;
+    line-height: 1.4;
+    -webkit-line-clamp: unset;
+    -webkit-box-orient: unset;
+  }
+
+  .fp .partner-logo-carousel--modal .arrow-btn {
+    width: 38px !important;
+    height: 38px !important;
+    font-size: 18px !important;
+  }
+`;
 
 const MEDIA_TABS = [
   { id: "social", label: "Social Media", emoji: "📱" },
@@ -255,23 +742,44 @@ const MEDIA_TABS = [
   { id: "events", label: "Events & Engagement", emoji: "📅" },
 ];
 
+/** Same image assets as About page — /Assets/public_assets/images/ */
+const ABOUT_MEDIA_ASSET = "/Assets/public_assets/images";
+
 const MEDIA_CARDS = [
-  { tab: "social", title: "Skill Training in Action", desc: "Hands-on training for a future ready workforce.", emoji: "📱", tag: "Social Media", accent: "var(--foc-green-dark)", img: "🧑‍💻" },
-  { tab: "social", title: "Placement Success", desc: "Connecting talent with meaningful opportunities.", emoji: "🤝", tag: "Placement Drive", accent: "var(--foc-blue)", img: "👩‍🎓" },
-  { tab: "social", title: "Digital Campaigns", desc: "Amplifying reach through targeted social campaigns.", emoji: "📣", tag: "Digital", accent: "var(--foc-blue)", img: "📣" },
-  { tab: "social", title: "Youth Outreach", desc: "Inspiring young learners through stories and live updates.", emoji: "🌟", tag: "Instagram", accent: "var(--foc-purple-dark)", img: "📸" },
-  { tab: "awards", title: "Award of Excellence", desc: "Recognized for impact, innovation and excellence.", emoji: "🥇", tag: "Award 2024", accent: "var(--foc-orange)", img: "🏆" },
-  { tab: "awards", title: "National Skill Honor", desc: "Celebrated for transformative skilling outcomes at scale.", emoji: "🏅", tag: "National Award", accent: "var(--foc-green-dark)", img: "🎖️" },
-  { tab: "awards", title: "CSR Impact Recognition", desc: "Honored for measurable CSR and community impact.", emoji: "⭐", tag: "CSR Award", accent: "var(--foc-blue)", img: "✨" },
-  { tab: "awards", title: "Innovation in EdTech", desc: "Awarded for technology-led learning and employability.", emoji: "💡", tag: "EdTech 2024", accent: "var(--foc-purple-dark)", img: "🔬" },
-  { tab: "print", title: "In the News", desc: "Our initiatives featured across leading publications.", emoji: "📰", tag: "Print Media", accent: "var(--foc-purple-dark)", img: "📄" },
-  { tab: "print", title: "Leading Daily Feature", desc: "Coverage in top newspapers on skills and employment.", emoji: "🗞️", tag: "National Daily", accent: "var(--foc-blue)", img: "📰" },
-  { tab: "print", title: "Industry Journal", desc: "Thought leadership on workforce development.", emoji: "📑", tag: "Industry Press", accent: "var(--foc-orange)", img: "📋" },
-  { tab: "print", title: "Regional Spotlight", desc: "Local media highlighting grassroots training impact.", emoji: "🌍", tag: "Regional Press", accent: "var(--foc-green-dark)", img: "🗞️" },
-  { tab: "events", title: "Community Events", desc: "Engaging communities through nationwide skill drives.", emoji: "🌍", tag: "Events", accent: "var(--foc-green-dark)", img: "🎪" },
-  { tab: "events", title: "Partner Engagement Summit", desc: "Collaborating with partners to scale impact together.", emoji: "🤝", tag: "Summit", accent: "var(--foc-blue)", img: "🎤" },
-  { tab: "events", title: "Nationwide Skill Drive", desc: "Mobilizing trainers and learners across multiple states.", emoji: "🚌", tag: "Skill Drive", accent: "var(--foc-orange)", img: "🛣️" },
-  { tab: "events", title: "Campus Connect Program", desc: "On-ground engagement with colleges and institutions.", emoji: "🎓", tag: "Campus Event", accent: "var(--foc-purple-dark)", img: "🏫" },
+  /* Mobilization — About page */
+  { tab: "social", title: "Community Mobilization", desc: "On-ground outreach mobilizing learners for skill programs.", emoji: "📱", tag: "Mobilization", accent: "var(--foc-green-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/MOBILIZATION-1.jpg` },
+  { tab: "social", title: "Skill Drive Outreach", desc: "Connecting youth with training and employment pathways.", emoji: "🤝", tag: "Mobilization", accent: "var(--foc-blue)", imageSrc: `${ABOUT_MEDIA_ASSET}/MOBILIZATION-3.jpg` },
+  { tab: "social", title: "Field Mobilization", desc: "Grassroots campaigns across training geographies.", emoji: "🌟", tag: "Mobilization", accent: "var(--foc-purple-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/MOBILIZATION-4.png` },
+  { tab: "social", title: "Youth Engagement Drive", desc: "Inspiring participation in future-ready skilling.", emoji: "📣", tag: "Mobilization", accent: "var(--foc-orange)", imageSrc: `${ABOUT_MEDIA_ASSET}/MOBILIZATION-5.jpg` },
+  /* Placement — About page */
+  { tab: "social", title: "Placement Success", desc: "Connecting trained talent with meaningful opportunities.", emoji: "👩‍🎓", tag: "Placement", accent: "var(--foc-blue)", imageSrc: `${ABOUT_MEDIA_ASSET}/placement-pic-2.jpg` },
+  { tab: "social", title: "Industry Placements", desc: "Learners placed with partner industries and employers.", emoji: "🏢", tag: "Placement", accent: "var(--foc-green-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/placement-pic-3.jpg` },
+  { tab: "social", title: "Career Outcomes", desc: "Celebrating employment and entrepreneurship milestones.", emoji: "🎯", tag: "Placement", accent: "var(--foc-purple-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/placement-pic-4.jpg` },
+  /* Training facilities — About page */
+  { tab: "social", title: "Training in Action", desc: "Hands-on sessions at Focalyt training centres.", emoji: "🧑‍💻", tag: "Training", accent: "var(--foc-blue)", imageSrc: `${ABOUT_MEDIA_ASSET}/TRAINING-FACILITIES-1.jpg` },
+  { tab: "social", title: "Future-Ready Labs", desc: "State-of-the-art facilities for practical skill building.", emoji: "🔬", tag: "Training", accent: "var(--foc-orange)", imageSrc: `${ABOUT_MEDIA_ASSET}/TRAINING-FACILITIES-2-1.jpg` },
+  /* Awards — About page */
+  { tab: "awards", title: "Awards & Recognition", desc: "Honoured for excellence in skilling and social impact.", emoji: "🏆", tag: "Award", accent: "var(--foc-orange)", imageSrc: `${ABOUT_MEDIA_ASSET}/AWARD-5.png` },
+  { tab: "awards", title: "National Recognition", desc: "Celebrated for transformative outcomes at scale.", emoji: "🥇", tag: "Award", accent: "var(--foc-green-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/AWARD-2.png` },
+  { tab: "awards", title: "Industry Excellence", desc: "Recognized for innovation and workforce development.", emoji: "🏅", tag: "Award", accent: "var(--foc-blue)", imageSrc: `${ABOUT_MEDIA_ASSET}/AWARD-4.png` },
+  { tab: "awards", title: "Impact Achievement", desc: "Acknowledged for measurable community and CSR impact.", emoji: "⭐", tag: "Award", accent: "var(--foc-purple-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/AWARD-3.png` },
+  /* Print media — About Media Coverage section */
+  { tab: "print", title: "Print Media Coverage", desc: "Focalyt initiatives featured in leading publications.", emoji: "📰", tag: "Print Media", accent: "var(--foc-purple-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/NEWSPAPER2.png` },
+  { tab: "print", title: "National Daily Feature", desc: "Coverage on skills, employment and education.", emoji: "🗞️", tag: "Print Media", accent: "var(--foc-blue)", imageSrc: `${ABOUT_MEDIA_ASSET}/NEWSPAPER3.png` },
+  { tab: "print", title: "Press Highlight", desc: "Stories on training, placement and community impact.", emoji: "📄", tag: "Print Media", accent: "var(--foc-orange)", imageSrc: `${ABOUT_MEDIA_ASSET}/NEWSPAPER4.png` },
+  { tab: "print", title: "News Feature", desc: "Our work spotlighted across print media.", emoji: "📑", tag: "Print Media", accent: "var(--foc-green-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/NEWSPAPER5.png` },
+  { tab: "print", title: "Regional Press", desc: "Local media highlighting grassroots training impact.", emoji: "🌍", tag: "Print Media", accent: "var(--foc-blue)", imageSrc: `${ABOUT_MEDIA_ASSET}/NEWSPAPER6.png` },
+  { tab: "print", title: "Media Spotlight", desc: "Continued coverage of Focalyt's nationwide initiatives.", emoji: "📰", tag: "Print Media", accent: "var(--foc-purple-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/NEWSPAPER7.png` },
+  /* Project launches — About page */
+  { tab: "events", title: "BPS Women University Centre", desc: "Inauguration of Focal Skill Training Center at Bhagat Phool Singh Women University.", emoji: "🎓", tag: "Project Launch", accent: "var(--foc-purple-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/DSC_5654.jpg` },
+  { tab: "events", title: "Manesar Training Centre", desc: "Inauguration of Focal Skill Training Center at Manesar, Haryana.", emoji: "🏫", tag: "Project Launch", accent: "var(--foc-blue)", imageSrc: `${ABOUT_MEDIA_ASSET}/Untitled-design.png` },
+  { tab: "events", title: "Skill Van RPL Project", desc: "Launch of 18 Skill Van RPL Project at Lucknow, UP.", emoji: "🚌", tag: "Project Launch", accent: "var(--foc-orange)", imageSrc: `${ABOUT_MEDIA_ASSET}/Untitled-design-2.png` },
+  { tab: "events", title: "Harit Umang — Panasonic", desc: "E-Waste Art Sculpture Inauguration with Panasonic (Harit Umang).", emoji: "♻️", tag: "Project Launch", accent: "var(--foc-green-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/Untitled-design-3.png` },
+  /* Extra curricular — About page */
+  { tab: "events", title: "Extra Curricular Activity", desc: "Engaging learners beyond the classroom.", emoji: "🎪", tag: "Engagement", accent: "var(--foc-green-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/ACTIVITIES-4.jpg` },
+  { tab: "events", title: "Campus Activities", desc: "Building confidence through experiential learning.", emoji: "🤝", tag: "Engagement", accent: "var(--foc-blue)", imageSrc: `${ABOUT_MEDIA_ASSET}/ACTIVITIES-2.jpg` },
+  { tab: "events", title: "Learner Engagement", desc: "Community events that inspire future-ready mindsets.", emoji: "🌟", tag: "Engagement", accent: "var(--foc-orange)", imageSrc: `${ABOUT_MEDIA_ASSET}/ACTIVITIES-1.jpg` },
+  { tab: "events", title: "Youth Programs", desc: "Activities that complement skills training and placement.", emoji: "🎯", tag: "Engagement", accent: "var(--foc-purple-dark)", imageSrc: `${ABOUT_MEDIA_ASSET}/ACTIVITIES-3.jpg` },
 ];
 
 const MEDIA_STATS = [
@@ -378,9 +886,11 @@ function SectionHeader({ icon, titleHtml, subtitle, accentColor = "var(--foc-gre
 }
 
 function LogoChip({ logo }) {
+  const hasImage = Boolean(logo.imageSrc);
+
   return (
     <div
-      className="logo-chip"
+      className={`logo-chip${hasImage ? " logo-chip--image" : ""}`}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -395,176 +905,329 @@ function LogoChip({ logo }) {
         gap: 5,
       }}
     >
-      <div style={{ fontSize: 21 }}>{logo.emoji}</div>
-      <div style={{ fontWeight: 800, fontSize: 10.5, color: logo.color, textAlign: "center", letterSpacing: 0.3 }}>{logo.label}</div>
+      {hasImage ? (
+        <img src={logo.imageSrc} alt={logo.label} className="logo-chip__img" loading="lazy" />
+      ) : (
+        <div style={{ fontSize: 21 }}>{logo.emoji}</div>
+      )}
+      <div
+        className={`logo-chip__label${hasImage ? " logo-chip__label--image" : ""}`}
+        style={hasImage ? undefined : { color: logo.color }}
+        title={logo.label}
+      >
+        {logo.label}
+      </div>
+    </div>
+  );
+}
+
+const PARTNER_CAROUSEL_AUTO_MS = 4000;
+
+function PartnerLogoGallery({ partners }) {
+  const logos = useMemo(() => partners.map((p, i) => normalizePartner(p, i)), [partners]);
+
+  return (
+    <div className="partner-modal-gallery" role="list">
+      {logos.map((logo) => (
+        <article key={logo.label} className="partner-modal-gallery__item" role="listitem">
+          {logo.imageSrc ? (
+            <img src={logo.imageSrc} alt="" className="partner-modal-gallery__img" loading="lazy" />
+          ) : (
+            <span style={{ fontSize: 32 }}>{logo.emoji}</span>
+          )}
+          <p className="partner-modal-gallery__name">{logo.label}</p>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function PartnerLogoCarousel({ cat, slides, slide, setSlide, bg, autoPlay = true, variant = "card" }) {
+  const total = slides.length;
+  const carouselBg = bg ?? cat.bg;
+  const isModal = variant === "modal";
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    if (!autoPlay || paused || total <= 1) return undefined;
+
+    const prefersReduced =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReduced) return undefined;
+
+    const id = window.setInterval(() => {
+      setSlide((s) => (s + 1) % total);
+    }, PARTNER_CAROUSEL_AUTO_MS);
+
+    return () => window.clearInterval(id);
+  }, [autoPlay, paused, total, setSlide]);
+
+  return (
+    <div
+      className={`partner-logo-carousel${isModal ? " partner-logo-carousel--modal" : ""}`}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setPaused(false);
+      }}
+      style={{
+        width: "100%",
+        borderRadius: 16,
+        background: isModal ? "var(--foc-color-bg-section)" : carouselBg,
+        padding: isModal ? "20px 52px 14px" : "14px 12px 10px",
+        position: "relative",
+        marginBottom: isModal ? 0 : 16,
+        border: isModal ? "1px solid var(--foc-color-border-light)" : undefined,
+      }}
+    >
+      <button
+        type="button"
+        className="arrow-btn partner-arrow-prev"
+        aria-label="Previous partners"
+        onClick={() => setSlide((s) => (s - 1 + total) % total)}
+        style={{
+          position: "absolute",
+          left: -14,
+          top: "50%",
+          transform: "translateY(-50%)",
+          width: 30,
+          height: 30,
+          borderRadius: "50%",
+          border: `2px solid ${cat.color}44`,
+          background: "var(--foc-color-surface)",
+          color: cat.color,
+          fontSize: 15,
+          fontWeight: 900,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: `0 3px 12px ${cat.color}22`,
+          zIndex: 3,
+        }}
+      >
+        ‹
+      </button>
+      <div
+        className="partner-logo-row"
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: isModal ? 16 : 6,
+          width: "100%",
+          minHeight: isModal ? 140 : 72,
+        }}
+      >
+        {slides[slide]?.map((logo) => (
+          <LogoChip key={logo.label} logo={logo} />
+        ))}
+      </div>
+      <button
+        type="button"
+        className="arrow-btn partner-arrow-next"
+        aria-label="Next partners"
+        onClick={() => setSlide((s) => (s + 1) % total)}
+        style={{
+          position: "absolute",
+          right: -14,
+          top: "50%",
+          transform: "translateY(-50%)",
+          width: 30,
+          height: 30,
+          borderRadius: "50%",
+          border: `2px solid ${cat.color}44`,
+          background: "var(--foc-color-surface)",
+          color: cat.color,
+          fontSize: 15,
+          fontWeight: 900,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: `0 3px 12px ${cat.color}22`,
+          zIndex: 3,
+        }}
+      >
+        ›
+      </button>
+      <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 10 }}>
+        {Array.from({ length: total }).map((_, i) => (
+          <button
+            type="button"
+            key={i}
+            aria-label={`Slide ${i + 1}`}
+            onClick={() => setSlide(i)}
+            style={{
+              width: i === slide ? 24 : 8,
+              height: 8,
+              borderRadius: 4,
+              background: i === slide ? cat.color : `${cat.color}44`,
+              cursor: "pointer",
+              transition: "all 0.3s ease",
+              border: "none",
+              padding: 0,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PartnerAllModal({ cat, open, onClose }) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="partner-all-modal-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="partner-all-modal partner-all-modal--gallery"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`partner-modal-title-${cat.id}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="partner-all-modal__head">
+          <div>
+            <h3 id={`partner-modal-title-${cat.id}`} className="partner-all-modal__title" style={{ color: cat.color }}>
+              {cat.title}
+            </h3>
+            <p className="partner-all-modal__subtitle">{cat.partners.length} partners</p>
+          </div>
+          <button type="button" className="partner-all-modal__close" aria-label="Close" onClick={onClose}>
+            ×
+          </button>
+        </div>
+        <div className="partner-all-modal__body">
+          <PartnerLogoGallery partners={cat.partners} />
+        </div>
+      </div>
     </div>
   );
 }
 
 function PartnerCard({ cat, delay = 0 }) {
+  const [modalOpen, setModalOpen] = useState(false);
   const [slide, setSlide] = useState(0);
-  const total = cat.logos.length;
+  const carouselSlides = useMemo(
+    () => partnersToCarouselSlides(cat.partners, PARTNER_PREVIEW_COUNT, 3),
+    [cat.partners]
+  );
+  const closeModal = useCallback(() => setModalOpen(false), []);
 
   return (
-    <div
-      className="partner-card fade-up"
-      style={{
-        animationDelay: `${delay}ms`,
-        width: "100%",
-        background: "var(--foc-color-surface)",
-        borderRadius: 24,
-        border: `2px solid ${cat.color}1a`,
-        boxShadow: `0 8px 40px ${cat.color}12`,
-        overflow: "visible",
-        display: "flex",
-        flexDirection: "column",
-        position: "relative",
-      }}
-    >
+    <>
       <div
+        className="partner-card fade-up"
         style={{
-          height: 5,
-          borderRadius: "22px 22px 0 0",
-          background: `linear-gradient(90deg, ${cat.color}, ${cat.color}77)`,
+          animationDelay: `${delay}ms`,
+          width: "100%",
+          background: "var(--foc-color-surface)",
+          borderRadius: 24,
+          border: `2px solid ${cat.color}1a`,
+          boxShadow: `0 8px 40px ${cat.color}12`,
+          overflow: "visible",
+          display: "flex",
+          flexDirection: "column",
+          position: "relative",
         }}
-      />
-      <div style={{ padding: "22px 20px 20px", display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
+      >
         <div
-          className="float"
           style={{
-            width: 70,
-            height: 70,
-            borderRadius: "50%",
-            background: cat.iconBg,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 30,
-            marginBottom: 14,
-            boxShadow: `0 10px 32px ${cat.color}44`,
+            height: 5,
+            borderRadius: "22px 22px 0 0",
+            background: `linear-gradient(90deg, ${cat.color}, ${cat.color}77)`,
           }}
-        >
-          {cat.emoji}
-        </div>
-        <div style={{ fontFamily: 'var(--foc-font-display)', fontWeight: 800, fontSize: 17.5, color: cat.color, marginBottom: 6, textAlign: "center" }}>
-          {cat.title}
-        </div>
-        <p style={{ fontFamily: 'var(--foc-font-sans)', fontSize: 13, color: "var(--foc-text-caption-alt)", textAlign: "center", lineHeight: 1.65, marginBottom: 18, flex: 1 }}>{cat.desc}</p>
-        <div style={{ width: "100%", borderRadius: 16, background: cat.bg, padding: "14px 12px 10px", position: "relative", marginBottom: 16 }}>
-          <button
-            type="button"
-            className="arrow-btn"
-            aria-label="Previous partners"
-            onClick={() => setSlide((s) => (s - 1 + total) % total)}
+        />
+        <div style={{ padding: "22px 20px 20px", display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
+          <div
+            className="float"
             style={{
-              position: "absolute",
-              left: -14,
-              top: "50%",
-              transform: "translateY(-50%)",
-              width: 30,
-              height: 30,
+              width: 70,
+              height: 70,
               borderRadius: "50%",
-              border: `2px solid ${cat.color}44`,
-              background: "var(--foc-color-surface)",
-              color: cat.color,
-              fontSize: 15,
-              fontWeight: 900,
+              background: cat.iconBg,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              boxShadow: `0 3px 12px ${cat.color}22`,
-              zIndex: 3,
-            }}
-          >
-            ‹
-          </button>
-          <div style={{ display: "flex", justifyContent: "center", gap: 6, width: "100%" }}>
-            {cat.logos[slide].map((logo) => (
-              <LogoChip key={logo.label} logo={logo} />
-            ))}
-          </div>
-          <button
-            type="button"
-            className="arrow-btn"
-            aria-label="Next partners"
-            onClick={() => setSlide((s) => (s + 1) % total)}
-            style={{
-              position: "absolute",
-              right: -14,
-              top: "50%",
-              transform: "translateY(-50%)",
-              width: 30,
-              height: 30,
-              borderRadius: "50%",
-              border: `2px solid ${cat.color}44`,
-              background: "var(--foc-color-surface)",
-              color: cat.color,
-              fontSize: 15,
-              fontWeight: 900,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: `0 3px 12px ${cat.color}22`,
-              zIndex: 3,
-            }}
-          >
-            ›
-          </button>
-          <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 10 }}>
-            {Array.from({ length: total }).map((_, i) => (
-              <button
-                type="button"
-                key={i}
-                aria-label={`Slide ${i + 1}`}
-                onClick={() => setSlide(i)}
-                style={{
-                  width: i === slide ? 24 : 8,
-                  height: 8,
-                  borderRadius: 4,
-                  background: i === slide ? cat.color : `${cat.color}44`,
-                  cursor: "pointer",
-                  transition: "all 0.3s ease",
-                  border: "none",
-                  padding: 0,
-                }}
-              />
-            ))}
-          </div>
-        </div>
-        <div className="view-btn" style={{ display: "flex", alignItems: "center", gap: 8, color: cat.color, fontWeight: 800, fontSize: 14 }}>
-          <span
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: "50%",
-              background: `${cat.color}18`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 14,
+              fontSize: 30,
+              marginBottom: 14,
+              boxShadow: `0 10px 32px ${cat.color}44`,
             }}
           >
             {cat.emoji}
-          </span>
-          View All Partners
-          <span
+          </div>
+          <div style={{ fontFamily: "var(--foc-font-display)", fontWeight: 800, fontSize: 17.5, color: cat.color, marginBottom: 6, textAlign: "center" }}>
+            {cat.title}
+          </div>
+          <p style={{ fontFamily: "var(--foc-font-sans)", fontSize: 13, color: "var(--foc-text-caption-alt)", textAlign: "center", lineHeight: 1.65, marginBottom: 18, flex: 1 }}>
+            {cat.desc}
+          </p>
+          <PartnerLogoCarousel cat={cat} slides={carouselSlides} slide={slide} setSlide={setSlide} />
+          <button
+            type="button"
+            className="view-btn"
+            onClick={() => setModalOpen(true)}
             style={{
-              width: 26,
-              height: 26,
-              borderRadius: "50%",
-              background: cat.color,
-              color: "var(--foc-color-surface)",
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              fontSize: 13,
+              gap: 8,
+              color: cat.color,
+              fontWeight: 800,
+              fontSize: 14,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: 0,
             }}
           >
-            →
-          </span>
+            <span
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                background: `${cat.color}18`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 14,
+              }}
+            >
+              {cat.emoji}
+            </span>
+            View All Partners
+            <span
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: "50%",
+                background: cat.color,
+                color: "var(--foc-color-surface)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 13,
+              }}
+            >
+              →
+            </span>
+          </button>
         </div>
       </div>
-    </div>
+      <PartnerAllModal cat={cat} open={modalOpen} onClose={closeModal} />
+    </>
   );
 }
 
@@ -608,7 +1271,7 @@ function PartnersStrengthSection() {
           animationDirection: "reverse",
         }}
       />
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 32px", position: "relative", zIndex: 1 }}>
+      <div className="fp-section-inner">
         <SectionHeader
           icon="🤝"
           titleHtml={`<span style="color:var(--foc-navy-deep)">Our Partners.</span> <span style="color:var(--foc-green-dark)">Our Strength.</span>`}
@@ -617,7 +1280,7 @@ function PartnersStrengthSection() {
           noSubtitleMaxWidth
         />
         <div className="partner-cards-grid">
-          {PARTNER_CATS.map((cat, i) => (
+          {PARTNER_CATEGORIES.map((cat, i) => (
             <PartnerCard key={cat.id} cat={cat} delay={i * 110} />
           ))}
         </div>
@@ -827,26 +1490,59 @@ function MediaCard({ card, delay = 0 }) {
           justifyContent: "center",
         }}
       >
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            opacity: 0.09,
-            backgroundImage: `radial-gradient(circle, ${card.accent} 1.5px, transparent 1.5px)`,
-            backgroundSize: "20px 20px",
-          }}
-        />
-        <div
-          style={{
-            fontSize: 74,
-            zIndex: 1,
-            filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.4))",
-            transform: hov ? "scale(1.18) rotate(-8deg)" : "scale(1)",
-            transition: "transform 0.4s cubic-bezier(.34,1.56,.64,1)",
-          }}
-        >
-          {card.img}
-        </div>
+        {card.imageSrc ? (
+          <>
+            <img
+              src={card.imageSrc}
+              alt={card.title}
+              loading="lazy"
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: card.tab === "print" || card.tab === "awards" ? "contain" : "cover",
+                background: card.tab === "print" || card.tab === "awards" ? "var(--foc-color-bg-muted)" : "transparent",
+                padding: card.tab === "print" || card.tab === "awards" ? "8px" : 0,
+                transform: hov ? "scale(1.05)" : "scale(1)",
+                transition: "transform 0.4s cubic-bezier(.34,1.56,.64,1)",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: card.tab === "print" || card.tab === "awards"
+                  ? "linear-gradient(180deg, rgba(6,20,38,.04) 0%, rgba(6,20,38,.18) 100%)"
+                  : "linear-gradient(180deg, rgba(6,20,38,.08) 0%, rgba(6,20,38,.42) 100%)",
+                pointerEvents: "none",
+              }}
+            />
+          </>
+        ) : (
+          <>
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                opacity: 0.09,
+                backgroundImage: `radial-gradient(circle, ${card.accent} 1.5px, transparent 1.5px)`,
+                backgroundSize: "20px 20px",
+              }}
+            />
+            <div
+              style={{
+                fontSize: 74,
+                zIndex: 1,
+                filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.4))",
+                transform: hov ? "scale(1.18) rotate(-8deg)" : "scale(1)",
+                transition: "transform 0.4s cubic-bezier(.34,1.56,.64,1)",
+              }}
+            >
+              {card.img}
+            </div>
+          </>
+        )}
         <div
           style={{
             position: "absolute",
@@ -868,6 +1564,7 @@ function MediaCard({ card, delay = 0 }) {
       <div style={{ padding: "17px 19px 19px" }}>
         <div style={{ fontFamily: 'var(--foc-font-display)', fontWeight: 800, fontSize: 15.5, color: "var(--foc-color-surface)", marginBottom: 6 }}>{card.title}</div>
         <div style={{ fontFamily: 'var(--foc-font-sans)', color: "var(--foc-sky-caption-2)", fontSize: 12.5, lineHeight: 1.55 }}>{card.desc}</div>
+        {/*
         <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 7, color: card.accent, fontWeight: 700, fontSize: 12.5 }}>
           <span>{card.emoji}</span> Explore More
           <div
@@ -887,6 +1584,7 @@ function MediaCard({ card, delay = 0 }) {
             →
           </div>
         </div>
+        */}
       </div>
     </div>
   );
@@ -921,7 +1619,7 @@ function MediaSection() {
   return (
     <section id="media" className="fp-sub fp-sub--media" style={{ background: "var(--foc-color-surface)", position: "relative" }}>
       <Blobs colors={["var(--foc-navy-deep)", "var(--foc-blue)", "var(--foc-green-dark)", "var(--foc-purple-dark)"]} />
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 32px", position: "relative", zIndex: 1 }}>
+      <div className="fp-section-inner">
         <SectionHeader
           icon="⭐"
           titleHtml={`<span style="color:var(--foc-navy-deep)">Media &amp; </span><span style="color:var(--foc-blue)">&nbsp; Recognition</span>`}
@@ -929,7 +1627,7 @@ function MediaSection() {
           accentColor="var(--foc-blue)"
           noSubtitleMaxWidth
         />
-        <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 10, marginTop: 36 }}>
+        <div className="media-tabs-row">
           {MEDIA_TABS.map((t, i) => (
             <button
               key={t.label}
@@ -1118,6 +1816,7 @@ export default function PartnersMediaSection() {
       <div className="fp" id="partners-media">
         <PartnersStrengthSection />
         {/* <OurPartnersSection /> */}
+        <PartnerWithFocalytSection />
         <MediaSection />
       </div>
     </>

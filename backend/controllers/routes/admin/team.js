@@ -21,6 +21,7 @@ const {
   bucketName,
   mimetypes,
 } = require('../../../config');
+const { resolvePublicUrl, storageKeyFromUpload } = require('../../../helpers/s3Storage');
 
 
 
@@ -84,7 +85,8 @@ router.post("/add", async (req, res) => {
         ContentType
       };
       // **Upload to S3**
-      const uploadResult = await s3.upload(params).promise();
+      await s3.upload(params).promise();
+      const imageKey = storageKeyFromUpload(null, key);
 
       const memberName = req.body.name;
       const position = req.body.position;
@@ -96,8 +98,7 @@ router.post("/add", async (req, res) => {
       const newTeam = new Team({
         name: memberName,
         image: {
-          fileURL: uploadResult.Location,
-
+          fileURL: imageKey,
         },
         position,
         designation,
@@ -146,9 +147,14 @@ router.post("/add", async (req, res) => {
         return res.redirect("/admin/team/view");
       }
 
-      return res.render(`${req.vPath}/admin/team/edit`, { 
-        teamMember, 
-        menu: 'team' 
+      const imageUrl = teamMember.image?.fileURL
+        ? resolvePublicUrl(teamMember.image.fileURL)
+        : "";
+
+      return res.render(`${req.vPath}/admin/team/edit`, {
+        teamMember,
+        imageUrl,
+        menu: 'team'
       });
     } catch (err) {
       req.flash("error", err.message || "Something went wrong!");
@@ -196,12 +202,12 @@ router.post("/add", async (req, res) => {
           ContentType
         };
 
-        const uploadResult = await s3.upload(params).promise();
+        await s3.upload(params).promise();
         updateData.image = {
-          fileURL: uploadResult.Location
+          fileURL: storageKeyFromUpload(null, key),
         };
       }
-r
+
       const updatedTeam = await Team.findByIdAndUpdate(
         id,
         { $set: updateData },

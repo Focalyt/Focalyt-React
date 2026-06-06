@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import axios from 'axios';
 import moment from 'moment';
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 
 const CandidateEarning = ({
@@ -1016,7 +1017,7 @@ const CandidateEarning = ({
                   {formData.aadharCardImage ? (
                     <>
                       <a
-                        href={`${process.env.REACT_APP_MIPIE_BUCKET_URL}/${formData.aadharCardImage}`}
+                        href={resolveMediaUrl(bucketUrl, formData.aadharCardImage)}
                         target="_blank"
                         rel="noopener noreferrer"
                         id="aadharLink"
@@ -1086,7 +1087,7 @@ const CandidateEarning = ({
                   {formData.panCardImage ? (
                     <>
                       <a
-                        href={`${process.env.REACT_APP_MIPIE_BUCKET_URL}/${formData.panCardImage}`}
+                        href={resolveMediaUrl(bucketUrl, formData.panCardImage)}
                         target="_blank"
                         rel="noopener noreferrer"
                         id="panLink"
@@ -1184,7 +1185,7 @@ const CandidateEarning = ({
                   {formData.bankDocumentImage ? (
                     <>
                       <a
-                        href={`${bucketUrl}/${formData.bankDocumentImage}`}
+                        href={resolveMediaUrl(bucketUrl, formData.bankDocumentImage)}
                         target="_blank"
                         rel="noopener noreferrer"
                       >
@@ -1430,7 +1431,7 @@ const CandidateEarning = ({
                           {claimFormData.documents[doc.name] ? (
                             <div className="d-flex align-items-center">
                               <a
-                                href={`${bucketUrl}/${claimFormData.documents[doc.name].documentKey}`}
+                                href={resolveMediaUrl(bucketUrl, claimFormData.documents[doc.name].documentKey)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="mr-2 text-primary"

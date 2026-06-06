@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 
 import moment from 'moment';
 import axios from 'axios';
@@ -8,6 +8,126 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSearch } from '@fortawesome/free-solid-svg-icons';
 import CompanyPartners from '../CompanyPartners/CompanyPartners';
 import ChatbotWidget from '../../../Component/ChatbotWidget/ChatbotWidget';
+import { Link } from 'react-router-dom';
+import { resolveMediaUrl } from '../../../utils/resolveMediaUrl';
+
+const THUMB_FALLBACK = "/Assets/public_assets/images/newjoblisting/course_img.svg";
+
+function formatJobExperience(job) {
+  if ((job.experience === 0 && job.experienceMonths === 0) || (job.experience === 0 && !job.experienceMonths)) {
+    return "Fresher";
+  }
+  const parts = [];
+  if (job.experience > 0) parts.push(`${job.experience} ${job.experience === 1 ? "Year" : "Years"}`);
+  if (job.experienceMonths > 0) parts.push(`${job.experienceMonths} ${job.experienceMonths === 1 ? "Month" : "Months"}`);
+  return parts.join(" ") || "N/A";
+}
+
+function formatJobSalary(job) {
+  if (job.isFixed && job.amount) return `₹ ${job.amount}`;
+  if (!job.isFixed && job.min && job.max) return `₹ ${job.min} - ${job.max}`;
+  return null;
+}
+
+function resolveJobVideoUrl(bucketUrl, job) {
+  if (!job?.jobVideo) return "";
+  const v = String(job.jobVideo);
+  if (v.startsWith("http://") || v.startsWith("https://")) return v;
+  return resolveMediaUrl(bucketUrl, job.jobVideo) || v;
+}
+
+export function JobCard({ job, thumbUrl, bucketUrl, onPlayVideo, onShare }) {
+  const loc = job?.city ? `(${job.city.name}, ${job.state?.name || "NA"})` : "NA";
+  const lastDate = job?.validity
+    ? moment(job.validity).utcOffset("+05:30").format("DD MMM YYYY")
+    : "NA";
+  const badgeLabel = job.courseType === "coursejob" ? "Course + Jobs" : "Jobs";
+  const videoUrl = resolveJobVideoUrl(bucketUrl, job);
+  const expLabel = formatJobExperience(job);
+
+  return (
+    <div className="course-card">
+      <div className="course-thumb">
+        {videoUrl ? (
+          <button
+            type="button"
+            className="course-thumb-media"
+            data-bs-toggle="modal"
+            data-bs-target="#videoModal"
+            onClick={() => onPlayVideo(videoUrl)}
+            aria-label={`Play video for ${job.title || "job"}`}
+          >
+            <img src={thumbUrl || THUMB_FALLBACK} alt={job.title || "Job"} />
+            <img src="/Assets/public_assets/images/newjoblisting/play.svg" alt="" className="course-thumb-play" />
+          </button>
+        ) : (
+          <img src={thumbUrl || THUMB_FALLBACK} alt={job.title || "Job"} />
+        )}
+        <div className="verified-badge-container">
+          <span className="wave-ring wave-1" />
+          <span className="wave-ring wave-2" />
+          <span className="wave-ring wave-3" />
+          <img src="/Assets/public_assets/images/verified.png" alt="" className="verified-badge" />
+        </div>
+        <div className="course-badge">{badgeLabel}</div>
+      </div>
+
+      <div className="job-card-body">
+        <div className="job-card-title" title={job.title}>{job.title || "Job"}</div>
+        {job.displayCompanyName ? (
+          <div className="job-card-company" title={job.displayCompanyName}>
+            ({job.displayCompanyName})
+          </div>
+        ) : null}
+
+        <div className="job-card-details">
+          <div className="job-detail-cell">
+            <img src="/Assets/public_assets/images/newjoblisting/qualification.png" alt="" className="job-detail-icon" />
+            <span title={job._qualification?.name || "N/A"}>{job._qualification?.name || "N/A"}</span>
+          </div>
+          <div className="job-detail-cell">
+            <img src="/Assets/public_assets/images/newjoblisting/fresher.png" alt="" className="job-detail-icon" />
+            <span title={expLabel}>{expLabel}</span>
+          </div>
+          <div className="job-detail-cell">
+            <img src="/Assets/public_assets/images/icons/location-pin.png" alt="" className="job-detail-icon" />
+            <span title={loc}>{loc}</span>
+          </div>
+          <div className="job-detail-cell">
+            <img src="/Assets/public_assets/images/newjoblisting/onsite.png" alt="" className="job-detail-icon" />
+            <span title={job.work || "N/A"}>{job.work || "N/A"}</span>
+          </div>
+        </div>
+
+        <div className="job-card-deadline">
+          <span className="job-card-deadline__label">Last Date for apply</span>
+          <span className="job-card-deadline__date">{lastDate}</span>
+        </div>
+
+        <div className="course-action-btns">
+          <a className="btn cta-callnow btn-bg-color shr--width" href={`/candidate/login?returnUrl=/candidate/job/${job._id}`}>
+            Apply Now
+          </a>
+          <button
+            type="button"
+            className="btn cta-callnow shr--width"
+            onClick={() => onShare(job._id, job.title || job.name, job.jobVideoThumbnail)}
+          >
+            Share
+          </button>
+        </div>
+      </div>
+
+      <div className="course_card_footer">
+        <Link to={`/jobdetailsmore/${job._id}`} className="course-learn-more">
+          <span className="learnn">Learn More</span>
+          <img src="/Assets/public_assets/images/link.png" alt="" className="course-learn-more__icon" />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function Jobs() {
   const [courses, setCourses] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
@@ -81,6 +201,14 @@ function Jobs() {
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const backendAppUrl = process.env.REACT_APP_MIPIE_APP_BACKEND_URL;
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute("data-foc-theme", "sky-magenta");
+    root.style.setProperty("--front-layout-bg", "var(--foc-color-bg)");
+    return () => root.style.removeProperty("--front-layout-bg");
+  }, []);
+
   const openChatbot = () => {
     console.log("On click start")
     const chatContainer = document.getElementById("iframe-box");
@@ -1393,7 +1521,7 @@ Provide analysis in clear format.`;
   // Helper function to get thumbnail URL with priority: jobVideoThumbnail > thumbnail > _company?.logo > default
   const getThumbnailUrl = (course) => {
     if (course.jobVideoThumbnail) {
-      return course.jobVideoThumbnail;
+      return resolveMediaUrl(bucketUrl, course.jobVideoThumbnail);
     }
     if (course.thumbnail) {
       // If thumbnail is relative path, make it absolute using bucketUrl
@@ -1504,9 +1632,12 @@ Provide analysis in clear format.`;
 
 
   const filteredCourses = getFilteredCourses();
-  console.log("filteredCourses", filteredCourses)
+  console.log("filteredCourses", filteredCourses);
 
-
+  const selectedSectorName =
+    activeFilter === "all"
+      ? "All"
+      : uniqueSectors.find((s) => `id_${s._id}` === activeFilter)?.name || "All";
 
   return (
     <>
@@ -1535,527 +1666,123 @@ Provide analysis in clear format.`;
           </div>
         </section>
 
-        {/* Courses Section */}
-        <section className="jobs section-padding-60">
+        <div className="foc-cyber-home hp-theme foc-courses-page foc-jobs-page">
+        <section className="section grid-bg" id="jobs-list">
           <div className="container">
-            <div className="row">
-              <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mx-auto mt-xxl-5 mt-xl-3 mt-lg-3 mt-md-3 mt-sm-3 mt-3">
-                <div className="row my-xl-5 my-lg-5 my-md-3 my-sm-3 my-5 mobileJobs">
-                  <h1 className="text-center text-uppercase jobs-heading pb-4">Select jobs for your career</h1>
+            <div className="section-head">
+              <div className="stag">Career Opportunities</div>
+              <h1 className="sh2">
+                Select jobs for your <span className="cyan">career</span>
+              </h1>
+              <p className="s-body">Find roles that match your skills and ambitions.</p>
+            </div>
 
-                  {/* Filter Container */}
-                  <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                    <div className="filter-container">
-                      <div className="filter-headerss">
-                        <div className='row align-items-center justify-content-between'>
-                          <div className='col-md-6 col-12'>
-                            <div className='filter-header'>
-                              <span>▶</span>
-                              <h2 className='fill--sec'>Filter by Sector</h2>
-                            </div>
+            <div className="courses-filters">
+              <div className="courses-filters__row">
+                <div className="courses-filters__label">
+                  <span className="courses-filters__tag">Filter by Sector</span>
+                  <span className="courses-filters__active">{selectedSectorName}</span>
+                </div>
 
-                          </div>
-
-                          {/* AI Search Bar */}
-                          <div className="col-md-6 col-12">
-                            <div className="ai-search-container">
-                              <div className="search-wrapper">
-                                <input
-                                  ref={searchInputRef}
-                                  type="text"
-                                  className="form-control ai-search-input"
-                                  placeholder="🔍 Search jobs with AI... (e.g., 'Find data analyst jobs')"
-                                  value={searchTerm}
-                                  onChange={handleSearchChange}
-                                  onKeyDown={handleSearchKeyDown}
-                                  onFocus={handleSearchFocus}
-                                  onBlur={handleSearchBlur}
-                                  style={{ background: "transparent", border: "1px solid #e9ecef", borderRadius: "24px", padding: "10px 45px 10px 20px" }}
-                                />
-                                <span className="search-icon">
-                                  <FontAwesomeIcon icon={faSearch} />
-                                </span>
-                                {showMainSearchSuggestions && mainSearchSuggestions.length > 0 && hasUserTyped && (
-                                  <div 
-                                    className="search-suggestions-dropdown" 
-                                    ref={searchSuggestionsRef}
-                                    onMouseDown={(e) => e.preventDefault()} // Prevent blur when clicking dropdown
-                                  >
-                                    {mainSearchSuggestions.map((suggestion, index) => (
-                                      <div
-                                        key={index}
-                                        className={`search-suggestion-item ${
-                                          index === selectedMainSearchSuggestionIndex ? 'selected' : ''
-                                        }`}
-                                        onClick={() => handleSearchSuggestionClick(suggestion)}
-                                        onMouseEnter={() => setSelectedMainSearchSuggestionIndex(index)}
-                                      >
-                                        <span className="search-suggestion-icon">💡</span>
-                                        <span className="search-suggestion-text">{suggestion}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                      </div>
-
-                      <div className="filter-buttonss">
-                        <button
-                          id="all"
-                          className={`filter-button text-uppercase ${activeFilter === "all" ? "active" : ""}`}
-                          onClick={() => handleFilterClick("all")}
-                        >
-                          All
-                          <span className="count">{Array.isArray(courses) ? courses.length : 0}</span>
-
-                          {activeFilter === "all" && <div className="active-indicator"></div>}
-                        </button>
-
-                        {Array.isArray(uniqueSectors) && uniqueSectors.map((sector) => (
-
-                          <button
-                            key={sector._id}
-                            id={`id_${sector._id}`}
-                            className={`filter-button text-uppercase ${activeFilter === `id_${sector._id}` ? "active" : ""}`}
-                            onClick={() => handleFilterClick(`id_${sector._id}`)}
-                          >
-                            {sector.name}
-                            <span className="count">
-                              {courses.filter(course =>
-                                course._industry &&
-                                course._industry._id.toString() === sector._id.toString()
-                              ).length}
-                            </span>
-                            {activeFilter === `id_${sector._id}` && <div className="active-indicator"></div>}
-                          </button>
-                        ))}
-                      </div>
-                      <div className='d-flex align-items-center d-md-none d-sm-block'>
-                        <span className="font-medium text-uppercase me-2">Selected Sector:</span>
-                        <span className="filter-button active text-uppercase">
-                          {activeFilter === "all"
-                            ? "ALL"
-                            : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "ALL"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-{/* <CompanyPartners/> */}
-                  {/* Selected Sector Display */}
-                  <div className="d-flex justify-content-between gap-3 text-gray-600 mb-4 mt-3 align-items-center">
-                    <div className='sector--select'>
-                      <span className="font-medium text-uppercase me-2">Selected Sector:</span>
-                      <span className="filter-button active text-uppercase">
-                        {activeFilter === "all"
-                          ? "ALL"
-                          : uniqueSectors.find(s => `id_${s._id}` === activeFilter)?.name || "ALL"}
-                      </span>
-                    </div>
-                    <div className="d-flex gap-2 align-items-center">
-                      {filteredCourses.length > 0 && (
-                        <>
-                          {compareJobs.length > 0 ? (
-                            <>
-                              <button
-                                className="btn btn-sm"
-                                onClick={() => {
-                                  console.log('Compare button clicked, jobs:', compareJobs);
-                                  setShowCompareModal(true);
-                                }}
-                                title="Click to view comparison"
-                                style={{ 
-                                  position: 'relative', 
-                                  fontWeight: '600',
-                                  background: '#ec4899',
-                                  color: 'white',
-                                  border: 'none'
-                                }}
-                              >
-                                ⚖️ View Comparison ({compareJobs.length}/3)
-                                <span className="compare-pulse"></span>
-                              </button>
-                              <button
-                                className="btn btn-sm btn-outline-danger"
-                                onClick={() => setCompareJobs([])}
-                                title="Clear Compare List"
-                              >
-                                ✕ Clear All
-                              </button>
-                            </>
-                          ) : (
-                            <div className="text-muted small" style={{ fontSize: '12px', padding: '4px 8px' }}>
-                              {/* 💡 Tip: Click "⚖️ Add to Compare" on job cards to compare */}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    {/* <div className='d-flex gap-1' ><span className="font-medium text-uppercase align-content-center me-2">Select Job Type:</span>
-                      <button
-                        className={`filter-button text-uppercase ${feeFilter === "all" ? "active" : ""}`}
-                        onClick={() => handleFeeFilterClick("all")}
+                <div className="courses-search jobs-ai-search">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  className="courses-search__input"
+                  placeholder="Search jobs with AI..."
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                  onKeyDown={handleSearchKeyDown}
+                  onFocus={handleSearchFocus}
+                  onBlur={handleSearchBlur}
+                  aria-label="Search jobs with AI"
+                />
+                <span className="courses-search__icon" aria-hidden="true">
+                  <FontAwesomeIcon icon={faSearch} />
+                </span>
+                {showMainSearchSuggestions && mainSearchSuggestions.length > 0 && hasUserTyped && (
+                  <div
+                    className="jobs-search-suggestions"
+                    ref={searchSuggestionsRef}
+                    onMouseDown={(e) => e.preventDefault()}
+                  >
+                    {mainSearchSuggestions.map((suggestion, index) => (
+                      <div
+                        key={index}
+                        className={`jobs-search-suggestion${index === selectedMainSearchSuggestionIndex ? " selected" : ""}`}
+                        onClick={() => handleSearchSuggestionClick(suggestion)}
+                        onMouseEnter={() => setSelectedMainSearchSuggestionIndex(index)}
                       >
-
-                        ALL
-                      </button>
-                      <button
-                        className={`filter-button text-uppercase ${feeFilter === "paid" ? "active" : ""}`}
-                        onClick={() => handleFeeFilterClick("paid")}
-                      >
-                        Paid
-                      </button>
-                      <button
-                        className={`filter-button text-uppercase ${feeFilter === "free" ? "active" : ""}`}
-                        onClick={() => handleFeeFilterClick("free")}
-                      >
-                        Free
-                      </button>
-
-                    </div> */}
-                  </div>
-
-                  {/* Course Cards */}
-                  <div className="row">
-                    {filteredCourses.length > 0 ? (
-                      filteredCourses.map((course) => (
-                        <div key={course._id} className="col-lg-4 col-md-6 col-sm-12 col-12 pb-4 card-padd">
-                          <div className={`card bg-dark courseCard ${compareJobs.find(j => j._id === course._id) ? 'compare-selected' : ''}`}>
-                            {compareJobs.find(j => j._id === course._id) && (
-                              <div className="compare-badge">
-                                <span className="compare-badge-icon">⚖️</span>
-                                <span className="compare-badge-text">Compare List #{compareJobs.findIndex(j => j._id === course._id) + 1}</span>
-                              </div>
-                            )}
-                            <div className="bg-img">
-                              {/* <a
-                              href="#"
-                              data-bs-target="#videoModal"
-                              data-bs-toggle="modal"
-                              data-bs-link={course.videos && course.videos[0] ? `${bucketUrl}/${course.videos[0]}` : ""}
-                              className="pointer img-fluid"
-                            >
-                              <img
-                                src={course.thumbnail
-                                  ? `${bucketUrl}/${course.thumbnail}`
-                                  : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
-                                className="digi"
-                                alt={course.name}
-                              />
-                              <img
-                                src="/Assets/public_assets/images/newjoblisting/play.svg"
-                                alt="Play"
-                                className="group1"
-                              />
-                            </a> */}
-                              <a
-                                href="#"
-                                data-bs-toggle="modal"
-                                data-bs-target="#videoModal"
-                                onClick={(e) => {
-                                  e.preventDefault(); // ✅ Prevents default link behavior
-                                  // setVideoSrc(course.videos && course.jobVideo ? `${bucketUrl}/${course.jobVideo}` : "");
-                                  // setVideoSrc(course.jobVideo);
-                                  if (course.jobVideo) {
-                                    console.log("Opening video:", course.jobVideo);
-                                    setVideoSrc(course.jobVideo);
-                                  } else {
-                                    console.warn("No video found for this job");
-                                    setVideoSrc("");
-                                  }
-                                }}
-                                className="pointer img-fluid"
-                              >
-
-                                <div className="verified-badge-container" style={{position: "absolute", top: "10px", right: "10px", width: "60px", height: "60px", zIndex: "10"}}>
-                                  <span className="wave-ring wave-1"></span>
-                                  <span className="wave-ring wave-2"></span>
-                                  <span className="wave-ring wave-3"></span>
-                                  <img src="/Assets/public_assets/images/verified.png" className="digi verified-badge" alt={course.name} />
-                                </div>
-                                <img
-                                  src={course.jobVideoThumbnail ? `${course.jobVideoThumbnail}` : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
-                                //  src={getThumbnailUrl(course)}
-                                  className="digi"
-                                  alt={course.name}
-                                  onError={(e) => {
-                                    e.target.onerror = null;
-                                    e.target.src = "/Assets/public_assets/images/newjoblisting/course_img.svg";
-                                  }}
-                                />
-
-
-                                <img src="/Assets/public_assets/images/newjoblisting/play.svg" alt="Play" className="group1" />
-                              </a>
-
-
-                              <div className="flag"></div>
-                              <div className="right_obj shadow shadow-new">
-                                {course.courseType === 'coursejob' ? 'Course + Jobs' : 'Jobs'}
-                              </div>
-                            </div>
-
-                            <div className="card-body px-0 pb-0">
-                              <h4 class=" text-center course-title text-white fw-bolder text-truncate text-capitalize ellipsis mx-auto" style={{ fontSize: "25px!important", fontWeight: "700!important" }}>
-                                {course.title}
-                              </h4>
-                              <h5
-                                className="text-center text-white companyname mb-2 mx-auto text-capitalize ellipsis"
-                                title={course.name}
-                              >
-                                ({course.displayCompanyName})
-                              </h5>
-                              {(
-                                (course.isFixed && course.amount) ||
-                                (!course.isFixed && course.min && course.max)
-                              ) ? (
-                                <p className="text-center digi-price mb-3 mt-3">
-                                  <span className="rupee text-white">₹ &nbsp;</span>
-                                  <span className="r-price text-white">
-                                    {course.isFixed
-                                      ? (course.amount || "--")
-                                      : ((course.min && course.max) ? `${course.min}-${course.max}` : "--")}
-                                  </span>
-                                </p>
-                              ) : (
-                                <p className="text-center digi-price mb-3 mt-3">
-                                  <span className="r-price text-white">--</span>
-                                </p>
-                              )}
-
-
-                              <div className="row" id="course_height">
-                                <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                  <div className="col-xxl-10 col-xl-10 col-lg-10 col-md-10 col-sm-10 col-10 mx-auto mb-2">
-                                    <div className="row">
-                                      {/* Eligibility */}
-                                      <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                        <div className="row">
-                                          <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                            <figure className="text-end">
-                                              <img
-                                                src="/Assets/public_assets/images/newjoblisting/qualification.png"
-                                                className="img-fluid new_img p-0"
-                                                draggable="false"
-                                              />
-                                            </figure>
-                                          </div>
-                                          <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-
-                                            <p className="mb-0 text-white" title={course._qualification?.name || 'N/A'}>
-                                              {course._qualification?.name || 'N/A'}
-                                            </p>
-
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      {/* Duration */}
-                                      <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                        <div className="row">
-                                          <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                            <figure className="text-end">
-                                              <img
-                                                src="/Assets/public_assets/images/newjoblisting/fresher.png"
-                                                className="img-fluid new_img p-0"
-                                                draggable="false"
-                                              />
-                                            </figure>
-                                          </div>
-                                          <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-                                            <p className="mb-0 text-white" title={((course.experience == 0 && course.experienceMonths == 0) || (course.experience == 0 && !course.experienceMonths)
-                                                ? "Fresher"
-                                                : `${course.experience > 0 ? `${course.experience} ${course.experience === 1 ? 'Year' : 'Years'}` : ''} ${course.experienceMonths > 0 ? `${course.experienceMonths} ${course.experienceMonths === 1 ? 'Month' : 'Months'}` : ''}`.trim())}>
-                                              {(course.experience == 0 && course.experienceMonths == 0) || (course.experience == 0 && !course.experienceMonths)
-                                                ? "Fresher"
-                                                : `${course.experience > 0 ? `${course.experience} ${course.experience === 1 ? 'Year' : 'Years'}` : ''} ${course.experienceMonths > 0 ? `${course.experienceMonths} ${course.experienceMonths === 1 ? 'Month' : 'Months'}` : ''}`.trim()}
-                                            </p>
-
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      {/* Location */}
-                                      <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                        <div className="row">
-                                          <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                            <figure className="text-end">
-                                              <img
-                                                src="/Assets/public_assets/images/icons/location-pin.png"
-                                                className="img-fluid new_img p-0"
-                                                draggable="false"
-                                              />
-                                            </figure>
-                                          </div>
-                                          <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-
-                                            <div className="ellipsis-wrapper">
-                                              <p
-                                                className="mb-0 text-white"
-                                                title={course.city ? `${course.city.name}, ${course.state.name}` : 'NA'}
-                                              >
-                                                {course.city
-                                                  ? `(${course.city.name}, ${course.state.name})`
-                                                  : 'NA'}
-
-                                              </p>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      {/* Mode */}
-                                      <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                        <div className="row">
-                                          <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                            <figure className="text-end">
-                                              <img
-                                                src="/Assets/public_assets/images/newjoblisting/onsite.png"
-                                                className="img-fluid new_img p-0"
-                                                draggable="false"
-                                              />
-                                            </figure>
-                                          </div>
-
-                                          <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-
-                                            <p className="mb-0 text-white" title={course.work || 'N/A'}>
-                                              {course.work}
-
-                                            </p>
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      {/* Last Date */}
-                                      <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mb-2 text-center">
-                                        <div className="row">
-                                          <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 my-auto">
-                                            <p className="text-white apply_date">Last Date for apply</p>
-                                          </div>
-                                          <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 text-white courses_features ps-0">
-                                            <p className="color-yellow fw-bold">
-                                              {course.validity
-                                                ? moment(course.validity).utcOffset("+05:30").format('DD MMM YYYY')
-                                                : 'NA'}
-                                            </p>
-                                          </div>
-                                        </div>
-                                      </div>
-
-
-                                      {/* Action Buttons */}
-                                      <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 mb-2 text-center me-1">
-                                        <a
-                                          className="btn cta-callnow btn-bg-color shr--width"
-                                          href={`/candidate/login?returnUrl=/candidate/job/${course._id}`}
-                                        >
-                                          Apply Now
-                                        </a>
-                                      </div>
-                                       {/* <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
-                                        <button onClick={() => openChatbot()} className="btn cta-callnow shr--width">
-                                          Chat Now
-                                        </button>
-                                      </div> */}
-                                      <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 mb-2 text-center ms-2">
-                                        <button
-                                          onClick={() => {
-                                            // Priority: jobVideoThumbnail only (backend will handle default image)
-                                            const thumbnail = course.jobVideoThumbnail || null;
-                                            handleShare(
-                                              course._id, 
-                                              course.title || course.name, 
-                                              thumbnail
-                                            );
-                                          }} 
-                                          className="btn cta-callnow shr--width">
-                                          Share
-                                        </button>
-                                      </div>
-                                      <div className="col-xxl-10 col-xl-10 col-lg-10 col-md-10 col-sm-10 col-10 mb-2 text-center ms-1">
-                                        {/* <button
-                                          onClick={() => {
-                                            if (compareJobs.find(j => j._id === course._id)) {
-                                              handleRemoveFromCompare(course._id);
-                                            } else {
-                                              handleAddToCompare(course);
-                                            }
-                                          }}
-                                          className={`btn cta-callnow shr--width ${compareJobs.find(j => j._id === course._id) ? 'compare-btn-active' : ''}`}
-                                          title={compareJobs.find(j => j._id === course._id) ? 'Remove from Compare' : 'Add to Compare'}
-                                        >
-                                          {compareJobs.find(j => j._id === course._id) ? `✓ Added to Compare` : '⚖️ Add to Compare'}
-                                        </button> */}
-                                      </div>
-
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Footer */}
-                              <div className="col-xxl-12 col-12 col-lg-12 col-md-12 col-sm-12 col-12 course_card_footer">
-                                <div className="row py-2">
-                                  <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 justify-content-center align-items-center text-center">
-                                    <a href={`/candidate/login?returnUrl=/candidate/job/${course._id}`}>
-                                      <span className="learnn pt-1 text-white">Learn More</span>
-                                      <img src="/Assets/public_assets/images/link.png" className="align-text-top" />
-                                    </a>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="col-12 text-center py-5">
-                        <h3 className="text-muted">No Jobs found matching your criteria</h3>
-                        <p>Try adjusting your search or filters to find more Jobs</p>
+                        <span className="jobs-search-suggestion__icon">💡</span>
+                        <span>{suggestion}</span>
                       </div>
-                    )}
+                    ))}
                   </div>
+                )}
                 </div>
               </div>
-            </div>
-          </div>
 
+              <div className="courses-filters__chips">
+                <button
+                  type="button"
+                  id="all"
+                  className={`filter-chip${activeFilter === "all" ? " active" : ""}`}
+                  onClick={() => handleFilterClick("all")}
+                >
+                  All <span className="filter-chip__count">{Array.isArray(courses) ? courses.length : 0}</span>
+                </button>
+                {Array.isArray(uniqueSectors) &&
+                  uniqueSectors.map((sector) => {
+                    const count = courses.filter(
+                      (c) => c._industry && c._industry._id.toString() === sector._id.toString()
+                    ).length;
+                    return (
+                      <button
+                        key={sector._id}
+                        type="button"
+                        id={`id_${sector._id}`}
+                        className={`filter-chip${activeFilter === `id_${sector._id}` ? " active" : ""}`}
+                        onClick={() => handleFilterClick(`id_${sector._id}`)}
+                      >
+                        {sector.name} <span className="filter-chip__count">{count}</span>
+                      </button>
+                    );
+                  })}
+              </div>
+
+            </div>
+
+            {filteredCourses.length > 0 ? (
+              <div className="courses-grid">
+                {filteredCourses.map((course) => (
+                    <JobCard
+                      key={course._id}
+                      job={course}
+                      thumbUrl={getThumbnailUrl(course)}
+                      bucketUrl={bucketUrl}
+                      onPlayVideo={setVideoSrc}
+                      onShare={handleShare}
+                    />
+                ))}
+              </div>
+            ) : (
+              <div className="courses-empty">
+                <h3>No jobs found</h3>
+                <p>Try adjusting your search or filters.</p>
+              </div>
+            )}
+          </div>
         </section>
 
-        {/* Video Modal */}
-        {/* <div className="modal fade" id="videoModal" tabIndex="-1" role="dialog" aria-labelledby="videoModalTitle" aria-hidden="true">
-          <div className="modal-dialog modal-dialog-centered" role="document">
-            <div className="modal-content">
-              <button type="button" className="close" data-bs-dismiss="modal" aria-label="Close">
+        <div className="modal fade event-video-modal" id="videoModal" tabIndex="-1" aria-hidden="true">
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content event-video-modal__content">
+              <button type="button" className="event-video-modal__close" data-bs-dismiss="modal" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
               </button>
-              <div className="modal-body p-0 text-center embed-responsive">
-                <video id="courseVid" controls autoPlay className="video-fluid text-center">
-                  <source id="videoElement" src="" type="video/mp4" className="img-fluid video-fluid" />
-                  Your browser does not support the video tag.
-                </video>
-              </div>
-            </div>
-          </div>
-        </div> */}
-        {/* Video Modal */}
-        <div className="modal fade" id="videoModal" tabIndex="-1" aria-labelledby="videoModalTitle" aria-hidden="true"
-          onClick={() => setVideoSrc("")}
-        >
-          <div className="modal-dialog modal-dialog-centered" role="document">
-            <div className="modal-content">
-              <button type="button" className="close" data-bs-dismiss="modal" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-              </button>
-              <div className="modal-body p-0 text-center embed-responsive">
-                <video key={videoSrc} id="courseVid" controls className="video-fluid text-center">
-                  <source src={videoSrc} type="video/mp4" className="img-fluid video-fluid" />
-                  Your browser does not support the video tag.
+              <div className="modal-body p-0">
+                <video key={videoSrc} id="courseVid" controls className="w-100">
+                  <source src={videoSrc} type="video/mp4" />
                 </video>
               </div>
             </div>
@@ -2119,9 +1846,451 @@ Provide analysis in clear format.`;
             </div>
           </div>
         </div>
+
+        <style>{`
+.foc-cyber-home.foc-courses-page, .foc-cyber-home.foc-courses-page * { box-sizing: border-box; }
+.foc-cyber-home.foc-courses-page {
+  --home-card-cta: var(--foc-navy-deep, #0d2146);
+  --home-card-cta-hover: var(--foc-navy-badge, #163565);
+  --cyan: var(--foc-cyan);
+  --red: var(--foc-magenta);
+  --bg: var(--foc-color-bg);
+  --surface: var(--foc-color-surface);
+  --surface2: var(--foc-color-surface-2);
+  --border: rgba(4, 25, 45, .12);
+  --text: var(--foc-color-text);
+  --muted: var(--foc-color-text-muted);
+  --muted2: var(--foc-color-text-muted-2);
+  --orb1: rgba(27,167,255,.14);
+  --orb2: rgba(255,45,170,.12);
+  --grid-line: rgba(6,20,38,.055);
+  --cyan-soft: rgba(27,167,255,.085);
+  --r: var(--foc-radius-lg);
+  --ease: var(--foc-ease);
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100%;
+  padding-top: 88px;
+  position: relative;
+  overflow-x: hidden;
+}
+.foc-courses-page > section { padding: 48px 0; background: var(--bg) !important; position: relative; }
+.foc-courses-page .container { max-width: var(--foc-container-max); margin: 0 auto; padding: 0 var(--foc-container-pad); position: relative; z-index: 1; }
+.foc-courses-page .grid-bg::before {
+  content: ''; position: absolute; inset: 0;
+  background-image: radial-gradient(circle at 18% 12%, var(--orb1) 0%, transparent 55%), radial-gradient(circle at 82% 28%, var(--orb2) 0%, transparent 60%), linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: auto, auto, 48px 48px, 48px 48px; opacity: .9; pointer-events: none;
+}
+.foc-courses-page .section-head { text-align: center; margin-bottom: 28px; }
+.foc-courses-page .stag { display: inline-flex; align-items: center; gap: 8px; background: var(--cyan-soft); border: 1px solid var(--border); color: var(--cyan); font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; padding: 5px 14px; border-radius: 2px; margin-bottom: 14px; }
+.foc-courses-page .stag::before { content: '//'; color: var(--red); }
+.foc-courses-page .sh2 { font-family: var(--foc-font-display), Orbitron, sans-serif; font-size: clamp(26px, 4vw, 44px); font-weight: 700; color: var(--text); line-height: 1.1; margin: 0; }
+.foc-courses-page .sh2 .cyan { background: linear-gradient(90deg, var(--cyan), var(--red)); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+.foc-courses-page .s-body { font-size: 15px; color: var(--muted); margin-top: 12px; text-align: center; line-height: 1.75; font-style: italic; margin-left: auto; margin-right: auto; }
+.foc-courses-page .courses-filters { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 18px; margin-bottom: 24px; }
+.foc-courses-page .courses-filters__row { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.foc-courses-page .courses-filters__tag { font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--cyan); display: block; }
+.foc-courses-page .courses-filters__active { font-size: 14px; font-weight: 600; color: var(--text); }
+.foc-courses-page .courses-search { position: relative; min-width: 220px; flex: 1; max-width: 360px; }
+.foc-jobs-page .courses-filters__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.foc-jobs-page .courses-filters__row .courses-filters__label {
+  margin-bottom: 0;
+  flex: 0 0 auto;
+}
+.foc-jobs-page .jobs-ai-search {
+  position: relative;
+  flex: 0 1 auto;
+  width: min(280px, 100%);
+  min-width: 180px;
+  max-width: 280px;
+  margin-left: auto;
+}
+.foc-jobs-page .jobs-ai-search .courses-search__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px 8px 34px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.35;
+  display: block;
+}
+.foc-jobs-page .jobs-ai-search .courses-search__input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+  font-size: 12px;
+}
+.foc-jobs-page .jobs-ai-search .courses-search__input:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px var(--cyan-soft);
+}
+.foc-jobs-page .jobs-ai-search .courses-search__icon {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 13px;
+  pointer-events: none;
+  z-index: 1;
+}
+@media (max-width: 575px) {
+  .foc-jobs-page .jobs-ai-search {
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+  }
+}
+.foc-jobs-page .jobs-search-suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.12);
+  z-index: 50;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.foc-jobs-page .jobs-search-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+}
+.foc-jobs-page .jobs-search-suggestion__icon { flex-shrink: 0; }
+.foc-jobs-page .jobs-search-suggestion:hover,
+.foc-jobs-page .jobs-search-suggestion.selected { background: var(--cyan-soft); }
+.foc-courses-page .courses-search__input { width: 100%; padding: 10px 14px 10px 36px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg); color: var(--text); font-size: 14px; }
+.foc-courses-page .courses-search__input:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 3px var(--cyan-soft); }
+.foc-courses-page .courses-search__icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 14px; pointer-events: none; }
+.foc-courses-page .courses-filters__chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.foc-courses-page .filter-chip { border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 999px; padding: 8px 14px; font-size: 12px; font-weight: 600; cursor: pointer; transition: .2s var(--ease); }
+.foc-courses-page .filter-chip.active { background: linear-gradient(90deg, var(--cyan), var(--red)); color: var(--foc-color-text-inverse); border-color: transparent; }
+.foc-courses-page .filter-chip__count { margin-left: 6px; opacity: .85; font-size: 11px; }
+.foc-jobs-page .jobs-compare-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; }
+.foc-jobs-page .jobs-compare-bar__clear { font-size: 12px; font-weight: 600; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--red); background: transparent; color: var(--red); cursor: pointer; }
+.foc-courses-page .courses-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 8px; }
+@media (min-width: 768px) { .foc-courses-page .courses-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1200px) { .foc-courses-page .courses-grid { grid-template-columns: repeat(3, 1fr); } }
+
+.foc-jobs-page .job-card-body {
+  padding: 12px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 0 1 auto;
+  text-align: center;
+}
+.foc-jobs-page .job-card-title {
+  font-family: var(--foc-font-display), Orbitron, sans-serif;
+  font-size: clamp(17px, 2vw, 20px);
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.foc-jobs-page .job-card-company {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.foc-jobs-page .job-card-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  text-align: left;
+  margin-bottom: 4px;
+}
+.foc-jobs-page .job-detail-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px;
+  min-width: 0;
+}
+.foc-jobs-page .job-detail-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.foc-jobs-page .job-detail-cell span {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.foc-jobs-page .job-card-deadline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 2px 4px;
+  text-align: left;
+}
+.foc-jobs-page .job-card-deadline__label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.foc-jobs-page .job-card-deadline__date {
+  font-size: 13px;
+  font-weight: 700;
+  color: #c9a227;
+}
+
+
+.foc-courses-page .course-card { background: var(--surface); border: 1px solid color-mix(in srgb, var(--cr-accent) 22%, var(--border)); border-radius: var(--r); overflow: hidden; position: relative; --cr-accent: var(--cyan); box-shadow: 0 10px 28px color-mix(in srgb, var(--cr-accent) 12%, rgba(0,0,0,.06)); display: flex; flex-direction: column; min-height: 100%; transition: .25s var(--ease); padding: 0; }
+.foc-courses-page .course-card:hover { transform: translateY(-3px); box-shadow: 0 14px 36px color-mix(in srgb, var(--cr-accent) 18%, rgba(0,0,0,.08)); }
+.foc-courses-page .courses-grid .course-card:nth-child(4n + 1) { --cr-accent: var(--cyan); border-radius: 14px 20px 14px 16px; }
+.foc-courses-page .courses-grid .course-card:nth-child(4n + 2) { --cr-accent: var(--red); border-radius: 18px 12px 22px 14px; }
+.foc-courses-page .courses-grid .course-card:nth-child(4n + 3) { --cr-accent: color-mix(in srgb, var(--cyan) 55%, var(--red)); border-radius: 12px 18px 14px 20px; }
+.foc-courses-page .courses-grid .course-card:nth-child(4n) { --cr-accent: color-mix(in srgb, var(--red) 70%, var(--foc-purple)); border-radius: var(--foc-radius-xl) 14px 16px 18px; }
+.foc-courses-page .course-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, var(--cr-accent), color-mix(in srgb, var(--cr-accent) 35%, transparent)); z-index: 2; pointer-events: none; }
+.foc-jobs-page .course-card--compare { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.foc-jobs-page .course-compare-pill { position: absolute; top: 10px; left: 56px; z-index: 4; background: var(--cyan); color: #fff; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+.foc-courses-page .course-thumb { height: 160px; background: var(--surface2); position: relative; overflow: hidden; }
+.foc-jobs-page .course-thumb { overflow: visible; }
+.foc-courses-page .course-thumb > img, .foc-courses-page .course-thumb-media img:first-child { width: 100%; height: 100%; object-fit: cover; display: block; }
+.foc-courses-page .course-thumb-media { display: block; width: 100%; height: 100%; padding: 0; border: none; background: transparent; cursor: pointer; position: relative; }
+.foc-courses-page .course-thumb-play { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 52px; height: 52px; z-index: 1; pointer-events: none; }
+.foc-courses-page .course-thumb::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(11,18,32,.35)); pointer-events: none; }
+.foc-jobs-page .course-thumb .verified-badge-container {
+  position: absolute;
+  top: 10px;
+  right: 7px;
+  width: 15px;
+  height: 15px;
+  z-index: 4;
+  pointer-events: none;
+}
+.foc-jobs-page .course-thumb .verified-badge-container .verified-badge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 30px !important;
+  height: 30px !important;
+  transform: translate(-50%, -50%);
+  transform-origin: center center;
+  border-radius: 50%;
+  object-fit: contain;
+  z-index: 1002;
+  animation: job-verified-pulse 2s ease-in-out infinite;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), 0 0 12px rgba(76, 175, 80, 0.45);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+}
+.foc-jobs-page .course-thumb .verified-badge-container .wave-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid rgba(76, 175, 80, 0.6);
+  width: 60px;
+  height: 60px;
+  pointer-events: none;
+  z-index: 1001;
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
+  animation: job-wave-expand 2s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+}
+.foc-jobs-page .course-thumb .verified-badge-container .wave-ring.wave-1 {
+  animation-delay: 0s;
+  border-color: rgba(76, 175, 80, 0.6);
+}
+.foc-jobs-page .course-thumb .verified-badge-container .wave-ring.wave-2 {
+  animation-delay: 0.7s;
+  border-color: rgba(76, 175, 80, 0.4);
+}
+.foc-jobs-page .course-thumb .verified-badge-container .wave-ring.wave-3 {
+  animation-delay: 1.4s;
+  border-color: rgba(76, 175, 80, 0.3);
+}
+@keyframes job-verified-pulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  50% { transform: translate(-50%, -50%) scale(1.08); opacity: 0.92; }
+}
+@keyframes job-wave-expand {
+  0% {
+    width: 60px;
+    height: 60px;
+    opacity: 0.7;
+    transform: translate(-50%, -50%) scale(1);
+    border-width: 2px;
+  }
+  100% {
+    width: 60px;
+    height: 60px;
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(3);
+    border-width: 1px;
+  }
+}
+.foc-jobs-page .course-thumb .course-badge {
+  left: 12px;
+  right: auto;
+}
+.foc-courses-page .course-badge { position: absolute; right: 12px; top: 12px; z-index: 2; font-size: 10px; font-weight: 600; text-transform: uppercase; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border); background: rgba(255,255,255,.92); color: var(--text); }
+.foc-courses-page .course-fee { position: absolute; left: 12px; bottom: 12px; z-index: 2; font-size: 10px; font-weight: 600; padding: 6px 10px; border-radius: 999px; background: rgba(255,255,255,.92); border: 1px solid var(--border); }
+.foc-courses-page .course-fee--paid { color: var(--red); border-color: rgba(255,45,122,.28); }
+.foc-courses-page .course-body { padding: 12px 12px 8px; display: flex; flex-direction: column; gap: 8px; flex: 0 1 auto; }
+.foc-courses-page .course-title { font-family: var(--foc-font-display), Orbitron, sans-serif; font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.foc-courses-page .course-sector { font-size: 12px; color: var(--muted); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.foc-courses-page .course-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 0; }
+.foc-courses-page .course-meta .m { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 8px; }
+.foc-courses-page .course-meta .m--wide {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.foc-courses-page .course-meta .m--wide strong {
+  display: inline;
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+.foc-courses-page .course-meta .m--wide span {
+  display: inline;
+  text-align: right;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.foc-courses-page .course-meta .m strong { display: block; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted2); margin-bottom: 4px; }
+.foc-courses-page .course-meta .m span { display: block; font-size: 12px; font-weight: 500; color: var(--text); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.foc-courses-page .course-action-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px; }
+.foc-courses-page .btn.shr--width { width: 100%; }
+.foc-courses-page .btn.cta-callnow, .foc-courses-page .btn.cta-callnow.btn-bg-color { background: var(--home-card-cta); color: #fff; border: 1px solid var(--home-card-cta); border-radius: 50px; font-weight: 600; padding: 8px 10px; font-size: 12px; transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; width: 100%; }
+.foc-courses-page .btn.cta-callnow:not(.btn-bg-color) { background: #fff; color: var(--home-card-cta); }
+.foc-courses-page .btn.cta-callnow:hover, .foc-courses-page .btn.cta-callnow.btn-bg-color:hover { background: var(--home-card-cta-hover); border-color: var(--home-card-cta-hover); color: #fff; }
+.foc-courses-page .course-callback-btn { margin-top: 6px; padding: 8px 10px; }
+.foc-courses-page .course_card_footer { background: var(--home-card-cta); border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; margin-top: 0; text-align: center; padding: 8px 10px; }
+.foc-courses-page .course-learn-more { display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; }
+.foc-courses-page .course-learn-more .learnn { color: #fff; font-size: 13px; font-weight: 600; padding: 4px 0; }
+.foc-courses-page .course-learn-more__icon { width: 18px; height: auto; display: block; }
+.foc-courses-page .courses-empty { text-align: center; padding: 48px 16px; color: var(--muted); }
+.foc-courses-page .courses-empty h3 { font-family: var(--foc-font-display), Orbitron, sans-serif; color: var(--text); margin-bottom: 8px; }
+.foc-courses-page #courseVid { width: 100%; border-radius: 10px; outline: none; display: block; }
+.event-video-modal .event-video-modal__content { position: relative; border: none; background: #000; overflow: visible; }
+.event-video-modal .modal-body { padding: 0; }
+.event-video-modal__close { position: absolute; top: 10px; right: 10px; z-index: 20; width: 30px; height: 30px; padding: 0; border: none; border-radius: 50%; background: rgba(255,255,255,.95); color: #1a1a2e; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 10px rgba(0,0,0,.2); }
+.event-video-modal__close span { font-size: 22px; line-height: 1; margin-top: -2px; }
+        `}</style>
+        </div>
+
         <style>
           {
             `
+.verified-badge-container {
+    position: relative;
+    display: inline-block;
+  }
+
+  .verified-badge {
+    width: 50% !important;
+    height: 50% !important;
+    border-radius: 50%;
+    animation: pulse 2s ease-in-out infinite;
+    z-index: 1002;
+    position: relative;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 15px rgba(76, 175, 80, 0.5);
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.4));
+    object-fit: cover;
+    right: -41px;
+    top: -10px;
+    transform-origin: center center;
+  }
+
+  .wave-ring {
+    position: absolute;
+    top: 0%;
+    left: 100%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 2px solid rgba(76, 175, 80, 0.6);
+    width: 60px;
+    height: 60px;
+    pointer-events: none;
+    z-index: 1001;
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
+    animation: wave-expand 2s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+  }
+
+  .wave-ring.wave-1 {
+    animation-delay: 0s;
+    border-color: rgba(76, 175, 80, 0.6);
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
+  }
+
+  .wave-ring.wave-2 {
+    animation-delay: 0.7s;
+    border-color: rgba(76, 175, 80, 0.4);
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
+  }
+
+  .wave-ring.wave-3 {
+    animation-delay: 1.4s;
+    border-color: rgba(76, 175, 80, 0.3);
+    box-shadow: 0 0 6px rgba(76, 175, 80, 0.2);
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 0.9;
+    }
+  }
+
+  @keyframes wave-expand {
+    0% {
+      width: 60px;
+      height: 60px;
+      opacity: 0.7;
+      transform: translate(-50%, -50%) scale(1);
+      border-width: 2px;
+    }
+    100% {
+      width: 60px;
+      height: 60px;
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(3);
+      border-width: 1px;
+    }
+  }
+
             
 .bg-img {
     position: relative;
@@ -2154,36 +2323,41 @@ img.group1 {
 .btn.shr--width{
   width: 100%;
 }
-.btn.cta-callnow {
+.foc-jobs-page .btn.cta-callnow {
     background: #fff;
-    color: #FC2B5A;
-    font-family: inter;
+    color: var(--home-card-cta, #0d2146);
+    font-family: var(--foc-font-sans), Inter, sans-serif;
+    border: 1px solid var(--home-card-cta, #0d2146);
     border-radius: 50px;
-    font-weight: 500;
-    padding: 10px 4px;
-    width: 120%;
+    font-weight: 600;
+    padding: 8px 10px;
+    width: 100%;
     font-size: 12px;
-    letter-spacing: 1px;
-    transition: .3s;
+    letter-spacing: 0.02em;
+    transition: .2s;
 }
-.btn.cta-callnow:hover {
-    transition: .5s;
-    background: #FC2B5A;
+.foc-jobs-page .btn.cta-callnow.btn-bg-color {
+    background: var(--home-card-cta, #0d2146);
     color: #fff;
 }
-.learnn{
-  padding: 10px 14px;
+.foc-jobs-page .btn.cta-callnow:hover {
+    background: var(--home-card-cta-hover, #163565);
+    border-color: var(--home-card-cta-hover, #163565);
+    color: #fff;
 }
-.course_card_footer {
-    background: #FC2B5A;
+.foc-jobs-page .learnn {
+  padding: 4px 0;
+}
+.foc-jobs-page .course_card_footer {
+    background: var(--home-card-cta, #0d2146);
     border-bottom-left-radius: 10px;
     border-bottom-right-radius: 10px;
 }
-.jobs h1 {
-    color: #FC2B5A;
+.foc-jobs-page .jobs h1 {
+    color: var(--home-card-cta, #0d2146);
     font-size: 45px;
     font-weight: 700;
-    font-family: 'INTER', sans-serif;
+    font-family: var(--foc-font-display), Inter, sans-serif;
 }
 
 .courseCard{

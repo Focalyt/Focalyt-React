@@ -19,6 +19,9 @@ import {
   Phone,
   Share2,
   Sparkles,
+  User,
+  Clock,
+  FileUp,
   Zap,
 } from "lucide-react";
 import axios from "axios";
@@ -56,17 +59,13 @@ const SOCIAL_LINKS = [
   { href: "https://www.youtube.com/@focalyt", icon: faYoutube, label: "YouTube" },
 ];
 
+const GOOGLE_PLAY_LINK = "#";
+
 function Footer() {
   const location = useLocation();
   const navigate = useNavigate();
   const isHomePage = location.pathname === "/";
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-
-  const handlePartnerWithUs = (e) => {
-    if (isHomePage) return;
-    e.preventDefault();
-    navigate("/", { state: { openPartnerModal: true } });
-  };
 
   const scrollToHomeSection = (sectionId) => {
     const el = document.getElementById(sectionId);
@@ -96,6 +95,7 @@ function Footer() {
     info: "",
     termsAccepted: false,
   });
+  const [careerSubmitting, setCareerSubmitting] = useState(false);
 
   const handleChange = (e) => {
     const { name, value, type, checked, files } = e.target;
@@ -114,6 +114,7 @@ function Footer() {
       alert("Please agree to the terms and conditions.");
       return;
     }
+    setCareerSubmitting(true);
     try {
       const submissionData = new FormData();
       submissionData.append("name", formData.name);
@@ -133,6 +134,8 @@ function Footer() {
     } catch (error) {
       console.error("Career form error:", error);
       alert("Something went wrong while submitting.");
+    } finally {
+      setCareerSubmitting(false);
     }
   };
 
@@ -208,6 +211,30 @@ function Footer() {
                   </li>
                 ))}
               </ul>
+              {/* <div className="ftr-download-card">
+                <h4 className="ftr-download-heading">Download App From</h4>
+                <a
+                  className="ftr-playstore-button"
+                  href={GOOGLE_PLAY_LINK}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Get Focalyt on Google Play"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="currentColor"
+                    className="ftr-playstore-icon"
+                    viewBox="0 0 512 512"
+                    aria-hidden="true"
+                  >
+                    <path d="M99.617 8.057a50.191 50.191 0 00-38.815-6.713l230.932 230.933 74.846-74.846L99.617 8.057zM32.139 20.116c-6.441 8.563-10.148 19.077-10.148 30.199v411.358c0 11.123 3.708 21.636 10.148 30.199l235.877-235.877L32.139 20.116zM464.261 212.087l-67.266-37.637-81.544 81.544 81.548 81.548 67.273-37.64c16.117-9.03 25.738-25.442 25.738-43.908s-9.621-34.877-25.749-43.907zM291.733 279.711L60.815 510.629c3.786.891 7.639 1.371 11.492 1.371a50.275 50.275 0 0027.31-8.07l266.965-149.372-74.849-74.847z" />
+                  </svg>
+                  <span className="ftr-playstore-texts">
+                    <span className="ftr-playstore-text-1">GET IT ON</span>
+                    <span className="ftr-playstore-text-2">Google Play</span>
+                  </span>
+                </a>
+              </div> */}
             </div>
 
             <div className="ftr-col">
@@ -235,7 +262,7 @@ function Footer() {
             <div className="ftr-col ftr-contact-col">
               <h4 className="ftr-heading color-pink">Contact Us</h4>
               <ul className="ftr-contact-list p-0">
-                <li>
+                {/* <li>
                   <span className="ftr-contact-ico" aria-hidden><MapPin size={16} strokeWidth={2} /></span>
                   <address className="ftr-contact-text">{FOOTER_CONTACT.address}</address>
                 </li>
@@ -244,7 +271,7 @@ function Footer() {
                   <a href={FOOTER_CONTACT.phoneHref} className="ftr-contact-text ftr-contact-link">
                     {FOOTER_CONTACT.phone}
                   </a>
-                </li>
+                </li> */}
                 <li>
                   <span className="ftr-contact-ico" aria-hidden><Mail size={16} strokeWidth={2} /></span>
                   <a href={FOOTER_CONTACT.emailHref} className="ftr-contact-text ftr-contact-link">
@@ -255,9 +282,8 @@ function Footer() {
               <button
                 type="button"
                 className="ftr-contact-cta"
-                data-bs-toggle={isHomePage ? "modal" : undefined}
-                data-bs-target={isHomePage ? "#partnerModal" : undefined}
-                onClick={handlePartnerWithUs}
+                data-bs-toggle="modal"
+                data-bs-target="#partnerModal"
               >
                 Partner With Us →
               </button>
@@ -294,81 +320,156 @@ function Footer() {
       </footer>
 
       <div className="modal fade" id="careerModal" tabIndex="-1" aria-labelledby="careerModalLabel" aria-hidden="true">
-        <div className="modal-dialog modal-xl modal-dialog-scrollable">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h5 className="modal-title" id="careerModalLabel">Career Opportunities</h5>
-              <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close" />
+        <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable career-modal-dialog">
+          <div className="modal-content career-modal-content">
+            <div className="modal-header career-modal-header">
+              <div className="career-modal-header-inner">
+                <span className="career-modal-emoji" aria-hidden="true">
+                  💼
+                </span>
+                <div>
+                  <h5 className="career-modal-title" id="careerModalLabel">
+                    Career Opportunities
+                  </h5>
+                  <p className="career-modal-tagline">Build the future of skills and employability with us</p>
+                </div>
+              </div>
+              <button type="button" className="btn-close career-modal-close" data-bs-dismiss="modal" aria-label="Close" />
             </div>
-            <div className="modal-body p-0">
+            <div className="modal-body career-modal-body">
+              <p className="career-modal-intro">
+                Share your details below. Our team will review your application and get in touch if there is a suitable opening.
+              </p>
               <section id="current-openings">
-                <form method="post" className="career-form" id="careerForm" onSubmit={handleSubmit}>
-                  <div className="row g-4">
-                    <div className="col-12"><h4 className="mb-4">Personal Information</h4></div>
-                    <div className="col-md-6">
-                      <label htmlFor="name" className="form-label required-field">Full Name</label>
-                      <input type="text" className="form-control" name="name" value={formData.name} onChange={handleChange} required />
+                <form method="post" id="careerForm" onSubmit={handleSubmit}>
+                  <h4 className="career-section-title">
+                    <span className="career-section-accent">Personal</span> Information
+                  </h4>
+                  <div className="row g-2">
+                    <div className="col-sm-6 career-field">
+                      <label className="career-label career-label-required" htmlFor="career-name">
+                        <User size={14} aria-hidden /> Full Name
+                      </label>
+                      <input
+                        id="career-name"
+                        type="text"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleChange}
+                        required
+                        placeholder="Your full name"
+                      />
                     </div>
-                    <div className="col-md-6">
-                      <label htmlFor="email" className="form-label required-field">Email Address</label>
-                      <input type="email" className="form-control" name="email" value={formData.email} onChange={handleChange} required />
+                    <div className="col-sm-6 career-field">
+                      <label className="career-label career-label-required" htmlFor="career-email">
+                        <Mail size={14} aria-hidden /> Email
+                      </label>
+                      <input
+                        id="career-email"
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        required
+                        placeholder="you@email.com"
+                      />
                     </div>
-                    <div className="col-md-6">
-                      <label htmlFor="number" className="form-label required-field">Phone Number</label>
-                      <input type="tel" className="form-control" name="number" value={formData.number} onChange={handleChange} required />
+                    <div className="col-sm-6 career-field">
+                      <label className="career-label career-label-required" htmlFor="career-phone">
+                        <Phone size={14} aria-hidden /> Phone
+                      </label>
+                      <input
+                        id="career-phone"
+                        type="tel"
+                        name="number"
+                        value={formData.number}
+                        onChange={handleChange}
+                        required
+                        placeholder="10-digit mobile"
+                      />
                     </div>
-                    <div className="col-md-6">
-                      <label htmlFor="location" className="form-label required-field">Current Location</label>
-                      <input type="text" className="form-control" name="location" value={formData.location} onChange={handleChange} required />
+                    <div className="col-sm-6 career-field">
+                      <label className="career-label career-label-required" htmlFor="career-location">
+                        <MapPin size={14} aria-hidden /> Location
+                      </label>
+                      <input
+                        id="career-location"
+                        type="text"
+                        name="location"
+                        value={formData.location}
+                        onChange={handleChange}
+                        required
+                        placeholder="City, state"
+                      />
                     </div>
-                    <div className="col-12">
-                      <label htmlFor="position" className="form-label required-field">Position Applied For</label>
-                      <input type="text" className="form-control" name="position" value={formData.position} onChange={handleChange} required />
+                    <div className="col-12 career-field">
+                      <label className="career-label career-label-required" htmlFor="career-position">
+                        <Briefcase size={14} aria-hidden /> Position Applied For
+                      </label>
+                      <input
+                        id="career-position"
+                        type="text"
+                        name="position"
+                        value={formData.position}
+                        onChange={handleChange}
+                        required
+                        placeholder="Role you are applying for"
+                      />
                     </div>
-                    <div className="col-12">
-                      <label htmlFor="experience" className="form-label required-field">Years of Experience</label>
-                      <select className="form-select" name="experience" value={formData.experience} onChange={handleChange} required>
-                        <option value="">Select Experience</option>
+                    <div className="col-12 career-field">
+                      <label className="career-label career-label-required" htmlFor="career-experience">
+                        <Clock size={14} aria-hidden /> Years of Experience
+                      </label>
+                      <select id="career-experience" name="experience" value={formData.experience} onChange={handleChange} required>
+                        <option value="" disabled>
+                          Select experience
+                        </option>
                         <option value="fresher">Fresher</option>
-                        <option value="1-3">1-3 years</option>
-                        <option value="3-5">3-5 years</option>
+                        <option value="1-3">1–3 years</option>
+                        <option value="3-5">3–5 years</option>
                         <option value="5+">5+ years</option>
                       </select>
                     </div>
-                    <div className="col-12">
-                      <label htmlFor="cv" className="form-label required-field">Upload CV</label>
-                      <input type="file" className="form-control" name="cv" onChange={handleChange} accept=".pdf,.doc,.docx" required />
-                      <div className="form-text">Accepted formats: PDF, DOC, DOCX (Max size: 5MB)</div>
-                      {formData.cv && <p>Selected File: {formData.cv.name}</p>}
+                    <div className="col-12 career-field">
+                      <label className="career-label career-label-required" htmlFor="career-cv">
+                        <FileUp size={14} aria-hidden /> Upload CV
+                      </label>
+                      <input id="career-cv" type="file" name="cv" onChange={handleChange} accept=".pdf,.doc,.docx" required />
+                      <p className="career-hint">PDF, DOC, or DOCX — max 5MB</p>
+                      {formData.cv && <p className="career-file-name">Selected: {formData.cv.name}</p>}
                     </div>
-                    <div className="col-12">
-                      <label htmlFor="info" className="form-label">Additional Information</label>
+                    <div className="col-12 career-field">
+                      <label className="career-label" htmlFor="career-info">
+                        Additional Information
+                      </label>
                       <textarea
-                        className="form-control"
+                        id="career-info"
                         name="info"
                         value={formData.info}
                         onChange={handleChange}
-                        rows="4"
-                        placeholder="Tell us about yourself and why you'd be a great fit for this position"
+                        rows={4}
+                        placeholder="Tell us about yourself and why you would be a great fit"
                       />
                     </div>
                     <div className="col-12">
-                      <div className="form-check">
+                      <div className="career-terms">
                         <input
-                          className="form-check-input"
+                          id="career-terms"
                           type="checkbox"
                           name="termsAccepted"
                           checked={formData.termsAccepted}
                           onChange={handleChange}
                           required
                         />
-                        <label className="form-check-label" htmlFor="terms">
+                        <label htmlFor="career-terms">
                           I agree to the processing of my personal data according to the privacy policy
                         </label>
                       </div>
                     </div>
-                    <div className="col-12">
-                      <button type="submit" className="new_link text-center">Submit Application</button>
+                    <div className="col-12 career-modal-footer">
+                      <button type="submit" className="career-modal-submit" disabled={careerSubmitting}>
+                        {careerSubmitting ? "Submitting…" : "Submit Application"}
+                      </button>
                     </div>
                   </div>
                 </form>
@@ -377,22 +478,6 @@ function Footer() {
           </div>
         </div>
       </div>
-
-      <style>{`
-        #careerForm textarea.form-control { min-height: 120px; resize: vertical; }
-        #careerModal .modal-xl { max-width: 1140px; }
-        #careerModal .required-field::after { content: "*"; color: red; margin-left: 4px; }
-        #careerModal .career-form { max-width: 800px; margin: 0 auto; padding: 2rem; }
-        #careerModal .form-control:focus, #careerModal .form-select:focus {
-          border-color: #FC2B5A; box-shadow: 0 0 0 0.25rem rgba(252, 43, 90, 0.25);
-        }
-        #careerModal .form-check-input:checked { background-color: #FC2B5A; border-color: #FC2B5A; }
-        @media (max-width: 768px) { #careerModal .career-form { padding: 1rem; } }
-        .new_link {
-          width: 50%; margin: auto; background: #FC2B5A; border-radius: 10px;
-          padding: 10px 20px; border: 1px solid #fc2b5a; color: #fff; display: block; text-align: center;
-        }
-      `}</style>
     </>
   );
 }

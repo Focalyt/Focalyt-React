@@ -3270,7 +3270,7 @@ router.post('/leads/:id/documents', isCollege, async (req, res) => {
 		const doc = {
 			name: req.body?.name ? String(req.body.name).trim() : originalName,
 			docType: req.body?.docType ? String(req.body.docType).trim() : '',
-			url: uploaded.Location,
+			url: key,
 			key,
 			status: 'PENDING',
 			remarks: req.body?.remarks ? String(req.body.remarks).trim() : '',
@@ -3379,6 +3379,9 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			});
 		}
 
+		if (typeof Lead.normalizeApproval === 'function') {
+			lead.approval = Lead.normalizeApproval(lead.approval);
+		}
 		// Check if user is Admin - Admin can update any lead
 		const isAdmin = () => {
 			const permissionType = req.user.permissions?.permission_type;
@@ -3827,6 +3830,9 @@ router.post('/leads/:id/followup', isCollege, async (req, res) => {
 			});
 		}
 
+		if (typeof Lead.normalizeApproval === 'function') {
+			lead.approval = Lead.normalizeApproval(lead.approval);
+		}
 		// Combine date and time
 		const [hours, minutes] = scheduledTime.split(':');
 		// If scheduledDate is yyyy-mm-dd, treat it as local date (avoid UTC shift)

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import moment from 'moment';
 import axios from 'axios';
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 const CandidatesEvents = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -146,13 +147,13 @@ const CandidatesEvents = () => {
                                 <a href="#" data-bs-target="#videoModal" data-bs-toggle="modal"
                                   onClick={(e) => {
                                     e.preventDefault();
-                                    setVideoSrc(event.video);
+                                    setVideoSrc(resolveMediaUrl(bucketUrl, event.video));
                                     console.log('event video ', event.video)
                                   }}
                                   className="video-bttn position-relative d-block">
                                   <img
                                     id="videoPlay"
-                                    src={event.thumbnail}
+                                    src={resolveMediaUrl(bucketUrl, event.thumbnail)}
                                     className="video_thum img-fluid"
                                     alt={event.name}
                                   />

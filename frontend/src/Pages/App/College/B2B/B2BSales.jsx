@@ -97,6 +97,16 @@ function getLeadB2bDepartmentName(lead) {
   ) || '—';
 }
 
+function getLeadAddressLine(lead) {
+  const parts = [
+    pickFirstNonEmpty(lead?.address, lead?.businessAddress),
+    lead?.city,
+    lead?.state,
+  ].map(safeStr).filter(Boolean);
+
+  return parts.join(', ');
+}
+
 function getLeadGroupRootId(lead) {
   if (!lead) return '';
   return String(lead.crossSaleRootId || lead.parentLeadId || lead._id || '');
@@ -531,6 +541,25 @@ const B2BSales = () => {
     updatedPermission()
   }, [])
 
+  useEffect(() => {
+    try {
+      const storedToken = sessionStorage.getItem('googleAuthToken');
+      if (!storedToken) return;
+      const parsedToken = JSON.parse(storedToken);
+      if (!parsedToken || !parsedToken.accessToken) return;
+
+      setUserData((prev) => {
+        if (prev?.googleAuthToken?.accessToken) return prev;
+        const next = { ...(prev || {}), googleAuthToken: parsedToken };
+        try {
+          sessionStorage.setItem('user', JSON.stringify(next));
+        } catch (_) { }
+        return next;
+      });
+    } catch (_) {
+    }
+  }, []);
+
   // Console: logged-in institute user and all permissions (for debugging)
   useEffect(() => {
     if (permissions != null && userData?._id) {
@@ -885,6 +914,7 @@ const B2BSales = () => {
         googleAuthToken: refreshToken.data
       }
       sessionStorage.setItem('googleAuthToken', JSON.stringify(refreshToken.data));
+      sessionStorage.setItem('user', JSON.stringify(user));
 
       setUserData(user);
 
@@ -2574,13 +2604,29 @@ const B2BSales = () => {
       });
 
       if (response.data.status) {
-        // Refresh the leads list
-        fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
+        const updatedLead = response?.data?.data || null;
 
-        // Refresh status counts
+        if (updatedLead && updatedLead._id) {
+          setLeads((prev) => {
+            const next = Array.isArray(prev) ? prev.map((l) => (l?._id === updatedLead._id ? updatedLead : l)) : prev;
+
+            // If user is filtering by a specific status, and the lead moved out of it, remove it.
+            const filterId = selectedStatusFilter ? String(selectedStatusFilter) : '';
+            const leadStatusId = updatedLead?.status?._id ? String(updatedLead.status._id) : (updatedLead?.status ? String(updatedLead.status) : '');
+            if (filterId && leadStatusId && filterId !== leadStatusId) {
+              return next.filter((l) => l?._id !== updatedLead._id);
+            }
+            return next;
+          });
+        }
+
+        // Also update selectedProfile if it is this lead
+        setSelectedProfile((prev) => (prev?._id === leadId && updatedLead ? updatedLead : prev));
+
+        // Refresh the leads list + counts in background (source of truth)
+        fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
         fetchStatusCounts();
 
-        // Close the panel
         closePanel();
       } else {
         alert(response.data.message || 'Failed to update lead status');
@@ -5673,7 +5719,12 @@ const B2BSales = () => {
                               {/* Row 1 — Name + Refer/History pills + Status */}
                               <div className="lhm__row1">
 
-                                <div className="lhm__name" title={lead.businessName || lead.concernPersonName || ''}>
+                                {(() => {
+                                  const addressLine = getLeadAddressLine(lead);
+                                  const title = [lead.concernPersonName, addressLine, lead.mobile].filter(Boolean).join(' - ');
+
+                                  return (
+                                    <div className="lhm__name" title={title || lead.businessName || ''}>
                                   {canEditLeadDetails(lead) && (
                                     <button
                                       type="button"
@@ -5689,16 +5740,31 @@ const B2BSales = () => {
                                       <i className="fas fa-pen" aria-hidden="true"></i>
                                     </button>
                                   )}
+                                  <span className="lhm__floating-label">Lead Details</span>
+                                  <div className="lhm__info-row">
                                   <i className="fas fa-user-circle lhm__name-icon" aria-hidden="true"></i>
+                                  <span className="lhm__info-label">Concern</span>
                                   <span className="text-capitalize lhm__name-text">
                                     {lead.concernPersonName || '—'}
                                   </span>
-                                  {lead.businessName && lead.businessName !== lead.concernPersonName && (
-                                    <small className="text-muted lhm__biz text-capitalize" title={lead.businessName}>
-                                      {lead.businessName}
-                                    </small>
-                                  )}
-                                </div>
+                                  </div>
+                                  <div className="lhm__info-row lhm__info-row--address">
+                                  <i className="fas fa-map-marker-alt lhm__address-icon" aria-hidden="true"></i>
+                                  <span className="lhm__info-label">Address</span>
+                                  <span className="lhm__address-text text-capitalize">
+                                    {addressLine || '-'}
+                                  </span>
+                                  </div>
+                                  <div className="lhm__info-row">
+                                  <i className="fas fa-phone lhm__phone-icon" aria-hidden="true"></i>
+                                  <span className="lhm__info-label">Mobile</span>
+                                  <span className="lhm__mobile-text">
+                                    {lead.mobile || '-'}
+                                  </span>
+                                  </div>
+                                    </div>
+                                  );
+                                })()}
 
                                 {/* {aiLeadIntelById?.[lead._id] && (
                                   <div
@@ -5752,8 +5818,18 @@ const B2BSales = () => {
                                   >
                                     <i className="fas fa-eye" aria-hidden="true"></i>
                                   </button>
+                                  <button
+                                    type="button"
+                                    className="lead-meta-v2__pill lhm__more-float"
+                                    onClick={() => setMobileMoreLead(lead)}
+                                    title="More"
+                                    aria-label="More"
+                                  >
+                                    <i className="fas fa-ellipsis-v" aria-hidden="true"></i>
+                                  </button>
                                 </div>
 
+                                <div className="lhm__status-approval-row">
                                 <div className="lhm__status-block" onClick={() => openEditPanel(lead, 'StatusChange')}>
                                   <button
                                     type="button"
@@ -5860,19 +5936,11 @@ const B2BSales = () => {
                                     })()}
                                   </div>
 
-                                  <button type="button" className="lhm__action-btn lhm__action-btn--more"
-                                    onClick={() => setMobileMoreLead(lead)} aria-label="More">
-                                    More
-                                  </button>
-                                  <button type="button" className="lhm__action-btn"
-                                    onClick={() => toggleLeadDetails(leadIndex)}
-                                    aria-label={leadDetailsVisible === leadIndex ? 'Collapse' : 'Expand'}>
-                                    <i className={leadDetailsVisible === leadIndex ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
-                                  </button>
                                 </div>
                               </div>
 
                               {/* Row 3 — Followup Calling + Followup Visit */}
+                              </div>
                               <div className="lhm__row3">
                                 {/* Followup Calling */}
                                 <div className="lhm__followup-box">
@@ -8348,7 +8416,7 @@ const B2BSales = () => {
   .lead-header {
     color: white;
     position: relative;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .lead-header-v2{
@@ -8356,8 +8424,8 @@ const B2BSales = () => {
     padding: 8px 10px;
     position: relative;
     --lead-header-v2-block-h: 92px;
-    overflow: hidden;
-    z-index: 2;
+    overflow: visible;
+    z-index: 3;
   }
 
   .lhm__name-edit,
@@ -8414,6 +8482,12 @@ const B2BSales = () => {
 
   .lead-header-v2__float-icon:hover{
     background: rgba(255,255,255,0.98);
+  }
+
+  @media (max-width: 768px){
+    .lead-header-v2__float-icon{
+      display: none;
+    }
   }
 
   .lead-header-v2__float-ai{
@@ -8520,6 +8594,8 @@ const B2BSales = () => {
     background: rgba(255, 255, 255, 0.14);
     border: 1px solid rgba(255,255,255,0.28);
     backdrop-filter: blur(6px);
+    z-index: 20;
+    overflow: visible;
   }
 
   .lead-header-v2__approval-label{
@@ -8679,9 +8755,11 @@ const B2BSales = () => {
   .lead-header-v2__approval-editor{
     position:absolute;
     top: calc(100% + 8px);
+    left: 0;
+    right: 0;
     width: 100%;
     max-width: 100%;
-    z-index: 999;
+    z-index: 1000;
     opacity: 0;
     transform: translateY(-6px) scale(0.98);
     pointer-events: none;
@@ -9015,28 +9093,35 @@ position: absolute;
     display: flex;
     flex-direction: column;
     gap: 8px;
+    position: relative;
+    padding-right: 42px;
   }
 
   /* ── Row 1: Name | Pills | Status ── */
   .lhm__row1{
-    display: flex;
-    align-items: center;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: stretch;
     gap: 8px;
   }
 
   .lhm__name{
+    grid-column: 1 / -1;
     display: flex;
-    align-items: center;
-    gap: 6px;
-    flex: 0 1 clamp(150px, 40vw, 220px);
-    max-width: clamp(150px, 40vw, 220px);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
+    flex: 1 1 auto;
+    max-width: none;
     min-width: 0;
     background: rgba(255,255,255,0.15);
     border: 1px solid rgba(255,255,255,0.3);
     border-radius: 10px;
-    padding: 6px 10px;
+    padding: 14px 10px 9px;
     overflow: visible;
     position: relative;
+    min-height: 92px;
+    white-space: normal;
   }
 
   .lhm__name-edit{
@@ -9060,15 +9145,100 @@ position: absolute;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    flex: 1 1 auto;
     min-width: 0;
+  }
+
+  .lhm__floating-label{
+    position: absolute;
+    top: -8px;
+    left: 12px;
+    z-index: 2;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: rgba(11,94,215,0.95);
+    border: 1px solid rgba(255,255,255,0.35);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 900;
+    line-height: 16px;
+    white-space: nowrap;
+  }
+
+  .lhm__identity-divider{
+    flex: 0 0 auto;
+    width: 1px;
+    height: 16px;
+    background: rgba(255,255,255,0.38);
+  }
+
+  .lhm__info-row{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    line-height: 1.15;
+  }
+
+  .lhm__info-row--address{
+    align-items: flex-start;
+  }
+
+  .lhm__info-label{
+    flex: 0 0 42px;
+    color: rgba(255,255,255,0.72);
+    font-size: 9px;
+    font-weight: 900;
+    line-height: 1.15;
+    text-transform: uppercase;
+  }
+
+  .lhm__address-icon{
+    flex: 0 0 auto;
+    font-size: 11px;
+    color: rgba(255,255,255,0.88);
+  }
+
+  .lhm__phone-icon{
+    flex: 0 0 auto;
+    font-size: 11px;
+    color: rgba(255,255,255,0.88);
+  }
+
+  .lhm__address-text{
+    flex: 1 1 auto;
+    min-width: 0;
+    display: -webkit-box;
+    overflow: hidden;
+    color: rgba(255,255,255,0.92) !important;
+    font-size: 11.5px;
+    font-weight: 800;
+    line-height: 1.25;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .lhm__mobile-text{
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 900;
+    line-height: 1.2;
+    white-space: nowrap;
   }
 
   /* Refer + History — stacked, compact */
   .lhm__pills{
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    flex-shrink: 0;
+    gap: 5px;
+    position: absolute;
+    top: 2px;
+    right: 0;
+    z-index: 5;
   }
 
   /* Mobile: make icon pills match header glass style (not red) */
@@ -9113,24 +9283,43 @@ position: absolute;
   }
 
   /* Status block — tappable, shows status + sub-status */
+  .lhm__status-approval-row{
+    grid-column: 1;
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+  }
+
   .lhm__status-block{
     display: flex;
-    flex-direction: column;
-    gap: 3px;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
     flex-shrink: 0;
     background: rgba(255,255,255,0.15);
     border: 1px solid rgba(255,255,255,0.3);
     border-radius: 10px;
-    padding: 5px 8px;
+    padding: 7px 36px 7px 9px;
     cursor: pointer;
-    min-width: 145px;
+    min-width: 0;
+    max-width: none;
+    width: 100%;
     position: relative;
+  }
+
+  .lhm__status-block .lhm__editbtn{
+    top: 50%;
+    right: 7px;
+    bottom: auto;
+    transform: translateY(-50%);
   }
 
   .lhm__status-row{
     display: flex;
     align-items: center;
     gap: 4px;
+    min-width: 0;
+    flex: 1 1 0;
   }
 
   .lhm__status-label{
@@ -9148,19 +9337,24 @@ position: absolute;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 70px;
+    max-width: none;
+    min-width: 0;
   }
 
   /* ── Row 2: Phone | More | Expand ── */
   .lhm__row2{
+    grid-column: 2;
+    grid-row: 2;
     display: flex;
     align-items: center;
-    gap: 8px;
+    justify-content: flex-end;
+    align-self: stretch;
+    gap: 6px;
   }
 
   .lhm__phone{
+    display: none;
     flex: 1 1 auto;
-    display: flex;
     align-items: center;
     gap: 7px;
     background: rgba(255,255,255,0.15);
@@ -9186,7 +9380,9 @@ position: absolute;
     display: flex;
     align-items: center;
     gap: 6px;
-    flex-shrink: 0;
+    justify-content: flex-end;
+    flex: 0 0 auto;
+    min-width: 0;
   }
 
   .lhm__action-btn{
@@ -9214,8 +9410,16 @@ position: absolute;
   .lhm__row3{
     display: flex;
     gap: 8px;
-    flex-wrap: wrap;
-    overflow: visible;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+    padding-top: 9px;
+    padding-bottom: 2px;
+    width: 100%;
+    max-width: 100%;
   }
 
   .lhm__row3::-webkit-scrollbar{
@@ -9223,14 +9427,15 @@ position: absolute;
   }
 
   .lhm__followup-box{
-    flex: 1 1 calc(33.333% - 8px);
-    min-width: 0;
+    flex: 0 0 clamp(252px, 86vw, 292px);
+    min-width: clamp(252px, 86vw, 292px);
     background: rgba(255,255,255,0.13);
     border: 1px solid rgba(255,255,255,0.3);
     border-radius: 10px;
     padding: 10px 8px 7px;
     position: relative;
     overflow: visible;
+    scroll-snap-align: start;
   }
 
   /* Bottom-right edit button (mobile header boxes) */
@@ -9254,12 +9459,6 @@ position: absolute;
 
   .lhm__editbtn i{
     font-size: 11px;
-  }
-
-  @media (max-width: 520px){
-    .lhm__followup-box{
-      flex: 1 1 100%;
-    }
   }
 
   .lhm__followup-title{
@@ -9731,6 +9930,8 @@ position: absolute;
     align-items:center;
     justify-content:space-between;
     gap:14px;
+    position: relative;
+    z-index: 1;
   }
 
   .lead-meta-v2__panel{

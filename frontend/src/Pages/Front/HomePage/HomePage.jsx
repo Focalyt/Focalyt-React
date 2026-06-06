@@ -3,9 +3,13 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import FrontLayout from "../../../Component/Layouts/Front/index";
 import { PillarProjectLogo } from "./PillarProjectLogos";
 import ZenithXSection from "./ZenithXSection";
-import PartnersMediaSection from "./PartnersMediaSection";
+import PartnersMediaSection, { ACADEMIC_PARTNERS, CSR_PARTNERS, GOVT_PARTNERS, getPartnerLabel } from "./PartnersMediaSection";
 import OurApproachSection from "./OurApproachSection";
 import IndustryAutomationSection from "./IndustryAutomationSection";
+import { EventCard } from "../Event/Event";
+import { CourseCard } from "../Courses/Course";
+import { JobCard } from "../Jobs/Jobs";
+import { resolveMediaUrl } from "../../../utils/resolveMediaUrl";
 import axios from "axios";
 import moment from "moment";
 import L from "leaflet";
@@ -1887,12 +1891,19 @@ const STYLES = `
   pointer-events: none;
   opacity: 1;
 }
+.event-thumb-wrap { position: relative; }
 .event-thumb {
-  height: 160px;
+  display: block;
+  width: 100%;
+  height: 180px;
+  padding: 0;
+  border: none;
   background: var(--surface2);
   position: relative;
   overflow: hidden;
+  cursor: pointer;
 }
+.event-thumb--static { cursor: default; }
 .event-thumb img {
   width: 100%;
   height: 100%;
@@ -1907,11 +1918,21 @@ const STYLES = `
   background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(11,18,32,.35));
   pointer-events: none;
 }
+.event-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  pointer-events: none;
+}
+.event-play img { width: 52px; height: 52px; }
 .event-status {
   position: absolute;
   left: 12px;
   bottom: 12px;
-  z-index: 1;
+  z-index: 2;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: .12em;
@@ -1926,11 +1947,16 @@ const STYLES = `
   border-color: rgba(255,45,122,.28);
   color: var(--red);
 }
+.event-status.open {
+  border-color: rgba(27,167,255,.28);
+  color: var(--cyan);
+}
 .event-body {
-  padding: 16px 16px 14px;
+  padding: 12px 12px 8px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+  flex: 0 1 auto;
 }
 .event-title {
   font-family: var(--foc-font-display);
@@ -1949,14 +1975,14 @@ const STYLES = `
 .event-meta {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 2px;
+  gap: 8px;
+  margin-top: 0;
 }
 .event-meta .m {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 10px 10px;
+  padding: 8px;
 }
 .event-meta .m strong {
   display: block;
@@ -1975,12 +2001,36 @@ const STYLES = `
 .event-actions {
   display: flex;
   gap: 10px;
-  margin-top: 4px;
+  margin-top: auto;
 }
 .event-actions a {
   flex: 1;
   text-align: center;
   text-decoration: none;
+}
+#events .event-actions .btn-primary {
+  display: block;
+  width: 100%;
+  border-radius: 50px;
+  font-family: var(--foc-font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  padding: 8px 10px;
+  background: var(--home-card-cta, var(--foc-navy-deep, #0d2146)) !important;
+  border: 1px solid var(--home-card-cta, var(--foc-navy-deep, #0d2146)) !important;
+  box-shadow: none !important;
+  text-shadow: none;
+}
+#events .event-actions .btn-primary:hover {
+  background: var(--home-card-cta-hover, var(--foc-navy-badge, #163565)) !important;
+  border-color: var(--home-card-cta-hover, var(--foc-navy-badge, #163565)) !important;
+  transform: none;
+}
+#events .event-actions .btn-primary.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 .event-actions .btn-secondary {
   background: transparent;
@@ -2005,42 +2055,89 @@ const STYLES = `
   gap: 16px;
   margin-top: 26px;
 }
-.course-card {
+#future-courses .course-card {
+  font-family: var(--foc-font-sans);
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--cr-accent, var(--cyan)) 22%, var(--border));
   border-radius: var(--r);
   overflow: hidden;
-  transition: .3s var(--ease);
+  position: relative;
+  --cr-accent: var(--cyan);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--cr-accent) 12%, rgba(0,0,0,.06));
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  height: 100%;
+  padding: 0;
+  transition: .25s var(--ease);
 }
-.course-card:hover {
-  border-color: var(--cyan);
-  box-shadow: 0 0 22px var(--cyan-glow);
-  transform: translateY(-4px);
+#future-courses .course-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 36px color-mix(in srgb, var(--cr-accent) 18%, rgba(0,0,0,.08));
 }
-.course-thumb {
+#future-courses .course-carousel .course-card:nth-child(4n + 1) { --cr-accent: var(--cyan); border-radius: 14px 20px 14px 16px; }
+#future-courses .course-carousel .course-card:nth-child(4n + 2) { --cr-accent: var(--red); border-radius: 18px 12px 22px 14px; }
+#future-courses .course-carousel .course-card:nth-child(4n + 3) { --cr-accent: color-mix(in srgb, var(--cyan) 55%, var(--red)); border-radius: 12px 18px 14px 20px; }
+#future-courses .course-carousel .course-card:nth-child(4n) { --cr-accent: color-mix(in srgb, var(--red) 70%, var(--foc-purple)); border-radius: var(--foc-radius-xl) 14px 16px 18px; }
+#future-courses .course-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--cr-accent), color-mix(in srgb, var(--cr-accent) 35%, transparent));
+  z-index: 2;
+  pointer-events: none;
+}
+#future-courses .course-thumb {
   height: 160px;
   background: var(--surface2);
   position: relative;
   overflow: hidden;
 }
-.course-thumb img {
+#future-courses .course-thumb > img,
+#future-courses .course-thumb-media img:first-child {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
   filter: saturate(1.03) contrast(1.03);
 }
-.course-badge {
+#future-courses .course-thumb-media {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+}
+#future-courses .course-thumb-play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 52px;
+  height: 52px;
+  z-index: 1;
+  pointer-events: none;
+}
+#future-courses .course-thumb::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(11,18,32,.35));
+  pointer-events: none;
+}
+#future-courses .course-badge {
   position: absolute;
   right: 12px;
   top: 12px;
-  z-index: 1;
+  z-index: 2;
   font-size: 10px;
-  font-weight: 800;
-  letter-spacing: .12em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   padding: 6px 10px;
   border-radius: 999px;
@@ -2048,62 +2145,412 @@ const STYLES = `
   background: rgba(255,255,255,.92);
   color: var(--text);
 }
-.course-body {
-  padding: 16px 16px 14px;
+#future-courses .course-fee {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 2;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.92);
+  border: 1px solid var(--border);
+}
+#future-courses .course-fee--free { color: var(--cyan); border-color: rgba(27,167,255,.28); }
+#future-courses .course-fee--paid { color: var(--red); border-color: rgba(255,45,122,.28); }
+#future-courses .course-body {
+  padding: 12px 12px 8px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+  flex: 0 1 auto;
 }
-.course-title {
+#future-courses .course-title {
   font-family: var(--foc-font-display);
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: .04em;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   color: var(--text);
-  line-height: 1.25;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
-.course-sector {
-  font-family: var(--foc-font-sans);
-  font-size: 11px;
+#future-courses .course-sector {
+  font-size: 12px;
   color: var(--muted);
-  letter-spacing: .08em;
-  text-transform: uppercase;
+  line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
-.course-meta {
+#future-courses .course-meta {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 2px;
+  gap: 8px;
+  margin-top: 0;
 }
-.course-meta .m {
+#future-courses .course-meta .m {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 10px 10px;
+  padding: 8px;
 }
-.course-meta .m strong {
+#future-courses .course-meta .m--wide {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+#future-courses .course-meta .m--wide strong {
+  display: inline;
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+#future-courses .course-meta .m--wide span {
+  display: inline;
+  text-align: right;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#future-courses .course-meta .m strong {
   display: block;
   font-size: 10px;
-  letter-spacing: .12em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted2);
   margin-bottom: 4px;
 }
-.course-meta .m span {
+#future-courses .course-meta .m span {
   display: block;
   font-size: 12px;
+  font-weight: 500;
   color: var(--text);
-  line-height: 1.35;
+  line-height: 1.4;
 }
-.course-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 4px;
+#future-courses .course-action-btns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 2px;
 }
-.course-actions a {
-  flex: 1;
-  text-align: center;
+#future-courses .btn.shr--width { width: 100%; }
+#future-courses .btn.cta-callnow,
+#future-courses .btn.cta-callnow.btn-bg-color {
+  background: var(--home-card-cta, var(--foc-navy-deep, #0d2146));
+  color: #fff;
+  border: 1px solid var(--home-card-cta, var(--foc-navy-deep, #0d2146));
+  border-radius: 50px;
+  font-weight: 600;
+  padding: 8px 10px;
+  font-size: 12px;
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  line-height: 1.25;
+}
+#future-courses .btn.cta-callnow:not(.btn-bg-color) {
+  background: #fff;
+  color: var(--home-card-cta, var(--foc-navy-deep, #0d2146));
+}
+#future-courses .btn.cta-callnow:hover,
+#future-courses .btn.cta-callnow.btn-bg-color:hover {
+  background: var(--home-card-cta-hover, var(--foc-navy-badge, #163565));
+  border-color: var(--home-card-cta-hover, var(--foc-navy-badge, #163565));
+  color: #fff;
+}
+#future-courses .course-callback-btn { margin-top: 6px; padding: 8px 10px; }
+#future-courses .course_card_footer {
+  background: var(--home-card-cta, var(--foc-navy-deep, #0d2146));
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+  margin-top: 0;
+  text-align: center;
+  padding: 8px 10px;
+}
+#future-courses .course-learn-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+}
+#future-courses .course-learn-more .learnn {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 0;
+}
+#future-courses .course-learn-more__icon {
+  width: 18px;
+  height: auto;
+  display: block;
+}
+
+#future-jobs .course-card {
+  font-family: var(--foc-font-sans);
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--cr-accent, var(--cyan)) 22%, var(--border));
+  border-radius: var(--r);
+  overflow: hidden;
+  position: relative;
+  --cr-accent: var(--cyan);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--cr-accent) 12%, rgba(0,0,0,.06));
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 0;
+  transition: .25s var(--ease);
+}
+#future-jobs .course-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 36px color-mix(in srgb, var(--cr-accent) 18%, rgba(0,0,0,.08));
+}
+#future-jobs .job-carousel .course-card:nth-child(4n + 1) { --cr-accent: var(--cyan); border-radius: 14px 20px 14px 16px; }
+#future-jobs .job-carousel .course-card:nth-child(4n + 2) { --cr-accent: var(--red); border-radius: 18px 12px 22px 14px; }
+#future-jobs .job-carousel .course-card:nth-child(4n + 3) { --cr-accent: color-mix(in srgb, var(--cyan) 55%, var(--red)); border-radius: 12px 18px 14px 20px; }
+#future-jobs .job-carousel .course-card:nth-child(4n) { --cr-accent: color-mix(in srgb, var(--red) 70%, var(--foc-purple)); border-radius: var(--foc-radius-xl) 14px 16px 18px; }
+#future-jobs .course-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--cr-accent), color-mix(in srgb, var(--cr-accent) 35%, transparent));
+  z-index: 2;
+  pointer-events: none;
+}
+#future-jobs .course-thumb {
+  height: 160px;
+  background: var(--surface2);
+  position: relative;
+  overflow: visible;
+}
+#future-jobs .course-thumb > img,
+#future-jobs .course-thumb-media img:first-child {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: saturate(1.03) contrast(1.03);
+}
+#future-jobs .course-thumb-media {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+}
+#future-jobs .course-thumb-play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 52px;
+  height: 52px;
+  z-index: 1;
+  pointer-events: none;
+}
+#future-jobs .course-thumb::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(11,18,32,.35));
+  pointer-events: none;
+}
+#future-jobs .course-thumb .verified-badge-container {
+  position: absolute;
+  top: 10px;
+  right: 7px;
+  width: 15px;
+  height: 15px;
+  z-index: 4;
+  pointer-events: none;
+}
+#future-jobs .course-thumb .verified-badge-container .verified-badge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 30px !important;
+  height: 30px !important;
+  transform: translate(-50%, -50%);
+  transform-origin: center center;
+  border-radius: 50%;
+  object-fit: contain;
+  z-index: 1002;
+}
+#future-jobs .course-badge {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  right: auto;
+  z-index: 2;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.92);
+  color: var(--text);
+}
+#future-jobs .job-card-body {
+  padding: 12px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 0 1 auto;
+  text-align: center;
+}
+#future-jobs .job-card-title {
+  font-family: var(--foc-font-display), Orbitron, sans-serif;
+  font-size: clamp(17px, 2vw, 20px);
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#future-jobs .job-card-company {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#future-jobs .job-card-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  text-align: left;
+  margin-bottom: 4px;
+}
+#future-jobs .job-detail-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px;
+  min-width: 0;
+}
+#future-jobs .job-detail-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+#future-jobs .job-detail-cell span {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#future-jobs .job-card-deadline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 2px 4px;
+  text-align: left;
+}
+#future-jobs .job-card-deadline__label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+#future-jobs .job-card-deadline__date {
+  font-size: 13px;
+  font-weight: 700;
+  color: #c9a227;
+}
+#future-jobs .course-action-btns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 2px;
+}
+#future-jobs .btn.shr--width { width: 100%; }
+#future-jobs .btn.cta-callnow,
+#future-jobs .btn.cta-callnow.btn-bg-color {
+  background: var(--home-card-cta, var(--foc-navy-deep, #0d2146));
+  color: #fff;
+  border: 1px solid var(--home-card-cta, var(--foc-navy-deep, #0d2146));
+  border-radius: 50px;
+  font-weight: 600;
+  padding: 8px 10px;
+  font-size: 12px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  line-height: 1.25;
+}
+#future-jobs .btn.cta-callnow:not(.btn-bg-color) {
+  background: #fff;
+  color: var(--home-card-cta, var(--foc-navy-deep, #0d2146));
+}
+#future-jobs .btn.cta-callnow:hover,
+#future-jobs .btn.cta-callnow.btn-bg-color:hover {
+  background: var(--home-card-cta-hover, var(--foc-navy-badge, #163565));
+  border-color: var(--home-card-cta-hover, var(--foc-navy-badge, #163565));
+  color: #fff;
+}
+#future-jobs .course_card_footer {
+  background: var(--home-card-cta, var(--foc-navy-deep, #0d2146));
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+  margin-top: 0;
+  text-align: center;
+  padding: 8px 10px;
+}
+#future-jobs .course-learn-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+}
+#future-jobs .course-learn-more .learnn {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 0;
+}
+#future-jobs .course-learn-more__icon {
+  width: 18px;
+  height: auto;
+  display: block;
+}
+
+.foc-cyber-home #future-courses,
+.foc-cyber-home #future-jobs,
+.foc-cyber-home #events {
+  --home-card-cta: var(--foc-navy-deep, #0d2146);
+  --home-card-cta-hover: var(--foc-navy-badge, #163565);
 }
 
 .course-carousel {
@@ -2117,7 +2564,7 @@ const STYLES = `
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
-  padding: 8px 4px 18px;
+  padding: 4px 4px 12px;
   margin: 0 -4px;
 }
 .course-carousel-viewport::-webkit-scrollbar {
@@ -2161,7 +2608,12 @@ const STYLES = `
 .event-carousel .course-carousel-track > .event-card:nth-child(4n + 2) { --ev-accent: var(--red); border-radius: 18px 12px 22px 14px; }
 .event-carousel .course-carousel-track > .event-card:nth-child(4n + 3) { --ev-accent: color-mix(in srgb, var(--cyan) 55%, var(--red)); border-radius: 12px 18px 14px 20px; }
 .event-carousel .course-carousel-track > .event-card:nth-child(4n) { --ev-accent: color-mix(in srgb, var(--red) 70%, var(--foc-purple)); border-radius: var(--foc-radius-xl) 14px 16px 18px; }
-
+.job-carousel .course-carousel-track > .course-card {
+  flex: 0 0 clamp(260px, 72vw, 360px);
+  scroll-snap-align: start;
+  max-width: 100%;
+  box-sizing: border-box;
+}
 .course-carousel-btn {
   position: absolute;
   top: 50%;
@@ -4087,6 +4539,7 @@ const PILLAR_UI = {
         name: "IoT Lab Setup under Ericsson CSR",
         desc: "Technology-enabled innovation labs in government schools for hands-on exposure to IoT, AI, Robotics, and emerging technologies for school students.",
         img: "/Assets/public_assets/images/homepage/iot_lab.jpeg",
+        logoImg: "/Assets/public_assets/images/homepage/ericsson.png",
         logoKey: "ericsson",
         chips: { target: "Govt. school students", coverage: "Delhi NCR", impact: "Future tech exposure" },
       },
@@ -5294,7 +5747,7 @@ const MARQUEE = [
   "Industry 4.0",
 ];
 
-const SIC_PARTNERS = ["Chandigarh University", "Amity University", "Central University of Haryana", "Lovely Professional University", "SGT University", "Rayat-Bahra University", "APIIT SD India", "G.M.N. College Ambala", "SIET Nilokheri", "MRSPTU"];
+const SIC_PARTNERS = ACADEMIC_PARTNERS.map(getPartnerLabel);
 
 /** Partner-with-us section — narrative aligned with company profile / pillars on site. */
 const PARTNER_PROFILE_HIGHLIGHTS = [
@@ -5325,26 +5778,9 @@ const IMPACT_PARTNERS = [
   "Patanjali",
 ];
 
-/** CSR / corporate & implementing partners — marquee under #csr */
-const CSR_MARQUEE_PARTNERS = [
-  "Samsung",
-  "Ericsson",
-  "Panasonic",
-  "Patanjali",
-  "Focal Skill Foundation",
-  "Samsung Innovation Campus",
-  "Leading Universities & Colleges",
-];
-
-/** Government & sector-skill bodies — marquee under #govt (Focalyt profile PDF, Apr 2026) */
-const GOVT_MARQUEE_PARTNERS = [
-  "Ministry of Electronics & Information Technology (Govt. of India)",
-  "Telecom Sector Skill Council (TSSC)",
-  "Tourism & Hospitality Sector Skill Council",
-  "Ministry of Tourism",
-  "Ministry of Rural Development (Uttarakhand)",
-  "Ministry of Tribal Affairs",
-];
+/** CSR / govt marquees — same lists as Our Partners section */
+const CSR_MARQUEE_PARTNERS = CSR_PARTNERS;
+const GOVT_MARQUEE_PARTNERS = GOVT_PARTNERS;
 
 const FOC_HOME_THEME_STORAGE_KEY = "foc-homepage-theme";
 
@@ -5390,16 +5826,6 @@ export default function HomePage() {
   const [callbackLoading, setCallbackLoading] = useState(false);
   const [callbackSuccess, setCallbackSuccess] = useState("");
   const [callbackError, setCallbackError] = useState("");
-  const [partnerForm, setPartnerForm] = useState({
-    name: "",
-    organization: "",
-    state: "",
-    mobile: "",
-    email: "",
-    message: "",
-  });
-  const [partnerLoading, setPartnerLoading] = useState(false);
-  const [partnerError, setPartnerError] = useState("");
   const [jobs, setJobs] = useState([]);
   const [jobsError, setJobsError] = useState("");
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
@@ -5447,11 +5873,25 @@ export default function HomePage() {
     el.scrollBy({ left: direction * step, behavior: "smooth" });
   };
 
-  const jobExperienceLabel = (job) => {
-    if ((job.experience == 0 && job.experienceMonths == 0) || (job.experience == 0 && !job.experienceMonths)) return "Fresher";
-    const y = job.experience > 0 ? `${job.experience} ${job.experience === 1 ? "Year" : "Years"}` : "";
-    const m = job.experienceMonths > 0 ? `${job.experienceMonths} ${job.experienceMonths === 1 ? "Month" : "Months"}` : "";
-    return `${y} ${m}`.trim() || "—";
+  const getJobThumbnailUrl = (job) => {
+    if (job?.jobVideoThumbnail) {
+      return resolveMediaUrl(bucketUrl, job.jobVideoThumbnail);
+    }
+    if (job?.thumbnail) {
+      if (bucketUrl && !job.thumbnail.startsWith("http://") && !job.thumbnail.startsWith("https://")) {
+        const thumbPath = job.thumbnail.startsWith("/") ? job.thumbnail.slice(1) : job.thumbnail;
+        return `${bucketUrl}/${thumbPath}`;
+      }
+      return job.thumbnail;
+    }
+    if (job?._company?.logo) {
+      if (bucketUrl && !job._company.logo.startsWith("http://") && !job._company.logo.startsWith("https://")) {
+        const logoPath = job._company.logo.startsWith("/") ? job._company.logo.slice(1) : job._company.logo;
+        return `${bucketUrl}/${logoPath}`;
+      }
+      return job._company.logo;
+    }
+    return "/Assets/public_assets/images/newjoblisting/course_img.svg";
   };
 
   const handleShare = async (course, courseId, courseName) => {
@@ -5473,6 +5913,20 @@ export default function HomePage() {
     navigator.clipboard?.writeText(`${shareText}\n${courseUrl}`).then(() => {
       alert("Course link copied! You can paste it anywhere.");
     });
+  };
+
+  const handleCourseShare = (course) => {
+    handleShare(course, course._id, course.name);
+  };
+
+  const handleCourseRequestCallback = (course) => {
+    setFormData((prev) => ({
+      ...prev,
+      courseName: course.name ?? "",
+      sectorName: course.sectorNames ?? "",
+      projectName: course.projectName ?? "",
+      typeOfProject: course.typeOfProject ?? "",
+    }));
   };
 
   const handleShareJob = async (jobId, jobTitle) => {
@@ -5670,14 +6124,6 @@ export default function HomePage() {
     return eventEndDate.isBefore(today);
   };
 
-  const getFullUrl = (filePath) => {
-    if (!filePath) return "";
-    // Already contains full bucket URL
-    if (filePath.startsWith(bucketUrl)) return filePath;
-    // Is relative path, so prepend bucket URL
-    return `${bucketUrl}/${filePath}`;
-  };
-
   const pillarUi = PILLAR_UI[activeArea];
   const hoveredGovtAreaItem = currentGovtArea?.items?.[hoveredGovtAreaItemIdx ?? -1] ?? null;
   const govtAreaVisual = hoveredGovtAreaItem?.img ?? hoveredGovtAreaItem?.icon ?? currentGovtArea?.emoji ?? "📣";
@@ -5686,15 +6132,9 @@ export default function HomePage() {
     const fetchData = async () => {
       try {
         const response = await axios.get(`${backendUrl}/event`);
-        console.log("events", response.data.events)
-
-        response.data.events.forEach(event => {
-          const fromDate = moment(event.timing.from).format('DD-MM-YYYY');
-          const fromTime = moment(event.timing.from).format('hh:mm A');
-          const toDate = moment(event.timing.to).format('DD-MM-YYYY');
-          const toTime = moment(event.timing.to).format('hh:mm A');
-        });
-        setEvents(response.data.events);
+        const all = response.data.events ?? [];
+        setEvents(all.filter((e) => !checkRegistrationStatus(e.timing?.to)));
+        setExpiredEvents(all.filter((e) => checkRegistrationStatus(e.timing?.to)));
 
       } catch (error) {
         console.error("Error fetching events data:", error);
@@ -5728,18 +6168,6 @@ export default function HomePage() {
     return () => clearTimeout(timer);
   }, [location.hash]);
 
-  useEffect(() => {
-    if (!location.state?.openPartnerModal) return undefined;
-    const timer = setTimeout(() => {
-      const modalEl = document.getElementById("partnerModal");
-      if (!modalEl) return;
-      const Modal = window.bootstrap?.Modal;
-      if (Modal) Modal.getOrCreateInstance(modalEl).show();
-      navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, { replace: true, state: {} });
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [location.state, location.pathname, location.search, location.hash, navigate]);
-
   const handleCallbackChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -5770,56 +6198,6 @@ export default function HomePage() {
       setCallbackError("Failed to submit. Please try again.");
     } finally {
       setCallbackLoading(false);
-    }
-  };
-
-  const handlePartnerChange = (e) => {
-    const { name, value } = e.target;
-    setPartnerForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const showPartnerSuccessPopup = () => {
-    const partnerModalEl = document.getElementById("partnerModal");
-    const successModalEl = document.getElementById("partnerSuccessModal");
-    const Modal = window.bootstrap?.Modal;
-    if (!Modal || !successModalEl) return;
-
-    if (partnerModalEl) {
-      const partnerModal = Modal.getInstance(partnerModalEl) || Modal.getOrCreateInstance(partnerModalEl);
-      partnerModal.hide();
-    }
-
-    setTimeout(() => {
-      Modal.getOrCreateInstance(successModalEl).show();
-    }, 300);
-  };
-
-  const handlePartnerSubmit = async (e) => {
-    e.preventDefault();
-    setPartnerLoading(true);
-    setPartnerError("");
-
-    const payload = {
-      name: partnerForm.name,
-      organization: partnerForm.organization,
-      state: partnerForm.state,
-      mobile: partnerForm.mobile,
-      email: partnerForm.email,
-      message: partnerForm.message,
-    };
-
-    try {
-      const response = await axios.post(`${backendUrl}/partner`, payload, {
-        headers: { "Content-Type": "application/json" },
-      });
-      if (response.status === 200 || response.status === 201) {
-        setPartnerForm({ name: "", organization: "", state: "", mobile: "", email: "", message: "" });
-        showPartnerSuccessPopup();
-      }
-    } catch {
-      setPartnerError("Failed to submit. Please try again.");
-    } finally {
-      setPartnerLoading(false);
     }
   };
 
@@ -6530,15 +6908,15 @@ export default function HomePage() {
 
         <section className="section grid-bg" id="events">
           <div className="container">
-            <div className="section-head">
+            {/* <div className="section-head">
               <div className="stag">Latest Updates</div>
               <h2 className="sh2">
                Live <span className="cyan">Events</span>
               </h2>
               <p className="s-body">Explore our latest events and register to participate.</p>
-            </div>
+            </div> */}
 
-            {events.length > 0 ? (
+            {/* {events.length > 0 ? (
               <div className="course-carousel event-carousel">
                 <button
                   type="button"
@@ -6550,230 +6928,15 @@ export default function HomePage() {
                 </button>
                 <div className="course-carousel-viewport" ref={eventsCarouselRef}>
                   <div className="course-carousel-track">
-                    {events.map((event) => {
-                        const isRegistrationClosed = checkRegistrationStatus(event.timing.to);
-                        
-                        return (
-                          <div key={event._id} className="course-carousel-item pb-4 card-padd">
-                            <div className="card bg-dark eventCard">
-                              <div className="bg-img">
-                                <a
-                                  href="#"
-                                  data-bs-toggle="modal"
-                                  data-bs-target="#videoModal"
-                                  onClick={(e) => {
-                                    e.preventDefault(); // ✅ Prevents default link behavior
-                                    setVideoSrc(event.video);
-                                  }}
-                                  className="pointer img-fluid" 
-                                >
-                                  <img
-                                    src={event.thumbnail}
-                                    className="digi"
-                                    alt={event.name}
-                                  />
-                                  <img src="/Assets/public_assets/images/newjoblisting/play.svg" alt="Play" className="group1" />
-                                </a>
-
-                                <div className="flag">
-                                  {/* <h4
-                                    className="text-center text-black fw-bolder mb-2 mx-auto text-capitalize ellipsis"
-                                    title={event.eventTitle}
-                                  >
-                                    {event.eventType}
-                                  </h4> */}
-                                </div>
-                                <div className="share-Event">
-                                  <div className="tooltip-container">
-                                    <div className="button-content">
-                                      <span className="text">Share</span>
-                                      <svg
-                                        className="share-icon"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        viewBox="0 0 24 24"
-                                        width="20"
-                                        height="20"
-                                      >
-                                        <path
-                                          d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92zM18 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM6 13c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm12 7.02c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"
-                                        ></path>
-                                      </svg>
-                                    </div>
-                                    <div className="tooltip-content">
-                                      <div className="social-icons">
-                                        <a href="#" className="social-icon twitter">
-                                          <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            viewBox="0 0 24 24"
-                                            width="20"
-                                            height="20"
-                                          >
-                                            <path
-                                              d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"
-                                            ></path>
-                                          </svg>
-                                        </a>
-                                        <a href="#" className="social-icon facebook">
-                                          <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            viewBox="0 0 24 24"
-                                            width="20"
-                                            height="20"
-                                          >
-                                            <path
-                                              d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"
-                                            ></path>
-                                          </svg>
-                                        </a>
-                                        <a href="#" className="social-icon linkedin">
-                                          <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            viewBox="0 0 24 24"
-                                            width="20"
-                                            height="20"
-                                          >
-                                            <path
-                                              d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"
-                                            ></path>
-                                          </svg>
-                                        </a>
-                                        <a href="" className="social-icon linkedin">
-                                          <svg
-                                            className="share-icon"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            viewBox="0 0 32 32"
-                                            width="20"
-                                            height="20"
-                                          >
-                                            <path
-                                              d="M16.003 2.667C8.64 2.667 2.667 8.64 2.667 16.003c0 2.693.704 5.273 2.032 7.567L2 30l6.611-2.673A13.27 13.27 0 0016.003 29.34C23.367 29.34 29.34 23.366 29.34 16.003 29.34 8.64 23.367 2.667 16.003 2.667zm0 24.027a11.58 11.58 0 01-5.893-1.609l-.423-.25-3.929 1.589.75-4.087-.27-.42a11.412 11.412 0 01-1.714-6.047c0-6.37 5.184-11.553 11.554-11.553 6.37 0 11.553 5.183 11.553 11.553 0 6.37-5.183 11.553-11.553 11.553zm6.308-8.518c-.348-.174-2.067-1.02-2.388-1.137-.32-.118-.553-.174-.785.174-.232.348-.898 1.137-1.103 1.372-.205.232-.38.26-.728.087-.347-.174-1.465-.54-2.79-1.72-1.03-.919-1.726-2.054-1.929-2.4-.2-.348-.022-.535.152-.71.156-.156.348-.406.522-.61.174-.2.232-.348.348-.58.116-.232.058-.435-.029-.609-.087-.174-.785-1.9-1.077-2.607-.285-.686-.576-.593-.785-.603l-.668-.012a1.297 1.297 0 00-.938.435c-.32.348-1.218 1.19-1.218 2.899 0 1.709 1.247 3.36 1.42 3.593.174.232 2.457 3.746 5.956 5.25.833.359 1.482.574 1.987.733.835.266 1.596.228 2.196.139.67-.1 2.067-.844 2.359-1.66.292-.814.292-1.51.204-1.66-.087-.145-.32-.232-.668-.406z"
-                                              fill="#25D366"
-                                            />
-                                          </svg>
-
-                                        </a>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                </div>
-                              </div>
-
-                              <div className="card-body px-0 pb-0">
-                                <h4
-                                  className="text-center text-white fw-bolder mb-2 mx-auto text-capitalize ellipsis"
-                                  title={event.eventTitle}
-                                >
-                                  {event.name}
-                                </h4>
-
-                                <div className="row" id="event_height">
-                                  <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                    <div className="col-xxl-10 col-xl-10 col-lg-10 col-md-10 col-sm-10 col-10 mx-auto mb-2">
-                                      <div className="row">
-                                        <h4
-                                          className="text-center text-white fw-bolder mb-2 mx-auto text-capitalize ellipsis"
-                                          title={event.eventTitle}
-                                        >
-                                          {event.eventTitle}
-                                        </h4>
-                                        <h5 className={`op-Reg text-center ${isRegistrationClosed ? 'text-danger' : ''}`}>
-                                          {isRegistrationClosed ? "Registration Closed" : "Registration Open"}
-                                        </h5>
-                                        <h6
-                                          className="text-center text-white fw-bolder mb-2 mx-auto text-capitalize ellipsis"
-                                          title={event.eventTitle}
-                                        >
-                                          Event Date:   {moment(event.timing.from).format("DD-MM-YYYY")} &nbsp;
-                                          To: {moment(event.timing.to).format("DD-MM-YYYY")}
-                                        </h6>
-
-                                        <h6
-                                          className="text-center text-white fw-bolder mb-2 mx-auto text-capitalize ellipsis"
-                                          title={event.eventTitle}
-                                        >
-                                          Event Time  {moment(event.timing.from).format("hh:mm A")} &nbsp; To: {moment(event.timing.to).format("hh:mm A")}
-                                        </h6>
-
-                                        {/* Location */}
-                                        <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                          <div className="row">
-                                            <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                              <figure className="text-end">
-                                                <img
-                                                  src="/Assets/public_assets/images/icons/location-pin.png"
-                                                  className="img-fluid new_img p-0"
-                                                  draggable="false"
-                                                />
-                                              </figure>
-                                            </div>
-                                            <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white events_features ps-0">
-                                              <p className="mb-0 text-white">Location</p>
-                                              <div className="ellipsis-wrapper">
-                                                <p
-                                                  className="mb-0 text-white para_ellipsis"
-                                                  title={event.location.city ? `${event.location.city}, ${event.location.state}` : 'NA'}
-                                                >
-                                                  <small className="sub_head">
-                                                    {event.location.city
-                                                      ? `(${event.location.city}, ${event.location.state})`
-                                                      : 'NA'}
-                                                  </small>
-                                                </p>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        </div>
-
-                                        {/* Mode */}
-                                        <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                          <div className="row">
-                                            <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                              <figure className="text-end">
-                                                <img
-                                                  src="/Assets/public_assets/images/icons/job-mode.png"
-                                                  className="img-fluid new_img p-0"
-                                                  draggable="false"
-                                                />
-                                              </figure>
-                                            </div>
-                                            <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white events_features ps-0">
-                                              <p className="mb-0 text-white">Mode</p>
-                                              <p className="mb-0 text-white">
-                                                <small className="sub_head">({event.eventMode})</small>
-                                              </p>
-                                            </div>
-                                          </div>
-                                        </div>
-
-                                        {/* Action Buttons */}
-                                        <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2 text-center">
-                                          <a
-                                            className={`btn cta-callnow btn-bg-color shr--width w-100 ${isRegistrationClosed ? 'disabled opacity-50 cursor-not-allowed' : ''}`}
-                                            href={`/candidate/login?returnUrl=/candidate/candidateevent`} 
-                                            onClick={(e) => {
-                                              if (isRegistrationClosed) e.preventDefault();
-                                            }}
-                                          >
-                                            Apply Now
-                                          </a>
-                                        </div>
-                                        <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2 text-center">
-                                          <button className="btn cta-callnow shr--width w-100">
-                                            Guidelines
-                                          </button>
-                                        </div>
-
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                    {events.map((event) => (
+                      <EventCard
+                        key={event._id}
+                        event={event}
+                        bucketUrl={bucketUrl}
+                        closed={checkRegistrationStatus(event.timing?.to)}
+                        onPlayVideo={setVideoSrc}
+                      />
+                    ))}
                   </div>
                 </div>
                 <button
@@ -6789,13 +6952,13 @@ export default function HomePage() {
               <div className="text-center py-5">
                 <h3 className="text-muted">No Events found </h3>
               </div>
-            )}
+            )} */}
 
             {expiredEvents.length > 0 && (
               <>
                 <div className="section-head" style={{ marginTop: 34 }}>
                   <h2 className="sh2">
-                    Expired <span className="red">Events</span>
+                    Live <span className="red">Events</span>
                   </h2>
                   <p className="s-body">Recent events whose registration is closed.</p>
                 </div>
@@ -6811,71 +6974,15 @@ export default function HomePage() {
                   </button>
                   <div className="course-carousel-viewport" ref={expiredEventsCarouselRef}>
                     <div className="course-carousel-track">
-                  {expiredEvents.map((event) => {
-                    const closed = true;
-                    const dateFrom = event?.timing?.from ? moment(event.timing.from).format("DD-MM-YYYY") : "NA";
-                    const dateTo = event?.timing?.to ? moment(event.timing.to).format("DD-MM-YYYY") : "NA";
-                    const timeFrom = event?.timing?.from ? moment(event.timing.from).format("hh:mm A") : "NA";
-                    const timeTo = event?.timing?.to ? moment(event.timing.to).format("hh:mm A") : "NA";
-                    const loc = event?.location?.city ? `${event.location.city}, ${event.location.state}` : "NA";
-                    const mode = event?.eventMode ?? "NA";
-
-                    return (
-                      <div key={event?._id ?? `${event?.name}-${dateFrom}-expired`} className="course-carousel-item event-card">
-                        <div className="event-thumb">
-                          <img src={event?.thumbnail ?? "/Assets/public_assets/images/newjoblisting/digital_marketing.jpg"} alt={event?.name ?? "Event"} />
-                          <div className="event-status closed">Registration Closed</div>
-                        </div>
-
-                        <div className="event-body">
-                          <div className="event-title" title={event?.eventTitle ?? event?.name}>
-                            {event?.name ?? "Event"}
-                          </div>
-                          <div className="event-subtitle" title={event?.eventTitle}>
-                            {event?.eventTitle ?? ""}
-                          </div>
-
-                          <div className="event-meta">
-                            <div className="m">
-                              <strong>Date</strong>
-                              <span>
-                                {dateFrom} → {dateTo}
-                              </span>
-                            </div>
-                            <div className="m">
-                              <strong>Time</strong>
-                              <span>
-                                {timeFrom} → {timeTo}
-                              </span>
-                            </div>
-                            <div className="m">
-                              <strong>Location</strong>
-                              <span title={loc}>{loc}</span>
-                            </div>
-                            <div className="m">
-                              <strong>Mode</strong>
-                              <span>{mode}</span>
-                            </div>
-                          </div>
-
-                          <div className="event-actions">
-                            <Link to="/event" className="btn-secondary">
-                              View Details
-                            </Link>
-                            <a
-                              className={`btn-primary${closed ? " disabled" : ""}`}
-                              href={`/candidate/login?returnUrl=/candidate/candidateevent`}
-                              onClick={(e) => {
-                                if (closed) e.preventDefault();
-                              }}
-                            >
-                              Apply Now →
-                            </a>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {expiredEvents.map((event) => (
+                    <EventCard
+                      key={event._id}
+                      event={event}
+                      bucketUrl={bucketUrl}
+                      closed
+                      onPlayVideo={setVideoSrc}
+                    />
+                  ))}
                     </div>
                   </div>
                   <button
@@ -6891,7 +6998,7 @@ export default function HomePage() {
             )}
 
             <div style={{ marginTop: 18, textAlign: "center" }}>
-              <Link to="/event" className="btn-ghost">
+              <Link to="/events" className="btn-ghost">
                 View all events →
               </Link>
             </div>
@@ -6952,248 +7059,15 @@ export default function HomePage() {
                 </button>
                 <div className="course-carousel-viewport" ref={courseCarouselRef}>
                   <div className="course-carousel-track">
-                    {courses.map((course, courseShellIdx) => (
-                      <div
+                    {courses.map((course) => (
+                      <CourseCard
                         key={course._id}
-                        className={`course-carousel-item pb-4 card-padd course-card-shell course-card-shell--${courseShellIdx % 4}`}
-                      >
-                          <div className="card bg-dark courseCard">
-                            <div className="bg-img">
-                              {/* <a
-                              href="#"
-                              data-bs-target="#videoModal"
-                              data-bs-toggle="modal"
-                              data-bs-link={course.videos && course.videos[0] ? `${bucketUrl}/${course.videos[0]}` : ""}
-                              className="pointer img-fluid"
-                            >
-                              <img
-                                src={course.thumbnail
-                                  ? `${bucketUrl}/${course.thumbnail}`
-                                  : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
-                                className="digi"
-                                alt={course.name}
-                              />
-                              <img
-                                src="/Assets/public_assets/images/newjoblisting/play.svg"
-                                alt="Play"
-                                className="group1"
-                              />
-                            </a> */}
-                              <a
-                                href="#"
-                                data-bs-toggle="modal"
-                                data-bs-target="#videoModal"
-                                onClick={(e) => {
-                                  e.preventDefault(); // ✅ Prevents default link behavior
-                                  setVideoSrc(course.videos && course.videos[0] ? getFullUrl(course.videos[0]) : "");
-
-                                }}
-                                className="pointer img-fluid"
-                              >
-                                <img
-                                  src={course.thumbnail ? getFullUrl(course.thumbnail) : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
-                                  className="digi"
-                                  alt={course.name}
-                                />
-                                <img src="/Assets/public_assets/images/newjoblisting/play.svg" alt="Play" className="group1" />
-                              </a>
-
-
-                              <div className="flag"></div>
-                              <div className="right_obj shadow shadow-new">
-                                {course.courseType === 'coursejob' ? 'Course + Jobs' : 'Course'}
-                              </div>
-                            </div>
-
-                            <div className="card-body px-0 pb-0">
-                              <h4
-                                className="text-center text-white fw-bolder mb-2 mx-auto text-capitalize ellipsis course-card-title"
-                                title={course.name}
-                              >
-                                {course.name}
-                              </h4>
-
-                              <div className="row" id="course_height">
-                                <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                  <div className="col-xxl-10 col-xl-10 col-lg-10 col-md-10 col-sm-10 col-10 mx-auto mb-2">
-                                    <div className="row">
-                                      {/* Eligibility */}
-                                      <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                        <div className="row">
-                                          <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                            <figure className="text-end">
-                                              <img
-                                                src="/Assets/public_assets/images/icons/eligibility.png"
-                                                className="img-fluid new_img p-0"
-                                                draggable="false"
-                                              />
-                                            </figure>
-                                          </div>
-                                          <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-                                            <p className="mb-0 text-white">Eligibility</p>
-                                            <div className="ellipsis-wrapper">
-                                              <small
-                                                className="sub_head course-qualification-text"
-                                                title={course.qualification || "N/A"}
-                                              >
-                                                ({course.qualification || "N/A"})
-                                              </small>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      {/* Duration */}
-                                      <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                        <div className="row">
-                                          <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                            <figure className="text-end">
-                                              <img
-                                                src="/Assets/public_assets/images/icons/duration.png"
-                                                className="img-fluid new_img p-0"
-                                                draggable="false"
-                                              />
-                                            </figure>
-                                          </div>
-                                          <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-                                            <p className="mb-0 text-white">Duration</p>
-                                            <p className="mb-0 text-white">
-                                              <small className="sub_head">({course.duration})</small>
-                                            </p>
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      {/* Location */}
-                                      <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                        <div className="row">
-                                          <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                            <figure className="text-end">
-                                              <img
-                                                src="/Assets/public_assets/images/icons/location-pin.png"
-                                                className="img-fluid new_img p-0"
-                                                draggable="false"
-                                              />
-                                            </figure>
-                                          </div>
-                                          <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-                                            <p className="mb-0 text-white">Location</p>
-                                            <div className="ellipsis-wrapper">
-                                              <p
-                                                className="mb-0 text-white para_ellipsis"
-                                                title={course.city ? `${course.city}, ${course.state}` : 'NA'}
-                                              >
-                                                <small className="sub_head">
-                                                  {course.city
-                                                    ? `(${course.city}, ${course.state})`
-                                                    : 'NA'}
-                                                </small>
-                                              </p>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      {/* Mode */}
-                                      <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                        <div className="row">
-                                          <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                            <figure className="text-end">
-                                              <img
-                                                src="/Assets/public_assets/images/icons/job-mode.png"
-                                                className="img-fluid new_img p-0"
-                                                draggable="false"
-                                              />
-                                            </figure>
-                                          </div>
-                                          <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-                                            <p className="mb-0 text-white">Mode</p>
-                                            <p className="mb-0 text-white">
-                                              <small className="sub_head">({course.trainingMode})</small>
-                                            </p>
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      {/* Last Date */}
-                                      <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mb-2 text-center">
-                                        <div className="row">
-                                          <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 my-auto">
-                                            <p className="text-white apply_date">Last Date for apply</p>
-                                          </div>
-                                          <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 text-white courses_features ps-0">
-                                            <p className="color-yellow fw-bold">
-                                              {course.lastDateForApply
-                                                ? moment(course.lastDateForApply).utcOffset("+05:30").format('MMM DD YYYY')
-                                                : 'NA'}
-                                            </p>
-                                          </div>
-                                        </div>
-                                      </div>
-
-
-                                      {/* Action Buttons */}
-                                      <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 mb-2 me-2 text-center">
-                                        <a
-                                          className="btn cta-callnow btn-bg-color shr--width"
-                                          href={`/candidate/login?returnUrl=/candidate/course/${course._id}`}
-                                        >
-                                          Apply Now
-                                        </a>
-                                      </div>
-                                      {/* <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
-                                        <a href="https://wa.me/918699017301?text=hi" className="btn cta-callnow shr--width">
-                                          Chat Now
-                                        </a>
-                                      </div> */}
-                                      {/* <div className="col-xxl-4 col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 mb-2 text-center">
-                                      <button  onClick={() => openChatbot()}   className="btn cta-callnow shr--width">
-                                          Chat Now
-                                        </button>
-                                      </div>   */}
-                                      
-                                      <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 mb-2 ms-2 text-center">
-                                        <button
-                                          onClick={() => handleShare(course, course._id, course.name, course.thumbnail)} className="btn cta-callnow shr--width">
-                                          {/* <Share2 size={16} className="mr-1" /> */}
-                                          Share
-                                        </button>
-                                      </div>
-                                      <div className="col-xxl-12 col-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                                        <div className="row pt-2">
-                                          <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 justify-content-center align-items-center text-center">
-                                            <a href="#" data-bs-toggle="modal" data-bs-target="#callbackModal">
-                                              <span
-                                                className="learnn btn cta-callnow w-100"
-                                                style={{ padding: "10px 14px", cursor: "pointer" }}
-                                                onClick={() => setFormData({ ...formData, courseName: course.name,sectorName:course.sectorNames,projectName:course.projectName,typeOfProject:course.typeOfProject })}
-                                              >
-                                                Request for Call Back
-                                              </span>
-
-                                            </a>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Footer */}
-                              <div className="col-xxl-12 col-12 col-lg-12 col-md-12 col-sm-12 col-12 course_card_footer">
-                                <div className="row py-2">
-                                  <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 justify-content-center align-items-center text-center">
-                                    <a href={`/candidate/login?returnUrl=/candidate/course/${course._id}`}>
-                                      <span className="learnn pt-1 text-white">Learn More</span>
-                                      <img src="/Assets/public_assets/images/link.png" className="align-text-top" />
-                                    </a>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                        course={course}
+                        bucketUrl={bucketUrl}
+                        onPlayVideo={setVideoSrc}
+                        onShare={handleCourseShare}
+                        onRequestCallback={handleCourseRequestCallback}
+                      />
                     ))}
                   </div>
                 </div>
@@ -7244,219 +7118,14 @@ export default function HomePage() {
                 <div className="course-carousel-viewport" ref={jobCarouselRef}>
                   <div className="course-carousel-track">
                     {jobs.map((job) => (
-                      <div key={job._id} className="course-carousel-item pb-4 card-padd">
-                        <div className="card bg-dark courseCard job-live-card">
-                      <div className="bg-img">
-                        <a
-                          href="#"
-                          data-bs-toggle="modal"
-                          data-bs-target="#videoModal"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (job.jobVideo) {
-                              setVideoSrc(job.jobVideo);
-                            } else {
-                              setVideoSrc("");
-                            }
-                          }}
-                          className="pointer img-fluid"
-                        >
-                          <div
-                            className="verified-badge-container"
-                            style={{ position: "absolute", top: "10px", right: "10px", width: "60px", height: "60px", zIndex: "10" }}
-                          >
-                            <span className="wave-ring wave-1"></span>
-                            <span className="wave-ring wave-2"></span>
-                            <span className="wave-ring wave-3"></span>
-                            <img src="/Assets/public_assets/images/verified.png" className="digi verified-badge" alt="" />
-                          </div>
-                          <img
-                            src={job.jobVideoThumbnail ? `${job.jobVideoThumbnail}` : "/Assets/public_assets/images/newjoblisting/course_img.svg"}
-                            className="digi"
-                            alt={job.title || job.name || "Job"}
-                            onError={(e) => {
-                              e.target.onerror = null;
-                              e.target.src = "/Assets/public_assets/images/newjoblisting/course_img.svg";
-                            }}
-                          />
-                          <img src="/Assets/public_assets/images/newjoblisting/play.svg" alt="Play" className="group1" />
-                        </a>
-                        <div className="flag"></div>
-                        <div className="right_obj shadow shadow-new">
-                          {job.courseType === "coursejob" ? "Course + Jobs" : "Jobs"}
-                        </div>
-                      </div>
-
-                      <div className="card-body px-0 pb-0">
-                        <h4
-                          className="text-center course-title text-white fw-bolder text-capitalize ellipsis mx-auto"
-                          title={job.title}
-                        >
-                          {job.title}
-                        </h4>
-                        <h5
-                          className="text-center text-white companyname mb-2 mx-auto text-capitalize ellipsis"
-                          title={job.name}
-                        >
-                          ({job.displayCompanyName})
-                        </h5>
-                        {(job.isFixed && job.amount) || (!job.isFixed && job.min && job.max) ? (
-                          <p className="text-center digi-price mb-3 mt-3">
-                            <span className="rupee text-white">₹ &nbsp;</span>
-                            <span className="r-price text-white">
-                              {job.isFixed ? job.amount || "--" : job.min && job.max ? `${job.min}-${job.max}` : "--"}
-                            </span>
-                          </p>
-                        ) : (
-                          <p className="text-center digi-price mb-3 mt-3">
-                            <span className="r-price text-white">--</span>
-                          </p>
-                        )}
-
-                        <div className="row">
-                          <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
-                            <div className="col-xxl-10 col-xl-10 col-lg-10 col-md-10 col-sm-10 col-10 mx-auto mb-2">
-                              <div className="row">
-                                <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                  <div className="row">
-                                    <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                      <figure className="text-end">
-                                        <img
-                                          src="/Assets/public_assets/images/newjoblisting/qualification.png"
-                                          className="img-fluid new_img p-0"
-                                          draggable="false"
-                                          alt=""
-                                        />
-                                      </figure>
-                                    </div>
-                                    <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-                                      <div className="ellipsis-wrapper">
-                                        <p
-                                          className="mb-0 text-white job-qualification-text"
-                                          title={job._qualification?.name || "N/A"}
-                                        >
-                                          {job._qualification?.name || "N/A"}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                  <div className="row">
-                                    <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                      <figure className="text-end">
-                                        <img
-                                          src="/Assets/public_assets/images/newjoblisting/fresher.png"
-                                          className="img-fluid new_img p-0"
-                                          draggable="false"
-                                          alt=""
-                                        />
-                                      </figure>
-                                    </div>
-                                    <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-                                      <p className="mb-0 text-white" title={jobExperienceLabel(job)}>
-                                        {jobExperienceLabel(job)}
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                  <div className="row">
-                                    <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                      <figure className="text-end">
-                                        <img
-                                          src="/Assets/public_assets/images/icons/location-pin.png"
-                                          className="img-fluid new_img p-0"
-                                          draggable="false"
-                                          alt=""
-                                        />
-                                      </figure>
-                                    </div>
-                                    <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-                                      <div className="ellipsis-wrapper">
-                                        <p
-                                          className="mb-0 text-white"
-                                          title={job.city ? `${job.city.name}, ${job.state?.name || ""}` : "NA"}
-                                        >
-                                          {job.city ? `(${job.city.name}, ${job.state?.name || "NA"})` : "NA"}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="col-xxl-6 col-xl-6 col-lg-6 col-md-6 col-sm-6 col-6 mb-2">
-                                  <div className="row">
-                                    <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 my-auto">
-                                      <figure className="text-end">
-                                        <img
-                                          src="/Assets/public_assets/images/newjoblisting/onsite.png"
-                                          className="img-fluid new_img p-0"
-                                          draggable="false"
-                                          alt=""
-                                        />
-                                      </figure>
-                                    </div>
-                                    <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 text-white courses_features ps-0">
-                                      <p className="mb-0 text-white" title={job.work || "N/A"}>
-                                        {job.work}
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="col-xxl-12 col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mb-2 text-center">
-                                  <div className="row">
-                                    <div className="col-xxl-7 col-xl-7 col-lg-7 col-md-7 col-sm-7 col-7 my-auto">
-                                      <p className="text-white apply_date">Last Date for apply</p>
-                                    </div>
-                                    <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 text-white courses_features ps-0">
-                                      <p className="color-yellow fw-bold">
-                                        {job.validity
-                                          ? moment(job.validity).utcOffset("+05:30").format("DD MMM YYYY")
-                                          : "NA"}
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 mb-2 text-center me-1">
-                                  <a
-                                    className="btn cta-callnow btn-bg-color shr--width"
-                                    href={`/candidate/login?returnUrl=/candidate/job/${job._id}`}
-                                  >
-                                    Apply Now
-                                  </a>
-                                </div>
-                                <div className="col-xxl-5 col-xl-5 col-lg-5 col-md-5 col-sm-5 col-5 mb-2 text-center ms-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleShareJob(job._id, job.title || job.name)}
-                                    className="btn cta-callnow shr--width"
-                                  >
-                                    Share
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="col-xxl-12 col-12 col-lg-12 col-md-12 col-sm-12 col-12 course_card_footer">
-                          <div className="row py-2">
-                            <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 justify-content-center align-items-center text-center">
-                              <a href={`/candidate/login?returnUrl=/candidate/job/${job._id}`}>
-                                <span className="learnn pt-1 text-white">Learn More</span>
-                                <img src="/Assets/public_assets/images/link.png" className="align-text-top" alt="" />
-                              </a>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                      </div>
+                      <JobCard
+                        key={job._id}
+                        job={job}
+                        thumbUrl={getJobThumbnailUrl(job)}
+                        bucketUrl={bucketUrl}
+                        onPlayVideo={setVideoSrc}
+                        onShare={handleShareJob}
+                      />
                     ))}
                   </div>
                 </div>
@@ -7489,6 +7158,7 @@ export default function HomePage() {
         </section>
 
         <OurApproachSection />
+
 
         <PartnersMediaSection />
 
@@ -7667,28 +7337,18 @@ img.group1 {
 .btn.shr--width{
   width: 100%;
 }
-.btn.cta-callnow {
-    background: var(--foc-color-surface);
-    color: var(--foc-color-cta);
-    font-family: var(--foc-font-display);
-    border-radius: 50px;
-    font-weight: 500;
-    padding: 10px 4px;
-    width: 120%;
-    font-size: 12px;
-    letter-spacing: 1px;
-    transition: .3s;
+.foc-cyber-home #future-courses .btn.cta-callnow,
+.foc-cyber-home #future-jobs .btn.cta-callnow {
+    width: 100%;
+    letter-spacing: 0.02em;
 }
-.btn.cta-callnow:hover {
-    transition: .5s;
-    background: var(--foc-color-cta);
-    color: var(--foc-color-text-inverse);
+.foc-cyber-home #future-courses .learnn,
+.foc-cyber-home #future-jobs .learnn {
+  padding: 4px 0;
 }
-.learnn{
-  padding: 10px 14px;
-}
-.course_card_footer {
-    background: var(--foc-color-cta);
+.foc-cyber-home #future-courses .course_card_footer,
+.foc-cyber-home #future-jobs .course_card_footer {
+    background: var(--home-card-cta, var(--foc-navy-deep, #0d2146));
     border-bottom-left-radius: 10px;
     border-bottom-right-radius: 10px;
 }
@@ -8147,323 +7807,6 @@ button.close span {
   scale: 1.1;
 }
 
-/* Partner modal — matches homepage Sky Magenta theme */
-#partnerModal {
-  --pm-cyan: var(--foc-cyan);
-  --pm-red: var(--foc-magenta);
-  --pm-bg: var(--foc-color-bg);
-  --pm-surface: var(--foc-color-surface);
-  --pm-border: rgba(4, 25, 45, .12);
-  --pm-text: var(--foc-color-text);
-  --pm-muted: var(--foc-color-text-muted);
-  --pm-muted2: var(--foc-color-text-muted-2);
-  --pm-r: 14px;
-  --pm-ease: cubic-bezier(.4,0,.2,1);
-  --pm-shadow: rgba(27,167,255,.18);
-  --pm-shadow-hover: rgba(255,45,170,.16);
-  font-family: var(--foc-font-sans);
-}
-#partnerModal .modal-dialog {
-  max-width: 520px;
-  width: calc(100% - 2rem);
-  max-height: calc(100vh - 2rem);
-  margin: 1rem auto;
-}
-#partnerModal .partner-modal-content {
-  border: 1px solid var(--pm-border);
-  border-radius: var(--pm-r);
-  max-height: calc(100vh - 2rem);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-shadow: 0 18px 46px var(--pm-shadow);
-  background: var(--pm-surface);
-}
-#partnerModal .partner-modal-header {
-  background: linear-gradient(90deg, var(--pm-cyan), var(--pm-red));
-  border: none;
-  padding: 20px 22px 18px;
-  position: relative;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-#partnerModal .partner-modal-header::before,
-#partnerModal .partner-modal-header::after {
-  content: "";
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-  opacity: 0.2;
-}
-#partnerModal .partner-modal-header::before {
-  width: 100px;
-  height: 100px;
-  background: var(--foc-color-surface);
-  top: -40px;
-  right: -16px;
-}
-#partnerModal .partner-modal-header::after {
-  width: 56px;
-  height: 56px;
-  background: var(--pm-cyan);
-  bottom: -24px;
-  left: 10px;
-  opacity: 0.25;
-}
-#partnerModal .partner-modal-header-inner {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  position: relative;
-  z-index: 1;
-}
-#partnerModal .partner-modal-emoji {
-  font-size: 1.75rem;
-  line-height: 1;
-}
-#partnerModal .partner-modal-title {
-  margin: 0;
-  font-family: var(--foc-font-display);
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: var(--foc-color-text-inverse);
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-}
-#partnerModal .partner-modal-tagline {
-  margin: 4px 0 0;
-  font-size: 0.78rem;
-  color: rgba(255,255,255,.9);
-  font-weight: 500;
-  letter-spacing: .02em;
-}
-#partnerModal .partner-modal-close {
-  position: relative;
-  z-index: 2;
-  opacity: 0.92;
-  filter: brightness(0) invert(1);
-  transition: transform 0.2s var(--pm-ease), opacity 0.2s ease;
-}
-#partnerModal .partner-modal-close:hover {
-  transform: scale(1.08);
-  opacity: 1;
-}
-#partnerModal .partner-modal-body {
-  padding: 20px 22px 24px;
-  background: var(--pm-bg);
-  overflow-y: auto;
-  overflow-x: hidden;
-  flex: 1 1 auto;
-  min-height: 0;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(27, 167, 255, 0.45) transparent;
-}
-#partnerModal .partner-modal-body::-webkit-scrollbar {
-  width: 5px;
-}
-#partnerModal .partner-modal-body::-webkit-scrollbar-track {
-  background: transparent;
-}
-#partnerModal .partner-modal-body::-webkit-scrollbar-thumb {
-  background: rgba(27, 167, 255, 0.35);
-  border-radius: 999px;
-}
-#partnerModal .partner-modal-body::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 45, 170, 0.5);
-}
-#partnerModal .partner-modal-body::-webkit-scrollbar-button {
-  display: none;
-  height: 0;
-  width: 0;
-}
-#partnerModal .partner-modal-intro {
-  font-family: var(--foc-font-sans);
-  font-size: 0.85rem;
-  color: var(--pm-muted);
-  line-height: 1.6;
-  margin-bottom: 18px;
-  padding: 10px 12px;
-  background: rgba(27,167,255,.06);
-  border-radius: var(--pm-r);
-  border: 1px solid var(--pm-border);
-}
-#partnerModal .partner-field {
-  margin-bottom: 12px;
-}
-#partnerModal .partner-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--foc-font-sans);
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--pm-muted);
-  margin-bottom: 6px;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-}
-#partnerModal .partner-label svg {
-  color: var(--pm-cyan);
-  flex-shrink: 0;
-}
-#partnerModal #partnerForm input,
-#partnerModal #partnerForm select,
-#partnerModal #partnerForm textarea {
-  width: 100%;
-  border: 1px solid var(--pm-border);
-  border-radius: 4px;
-  padding: 10px 12px;
-  font-size: 0.88rem;
-  font-family: var(--foc-font-sans);
-  background: var(--pm-surface);
-  color: var(--pm-text);
-  transition: border-color 0.2s var(--pm-ease), box-shadow 0.2s var(--pm-ease);
-  height: auto;
-}
-#partnerModal #partnerForm select {
-  cursor: pointer;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231BA7FF' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  padding-right: 36px;
-}
-#partnerModal #partnerForm input::placeholder,
-#partnerModal #partnerForm textarea::placeholder {
-  color: var(--pm-muted2);
-}
-#partnerModal #partnerForm input:focus,
-#partnerModal #partnerForm select:focus,
-#partnerModal #partnerForm textarea:focus {
-  outline: none;
-  border-color: rgba(27,167,255,.45);
-  box-shadow: 0 0 0 3px rgba(27,167,255,.15);
-}
-#partnerModal #partnerForm textarea {
-  resize: vertical;
-  min-height: 96px;
-  margin-bottom: 0;
-}
-#partnerModal .partner-modal-footer {
-  margin-top: 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-}
-#partnerModal .partner-modal-submit {
-  width: 100%;
-  max-width: 280px;
-  padding: 12px 28px;
-  border: none;
-  border-radius: 4px;
-  font-family: var(--foc-font-sans);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--foc-color-text-inverse);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-  background: linear-gradient(90deg, var(--pm-cyan), var(--pm-red));
-  box-shadow: 0 14px 34px var(--pm-shadow);
-  cursor: pointer;
-  transition: transform 0.25s var(--pm-ease), box-shadow 0.25s var(--pm-ease);
-}
-#partnerModal .partner-modal-submit:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 18px 46px var(--pm-shadow-hover);
-}
-#partnerModal .partner-modal-submit:disabled {
-  opacity: 0.7;
-  cursor: wait;
-}
-#partnerModal .partner-modal-success {
-  font-family: var(--foc-font-sans);
-  font-size: 0.85rem;
-  color: var(--pm-text);
-  background: rgba(27,167,255,.08);
-  border: 1px solid rgba(27,167,255,.22);
-  padding: 10px 14px;
-  border-radius: 4px;
-  width: 100%;
-  text-align: center;
-}
-#partnerModal .partner-modal-error {
-  font-family: var(--foc-font-sans);
-  font-size: 0.85rem;
-  color: var(--pm-red);
-  background: rgba(255,45,170,.06);
-  border: 1px solid rgba(255,45,170,.2);
-  padding: 10px 14px;
-  border-radius: 4px;
-  width: 100%;
-  text-align: center;
-}
-#partnerSuccessModal .modal-dialog {
-  max-width: 420px;
-}
-#partnerSuccessModal .partner-success-content {
-  background: var(--pm-bg, #0a0e17);
-  border: 1px solid rgba(27,167,255,.25);
-  border-radius: 12px;
-  overflow: hidden;
-  text-align: center;
-}
-#partnerSuccessModal .partner-success-body {
-  padding: 36px 28px 32px;
-}
-#partnerSuccessModal .partner-success-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: rgba(27,167,255,.12);
-  border: 1px solid rgba(27,167,255,.35);
-  color: #1ba7ff;
-  margin-bottom: 18px;
-}
-#partnerSuccessModal .partner-success-title {
-  font-family: var(--foc-font-sans);
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--pm-text, #e8f4ff);
-  margin-bottom: 10px;
-}
-#partnerSuccessModal .partner-success-message {
-  font-family: var(--foc-font-sans);
-  font-size: 0.95rem;
-  line-height: 1.55;
-  color: rgba(232,244,255,.78);
-  margin-bottom: 24px;
-}
-#partnerSuccessModal .partner-success-close-btn {
-  font-family: var(--foc-font-sans);
-  font-size: 0.9rem;
-  font-weight: 600;
-  padding: 10px 28px;
-  border-radius: 6px;
-  border: none;
-  background: linear-gradient(135deg, #1ba7ff, #0066cc);
-  color: #fff;
-  cursor: pointer;
-}
-#partnerSuccessModal .partner-success-close-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 32px rgba(27,167,255,.25);
-}
-@media (max-width: 576px) {
-  #partnerModal .modal-dialog {
-    margin: 0.75rem auto;
-  }
-  #partnerModal .partner-modal-body {
-    padding: 16px 14px 20px;
-  }
-}
 .newWidth{
   width: 30%!important;
 }
@@ -8701,30 +8044,25 @@ button.close span {
 
 .foc-cyber-home #future-jobs .job-action .btn.cta-callnow {
   width: 100% !important;
-  min-height: 38px;
+  min-height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 9px 12px;
-  border: 1px solid rgba(252,43,90,.9);
+  padding: 8px 10px;
+  border: 1px solid var(--home-card-cta, var(--foc-navy-deep, #0d2146));
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .foc-cyber-home #future-jobs .job-action .btn-bg-color {
-  background: var(--foc-color-cta) !important;
+  background: var(--home-card-cta, var(--foc-navy-deep, #0d2146)) !important;
   color: var(--foc-color-text-inverse) !important;
 }
 
 .foc-cyber-home #future-jobs .job-action .btn.cta-callnow:not(.btn-bg-color) {
   background: rgba(255,255,255,.96);
-}
-
-.foc-cyber-home #future-jobs .course_card_footer {
-   background: var(--foc-color-cta);
-    border-bottom-left-radius: 10px;
-    border-bottom-right-radius: 10px;
+  color: var(--home-card-cta, var(--foc-navy-deep, #0d2146)) !important;
 }
 
 .foc-cyber-home #future-jobs .course_card_footer a {
@@ -8737,8 +8075,8 @@ button.close span {
 }
 
 .foc-cyber-home #future-jobs .course_card_footer .learnn {
-  padding: 8px 0;
-  font-weight: 800;
+  padding: 4px 0;
+  font-weight: 700;
   letter-spacing: .03em;
 }
 
@@ -9498,153 +8836,6 @@ height:15rem;
         </div>
       </div>
 
-      <div className="modal fade" id="partnerModal" tabIndex="-1" aria-labelledby="partnerModalLabel" aria-hidden="true">
-        <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-          <div className="modal-content partner-modal-content">
-            <div className="modal-header partner-modal-header">
-              <div className="partner-modal-header-inner">
-                <span className="partner-modal-emoji" aria-hidden="true">
-                  🤝
-                </span>
-                <div>
-                  <h5 className="partner-modal-title" id="partnerModalLabel">
-                    Partner With Us
-                  </h5>
-                  <p className="partner-modal-tagline">Future-tech partnerships that create real impact</p>
-                </div>
-              </div>
-              <button type="button" className="btn-close partner-modal-close" data-bs-dismiss="modal" aria-label="Close" />
-            </div>
-            <div className="modal-body partner-modal-body">
-              <p className="partner-modal-intro">
-                Share your proposal.
-              </p>
-              <form id="partnerForm" onSubmit={handlePartnerSubmit}>
-                <div className="row g-2">
-                  <div className="col-sm-6 partner-field">
-                    <label className="partner-label" htmlFor="partner-name">
-                      <User size={14} aria-hidden /> Name
-                    </label>
-                    <input
-                      id="partner-name"
-                      type="text"
-                      name="name"
-                      value={partnerForm.name}
-                      onChange={handlePartnerChange}
-                      required
-                      placeholder="Your name"
-                    />
-                  </div>
-                  <div className="col-sm-6 partner-field">
-                    <label className="partner-label" htmlFor="partner-org">
-                      <Building size={14} aria-hidden /> Organization
-                    </label>
-                    <input
-                      id="partner-org"
-                      type="text"
-                      name="organization"
-                      value={partnerForm.organization}
-                      onChange={handlePartnerChange}
-                      placeholder="Company / institution"
-                    />
-                  </div>
-                  <div className="col-sm-6 partner-field">
-                    <label className="partner-label" htmlFor="partner-state">
-                      <MapPin size={14} aria-hidden /> State
-                    </label>
-                    <select
-                      id="partner-state"
-                      name="state"
-                      value={partnerForm.state}
-                      onChange={handlePartnerChange}
-                      required
-                    >
-                      <option value="" disabled>
-                        Pick your state
-                      </option>
-                      {INDIAN_STATES.map((state) => (
-                        <option key={state} value={state}>
-                          {state}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="col-sm-6 partner-field">
-                    <label className="partner-label" htmlFor="partner-mobile">
-                      <Smartphone size={14} aria-hidden /> Phone
-                    </label>
-                    <input
-                      id="partner-mobile"
-                      type="tel"
-                      name="mobile"
-                      value={partnerForm.mobile}
-                      onChange={handlePartnerChange}
-                      required
-                      pattern="[0-9]{10}"
-                      placeholder="10-digit number"
-                    />
-                  </div>
-                  <div className="col-12 partner-field">
-                    <label className="partner-label" htmlFor="partner-email">
-                      <Mail size={14} aria-hidden /> Email
-                    </label>
-                    <input
-                      id="partner-email"
-                      type="email"
-                      name="email"
-                      value={partnerForm.email}
-                      onChange={handlePartnerChange}
-                      required
-                      placeholder="you@company.com"
-                    />
-                  </div>
-                  <div className="col-12 partner-field">
-                    <label className="partner-label" htmlFor="partner-message">
-                      <MessageCircle size={14} aria-hidden /> Message
-                    </label>
-                    <textarea
-                      id="partner-message"
-                      name="message"
-                      value={partnerForm.message}
-                      onChange={handlePartnerChange}
-                      required
-                      rows={4}
-                      placeholder="Tell us about your partnership idea..."
-                    />
-                  </div>
-                </div>
-                <div className="partner-modal-footer">
-                  <button type="submit" className="partner-modal-submit" disabled={partnerLoading}>
-                    {partnerLoading ? "Submitting..." : "Submit →"}
-                  </button>
-                  {partnerError && <p className="partner-modal-error mb-0">{partnerError}</p>}
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="modal fade" id="partnerSuccessModal" tabIndex="-1" aria-labelledby="partnerSuccessModalLabel" aria-hidden="true">
-        <div className="modal-dialog modal-dialog-centered">
-          <div className="modal-content partner-success-content">
-            <div className="partner-success-body">
-              <div className="partner-success-icon" aria-hidden="true">
-                <Check size={32} strokeWidth={2.5} />
-              </div>
-              <h5 className="partner-success-title" id="partnerSuccessModalLabel">
-                Thank you!
-              </h5>
-              <p className="partner-success-message mb-0">
-                We will contact you within three working days.
-              </p>
-              <button type="button" className="partner-success-close-btn" data-bs-dismiss="modal">
-                Got it
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
     </FrontLayout>
   );
 }

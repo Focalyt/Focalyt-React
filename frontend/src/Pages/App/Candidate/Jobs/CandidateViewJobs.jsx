@@ -921,10 +921,10 @@
 //                         <div className="swiper-wrapper">
 //                           {jobDetails._company.mediaGallery.map((img, index) => (
 //                             <div className="swiper-slide" key={index}>
-//                               <a href={`${process.env.REACT_APP_MIPIE_BUCKET_URL}/${img}`} data-fancybox="gallery">
+//                               <a href={resolveMediaUrl(bucketUrl, img)} data-fancybox="gallery">
 //                                 <div
 //                                   className="image"
-//                                   style={{ backgroundImage: `url('${process.env.REACT_APP_MIPIE_BUCKET_URL}/${img}')` }}
+//                                   style={{ backgroundImage: `url('${resolveMediaUrl(bucketUrl, img)}')` }}
 //                                 >
 //                                   <div className="overlay">
 //                                     <em className="mdi mdi-magnify-plus"></em>
@@ -965,7 +965,7 @@
 //                             />
 //                             <a
 //                               target="_blank"
-//                               href={`${process.env.REACT_APP_MIPIE_BUCKET_URL}/${jobDetails._company.mediaGalaryVideo}`}
+//                               href={resolveMediaUrl(bucketUrl, jobDetails._company.mediaGalaryVideo)}
 //                               className="glightbox play-btn"
 //                               rel="noopener noreferrer"
 //                             >
@@ -1548,6 +1548,7 @@ import 'swiper/css/pagination';
 import "@fancyapps/ui/dist/fancybox/fancybox.css";
 import { Fancybox } from '@fancyapps/ui';
 import '@fortawesome/fontawesome-free/css/all.min.css';
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 
 
@@ -2701,10 +2702,10 @@ const CandidateViewJobs = () => {
                         <div className="swiper-wrapper">
                           {jobDetails._company.mediaGallery.map((img, index) => (
                             <div className="swiper-slide" key={index}>
-                              <a href={`${process.env.REACT_APP_MIPIE_BUCKET_URL}/${img}`} data-fancybox="gallery">
+                              <a href={resolveMediaUrl(bucketUrl, img)} data-fancybox="gallery">
                                 <div
                                   className="image"
-                                  style={{ backgroundImage: `url('${process.env.REACT_APP_MIPIE_BUCKET_URL}/${img}')` }}
+                                  style={{ backgroundImage: `url('${resolveMediaUrl(bucketUrl, img)}')` }}
                                 >
                                   <div className="overlay">
                                     <em className="mdi mdi-magnify-plus"></em>
@@ -2745,7 +2746,7 @@ const CandidateViewJobs = () => {
                             />
                             <a
                               target="_blank"
-                              href={`${process.env.REACT_APP_MIPIE_BUCKET_URL}/${jobDetails._company.mediaGalaryVideo}`}
+                              href={resolveMediaUrl(bucketUrl, jobDetails._company.mediaGalaryVideo)}
                               className="glightbox play-btn"
                               rel="noopener noreferrer"
                             >
@@ -2926,7 +2927,7 @@ const CandidateViewJobs = () => {
                     {referralFormData.aadharCardImage ? (
                       <>
                         <a
-                          href={`${bucketUrl}/${referralFormData.aadharCardImage}`}
+                          href={resolveMediaUrl(bucketUrl, referralFormData.aadharCardImage)}
                           target="_blank"
                           rel="noopener noreferrer"
                           id="aadharLink"
@@ -2993,7 +2994,7 @@ const CandidateViewJobs = () => {
                     {referralFormData.panCardImage ? (
                       <>
                         <a
-                          href={`${bucketUrl}/${referralFormData.panCardImage}`}
+                          href={resolveMediaUrl(bucketUrl, referralFormData.panCardImage)}
                           target="_blank"
                           rel="noopener noreferrer"
                           id="panLink"
@@ -3087,7 +3088,7 @@ const CandidateViewJobs = () => {
                     {referralFormData.bankDocumentImage ? (
                       <>
                         <a
-                          href={`${bucketUrl}/${referralFormData.bankDocumentImage}`}
+                          href={resolveMediaUrl(bucketUrl, referralFormData.bankDocumentImage)}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
@@ -3562,7 +3563,9 @@ const CandidateViewJobs = () => {
 
       <style>
         {`
-        
+        .video-fluid {
+    width: 100%;
+}
         .card .card-header {
   display: flex;
   align-items: center;
@@ -4612,7 +4615,7 @@ padding-bottom: 0px!important;
   {
 
     `
-    .video-bttn:after {
+.video-bttn:after {
     content: '';
     position: absolute;
     top: 50%;
@@ -4620,7 +4623,7 @@ padding-bottom: 0px!important;
     z-index: 1;
     margin-left: -20px;
     margin-top: -20px;
-    /* background-image: url(../images/icon-play.png); */
+    background-image: url(/Assets/images/icon-play.png);
     background-size: contain;
     display: block;
     width: 44px;

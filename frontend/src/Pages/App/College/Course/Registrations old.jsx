@@ -1,12 +1,47 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import DatePicker from 'react-date-picker';
+import { io } from 'socket.io-client';
 
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
+import { toast } from 'react-toastify';
+import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/googleOAuth';
+
+import useWebsocket from '../../../../utils/websocket';
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
+
+const DOC_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
+
+const DOC_COURSE_PREFIX = /^Documents for course\/?/i;
+
+const normalizeDocStorageKey = (fileUrl) => {
+  if (!fileUrl) return '';
+  let key = String(fileUrl).trim();
+  if (key.startsWith('blob:')) return key;
+  if (key.startsWith('http://') || key.startsWith('https://')) {
+    const bucketBase = DOC_BUCKET_URL.replace(/\/$/, '');
+    if (bucketBase && key.startsWith(bucketBase)) {
+      key = key.slice(bucketBase.length);
+    } else {
+      const s3Match = key.match(/amazonaws\.com\/(.+)$/i);
+      if (s3Match) key = decodeURIComponent(s3Match[1]);
+      else return key;
+    }
+  }
+  return key.replace(/^\//, '').replace(DOC_COURSE_PREFIX, '');
+};
+
+const getDocFileUrl = (fileUrl) => {
+  const key = normalizeDocStorageKey(fileUrl);
+  if (!key) return '';
+  if (key.startsWith('blob:') || key.startsWith('http://') || key.startsWith('https://')) {
+    return key;
+  }
+  return `${DOC_BUCKET_URL}/${key}`;
+};
 
 const MultiSelectCheckbox = ({
   title,
@@ -17,12 +52,27 @@ const MultiSelectCheckbox = ({
   isOpen,
   onToggle
 }) => {
+
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchTerm('');
+    }
+  }, [isOpen]);
+
   const handleCheckboxChange = (value) => {
     const newValues = selectedValues.includes(value)
       ? selectedValues.filter(v => v !== value)
       : [...selectedValues, value];
     onChange(newValues);
   };
+
+  const filteredOptions = [...options]
+    .sort((a, b) => (a?.label || '').localeCompare((b?.label || ''), undefined, { sensitivity: 'base' }))
+    .filter(option =>
+      (option?.label || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
   // Get display text for selected items
   const getDisplayText = () => {
@@ -77,6 +127,8 @@ const MultiSelectCheckbox = ({
                   type="text"
                   className="form-control"
                   placeholder={`Search ${title.toLowerCase()}...`}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
@@ -84,7 +136,7 @@ const MultiSelectCheckbox = ({
 
             {/* Options List */}
             <div className="options-list-new">
-              {options.map((option) => (
+              {filteredOptions.map((option) => (
                 <label key={option.value} className="option-item-new">
                   <input
                     type="checkbox"
@@ -100,10 +152,10 @@ const MultiSelectCheckbox = ({
                 </label>
               ))}
 
-              {options.length === 0 && (
+              {filteredOptions.length === 0 && (
                 <div className="no-options">
                   <i className="fas fa-info-circle me-2"></i>
-                  No {title.toLowerCase()} available
+                  {searchTerm ? `No ${title.toLowerCase()} found for "${searchTerm}"` : `No ${title.toLowerCase()} available`}
                 </div>
               )}
             </div>
@@ -112,7 +164,8 @@ const MultiSelectCheckbox = ({
             {selectedValues.length > 0 && (
               <div className="options-footer">
                 <small className="text-muted">
-                  {selectedValues.length} of {options.length} selected
+                  {selectedValues.length} of {filteredOptions.length} selected
+                  {searchTerm && ` (filtered from ${options.length} total)`}
                 </small>
               </div>
             )}
@@ -166,7 +219,7 @@ const DocumentModal = memo(({
     setDocumentRotation(0);
   }, []);
 
-  const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+  const fileUrl = getDocFileUrl(latestUpload?.fileUrl || selectedDocument?.fileUrl);
   const fileType = fileUrl ? getFileType(fileUrl) : null;
 
   const handleRejectClick = useCallback(() => {
@@ -189,7 +242,7 @@ const DocumentModal = memo(({
 
   // Fixed renderDocumentThumbnail - removed setCurrentPreviewUpload calls
   const renderDocumentThumbnail = (upload, isSmall = true) => {
-    const fileUrl = upload?.fileUrl;
+    const fileUrl = getDocFileUrl(upload?.fileUrl);
     if (!fileUrl) {
       return (
         <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
@@ -205,7 +258,7 @@ const DocumentModal = memo(({
           fontSize: isSmall ? '16px' : '24px',
           color: '#6c757d'
         }}>
-          📄
+          ðŸ“„
         </div>
       );
     }
@@ -276,8 +329,8 @@ const DocumentModal = memo(({
               // Disable pointer events
               pointerEvents: 'none'
             }}>
-              {fileType === 'document' ? '📄' :
-                fileType === 'spreadsheet' ? '📊' : '📁'}
+              {fileType === 'document' ? 'ðŸ“„' :
+                fileType === 'spreadsheet' ? 'ðŸ“Š' : 'ðŸ“'}
             </div>
           )}
         </div>
@@ -300,15 +353,12 @@ const DocumentModal = memo(({
                 (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads")) ? (
                 <>
                   {(() => {
-                    console.log('selectedDocument:', selectedDocument);
-                    console.log('latestUpload:', latestUpload);
 
-                    const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+
+                    const fileUrl = getDocFileUrl(latestUpload?.fileUrl || selectedDocument?.fileUrl);
                     const hasDocument = fileUrl ||
                       (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
 
-                    console.log('fileUrl:', fileUrl);
-                    console.log('hasDocument:', hasDocument);
 
                     if (hasDocument) {
                       // If we have a file URL, show the appropriate viewer
@@ -349,8 +399,8 @@ const DocumentModal = memo(({
                           return (
                             <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
                               <div style={{ fontSize: '60px', marginBottom: '20px' }}>
-                                {fileType === 'document' ? '📄' :
-                                  fileType === 'spreadsheet' ? '📊' : '📁'}
+                                {fileType === 'document' ? 'ðŸ“„' :
+                                  fileType === 'spreadsheet' ? 'ðŸ“Š' : 'ðŸ“'}
                               </div>
                               <h4>Document Preview</h4>
                               <p>Click download to view this file</p>
@@ -382,7 +432,7 @@ const DocumentModal = memo(({
                         // Document exists but no file URL - show document uploaded message
                         return (
                           <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
-                            <div style={{ fontSize: '60px', marginBottom: '20px' }}>📄</div>
+                            <div style={{ fontSize: '60px', marginBottom: '20px' }}>ðŸ“„</div>
                             <h4>Document Uploaded</h4>
                             <p>Document is available for verification</p>
                             <p><strong>Status:</strong> {selectedDocument?.status}</p>
@@ -464,7 +514,7 @@ const DocumentModal = memo(({
                         {upload.fileUrl && (
                           <div className="history-actions" style={{ marginTop: '8px' }}>
                             <a
-                              href={upload.fileUrl}
+                              href={getDocFileUrl(upload.fileUrl)}
                               download
                               className="btn btn-sm btn-outline-primary"
                               target="_blank"
@@ -543,7 +593,7 @@ const useNavHeight = (dependencies = []) => {
     if (navRef.current) {
       const height = navRef.current.offsetHeight;
       setNavHeight(height);
-      console.log('Nav height updated:', height + 'px');
+
     }
   }, []);
 
@@ -552,7 +602,7 @@ const useNavHeight = (dependencies = []) => {
     if (widthRef.current) {
       const width = widthRef.current.offsetWidth;
       setWidth(width);
-      console.log('Width updated:', width + 'px');
+
     }
   }, []);
 
@@ -606,7 +656,6 @@ const useMainWidth = (dependencies = []) => {// Default fallback
     if (widthRef.current) {
       const width = widthRef.current.offsetWidth;
       setWidth(width);
-      console.log('Width updated:', width + 'px');
     }
   }, []);
 
@@ -686,32 +735,150 @@ const useScrollBlur = (navbarHeight = 140) => {
 const CRMDashboard = () => {
 
   const candidateRef = useRef();
+  // Refs
+  const addressInputRef = useRef(null);
+  const [userData, setUserData] = useState(JSON.parse(sessionStorage.getItem("user") || "{}"));
+  const token = userData.token;
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
+  const { messages, updates } = useWebsocket(userData._id || userData._id);
+
+  // Bulk WhatsApp delivery tracker (messageId -> recipient), so we can print who delivered/failed + totals
+  const bulkWhatsappTrackerRef = useRef({
+    messageIdToRecipient: {},
+    deliveredMessageIds: new Set(),
+    failedMessageIds: new Set(),
+    lastSummaryAt: 0
+  });
+
+  // Avoid re-processing the same socket status update repeatedly (updates[] is cumulative)
+  const processedWhatsappStatusUpdateKeysRef = useRef(new Set());
+
+
+  // 1. State
+  const [verticalOptions, setVerticalOptions] = useState([]);
+  const [projectOptions, setProjectOptions] = useState([]);
+  const [courseOptions, setCourseOptions] = useState([]);
+  const [centerOptions, setCenterOptions] = useState([]);
+  const [counselorOptions, setCounselorOptions] = useState([]);
+  const [sources, setSources] = useState([]);
+  const [batchOptions, setBatchOptions] = useState([]);
+  const [allCoursesMeta, setAllCoursesMeta] = useState([]);
+  const [cycleFilters, setCycleFilters] = useState({
+    department: '',
+    project: '',
+    center: '',
+    course: '',
+    batch: '',
+  });
+  const [leadViewTab, setLeadViewTab] = useState('all');
+  const [myReferLeadsCount, setMyReferLeadsCount] = useState(0);
+  const [approvalCounts, setApprovalCounts] = useState({ total: 0, approved: 0, pending: 0, rejected: 0 });
+  const [selectedApprovalFilter, setSelectedApprovalFilter] = useState(null);
+  const [followupDashCounts, setFollowupDashCounts] = useState({
+    call: { done: 0, planned: 0, missed: 0 },
+    visit: { done: 0, planned: 0, missed: 0 },
+  });
+  const [docDashCounts, setDocDashCounts] = useState({ done: 0, pending: 0 });
+  const [selectedFollowupBucket, setSelectedFollowupBucket] = useState('');
+  const [approvalEditProfileId, setApprovalEditProfileId] = useState(null);
+
+  // Google Maps initialization
+
+
+  const fetchProfile = (id) => {
+
+    if (candidateRef.current) {
+      candidateRef.current.fetchProfile(id);
+    }
+  };
 
   useEffect(() => {
-    console.log('CandidateRef initialized:', candidateRef.current);
+    const fetchFilterOptions = async () => {
+      try {
+
+        const res = await axios.get(`${backendUrl}/college/filters-data`, {
+          headers: { 'x-auth': token }
+        });
+        if (res.data.status) {
+          setVerticalOptions(res.data.verticals.map(v => ({ value: v._id, label: v.name })));
+          setProjectOptions(res.data.projects.map(p => ({ value: p._id, label: p.name })));
+          setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
+          // setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
+          // Fetch ALL centers (not just from AppliedCourses) to show aligned centers
+          try {
+            const centersRes = await axios.get(`${backendUrl}/college/list_all_centers`, {
+              headers: { 'x-auth': token }
+            });
+            if (centersRes.data.success && centersRes.data.data) {
+              const allCentersMapped = centersRes.data.data.map(c => ({ 
+                value: c._id, 
+                label: c.name 
+              }));
+              // console.log('ðŸ¢ ALL CENTERS DEBUG - All centers from list_all_centers:', allCentersMapped);
+              setCenterOptions(allCentersMapped);
+            } else {
+              // Fallback to centers from filters-data if list_all_centers fails
+              const centersMapped = res.data.centers.map(c => ({ value: c._id, label: c.name }));
+              // console.log('ðŸ¢ CENTERS DEBUG - Mapped centers for filter (fallback):', centersMapped);
+              setCenterOptions(centersMapped);
+            }
+          } catch (centerErr) {
+            console.error('Failed to fetch all centers, using filters-data centers:', centerErr);
+            // Fallback to centers from filters-data
+            const centersMapped = res.data.centers.map(c => ({ value: c._id, label: c.name }));
+            setCenterOptions(centersMapped);
+          }
+          
+          const activeCounselors = (res.data.counselors || []).filter(
+            (c) => c?.status === true || c?.status === 'active'
+          );
+          setCounselorOptions(activeCounselors.map(c => ({ value: c._id, label: c.name })));
+        }
+
+        try {
+          const coursesMetaRes = await axios.get(`${backendUrl}/college/all_courses`, {
+            headers: { 'x-auth': token }
+          });
+          if (coursesMetaRes.data?.success) {
+            setAllCoursesMeta(coursesMetaRes.data.data || []);
+          }
+        } catch (metaErr) {
+          console.error('Failed to fetch courses meta:', metaErr);
+        }
+      } catch (err) {
+        console.error('Failed to fetch filter options:', err);
+      }
+    };
+    fetchFilterOptions();
   }, []);
 
   useEffect(() => {
-    console.log('CandidateRef current changed:', candidateRef.current);
-  }, [candidateRef.current]);
-
-  const fetchProfile = (id) => {
-    console.log('fetchProfile called with id:', id);
-    console.log('candidateRef.current:', candidateRef.current);
-    if (candidateRef.current) {
-      console.log('candidateRef.current exists, calling fetchProfile');
-      candidateRef.current.fetchProfile(id);
-    } else {
-      console.log('candidateRef.current is null - this is the problem!');
-    }
-  };
+    const fetchBatches = async () => {
+      try {
+        const params = new URLSearchParams();
+        if (cycleFilters.center) params.set('centerId', cycleFilters.center);
+        if (cycleFilters.course) params.set('courseId', cycleFilters.course);
+        const res = await axios.get(`${backendUrl}/college/get_batches?${params.toString()}`, {
+          headers: { 'x-auth': token }
+        });
+        if (res.data?.success) {
+          setBatchOptions((res.data.data || []).map((b) => ({ value: b._id, label: b.name })));
+        } else {
+          setBatchOptions([]);
+        }
+      } catch (err) {
+        console.error('Failed to fetch batches:', err);
+        setBatchOptions([]);
+      }
+    };
+    fetchBatches();
+  }, [cycleFilters.center, cycleFilters.course, token, backendUrl]);
 
 
   const handleSaveCV = async () => {
     if (candidateRef.current) {
       const result = await candidateRef.current.handleSaveCV();
 
-      console.log(result, 'result')
       if (result.isvalid === true) {
         // Find and update the candidate in allProfiles
         setAllProfiles(prevProfiles =>
@@ -732,17 +899,138 @@ const CRMDashboard = () => {
     }
   };
 
-  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-  const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-  const token = userData.token;
+
+
+  const [isGoogleLoginLoading, setIsGoogleLoginLoading] = useState(false);
+
+  // WhatsApp templates dropdown state
+  const [showWhatsAppTemplates, setShowWhatsAppTemplates] = useState(false);
+  const [whatsAppTemplates, setWhatsAppTemplates] = useState([]);
+  const [isLoadingWhatsAppTemplates, setIsLoadingWhatsAppTemplates] = useState(false);
+  const [whatsAppTemplatesError, setWhatsAppTemplatesError] = useState("");
+
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [templatePreview, setTemplatePreview] = useState("");
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showWhatsAppTemplates && !event.target.closest('.input-template')) {
+        setShowWhatsAppTemplates(false);
+      }
+    };
+
+    if (showWhatsAppTemplates) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showWhatsAppTemplates]);
+
+  const fetchWhatsAppTemplates = async () => {
+    try {
+      setIsLoadingWhatsAppTemplates(true);
+      setWhatsAppTemplatesError("");
+      const response = await axios.get(`${backendUrl}/college/whatsapp/templates`, {
+        headers: { 'x-auth': token }
+      });
+      const list = response?.data?.data || [];
+      setWhatsAppTemplates(Array.isArray(list) ? list : []);
+    } catch (error) {
+      setWhatsAppTemplatesError("Failed to load WhatsApp templates.");
+    } finally {
+      setIsLoadingWhatsAppTemplates(false);
+    }
+  };
+
+  // const permissions = userData.permissions
+
+  const [permissions, setPermissions] = useState();
+
+  const handleGoogleLogin = async () => {
+    try {
+      setIsGoogleLoginLoading(true);
+
+      const result = await getGoogleAuthCode({
+        scopes: ['openid', 'profile', 'email', 'https://www.googleapis.com/auth/calendar'],
+        user: userData
+      });
+
+      const refreshToken = await getGoogleRefreshToken({
+        code: result,
+        user: userData
+      });
+
+      const user = {
+        ...userData,
+        googleAuthToken: refreshToken.data
+      };
+
+      sessionStorage.setItem('googleAuthToken', JSON.stringify(refreshToken.data));
+      sessionStorage.setItem('user', JSON.stringify(user));
+
+      setUserData(user);
+
+    } catch (error) {
+      console.error('Google login failed:', error);
+
+      if (error.message?.includes('Popup blocked')) {
+        alert('Please allow popups for this site and try again.');
+      } else if (error.message?.includes('closed by user')) {
+        alert('Login cancelled by user.');
+      } else {
+        alert('Login failed: ' + error.message);
+      }
+    } finally {
+      setIsGoogleLoginLoading(false);
+    }
+  };
+
+  const handleGoogleLogout = () => {
+    try {
+      const updatedUser = { ...userData };
+      delete updatedUser.googleAuthToken;
+      setUserData(updatedUser);
+
+      sessionStorage.removeItem('googleAuthToken');
+
+      const storedUser = sessionStorage.getItem('user');
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        delete parsedUser.googleAuthToken;
+        sessionStorage.setItem('user', JSON.stringify(parsedUser));
+      }
+
+      alert('Disconnected from Google Calendar successfully.');
+    } catch (err) {
+      console.error('Error while disconnecting Google Calendar:', err);
+    }
+  };
+
+  useEffect(() => {
+    updatedPermission()
+  }, [])
+
+  const updatedPermission = async () => {
+
+    const respose = await axios.get(`${backendUrl}/college/permission`, {
+      headers: { 'x-auth': token }
+    });
+    if (respose.data.status) {
+
+      setPermissions(respose.data.permissions);
+    }
+  }
 
   const [openModalId, setOpenModalId] = useState(null);
-
+  const [showBranchModal, setShowBranchModal] = useState(false);
   // const [activeTab, setActiveTab] = useState(0);
   const [activeTab, setActiveTab] = useState({});
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [showPopup, setShowPopup] = useState(null);
   const [activeCrmFilter, setActiveCrmFilter] = useState(0);
+  const [input1Value, setInput1Value] = useState('');
+  const [showBulkInputs, setShowBulkInputs] = useState(false);
+  const [bulkMode, setBulkMode] = useState(null); // 'whatsapp' or 'bulkaction'
 
   const [mainContentClass, setMainContentClass] = useState('col-12');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -801,50 +1089,384 @@ const CRMDashboard = () => {
 
   //side pannel stats
   const [showPanel, setShowPanel] = useState('')
-
+  const [branches, setBranches] = useState([]);
+  const [selectedBranch, setSelectedBranch] = useState('');
   // Loading state for fetchProfileData
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
+  const [isLoadingProfilesData, setIsLoadingProfilesData] = useState(false);
 
-  // 1. State
-  const [verticalOptions, setVerticalOptions] = useState([]);
-  const [projectOptions, setProjectOptions] = useState([]);
-  const [courseOptions, setCourseOptions] = useState([]);
-  const [centerOptions, setCenterOptions] = useState([]);
-  const [counselorOptions, setCounselorOptions] = useState([]);
+ 
+  const [leadIntelMap, setLeadIntelMap] = useState({});
+  const [loadingLeadIntel, setLoadingLeadIntel] = useState(false);
+  const [bulkSelectCount, setBulkSelectCount] = useState('50');
 
-  // Fetch filter options from backend API on mount
-  useEffect(() => {
-    const fetchFilterOptions = async () => {
-      try {
-        const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
-        const token = userData.token;
-        const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-        const res = await axios.get(`${backendUrl}/college/filters-data`, {
-          headers: { 'x-auth': token }
-        });
-        if (res.data.status) {
-          setVerticalOptions(res.data.verticals.map(v => ({ value: v._id, label: v.name })));
-          setProjectOptions(res.data.projects.map(p => ({ value: p._id, label: p.name })));
-          setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
-          setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
-          setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
-        }
-      } catch (err) {
-        console.error('Failed to fetch filter options:', err);
+  // WhatsApp Panel states
+  const [whatsappMessages, setWhatsappMessages] = useState([
+  ]);
+  const [whatsappNewMessage, setWhatsappNewMessage] = useState('');
+  const [selectedWhatsappTemplate, setSelectedWhatsappTemplate] = useState(null);
+  const [showWhatsappTemplateMenu, setShowWhatsappTemplateMenu] = useState(false);
+  const [showWhatsappEmojiPicker, setShowWhatsappEmojiPicker] = useState(false);
+  const [showWhatsappFileMenu, setShowWhatsappFileMenu] = useState(false);
+  const [isSendingWhatsapp, setIsSendingWhatsapp] = useState(false);
+  const [hasActiveSession, setHasActiveSession] = useState(true); // Default true for demo
+  const whatsappMessagesEndRef = useRef(null);
+  const [whatsappTemplates, setWhatsappTemplates] = useState([]);
+  const [isLoadingChatHistory, setIsLoadingChatHistory] = useState(false);
+  const [sessionWindow, setSessionWindow] = useState({
+    isOpen: false,
+    openedAt: null,
+    expiresAt: null,
+    remainingTimeMs: 0
+  });
+  const [sessionCountdown, setSessionCountdown] = useState('24:00:00');
+  const [aiWhatsappSummary, setAiWhatsappSummary] = useState(null);
+  const [aiWhatsappLoading, setAiWhatsappLoading] = useState(false);
+  const [aiWhatsappError, setAiWhatsappError] = useState(null);
+  const [aiSuggestedReplyDraft, setAiSuggestedReplyDraft] = useState('');
+
+  // Unified AI Supervision view (one place for lead + WhatsApp insights)
+  const [showAiSupervision, setShowAiSupervision] = useState(false);
+  const [waSummaryByProfileId, setWaSummaryByProfileId] = useState({});
+  const [waSummaryLoadingByProfileId, setWaSummaryLoadingByProfileId] = useState({});
+  const [waSummaryErrorByProfileId, setWaSummaryErrorByProfileId] = useState({});
+  const [nextActionsByProfileId, setNextActionsByProfileId] = useState({});
+  const [nextActionsLoadingByProfileId, setNextActionsLoadingByProfileId] = useState({});
+  const [nextActionsErrorByProfileId, setNextActionsErrorByProfileId] = useState({});
+  const [aiSupervisionCount, setAiSupervisionCount] = useState('10');
+  const [leadSummaryByProfileId, setLeadSummaryByProfileId] = useState({});
+  const [leadSummaryLoadingByProfileId, setLeadSummaryLoadingByProfileId] = useState({});
+  const [leadSummaryErrorByProfileId, setLeadSummaryErrorByProfileId] = useState({});
+  const [aiSupervisionActiveLeadId, setAiSupervisionActiveLeadId] = useState(null);
+  const [aiSupervisionSearchTerm, setAiSupervisionSearchTerm] = useState('');
+  const [aiSupervisionQueueFilter, setAiSupervisionQueueFilter] = useState('all');
+
+ 
+  const [modalType, setModalType] = useState(null); 
+
+  const [selectedSenderId, setSelectedSenderId] = useState('');
+  const [selectedWhatsappNumbers, setSelectedWhatsappNumbers] = useState([]);
+  const [responseRecipient, setResponseRecipient] = useState('sender');
+  const [selectedWhatsappTemplateModal, setSelectedWhatsappTemplateModal] = useState('');
+  const [whatsappMessage, setWhatsappMessage] = useState('');
+  const [isSendingBulkWhatsapp, setIsSendingBulkWhatsapp] = useState(false);
+
+  // Handle incoming messages from users
+  const handleIncomingMessage = useCallback((data) => {
+    console.log('ðŸ“¬ Processing incoming message:', data);
+
+    // Check if this message is for the currently opened chat
+    if (!selectedProfile?._candidate?.mobile) {
+      console.log('âš ï¸ No chat currently open');
+      return;
+    }
+
+    const currentChatPhone = String(selectedProfile._candidate.mobile).replace(/\D/g, '');
+    const incomingFrom = String(data.from).replace(/\D/g, '');
+
+    if (!incomingFrom.includes(currentChatPhone) && !currentChatPhone.includes(incomingFrom)) {
+      console.log('âš ï¸ Message not for current chat:', { currentChatPhone, incomingFrom });
+      return;
+    }
+
+    // Add incoming message to chat
+    setWhatsappMessages((prevMessages) => {
+      // Check if message already exists
+      const exists = prevMessages.some(msg =>
+        msg.whatsappMessageId === data.whatsappMessageId ||
+        msg.dbId === data.messageId
+      );
+
+      if (exists) {
+        console.log('âš ï¸ Message already exists in chat');
+        return prevMessages;
       }
-    };
-    fetchFilterOptions();
+
+      const newMessage = {
+        id: data.messageId,
+        dbId: data.messageId,
+        whatsappMessageId: data.whatsappMessageId,
+        text: data.message,
+        sender: 'user', // Incoming message from user
+        time: new Date(data.sentAt).toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        type: data.messageType,
+        mediaUrl: data.mediaUrl,
+        status: 'received',
+        timestamp: data.sentAt
+      };
+
+      console.log('âœ… Adding incoming message to chat:', {
+        from: data.from,
+        type: data.messageType,
+        text: data.message.substring(0, 50)
+      });
+
+      return [...prevMessages, newMessage];
+    });
+
+    // Update session window state if provided
+    if (data.sessionWindow) {
+      setSessionWindow({
+        isOpen: data.sessionWindow.isOpen,
+        openedAt: data.sessionWindow.openedAt,
+        expiresAt: data.sessionWindow.expiresAt,
+        remainingTimeMs: new Date(data.sessionWindow.expiresAt) - new Date()
+      });
+      console.log('âœ… 24-hour session window opened:', {
+        expiresAt: data.sessionWindow.expiresAt
+      });
+    }
+
+    // Optional: Show browser notification
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('New WhatsApp Message', {
+        body: data.message.substring(0, 100),
+        icon: '/whatsapp-icon.png'
+      });
+    }
+  }, [selectedProfile]);
+
+  // Handle message status updates from Socket.io
+  const handleMessageStatusUpdate = useCallback((data) => {
+    console.log('ðŸ“© Received status update:', data);
+
+    // Update messages in state
+    setWhatsappMessages((prevMessages) => {
+      const updatedMessages = prevMessages.map((msg) => {
+        const matchById = (data.messageId && msg.dbId === data.messageId) ||
+          (data.wamid && msg.wamid === data.wamid) ||
+          (data.id && msg.wamid === data.id) ||
+          (data.id && msg.whatsappMessageId === data.id); 
+        const matchByText = msg.type === 'template'
+          ? msg.templateData?.templateName === data.message?.split(':')[1]?.trim()
+          : msg.text === data.message;
+
+        const isMatchingMessage = matchById || matchByText;
+
+        if (isMatchingMessage && msg.sender === 'agent') {
+          console.log('âœ… Updating message status:', {
+            messageId: msg.id,
+            wamid: msg.wamid,
+            matchedWith: data.id,
+            oldStatus: msg.status,
+            newStatus: data.status
+          });
+
+          return {
+            ...msg,
+            status: data.status,
+            errorMessage: data.status === 'failed' ? (data.errors?.[0]?.title || data.errorMessage) : msg.errorMessage,
+            deliveredAt: data.status === 'delivered' ? new Date(parseInt(data.timestamp) * 1000).toISOString() : msg.deliveredAt,
+            readAt: data.status === 'read' ? new Date(parseInt(data.timestamp) * 1000).toISOString() : msg.readAt
+          };
+        }
+        return msg;
+      });
+
+      // Log if no message was updated
+      const wasUpdated = updatedMessages.some((msg, idx) => msg !== prevMessages[idx]);
+      if (!wasUpdated) {
+        console.warn('âš ï¸ No message found to update');
+        console.log('ðŸ“¨ Received data:', {
+          id: data.id,
+          wamid: data.wamid,
+          messageId: data.messageId,
+          status: data.status,
+          recipient_id: data.recipient_id
+        });
+        console.log('ðŸ’¬ Current messages:', prevMessages.map(m => ({
+          id: m.id,
+          dbId: m.dbId,
+          wamid: m.wamid,
+          whatsappMessageId: m.whatsappMessageId,
+          text: m.text?.substring(0, 30),
+          status: m.status
+        })));
+      }
+
+      return updatedMessages;
+    });
+
+    // Show notification (optional)
+    if (data.status === 'delivered') {
+      console.log('âœ“âœ“ Message delivered', {
+        candidateName: data.candidateName,
+        candidateId: data.candidateId,
+        to: data.to || data.recipient_id,
+        messageId: data.id
+      });
+    } else if (data.status === 'read') {
+      console.log('âœ“âœ“ Message read', {
+        candidateName: data.candidateName,
+        candidateId: data.candidateId,
+        to: data.to || data.recipient_id,
+        messageId: data.id
+      });
+    } else if (data.status === 'failed') {
+      console.error('âŒ Message failed:', {
+        candidateName: data.candidateName,
+        candidateId: data.candidateId,
+        to: data.to || data.recipient_id,
+        messageId: data.id,
+        errorMessage: data.errorMessage || data.errors?.[0]?.title
+      });
+    }
   }, []);
 
   useEffect(() => {
-    console.log(counselorOptions, 'counselorOptions')
-  }, [counselorOptions])
+    console.log('ðŸ“© WhatsApp message status updates:', updates);
+
+    // Process each update individually (updates is an array)
+    if (updates && updates.length > 0) {
+      updates.forEach(update => {
+        // Only process new updates (not already processed)
+        const updateKey = `${update?.id || update?.messageId || 'noid'}:${update?.status || 'nostatus'}:${update?.timestamp || 'notime'}`;
+        if (processedWhatsappStatusUpdateKeysRef.current.has(updateKey)) return;
+        processedWhatsappStatusUpdateKeysRef.current.add(updateKey);
+
+        // Keep bulk counters + log who delivered/failed for current bulk session
+        const wamid = update?.id || update?.messageId;
+        if (wamid && bulkWhatsappTrackerRef.current.messageIdToRecipient[wamid]) {
+          const recipient = bulkWhatsappTrackerRef.current.messageIdToRecipient[wamid];
+          const candidateName = update?.candidateName || recipient?.candidateName || 'Unknown Candidate';
+          const to = update?.to || update?.recipient_id || recipient?.phone;
+
+          if (update.status === 'delivered' || update.status === 'read') {
+            if (!bulkWhatsappTrackerRef.current.deliveredMessageIds.has(wamid)) {
+              bulkWhatsappTrackerRef.current.deliveredMessageIds.add(wamid);
+              console.log(`ðŸ“¦ âœ… Delivered (bulk): ${candidateName} | to=${to} | messageId=${wamid}`);
+            }
+          } else if (update.status === 'failed') {
+            if (!bulkWhatsappTrackerRef.current.failedMessageIds.has(wamid)) {
+              bulkWhatsappTrackerRef.current.failedMessageIds.add(wamid);
+              console.error(`ðŸ“¦ âŒ Failed (bulk): ${candidateName} | to=${to} | messageId=${wamid} | reason=${update?.errorMessage || update?.errors?.[0]?.title || 'Message failed'}`);
+            }
+          }
+
+          // Throttle summary logs (once per ~2s)
+          const now = Date.now();
+          if (now - bulkWhatsappTrackerRef.current.lastSummaryAt > 2000) {
+            bulkWhatsappTrackerRef.current.lastSummaryAt = now;
+            console.log('ðŸ“Š Bulk WhatsApp live totals =>', {
+              delivered: bulkWhatsappTrackerRef.current.deliveredMessageIds.size,
+              failed: bulkWhatsappTrackerRef.current.failedMessageIds.size,
+              tracked: Object.keys(bulkWhatsappTrackerRef.current.messageIdToRecipient).length
+            });
+          }
+        }
+
+        handleMessageStatusUpdate(update);
+      });
+    }
+  }, [updates]);
+
+  // Handle incoming messages from users
+  useEffect(() => {
+    console.log('ðŸ“¬ WhatsApp incoming messages:', messages);
+
+    if (messages && messages.length > 0) {
+      messages.forEach(message => {
+        handleIncomingMessage(message);
+      });
+    }
+  }, [messages]);
+
+
+  // Fetch filter options from backend API on mount
+  useEffect(() => {
+    const initMap = () => {
+      const options = {
+        componentRestrictions: { country: "in" },
+        fields: ["address_components", "geometry"],
+        types: ["geocode"]
+      };
+
+      setTimeout(() => {
+        if (addressInputRef.current && window.google) {
+          const autocomplete = new window.google.maps.places.Autocomplete(
+            addressInputRef.current,
+            options
+          );
+
+          autocomplete.addListener("place_changed", function () {
+            const place = autocomplete.getPlace();
+
+            if (!place.geometry || !place.address_components) {
+              alert("No details available for input: '" + place.name + "'");
+              return;
+            }
+
+            const latitude = place.geometry.location.lat();
+            const longitude = place.geometry.location.lng();
+
+            let state = "";
+            let city = "";
+            let country = "";
+
+            place.address_components.forEach(component => {
+              const types = component.types;
+              if (types.includes('administrative_area_level_1')) {
+                state = component.long_name;
+              }
+              if (types.includes('locality') || types.includes('sublocality')) {
+                city = component.long_name;
+              }
+              if (types.includes("country")) {
+                country = component.long_name;
+              }
+            });
+
+            const address = [city, state, country].filter(Boolean).join(", ");
+
+
+            setCandidateFormData(prev => ({
+              ...prev,
+              personalInfo: {
+                ...prev.personalInfo,
+                currentAddress: {
+                  ...prev.personalInfo.currentAddress,
+                  fullAddress: address,
+                  latitude: latitude.toString(),
+                  longitude: longitude.toString(),
+                  state,
+                  city
+                }
+              }
+            }));
+
+
+
+            addressInputRef.current.value = place.formatted_address || place.name || "";
+          });
+        }
+      }, 500);
+    };
+
+    // Load Google Maps script if not already loaded
+    if (!window.google) {
+      const script = document.createElement('script');
+      script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyB7DDN_gUp2zyrlElXtYpjTEQobYiUB9Lg&callback=initMap&libraries=places&v=weekly';
+      script.async = true;
+      script.defer = true;
+      window.initMap = initMap;
+      document.head.appendChild(script);
+    } else {
+      initMap();
+    }
+  }, [showPanel]);
+
+
+
+
 
   const handleCheckboxChange = (profile, checked) => {
     if (checked) {
-      setSelectedProfiles(prev => [...prev, profile._id]);
+      setSelectedProfiles(prev => [...(Array.isArray(prev) ? prev : []), profile._id]);
     } else {
-      setSelectedProfiles(prev => prev.filter(id => id !== profile._id));
+      setSelectedProfiles(prev => (Array.isArray(prev) ? prev : []).filter(id => id !== profile._id));
     }
   };
 
@@ -903,7 +1525,6 @@ const CRMDashboard = () => {
   const handleFileUpload = async () => {
     if (!selectedFile || !selectedDocumentForUpload) return;
 
-    console.log('selectedDocumentForUpload', selectedDocumentForUpload, 'selectedProfile', selectedProfile)
 
     setIsUploading(true);
     setUploadProgress(0);
@@ -918,7 +1539,6 @@ const CRMDashboard = () => {
       const formData = new FormData();
       formData.append('file', selectedFile);
       formData.append('doc', selectedDocumentForUpload._id);
-      console.log('selectedDocumentForUpload', selectedDocumentForUpload._id);
 
       const response = await axios.put(`${backendUrl}/college/upload_docs/${selectedProfile._id}`, formData, {
         headers: {
@@ -927,10 +1547,9 @@ const CRMDashboard = () => {
         }
       });
 
-      console.log('response', response)
 
       if (response.data.status) {
-
+        fetchLeadDetails()
         alert('Document uploaded successfully! Status: Pending Review');
 
         // Optionally refresh data here
@@ -938,7 +1557,7 @@ const CRMDashboard = () => {
         if (closeButton) {
           closeButton.click();
         }
-        fetchProfileData()
+        // fetchProfileData()
       } else {
         alert('Failed to upload file');
       }
@@ -1009,7 +1628,6 @@ const CRMDashboard = () => {
   };
 
   const updateDocumentStatus = useCallback((uploadId, status, reason) => {
-    console.log(`Updating document ${uploadId} to ${status}`);
     if (status === 'Rejected' && !reason?.trim()) {
       alert('Please provide a rejection reason');
       return;
@@ -1028,7 +1646,30 @@ const CRMDashboard = () => {
   //   alert(`Document ${status} successfully!`);
   //   closeDocumentModal();
   // };
+  useEffect(() => {
+    fetchSources();
+  }, []);
+  const fetchSources = async () => {
+    try {
+      const response = await fetch(`${backendUrl}/college/users/sources`, {
+        method: 'GET',
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'application/json'
+        }
+      });
 
+      const data = await response.json();
+
+      if (data.status || data.success) {
+        setSources(data.data || []);
+      } else {
+        console.error('Failed to fetch sources:', data.message);
+      }
+    } catch (error) {
+      console.error('Error fetching sources:', error);
+    }
+  };
 
 
   const getFileType = (fileUrl) => {
@@ -1122,7 +1763,7 @@ const CRMDashboard = () => {
             onClick={onRotate}
             className="control-btn"
             style={{ whiteSpace: 'nowrap' }}
-            title="Rotate 90°"
+            title="Rotate 90Â°"
           >
             <i className="fas fa-redo"></i> Rotate
           </button>
@@ -1168,6 +1809,373 @@ const CRMDashboard = () => {
 
 
 
+  // Form state for candidate add leads
+  const [centerId, setCenterId] = useState('');
+  const [courseId, setCourseId] = useState('');
+  const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
+  const courseDropdownRef = useRef(null);
+  const [isCenterDropdownOpen, setIsCenterDropdownOpen] = useState(false);
+  const centerDropdownRef = useRef(null);
+  const [isQualificationDropdownOpen, setIsQualificationDropdownOpen] = useState(false);
+  const qualificationDropdownRef = useRef(null);
+  const [isCounselorDropdownOpen, setIsCounselorDropdownOpen] = useState(false);
+  const counselorDropdownRef = useRef(null);
+  const [selectSearch, setSelectSearch] = useState({
+    course: '',
+    center: '',
+    qualification: '',
+    counselor: '',
+  });
+  const [counselorId, setCounselorId] = useState('');
+  const [registeredBy, setRegisteredBy] = useState('');
+
+  const [candidateFormData, setCandidateFormData] = useState({
+    // Basic Information
+    name: '',
+    mobile: '',
+    email: '',
+    sex: '',
+    dob: '',
+    whatsapp: '',
+    showProfileForm: false,
+    highestQualification: '',
+    // Personal Info
+    personalInfo: {
+      currentAddress: {
+        type: 'Point',
+        coordinates: [0, 0],
+        latitude: '',
+        longitude: '',
+        city: '',
+        state: '',
+        fullAddress: ''
+      },
+
+    },
+
+  });
+
+  // Form validation state
+  const [formErrors, setFormErrors] = useState({});
+
+  // Form submission state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [courses, setCourses] = useState([]);
+  const [centers, setCenters] = useState([]);
+  const [qualifications, setQualifications] = useState([]);
+  const [loadingData, setLoadingData] = useState(false);
+  const updateSelectSearch = (field, value) => {
+    setSelectSearch((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const filteredSortedCourses = useMemo(() => {
+    const query = selectSearch.course.trim().toLowerCase();
+    return [...courses]
+      .sort((a, b) => (a?.name || '').localeCompare((b?.name || ''), undefined, { sensitivity: 'base' }))
+      .filter((course) => !query || (course?.name || '').toLowerCase().includes(query));
+  }, [courses, selectSearch.course]);
+
+  const filteredSortedCenters = useMemo(() => {
+    const query = selectSearch.center.trim().toLowerCase();
+    return [...centers]
+      .sort((a, b) => (a?.name || '').localeCompare((b?.name || ''), undefined, { sensitivity: 'base' }))
+      .filter((center) => !query || (center?.name || '').toLowerCase().includes(query));
+  }, [centers, selectSearch.center]);
+
+  const filteredSortedQualifications = useMemo(() => {
+    const query = selectSearch.qualification.trim().toLowerCase();
+    return [...qualifications]
+      .sort((a, b) => (a?.name || '').localeCompare((b?.name || ''), undefined, { sensitivity: 'base' }))
+      .filter((qualification) => !query || (qualification?.name || '').toLowerCase().includes(query));
+  }, [qualifications, selectSearch.qualification]);
+
+  const filteredSortedCounselors = useMemo(() => {
+    const query = selectSearch.counselor.trim().toLowerCase();
+    return [...counselorOptions]
+      .sort((a, b) => (a?.label || '').localeCompare((b?.label || ''), undefined, { sensitivity: 'base' }))
+      .filter((counselor) => !query || (counselor?.label || '').toLowerCase().includes(query));
+  }, [counselorOptions, selectSearch.counselor]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (courseDropdownRef.current && !courseDropdownRef.current.contains(event.target)) {
+        setIsCourseDropdownOpen(false);
+      }
+      if (centerDropdownRef.current && !centerDropdownRef.current.contains(event.target)) {
+        setIsCenterDropdownOpen(false);
+      }
+      if (qualificationDropdownRef.current && !qualificationDropdownRef.current.contains(event.target)) {
+        setIsQualificationDropdownOpen(false);
+      }
+      if (counselorDropdownRef.current && !counselorDropdownRef.current.contains(event.target)) {
+        setIsCounselorDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  //course history
+  const [courseHistory, setCourseHistory] = useState([]);
+  const [jobHistory, setJobHistory] = useState([]);
+
+  // Fetch courses, centers, and qualifications on component mount
+  useEffect(() => {
+    fetchFormData();
+
+  }, []);
+
+  const fetchFormData = async () => {
+    try {
+      setLoadingData(true);
+
+      // const coursesResponse = await axios.get(`${backendUrl}/college/all_courses`, {
+      //   headers: {
+      //     'x-auth': token,
+      //     'Content-Type': 'application/json',
+      //   }
+      // });
+      const coursesResponse = await axios.get(`${backendUrl}/courses`);
+
+      // Fetch qualifications
+      const qualificationsResponse = await axios.get(`${backendUrl}/candidate/api/highestQualifications`, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'application/json',
+        }
+      });
+
+
+
+      if (Array.isArray(coursesResponse?.data?.courses)) {
+        setCourses(coursesResponse.data.courses);
+      } else if (coursesResponse.data.success) {
+        const activeCourses = (coursesResponse.data.data || []).filter((course) => course?.status === true);
+        setCourses(activeCourses);
+      }
+
+
+      if (qualificationsResponse.data.status) {
+        setQualifications(qualificationsResponse.data.data);
+      }
+
+    } catch (error) {
+      console.error('Error fetching form data:', error);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  //fetch centers
+  useEffect(() => {
+    fetchCentersByCourse(courseId);
+  }, [courseId]);
+
+
+  const fetchCentersByCourse = async (courseId) => {
+    try {
+      if (!courseId) {
+        setCenters([]);
+        return;
+      }
+
+
+
+      const response = await axios.get(`${backendUrl}/college/courses/course_centers?courseId=${courseId}`, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'application/json',
+        }
+      });
+
+
+      if (response.data.status) {
+        setCenters(response.data.data);
+      } else {
+        setCenters([]);
+      }
+    } catch (error) {
+      console.error('Error fetching centers by course:', error);
+      setCenters([]);
+    } finally {
+    }
+  };
+
+  // Form submission handler
+  const handleAddLeadsB2C = async (e) => {
+    e.preventDefault();
+
+    try {
+      // Frontend validation (to avoid silent backend 500s)
+      const errors = [];
+      const name = (candidateFormData.name || '').trim();
+      const mobile = String(candidateFormData.mobile || '').trim();
+      const whatsapp = String(candidateFormData.whatsapp || '').trim();
+      const email = (candidateFormData.email || '').trim();
+      const sex = (candidateFormData.sex || '').trim();
+      const highestQualification = candidateFormData.highestQualification || '';
+      const dobRaw = candidateFormData.dob;
+
+      if (!courseId) errors.push('Please select Course');
+      if (!centerId) errors.push('Please select Center');
+      if (!counselorId) errors.push('Please select Counselor');
+      if (!registeredBy) errors.push('Please select Source');
+
+      if (!name) errors.push('Please enter Name');
+      if (!mobile) errors.push('Please enter Mobile number');
+      if (mobile && !/^\d{10}$/.test(mobile)) errors.push('Mobile number must be 10 digits');
+      if (!whatsapp) errors.push('Please enter WhatsApp number');
+      if (whatsapp && !/^\d{10}$/.test(whatsapp)) errors.push('WhatsApp number must be 10 digits');
+      if (!sex) errors.push('Please select Gender');
+      if (!dobRaw) errors.push('Please select Date of Birth');
+      if (!highestQualification) errors.push('Please select Highest Qualification');
+      if (email && !/^\S+@\S+\.\S+$/.test(email)) errors.push('Please enter a valid Email');
+
+      if (errors.length > 0) {
+        setFormErrors({ addLead: errors });
+        alert(errors.join('\n'));
+        return;
+      }
+
+      setIsSubmitting(true);
+
+      const dob =
+        dobRaw instanceof Date && !isNaN(dobRaw.getTime())
+          ? dobRaw.toISOString()
+          : dobRaw;
+
+      // Prepare the data according to the API structure
+      const requestData = {
+        courseId,
+        centerId,
+        counselorId,
+        candidateData: {
+          name,
+          mobile,
+          email,
+          sex,
+          dob,
+          whatsapp,
+          highestQualification,
+          personalInfo: {
+            currentAddress: {
+              fullAddress: candidateFormData.personalInfo.currentAddress.fullAddress,
+              city: candidateFormData.personalInfo.currentAddress.city,
+              state: candidateFormData.personalInfo.currentAddress.state,
+              latitude: candidateFormData.personalInfo.currentAddress.latitude,
+              longitude: candidateFormData.personalInfo.currentAddress.longitude,
+              type: candidateFormData.personalInfo.currentAddress.type,
+              coordinates: candidateFormData.personalInfo.currentAddress.coordinates
+            }
+
+          }
+        },
+        registeredBy,
+      };
+
+
+      // Make API call
+
+      const response = await axios.post(`${backendUrl}/college/courses/addleadsb2c`, requestData, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (response.data.status) {
+        alert("Lead added successfully");
+
+        // Switch to "All" tab so the newly added lead is visible regardless of leadStatus tab filter
+        setActiveCrmFilter(0);
+        const newFilterData = { ...(filterData || {}) };
+        delete newFilterData.leadStatus;
+        setFilterData(newFilterData);
+
+        // Reset all form fields
+        setCandidateFormData({
+          name: '',
+          mobile: '',
+          email: '',
+          sex: '',
+          dob: '',
+          whatsapp: '',
+          showProfileForm: false,
+          personalInfo: {
+            currentAddress: {
+              type: 'Point',
+              coordinates: [0, 0],
+              latitude: '',
+              longitude: '',
+              city: '',
+              state: '',
+              fullAddress: ''
+            }
+
+          },
+
+          highestQualification: '',
+
+        });
+
+        // Reset form selection fields
+        setCourseId('');
+        setIsCourseDropdownOpen(false);
+        setIsCenterDropdownOpen(false);
+        setIsQualificationDropdownOpen(false);
+        setIsCounselorDropdownOpen(false);
+        setSelectSearch({ course: '', center: '', qualification: '', counselor: '' });
+        setCenterId('');
+        setCounselorId('');
+        setRegisteredBy('');
+
+        // After adding, refresh list from first page so the new lead is visible immediately
+        setCurrentPage(1);
+        await fetchProfileData(newFilterData, 1);
+
+        closePanel();
+      }
+      else {
+        alert(response.data.message);
+      }
+
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      alert(error?.response?.data?.message || error?.message || 'Failed to add lead');
+    } finally {
+
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle input changes
+  const handleInputChange = (field, value) => {
+    setCandidateFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+
+  };
+
+  // Handle nested input changes
+  const handleNestedInputChange = (parentField, childField, value) => {
+    setCandidateFormData(prev => ({
+      ...prev,
+      [parentField]: {
+        ...prev[parentField],
+        [childField]: value
+      }
+    }));
+  };
+
+  const handleFormDataChange = (field, value) => {
+    setCandidateFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
   // Form data state
   const [formData, setFormData] = useState({
     projects: {
@@ -1193,8 +2201,63 @@ const CRMDashboard = () => {
     sector: {
       type: "includes",
       values: []
-    }
+    },
   });
+  
+  // Ref to store latest formData for use in async functions
+  const formDataRef = useRef(formData);
+  
+  // Update ref whenever formData changes
+  useEffect(() => {
+    formDataRef.current = formData;
+  }, [formData]);
+
+  const cycleProjectOptions = useMemo(() => {
+    if (!cycleFilters.department) return projectOptions;
+    const projectIds = new Set(
+      allCoursesMeta
+        .filter((c) => String(c.vertical?._id || c.vertical) === String(cycleFilters.department))
+        .map((c) => String(c.project?._id || c.project))
+    );
+    return projectOptions.filter((p) => projectIds.has(String(p.value)));
+  }, [cycleFilters.department, projectOptions, allCoursesMeta]);
+
+  const cycleCourseOptions = useMemo(() => {
+    let list = courseOptions;
+    if (cycleFilters.department) {
+      const courseIds = new Set(
+        allCoursesMeta
+          .filter((c) => String(c.vertical?._id || c.vertical) === String(cycleFilters.department))
+          .map((c) => String(c._id))
+      );
+      list = list.filter((c) => courseIds.has(String(c.value)));
+    }
+    if (cycleFilters.project) {
+      const courseIds = new Set(
+        allCoursesMeta
+          .filter((c) => String(c.project?._id || c.project) === String(cycleFilters.project))
+          .map((c) => String(c._id))
+      );
+      list = list.filter((c) => courseIds.has(String(c.value)));
+    }
+    return list;
+  }, [cycleFilters.department, cycleFilters.project, courseOptions, allCoursesMeta]);
+
+  const buildListFilterQueryParts = useCallback((fd = formDataRef.current || formData, cycle = cycleFilters) => {
+    const projectsValues = cycle.project ? [cycle.project] : (fd.projects?.values || []);
+    const verticalsValues = cycle.department ? [cycle.department] : (fd.verticals?.values || []);
+    const courseValues = cycle.course ? [cycle.course] : (fd.course?.values || []);
+    const centerValues = cycle.center ? [cycle.center] : (fd.center?.values || []);
+    const batchValues = cycle.batch ? [cycle.batch] : [];
+    return {
+      ...(projectsValues.length > 0 && { projects: JSON.stringify(projectsValues) }),
+      ...(verticalsValues.length > 0 && { verticals: JSON.stringify(verticalsValues) }),
+      ...(courseValues.length > 0 && { course: JSON.stringify(courseValues) }),
+      ...(centerValues.length > 0 && { center: JSON.stringify(centerValues) }),
+      ...(batchValues.length > 0 && { batch: JSON.stringify(batchValues) }),
+      ...(fd.counselor?.values?.length > 0 && { counselor: JSON.stringify(fd.counselor.values) }),
+    };
+  }, [formData, cycleFilters]);
 
   // Dropdown open state
   const [dropdownStates, setDropdownStates] = useState({
@@ -1203,7 +2266,9 @@ const CRMDashboard = () => {
     course: false,
     center: false,
     counselor: false,
-    sector: false
+    sector: false,
+    statuses: false,
+    subStatuses: false
   });
 
 
@@ -1245,8 +2310,54 @@ const CRMDashboard = () => {
     };
   }, []);
 
+  useEffect(() => {
+    fetchCourseHistory();
+    fetchJobHistory();
+    console.log('selectedProfile', selectedProfile);
+  }, [selectedProfile]);
+
+
+
+  const fetchCourseHistory = async () => {
+    try {
+
+      if (!selectedProfile) {
+        return;
+      }
+      setCourseHistory([]);
+      const response = await axios.get(`${backendUrl}/college/candidate/appliedCourses/${selectedProfile._candidate._id}`, {
+        headers: { 'x-auth': token }
+      });
+      // console.log("response", response);
+      if (response.data && response.data.courses) {
+        setCourseHistory(response.data.courses);
+      }
+    } catch (error) {
+      console.log("error", error);
+    }
+  }
+
+  const fetchJobHistory = async () => {
+    try {
+
+      if (!selectedProfile) {
+        return;
+      }
+      setJobHistory([]);
+      const response = await axios.get(`${backendUrl}/college/candidate/appliedJobs/${selectedProfile._candidate._id}`, {
+        headers: { 'x-auth': token }
+      });
+      if (response.data && response.data.jobs) {
+        setJobHistory(response.data.jobs);
+      }
+    } catch (error) {
+      console.log("error", error);
+    }
+  }
+
+
   // Calculate total selected filters
-  const totalSelected = Object.values(formData).reduce((total, filter) => total + filter.values.length, 0);
+  const totalSelected = Object.values(formData).reduce((total, filter) => total + (filter.values.length || 0), 0);
 
   // Document Modal Component
 
@@ -1421,6 +2532,7 @@ const CRMDashboard = () => {
     status: 'true',
     leadStatus: '',
     sector: '',
+    followupStatus: '',
     // Date filter states
     createdFromDate: null,
     createdToDate: null,
@@ -1428,8 +2540,12 @@ const CRMDashboard = () => {
     modifiedToDate: null,
     nextActionFromDate: null,
     nextActionToDate: null,
+    subStatuses: null,
+    statuses: null,
 
   });
+
+  const MOVED_IN_KYC_STATUS_ID = '6894825c9fc1425f4d5e2fc5';
   // Add dropdown visibility states
   const [showCreatedDatePicker, setShowCreatedDatePicker] = useState(false);
   const [showModifiedDatePicker, setShowModifiedDatePicker] = useState(false);
@@ -1439,6 +2555,10 @@ const CRMDashboard = () => {
     { _id: '', name: '', count: 0, milestone: '' },
 
   ]);
+  const performanceFilters = useMemo(
+    () => crmFilters.filter((f) => f._id && f._id !== 'all'),
+    [crmFilters]
+  );
   const [statuses, setStatuses] = useState([
     { _id: '', name: '', count: 0 },
 
@@ -1447,15 +2567,12 @@ const CRMDashboard = () => {
   // edit status and set followup
   const [seletectedStatus, setSelectedStatus] = useState('');
   const [seletectedSubStatus, setSelectedSubStatus] = useState(null);
-  const [followupDate, setFollowupDate] = useState('');
+  const [followupDate, setFollowupDate] = useState(null);
   const [followupTime, setFollowupTime] = useState('');
   const [remarks, setRemarks] = useState('');
 
 
-  const [subStatuses, setSubStatuses] = useState([
-
-
-  ]);
+  const [subStatuses, setSubStatuses] = useState([]);
 
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
 
@@ -1489,10 +2606,10 @@ const CRMDashboard = () => {
   }, []);
 
   useEffect(() => {
-    if (seletectedStatus) {
+    if (seletectedStatus || filterData.statuses) {
       fetchSubStatus()
     }
-  }, [seletectedStatus]);
+  }, [seletectedStatus, filterData.statuses]);
 
 
 
@@ -1559,6 +2676,9 @@ const CRMDashboard = () => {
       modifiedToDate: null,
       nextActionFromDate: null,
       nextActionToDate: null,
+      subStatuses: null,
+      statuses: null,
+      followupStatus: '',
     };
 
     setFilterData(clearedFilters);
@@ -1568,8 +2688,18 @@ const CRMDashboard = () => {
       course: { type: "includes", values: [] },
       center: { type: "includes", values: [] },
       counselor: { type: "includes", values: [] },
-      sector: { type: "includes", values: [] }
+      sector: { type: "includes", values: [] },
     });
+    setCycleFilters({
+      department: '',
+      project: '',
+      center: '',
+      course: '',
+      batch: '',
+    });
+    setLeadViewTab('all');
+    setSelectedApprovalFilter(null);
+    setSelectedFollowupBucket('');
 
     setCurrentPage(1);
     // Explicitly call fetchProfileData with cleared filters to ensure data is fetched
@@ -1615,10 +2745,10 @@ const CRMDashboard = () => {
   const handleSubStatusChange = (e) => {
     const selectedSubStatusId = e.target.value;
 
-    // ID से पूरा object find करें
+    // ID à¤¸à¥‡ à¤ªà¥‚à¤°à¤¾ object find à¤•à¤°à¥‡à¤‚
     const selectedSubStatusObject = subStatuses.find(status => status._id === selectedSubStatusId);
 
-    // पूरा object set करें
+    // à¤ªà¥‚à¤°à¤¾ object set à¤•à¤°à¥‡à¤‚
     setSelectedSubStatus(selectedSubStatusObject || null);
   };
 
@@ -1628,7 +2758,6 @@ const CRMDashboard = () => {
         headers: { 'x-auth': token }
       });
 
-      console.log('response', response)
 
       if (response.data.success) {
         const status = response.data.data;
@@ -1656,10 +2785,17 @@ const CRMDashboard = () => {
   };
 
   const handleMoveToKyc = async (profile) => {
-    console.log('Function called');
     try {
 
-      console.log('Function in try');
+
+      if (profile?._course?.center || profile?._course?.center?.length > 0) {
+        if (!profile._center || !profile._center._id) {
+          alert('Please assign a branch/center first before moving to KYC!');
+          return;
+        }
+      }
+
+
       // Prepare the request body
       const updatedData = {
         kycStage: true
@@ -1673,7 +2809,6 @@ const CRMDashboard = () => {
         }
       });
 
-      console.log('API response:', response.data);
 
       if (response.data.success) {
         alert('Lead moved to KYC Section successfully!');
@@ -1690,11 +2825,16 @@ const CRMDashboard = () => {
 
   const fetchSubStatus = async () => {
     try {
-      const response = await axios.get(`${backendUrl}/college/status/${seletectedStatus}/substatus`, {
+      const status = seletectedStatus || filterData.statuses;
+
+      if (!status) {
+        alert('Please select a status');
+        return;
+      }
+      const response = await axios.get(`${backendUrl}/college/status/${status}/substatus`, {
         headers: { 'x-auth': token }
       });
 
-      console.log('response', response)
 
       if (response.data.success) {
         const status = response.data.data;
@@ -1710,13 +2850,38 @@ const CRMDashboard = () => {
     }
   };
 
+  // Helper function to check if fields are required
+  const isFieldRequired = (fieldType) => {
+    if (showPanel === 'followUp') {
+      return true; // All fields are required in followup panel
+    }
+
+    if (seletectedSubStatus) {
+      if (fieldType === 'remarks') {
+        return seletectedSubStatus.hasRemarks;
+      }
+      if (fieldType === 'followup') {
+        return seletectedSubStatus.hasFollowup;
+      }
+    }
+
+    return false;
+  };
+
+  // Helper function to get CSS class for required fields
+  const getRequiredFieldClass = (fieldType) => {
+    const isRequired = isFieldRequired(fieldType);
+    return isRequired ? 'border-danger' : '';
+  };
+
   const handleUpdateStatus = async (e) => {
     e.preventDefault();
+    let shouldClosePanel = false;
 
     try {
       if (showPanel === 'bulkstatuschange') {
         // Validation checks
-        if (!selectedProfiles) {
+        if (!selectedProfiles || !Array.isArray(selectedProfiles) || selectedProfiles.length === 0) {
           alert('No profile selected');
           return;
         }
@@ -1726,16 +2891,42 @@ const CRMDashboard = () => {
           return;
         }
 
+        // Check for mandatory remarks and followup
+        const hasRemarksRequired = seletectedSubStatus && seletectedSubStatus.hasRemarks;
+        const hasFollowupRequired = seletectedSubStatus && seletectedSubStatus.hasFollowup;
+
+        if (hasRemarksRequired && (!remarks || remarks.trim() === '')) {
+          alert('Remarks are mandatory for this status. Please add remarks.');
+          return;
+        }
+
+        if (hasFollowupRequired && (!followupDate || !followupTime)) {
+          alert('Followup date and time are mandatory for this status. Please select followup date and time.');
+          return;
+        }
+
+
+       
+        if (remarks && remarks.trim()) {
+          const improved = await checkAndImproveRemarkIfWeak({
+            remarkText: remarks,
+            context: {
+              mode: 'bulk_status_change',
+              status: seletectedStatus?.title || seletectedStatus,
+              substatus: seletectedSubStatus?.title,
+              followupRequired: !!hasFollowupRequired
+            }
+          });
+          if (improved.changed) setRemarks(improved.finalRemark);
+        }
 
         // Prepare the request body
         const data = {
           selectedProfiles,
           _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
           _leadSubStatus: seletectedSubStatus?._id || null,
-          remarks: remarks || ''
+          remarks: (remarks || '').trim()
         };
-
-
 
         // Check if backend URL and token exist
         if (!backendUrl) {
@@ -1763,11 +2954,12 @@ const CRMDashboard = () => {
 
         if (response.data.success) {
           alert('Status updated successfully!');
+          shouldClosePanel = true;
 
           // Reset form
           setSelectedStatus('');
           setSelectedSubStatus(null);
-          setFollowupDate('');
+          setFollowupDate(null);
           setFollowupTime('');
           setRemarks('');
 
@@ -1792,13 +2984,29 @@ const CRMDashboard = () => {
           return;
         }
 
+        // Check for mandatory remarks and followup
+        const hasRemarksRequired = seletectedSubStatus && seletectedSubStatus.hasRemarks;
+        const hasFollowupRequired = seletectedSubStatus && seletectedSubStatus.hasFollowup;
+
+        if (hasRemarksRequired && (!remarks || remarks.trim() === '')) {
+          alert('Remarks are mandatory for this status. Please add remarks.');
+          return;
+        }
+
+        if (hasFollowupRequired && (!followupDate || !followupTime)) {
+          alert('Followup date and time are mandatory for this status. Please select followup date and time.');
+          return;
+        }
+
         // Combine date and time into a single Date object (if both are set)
         let followupDateTime = '';
         if (followupDate && followupTime) {
           // Create proper datetime string
-          const dateStr = followupDate instanceof Date
-            ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
-            : followupDate;
+          const year = followupDate.getFullYear();
+          const month = String(followupDate.getMonth() + 1).padStart(2, "0");
+          const day = String(followupDate.getDate()).padStart(2, "0");
+
+          const dateStr = `${year}-${month}-${day}`;
 
           followupDateTime = new Date(`${dateStr}T${followupTime}`);
 
@@ -1809,12 +3017,28 @@ const CRMDashboard = () => {
           }
         }
 
+        // Weak remark detection (optional improvement)
+        if (remarks && remarks.trim()) {
+          const improved = await checkAndImproveRemarkIfWeak({
+            remarkText: remarks,
+            context: {
+              mode: 'single_status_change',
+              candidate: selectedProfile?._candidate?.name,
+              status: seletectedStatus?.title || seletectedStatus,
+              substatus: seletectedSubStatus?.title,
+              followupRequired: !!hasFollowupRequired
+            }
+          });
+          if (improved.changed) setRemarks(improved.finalRemark);
+        }
+
         // Prepare the request body
         const data = {
           _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
           _leadSubStatus: seletectedSubStatus?._id || null,
           followup: followupDateTime ? followupDateTime.toISOString() : null,
-          remarks: remarks || ''
+          googleCalendarEvent: !!(followupDateTime && userData.googleAuthToken?.accessToken),
+          remarks: (remarks || '').trim()
         };
 
 
@@ -1841,7 +3065,7 @@ const CRMDashboard = () => {
             }
           }
         );
-
+console.log('API Response:', response.data);
 
         if (response.data.success) {
           alert('Status updated successfully!');
@@ -1849,12 +3073,28 @@ const CRMDashboard = () => {
           // Reset form
           setSelectedStatus('');
           setSelectedSubStatus(null);
-          setFollowupDate('');
+          setFollowupDate(null);
           setFollowupTime('');
           setRemarks('');
 
           // Refresh data and close panel
           await fetchProfileData();
+
+          // Refetch full details for this lead and merge into list so NEXT ACTION DATE updates immediately
+          const updatedLeadId = selectedProfile._id;
+          try {
+            const detailRes = await axios.get(`${backendUrl}/college/appliedCandidatesDetails`, {
+              params: { leadId: updatedLeadId },
+              headers: { 'x-auth': token }
+            });
+            if (detailRes.data.success && detailRes.data.data) {
+              const fullDetail = detailRes.data.data;
+              setAllProfiles(prev => prev.map(p => p._id === updatedLeadId ? { ...p, ...fullDetail, followup: fullDetail.followup } : p));
+            }
+          } catch (err) {
+            console.error('Error refetching lead details after status update:', err);
+          }
+
           closePanel();
         } else {
           console.error('API returned error:', response.data);
@@ -1863,15 +3103,29 @@ const CRMDashboard = () => {
 
       }
       if (showPanel === 'followUp') {
+        // Validation checks for followup panel
+        if (!followupDate || !followupTime) {
+          alert('Followup date and time are mandatory. Please select both date and time.');
+          return;
+        }
 
+        if (!remarks || remarks.trim() === '') {
+          alert('Remarks are mandatory for followup. Please add remarks.');
+          return;
+        }
 
         // Combine date and time into a single Date object (if both are set)
         let followupDateTime = '';
         if (followupDate && followupTime) {
+
+
           // Create proper datetime string
-          const dateStr = followupDate instanceof Date
-            ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
-            : followupDate;
+          const year = followupDate.getFullYear();
+          const month = String(followupDate.getMonth() + 1).padStart(2, "0");
+          const day = String(followupDate.getDate()).padStart(2, "0");
+
+          const dateStr = `${year}-${month}-${day}`;
+
 
           followupDateTime = new Date(`${dateStr}T${followupTime}`);
 
@@ -1882,13 +3136,23 @@ const CRMDashboard = () => {
           }
         }
 
-        // Prepare the request body
-        const data = {
-          followup: followupDateTime ? followupDateTime.toISOString() : null,
-          remarks: remarks || ''
-        };
-
-
+        const hasExistingFollowup = selectedProfile?.followup?._id;
+        const payload = hasExistingFollowup
+          ? {
+            id: selectedProfile.followup._id,
+            appliedCourseId: selectedProfile._id,
+            followupDate: followupDateTime ? followupDateTime.toISOString() : null,
+            remarks: remarks || '',
+            folloupType: 'update',
+            googleCalendarEvent: !!(followupDateTime && userData.googleAuthToken?.accessToken)
+          }
+          : {
+            appliedCourseId: selectedProfile._id,
+            followupDate: followupDateTime ? followupDateTime.toISOString() : null,
+            remarks: remarks || '',
+            folloupType: 'new',
+            googleCalendarEvent: !!(followupDateTime && userData.googleAuthToken?.accessToken)
+          };
 
         // Check if backend URL and token exist
         if (!backendUrl) {
@@ -1901,10 +3165,9 @@ const CRMDashboard = () => {
           return;
         }
 
-        // Send PUT request to backend API
-        const response = await axios.put(
-          `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
-          data,
+        const response = await axios.post(
+          `${backendUrl}/college/b2c-set-followups`,
+          payload,
           {
             headers: {
               'x-auth': token,
@@ -1913,24 +3176,15 @@ const CRMDashboard = () => {
           }
         );
 
-        console.log('API response:', response.data);
-
-        if (response.data.success) {
-          alert('Status updated successfully!');
-
-          // Reset form
-          setSelectedStatus('');
-          setSelectedSubStatus(null);
-          setFollowupDate('');
-          setFollowupTime('');
-          setRemarks('');
-
-          // Refresh data and close panel
-          await fetchProfileData();
+        // Backend returns status: true (not success: true)
+        if (response.data.status === true || response.data.success === true) {
+          toast.success('Followup updated successfully!');
+          shouldClosePanel = true;
           closePanel();
+
         } else {
           console.error('API returned error:', response.data);
-          alert(response.data.message || 'Failed to update status');
+          toast.error(response.data.message || 'Failed to update followup');
         }
 
       }
@@ -1954,8 +3208,91 @@ const CRMDashboard = () => {
         alert(`Error: ${error.message}`);
       }
     }
+    finally {
+      if (shouldClosePanel) {
+        closePanel();
+      } else {
+        setSelectedStatus('');
+        setSelectedSubStatus(null);
+        setFollowupDate(null);
+        setFollowupTime('');
+        setRemarks('');
+      }
+
+      // Refresh data and close panel
+      await fetchProfileData();
+    }
   };
 
+  const getBranches = async (profile) => {
+    // Check if profile and course exist
+    if (!profile || !profile._course || !profile._course._id) {
+      alert('Profile or course information is missing. Cannot fetch branches.');
+      return;
+    }
+
+    const courseId = profile._course._id;
+    const response = await axios.get(`${backendUrl}/college/courses/get-branches?courseId=${courseId}`, {
+      headers: {
+        'x-auth': token,
+        'Content-Type': 'multipart/form-data',
+      }
+    });
+    if (response.data.status) {
+      setBranches(response.data);
+      setSelectedBranch('');
+    } else {
+      alert('Failed to fetch branches');
+    }
+  }
+
+  const updateBranch = async (profile, selectedBranchId) => {
+    if (!selectedBranchId) {
+      alert('Please select a branch first');
+      return;
+    }
+
+    const profileId = profile._id;
+
+    try {
+      const response = await axios.put(`${backendUrl}/college/courses/update-branch/${profileId}`, {
+        centerId: selectedBranchId
+      }, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'application/json',
+        }
+      });
+      if (response.data.success) {
+        alert('Branch updated successfully!');
+        // Optionally refresh the data or close modal
+        setShowBranchModal(false);
+
+        // const selectedBranchDetails = branches.data?.find(branch => branch._id === selectedBranchId);
+        // setAllProfiles(prevProfiles => 
+        //   prevProfiles.map(p => 
+        //     p._id === profile._id 
+        //       ? {
+        //           ...p,
+        //           _center: selectedBranchDetails || { _id: selectedBranchId, name: 'Updated Branch' }
+        //         }
+        //       : p
+        //   )
+        // );
+
+        setSelectedBranch('');
+
+
+
+        await fetchProfileData();
+      } else {
+        alert('Failed to update branch');
+      }
+    } catch (error) {
+      console.error('Error updating branch:', error);
+      alert('Failed to update branch: ' + (error.response?.data?.message || error.message));
+    }
+  }
 
 
 
@@ -1973,13 +3310,28 @@ const CRMDashboard = () => {
   }, [currentPage]);
 
   // Add this function in your component:
-  const updateCrmFiltersFromBackend = (backendCounts) => {
-    console.log('Backend counts received:', backendCounts);
+  const updateCrmFiltersFromBackend = (backendCounts, filteredTotalCountFromAPI = null) => {
+    // Always calculate "All" count by summing all individual tab counts
+    // This ensures "All" tab count remains consistent regardless of which tab is active
+    const calculatedFilteredTotal = Object.keys(backendCounts || {})
+      .filter(key => key !== 'all' && key !== 'null')
+      .reduce((sum, key) => {
+        const statusData = backendCounts[key];
+        if (statusData && typeof statusData === 'object' && statusData.count) {
+          return sum + (statusData.count || 0);
+        } else if (typeof statusData === 'number') {
+          return sum + statusData;
+        }
+        return sum;
+      }, 0);
+    
+    // Use calculated sum, or fallback to backend's "all" value, or 0
+    const allCount = calculatedFilteredTotal > 0 ? calculatedFilteredTotal : (backendCounts.all || 0);
 
     setCrmFilters(prevFilters => {
       return prevFilters.map(filter => {
         if (filter._id === 'all') {
-          return { ...filter, count: backendCounts.all || 0 };
+          return { ...filter, count: allCount };
         }
 
         const backendFilter = backendCounts[filter._id];
@@ -1994,40 +3346,111 @@ const CRMDashboard = () => {
         return { ...filter, count: 0 };
       });
     });
+
+    const movedInKycId = '6894825c9fc1425f4d5e2fc5';
+    const approved = backendCounts?.[movedInKycId]?.count || 0;
+    setApprovalCounts({
+      total: allCount,
+      approved,
+      pending: Math.max(0, allCount - approved),
+      rejected: 0,
+    });
+    setDocDashCounts({
+      done: approved,
+      pending: Math.max(0, allCount - approved),
+    });
   };
 
-  const fetchProfileData = async (filters = filterData, page = currentPage) => {
+  const fetchDashboardCounts = async (filters = filterData) => {
+    if (!token) return;
     try {
-      setIsLoadingProfiles(true);
-
-      if (!token) {
-        console.warn('No token found in session storage.');
-        setIsLoadingProfiles(false);
-        return;
+      const listParts = buildListFilterQueryParts(formDataRef.current || formData);
+      const followupParams = new URLSearchParams({ allTime: 'true', ...listParts });
+      const followupRes = await axios.get(`${backendUrl}/college/followupcounts?${followupParams}`, {
+        headers: { 'x-auth': token },
+      });
+      if (followupRes.data?.success && followupRes.data?.data) {
+        const fc = followupRes.data.data;
+        setFollowupDashCounts({
+          call: {
+            done: fc.done || 0,
+            planned: fc.planned || 0,
+            missed: fc.missed || 0,
+          },
+          visit: { done: 0, planned: 0, missed: 0 },
+        });
       }
 
-      // Prepare query parameters
-      const queryParams = new URLSearchParams({
-        page: page.toString(),
-        ...(filters.name && { name: filters.name }),
-        ...(filters.courseType && { courseType: filters.courseType }),
-        ...(filters.status && filters.status !== 'true' && { status: filters.status }),
-        ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
-        ...(filters.sector && { sector: filters.sector }),
-        ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
-        ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
-        ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
-        ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
-        ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
-        ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
-        // Multi-select filters
-        ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
-        ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
-        ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
-        ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
-        ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
-      });
-      console.log('API counselor:', formData.counselor.values);
+      if (userData?._id) {
+        const referParams = new URLSearchParams({
+          page: '1',
+          registeredByMe: userData._id,
+          ...listParts,
+        });
+        const referRes = await axios.get(`${backendUrl}/college/appliedCandidates?${referParams}`, {
+          headers: { 'x-auth': token },
+        });
+        if (referRes.data?.success) {
+          setMyReferLeadsCount(referRes.data.totalCount || 0);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching dashboard counts:', err);
+    }
+  };
+
+  const fetchProfileData = async (filters = filterData, page = currentPage, cycleOverride = null) => {
+    setIsLoadingProfiles(true);
+    closePanel();
+    setLeadDetailsVisible(null);
+
+    if (!token) {
+      console.warn('No token found in session storage.');
+      setIsLoadingProfiles(false);
+      return;
+    }
+
+    // Prepare query parameters
+    // Helper function to format date for API (set to start of day for fromDate, end of day for toDate)
+    // Only used for nextAction dates
+    const formatDateForAPI = (date, isEndDate = false) => {
+      if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
+      const d = new Date(date);
+      if (isEndDate) {
+        d.setHours(23, 59, 59, 999); // End of day
+      } else {
+        d.setHours(0, 0, 0, 0); // Start of day
+      }
+      return d.toISOString();
+    };
+
+    // Format only nextAction dates before using in query params
+    const nextActionFromDateFormatted = filters.nextActionFromDate ? formatDateForAPI(filters.nextActionFromDate, false) : null;
+    const nextActionToDateFormatted = filters.nextActionToDate ? formatDateForAPI(filters.nextActionToDate, true) : null;
+
+    const fd = formDataRef.current || formData;
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      ...(filters.name && { name: filters.name }),
+      ...(filters.courseType && { courseType: filters.courseType }),
+      ...(filters.status && filters.status !== 'true' && { status: filters.status }),
+      ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
+      ...(filters.sector && { sector: filters.sector }),
+      ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
+      ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
+      ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
+      ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
+      ...(nextActionFromDateFormatted && { nextActionFromDate: nextActionFromDateFormatted }),
+      ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
+      ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
+      ...(filters.followupStatus && { followupStatus: filters.followupStatus }),
+      ...(leadViewTab === 'myRefer' && userData?._id && { registeredByMe: userData._id }),
+      ...buildListFilterQueryParts(fd, cycleOverride || cycleFilters),
+    });
+
+    try {
+
+      // console.log('API counselor:', formData.counselor.values);
 
       const response = await axios.get(`${backendUrl}/college/appliedCandidates?${queryParams}`, {
         headers: { 'x-auth': token }
@@ -2035,17 +3458,18 @@ const CRMDashboard = () => {
 
       if (response.data.success && response.data.data) {
         const data = response.data;
-        console.log('data', data);
-
         // Sirf ek state me data set karo - paginated data
         setAllProfiles(data.data);
         setTotalPages(data.totalPages);
         setPageSize(data.limit);
 
         // Update CRM filter counts from backend
-        if (data.crmFilterCounts) {
-          updateCrmFiltersFromBackend(data.crmFilterCounts);
-        }
+        // if (data.crmFilterCounts) {
+        //   updateCrmFiltersFromBackend(data.crmFilterCounts);
+        // }
+        await fetchRegistrationCrmFilterCounts(filters, page, null);
+        await fetchDashboardCounts(filters);
+
       } else {
         console.error('Failed to fetch profile data', response.data.message);
       }
@@ -2054,9 +3478,507 @@ const CRMDashboard = () => {
       console.error('Error fetching profile data:', error);
     } finally {
       setIsLoadingProfiles(false);
+
+
     }
   };
 
+  const getProfileDisplayName = useCallback((profile) => (
+    profile?._candidate?.name
+    || profile?._candidate?.fullName
+    || [profile?.firstName, profile?.middleName, profile?.lastName].filter(Boolean).join(' ').trim()
+    || profile?.candidateName
+    || 'Unknown Lead'
+  ), []);
+
+  const getProfileCenterName = useCallback((profile) => (
+    profile?._center?.name
+    || profile?.centerName
+    || 'Unknown Center'
+  ), []);
+
+  const getProfileCounselorName = useCallback((profile) => {
+    const latestAssignment = Array.isArray(profile?.leadAssignment) && profile.leadAssignment.length > 0
+      ? profile.leadAssignment[profile.leadAssignment.length - 1]
+      : null;
+
+    return latestAssignment?.counsellorName
+      || latestAssignment?.name
+      || profile?.assignedTo?.name
+      || 'Unassigned';
+  }, []);
+
+  const getProfileBatchName = useCallback((profile) => (
+    profile?._batch?.name
+    || profile?.batchName
+    || profile?._course?.batchName
+    || ''
+  ), []);
+
+  const getProfileNotes = useCallback((profile) => {
+    const followupNotes = Array.isArray(profile?.followups)
+      ? profile.followups.map((item) => item?.remarks || item?.remark || item?.note || item?.comment).filter(Boolean)
+      : [];
+    const remarkNotes = Array.isArray(profile?.remarks)
+      ? profile.remarks.map((item) => item?.remark || item?.text || item?.comment).filter(Boolean)
+      : [];
+
+    return [...remarkNotes, ...followupNotes].slice(-10);
+  }, []);
+
+  const getProfileDocumentSnapshot = useCallback((profile) => {
+    const documents = Array.isArray(profile?.uploadedDocs) ? profile.uploadedDocs : [];
+    const normalizedDocuments = documents.map((doc) => {
+      const latestUpload = Array.isArray(doc?.uploads) && doc.uploads.length > 0
+        ? doc.uploads[doc.uploads.length - 1]
+        : null;
+
+      const rawStatus = latestUpload?.status || doc?.status || '';
+      const hasUpload = Boolean(
+        latestUpload?.fileUrl
+        || doc?.fileUrl
+        || (Array.isArray(doc?.uploads) && doc.uploads.length > 0)
+      );
+
+      const status = rawStatus || (hasUpload ? 'Uploaded' : 'Not Uploaded');
+
+      return {
+        name: doc?.Name || doc?.name || 'Unknown Document',
+        status,
+        hasUpload,
+      };
+    });
+
+    const rejectedDocs = normalizedDocuments.filter((doc) => doc.status === 'Rejected').length;
+    const verifiedDocs = normalizedDocuments.filter((doc) => doc.status === 'Verified').length;
+    const pendingVerificationDocs = normalizedDocuments.filter((doc) => doc.status === 'Pending').length;
+    const pendingDocs = normalizedDocuments.filter((doc) =>
+      ['Not Uploaded', 'No Uploads', 'Pending', 'Uploaded'].includes(doc.status) && !['Verified', 'Rejected'].includes(doc.status)
+    ).length;
+    const hasAnyUploads = normalizedDocuments.some((doc) => doc.hasUpload);
+
+    const category = rejectedDocs > 0
+      ? 'Rejected'
+      : pendingVerificationDocs > 0
+        ? 'Pending Verification'
+        : !profile?.kyc && (pendingDocs > 0 || !hasAnyUploads)
+          ? 'Pending KYC'
+          : profile?.kyc
+            ? 'Verified'
+            : 'Review';
+
+    return {
+      documents: normalizedDocuments,
+      pendingDocs,
+      rejectedDocs,
+      verifiedDocs,
+      pendingVerificationDocs,
+      hasAnyUploads,
+      category,
+    };
+  }, []);
+
+  const normalizeWhatsappMessages = useCallback((messages = []) => (
+    (messages || []).map((m) => ({
+      timestamp: m.timestamp || m.sentAt || m.createdAt || m.time || '',
+      sender: m.sender || (m.direction === 'outgoing' ? 'agent' : 'user'),
+      text: m.text || m.message || m.body || '',
+      direction: m.direction || ((m.sender === 'agent' || m.sender === 'admin') ? 'outgoing' : 'incoming'),
+    }))
+  ), []);
+
+  const buildAiSupervisionProfile = useCallback((profile) => {
+    const documentSnapshot = getProfileDocumentSnapshot(profile);
+    const followupDate = profile?.followupDate || null;
+    const isOverdue = followupDate
+      ? new Date(followupDate) < new Date(new Date().setHours(0, 0, 0, 0))
+      : false;
+    const contactNumbers = [
+      profile?.mobile,
+      profile?.phone,
+      profile?.whatsappNumber,
+      profile?._candidate?.mobile,
+      profile?._candidate?.phone,
+      profile?._candidate?.whatsappNumber,
+      profile?._candidate?.personalInfo?.mobile,
+      profile?._candidate?.personalInfo?.phone,
+    ].filter(Boolean);
+
+    return {
+      _id: profile?._id,
+      _candidate: profile?._candidate,
+      _course: profile?._course,
+      _center: profile?._center,
+      _leadStatus: profile?._leadStatus,
+      selectedSubstatus: profile?.selectedSubstatus,
+      leadAssignment: profile?.leadAssignment,
+      followupDate,
+      followups: profile?.followups || [],
+      remarks: profile?.remarks || [],
+      createdAt: profile?.createdAt,
+      updatedAt: profile?.updatedAt,
+      admissionDate: profile?.admissionDate || null,
+      admissionDone: !!profile?.admissionDone,
+      registrationFee: profile?.registrationFee || 'Unknown',
+      dropout: !!profile?.dropout,
+      kyc: !!profile?.kyc,
+      kycStage: !!profile?.kycStage,
+      studentName: getProfileDisplayName(profile),
+      centerName: getProfileCenterName(profile),
+      counselorName: getProfileCounselorName(profile),
+      courseName: profile?._course?.name || profile?.courseName || 'Not specified',
+      batchName: getProfileBatchName(profile) || 'Unassigned',
+      contactNumbers,
+      notes: getProfileNotes(profile),
+      riskContext: {
+        isOverdueFollowup: isOverdue,
+        kycBucket: documentSnapshot.category,
+        pendingDocs: documentSnapshot.pendingDocs,
+        rejectedDocs: documentSnapshot.rejectedDocs,
+        verifiedDocs: documentSnapshot.verifiedDocs,
+        pendingVerificationDocs: documentSnapshot.pendingVerificationDocs,
+        hasNoUploads: !documentSnapshot.hasAnyUploads,
+      },
+    };
+  }, [
+    getProfileCenterName,
+    getProfileCounselorName,
+    getProfileDisplayName,
+    getProfileBatchName,
+    getProfileDocumentSnapshot,
+    getProfileNotes,
+  ]);
+
+  const buildLeadIntelPayload = useCallback((p) => {
+    const aiProfile = buildAiSupervisionProfile(p);
+    return {
+      _id: aiProfile._id,
+      _candidate: aiProfile._candidate,
+      _course: aiProfile._course,
+      _center: aiProfile._center,
+      _leadStatus: aiProfile._leadStatus,
+      selectedSubstatus: aiProfile.selectedSubstatus,
+      followupDate: aiProfile.followupDate,
+      followups: aiProfile.followups,
+      remarks: aiProfile.remarks,
+      createdAt: aiProfile.createdAt,
+      updatedAt: aiProfile.updatedAt,
+      admissionDone: aiProfile.admissionDone,
+      admissionDate: aiProfile.admissionDate,
+      registrationFee: aiProfile.registrationFee,
+      dropout: aiProfile.dropout,
+      kyc: aiProfile.kyc,
+      kycStage: aiProfile.kycStage,
+      centerName: aiProfile.centerName,
+      counselorName: aiProfile.counselorName,
+      courseName: aiProfile.courseName,
+      batchName: aiProfile.batchName,
+      notes: aiProfile.notes,
+      riskContext: aiProfile.riskContext,
+    };
+  }, [buildAiSupervisionProfile]);
+
+  const checkAndImproveRemarkIfWeak = useCallback(async ({ remarkText, context }) => {
+    const text = String(remarkText || '').trim();
+    if (!text || !token) return { finalRemark: text, changed: false };
+    try {
+      const res = await axios.post(
+        `${backendUrl}/api/ai/remark-quality`,
+        { remark: text, context: context || {} },
+        { headers: { 'x-auth': token } }
+      );
+      const data = res.data?.data;
+      if (res.data?.success && data?.isWeak && data?.improvedRemark) {
+        const ok = window.confirm(
+          `Remark looks too short/weak.\n\nSuggested improved remark:\n\n${data.improvedRemark}\n\nUse this improved remark?`
+        );
+        if (ok) return { finalRemark: data.improvedRemark, changed: true };
+      }
+      return { finalRemark: text, changed: false };
+    } catch (err) {
+      console.warn('Remark quality check failed:', err?.message || err);
+      return { finalRemark: text, changed: false };
+    }
+  }, [backendUrl, token]);
+
+  const chunkArray = useCallback((arr, size) => {
+    const chunks = [];
+    for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+    return chunks;
+  }, []);
+
+  const selectFirstNVisibleLeads = useCallback(() => {
+    const max = allProfiles?.length || 0;
+    const n = Math.max(0, Math.min(max, parseInt(String(bulkSelectCount || '').trim(), 10) || 0));
+    setSelectedProfiles((allProfiles || []).slice(0, n).map(p => p._id));
+  }, [allProfiles, bulkSelectCount]);
+
+  const clearSelectedLeads = useCallback(() => {
+    setSelectedProfiles([]);
+  }, []);
+
+  // Fetch AI lead intelligence (score, intent, suggested action) in BULK (auto-batched by 5)
+  const fetchLeadIntelBulk = useCallback(async (profiles = []) => {
+    if (!profiles?.length || loadingLeadIntel || !token) return;
+    const batches = chunkArray(profiles, 5); // backend endpoint processes up to 5 per call
+    setLoadingLeadIntel(true);
+    try {
+      for (const batch of batches) {
+        const leadsToFetch = batch.map(buildLeadIntelPayload);
+        const res = await axios.post(
+          `${backendUrl}/api/ai/lead-intel/bulk`,
+          { leads: leadsToFetch },
+          { headers: { 'x-auth': token } }
+        );
+        if (res.data?.success && res.data?.data) {
+          setLeadIntelMap((prev) => ({ ...prev, ...res.data.data }));
+        }
+      }
+    } catch (err) {
+      console.error('Lead intel bulk fetch failed:', err);
+    } finally {
+      setLoadingLeadIntel(false);
+    }
+  }, [backendUrl, buildLeadIntelPayload, chunkArray, loadingLeadIntel, token]);
+
+  // Bulk input box UX: click/focus should trigger AI supervision for first N visible leads
+  const runAiSupervisionForFirstN = useCallback(async () => {
+    const max = allProfiles?.length || 0;
+    const n = Math.max(0, Math.min(max, parseInt(String(input1Value || '').trim(), 10) || 0));
+    if (n <= 0) return;
+    const selected = (allProfiles || []).slice(0, n);
+    setSelectedProfiles(selected.map(p => p._id));
+    await fetchLeadIntelBulk(selected);
+  }, [allProfiles, fetchLeadIntelBulk, input1Value]);
+
+  // Bulk: all leads visible in current list
+  const fetchLeadIntelAll = useCallback(async () => {
+    await fetchLeadIntelBulk(allProfiles || []);
+  }, [allProfiles, fetchLeadIntelBulk]);
+
+  // Bulk: only selected leads (checkbox selection)
+  const fetchLeadIntelSelected = useCallback(async () => {
+    const selectedSet = new Set(Array.isArray(selectedProfiles) ? selectedProfiles : []);
+    const selected = (allProfiles || []).filter(p => selectedSet.has(p._id));
+    await fetchLeadIntelBulk(selected);
+  }, [allProfiles, fetchLeadIntelBulk, selectedProfiles]);
+
+  // Single lead: fetch intel for one lead (uses same bulk API with 1 lead)
+  const fetchLeadIntelSingle = useCallback(async (profile) => {
+    if (!profile?._id) return;
+    await fetchLeadIntelBulk([profile]);
+  }, [fetchLeadIntelBulk]);
+
+  // Overdue: followupDate is in the past (start of today)
+  const overdueLeads = useMemo(() => {
+    if (!allProfiles?.length) return [];
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    return allProfiles.filter((p) => {
+      const fd = p.followupDate ? new Date(p.followupDate) : null;
+      return fd && fd < todayStart;
+    });
+  }, [allProfiles]);
+
+  const downloadLeads = async (filters = filterData, page = currentPage) => {
+
+
+    if (!token) {
+      console.warn('No token found in session storage.');
+      return;
+    }
+
+    // Helper function to format date for API (set to start of day for fromDate, end of day for toDate)
+    // Only used for nextAction dates
+    const formatDateForAPI = (date, isEndDate = false) => {
+      if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
+      const d = new Date(date);
+      if (isEndDate) {
+        d.setHours(23, 59, 59, 999); // End of day
+      } else {
+        d.setHours(0, 0, 0, 0); // Start of day
+      }
+      return d.toISOString();
+    };
+
+    // Format only nextAction dates before using in query params
+    const nextActionFromDateFormatted = filters.nextActionFromDate ? formatDateForAPI(filters.nextActionFromDate, false) : null;
+    const nextActionToDateFormatted = filters.nextActionToDate ? formatDateForAPI(filters.nextActionToDate, true) : null;
+
+    // Prepare query parameters
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      leadStatus: crmFilters[activeCrmFilter]._id,
+      ...(filters.name && { name: filters.name }),
+      ...(filters.courseType && { courseType: filters.courseType }),
+      ...(filters.status && filters.status !== 'true' && { status: filters.status }),
+
+      ...(filters.sector && { sector: filters.sector }),
+      ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
+      ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
+      ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
+      ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
+      ...(nextActionFromDateFormatted && { nextActionFromDate: nextActionFromDateFormatted }),
+      ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
+      ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
+      ...buildListFilterQueryParts(formData, cycleFilters),
+    });
+
+    try {
+
+      // console.log('API counselor:', formData.counselor.values);
+
+      const response = await axios.get(
+        `${backendUrl}/college/downloadleads?${queryParams}`,
+        {
+          headers: { 'x-auth': token },
+          responseType: "blob"   // ðŸ‘ˆ yeh zaroori hai
+        }
+      );
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "leads.csv";
+      a.click();
+
+
+
+    } catch (error) {
+      console.error('Error fetching profile data:', error);
+    }
+  };
+
+  const fetchRegistrationCrmFilterCounts = async (filters = filterData, page = currentPage, filteredTotalCount = null) => {
+
+    if (!token) {
+      console.warn('No token found in session storage.');
+      setIsLoadingProfiles(false);
+      return;
+    }
+
+    // Prepare query parameters
+
+    const formatDateForAPI = (date, isEndDate = false) => {
+      if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
+      const d = new Date(date);
+      if (isEndDate) {
+        d.setHours(23, 59, 59, 999); // End of day
+      } else {
+        d.setHours(0, 0, 0, 0); // Start of day
+      }
+      return d.toISOString();
+    };
+
+    // Format only nextAction dates before using in query params
+    const nextActionFromDateFormatted = filters.nextActionFromDate ? formatDateForAPI(filters.nextActionFromDate, false) : null;
+    const nextActionToDateFormatted = filters.nextActionToDate ? formatDateForAPI(filters.nextActionToDate, true) : null;
+
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      ...(filters.name && { name: filters.name }),
+      ...(filters.courseType && { courseType: filters.courseType }),
+      ...(filters.status && filters.status !== 'true' && { status: filters.status }),
+      // leadStatus is intentionally excluded - we want counts for all statuses
+      ...(filters.sector && { sector: filters.sector }),
+      ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
+      ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
+      ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
+      ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
+      ...(nextActionFromDateFormatted && { nextActionFromDate: nextActionFromDateFormatted }),
+      ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
+      ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
+      // Multi-select filters
+      ...buildListFilterQueryParts(formData, cycleFilters),
+    });
+
+    try {
+
+
+      const response = await axios.get(`${backendUrl}/college/registrationCrmFilterCounts?${queryParams}`, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.success && response.data) {
+        const data = response.data;
+        // Debug log to verify counts received
+       
+        updateCrmFiltersFromBackend(data.crmFilterCount, filteredTotalCount)
+
+      } else {
+        console.error('Failed to fetch crm filter counts', response.data.message);
+      }
+
+    } catch (error) {
+      console.error('Error fetching profile data:', error);
+    }
+  };
+
+  useEffect(() => {
+    // Fetch candidate details for both leadDetailsVisible and WhatsApp panel
+    if (showPanel === 'Whatsapp' && selectedProfile) {
+      // WhatsApp panel open hai aur selectedProfile hai - fetch full candidate details
+      fetchLeadDetails();
+    } else if (leadDetailsVisible !== null && leadDetailsVisible !== undefined) {
+      // Lead details panel open hai - fetch full candidate details
+      fetchLeadDetails();
+    } else if (selectedProfile === null || selectedProfile === undefined) {
+      // No selected profile - don't fetch
+      return;
+    }
+  }, [leadDetailsVisible, showPanel]); // âœ… Removed selectedProfile to prevent infinite loop
+  const fetchLeadDetails = async () => {
+    try {
+      setIsLoadingProfilesData(true);
+
+      let leadId;
+      let updateTarget;
+
+      if (showPanel === 'Whatsapp' && selectedProfile) {
+        // WhatsApp panel ke liye selectedProfile ki full detail fetch karo
+        leadId = selectedProfile._id;
+        updateTarget = 'whatsapp';
+      } else if (leadDetailsVisible !== null && leadDetailsVisible !== undefined) {
+        // Lead details panel ke liye
+        leadId = allProfiles[leadDetailsVisible]._id || selectedProfile?._id;
+        updateTarget = 'leadDetails';
+
+      } else {
+        return;
+      }
+
+
+      const response = await axios.get(`${backendUrl}/college/appliedCandidatesDetails?leadId=${leadId}`, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.success && response.data.data) {
+        const data = response.data;
+
+        if (updateTarget === 'whatsapp' && selectedProfile) {
+          // WhatsApp panel ke liye selectedProfile ko update karo with full candidate details
+          setSelectedProfile(data.data)
+        } else if (updateTarget === 'leadDetails' && !isLoadingProfiles) {
+          // Lead details panel ke liye
+          allProfiles[leadDetailsVisible] = data.data;
+        }
+
+      } else {
+        console.error('Failed to fetch profile data', response.data.message);
+      }
+    }
+    catch (error) {
+      console.error('Error fetching profile data:', error);
+    }
+    finally {
+      setIsLoadingProfilesData(false);
+    }
+  }
+  const fetchJobs = async () => {
+    const response = await axios.get(`${backendUrl}/college/appliedJobs`, {
+      headers: { 'x-auth': token }
+    });
+  }
 
   const [experiences, setExperiences] = useState([{
     jobTitle: '',
@@ -2097,24 +4019,35 @@ const CRMDashboard = () => {
     });
   }, [allProfiles]);
 
-  // यह logs add करें अपने code में
+  // Fetch applied jobs on component mount
   useEffect(() => {
-    console.log('Current State:', {
-      totalProfiles: allProfiles.length,
-      totalPages: totalPages,
-      currentPage: currentPage,
-      pageSize: pageSize
-    });
-  }, [allProfiles, totalPages, currentPage, pageSize]);
+    fetchJobs(1);
+  }, []);
 
 
 
 
-  const handleTabClick = (profileIndex, tabIndex) => {
+
+  const handleTabClick = (profileIndex, tabIndex, profile) => {
+    setSelectedProfile(profile)
     setActiveTab(prevTabs => ({
       ...prevTabs,
       [profileIndex]: tabIndex
     }));
+
+    // Auto-scroll tab into view on mobile
+    if (isMobile) {
+      setTimeout(() => {
+        const tabButton = document.querySelector(`.nav-pills .nav-link:nth-child(${tabIndex + 1})`);
+        if (tabButton) {
+          tabButton.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+            inline: 'center'
+          });
+        }
+      }, 100);
+    }
   };
 
   // const handleTabClick = (index) => {
@@ -2136,6 +4069,7 @@ const CRMDashboard = () => {
 
 
   const handleCriteriaChange = (criteria, values) => {
+
     setFormData((prevState) => ({
       ...prevState,
       [criteria]: {
@@ -2143,13 +4077,15 @@ const CRMDashboard = () => {
         values: values
       }
     }));
-    console.log(`Selected ${criteria}:`, values);
-    // Reset to first page and fetch with new filters
   };
+
+
 
   const handleCrmFilterClick = async (index) => {
     setActiveCrmFilter(index);
     setCurrentPage(1);
+    setInput1Value(''); 
+    setSelectedProfiles([]); // Reset selected profiles when tab changes
 
     let newFilterData = { ...filterData };
 
@@ -2160,135 +4096,461 @@ const CRMDashboard = () => {
       delete newFilterData.leadStatus;
     }
 
+    newFilterData.followupStatus = '';
+    setSelectedFollowupBucket('');
+    setSelectedApprovalFilter(null);
     setFilterData(newFilterData);
     fetchProfileData(newFilterData, 1);
   };
+
+  const handleLeadViewTabChange = (tab) => {
+    setLeadViewTab(tab);
+    setCurrentPage(1);
+    fetchProfileData(filterData, 1);
+  };
+
+  const handleApprovalCardClick = (approval) => {
+    const togglingOff = selectedApprovalFilter === approval;
+    const next = togglingOff ? null : approval;
+    setSelectedApprovalFilter(next);
+    setSelectedFollowupBucket('');
+    setCurrentPage(1);
+
+    const newFilterData = { ...filterData, followupStatus: '' };
+    if (next === 'approved') {
+      newFilterData.leadStatus = MOVED_IN_KYC_STATUS_ID;
+    } else {
+      delete newFilterData.leadStatus;
+    }
+    setFilterData(newFilterData);
+    setActiveCrmFilter(0);
+    fetchProfileData(newFilterData, 1);
+  };
+
+  const handlePerformanceChipClick = (filterId) => {
+    if (!filterId) {
+      const allIndex = crmFilters.findIndex((f) => f._id === 'all' || !f._id);
+      handleCrmFilterClick(allIndex >= 0 ? allIndex : 0);
+      return;
+    }
+    const index = crmFilters.findIndex((f) => f._id === filterId);
+    if (index >= 0) {
+      setSelectedApprovalFilter(null);
+      handleCrmFilterClick(index);
+    }
+  };
+
+  const handleFollowupDashClick = (type, bucket) => {
+    if (type === 'Visit') return;
+    const key = `call:${bucket}`;
+    const togglingOff = selectedFollowupBucket === key;
+    setSelectedFollowupBucket(togglingOff ? '' : key);
+    setSelectedApprovalFilter(null);
+    setCurrentPage(1);
+    const newFilterData = {
+      ...filterData,
+      followupStatus: togglingOff ? '' : bucket,
+    };
+    setFilterData(newFilterData);
+    fetchProfileData(newFilterData, 1);
+  };
+
+  const isFollowupDashSelected = (type, bucket) => {
+    if (type === 'Visit') return false;
+    return selectedFollowupBucket === `call:${bucket}`;
+  };
+
+  const formatFollowupDate = (dateLike) => {
+    if (!dateLike) return '—';
+    const dt = new Date(dateLike);
+    if (Number.isNaN(dt.getTime())) return '—';
+    return dt.toLocaleDateString('en-GB');
+  };
+
+  const getFollowupBucket = (followUpLike) => {
+    if (!followUpLike) return null;
+    const status = String(followUpLike?.status || '').trim().toLowerCase();
+    if (status === 'completed') return 'done';
+    const dt = followUpLike?.scheduledDate ? new Date(followUpLike.scheduledDate) : null;
+    if (!dt || Number.isNaN(dt.getTime())) return null;
+    return dt.getTime() < Date.now() ? 'missed' : 'planned';
+  };
+
+  const getProfileFollowupBucket = (profile, type) => {
+    const t = String(type || '').toLowerCase();
+    const slot = t === 'visit' ? (profile?.followUpVisit || null) : (profile?.followUpCall || null);
+    const slotBucket = getFollowupBucket(slot);
+    if (slotBucket) return slotBucket;
+    const legacy = profile?.followup || profile?.followUp || null;
+    if (!legacy) return null;
+    const legacyType = String(legacy?.followUpType || legacy?.type || 'call').toLowerCase();
+    if (t === 'visit' && legacyType !== 'visit') return null;
+    if (t === 'call' && legacyType === 'visit') return null;
+    return getFollowupBucket(legacy);
+  };
+
+  const getProfileFollowupDateLabel = (profile, type) => {
+    const t = String(type || '').toLowerCase();
+    const bySlot = t === 'visit' ? (profile?.followUpVisit || null) : (profile?.followUpCall || null);
+    if (bySlot?.scheduledDate) return formatFollowupDate(bySlot.scheduledDate);
+    const legacy = profile?.followup || profile?.followUp || null;
+    if (legacy?.scheduledDate) {
+      const legacyType = String(legacy?.followUpType || legacy?.type || 'call').toLowerCase();
+      if ((t === 'visit' && legacyType === 'visit') || (t === 'call' && legacyType !== 'visit')) {
+        return formatFollowupDate(legacy.scheduledDate);
+      }
+    }
+    if (legacy?.followupDate) return formatFollowupDate(legacy.followupDate);
+    return '—';
+  };
+
+  const getProfileDocumentsBucket = (profile) => {
+    const total = profile?.docCounts?.totalRequired || 0;
+    if (total === 0) return null;
+    const pct = Number(profile?.docCounts?.uploadPercentage ?? 0);
+    return pct >= 100 ? 'done' : 'pending';
+  };
+
+  const getProfileApprovalStatus = (profile) => {
+    if (profile?.kyc) return 'approved';
+    if (String(profile?._leadStatus?._id || '') === MOVED_IN_KYC_STATUS_ID) return 'approved';
+    return 'pending';
+  };
+
+  const getProfileApprovalLabel = (status) => {
+    const safe = String(status || 'pending').toLowerCase();
+    return safe.charAt(0).toUpperCase() + safe.slice(1);
+  };
+
+  const canEditLeadsPermission =
+    (permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') ||
+    permissions?.permission_type === 'Admin';
+
+  const handleApproveLead = async (profile) => {
+    setApprovalEditProfileId(null);
+    await handleMoveToKyc(profile);
+  };
+
+  const handleRejectLeadClick = (profile) => {
+    setApprovalEditProfileId(null);
+    openEditPanel(profile, 'StatusChange');
+  };
+
+  useEffect(() => {
+    if (!approvalEditProfileId) return undefined;
+    const closeApprovalMenu = (event) => {
+      if (!event.target.closest('.lead-strip-v3__approval-block')) {
+        setApprovalEditProfileId(null);
+      }
+    };
+    // pointerdown works for both mouse + touch (mobile)
+    document.addEventListener('pointerdown', closeApprovalMenu);
+    return () => document.removeEventListener('pointerdown', closeApprovalMenu);
+  }, [approvalEditProfileId]);
+
+  const openProfileDocumentsTab = (profileIndex) => {
+    if (leadDetailsVisible !== profileIndex) toggleLeadDetails(profileIndex);
+    setActiveTab((prev) => ({ ...prev, [profileIndex]: 4 }));
+  };
+
+  const performanceTotalCount = approvalCounts.total || crmFilters[0]?.count || 0;
+  const activePerformanceId = (() => {
+    const id = crmFilters[activeCrmFilter]?._id;
+    if (!id || id === 'all') return null;
+    return id;
+  })();
+
+  // Auto-select profiles based on Input 1 value (bulk WhatsApp, bulk Refer, bulk Action)
+  useEffect(() => {
+    if (bulkMode !== 'whatsapp' && bulkMode !== 'bulkrefer' && bulkMode !== 'bulkaction') {
+      return;
+    }
+
+    if (!allProfiles || allProfiles.length === 0) {
+      return;
+    }
+
+    const numValue = input1Value === '' ? 0 : parseInt(input1Value, 10);
+    
+    if (isNaN(numValue) || numValue < 1) {
+      // Invalid value, deselect all (minimum is 1)
+      setSelectedProfiles([]);
+      return;
+    }
+
+    // Get total available leads from CRM filter
+    const totalAvailableLeads = crmFilters[activeCrmFilter]?.count || allProfiles.length;
+    const validNumValue = Math.min(numValue, totalAvailableLeads);
+
+    // If user wants more profiles than currently loaded, fetch them
+    if (validNumValue > allProfiles.length && validNumValue > 0) {
+      const fetchProfilesForSelection = async () => {
+        if (!token) return;
+
+        try {
+
+          const formatDateForAPI = (date, isEndDate = false) => {
+            if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
+            const d = new Date(date);
+            if (isEndDate) {
+              d.setHours(23, 59, 59, 999);
+            } else {
+              d.setHours(0, 0, 0, 0);
+            }
+            return d.toISOString();
+          };
+
+          // Format only nextAction dates
+          const nextActionFromDateFormatted = filterData.nextActionFromDate ? formatDateForAPI(filterData.nextActionFromDate, false) : null;
+          const nextActionToDateFormatted = filterData.nextActionToDate ? formatDateForAPI(filterData.nextActionToDate, true) : null;
+
+          const queryParams = new URLSearchParams({
+            page: '1',
+            limit: validNumValue.toString(),
+            leadStatus: crmFilters[activeCrmFilter]?._id || '',
+            ...(filterData.name && { name: filterData.name }),
+            ...(filterData.courseType && { courseType: filterData.courseType }),
+            ...(filterData.status && filterData.status !== 'true' && { status: filterData.status }),
+            ...(filterData.sector && { sector: filterData.sector }),
+            ...(filterData.createdFromDate && { createdFromDate: filterData.createdFromDate.toISOString() }),
+            ...(filterData.createdToDate && { createdToDate: filterData.createdToDate.toISOString() }),
+            ...(filterData.modifiedFromDate && { modifiedFromDate: filterData.modifiedFromDate.toISOString() }),
+            ...(filterData.modifiedToDate && { modifiedToDate: filterData.modifiedToDate.toISOString() }),
+            ...(nextActionFromDateFormatted && { nextActionFromDate: nextActionFromDateFormatted }),
+            ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
+            ...(filterData.subStatuses && { subStatuses: filterData.subStatuses }),
+            ...buildListFilterQueryParts(formData, cycleFilters),
+          });
+
+          const response = await axios.get(`${backendUrl}/college/appliedCandidates?${queryParams}`, {
+            headers: { 'x-auth': token }
+          });
+
+          if (response.data.success && response.data.data) {
+            const fetchedProfiles = response.data.data;
+            const selectedProfilesData = fetchedProfiles.slice(0, validNumValue);
+            const profilesToSelect = selectedProfilesData.map(profile => profile._id);
+            setSelectedProfiles(profilesToSelect);
+            
+            // Console log: Show selected profiles count and names
+            // console.log(`âœ… Selected ${profilesToSelect.length} profiles:`);
+            // selectedProfilesData.forEach((profile, index) => {
+            //   const candidateName = profile._candidate?.name || profile.candidate?.name || 'N/A';
+            //   const profileId = profile._id;
+            //   console.log(`  ${index + 1}. ${candidateName} (ID: ${profileId})`);
+            // });
+          }
+        } catch (error) {
+          console.error('Error fetching profiles for selection:', error);
+          // Fallback: select from current allProfiles
+          const selectedProfilesData = allProfiles.slice(0, Math.min(validNumValue, allProfiles.length));
+          const profilesToSelect = selectedProfilesData.map(profile => profile._id);
+          setSelectedProfiles(profilesToSelect);
+          
+          // Console log: Show selected profiles count and names (fallback)
+          // console.log(`âš ï¸ Using fallback - Selected ${profilesToSelect.length} profiles from current page:`);
+          selectedProfilesData.forEach((profile, index) => {
+            const candidateName = profile._candidate?.name || profile.candidate?.name || 'N/A';
+            const profileId = profile._id;
+            console.log(`  ${index + 1}. ${candidateName} (ID: ${profileId})`);
+          });
+        }
+      };
+
+      // Debounce: wait 300ms after user stops typing
+      const timeoutId = setTimeout(() => {
+        fetchProfilesForSelection();
+      }, 300);
+
+      return () => clearTimeout(timeoutId);
+    } else {
+      // Use current allProfiles if we have enough
+      const selectedProfilesData = allProfiles.slice(0, validNumValue);
+      const profilesToSelect = selectedProfilesData.map(profile => profile._id);
+      setSelectedProfiles(profilesToSelect);
+      
+      // Console log: Show selected profiles count and names
+      // console.log(`âœ… Selected ${profilesToSelect.length} profiles from current page:`);
+      selectedProfilesData.forEach((profile, index) => {
+        const candidateName = profile._candidate?.name || profile.candidate?.name || 'N/A';
+        const profileId = profile._id;
+        // console.log(`  ${index + 1}. ${candidateName} (ID: ${profileId})`);
+      });
+    }
+
+  }, [input1Value, allProfiles, bulkMode, crmFilters, activeCrmFilter, filterData, formData]);
 
 
 
 
 
   const openEditPanel = async (profile = null, panel) => {
-    console.log('panel', panel);
-    setSelectedProfile(null)
-    setShowPanel('')
-    setSelectedStatus(null)
-    setSelectedSubStatus(null)
-
+    setSelectedProfile(null);
+    setShowPanel('');
+    setSelectedStatus(null);
+    setSelectedSubStatus(null);
 
     if (profile) {
       setSelectedProfile(profile);
     }
 
     // Close all panels first
-
     setShowPopup(null);
     setSelectedConcernPerson(null);
-
 
     if (panel === 'StatusChange') {
       if (profile) {
         const newStatus = profile?._leadStatus?._id || '';
         setSelectedStatus(newStatus);
-
-        // if (newStatus) {
-        //   await fetchSubStatus(newStatus);
-        // }
-
         setSelectedSubStatus(profile?.selectedSubstatus || '');
       }
-      setShowPanel('editPanel')
+      setShowPanel('editPanel');
 
-    }
-    else if (panel === 'SetFollowup') {
-      setShowPopup(null)
-      setShowPanel('followUp')
-    }
-    else if (panel === 'bulkstatuschange') {
-      setShowPopup(null)
-      setShowPanel('bulkstatuschange')
+    } else if (panel === 'SetFollowup') {
+      // For followup we need the latest followup document (if any)
+      if (profile && profile._id) {
+        try {
+          const response = await axios.get(
+            `${backendUrl}/college/appliedCandidatesDetails`,
+            {
+              params: { leadId: profile._id },
+              headers: { 'x-auth': token }
+            }
+          );
 
+          if (response.data.success && response.data.data) {
+            const fullProfile = response.data.data;
+            setSelectedProfile(fullProfile);
+
+            // Pre-fill from existing followup if present
+            if (fullProfile.followup?.followupDate) {
+              const existing = new Date(fullProfile.followup.followupDate);
+              if (!isNaN(existing.getTime())) {
+                setFollowupDate(existing);
+                const hours = String(existing.getHours()).padStart(2, '0');
+                const minutes = String(existing.getMinutes()).padStart(2, '0');
+                setFollowupTime(`${hours}:${minutes}`);
+              } else {
+                setFollowupDate(null);
+                setFollowupTime('');
+              }
+              setRemarks(fullProfile.followup.remarks || '');
+            } else {
+              setFollowupDate(null);
+              setFollowupTime('');
+              setRemarks('');
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching lead details for followup:', error);
+          // Fallback: keep basic profile; backend will handle first-time followup
+          setSelectedProfile(profile);
+        }
+      }
+
+      setShowPopup(null);
+      setShowPanel('followUp');
+
+    } else if (panel === 'bulkstatuschange') {
+      setShowPopup(null);
+      setShowPanel('bulkstatuschange');
     }
 
     if (!isMobile) {
       setMainContentClass('col-8');
+    } else {
+      // On mobile, add body class to prevent scrolling
+      document.body.classList.add('panel-open');
     }
   };
 
 
   const closePanel = () => {
+    // Hide bulk inputs when bulkstatuschange panel is closed
+    if (showPanel === 'bulkstatuschange') {
+      setShowBulkInputs(false);
+      setBulkMode(null);
+    }
+    setIsCourseDropdownOpen(false);
+    setIsCenterDropdownOpen(false);
+    setIsQualificationDropdownOpen(false);
+    setIsCounselorDropdownOpen(false);
     setShowPanel('');
     setShowPopup(null);
     setSelectedConcernPerson(null);
-    setSelectedProfiles(null);
+    setSelectedProfiles([]);
     setSelectedProfile(null);
     setSelectedStatus(null)
     setSelectedSubStatus(null)
+    setFollowupDate(null);
+    setFollowupTime('');
+    setRemarks('');
     if (!isMobile) {
       setMainContentClass('col-12');
+    } else {
+      // On mobile, remove body class to allow scrolling again
+      document.body.classList.remove('panel-open');
     }
   };
 
 
 
-  const openRefferPanel = async (profile = null, panel) => {
-    console.log('panel', panel);
+  const openPanel = async (profile = null, panel) => {
 
     if (profile) {
       setSelectedProfile(profile);
-
-
     }
 
     setShowPopup(null)
 
     if (panel === 'RefferAllLeads') {
-
       setShowPanel('RefferAllLeads');
-
     } else if (panel === 'Reffer') {
       setShowPanel('Reffer');
     } else if (panel === 'AddAllLeads') {
       setShowPanel('AddAllLeads');
+    } else if (panel === 'whatsapp') {
+      setSelectedProfile(profile);
+      setShowPanel('Whatsapp');
+
+      // Use profile parameter directly instead of selectedProfile state
+      if (profile?._candidate?.mobile) {
+        await fetchWhatsappHistory(profile._candidate.mobile);
+        await checkSessionWindow(profile._candidate.mobile);
+      } else {
+        alert('Mobile number not found for this candidate');
+      }
+    } else if (panel === 'email') {
+      setSelectedProfile(profile);
+      setShowPanel('Email');
     }
 
     if (!isMobile) {
       setMainContentClass('col-8');
+    } else {
+      // On mobile, add body class to prevent scrolling
+      document.body.classList.add('panel-open');
     }
-
-
   };
   const handleFetchCandidate = async (profile = null) => {
-    console.log('handleFetchCandidate called with profile:', profile);
     setShowPopup(null)
     setSelectedProfile(profile)
     setOpenModalId(profile._id);
-    console.log('openModalId set to:', profile._id);
   }
 
   useEffect(() => {
-    console.log('useEffect triggered with selectedProfile:', selectedProfile);
     if (selectedProfile && selectedProfile._candidate && selectedProfile._candidate._id) {
-      console.log('About to call fetchProfile with candidate ID:', selectedProfile._candidate._id);
       fetchProfile(selectedProfile._candidate._id);
-    } else {
-      console.log('selectedProfile condition failed:', {
-        selectedProfile: !!selectedProfile,
-        hasCandidate: !!(selectedProfile && selectedProfile._candidate),
-        hasCandidateId: !!(selectedProfile && selectedProfile._candidate && selectedProfile._candidate._id)
-      });
     }
   }, [selectedProfile]);
 
 
 
   const handleConcernPersonChange = (e) => {
-    console.log(e.target.value, 'e.target.value');
     setSelectedConcernPerson(e.target.value);
   }
 
   const handleReferLead = async (type) => {
-    console.log(selectedConcernPerson, 'selectedConcernPerson');
     try {
       const response = await axios.post(`${backendUrl}/college/refer-leads`, {
         counselorId: selectedConcernPerson,
@@ -2324,13 +4586,2776 @@ const CRMDashboard = () => {
 
 
 
-  const openWhatsappPanel = () => {
+  const openWhatsappPanel = async () => {
     setShowPanel('whatsapp');
     if (!isMobile) {
       setMainContentClass('col-8');
     }
+    // Fetch chat history when panel opens
+    if (selectedProfile?._candidate?.mobile) {
+      await fetchWhatsappHistory(selectedProfile._candidate.mobile);
+    }
   };
 
+  // Fetch WhatsApp chat history for selected profile
+  const fetchWhatsappHistory = async (phoneNumber) => {
+    try {
+      if (!phoneNumber || !token) {
+        console.error('âŒ Phone number or token missing:', { phoneNumber, hasToken: !!token });
+        return;
+      }
+
+      setIsLoadingChatHistory(true);
+
+      const response = await axios.get(
+        `${backendUrl}/college/whatsapp/chat-history/${phoneNumber}`,
+        {
+          headers: {
+            'x-auth': token
+          }
+        }
+      );
+
+      if (response.data.success) {
+        console.log('ðŸ“¥ Fetched chat history from backend:', response.data.data.length, 'messages');
+        console.log('ðŸ“¥ Sample message from backend:', response.data.data[0]);
+
+        // Convert database messages to chat format
+        const formattedMessages = response.data.data.map((msg, index) => ({
+          id: msg._id || msg.wamid || msg.whatsappMessageId || `msg-${index}`, // Use database ID or wamid
+          dbId: msg._id, // Keep database ID separately
+          wamid: msg.wamid || msg.whatsappMessageId, // WhatsApp message ID (check both fields)
+          whatsappMessageId: msg.whatsappMessageId || msg.wamid, // Also store as whatsappMessageId for consistency
+          text: msg.message,
+          sender: msg.direction === 'incoming' ? 'user' : 'agent', // Check direction to determine sender
+          time: new Date(msg.sentAt).toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          type: msg.messageType, // 'text' or 'template'
+          templateData: msg.templateData, // Will contain components for template messages
+          mediaUrl: msg.mediaUrl, // Media URL if it's an image/video/document
+          status: msg.status || (msg.direction === 'incoming' ? 'received' : 'sent'),
+          deliveredAt: msg.deliveredAt,
+          readAt: msg.readAt
+        }));
+
+        console.log('ðŸ“¤ Formatted messages for state:', formattedMessages.map(m => ({
+          id: m.id,
+          wamid: m.wamid,
+          whatsappMessageId: m.whatsappMessageId,
+          text: m.text?.substring(0, 30),
+          status: m.status
+        })));
+
+        setWhatsappMessages(formattedMessages);
+        // reset AI summary when chat changes
+        setAiWhatsappSummary(null);
+        setAiWhatsappError(null);
+        setAiSuggestedReplyDraft('');
+      }
+    } catch (error) {
+      console.error('âŒ Error fetching chat history:', error.response?.data || error.message);
+
+      // Show error to user
+      if (error.response?.status === 401) {
+        alert('Session expired. Please login again.');
+      } else if (error.response?.status === 400) {
+        alert('Invalid phone number or missing information');
+      } else {
+        console.warn('âš ï¸ Could not fetch chat history. Starting with empty chat.');
+      }
+
+      // Start with empty messages on error
+      setWhatsappMessages([]);
+    } finally {
+      setIsLoadingChatHistory(false);
+    }
+  };
+
+  const generateAiWhatsappSummary = async () => {
+    try {
+      if (!token) return;
+      if (!selectedProfile?._candidate?.mobile) return;
+      if (!Array.isArray(whatsappMessages) || whatsappMessages.length === 0) return;
+
+      setAiWhatsappLoading(true);
+      setAiWhatsappError(null);
+
+      const payloadMessages = normalizeWhatsappMessages(whatsappMessages);
+      const aiProfile = buildAiSupervisionProfile(selectedProfile);
+
+      const leadContext = {
+        candidateName: aiProfile.studentName,
+        mobile: selectedProfile?._candidate?.mobile,
+        leadStatus: selectedProfile?._leadStatus?.title,
+        substatus: selectedProfile?.selectedSubstatus?.title,
+        course: aiProfile.courseName,
+        center: aiProfile.centerName,
+        counselor: aiProfile.counselorName,
+      };
+
+      const res = await axios.post(
+        `${backendUrl}/api/ai/whatsapp-summary`,
+        {
+          phone: selectedProfile._candidate.mobile,
+          leadContext,
+          messages: payloadMessages,
+        },
+        { headers: { 'x-auth': token } }
+      );
+
+      if (res.data?.success && res.data?.data) {
+        setAiWhatsappSummary(res.data.data);
+        setAiSuggestedReplyDraft(res.data.data.suggestedReply || '');
+      } else {
+        setAiWhatsappError(res.data?.message || 'Failed to generate AI summary');
+      }
+    } catch (err) {
+      console.error('AI whatsapp summary failed:', err);
+      setAiWhatsappError(err.response?.data?.message || err.message || 'Failed to generate AI summary');
+    } finally {
+      setAiWhatsappLoading(false);
+    }
+  };
+
+  const generateAiWhatsappSummaryForProfile = async (profile) => {
+    try {
+      if (!token || !profile?._id) return;
+      const mobile = profile?._candidate?.mobile;
+      if (!mobile) return;
+
+      setWaSummaryLoadingByProfileId((prev) => ({ ...prev, [profile._id]: true }));
+      setWaSummaryErrorByProfileId((prev) => ({ ...prev, [profile._id]: null }));
+
+      // fetch chat history first
+      const chatRes = await axios.get(
+        `${backendUrl}/college/whatsapp/chat-history/${mobile}`,
+        { headers: { 'x-auth': token } }
+      );
+      const chatMessages = chatRes.data?.data || [];
+      if (!Array.isArray(chatMessages) || chatMessages.length === 0) {
+        setWaSummaryErrorByProfileId((prev) => ({ ...prev, [profile._id]: 'No WhatsApp messages found for this lead.' }));
+        return;
+      }
+
+      const aiProfile = buildAiSupervisionProfile(profile);
+      const leadContext = {
+        candidateName: aiProfile.studentName,
+        mobile: profile?._candidate?.mobile,
+        leadStatus: profile?._leadStatus?.title,
+        substatus: profile?.selectedSubstatus?.title,
+        course: aiProfile.courseName,
+        center: aiProfile.centerName,
+        counselor: aiProfile.counselorName,
+      };
+
+      const aiRes = await axios.post(
+        `${backendUrl}/api/ai/whatsapp-summary`,
+        { phone: mobile, leadContext, messages: normalizeWhatsappMessages(chatMessages) },
+        { headers: { 'x-auth': token } }
+      );
+
+      if (aiRes.data?.success && aiRes.data?.data) {
+        setWaSummaryByProfileId((prev) => ({ ...prev, [profile._id]: aiRes.data.data }));
+      } else {
+        setWaSummaryErrorByProfileId((prev) => ({ ...prev, [profile._id]: aiRes.data?.message || 'Failed to generate summary' }));
+      }
+    } catch (err) {
+      console.error('AI WhatsApp summary (profile) failed:', err);
+      setWaSummaryErrorByProfileId((prev) => ({ ...prev, [profile?._id]: err.response?.data?.message || err.message || 'Failed to generate summary' }));
+    } finally {
+      setWaSummaryLoadingByProfileId((prev) => ({ ...prev, [profile?._id]: false }));
+    }
+  };
+
+  const generateNextBestActionsForProfile = async (profile) => {
+    try {
+      if (!token || !profile?._id) return;
+      setNextActionsLoadingByProfileId((prev) => ({ ...prev, [profile._id]: true }));
+      setNextActionsErrorByProfileId((prev) => ({ ...prev, [profile._id]: null }));
+
+      const leadProfile = buildAiSupervisionProfile(profile);
+      const notes = leadProfile.notes;
+
+      const res = await axios.post(
+        `${backendUrl}/api/ai/next-best-action`,
+        { leadProfile, notes },
+        { headers: { 'x-auth': token } }
+      );
+      if (res.data?.success && Array.isArray(res.data?.data?.actions)) {
+        setNextActionsByProfileId((prev) => ({ ...prev, [profile._id]: res.data.data.actions }));
+      } else {
+        setNextActionsErrorByProfileId((prev) => ({ ...prev, [profile._id]: res.data?.message || 'Failed to generate actions' }));
+      }
+    } catch (err) {
+      console.error('AI next-best-action (profile) failed:', err);
+      setNextActionsErrorByProfileId((prev) => ({ ...prev, [profile?._id]: err.response?.data?.message || err.message || 'Failed to generate actions' }));
+    } finally {
+      setNextActionsLoadingByProfileId((prev) => ({ ...prev, [profile?._id]: false }));
+    }
+  };
+
+  const generateNextBestActionsForSelected = async () => {
+    const selectedSet = new Set(Array.isArray(selectedProfiles) ? selectedProfiles : []);
+    const selected = (allProfiles || []).filter(p => selectedSet.has(p._id));
+    for (const p of selected) {
+      if (nextActionsByProfileId[p._id] || nextActionsLoadingByProfileId[p._id]) continue;
+      // eslint-disable-next-line no-await-in-loop
+      await generateNextBestActionsForProfile(p);
+    }
+  };
+
+  const generateAiWhatsappSummaryForSelected = async () => {
+    const selectedSet = new Set(Array.isArray(selectedProfiles) ? selectedProfiles : []);
+    const selected = (allProfiles || []).filter(p => selectedSet.has(p._id));
+    for (const p of selected) {
+      // skip if already generated
+      if (waSummaryByProfileId[p._id] || waSummaryLoadingByProfileId[p._id]) continue;
+      // eslint-disable-next-line no-await-in-loop
+      await generateAiWhatsappSummaryForProfile(p);
+    }
+  };
+
+  const generateLeadSummaryForProfile = async (profile) => {
+    try {
+      if (!token || !profile?._id) return;
+      setLeadSummaryLoadingByProfileId((prev) => ({ ...prev, [profile._id]: true }));
+      setLeadSummaryErrorByProfileId((prev) => ({ ...prev, [profile._id]: null }));
+
+      const leadProfile = buildAiSupervisionProfile(profile);
+      const notes = leadProfile.notes;
+
+      const res = await axios.post(
+        `${backendUrl}/api/ai/lead-summary`,
+        { leadId: profile._id, leadProfile, notes, messages: [] },
+        { headers: { 'x-auth': token } }
+      );
+      if (res.data?.success && res.data?.data) {
+        setLeadSummaryByProfileId((prev) => ({ ...prev, [profile._id]: res.data.data }));
+      } else {
+        setLeadSummaryErrorByProfileId((prev) => ({ ...prev, [profile._id]: res.data?.message || 'Failed to generate summary' }));
+      }
+    } catch (err) {
+      console.error('AI lead-summary (profile) failed:', err);
+      setLeadSummaryErrorByProfileId((prev) => ({ ...prev, [profile?._id]: err.response?.data?.message || err.message || 'Failed to generate summary' }));
+    } finally {
+      setLeadSummaryLoadingByProfileId((prev) => ({ ...prev, [profile?._id]: false }));
+    }
+  };
+
+  const generateLeadSummaryForSelected = async () => {
+    const selectedSet = new Set(Array.isArray(selectedProfiles) ? selectedProfiles : []);
+    const selected = (allProfiles || []).filter(p => selectedSet.has(p._id));
+    for (const p of selected) {
+      if (leadSummaryByProfileId[p._id] || leadSummaryLoadingByProfileId[p._id]) continue;
+      // eslint-disable-next-line no-await-in-loop
+      await generateLeadSummaryForProfile(p);
+    }
+  };
+
+  const selectFirstNForAiSupervision = useCallback(() => {
+    const max = allProfiles?.length || 0;
+    const n = Math.max(0, Math.min(max, parseInt(String(aiSupervisionCount || '').trim(), 10) || 0));
+    const ids = (allProfiles || []).slice(0, n).map(p => p._id);
+    setSelectedProfiles(ids);
+    return (allProfiles || []).slice(0, n);
+  }, [aiSupervisionCount, allProfiles]);
+
+  const aiSupervisionQueue = useMemo(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const queue = (allProfiles || []).flatMap((profile) => {
+      const aiProfile = buildAiSupervisionProfile(profile);
+      const followupDate = aiProfile.followupDate;
+      const isOverdue = followupDate ? new Date(followupDate) < todayStart : false;
+      const items = [];
+
+      const pushItem = (type, severity, label, reason, action) => {
+        items.push({
+          _id: `${profile._id}-${type}`,
+          leadId: profile._id,
+          type,
+          severity,
+          label,
+          reason,
+          action,
+          studentName: aiProfile.studentName,
+          centerName: aiProfile.centerName,
+          counselorName: aiProfile.counselorName,
+          courseName: aiProfile.courseName,
+          contactNumbers: aiProfile.contactNumbers,
+          batchName: aiProfile.batchName,
+          followupDate: aiProfile.followupDate,
+          feeStatus: aiProfile.registrationFee,
+          kycBucket: aiProfile.riskContext.kycBucket,
+        });
+      };
+
+      if (aiProfile.riskContext.rejectedDocs > 0) {
+        pushItem(
+          'kycRejected',
+          'High',
+          'KYC Rejected',
+          `${aiProfile.riskContext.rejectedDocs} rejected document(s) need correction.`,
+          'Call the lead and ask for corrected document upload today.'
+        );
+      }
+
+      if (aiProfile.riskContext.pendingVerificationDocs > 0) {
+        pushItem(
+          'kycPendingVerification',
+          'Medium',
+          'Pending Verification',
+          `${aiProfile.riskContext.pendingVerificationDocs} uploaded document(s) are waiting for verification.`,
+          'Review and verify documents to avoid blocking the admission journey.'
+        );
+      }
+
+      if (aiProfile.riskContext.hasNoUploads && !aiProfile.kyc) {
+        pushItem(
+          'kycNoUpload',
+          'Medium',
+          'No KYC Upload',
+          'No document upload found for this lead.',
+          'Send checklist and follow up for upload completion.'
+        );
+      }
+
+      if ((aiProfile.admissionDone || aiProfile.admissionDate) && aiProfile.registrationFee !== 'Paid') {
+        pushItem(
+          'admissionUnpaid',
+          'High',
+          'Admission Unpaid',
+          'Admission is marked but fee is still unpaid.',
+          'Take payment follow-up and confirm proof before batch movement.'
+        );
+      }
+
+      if ((aiProfile.admissionDone || aiProfile.admissionDate) && (!aiProfile.batchName || aiProfile.batchName === 'Unassigned')) {
+        pushItem(
+          'admissionNoBatch',
+          'Medium',
+          'Batch Not Assigned',
+          'Admission exists but no batch is assigned.',
+          'Assign batch quickly to reduce post-admission drop-off.'
+        );
+      }
+
+      if (aiProfile.dropout) {
+        pushItem(
+          'dropoutRisk',
+          'High',
+          'Dropout',
+          'Lead is already marked as dropout.',
+          'Review dropout reason and check if recovery is possible.'
+        );
+      }
+
+      if (isOverdue) {
+        pushItem(
+          'overdueFollowup',
+          'Medium',
+          'Overdue Follow-up',
+          'Follow-up date has passed.',
+          'Reconnect with the lead and update next action date.'
+        );
+      }
+
+      return items;
+    });
+
+    return queue.sort((a, b) => {
+      const severityOrder = { High: 3, Medium: 2, Low: 1 };
+      const severityDiff = (severityOrder[b.severity] || 0) - (severityOrder[a.severity] || 0);
+      if (severityDiff !== 0) return severityDiff;
+
+      const dateA = a.followupDate ? new Date(a.followupDate).getTime() : 0;
+      const dateB = b.followupDate ? new Date(b.followupDate).getTime() : 0;
+      return dateA - dateB;
+    });
+  }, [allProfiles, buildAiSupervisionProfile]);
+
+  const aiQueueCounts = useMemo(() => ({
+    all: aiSupervisionQueue.length,
+    kycRejected: aiSupervisionQueue.filter((item) => item.type === 'kycRejected').length,
+    kycPendingVerification: aiSupervisionQueue.filter((item) => item.type === 'kycPendingVerification').length,
+    kycNoUpload: aiSupervisionQueue.filter((item) => item.type === 'kycNoUpload').length,
+    admissionUnpaid: aiSupervisionQueue.filter((item) => item.type === 'admissionUnpaid').length,
+    admissionNoBatch: aiSupervisionQueue.filter((item) => item.type === 'admissionNoBatch').length,
+    dropoutRisk: aiSupervisionQueue.filter((item) => item.type === 'dropoutRisk').length,
+    overdueFollowup: aiSupervisionQueue.filter((item) => item.type === 'overdueFollowup').length,
+  }), [aiSupervisionQueue]);
+
+  const filteredAiSupervisionQueue = useMemo(() => {
+    const query = String(aiSupervisionSearchTerm || '').trim().toLowerCase();
+    const normalizedQueryDigits = query.replace(/\D/g, '');
+
+    return aiSupervisionQueue.filter((item) => {
+      const matchesFilter = aiSupervisionQueueFilter === 'all' || item.type === aiSupervisionQueueFilter;
+      if (!matchesFilter) return false;
+
+      if (!query) return true;
+
+      const haystack = [
+        item.studentName,
+        item.centerName,
+        item.counselorName,
+        item.courseName,
+        item.label,
+        item.reason,
+        item.action,
+        ...(Array.isArray(item.contactNumbers) ? item.contactNumbers : []),
+      ].filter(Boolean).join(' ').toLowerCase();
+
+      const matchesText = haystack.includes(query);
+      if (matchesText) return true;
+
+      if (!normalizedQueryDigits) return false;
+
+      const contactDigits = (Array.isArray(item.contactNumbers) ? item.contactNumbers : [])
+        .map((value) => String(value).replace(/\D/g, ''))
+        .filter(Boolean);
+
+      return contactDigits.some((digits) => digits.includes(normalizedQueryDigits));
+    });
+  }, [aiSupervisionQueue, aiSupervisionQueueFilter, aiSupervisionSearchTerm]);
+
+  // Check WhatsApp 24-hour session window status
+  const checkSessionWindow = async (phoneNumber) => {
+    try {
+      if (!phoneNumber || !token) {
+        console.error('âŒ Phone number or token missing');
+        return;
+      }
+
+      const response = await axios.get(
+        `${backendUrl}/college/whatsapp/session-window/${phoneNumber}`,
+        {
+          headers: {
+            'x-auth': token
+          }
+        }
+      );
+
+      if (response.data.success) {
+        const { sessionWindow: sw } = response.data;
+        setSessionWindow({
+          isOpen: sw.isOpen,
+          openedAt: sw.lastIncomingMessageAt,
+          expiresAt: sw.expiresAt,
+          remainingTimeMs: sw.remainingTimeMs
+        });
+
+        console.log('âœ… Session window status:', {
+          isOpen: sw.isOpen,
+          canSendManualMessages: response.data.messaging.canSendManualMessages,
+          requiresTemplate: response.data.messaging.requiresTemplate,
+          expiresAt: sw.expiresAt
+        });
+      }
+    } catch (error) {
+      console.error('âŒ Error checking session window:', error.response?.data || error.message);
+      // Set default state if error
+      setSessionWindow({
+        isOpen: false,
+        openedAt: null,
+        expiresAt: null,
+        remainingTimeMs: 0
+      });
+    }
+  };
+
+  // Auto-refresh session window when WhatsApp panel opens and messages load
+  useEffect(() => {
+    if (showPanel === 'Whatsapp' && selectedProfile?._candidate?.mobile && !isLoadingChatHistory) {
+      // Check session window after messages are loaded
+      checkSessionWindow(selectedProfile._candidate.mobile);
+    }
+  }, [showPanel, whatsappMessages.length, isLoadingChatHistory]);
+
+  // Countdown timer for session window
+  useEffect(() => {
+    if (!sessionWindow.isOpen || !sessionWindow.expiresAt) {
+      setSessionCountdown('00:00:00');
+      return;
+    }
+
+    const updateCountdown = () => {
+      const now = new Date();
+      const expiresAt = new Date(sessionWindow.expiresAt);
+      const diff = expiresAt - now;
+
+      if (diff <= 0) {
+        setSessionCountdown('00:00:00');
+        // Session expired, refresh status
+        if (selectedProfile?._candidate?.mobile) {
+          checkSessionWindow(selectedProfile._candidate.mobile);
+        }
+        return;
+      }
+
+      // Convert to hours, minutes, seconds
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      // Format as HH:MM:SS
+      const formatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      setSessionCountdown(formatted);
+    };
+
+    // Update immediately
+    updateCountdown();
+
+    // Update every second
+    const interval = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(interval);
+  }, [sessionWindow.isOpen, sessionWindow.expiresAt, selectedProfile]);
+
+  // Render message status icon (WhatsApp style)
+  const renderMessageStatus = (status, errorMessage = null) => {
+    switch (status) {
+      case 'sending':
+        return <i className="fas fa-clock" style={{ fontSize: '12px', color: '#8696a0', marginLeft: '4px' }} title="Sending..."></i>;
+      case 'sent':
+        return <i className="fas fa-check" style={{ fontSize: '12px', color: '#8696a0', marginLeft: '4px' }} title="Sent"></i>;
+      case 'delivered':
+        return (
+          <span style={{ position: 'relative', display: 'inline-block', width: '16px', height: '12px', marginLeft: '4px' }} title="Delivered">
+            <i className="fas fa-check" style={{ fontSize: '12px', color: '#8696a0', position: 'absolute', left: '0' }}></i>
+            <i className="fas fa-check" style={{ fontSize: '12px', color: '#8696a0', position: 'absolute', left: '3px' }}></i>
+          </span>
+        );
+      case 'read':
+        return (
+          <span style={{ position: 'relative', display: 'inline-block', width: '16px', height: '12px', marginLeft: '4px' }} title="Read">
+            <i className="fas fa-check" style={{ fontSize: '12px', color: '#53bdeb', position: 'absolute', left: '0' }}></i>
+            <i className="fas fa-check" style={{ fontSize: '12px', color: '#53bdeb', position: 'absolute', left: '3px' }}></i>
+          </span>
+        );
+      case 'failed':
+        return <i className="fas fa-exclamation-circle" style={{ fontSize: '12px', color: '#f44336', marginLeft: '4px', cursor: 'pointer' }} title={errorMessage || 'Message failed to send'}></i>;
+      default:
+        return null;
+    }
+  };
+
+  // Render WhatsApp Template Message
+  const renderTemplateMessage = (templateData, useSavedExamples = false) => {
+    if (!templateData || !templateData.components) {
+      return null;
+    }
+
+    const components = templateData.components;
+    const headerComponent = components.find(c => c.type === 'HEADER');
+    const bodyComponent = components.find(c => c.type === 'BODY');
+    const footerComponent = components.find(c => c.type === 'FOOTER');
+    const buttonsComponent = components.find(c => c.type === 'BUTTONS');
+    const carouselComponent = components.find(c => c.type === 'CAROUSEL');
+
+    return (
+      <div style={{ width: '100%' }}>
+        {/* Carousel Template */}
+        {carouselComponent && carouselComponent.cards && carouselComponent.cards.length > 0 && (
+          <div style={{ marginBottom: '8px' }}>
+            <div
+              className="d-flex overflow-auto pb-2"
+              style={{
+                gap: '8px',
+                scrollbarWidth: 'thin',
+                scrollbarColor: '#888 #f0f0f0'
+              }}
+            >
+              {carouselComponent.cards.map((card, cardIndex) => {
+                const cardHeader = card.components?.find(c => c.type === 'HEADER');
+                const cardBody = card.components?.find(c => c.type === 'BODY');
+                const cardButtons = card.components?.find(c => c.type === 'BUTTONS');
+                const cardMedia = templateData.carouselMedia?.[cardIndex];
+
+                return (
+                  <div
+                    key={cardIndex}
+                    style={{
+                      minWidth: '220px',
+                      maxWidth: '220px',
+                      backgroundColor: '#fff',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      border: '1px solid #e0e0e0'
+                    }}
+                  >
+                    {/* Card Media */}
+                    {cardHeader && cardMedia?.s3Url && (
+                      <div style={{ position: 'relative', width: '100%', height: '140px' }}>
+                        {cardMedia.mediaType === 'IMAGE' ? (
+                          <img
+                            src={cardMedia.s3Url}
+                            alt={`Card ${cardIndex + 1}`}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover'
+                            }}
+                          />
+                        ) : (
+                          <video
+                            controls
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover'
+                            }}
+                          >
+                            <source src={cardMedia.s3Url} type="video/mp4" />
+                          </video>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Card Body */}
+                    {cardBody && (
+                      <div style={{ padding: '10px', fontSize: '13px', lineHeight: '1.3' }}>
+                        {(() => {
+
+
+                          // Get candidate data for variable replacement
+                          const candidate = selectedProfile?._candidate;
+                          const registration = selectedProfile;
+
+                          // Get template variable mappings from selectedWhatsappTemplate
+                          const variableMappings = selectedWhatsappTemplate?.variableMappings || [];
+
+                          // Replace variables with actual candidate data using stored mappings
+                          let text = cardBody.text || '';
+
+                          if (variableMappings && variableMappings.length > 0) {
+                            // Use stored variable mappings from database
+
+                            variableMappings.forEach(mapping => {
+                              const position = mapping.position;
+                              const variableName = mapping.variableName;
+
+                              // Get value based on actual variable name from mapping
+                              let value = '';
+
+                              switch (variableName) {
+                                case 'name':
+                                  value = candidate?.name || registration?.name || 'User';
+                                  break;
+                                case 'gender':
+                                  value = candidate?.gender || 'Male';
+                                  break;
+                                case 'mobile':
+                                  value = candidate?.mobile || registration?.mobile || 'Mobile';
+                                  break;
+                                case 'email':
+                                  value = candidate?.email || registration?.email || 'Email';
+                                  break;
+                                case 'course_name':
+                                  value = selectedProfile?._course?.name || 'Course Name';
+                                  break;
+                                case 'counselor_name':
+                                  value = selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned';
+                                  break;
+                                case 'job_name':
+                                  value = candidate?.appliedJobs?.[0]?.title || 'Job Title';
+                                  break;
+                                case 'project_name':
+                                  value = selectedProfile?.project?.name || 'Project Name';
+                                  break;
+                                case 'batch_name':
+                                  value = selectedProfile?.batch?.name || 'Batch Not Assigned';
+                                  break;
+                                case 'lead_owner_name':
+                                  value = selectedProfile?.registeredBy?.name || 'Self Registered';
+                                  break;
+                                default:
+                                  // Try direct property access
+                                  value = candidate?.[variableName] || registration?.[variableName] || `[${variableName}]`;
+                                  break;
+                              }
+
+                              // Replace the numbered variable with actual value
+                              text = text.replace(new RegExp(`\\{\\{${position}\\}\\}`, 'g'), value);
+                            });
+                          } else {
+                            // Fallback: Use default mapping if no stored mappings
+
+                            // Replace {{1}} with name
+                            text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
+
+                            // Replace {{2}} with gender
+                            text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
+
+                            // Replace {{3}} with mobile
+                            text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
+
+                            // Replace {{4}} with email
+                            text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
+
+                            // Replace {{5}} with course name
+                            text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || 'Course Name');
+
+                            // Replace {{6}} with counselor name
+                            text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned');
+
+                            // Replace {{7}} with job name
+                            text = text.replace(/\{\{7\}\}/g, selectedProfile?.appliedJobs?.[0]?.title || 'Job Title');
+
+                            // Replace {{8}} with project name (college name)
+                            text = text.replace(/\{\{8\}\}/g, selectedProfile?.project?.name || 'Project Name');
+
+                            // Replace {{9}} with batch name
+                            text = text.replace(/\{\{9\}\}/g, selectedProfile?.batch?.name || 'Batch Not Assigned');
+
+                            // Replace {{10}} with lead owner name
+                            text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Self Registered');
+                          }
+
+                          return text;
+                        })()}
+                      </div>
+                    )}
+
+                    {/* Card Buttons */}
+                    {cardButtons && cardButtons.buttons && cardButtons.buttons.length > 0 && (
+                      <div style={{ borderTop: '1px solid #e0e0e0' }}>
+                        {cardButtons.buttons.map((btn, btnIndex) => (
+                          <div
+                            key={btnIndex}
+                            style={{
+                              padding: '8px',
+                              textAlign: 'center',
+                              color: '#00A5F4',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              cursor: 'pointer',
+                              borderBottom: btnIndex < cardButtons.buttons.length - 1 ? '1px solid #e0e0e0' : 'none'
+                            }}
+                          >
+                            {btn.type === 'URL' && <i className="fas fa-external-link-alt me-1" style={{ fontSize: '11px' }}></i>}
+                            {btn.type === 'PHONE_NUMBER' && <i className="fas fa-phone me-1" style={{ fontSize: '11px' }}></i>}
+                            {btn.text}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ fontSize: '11px', color: '#667781', marginTop: '4px', fontStyle: 'italic' }}>
+              <i className="fas fa-images me-1"></i>Carousel Template ({carouselComponent.cards.length} cards)
+            </div>
+          </div>
+        )}
+
+        {/* Regular Template (Non-Carousel) */}
+        {!carouselComponent && (
+          <>
+            {/* Header */}
+            {headerComponent && (
+              <div className="mb-2">
+                {headerComponent.format === 'TEXT' && (
+                  <div style={{ fontSize: '15px', fontWeight: '600', color: '#000' }}>
+                    {headerComponent.text}
+                  </div>
+                )}
+                {headerComponent.format === 'IMAGE' && templateData.headerMedia?.s3Url && (
+                  <img
+                    src={templateData.headerMedia.s3Url}
+                    alt="Header"
+                    style={{
+                      width: '100%',
+                      maxHeight: '200px',
+                      objectFit: 'cover',
+                      borderRadius: '8px 8px 0 0',
+                      marginLeft: '-10px',
+                      marginTop: '-6px',
+                      marginRight: '-10px',
+                      marginBottom: '8px',
+                      width: 'calc(100% + 20px)'
+                    }}
+                  />
+                )}
+                {headerComponent.format === 'VIDEO' && templateData.headerMedia?.s3Url && (
+                  <video
+                    controls
+                    style={{
+                      width: '100%',
+                      maxHeight: '200px',
+                      borderRadius: '8px 8px 0 0',
+                      marginLeft: '-10px',
+                      marginTop: '-6px',
+                      marginRight: '-10px',
+                      marginBottom: '8px',
+                      width: 'calc(100% + 20px)'
+                    }}
+                  >
+                    <source src={templateData.headerMedia.s3Url} type="video/mp4" />
+                  </video>
+                )}
+                {headerComponent.format === 'DOCUMENT' && templateData.headerMedia?.s3Url && (
+                  <a
+                    href={templateData.headerMedia.s3Url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="d-flex align-items-center p-2 mb-2"
+                    style={{
+                      backgroundColor: '#f0f0f0',
+                      borderRadius: '6px',
+                      textDecoration: 'none',
+                      color: '#000'
+                    }}
+                  >
+                    <i className="fas fa-file-pdf me-2" style={{ fontSize: '20px', color: '#d32f2f' }}></i>
+                    <span style={{ fontSize: '13px' }}>{templateData.headerMedia.fileName || 'Document'}</span>
+                  </a>
+                )}
+              </div>
+            )}
+
+            {/* Body */}
+            {bodyComponent && (
+              <div style={{ fontSize: '14px', lineHeight: '1.4', color: '#000', marginBottom: '8px', whiteSpace: 'pre-wrap' }}>
+                {(() => {
+                  // For saved messages (useSavedExamples=true), use database example values
+                  if (useSavedExamples && bodyComponent.example && bodyComponent.example.body_text && Array.isArray(bodyComponent.example.body_text[0])) {
+                    const exampleValues = bodyComponent.example.body_text[0];
+                    let text = bodyComponent.text || '';
+
+                    // Replace each numbered variable with its saved example value
+                    const variableRegex = /\{\{(\d+)\}\}/g;
+                    const matches = [...text.matchAll(variableRegex)];
+
+                    matches.forEach((match, index) => {
+                      if (index < exampleValues.length && exampleValues[index]) {
+                        const position = match[1];
+                        const replaceRegex = new RegExp(`\\{\\{${position}\\}\\}`, 'g');
+                        text = text.replace(replaceRegex, exampleValues[index]);
+                      }
+                    });
+
+                    return text;
+                  }
+
+                  // For preview mode, get candidate data for variable replacement
+                  const candidate = selectedProfile?._candidate;
+                  const registration = selectedProfile;
+
+                  // Get template variable mappings from selectedWhatsappTemplate
+                  const variableMappings = selectedWhatsappTemplate?.variableMappings || [];
+
+                  // Replace variables with actual candidate data using stored mappings
+                  let text = bodyComponent.text || '';
+
+                  if (variableMappings && variableMappings.length > 0) {
+                    // Use stored variable mappings from database
+
+                    variableMappings.forEach(mapping => {
+                      const position = mapping.position;
+                      const variableName = mapping.variableName;
+
+                      // Get value based on actual variable name from mapping
+                      let value = '';
+
+                      switch (variableName) {
+                        case 'name':
+                          value = candidate?.name || registration?.name || 'User';
+                          break;
+                        case 'gender':
+                          value = candidate?.gender || 'Male';
+                          break;
+                        case 'mobile':
+                          value = candidate?.mobile || registration?.mobile || 'Mobile';
+                          break;
+                        case 'email':
+                          value = candidate?.email || registration?.email || 'Email';
+                          break;
+                        case 'course_name':
+                          value = candidate?.appliedCourses?.[0]?.courseName || selectedProfile?.course?.name || 'Course Name';
+                          break;
+                        case 'counselor_name':
+                          value = selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned';
+                          break;
+                        case 'job_name':
+                          value = selectedProfile?.appliedJobs?.[0]?.title || 'Job Title';
+                          break;
+                        case 'project_name':
+                          value = selectedProfile?.project?.name || 'Project Name';
+                          break;
+                        case 'batch_name':
+                          value = selectedProfile?.batch?.name || 'Batch Not Assigned';
+                          break;
+                        case 'lead_owner_name':
+                          value = selectedProfile?.registeredBy?.name || 'Self Registered';
+                          break;
+                        default:
+                          // Try direct property access
+                          value = candidate?.[variableName] || registration?.[variableName] || `[${variableName}]`;
+                          break;
+                      }
+
+                      // Replace the numbered variable with actual value
+                      text = text.replace(new RegExp(`\\{\\{${position}\\}\\}`, 'g'), value);
+                    });
+                  } else {
+                    // Fallback: Use default mapping if no stored mappings
+
+                    // Replace {{1}} with name
+                    text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
+
+                    // Replace {{2}} with gender
+                    text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
+
+                    // Replace {{3}} with mobile
+                    text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
+
+                    // Replace {{4}} with email
+                    text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
+
+                    // Replace {{5}} with course name
+                    text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || selectedProfile?.course?.name || 'Course Name');
+
+                    // Replace {{6}} with counselor name
+                    text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned');
+
+                    // Replace {{7}} with job name
+                    text = text.replace(/\{\{7\}\}/g, selectedProfile?.appliedJobs?.[0]?.title || 'Job Title');
+
+                    // Replace {{8}} with project name (college name)
+                    text = text.replace(/\{\{8\}\}/g, selectedProfile?.project?.name || 'Project Name');
+
+                    // Replace {{9}} with batch name
+                    text = text.replace(/\{\{9\}\}/g, selectedProfile?.batch?.name || 'Batch Not Assigned');
+
+                    // Replace {{10}} with lead owner name
+                    text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Self Registered');
+                  }
+
+                  return text;
+                })()}
+              </div>
+            )}
+
+            {/* Footer */}
+            {footerComponent && (
+              <div style={{ fontSize: '12px', color: '#667781', marginTop: '6px', marginBottom: '8px' }}>
+                {footerComponent.text}
+              </div>
+            )}
+
+            {/* Buttons */}
+            {buttonsComponent && buttonsComponent.buttons && buttonsComponent.buttons.length > 0 && (
+              <div style={{ marginTop: '8px', borderTop: '1px solid #e0e0e0', paddingTop: '8px' }}>
+                {buttonsComponent.buttons.map((button, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      padding: '8px 12px',
+                      textAlign: 'center',
+                      color: '#00A5F4',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      borderBottom: index < buttonsComponent.buttons.length - 1 ? '1px solid #e0e0e0' : 'none'
+                    }}
+                  >
+                    {button.type === 'URL' && <i className="fas fa-external-link-alt me-2" style={{ fontSize: '12px' }}></i>}
+                    {button.type === 'PHONE_NUMBER' && <i className="fas fa-phone me-2" style={{ fontSize: '12px' }}></i>}
+                    {button.type === 'QUICK_REPLY' && <i className="fas fa-reply me-2" style={{ fontSize: '12px' }}></i>}
+                    {button.text}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  };
+
+  // Fetch WhatsApp Templates from backend
+  const fetchWhatsappTemplates = async () => {
+    try {
+      if (!token) {
+        alert('No token found in session storage.');
+        return;
+      }
+
+      // âœ… Use our backend API instead of direct Meta API
+      const response = await axios.get(`${backendUrl}/college/whatsapp/templates`, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.success) {
+        const templates = response.data.data || [];
+        setWhatsappTemplates(Array.isArray(templates) ? templates : []);
+      } else {
+        console.error('âŒ Backend API error:', response.data.message);
+        setWhatsappTemplates([]);
+      }
+    } catch (error) {
+      console.error('âŒ Error fetching WhatsApp templates:', error);
+      setWhatsappTemplates([]);
+    }
+  };
+
+  const downloadTemplatesJSON = (data) => {
+    const jsonStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `whatsapp-templates-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+
+  const emojis = ['ðŸ˜Š', 'ðŸ˜‚', 'â¤ï¸', 'ðŸ‘', 'ðŸ™', 'ðŸ˜', 'ðŸŽ‰', 'ðŸ‘', 'ðŸ”¥', 'ðŸ’¯', 'âœ…', 'ðŸš€', 'ðŸ’ª', 'ðŸ™Œ', 'ðŸ˜Ž', 'ðŸ¤', 'ðŸ’¼', 'ðŸ“±', 'â­', 'âœ¨'];
+
+  const handleWhatsappSendMessage = async () => {
+    if (!whatsappNewMessage.trim()) return;
+
+    if (!sessionWindow.isOpen) {
+      alert('24-hour window is closed. Please use a template message.');
+      return;
+    }
+
+    const messageText = whatsappNewMessage.trim();
+    const tempId = `temp-${Date.now()}`;
+
+    // Add message to UI immediately (optimistic update)
+    const newMessage = {
+      id: tempId,
+      text: messageText,
+      sender: 'agent',
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      type: 'text',
+      status: 'sending'
+    };
+
+    setWhatsappMessages(prev => [...prev, newMessage]);
+    setWhatsappNewMessage('');
+    setShowWhatsappEmojiPicker(false);
+
+    try {
+      const response = await axios.post(
+        `${backendUrl}/college/whatsapp/send-message`,
+        {
+          to: selectedProfile._candidate.mobile,
+          message: messageText,
+          candidateId: selectedProfile._candidate._id,
+          candidateName: selectedProfile._candidate.name
+        },
+        {
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.data.success) {
+        // Update message with real ID and status
+        setWhatsappMessages(prev =>
+          prev.map(msg =>
+            msg.id === tempId
+              ? {
+                ...msg,
+                id: response.data.data.messageId,
+                wamid: response.data.data.messageId,
+                status: 'sent'
+              }
+              : msg
+          )
+        );
+
+        console.log('âœ… Message sent successfully:', response.data);
+      }
+    } catch (error) {
+      console.error('âŒ Error sending message:', error);
+
+      // Update message status to failed
+      setWhatsappMessages(prev =>
+        prev.map(msg =>
+          msg.id === tempId
+            ? { ...msg, status: 'failed', errorMessage: error.response?.data?.message || 'Failed to send' }
+            : msg
+        )
+      );
+
+      // Show error to user
+      alert(error.response?.data?.message || 'Failed to send message. Please try again.');
+    }
+  };
+
+  const handleWhatsappEmojiClick = (emoji) => {
+    setWhatsappNewMessage(whatsappNewMessage + emoji);
+    setShowWhatsappEmojiPicker(false);
+  };
+
+  const handleWhatsappFileUpload = async (event, fileType) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Close the file menu
+    setShowWhatsappFileMenu(false);
+
+    // Validate that a chat is selected
+    console.log('ðŸ“‹ Selected Profile:', selectedProfile);
+
+    if (!selectedProfile) {
+      alert('Please select a candidate to send the file to.');
+      event.target.value = '';
+      return;
+    }
+
+    console.log('ðŸ” Selected Profile:', selectedProfile);
+
+
+    // Handle different profile structures
+    const candidate = selectedProfile._candidate || selectedProfile.candidate || selectedProfile;
+
+    if (!candidate || !candidate.mobile) {
+      alert('Candidate mobile number not found. Please select a valid candidate.');
+      console.error('âŒ Invalid candidate structure:', { selectedProfile, candidate });
+      event.target.value = '';
+      return;
+    }
+
+    // Check file size (25MB limit for WhatsApp)
+    const maxSize = 25 * 1024 * 1024; // 25MB
+    if (file.size > maxSize) {
+      alert('File size exceeds 25MB. Please choose a smaller file.');
+      event.target.value = '';
+      return;
+    }
+
+    const tempId = `temp-${Date.now()}`;
+
+    // Add file message to UI immediately (optimistic update)
+    const newMessage = {
+      id: tempId,
+      text: file.name,
+      sender: 'agent',
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      type: fileType,
+      status: 'sending',
+      mediaUrl: URL.createObjectURL(file),
+      fileName: file.name
+    };
+
+    setWhatsappMessages(prev => [...prev, newMessage]);
+
+    try {
+      // Prepare form data
+      const formData = new FormData();
+
+      if (fileType === 'audio') {
+        formData.append('audio', file);
+      } else {
+        formData.append('file', file);
+      }
+
+      const phoneNumber = candidate.mobile || candidate.phone;
+      const candidateId = candidate._id || candidate.id;
+      const candidateName = candidate.name;
+
+      formData.append('to', phoneNumber);
+      formData.append('candidateId', candidateId);
+      formData.append('candidateName', candidateName);
+
+      console.log('ðŸ” Pre-send validation:');
+      console.log('  - phoneNumber:', formData.phoneNumber);
+      console.log('  - candidateId:', formData.candidateId);
+      console.log('  - file exists:', !!file);
+      console.log('  - file name:', file.name);
+      console.log('  - file size:', file.size);
+
+      console.log('ðŸ“¤ Sending file:', {
+        fileType,
+        fileName: file.name,
+        fileSize: file.size,
+        to: phoneNumber,
+        candidateId: candidateId,
+        candidateName: candidateName
+      });
+
+      // Debug: Log FormData contents
+      console.log('ðŸ“‹ FormData contents:');
+      for (let pair of formData.entries()) {
+        console.log(`  - ${pair[0]}:`, typeof pair[1] === 'object' ? pair[1].name : pair[1]);
+      }
+
+      // Determine endpoint based on file type
+      const endpoint = fileType === 'audio'
+        ? `${backendUrl}/college/whatsapp/send-audio`
+        : `${backendUrl}/college/whatsapp/send-file`;
+
+      const response = await axios.post(endpoint, formData, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (response.data.success) {
+        // Update message with real ID, S3 URL and status
+        setWhatsappMessages(prev =>
+          prev.map(msg =>
+            msg.id === tempId
+              ? {
+                ...msg,
+                id: response.data.data.messageId,
+                wamid: response.data.data.messageId,
+                status: 'sent',
+                mediaUrl: response.data.data.s3Url
+              }
+              : msg
+          )
+        );
+
+        console.log(`âœ… ${fileType} sent successfully:`, response.data);
+      }
+    } catch (error) {
+      console.error(`âŒ Error sending ${fileType}:`, error);
+      console.error('Error response:', error.response?.data);
+
+      // Update message status to failed
+      setWhatsappMessages(prev =>
+        prev.map(msg =>
+          msg.id === tempId
+            ? { ...msg, status: 'failed', errorMessage: error.response?.data?.message || 'Failed to send' }
+            : msg
+        )
+      );
+
+      // Show detailed error to user with debug info
+      const debugInfo = error.response?.data?.debug
+        ? `\n\nDebug Info:\n${JSON.stringify(error.response.data.debug, null, 2)}`
+        : '';
+
+      alert(error.response?.data?.message || `Failed to send ${fileType}. Please try again.` + debugInfo);
+    }
+
+    // Reset file input
+    event.target.value = '';
+  };
+
+  const handleWhatsappSelectTemplate = (template) => {
+    setSelectedWhatsappTemplate(template);
+    handlePreparingSendingTemplate(template);
+    setShowWhatsappTemplateMenu(false);
+
+  };
+  const [editingTemplate, setEditingTemplate] = useState(null);
+  const [currentCarouselIndex, setCurrentCarouselIndex] = useState(0);
+  const [isCloneMode, setIsCloneMode] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const [editForm, setEditForm] = useState({
+    name: '',
+    category: 'UTILITY',
+    language: 'en',
+    bodyText: '',
+    headerText: '',
+    footerText: '',
+    headerType: 'None',
+    headerImage: null,
+    headerVideo: null,
+    headerDocument: null,
+    buttons: [],
+    templateType: 'Custom',
+    // Flow configuration fields
+    flowId: '',
+    flowAction: '',
+    navigateScreen: '',
+    // Authentication configuration fields
+    codeDeliveryMethod: 'copy_code',
+    // Carousel configuration fields
+    carouselMessage: '',
+    carouselHeaderType: '',
+    carouselCards: [],
+    carouselVariables: [],
+    // Order details configuration fields
+    orderButtonText: 'Review and Pay',
+    // Order status configuration fields
+    orderStatusButtons: ['Track Order', 'Cancel Order'],
+    // Variables configuration fields
+    variables: []
+
+  });
+  const formatTemplateName = (name) => {
+
+    if (!name) return '';
+
+
+
+    let formatted = name
+
+      .toLowerCase() // Convert to lowercase
+
+      .replace(/\s+/g, '_') // Replace all spaces with underscores
+
+      .replace(/[^a-z0-9_]/g, '') // Remove special characters except underscores
+
+      .replace(/_+/g, '_') // Replace multiple underscores with single underscore
+
+      .replace(/^|$/g, ''); // Remove leading/trailing underscores
+
+
+
+
+
+    return formatted;
+
+  };
+
+  const handlePreparingSendingTemplate = (template) => {
+
+    setEditingTemplate(template);
+
+
+
+    // Extract template data for editing
+
+    const templateData = template.template || template;
+
+    const bodyComponent = templateData.components?.find(comp => comp.type === 'BODY');
+
+    const headerComponent = templateData.components?.find(comp => comp.type === 'HEADER');
+
+    const footerComponent = templateData.components?.find(comp => comp.type === 'FOOTER');
+
+    const buttonsComponent = templateData.components?.find(comp => comp.type === 'BUTTONS');
+
+    // Determine template type based on buttons or other indicators
+
+    let templateType = 'Custom';
+
+    if (buttonsComponent?.buttons?.some(btn => btn.type === 'CATALOG')) {
+
+      templateType = 'Catalog';
+
+    } else if (buttonsComponent?.buttons?.some(btn => btn.type === 'FLOW')) {
+
+      templateType = 'Flows';
+
+    } else if (buttonsComponent?.buttons?.some(btn => btn.type === 'OTP')) {
+
+      templateType = 'Authentication';
+
+    } else if (templateData.carouselCards && templateData.carouselCards.length > 0) {
+
+      templateType = 'Carousel';
+
+    } else if (templateData.components.some(comp => (comp.type === 'carousel' || comp.type === 'CAROUSEL') && comp.cards && comp.cards.length > 0)) {
+
+      templateType = 'Carousel';
+
+    } else if (buttonsComponent?.buttons?.some(btn => btn.text === 'Review and Pay')) {
+
+      templateType = 'Order details';
+
+    } else if (buttonsComponent?.buttons?.some(btn => btn.text === 'Track Order')) {
+
+      templateType = 'Order Status';
+
+    }
+
+    // Extract carousel data from components
+    let carouselCards = [];
+    let carouselMessage = '';
+
+    if (templateType === 'Carousel') {
+      // First try to get carousel message from BODY component
+      const bodyComponent = templateData.components.find(comp => comp.type === 'BODY' || comp.type === 'body');
+      carouselMessage = bodyComponent?.text || '';
+
+      // Then find carousel component
+      const carouselComponent = templateData.components.find(comp => comp.type === 'carousel' || comp.type === 'CAROUSEL');
+
+
+      if (carouselComponent && carouselComponent.cards) {
+        carouselCards = carouselComponent.cards.map((card, index) => {
+          const headerComponent = card.components?.find(comp => comp.type === 'header' || comp.type === 'HEADER');
+          const headerImage = (headerComponent?.format === 'IMAGE' || headerComponent?.format === 'image') ? headerComponent?.example?.header_handle?.[0] : '';
+          const headerVideo = (headerComponent?.format === 'VIDEO' || headerComponent?.format === 'video') ? headerComponent?.example?.header_handle?.[0] : '';
+
+
+
+          return {
+            id: Date.now() + index,
+            bodyText: card.components?.find(comp => comp.type === 'body' || comp.type === 'BODY')?.text || '',
+            buttons: card.components?.find(comp => comp.type === 'buttons' || comp.type === 'BUTTONS')?.buttons || [],
+            headerType: headerComponent?.format || 'None',
+            headerImage: headerImage,
+            headerVideo: headerVideo
+          };
+        });
+      }
+    }
+
+    // Extract header text
+
+    const headerText = headerComponent?.text ||
+
+      headerComponent?.example?.header_text?.[0] ||
+
+      headerComponent?.example?.header_text_named_params?.[0] ||
+
+      '';
+
+
+
+    // Map header type
+
+    const headerType = headerComponent?.format === 'TEXT' ? 'Text' :
+
+      headerComponent?.format === 'IMAGE' ? 'IMAGE' :
+
+        headerComponent?.format === 'VIDEO' ? 'VIDEO' :
+
+          headerComponent?.format === 'DOCUMENT' ? 'DOCUMENT' :
+
+            headerComponent ? 'Text' : 'None';
+
+
+
+    // Extract variables from body text
+
+    const bodyText = bodyComponent?.text || '';
+
+    const variableMatches = bodyText.match(/\{\{\d+\}\}/g) || [];
+
+    const variables = variableMatches.map((match, index) => ({
+
+      id: Date.now() + index,
+
+      placeholder: match,
+
+      value: ''
+
+    }));
+
+
+
+    // Clone the template with all data
+
+    setEditForm({
+
+      name: formatTemplateName(`${templateData.name || 'template'}`),
+
+      category: templateData.category || 'UTILITY',
+
+      language: templateData.language || 'en',
+
+      bodyText: bodyText,
+
+      headerText: headerText,
+
+      footerText: footerComponent?.text || '',
+
+      headerType: headerType,
+
+      headerImage: headerComponent?.format === 'IMAGE' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+
+      headerVideo: headerComponent?.format === 'VIDEO' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+
+      headerDocument: headerComponent?.format === 'DOCUMENT' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+
+      buttons: buttonsComponent?.buttons || [],
+
+      templateType: templateType,
+
+      // Flow configuration fields
+
+      flowId: templateData.flowId || '',
+
+      flowAction: templateData.flowAction || '',
+
+      navigateScreen: templateData.navigateScreen || '',
+
+      // Authentication configuration fields
+
+      codeDeliveryMethod: templateData.codeDeliveryMethod || 'copy_code',
+
+      // Carousel configuration fields
+
+      carouselMessage: carouselMessage || templateData.carouselMessage || '',
+
+      carouselHeaderType: carouselCards.length > 0 ? carouselCards[0].headerType : (templateData.carouselHeaderType || ''),
+
+      carouselCards: carouselCards.length > 0 ? carouselCards : (templateData.carouselCards || []),
+
+      carouselVariables: templateData.carouselVariables || [],
+
+      // Order details configuration fields
+
+      orderButtonText: templateData.orderButtonText || 'Review and Pay',
+
+      // Order status configuration fields
+
+      orderStatusButtons: templateData.orderStatusButtons || ['Track Order', 'Cancel Order'],
+
+      // Variables configuration fields
+
+      variables: variables
+
+    });
+
+
+
+    // Reset carousel index
+
+    setCurrentCarouselIndex(0);
+
+    // Set clone mode and open create modal
+    setIsCloneMode(true);
+    setShowCreateModal(true);
+
+
+
+  };
+  // const handleWhatsappSendTemplate = async () => {
+  //   if (!selectedWhatsappTemplate) return;
+
+  //   setIsSendingWhatsapp(true);
+
+  //   let content = selectedWhatsappTemplate.content
+  //     .replace('{{1}}', selectedProfile?._candidate?.name || 'User')
+  //     .replace('{{2}}', 'Course Name');
+
+  //   setWhatsappMessages([...whatsappMessages, {
+  //     id: whatsappMessages.length + 1,
+  //     text: content,
+  //     sender: 'agent',
+  //     time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+  //     type: 'template'
+  //   }]);
+
+  //   // Template bhejne ke baad session activate ho jata hai
+  //   setHasActiveSession(true);
+  //   setSelectedWhatsappTemplate(null);
+
+  //   setTimeout(() => {
+  //     setIsSendingWhatsapp(false);
+  //   }, 1000);
+  // };
+  const handleWhatsappSendTemplate = async () => {
+    if (!selectedWhatsappTemplate) return;
+
+    // Validate required data
+    if (!selectedProfile?._candidate?.mobile) {
+      alert('Phone number not found for this candidate');
+      return;
+    }
+
+    if (!selectedWhatsappTemplate.name) {
+      alert('Template name is missing');
+      return;
+    }
+
+
+    setIsSendingWhatsapp(true);
+
+    try {
+
+      if (!token) {
+
+        alert('No token found in session storage.');
+
+        return;
+
+      }
+
+      // Validate required fields
+      const hasBodyText = editForm.bodyText || (editForm.templateType === 'Carousel' && editForm.carouselMessage);
+
+      if (!editForm.name || !editForm.category || !editForm.language || !hasBodyText) {
+
+        alert('Please fill in all required fields (Name, Category, Language, and Body Text).');
+
+        return;
+
+      }
+
+      // Validate body text length (WhatsApp has a limit of 1024 characters)
+      const bodyTextToValidate = editForm.bodyText || editForm.carouselMessage || '';
+
+      if (bodyTextToValidate.length > 1024) {
+
+        alert('Body text is too long. Please keep it under 1024 characters.');
+
+        return;
+
+      }
+
+      // Validate carousel-specific requirements
+      if (editForm.templateType === 'Carousel') {
+        if (!editForm.carouselCards || editForm.carouselCards.length < 2) {
+          alert('Carousel templates must have at least 2 cards.');
+          return;
+        }
+
+        if (editForm.carouselCards.length > 10) {
+          alert('Carousel templates can have maximum 10 cards.');
+          return;
+        }
+
+        // Validate that each card has required fields
+        for (let i = 0; i < editForm.carouselCards.length; i++) {
+          const card = editForm.carouselCards[i];
+          if (!card.buttons || card.buttons.length === 0) {
+            alert(`Card ${i + 1} must have at least one button.`);
+            return;
+          }
+        }
+      }
+
+
+      // Prepare the template data for API
+
+      const templateData = {
+
+        name: editForm.name,
+
+        language: editForm.language,
+
+        category: editForm.category,
+
+        components: [
+
+          ...(editForm.headerType !== 'None' && editForm.headerType === 'Text' && editForm.headerText ? [{
+
+            type: 'HEADER',
+
+            format: 'TEXT',
+
+            text: editForm.headerText
+
+          }] : []),
+
+          ...(editForm.headerType !== 'None' && editForm.headerType === 'IMAGE' ? [{
+
+            type: 'HEADER',
+
+            format: 'IMAGE'
+          }] : []),
+
+          ...(editForm.headerType !== 'None' && editForm.headerType === 'VIDEO' ? [{
+
+            type: 'HEADER',
+
+            format: 'VIDEO'
+          }] : []),
+
+          ...(editForm.headerType !== 'None' && editForm.headerType === 'DOCUMENT' ? [{
+
+            type: 'HEADER',
+
+            format: 'DOCUMENT'
+          }] : []),
+
+          {
+
+            type: 'BODY',
+
+            text: editForm.templateType === 'Carousel' ? editForm.carouselMessage : editForm.bodyText,
+
+            ...((editForm.templateType === 'Carousel' ? editForm.carouselMessage : editForm.bodyText).includes('{{') ? {
+
+              example: {
+
+                body_text: [
+
+                  ["User"]
+
+                ]
+
+              }
+
+            } : {})
+
+          },
+
+          ...(editForm.footerText ? [{
+
+            type: 'FOOTER',
+
+            text: editForm.footerText
+
+          }] : []),
+
+          // Handle carousel templates separately
+          ...(editForm.templateType === 'Carousel' && editForm.carouselCards && editForm.carouselCards.length > 0 ? [{
+            type: 'carousel',
+            cards: editForm.carouselCards.map(card => ({
+              components: [
+                // Header component for each card
+                ...(editForm.carouselHeaderType && editForm.carouselHeaderType !== 'None' ? [{
+                  type: 'header',
+                  format: editForm.carouselHeaderType.toLowerCase(),
+                  example: {
+                    header_handle: ['placeholder_handle'] // Will be replaced with actual file handle
+                  }
+                }] : []),
+                // Card body if exists
+                ...(card.bodyText ? [{
+                  type: 'body',
+                  text: card.bodyText
+                }] : []),
+                // Buttons for each card
+                ...(card.buttons && card.buttons.length > 0 ? [{
+                  type: 'buttons',
+                  buttons: card.buttons.map(button => ({
+                    type: button.type === 'quick_reply' ? 'quick_reply' :
+                      button.type === 'call_to_action' ? 'url' : 'quick_reply',
+                    text: button.text || 'Button',
+                    ...(button.type === 'call_to_action' && button.url ? {
+                      url: button.url,
+                      example: [button.url]
+                    } : {})
+                  }))
+                }] : [])
+              ]
+            }))
+          }] : []),
+          // Handle other template types
+          ...(editForm.buttons.length > 0 || editForm.templateType === 'Catalog' || editForm.templateType === 'Flows' || editForm.templateType === 'Authentication' || editForm.templateType === 'Order details' || editForm.templateType === 'Order Status' ? [{
+
+            type: 'BUTTONS',
+
+            buttons: editForm.templateType === 'Catalog'
+
+              ? [{ type: 'CATALOG', text: 'View catalog' }]
+
+              : editForm.templateType === 'Flows' && editForm.flowId
+
+                ? [{
+
+                  type: 'FLOW',
+
+                  text: 'Start Flow',
+
+                  flow_id: editForm.flowId,
+
+                  flow_action: editForm.flowAction || 'NAVIGATE',
+
+                  navigate_screen: editForm.navigateScreen || 'REGISTRATION'
+
+                }]
+
+                : editForm.templateType === 'Authentication'
+
+                  ? [{
+
+                    type: 'OTP',
+
+                    text: editForm.codeDeliveryMethod === 'copy_code' ? 'Copy Code' : 'Authenticate',
+
+                    otp_type: editForm.codeDeliveryMethod
+
+                  }]
+
+                  : editForm.templateType === 'Order details'
+
+                    ? [
+
+                      { type: 'URL', text: editForm.orderButtonText || 'Review and Pay', url: '#' },
+
+                      { type: 'URL', text: 'Pay now', url: '#' }
+
+                    ]
+
+                    : editForm.templateType === 'Order Status'
+
+                      ? (editForm.orderStatusButtons || []).map(buttonText => ({
+
+                        type: 'URL',
+
+                        text: buttonText,
+
+                        url: '#'
+
+                      }))
+
+                      : (editForm.buttons || []).map(button => {
+
+                        // Map button types to WhatsApp API format
+
+                        let mappedButton = {
+
+                          text: button.text
+
+                        };
+
+
+
+                        switch (button.type) {
+
+                          case 'CALL_TO_ACTION':
+
+                            mappedButton.type = 'URL';
+
+                            mappedButton.url = button.url || '#';
+
+                            break;
+
+                          case 'PHONE_NUMBER':
+
+                            mappedButton.type = 'PHONE_NUMBER';
+
+                            mappedButton.phone_number = button.phone_number || '+1234567890';
+
+                            break;
+
+                          case 'COPY_CODE':
+
+                            mappedButton.type = 'OTP';
+
+                            mappedButton.otp_type = 'copy_code';
+
+                            break;
+
+                          default:
+
+                            mappedButton.type = 'QUICK_REPLY';
+
+                        }
+
+
+
+                        return mappedButton;
+
+                      })
+
+          }] : [])
+
+        ]
+
+      };
+
+
+
+      // Add base64File if there's an image, video, or document header
+      if ((editForm.headerType === 'IMAGE' && editForm.headerImage) ||
+        (editForm.headerType === 'VIDEO' && editForm.headerVideo) ||
+        (editForm.headerType === 'DOCUMENT' && editForm.headerDocument)) {
+        // Get the appropriate file based on header type
+        const file = editForm.headerType === 'IMAGE' ? editForm.headerImage :
+          editForm.headerType === 'VIDEO' ? editForm.headerVideo :
+            editForm.headerDocument;
+        const defaultName = editForm.headerType === 'IMAGE' ? 'header_image.png' :
+          editForm.headerType === 'VIDEO' ? 'header_video.mp4' :
+            'header_document.pdf';
+
+        // Extract file name from the file or use a default name
+        const fileName = file.name || defaultName;
+
+        // If file is a File object, convert to base64
+        if (file instanceof File) {
+          const base64String = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result.split(',')[1]); // Remove data:image/...;base64, prefix
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+
+          templateData.base64File = {
+            name: fileName,
+            body: base64String
+          };
+        } else if (typeof file === 'string' && file.startsWith('data:')) {
+          // If it's already a data URL, extract the base64 part
+          const base64String = file.split(',')[1];
+          templateData.base64File = {
+            name: fileName,
+            body: base64String
+          };
+        } else if (typeof file === 'string') {
+          // If it's already a base64 string
+          templateData.base64File = {
+            name: fileName,
+            body: file
+          };
+        }
+      }
+
+      // Handle carousel file uploads
+      if (editForm.templateType === 'Carousel' && editForm.carouselHeaderType && editForm.carouselHeaderType !== 'None') {
+        // For carousel, we need to upload files for each card
+        const carouselFiles = [];
+
+        for (let i = 0; i < editForm.carouselCards.length; i++) {
+          const card = editForm.carouselCards[i];
+          let file = null;
+          let defaultName = '';
+
+          if (editForm.carouselHeaderType === 'IMAGE' && card.headerImage) {
+            file = card.headerImage;
+            defaultName = `card_${i + 1}_image.png`;
+          } else if (editForm.carouselHeaderType === 'VIDEO' && card.headerVideo) {
+            file = card.headerVideo;
+            defaultName = `card_${i + 1}_video.mp4`;
+          }
+
+          if (file) {
+            const fileName = file.name || defaultName;
+
+            // Convert file to base64
+            if (file instanceof File) {
+              const base64String = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+              });
+
+              carouselFiles.push({
+                name: fileName,
+                body: base64String,
+                cardIndex: i
+              });
+            } else if (typeof file === 'string' && file.startsWith('data:')) {
+              const base64String = file.split(',')[1];
+              carouselFiles.push({
+                name: fileName,
+                body: base64String,
+                cardIndex: i
+              });
+            } else if (typeof file === 'string') {
+              carouselFiles.push({
+                name: fileName,
+                body: file,
+                cardIndex: i
+              });
+            }
+          }
+        }
+
+        if (carouselFiles.length > 0) {
+          templateData.carouselFiles = carouselFiles;
+        }
+      }
+
+
+      // Generate variable values from frontend (same as preview logic)
+      const getVariableValue = (variableName) => {
+        const candidate = selectedProfile?._candidate;
+        const registration = selectedProfile;
+
+        switch (variableName) {
+          case 'name':
+            return candidate?.name || registration?.name || 'User';
+          case 'gender':
+            return candidate?.gender || 'Male';
+          case 'mobile':
+            return candidate?.mobile || registration?.mobile || 'Mobile';
+          case 'email':
+            return candidate?.email || registration?.email || 'Email';
+          case 'course_name':
+            return selectedProfile?._course?.name || candidate?.appliedCourses?.[0]?.courseName || 'Course Name';
+          case 'counselor_name':
+            return selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned';
+          case 'job_name':
+            return selectedProfile?._job?.title || selectedProfile?.appliedJobs?.[0]?.title || 'Job Title';
+          case 'project_name':
+            return selectedProfile?._project?.name || selectedProfile?.project?.name || 'Project Name';
+          case 'batch_name':
+            return selectedProfile?._batch?.name || selectedProfile?.batch?.name || 'Batch Not Assigned';
+          case 'lead_owner_name':
+            return selectedProfile?.registeredBy?.name || 'Self Registered';
+          default:
+            return candidate?.[variableName] || registration?.[variableName] || `[${variableName}]`;
+        }
+      };
+
+      // Extract template variables and get their values
+      const templateBody = selectedWhatsappTemplate.components?.find(c => c.type === 'BODY')?.text || '';
+      const variableMappings = selectedWhatsappTemplate?.variableMappings || [];
+
+      // Extract numbered variables ({{1}}, {{2}}, etc.) from template
+      const variableRegex = /\{\{(\d+)\}\}/g;
+      const matches = [...templateBody.matchAll(variableRegex)];
+
+      // Create array of actual values in order
+      const variableValues = matches.map(match => {
+        const position = parseInt(match[1]);
+
+        if (variableMappings && variableMappings.length > 0) {
+          const mapping = variableMappings.find(m => m.position === position);
+          if (mapping) {
+            return getVariableValue(mapping.variableName);
+          }
+        }
+
+        // Fallback to hardcoded mapping if no mappings found
+        switch (position) {
+          case 1: return getVariableValue('name');
+          case 2: return getVariableValue('gender');
+          case 3: return getVariableValue('mobile');
+          case 4: return getVariableValue('email');
+          case 5: return getVariableValue('course_name');
+          case 6: return getVariableValue('counselor_name');
+          case 7: return getVariableValue('job_name');
+          case 8: return getVariableValue('project_name');
+          case 9: return getVariableValue('batch_name');
+          case 10: return getVariableValue('lead_owner_name');
+          default: return '[Variable]';
+        }
+      });
+
+      // Prepare clean payload - only send required fields for template sending
+      const sendindData = {
+        templateName: selectedWhatsappTemplate.name,  // Template name
+        to: selectedProfile?._candidate?.mobile,       // Phone number
+        candidateId: selectedProfile?._candidate?._id, // âœ… For automatic variable filling
+        registrationId: selectedProfile?._id,          // âœ… Fallback if no candidateId
+        collegeId: userData.college || userData.collegeId,  // âœ… College ID
+        variableValues: variableValues  // âœ… Send actual values from frontend (same as preview)
+      }
+
+
+
+      // Make API call to send template
+      const response = await axios.post(`${backendUrl}/college/whatsapp/send-template`, sendindData, {
+
+        headers: { 'x-auth': token }
+
+      });
+
+
+
+      if (response.data.success) {
+        console.log('âœ… Template sent successfully. Backend response:', {
+          messageId: response.data.data.messageId,
+          to: response.data.data.to,
+          templateName: response.data.data.templateName,
+          status: response.data.data.status,
+          hasFilledMessage: !!response.data.data.filledMessage
+        });
+
+        // Refresh templates list
+
+        await fetchWhatsappTemplates();
+
+        // Generate actual message text with variables filled using variable mappings
+        const generateFilledMessage = (templateText) => {
+          if (!templateText) return '';
+
+          const candidate = selectedProfile?._candidate;
+          const registration = selectedProfile;
+
+          // Get template variable mappings from selectedWhatsappTemplate
+          const variableMappings = selectedWhatsappTemplate?.variableMappings || [];
+
+          let text = templateText;
+
+          // Use stored variable mappings from database if available
+          if (variableMappings && variableMappings.length > 0) {
+            variableMappings.forEach(mapping => {
+              const position = mapping.position;
+              const variableName = mapping.variableName;
+
+              // Get value based on actual variable name from mapping
+              let value = '';
+
+              switch (variableName) {
+                case 'name':
+                  value = candidate?.name || registration?.name || 'User';
+                  break;
+                case 'gender':
+                  value = candidate?.gender || 'Male';
+                  break;
+                case 'mobile':
+                  value = candidate?.mobile || registration?.mobile || 'Mobile';
+                  break;
+                case 'email':
+                  value = candidate?.email || registration?.email || 'Email';
+                  break;
+                case 'course_name':
+                  // âœ… Same as preview logic
+                  value = candidate?.appliedCourses?.[0]?.courseName || selectedProfile?.course?.name || 'Course Name';
+                  break;
+                case 'counselor_name':
+                  // âœ… Same as preview logic
+                  value = selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned';
+                  break;
+                case 'job_name':
+                  // âœ… Same as preview logic
+                  value = selectedProfile?.appliedJobs?.[0]?.title || 'Job Title';
+                  break;
+                case 'project_name':
+                  // âœ… Same as preview logic
+                  value = selectedProfile?.project?.name || 'Project Name';
+                  break;
+                case 'batch_name':
+                  // âœ… Same as preview logic
+                  value = selectedProfile?.batch?.name || 'Batch Not Assigned';
+                  break;
+                case 'lead_owner_name':
+                  // âœ… Same as preview logic
+                  value = selectedProfile?.registeredBy?.name || 'Self Registered';
+                  break;
+                default:
+                  // Try direct property access
+                  value = candidate?.[variableName] || registration?.[variableName] || `[${variableName}]`;
+              }
+
+              // Replace the numbered variable with actual value
+              text = text.replace(new RegExp(`\\{\\{${position}\\}\\}`, 'g'), value);
+            });
+          } else {
+            // Fallback: Use default mapping if no stored mappings (same as preview)
+            text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
+            text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
+            text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
+            text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
+            // âœ… Same as preview logic
+            text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || selectedProfile?.course?.name || 'Course Name');
+            text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned');
+            text = text.replace(/\{\{7\}\}/g, selectedProfile?.appliedJobs?.[0]?.title || 'Job Title');
+            text = text.replace(/\{\{8\}\}/g, selectedProfile?.project?.name || 'Project Name');
+            text = text.replace(/\{\{9\}\}/g, selectedProfile?.batch?.name || 'Batch Not Assigned');
+            text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Self Registered');
+          }
+
+          return text;
+        };
+
+        // Get template body text and fill variables
+        const templateBodyText = selectedWhatsappTemplate.components?.find(c => c.type === 'BODY')?.text || '';
+        const filledMessage = generateFilledMessage(templateBodyText);
+
+        // Add sent template to existing WhatsApp chat with FILLED variables
+        const templateMessage = {
+          id: response.data.data.messageId || response.data.data._id || `msg-${Date.now()}`,
+          dbId: response.data.data._id, // Database message ID
+          wamid: response.data.data.messageId, // WhatsApp message ID (backend sends as 'messageId')
+          whatsappMessageId: response.data.data.messageId, // Consistent field name
+          text: filledMessage || response.data.data.filledMessage || `Template: ${response.data.data.templateName}`,
+          sender: 'agent',
+          time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          type: 'template',
+          templateData: response.data.data.templateData || templateData,
+          status: 'sent',
+          deliveredAt: null,
+          readAt: null
+        };
+
+        console.log('âœ… Adding new message to state:', {
+          id: templateMessage.id,
+          wamid: templateMessage.wamid,
+          whatsappMessageId: templateMessage.whatsappMessageId,
+          text: templateMessage.text?.substring(0, 50),
+          status: templateMessage.status
+        });
+
+        setWhatsappMessages([...whatsappMessages, templateMessage]);
+
+        // âœ… Close the template preview
+        setSelectedWhatsappTemplate(null);
+
+        // Close the modal
+        setEditingTemplate(null);
+
+        setEditForm({
+
+          name: '',
+
+          category: 'UTILITY',
+
+          language: '',
+
+          bodyText: '',
+
+          headerText: '',
+
+          footerText: '',
+
+          headerType: 'None',
+
+          headerImage: null,
+
+          headerVideo: null,
+
+          headerDocument: null,
+
+          buttons: [],
+
+          templateType: 'Custom',
+
+          flowId: '',
+
+          flowAction: '',
+
+          navigateScreen: '',
+
+          codeDeliveryMethod: 'copy_code',
+
+          carouselMessage: '',
+
+          carouselHeaderType: '',
+
+          carouselCards: [],
+
+          orderButtonText: 'Review and Pay',
+
+          orderStatusButtons: ['Track Order', 'Cancel Order'],
+
+          variables: []
+
+        });
+
+
+
+        alert('Template sent successfully!');
+
+
+      } else {
+
+        throw new Error(response.data.message || 'Failed to create template');
+
+      }
+
+    } catch (error) {
+
+
+
+
+
+      // Extract detailed error message
+
+      let errorMessage = 'Error creating template. Please try again.';
+
+
+
+      if (error.response?.data?.error?.error_user_msg) {
+
+        errorMessage = error.response.data.error.error_user_msg;
+
+      } else if (error.response?.data?.detail) {
+
+        errorMessage = error.response.data.detail;
+
+      } else if (error.response?.data?.message) {
+
+        errorMessage = error.response.data.message;
+
+      } else if (error.message) {
+
+        errorMessage = error.message;
+
+      }
+
+
+
+      alert(`Error: ${errorMessage}`);
+
+    } finally {
+
+      setIsSendingWhatsapp(false);
+
+
+    }
+  };
+
+
+  const handleBulkWhatsappSend = async () => {
+    // Validation
+    if (selectedWhatsappNumbers.length === 0) {
+      alert('Please select at least one WhatsApp number to send');
+      return;
+    }
+
+    if (!selectedWhatsappTemplateModal && !whatsappMessage.trim()) {
+      alert('Please select a template or enter a message');
+      return;
+    }
+
+    if (!token) {
+      alert('No token found in session storage.');
+      return;
+    }
+
+    setIsSendingBulkWhatsapp(true);
+
+    try {
+      // Helper function to format date for API
+      // Only used for nextAction dates
+      const formatDateForAPI = (date, isEndDate = false) => {
+        if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
+        const d = new Date(date);
+        if (isEndDate) {
+          d.setHours(23, 59, 59, 999);
+        } else {
+          d.setHours(0, 0, 0, 0);
+        }
+        return d.toISOString();
+      };
+
+      // Fetch all profiles matching current filters (not just current page)
+      const queryParams = new URLSearchParams({
+        page: '1',
+        limit: '10000', // Fetch up to 10000 profiles
+        leadStatus: crmFilters[activeCrmFilter]?._id || '',
+        ...(filterData.name && { name: filterData.name }),
+        ...(filterData.courseType && { courseType: filterData.courseType }),
+        ...(filterData.status && filterData.status !== 'true' && { status: filterData.status }),
+        ...(filterData.sector && { sector: filterData.sector }),
+        ...(filterData.createdFromDate && { createdFromDate: filterData.createdFromDate.toISOString() }),
+        ...(filterData.createdToDate && { createdToDate: filterData.createdToDate.toISOString() }),
+        ...(filterData.modifiedFromDate && { modifiedFromDate: filterData.modifiedFromDate.toISOString() }),
+        ...(filterData.modifiedToDate && { modifiedToDate: filterData.modifiedToDate.toISOString() }),
+        ...(filterData.nextActionFromDate && { nextActionFromDate: filterData.nextActionFromDate.toISOString() }),
+        ...(filterData.nextActionToDate && { nextActionToDate: filterData.nextActionToDate.toISOString() }),
+        ...(filterData.subStatuses && { subStatuses: filterData.subStatuses }),
+        ...buildListFilterQueryParts(formData, cycleFilters),
+      });
+
+      const allProfilesResponse = await axios.get(`${backendUrl}/college/appliedCandidates?${queryParams}`, {
+        headers: { 'x-auth': token }
+      });
+
+      let allMatchingProfiles = [];
+      if (allProfilesResponse.data.success && allProfilesResponse.data.data) {
+        allMatchingProfiles = allProfilesResponse.data.data;
+      }
+
+      // If profiles are selected, use only selected ones; otherwise use all matching profiles
+      let profilesToSend = [];
+      if (selectedProfiles && selectedProfiles.length > 0) {
+        profilesToSend = allMatchingProfiles.filter(profile => 
+          selectedProfiles.includes(profile._id)
+        );
+      } else {
+        profilesToSend = allMatchingProfiles;
+      }
+      
+      if (profilesToSend.length === 0) {
+        alert('No profiles found to send messages');
+        setIsSendingBulkWhatsapp(false);
+        return;
+      }
+
+      // Console log: Show profiles that will receive messages
+      // console.log(`ðŸ“¤ Preparing to send messages to ${profilesToSend.length} profiles:`);
+      // profilesToSend.forEach((profile, index) => {
+      //   const candidateName = profile._candidate?.name || profile.candidate?.name || 'N/A';
+      //   const mobile = profile._candidate?.mobile || profile.candidate?.mobile || 'N/A';
+      //   const profileId = profile._id;
+      //   console.log(`  ${index + 1}. ${candidateName} (Mobile: ${mobile}, ID: ${profileId})`);
+      // });
+
+      const recipients = [];
+      
+      profilesToSend.forEach(profile => {
+        const candidate = profile._candidate || profile.candidate || {};
+        
+        selectedWhatsappNumbers.forEach(numberType => {
+          let phoneNumber = null;
+          
+          switch(numberType) {
+            case 'Primary Mobile':
+              phoneNumber = candidate.mobile || profile.mobile;
+              break;
+            case 'Father\'s Mobile':
+              phoneNumber = candidate.fatherMobile || candidate.father_mobile || profile.fatherMobile;
+              break;
+            case 'Mother\'s Mobile':
+              phoneNumber = candidate.motherMobile || candidate.mother_mobile || profile.motherMobile;
+              break;
+            case 'Whatsapp Number':
+              phoneNumber = candidate.whatsappNumber || candidate.whatsapp_number || candidate.mobile || profile.mobile;
+              break;
+            default:
+              phoneNumber = candidate.mobile || profile.mobile;
+          }
+          
+          if (phoneNumber) {
+            const exists = recipients.find(r => r.phone === phoneNumber && r.profileId === profile._id);
+            if (!exists) {
+              recipients.push({
+                phone: phoneNumber,
+                profileId: profile._id,
+                candidateId: candidate._id || candidate.id,
+                candidateName: candidate.name || profile.name,
+                registrationId: profile._id,
+                numberType: numberType
+              });
+            }
+          }
+        });
+      });
+
+      if (recipients.length === 0) {
+        alert('No valid phone numbers found for selected number types');
+        setIsSendingBulkWhatsapp(false);
+        return;
+      }
+      const confirmMessage = `Are you sure you want to send ${selectedWhatsappTemplateModal ? 'template' : 'message'} to ${recipients.length} recipient(s)?`;
+      if (!window.confirm(confirmMessage)) {
+        setIsSendingBulkWhatsapp(false);
+        return;
+      }
+
+      // Reset bulk tracker for this send session
+      bulkWhatsappTrackerRef.current = {
+        messageIdToRecipient: {},
+        deliveredMessageIds: new Set(),
+        failedMessageIds: new Set(),
+        lastSummaryAt: 0
+      };
+
+      const sentMessageIds = []; // Store WhatsApp message IDs
+      const recipientMap = {}; // Map messageId -> recipient info
+      const errors = [];
+
+      for (let i = 0; i < recipients.length; i++) {
+        const recipient = recipients[i];
+        
+        try {
+          if (selectedWhatsappTemplateModal) {
+            const template = whatsappTemplates.find(t => 
+              (t.id === selectedWhatsappTemplateModal) || (t.name === selectedWhatsappTemplateModal)
+            );
+            
+            if (!template) {
+              errors.push(`${recipient.phone}: Template not found`);
+              continue;
+            }
+
+            const getVariableValue = (variableName) => {
+              const candidate = profilesToSend.find(p => p._id === recipient.profileId)?._candidate || {};
+              const registration = profilesToSend.find(p => p._id === recipient.profileId) || {};
+              
+              switch (variableName) {
+                case 'name':
+                  return candidate.name || registration.name || 'User';
+                case 'gender':
+                  return candidate.gender || 'Male';
+                case 'mobile':
+                  return candidate.mobile || registration.mobile || 'Mobile';
+                case 'email':
+                  return candidate.email || registration.email || 'Email';
+                case 'course_name':
+                  return registration._course?.name || candidate.appliedCourses?.[0]?.courseName || 'Course Name';
+                case 'counselor_name':
+                  return registration.counsellor?.name || registration.leadAssignment?.[registration.leadAssignment?.length - 1]?.counsellorName || 'Counselor';
+                case 'job_name':
+                  return registration._job?.title || 'Job Title';
+                case 'project_name':
+                  return registration._project?.name || registration.project?.name || 'Project Name';
+                case 'batch_name':
+                  return registration._batch?.name || registration.batch?.name || 'Batch Not Assigned';
+                case 'lead_owner_name':
+                  return registration.registeredBy?.name || 'Self Registered';
+                default:
+                  return candidate[variableName] || registration[variableName] || `[${variableName}]`;
+              }
+            };
+            const templateBody = template.components?.find(c => c.type === 'BODY')?.text || '';
+            const variableMappings = template?.variableMappings || [];
+            const variableRegex = /\{\{(\d+)\}\}/g;
+            const matches = [...templateBody.matchAll(variableRegex)];
+            
+            const variableValues = matches.map(match => {
+              const position = parseInt(match[1]);
+              if (variableMappings && variableMappings.length > 0) {
+                const mapping = variableMappings.find(m => m.position === position);
+                if (mapping) {
+                  return getVariableValue(mapping.variableName);
+                }
+              }
+              switch (position) {
+                case 1: return getVariableValue('name');
+                case 2: return getVariableValue('gender');
+                case 3: return getVariableValue('mobile');
+                case 4: return getVariableValue('email');
+                case 5: return getVariableValue('course_name');
+                case 6: return getVariableValue('counselor_name');
+                case 7: return getVariableValue('job_name');
+                case 8: return getVariableValue('project_name');
+                case 9: return getVariableValue('batch_name');
+                case 10: return getVariableValue('lead_owner_name');
+                default: return '[Variable]';
+              }
+            });
+
+            const response = await axios.post(`${backendUrl}/college/whatsapp/send-template`, {
+              templateName: template.name,
+              to: recipient.phone,
+              candidateId: recipient.candidateId,
+              registrationId: recipient.registrationId,
+              collegeId: userData.college || userData.collegeId,
+              variableValues: variableValues
+            }, {
+              headers: { 'x-auth': token }
+            });
+
+            // Check if response is truly successful: must have HTTP 200, success=true AND messageId
+            if (response.status === 200 && response.data.success && response.data.data && response.data.data.messageId) {
+              const messageId = response.data.data.messageId;
+              sentMessageIds.push(messageId);
+              recipientMap[messageId] = recipient;
+              bulkWhatsappTrackerRef.current.messageIdToRecipient[messageId] = recipient;
+              console.log(`âœ… Successfully sent template to ${recipient.phone}, messageId: ${messageId}`);
+            } else {
+              const errorMsg = response.data.message || response.data.data?.error || 'Failed to send message';
+              errors.push(`${recipient.phone}: ${errorMsg}`);
+              console.error(`âŒ Failed to send template to ${recipient.phone}:`, {
+                status: response.status,
+                success: response.data.success,
+                hasMessageId: !!(response.data.data && response.data.data.messageId),
+                data: response.data
+              });
+            }
+          } else {
+            const response = await axios.post(`${backendUrl}/college/whatsapp/send-message`, {
+              to: recipient.phone,
+              message: whatsappMessage,
+              candidateId: recipient.candidateId,
+              candidateName: recipient.candidateName
+            }, {
+              headers: { 'x-auth': token }
+            });
+
+            // Check if response is truly successful: must have HTTP 200, success=true AND messageId
+            if (response.status === 200 && response.data.success && response.data.data && response.data.data.messageId) {
+              const messageId = response.data.data.messageId;
+              sentMessageIds.push(messageId);
+              recipientMap[messageId] = recipient;
+              bulkWhatsappTrackerRef.current.messageIdToRecipient[messageId] = recipient;
+              console.log(`âœ… Successfully sent message to ${recipient.phone}, messageId: ${messageId}`);
+            } else {
+              const errorMsg = response.data.message || response.data.data?.error || 'Failed to send message';
+              errors.push(`${recipient.phone}: ${errorMsg}`);
+              console.error(`âŒ Failed to send message to ${recipient.phone}:`, {
+                status: response.status,
+                success: response.data.success,
+                hasMessageId: !!(response.data.data && response.data.data.messageId),
+                data: response.data
+              });
+            }
+          }
+          if (i < recipients.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        } catch (error) {
+          let errorMessage = 'Failed to send message';
+          
+          if (error.response) {
+            errorMessage = error.response.data?.message || 
+                          error.response.data?.error?.message || 
+                          error.response.data?.error || 
+                          `HTTP ${error.response.status}: ${error.response.statusText}`;
+          } else if (error.request) {
+            errorMessage = 'No response from server. Network error or server timeout.';
+          } else {
+            errorMessage = error.message || 'Unknown error occurred';
+          }
+          
+          errors.push(`${recipient.phone}: ${errorMessage}`);
+          console.error(`âŒ Error sending to ${recipient.phone}:`, {
+            error: error.message,
+            response: error.response?.data,
+            status: error.response?.status
+          });
+        }
+      }
+
+      // Wait a bit for status updates from WhatsApp webhook
+      if (sentMessageIds.length > 0) {
+        console.log(`â³ Waiting 3 seconds for status updates... (${sentMessageIds.length} messages sent)`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+
+      // Query database to get actual statuses
+      let successCount = 0;
+      let failCount = errors.length; // Start with API errors
+      const failedMessages = [...errors];
+
+      if (sentMessageIds.length > 0) {
+        try {
+          const statusResponse = await axios.post(`${backendUrl}/college/whatsapp/message-statuses`, {
+            messageIds: sentMessageIds
+          }, {
+            headers: { 'x-auth': token }
+          });
+
+          if (statusResponse.data.success && statusResponse.data.data) {
+            const statusMap = statusResponse.data.data;
+
+            const deliveredList = [];
+            const failedList = [];
+            const pendingList = [];
+            
+            // Count based on database status
+            sentMessageIds.forEach(messageId => {
+              const statusInfo = statusMap[messageId];
+              const recipient = recipientMap[messageId];
+              const candidateName = recipient?.candidateName || 'Unknown Candidate';
+              
+              if (statusInfo) {
+                // Check actual status from database
+                if (statusInfo.status === 'failed') {
+                  failCount++;
+                  failedMessages.push(`${recipient.phone}: ${statusInfo.errorMessage || 'Message failed'}`);
+                  failedList.push({
+                    candidateName,
+                    to: recipient?.phone,
+                    messageId,
+                    reason: statusInfo.errorMessage || 'Message failed'
+                  });
+                  console.error(`ðŸ“¦ âŒ Failed (DB status): ${candidateName} | to=${recipient?.phone} | messageId=${messageId} | reason=${statusInfo.errorMessage || 'No error message'}`);
+                } else {
+                  // Status is 'sent', 'delivered', 'read', 'sending', 'received' - all considered success
+                  successCount++;
+                  if (statusInfo.status === 'delivered' || statusInfo.status === 'read') {
+                    deliveredList.push({
+                      candidateName,
+                      to: recipient?.phone,
+                      messageId,
+                      status: statusInfo.status
+                    });
+                  } else {
+                    pendingList.push({
+                      candidateName,
+                      to: recipient?.phone,
+                      messageId,
+                      status: statusInfo.status
+                    });
+                  }
+                  console.log(`ðŸ“¦ âœ… Status (DB): ${candidateName} | to=${recipient?.phone} | messageId=${messageId} | status=${statusInfo.status}`);
+                }
+              } else {
+                // Message not found in database - might still be processing
+                console.warn(`âš ï¸ Message ${messageId} not found in database yet`);
+                // Count as success for now (might be delayed)
+                successCount++;
+                pendingList.push({
+                  candidateName,
+                  to: recipient?.phone,
+                  messageId,
+                  status: 'not_found_yet'
+                });
+              }
+            });
+
+            // High-signal summary for bulk run (frontend console)
+            console.log('ðŸ“Š Bulk WhatsApp summary (DB snapshot) =>', {
+              deliveredOrRead: deliveredList.length,
+              failed: failedList.length,
+              pendingOrSent: pendingList.length,
+              totalSent: sentMessageIds.length
+            });
+            if (deliveredList.length) console.log('âœ… Delivered/Read candidates =>', deliveredList);
+            if (failedList.length) console.log('âŒ Failed candidates =>', failedList);
+            if (pendingList.length) console.log('â³ Pending/Sent candidates =>', pendingList);
+          } else {
+            console.error('Failed to fetch message statuses from database');
+            // Fallback: count all sent messages as success
+            successCount = sentMessageIds.length;
+          }
+        } catch (statusError) {
+          console.error('Error fetching message statuses:', statusError);
+          // Fallback: count all sent messages as success
+          successCount = sentMessageIds.length;
+        }
+      }
+
+      let resultMessage = `Messages sent: ${successCount} successful, ${failCount} failed`;
+      if (failedMessages.length > 0 && failedMessages.length <= 10) {
+        resultMessage += `\n\nErrors:\n${failedMessages.join('\n')}`;
+      } else if (failedMessages.length > 10) {
+        resultMessage += `\n\nFirst 10 errors:\n${failedMessages.slice(0, 10).join('\n')}`;
+      }
+      
+      alert(resultMessage);
+
+      if (failCount === 0 || successCount > 0) {
+        setModalType(null);
+        setSelectedSenderId('');
+        setSelectedWhatsappNumbers([]);
+        setResponseRecipient('sender');
+        setSelectedWhatsappTemplateModal('');
+        setWhatsappMessage('');
+        setShowBulkInputs(false);
+        setBulkMode(null);
+      }
+
+    } catch (error) {
+      console.error('Bulk WhatsApp send error:', error);
+      alert(`Error sending bulk messages: ${error.response?.data?.message || error.message || 'Unknown error'}`);
+    } finally {
+      setIsSendingBulkWhatsapp(false);
+    }
+  };
+
+  // Click outside to close WhatsApp dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Check if click is outside template menu
+      if (showWhatsappTemplateMenu) {
+        const templateButton = event.target.closest('.whatsapp-template-trigger');
+        const templateMenu = event.target.closest('.whatsapp-template-menu');
+        if (!templateButton && !templateMenu) {
+          setShowWhatsappTemplateMenu(false);
+        }
+      }
+      // Check if click is outside emoji picker
+      if (showWhatsappEmojiPicker) {
+        const emojiButton = event.target.closest('.whatsapp-emoji-trigger');
+        const emojiMenu = event.target.closest('.whatsapp-emoji-menu');
+        if (!emojiButton && !emojiMenu) {
+          setShowWhatsappEmojiPicker(false);
+        }
+      }
+      // Check if click is outside file menu
+      if (showWhatsappFileMenu) {
+        const fileButton = event.target.closest('.whatsapp-file-trigger');
+        const fileMenu = event.target.closest('.whatsapp-file-menu');
+        if (!fileButton && !fileMenu) {
+          setShowWhatsappFileMenu(false);
+        }
+      }
+    };
+
+    if (showWhatsappTemplateMenu || showWhatsappEmojiPicker || showWhatsappFileMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showWhatsappTemplateMenu, showWhatsappEmojiPicker, showWhatsappFileMenu]);
+
+  // Fetch templates when WhatsApp panel opens
+  useEffect(() => {
+    if (showPanel === 'Whatsapp' && whatsappTemplates.length === 0) {
+      fetchWhatsappTemplates();
+    }
+  }, [showPanel]);
+useEffect(() => {
+  if (modalType === 'whatsapp') {
+    fetchWhatsappTemplates();
+  } else if (modalType === 'templateEdit') {
+    fetchWhatsappTemplates();
+  }
+}, [modalType]);
+
+
+  // Auto-scroll to bottom when WhatsApp panel opens, messages change, or template selected
+  useEffect(() => {
+    if (showPanel === 'Whatsapp' && whatsappMessagesEndRef.current) {
+      whatsappMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [showPanel, whatsappMessages, selectedWhatsappTemplate]);
 
 
   const openleadHistoryPanel = async (profile = null) => {
@@ -2343,7 +7368,7 @@ const CRMDashboard = () => {
     setShowPopup(null);
     setShowPanel('leadHistory');
     setSelectedConcernPerson(null);
-    setSelectedProfiles(null);
+    setSelectedProfiles([]);
     if (!isMobile) {
       setMainContentClass('col-8');
     }
@@ -2359,15 +7384,12 @@ const CRMDashboard = () => {
     setShowPopup(null);
     setShowPanel('changeCenter');
     setSelectedConcernPerson(null);
-    setSelectedProfiles(null);
+    setSelectedProfiles([]);
     if (!isMobile) {
       setMainContentClass('col-8');
     }
   };
 
-  useEffect(() => {
-    console.log('selectedProfile', selectedProfile);
-  }, [selectedProfile]);
 
   const openProfileEditPanel = async (profile = null) => {
     if (profile) {
@@ -2379,7 +7401,7 @@ const CRMDashboard = () => {
     setShowPopup(null);
     setShowPanel('ProfileEdit');
     setSelectedConcernPerson(null);
-    setSelectedProfiles(null);
+    setSelectedProfiles([]);
     if (!isMobile) {
       setMainContentClass('col-8');
     }
@@ -2424,7 +7446,39 @@ const CRMDashboard = () => {
 
             </h6>
           </div>
-          <div>
+          <div className="d-flex align-items-center gap-2">
+            {(showPanel === 'followUp' || showPanel === 'editPanel') && (
+              userData.googleAuthToken?.accessToken ? (
+                <button
+                  type="button"
+                  className="btn btn-outline-danger btn-sm"
+                  onClick={handleGoogleLogout}
+                  disabled={isGoogleLoginLoading}
+                >
+                  <i className="fas fa-calendar-times me-1"></i>
+                  Disconnect Google Calendar
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-outline-primary btn-sm"
+                  onClick={handleGoogleLogin}
+                  disabled={isGoogleLoginLoading}
+                >
+                  {isGoogleLoginLoading ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-1" role="status" />
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-calendar-plus me-1"></i>
+                      Connect Google Calendar
+                    </>
+                  )}
+                </button>
+              )
+            )}
             <button className="btn-close" type="button" onClick={closePanel}>
               {/* <i className="fa-solid fa-xmark"></i> */}
             </button>
@@ -2493,12 +7547,15 @@ const CRMDashboard = () => {
             )}
 
 
-            {((seletectedSubStatus && seletectedSubStatus.hasFollowup && (showPanel !== 'bulkstatuschange')) || (showPanel === 'followUp') || (showPanel !== 'bulkstatuschange')) && (
+            {(isFieldRequired('followup') || showPanel === 'followUp') && (
 
               <div className="row mb-1">
                 <div className="col-6">
                   <label htmlFor="nextActionDate" className="form-label small fw-medium text-dark">
-                    Next Action Date <span className="text-danger">*</span>
+                    Next Action Date
+                    {(isFieldRequired('followup') || showPanel === 'followUp') &&
+                      <span className="text-danger">*</span>
+                    }
                   </label>
                   <div className="input-group">
                     {/* <input
@@ -2509,48 +7566,55 @@ const CRMDashboard = () => {
                     onChange={(e) => setFollowupDate(e.target.value)}
                   /> */}
                     <DatePicker
-                      className="form-control border-0  bgcolor"
+                      className={`form-control border-0 bgcolor ${getRequiredFieldClass('followup')}`}
                       onChange={setFollowupDate}
-
                       value={followupDate}
                       format="dd/MM/yyyy"
                       minDate={today}   // Isse past dates disable ho jayengi
-
+                      placeholder={(isFieldRequired('followup') || showPanel === 'followUp') ? "Date is mandatory" : "Select date"}
+                      style={{position: 'static'}}
                     />
                   </div>
                 </div>
 
                 <div className="col-6">
                   <label htmlFor="actionTime" className="form-label small fw-medium text-dark">
-                    Time <span className="text-danger">*</span>
+                    Time
+                    {(isFieldRequired('followup') || showPanel === 'followUp') &&
+                      <span className="text-danger">*</span>
+                    }
                   </label>
                   <div className="input-group">
                     <input
                       type="time"
-                      className="form-control border-0  bgcolor"
+                      className={`form-control border-0 bgcolor ${getRequiredFieldClass('followup')}`}
                       id="actionTime"
                       onChange={handleTimeChange}
                       value={followupTime}
-
-
+                      placeholder={(isFieldRequired('followup') || showPanel === 'followUp') ? "Time is mandatory" : "Select time"}
                       style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
                     />
                   </div>
                 </div>
               </div>)}
 
-            {((seletectedSubStatus && seletectedSubStatus.hasRemarks) || (setShowPanel === 'followUp')) && (
+            {(isFieldRequired('remarks') || showPanel === 'followUp') && (
 
               <div className="mb-1">
-                <label htmlFor="comment" className="form-label small fw-medium text-dark">Comment</label>
+                <label htmlFor="comment" className="form-label small fw-medium text-dark">
+                  Comment
+                  {(isFieldRequired('remarks') || showPanel === 'followUp') &&
+                    <span className="text-danger">*</span>
+                  }
+                </label>
                 <textarea
-                  className="form-control border-0 bgcolor"
+                  className={`form-control border-0 bgcolor ${getRequiredFieldClass('remarks')}`}
                   id="comment"
                   rows="4"
+                  value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
-
+                  placeholder={(isFieldRequired('remarks') || showPanel === 'followUp') ? "Remarks are mandatory" : "Add remarks (optional)"}
                   style={{ resize: 'none', backgroundColor: '#f1f2f6' }}
-
                 ></textarea>
               </div>
             )}
@@ -2601,7 +7665,7 @@ const CRMDashboard = () => {
     }
 
     return (showPanel === 'editPanel') || (showPanel === 'followUp') || (showPanel === 'bulkstatuschange') ? (
-      <div className="col-12 transition-col" id="editFollowupPanel">
+      <div className="col-11 transition-col" id="editFollowupPanel">
         {panelContent}
       </div>
     ) : null;
@@ -2633,11 +7697,8 @@ const CRMDashboard = () => {
 
         <div className="card-body">
           <form>
-
-
             <>
-
-              {/* NEW COUNSELOR SELECT DROPDOWN */}
+              {/* COUNSELOR SELECT DROPDOWN */}
               <div className="mb-1">
                 <label htmlFor="counselor" className="form-label small fw-medium text-dark">
                   Select Counselor<span className="text-danger">*</span>
@@ -2647,6 +7708,7 @@ const CRMDashboard = () => {
                     <select
                       className="form-select border-0  bgcolor"
                       id="counselor"
+                      value={selectedConcernPerson || ''}
                       style={{
                         height: '42px',
                         paddingTop: '8px',
@@ -2675,12 +7737,11 @@ const CRMDashboard = () => {
                 CLOSE
               </button>
               <button
-                type="submit"
+                type="button"
                 className="btn text-white"
                 onClick={() => handleReferLead(showPanel === 'Reffer' ? 'RefferSingleLead' : 'RefferBulkLead')}
                 style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
               >
-
                 {showPanel === 'Reffer' ? 'REFER LEAD' : 'REFER BULK LEAD'}
               </button>
             </div>
@@ -2708,11 +7769,90 @@ const CRMDashboard = () => {
     }
 
     return (showPanel === 'Reffer') || (showPanel === 'RefferAllLeads') ? (
-      <div className="col-12 transition-col" id="refferPanel">
+      <div className="col-11 transition-col" id="refferPanel">
         {panelContent}
       </div>
     ) : null;
   };
+
+  // Render compact lead actions menu (three-dots dropdown)
+  const renderLeadActionsMenu = (profile, onClose) => (
+    <div className="lead-strip-v3__actions-menu">
+      {canEditLeadsPermission && (
+        <>
+          <button
+            type="button"
+            className="lead-strip-v3__actions-item"
+            onClick={() => { handleMoveToKyc(profile); onClose(); }}
+          >
+            <i className="fas fa-arrow-right text-primary" aria-hidden="true"></i>
+            Move To KYC List
+          </button>
+          <button
+            type="button"
+            className="lead-strip-v3__actions-item"
+            onClick={() => { openEditPanel(profile, 'SetFollowup'); onClose(); }}
+          >
+            <i className="fas fa-calendar text-warning" aria-hidden="true"></i>
+            Set Followup
+          </button>
+          <button
+            type="button"
+            className="lead-strip-v3__actions-item"
+            onClick={() => { handleFetchCandidate(profile); onClose(); }}
+          >
+            <i className="fas fa-user-edit text-info" aria-hidden="true"></i>
+            Profile Edit
+          </button>
+          <button
+            type="button"
+            className="lead-strip-v3__actions-item"
+            onClick={() => { getBranches(profile); setShowBranchModal(true); onClose(); }}
+          >
+            <i className="fas fa-building text-success" aria-hidden="true"></i>
+            Change Branch
+          </button>
+        </>
+      )}
+      {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+        <button
+          type="button"
+          className="lead-strip-v3__actions-item"
+          onClick={() => { openPanel(profile, 'Reffer'); onClose(); }}
+        >
+          <i className="fas fa-user-plus text-secondary" aria-hidden="true"></i>
+          Refer to Counselor
+        </button>
+      )}
+      <button
+        type="button"
+        className="lead-strip-v3__actions-item"
+        onClick={() => { openleadHistoryPanel(profile); onClose(); }}
+      >
+        <i className="fas fa-history text-secondary" aria-hidden="true"></i>
+        History List
+      </button>
+    </div>
+  );
+
+  const renderLeadActionsDropdown = (profile, profileIndex) => {
+    if (showPopup !== profileIndex) return null;
+    return (
+      <>
+        <div
+          className="lead-strip-v3__actions-backdrop"
+          onClick={() => setShowPopup(null)}
+          aria-hidden="true"
+        />
+        <div className="lead-strip-v3__actions-dropdown is-open">
+          {renderLeadActionsMenu(profile, () => setShowPopup(null))}
+        </div>
+      </>
+    );
+  };
+
+  // Render Actions Modal for Mobile (Three-dot menu) — replaced by compact dropdown
+  const renderActionsModal = () => null;
 
   const renderAllLeadPanel = () => {
     const panelContent = (
@@ -2735,7 +7875,7 @@ const CRMDashboard = () => {
         </div>
 
         <div className="card-body">
-          <form>
+          <form onSubmit={handleAddLeadsB2C}>
 
 
             <>
@@ -2753,8 +7893,11 @@ const CRMDashboard = () => {
                   className="form-control border-0 shadow-sm"
                   placeholder="Enter 10 digit candidate number"
                   maxLength="10"
-                  onInput={(e) => {
-                    e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                  required
+                  value={candidateFormData.mobile}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                    handleInputChange('mobile', value);
                   }}
                   style={{
                     height: '48px',
@@ -2772,10 +7915,22 @@ const CRMDashboard = () => {
                 <label className="form-label fw-semibold text-dark mb-2">
                   Select Course<span className="text-danger">*</span>
                 </label>
-                <div className="position-relative">
-                  <select
-                    className="form-select border-0 shadow-sm"
+                <div className="position-relative" ref={courseDropdownRef}>
+                  <input
+                    type="text"
                     id="course"
+                    className="form-control border-0 shadow-sm"
+                    placeholder="Select / Search course..."
+                    value={selectSearch.course}
+                    onFocus={() => setIsCourseDropdownOpen(true)}
+                    onClick={() => setIsCourseDropdownOpen(true)}
+                    onChange={(e) => {
+                      updateSelectSearch('course', e.target.value);
+                      setCourseId('');
+                      setCenterId('');
+                      setIsCourseDropdownOpen(true);
+                    }}
+                    disabled={loadingData}
                     style={{
                       height: '48px',
                       padding: '12px 16px',
@@ -2783,13 +7938,60 @@ const CRMDashboard = () => {
                       borderRadius: '8px',
                       fontSize: '14px',
                       transition: 'all 0.3s ease',
-                      border: '1px solid #e9ecef',
-
+                      border: '1px solid #e9ecef'
                     }}
+                  />
+                  <input type="hidden" required value={courseId} readOnly />
 
-                  >
-                    <option value="">Select Course</option>
-                  </select>
+                  {isCourseDropdownOpen && (
+                    <div
+                      className="shadow-sm"
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 1000,
+                        backgroundColor: '#fff',
+                        border: '1px solid #e9ecef',
+                        borderRadius: '8px',
+                        marginTop: '6px',
+                        maxHeight: '220px',
+                        overflowY: 'auto'
+                      }}
+                    >
+                      {filteredSortedCourses.length ? (
+                        filteredSortedCourses.map((course) => (
+                          <button
+                            key={course._id}
+                            type="button"
+                            onClick={() => {
+                              setCourseId(course._id);
+                              updateSelectSearch('course', course.name || '');
+                              updateSelectSearch('center', '');
+                              setCenterId('');
+                              setIsCourseDropdownOpen(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              border: 'none',
+                              background: 'transparent',
+                              padding: '10px 12px',
+                              fontSize: '14px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {course.name}
+                          </button>
+                        ))
+                      ) : (
+                        <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>
+                          No course found
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2797,10 +7999,21 @@ const CRMDashboard = () => {
                 <label className="form-label fw-semibold text-dark mb-2">
                   Select Training Center<span className="text-danger">*</span>
                 </label>
-                <div className="position-relative">
-                  <select
-                    className="form-select border-0 shadow-sm"
+                <div className="position-relative" ref={centerDropdownRef}>
+                  <input
+                    type="text"
                     id="trainingCenter"
+                    className="form-control border-0 shadow-sm"
+                    placeholder="Select / Search training center..."
+                    value={selectSearch.center}
+                    onFocus={() => courseId && setIsCenterDropdownOpen(true)}
+                    onClick={() => courseId && setIsCenterDropdownOpen(true)}
+                    onChange={(e) => {
+                      updateSelectSearch('center', e.target.value);
+                      setCenterId('');
+                      if (courseId) setIsCenterDropdownOpen(true);
+                    }}
+                    disabled={!courseId}
                     style={{
                       height: '48px',
                       padding: '12px 16px',
@@ -2808,11 +8021,58 @@ const CRMDashboard = () => {
                       borderRadius: '8px',
                       fontSize: '14px',
                       transition: 'all 0.3s ease',
-                      border: '1px solid #e9ecef',
+                      border: '1px solid #e9ecef'
                     }}
-                  >
-                    <option value="">Select Training Center</option>
-                  </select>
+                  />
+                  <input type="hidden" required value={centerId} readOnly />
+
+                  {isCenterDropdownOpen && courseId && (
+                    <div
+                      className="shadow-sm"
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 1000,
+                        backgroundColor: '#fff',
+                        border: '1px solid #e9ecef',
+                        borderRadius: '8px',
+                        marginTop: '6px',
+                        maxHeight: '220px',
+                        overflowY: 'auto'
+                      }}
+                    >
+                      {filteredSortedCenters.length ? (
+                        filteredSortedCenters.map((center) => (
+                          <button
+                            key={center._id}
+                            type="button"
+                            onClick={() => {
+                              setCenterId(center._id);
+                              updateSelectSearch('center', center.name || '');
+                              setIsCenterDropdownOpen(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              border: 'none',
+                              background: 'transparent',
+                              padding: '10px 12px',
+                              fontSize: '14px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {center.name}
+                          </button>
+                        ))
+                      ) : (
+                        <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>
+                          No center found
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2823,8 +8083,11 @@ const CRMDashboard = () => {
                 <input
                   type="text"
                   id="candidateName"
+                  required
                   className="form-control border-0 shadow-sm"
                   placeholder="Enter candidate name"
+                  value={candidateFormData.name}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
                   style={{
                     height: '48px',
                     padding: '12px 16px',
@@ -2847,6 +8110,8 @@ const CRMDashboard = () => {
                   className="form-control border-0 shadow-sm"
                   placeholder="Enter email address"
                   required
+                  value={candidateFormData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
                   style={{
                     height: '48px',
                     padding: '12px 16px',
@@ -2860,23 +8125,74 @@ const CRMDashboard = () => {
               </div>
 
               <div className="mb-3">
-                <label htmlFor="candidateAddress" className="form-label fw-semibold text-dark mb-2">
-                  Address
-                </label>
+                <label>Address</label>
                 <input
+                  ref={addressInputRef}
+                  id="loc"
                   type="text"
-                  id="candidateAddress"
-                  className="form-control border-0 shadow-sm"
-                  placeholder="Enter your address"
-                  style={{
-                    height: '48px',
-                    padding: '12px 16px',
-                    backgroundColor: '#f8f9fa',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    transition: 'all 0.3s ease',
-                    border: '1px solid #e9ecef'
-                  }}
+                  className="form-control"
+                  maxLength="100"
+                  name="address"
+                  value={candidateFormData.personalInfo.currentAddress.fullAddress}
+                  onChange={(e) => setCandidateFormData({
+                    ...candidateFormData,
+                    personalInfo: {
+                      ...candidateFormData.personalInfo,
+                      currentAddress: {
+                        ...candidateFormData.personalInfo.currentAddress,
+                        fullAddress: e.target.value
+                      }
+                    }
+                  })}
+                />
+              </div>
+
+              {/* Hidden fields for location data */}
+              <div className="col-xl-3 mb-3 d-none">
+                <label>State <span className="mandatory">*</span></label>
+                <input
+                  id="state"
+                  name="state"
+                  type="hidden"
+                  className="form-control"
+                  maxLength="50"
+                  value={candidateFormData.personalInfo.currentAddress.state}
+                />
+              </div>
+
+              <div className="col-xl-3 mb-3 d-none">
+                <label>City <span className="mandatory">*</span></label>
+                <input
+                  id="city"
+                  name="city"
+                  type="hidden"
+                  className="form-control"
+                  maxLength="50"
+                  value={candidateFormData.personalInfo.currentAddress.city}
+                />
+              </div>
+
+              <div className="col-xl-3 mb-3 d-none">
+                <label>Longitude <span className="mandatory">*</span></label>
+                <input
+                  id="longitude"
+                  name="longitude"
+                  type="hidden"
+                  className="form-control"
+                  maxLength="50"
+                  value={candidateFormData.personalInfo.currentAddress.longitude}
+                />
+              </div>
+
+              <div className="mb-3 d-none">
+                <label>Latitude <span className="mandatory">*</span></label>
+                <input
+                  id="latitude"
+                  name="latitude"
+                  type="hidden"
+                  className="form-control"
+                  maxLength="50"
+                  value={candidateFormData.personalInfo.currentAddress.latitude}
                 />
               </div>
 
@@ -2888,6 +8204,9 @@ const CRMDashboard = () => {
                   <select
                     id="candidateGender"
                     className="form-select border-0 shadow-sm"
+                    value={candidateFormData.sex}
+                    required
+                    onChange={(e) => handleInputChange('sex', e.target.value)}
                     style={{
                       height: '48px',
                       padding: '12px 16px',
@@ -2914,6 +8233,9 @@ const CRMDashboard = () => {
                   type="date"
                   id="candidateDob"
                   className="form-control border-0 shadow-sm"
+                  value={candidateFormData.dob}
+                  required
+                  onChange={(e) => handleInputChange('dob', e.target.value)}
                   style={{
                     height: '48px',
                     padding: '12px 16px',
@@ -2933,11 +8255,14 @@ const CRMDashboard = () => {
                 <input
                   type="tel"
                   id="candidateWhatsapp"
+                  required
                   className="form-control border-0 shadow-sm"
                   placeholder="Enter WhatsApp number"
                   maxLength="10"
-                  onInput={(e) => {
-                    e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                  value={candidateFormData.whatsapp}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                    handleInputChange('whatsapp', value);
                   }}
                   style={{
                     height: '48px',
@@ -2955,10 +8280,21 @@ const CRMDashboard = () => {
                 <label className="form-label fw-semibold text-dark mb-2">
                   Highest Qualification<span className="text-danger">*</span>
                 </label>
-                <div className="position-relative">
-                  <select
-                    className="form-select border-0 shadow-sm"
+                <div className="position-relative" ref={qualificationDropdownRef}>
+                  <input
+                    type="text"
                     id="highestQualification"
+                    className="form-control border-0 shadow-sm"
+                    placeholder="Select / Search highest qualification..."
+                    value={selectSearch.qualification}
+                    onFocus={() => !loadingData && setIsQualificationDropdownOpen(true)}
+                    onClick={() => !loadingData && setIsQualificationDropdownOpen(true)}
+                    onChange={(e) => {
+                      updateSelectSearch('qualification', e.target.value);
+                      handleInputChange('highestQualification', '');
+                      if (!loadingData) setIsQualificationDropdownOpen(true);
+                    }}
+                    disabled={loadingData}
                     style={{
                       height: '48px',
                       padding: '12px 16px',
@@ -2968,9 +8304,56 @@ const CRMDashboard = () => {
                       transition: 'all 0.3s ease',
                       border: '1px solid #e9ecef'
                     }}
-                  >
-                    <option value="">Select Highest Qualification</option>
-                  </select>
+                  />
+                  <input type="hidden" required value={candidateFormData.highestQualification || ''} readOnly />
+
+                  {isQualificationDropdownOpen && !loadingData && (
+                    <div
+                      className="shadow-sm"
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 1000,
+                        backgroundColor: '#fff',
+                        border: '1px solid #e9ecef',
+                        borderRadius: '8px',
+                        marginTop: '6px',
+                        maxHeight: '220px',
+                        overflowY: 'auto'
+                      }}
+                    >
+                      {filteredSortedQualifications.length ? (
+                        filteredSortedQualifications.map((qualification) => (
+                          <button
+                            key={qualification._id}
+                            type="button"
+                            onClick={() => {
+                              handleInputChange('highestQualification', qualification._id);
+                              updateSelectSearch('qualification', qualification.name || '');
+                              setIsQualificationDropdownOpen(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              border: 'none',
+                              background: 'transparent',
+                              padding: '10px 12px',
+                              fontSize: '14px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {qualification.name}
+                          </button>
+                        ))
+                      ) : (
+                        <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>
+                          No qualification found
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2978,10 +8361,20 @@ const CRMDashboard = () => {
                 <label className="form-label fw-semibold text-dark mb-2">
                   Counselor Name<span className="text-danger">*</span>
                 </label>
-                <div className="position-relative">
-                  <select
-                    className="form-select border-0 shadow-sm"
+                <div className="position-relative" ref={counselorDropdownRef}>
+                  <input
+                    type="text"
                     id="counselorName"
+                    className="form-control border-0 shadow-sm"
+                    placeholder="Select / Search counselor..."
+                    value={selectSearch.counselor}
+                    onFocus={() => setIsCounselorDropdownOpen(true)}
+                    onClick={() => setIsCounselorDropdownOpen(true)}
+                    onChange={(e) => {
+                      updateSelectSearch('counselor', e.target.value);
+                      setCounselorId('');
+                      setIsCounselorDropdownOpen(true);
+                    }}
                     style={{
                       height: '48px',
                       padding: '12px 16px',
@@ -2991,8 +8384,79 @@ const CRMDashboard = () => {
                       transition: 'all 0.3s ease',
                       border: '1px solid #e9ecef'
                     }}
+                  />
+
+                  {isCounselorDropdownOpen && (
+                    <div
+                      className="shadow-sm"
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 1000,
+                        backgroundColor: '#fff',
+                        border: '1px solid #e9ecef',
+                        borderRadius: '8px',
+                        marginTop: '6px',
+                        maxHeight: '220px',
+                        overflowY: 'auto'
+                      }}
+                    >
+                      {filteredSortedCounselors.length ? (
+                        filteredSortedCounselors.map((counselor) => (
+                          <button
+                            key={counselor.value}
+                            type="button"
+                            onClick={() => {
+                              setCounselorId(counselor.value);
+                              updateSelectSearch('counselor', counselor.label || '');
+                              setIsCounselorDropdownOpen(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              border: 'none',
+                              background: 'transparent',
+                              padding: '10px 12px',
+                              fontSize: '14px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {counselor.label}
+                          </button>
+                        ))
+                      ) : (
+                        <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>
+                          No counselor found
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="mb-3">
+                <label>
+                  Source <span className="mandatory">*</span>
+                </label>
+                <div className="mb-1" id="thirdPartySource">
+
+                  <select
+                    className="form-control single-field"
+                    value={registeredBy}
+                    name="sourceType"
+                    id="thirdPartySourceSelect"
+                    onChange={(e) => {
+                      // const selectedSource = sources.find(s => s._id === e.target.value);
+                      setRegisteredBy(e.target.value);
+                    }}
                   >
-                    <option value="">Select Counselor name</option>
+                    <option value="">Select Third Party Source</option>
+                    {sources.map((source) => (
+                      <option key={source._id} value={source._id} className="text-capitalize">
+                        {source.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -3011,11 +8475,10 @@ const CRMDashboard = () => {
               <button
                 type="submit"
                 className="btn text-white"
-                onClick={() => console.log('add lead')}
+                disabled={isSubmitting}
                 style={{ backgroundColor: '#fb2d5e', border: 'none', padding: '8px 24px', fontSize: '14px' }}
               >
-
-                {showPanel === 'AddAllLeads' ? 'ADD LEAD' : 'ADD BULK LEAD'}
+                {isSubmitting ? 'SUBMITTING...' : (showPanel === 'AddAllLeads' ? 'ADD LEAD' : 'ADD BULK LEAD')}
               </button>
             </div>
           </form>
@@ -3042,7 +8505,7 @@ const CRMDashboard = () => {
     }
 
     return (showPanel === 'AddAllLeads') ? (
-      <div className="col-12 transition-col" id="addLeadPanel">
+      <div className="col-11 transition-col" id="addLeadPanel">
         {panelContent}
       </div>
     ) : null;
@@ -3052,124 +8515,1116 @@ const CRMDashboard = () => {
   // Render WhatsApp Panel (Desktop Sidebar or Mobile Modal)
   const renderWhatsAppPanel = () => {
     const panelContent = (
-      <div className="whatsapp-chat right-side-panel">
-        <section className="topbar-container">
-          <div className="left-topbar">
-            <div className="img-container">
-              <div className="small-avatar" title="Ram Ruhela">RR</div>
-            </div>
-            <div className="flex-column">
-              <span title="Ram Ruhela" className="lead-name">Ram Ruhela</span><br />
-              <span className="selected-number">Primary: 918875426236</span>
-            </div>
-          </div>
-          <div className="right-topbar">
-            <a className="margin-horizontal-4" href="#">
-              <img src="/Assets/public_assets/images/whatapp/refresh.svg" alt="whatsAppAccount" title="whatsAppChatList.title.whatsAppAccount" />
-            </a>
-            <a className="margin-horizontal-5" href="#">
-              <img src="/Assets/public_assets/images/whatapp/refresh.svg" alt="refresh" title="refresh" />
-            </a>
-            <button
-              className="btn btn-sm btn-outline-secondary"
-              onClick={closePanel}
-              title="Close WhatsApp"
-            >
-              <i className="fas fa-times"></i>
-            </button>
-          </div>
-        </section>
+      <div className="d-flex flex-column" style={{ height: '100%', backgroundColor: '#f0f2f5' }}>
+        {/* WhatsApp Header */}
+        <div className="bg-white border-bottom" style={{ padding: '16px 16px 12px 16px', position: 'relative' }}>
 
-        <section className="chat-view">
-          <ul className="chat-container" id="messageList">
-            <div className="counselor-msg-container">
-              <div className="chatgroupdate"><span>03/26/2025</span></div>
-              <div className="counselor-msg-0 counselor-msg macro">
-                <div className="text text-r">
-                  <div>
-                    <span className="message-header-name student-messages">Anjali</span><br />
-                    <div className="d-flex">
-                      <pre className="text-message">
-                        <br /><span><span style={{ fontSize: '16px' }}>🎯</span>&nbsp;फ्री&nbsp;होटल&nbsp;मैनेजमेंट&nbsp;कोर्स&nbsp;-&nbsp;सुनहरा&nbsp;मौका&nbsp;<span style={{ fontSize: '16px' }}>🎯</span><br /><br />अब&nbsp;बने&nbsp;Guest&nbsp;Service&nbsp;Executive&nbsp;(Front&nbsp;Office)&nbsp;और&nbsp;होटल&nbsp;इंडस्ट्री&nbsp;में&nbsp;पाएं&nbsp;शानदार&nbsp;करियर&nbsp;की&nbsp;शुरुआत।<br /><br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;आयु&nbsp;सीमा:&nbsp;18&nbsp;से&nbsp;29&nbsp;वर्ष<br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;योग्यता:&nbsp;12वीं&nbsp;पास<br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;कोर्स&nbsp;अवधि:&nbsp;3&nbsp;से&nbsp;4&nbsp;महीने<br /><span style={{ fontSize: '16px' }}>✅</span>&nbsp;100%&nbsp;जॉब&nbsp;प्लेसमेंट&nbsp;गारंटी</span>
-                        <span className="messageTime text-message-time" id="time_0" style={{ marginTop: '12px' }}>
-                          12:31 PM
-                          <img src="/Assets/public_assets/images/whatapp/checked.png" style={{ marginLeft: '5px', marginBottom: '2px', width: '15px' }} alt="tick" />
+          <div className="d-flex align-items-center mb-2">
+            <div
+              className="rounded-circle d-flex align-items-center justify-content-center text-white me-3"
+              style={{
+                width: '48px',
+                height: '48px',
+                fontSize: '20px',
+                fontWeight: '600',
+                background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                flexShrink: 0
+              }}
+            >
+              {selectedProfile?._candidate?.name?.charAt(0)?.toUpperCase() || 'R'}
+            </div>
+            <div className="flex-grow-1">
+              <h6 className="mb-0 fw-bold" style={{ fontSize: '16px' }}>
+                {selectedProfile?._candidate?.name || 'N/A'}
+              </h6>
+              <p className="mb-0 text-muted" style={{ fontSize: '13px' }}>
+                {selectedProfile?._candidate?.mobile || 'N/A'}
+              </p>
+            </div>
+            <button
+              className="btn-close"
+              onClick={closePanel}
+              style={{ marginLeft: '8px' }}
+            ></button>
+          </div>
+
+          {/* Session Status Badge - Below name */}
+          <div className="d-flex align-items-center" style={{ paddingLeft: '64px' }}>
+            {sessionWindow.isOpen ? (
+              <div
+                className="d-flex align-items-center px-2 py-1 rounded"
+                style={{
+                  backgroundColor: '#D1F4E0',
+                  border: '1px solid #25D366',
+                  fontSize: '11px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <div
+                  className="rounded-circle me-1"
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    backgroundColor: '#25D366'
+                  }}
+                ></div>
+                <span className="fw-semibold" style={{ color: '#0A6E44' }}>
+                  <i className="fas fa-clock me-1" style={{ fontSize: '10px' }}></i>
+                  {sessionCountdown} remaining
+                </span>
+              </div>
+            ) : (
+              <div
+                className="d-flex align-items-center px-2 py-1 rounded"
+                style={{
+                  backgroundColor: '#FFF3CD',
+                  border: '1px solid #FFA500',
+                  fontSize: '11px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <i className="fas fa-clock me-1" style={{ color: '#FFA500', fontSize: '10px' }}></i>
+                <span className="fw-semibold" style={{ color: '#856404' }}>
+                  No Active Window
+                </span>
+              </div>
+            )}
+          </div>
+
+        </div>
+
+        {/* Messages Area */}
+        <div
+          className="flex-grow-1 overflow-auto p-3"
+          style={{
+            backgroundColor: '#ECE5DD',
+            backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 0h100v100H0z\' fill=\'%23ECE5DD\'/%3E%3Cpath d=\'M50 0L0 50h100L50 0z\' fill=\'%23E1DCD5\' fill-opacity=\'0.1\'/%3E%3C/svg%3E")',
+            maxHeight: '55vh',
+            minHeight: '300px'
+          }}
+        >
+          {/* Loading State */}
+          {isLoadingChatHistory && (
+            <div className="d-flex justify-content-center align-items-center h-100">
+              <div className="text-center">
+                <div className="spinner-border text-success mb-2" role="status" style={{ width: '40px', height: '40px' }}>
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+                <p style={{ color: '#667781', fontSize: '14px' }}>Loading chat history...</p>
+              </div>
+            </div>
+          )}
+
+          {/* Messages */}
+          {!isLoadingChatHistory && whatsappMessages.map(message => (
+            <div key={message.id} className={`d-flex mb-2 ${message.sender === 'agent' ? 'justify-content-end' : 'justify-content-start'}`}>
+              <div style={{ maxWidth: message.type === 'template' ? '85%' : '75%' }}>
+                <div
+                  className={`${message.sender === 'agent'
+                    ? 'text-white'
+                    : 'bg-white text-dark'
+                    }`}
+                  style={{
+                    backgroundColor: message.sender === 'agent' ? '#DCF8C6' : '#FFFFFF',
+                    color: message.sender === 'agent' ? '#000' : '#000',
+                    borderRadius: '8px',
+                    borderBottomRightRadius: message.sender === 'agent' ? '2px' : '8px',
+                    borderBottomLeftRadius: message.sender === 'lead' ? '2px' : '8px',
+                    boxShadow: '0 1px 0.5px rgba(0,0,0,0.13)',
+                    padding: message.type === 'template' ? '6px 10px 8px' : '6px 10px 8px',
+                    overflow: 'hidden'
+                  }}
+                >
+                  {/* Render template message with components */}
+                  {message.type === 'template' && message.templateData ? (
+                    <>
+                      {renderTemplateMessage(message.templateData, true)}
+                      <div
+                        className="d-flex align-items-center justify-content-end"
+                        style={{
+                          fontSize: '11px',
+                          color: '#667781',
+                          marginTop: '4px'
+                        }}
+                      >
+                        <span>{message.time}</span>
+                        {message.sender === 'agent' && renderMessageStatus(message.status)}
+                      </div>
+                    </>
+                  ) : (
+                    /* Regular text/media message */
+                    <>
+                      {/* Render media if present */}
+                      {message.mediaUrl && message.type === 'image' && (
+                        <img
+                          src={message.mediaUrl}
+                          alt="Shared image"
+                          style={{
+                            maxWidth: '100%',
+                            borderRadius: '8px',
+                            marginBottom: message.text !== '[Image]' ? '8px' : '0',
+                            display: 'block'
+                          }}
+                        />
+                      )}
+                      {message.mediaUrl && message.type === 'video' && (
+                        <video
+                          controls
+                          style={{
+                            maxWidth: '100%',
+                            borderRadius: '8px',
+                            marginBottom: message.text !== '[Video]' ? '8px' : '0',
+                            display: 'block'
+                          }}
+                        >
+                          <source src={message.mediaUrl} type="video/mp4" />
+                          Your browser does not support the video tag.
+                        </video>
+                      )}
+                      {message.mediaUrl && message.type === 'audio' && (
+                        <audio
+                          controls
+                          style={{
+                            width: '100%',
+                            marginBottom: '4px'
+                          }}
+                        >
+                          <source src={message.mediaUrl} type="audio/mpeg" />
+                          Your browser does not support the audio tag.
+                        </audio>
+                      )}
+                      {message.mediaUrl && message.type === 'document' && (
+                        <a
+                          href={message.mediaUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="d-flex align-items-center text-decoration-none"
+                          style={{
+                            padding: '8px',
+                            backgroundColor: 'rgba(0,0,0,0.05)',
+                            borderRadius: '4px',
+                            marginBottom: '4px'
+                          }}
+                        >
+                          <i className="fas fa-file-pdf me-2" style={{ fontSize: '20px', color: '#DC3545' }}></i>
+                          <span style={{ fontSize: '13px', color: '#000' }}>{message.text}</span>
+                        </a>
+                      )}
+
+                      {/* Render text if it's not a default placeholder */}
+                      {message.text && !['[Image]', '[Video]', '[Audio]', '[Document]'].includes(message.text) && (
+                        <p className="mb-0" style={{ fontSize: '14px', lineHeight: '1.4', wordWrap: 'break-word' }}>
+                          {message.text}
+                        </p>
+                      )}
+
+                      <div
+                        className="d-flex align-items-center justify-content-end"
+                        style={{
+                          fontSize: '11px',
+                          color: '#667781',
+                          marginTop: '4px'
+                        }}
+                      >
+                        <span>{message.time}</span>
+                        {message.sender === 'agent' && renderMessageStatus(message.status)}
+                      </div>
+                    </>
+                  )}
+                </div>
+                {message.sender === 'agent' && message.type === 'template' && (
+                  <p className="text-muted text-end mb-0 mt-1" style={{ fontSize: '10px', fontStyle: 'italic' }}>
+                    <i className="fas fa-file-alt me-1"></i>Template Message
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {/* Selected Template Preview in Chat */}
+          {selectedWhatsappTemplate && (
+            <div className="d-flex justify-content-end mb-3" style={{ animation: 'slideInFromRight 0.3s ease-out' }}>
+              <div style={{ maxWidth: '85%', minWidth: '300px' }}>
+                <div
+                  className="rounded-3 overflow-hidden"
+                  style={{
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    boxShadow: '0 8px 20px rgba(102, 126, 234, 0.3), 0 3px 10px rgba(0,0,0,0.15)',
+                    border: '2px solid rgba(255,255,255,0.3)',
+                    position: 'relative'
+                  }}
+                >
+                  {/* Decorative gradient overlay */}
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '100%',
+                    background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%)',
+                    pointerEvents: 'none'
+                  }}></div>
+
+                  {/* Header */}
+                  <div className="d-flex align-items-center justify-content-between p-3" style={{
+                    backgroundColor: 'rgba(255,255,255,0.15)',
+                    backdropFilter: 'blur(10px)',
+                    borderBottom: '1px solid rgba(255,255,255,0.2)'
+                  }}>
+                    <div className="d-flex align-items-center">
+                      <div
+                        className="rounded-circle d-flex align-items-center justify-content-center me-2"
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          backgroundColor: 'rgba(255,255,255,0.95)',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                        }}
+                      >
+                        <i className="fas fa-file-alt" style={{ color: '#667eea', fontSize: '14px' }}></i>
+                      </div>
+                      <div>
+                        <p className="mb-0" style={{ fontSize: '11px', color: 'rgba(255,255,255,0.9)', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          WhatsApp Template
+                        </p>
+                        <p className="mb-0" style={{ fontSize: '13px', color: '#fff', fontWeight: '600' }}>
+                          {selectedWhatsappTemplate.name}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      className="btn btn-sm p-0"
+                      onClick={() => setSelectedWhatsappTemplate(null)}
+                      style={{
+                        width: '28px',
+                        height: '28px',
+                        backgroundColor: 'rgba(255,255,255,0.2)',
+                        border: '1px solid rgba(255,255,255,0.4)',
+                        borderRadius: '50%',
+                        color: '#fff',
+                        fontSize: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.35)';
+                        e.currentTarget.style.transform = 'rotate(90deg) scale(1.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)';
+                        e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
+                      }}
+                      title="Remove Template"
+                    >
+                      <i className="fas fa-times"></i>
+                    </button>
+                  </div>
+
+                  {/* Content */}
+                  <div className="p-3" style={{ backgroundColor: '#fff', position: 'relative' }}>
+                    {/* Category Badge */}
+                    <div className="mb-2">
+                      <span className="badge" style={{
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        color: '#fff',
+                        fontSize: '10px',
+                        padding: '5px 12px',
+                        fontWeight: '600',
+                        borderRadius: '20px',
+                        letterSpacing: '0.3px'
+                      }}>
+                        <i className="fas fa-tag me-1" style={{ fontSize: '9px' }}></i>
+                        {selectedWhatsappTemplate.category}
+                      </span>
+                    </div>
+
+                    {/* Template Content */}
+                    <div
+                      className="rounded-3 p-3 mb-2"
+                      style={{
+                        backgroundColor: '#f8f9fa',
+                        border: '2px solid #e9ecef',
+                        borderLeft: '4px solid #667eea',
+                        position: 'relative'
+                      }}
+                    >
+                      {(() => {
+                        const components = selectedWhatsappTemplate.components || [];
+
+                        // Check if it's a carousel template
+                        const carouselComponent = components.find(c => c.type === 'CAROUSEL');
+                        if (carouselComponent && carouselComponent.cards) {
+                          return (
+                            <div>
+                              {/* Carousel Body Text (if exists outside carousel) */}
+                              {(() => {
+                                const bodyComp = components.find(c => c.type === 'BODY');
+                                if (bodyComp && bodyComp.text) {
+                                  return (
+                                    <p className="mb-3" style={{
+                                      fontSize: '13px',
+                                      color: '#2c3e50',
+                                      fontWeight: '500'
+                                    }}>
+                                      {bodyComp.text}
+                                    </p>
+                                  );
+                                }
+                              })()}
+
+                              <p className="mb-2 small fw-semibold" style={{ color: '#667eea' }}>
+                                <i className="fas fa-images me-1"></i>
+                                Carousel ({carouselComponent.cards.length} cards)
+                              </p>
+
+                              <div style={{
+                                display: 'flex',
+                                gap: '12px',
+                                overflowX: 'auto',
+                                paddingBottom: '10px',
+                                scrollbarWidth: 'thin'
+                              }}>
+                                {carouselComponent.cards.map((card, idx) => {
+                                  const cardHeader = card.components.find(c => c.type === 'HEADER');
+                                  const cardBody = card.components.find(c => c.type === 'BODY');
+                                  const cardButtons = card.components.find(c => c.type === 'BUTTONS');
+                                  const imageUrl = cardHeader?.example?.header_handle?.[0];
+
+                                  return (
+                                    <div key={idx} style={{
+                                      minWidth: '200px',
+                                      maxWidth: '200px',
+                                      border: '2px solid #dee2e6',
+                                      borderRadius: '12px',
+                                      overflow: 'hidden',
+                                      backgroundColor: '#fff',
+                                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                    }}>
+                                      {imageUrl && (
+                                        <>
+                                          <img
+                                            src={imageUrl}
+                                            alt={`Card ${idx + 1}`}
+                                            style={{
+                                              width: '100%',
+                                              height: '150px',
+                                              objectFit: 'cover'
+                                            }}
+                                            onError={(e) => {
+                                              e.target.style.display = 'none';
+                                              e.target.nextElementSibling.style.display = 'flex';
+                                            }}
+                                          />
+                                          <div style={{
+                                            display: 'none',
+                                            height: '150px',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            backgroundColor: '#e9ecef',
+                                            fontSize: '48px'
+                                          }}>
+                                            ðŸ–¼ï¸
+                                          </div>
+                                        </>
+                                      )}
+                                      <div style={{ padding: '12px' }}>
+                                        <p className="mb-2" style={{
+                                          fontSize: '12px',
+                                          lineHeight: '1.4',
+                                          color: '#2c3e50'
+                                        }}>
+                                          {(() => {
+                                            // Get candidate data for variable replacement
+                                            const candidate = selectedProfile?._candidate;
+                                            const registration = selectedProfile;
+
+                                            // Replace variables with actual candidate data
+                                            let text = cardBody?.text || '';
+
+                                            // Replace {{1}} with name
+                                            text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
+
+                                            // Replace {{2}} with gender
+                                            text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
+
+                                            // Replace {{3}} with mobile
+                                            text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
+
+                                            // Replace {{4}} with email
+                                            text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
+
+                                            // Replace {{5}} with course name
+                                            text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || 'Course Name');
+
+                                            // Replace {{6}} with counselor name
+                                            text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned');
+
+                                            // Replace {{7}} with job name
+                                            text = text.replace(/\{\{7\}\}/g, selectedProfile?._job?.title || 'Job Title');
+
+                                            // Replace {{8}} with project name (college name)
+                                            text = text.replace(/\{\{8\}\}/g, candidate?._college?.name || 'Project Name');
+
+                                            // Replace {{9}} with batch name
+                                            text = text.replace(/\{\{9\}\}/g, selectedProfile?._batch?.name || 'Batch Not Assigned');
+
+                                            // Replace {{10}} with lead owner name
+                                            text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Self Registered');
+
+                                            return text;
+                                          })()}
+                                        </p>
+                                        {cardButtons?.buttons && cardButtons.buttons.length > 0 && (
+                                          <div style={{
+                                            borderTop: '1px solid #dee2e6',
+                                            paddingTop: '8px',
+                                            marginTop: '8px'
+                                          }}>
+                                            {cardButtons.buttons.map((btn, bidx) => (
+                                              <div
+                                                key={bidx}
+                                                style={{
+                                                  padding: '6px',
+                                                  marginBottom: '4px',
+                                                  textAlign: 'center',
+                                                  fontSize: '11px',
+                                                  color: '#007bff',
+                                                  fontWeight: '500'
+                                                }}
+                                              >
+                                                {btn.type === 'QUICK_REPLY' && 'â†©ï¸ '}
+                                                {btn.text}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        // Regular template with header (image/video), body, footer, buttons
+                        const headerComponent = components.find(c => c.type === 'HEADER');
+                        const bodyComponent = components.find(c => c.type === 'BODY');
+                        const footerComponent = components.find(c => c.type === 'FOOTER');
+                        const buttonsComponent = components.find(c => c.type === 'BUTTONS');
+
+                        return (
+                          <div>
+                            {/* Header - Image or Video */}
+                            {headerComponent && headerComponent.format === 'IMAGE' && headerComponent.example?.header_handle?.[0] && (
+                              <div style={{ marginBottom: '12px', marginLeft: '-12px', marginRight: '-12px', marginTop: '-12px' }}>
+                                <img
+                                  src={headerComponent.example.header_handle[0]}
+                                  alt="Template header"
+                                  style={{
+                                    width: '100%',
+                                    maxHeight: '200px',
+                                    objectFit: 'cover',
+                                    borderRadius: '12px 12px 0 0'
+                                  }}
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    e.target.nextElementSibling.style.display = 'flex';
+                                  }}
+                                />
+                                <div style={{
+                                  display: 'none',
+                                  height: '200px',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  backgroundColor: '#e9ecef',
+                                  fontSize: '64px'
+                                }}>
+                                  ðŸ–¼ï¸
+                                </div>
+                              </div>
+                            )}
+
+                            {headerComponent && headerComponent.format === 'VIDEO' && headerComponent.example?.header_handle?.[0] && (
+                              <div style={{ marginBottom: '12px', marginLeft: '-12px', marginRight: '-12px', marginTop: '-12px' }}>
+                                <video
+                                  src={headerComponent.example.header_handle[0]}
+                                  controls
+                                  style={{
+                                    width: '100%',
+                                    maxHeight: '200px',
+                                    borderRadius: '12px 12px 0 0',
+                                    backgroundColor: '#000'
+                                  }}
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    e.target.nextElementSibling.style.display = 'flex';
+                                  }}
+                                >
+                                  Your browser does not support the video tag.
+                                </video>
+                                <div style={{
+                                  display: 'none',
+                                  height: '200px',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  backgroundColor: '#000',
+                                  color: '#fff',
+                                  fontSize: '64px'
+                                }}>
+                                  ðŸŽ¥
+                                </div>
+                              </div>
+                            )}
+
+                            {headerComponent && headerComponent.format === 'TEXT' && (
+                              <p className="mb-2 fw-bold" style={{ fontSize: '14px', color: '#1a1a1a' }}>
+                                {headerComponent.text}
+                              </p>
+                            )}
+
+                            {/* Body */}
+                            {bodyComponent && (
+                              <p className={headerComponent?.format === 'IMAGE' || headerComponent?.format === 'VIDEO' ? 'mt-3 mb-2' : 'mb-2'} style={{
+                                fontSize: '13px',
+                                color: '#2c3e50',
+                                lineHeight: '1.6',
+                                whiteSpace: 'pre-wrap'
+                              }}>
+                                {(() => {
+                                  // Get candidate data for variable replacement
+                                  const candidate = selectedProfile?._candidate;
+                                  const registration = selectedProfile;
+
+                                  // Get template variable mappings from selectedWhatsappTemplate
+                                  const variableMappings = selectedWhatsappTemplate?.variableMappings || [];
+
+                                  // Replace variables with actual candidate data using stored mappings
+                                  let text = bodyComponent.text || '';
+
+                                  if (variableMappings && variableMappings.length > 0) {
+                                    // Use stored variable mappings from database
+
+                                    variableMappings.forEach(mapping => {
+                                      const position = mapping.position;
+                                      const variableName = mapping.variableName;
+
+                                      // Get value based on actual variable name from mapping
+                                      let value = '';
+
+                                      switch (variableName) {
+                                        case 'name':
+                                          value = candidate?.name || registration?.name || 'User';
+                                          break;
+                                        case 'gender':
+                                          value = candidate?.gender || 'Male';
+                                          break;
+                                        case 'mobile':
+                                          value = candidate?.mobile || registration?.mobile || 'Mobile';
+                                          break;
+                                        case 'email':
+                                          value = candidate?.email || registration?.email || 'Email';
+                                          break;
+                                        case 'course_name':
+                                          value = selectedProfile?._course?.name || 'Course Name';
+                                          break;
+                                        case 'counselor_name':
+                                          value = selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned';
+                                          break;
+                                        case 'job_name':
+                                          value = selectedProfile?._job?.title || 'Job Title';
+                                          break;
+                                        case 'project_name':
+                                          value = selectedProfile?._project?.name || 'Project Name';
+                                          break;
+                                        case 'batch_name':
+                                          value = selectedProfile?._batch?.name || 'Batch Not Assigned';
+                                          break;
+                                        case 'lead_owner_name':
+                                          value = selectedProfile?.registeredBy?.name || 'Self Registered';
+                                          break;
+                                        default:
+                                          // Try direct property access
+                                          value = candidate?.[variableName] || registration?.[variableName] || `[${variableName}]`;
+                                          break;
+                                      }
+
+                                      // Replace the numbered variable with actual value
+                                      text = text.replace(new RegExp(`\\{\\{${position}\\}\\}`, 'g'), value);
+
+                                    });
+                                  } else {
+                                    text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
+
+                                    text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
+
+                                    text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
+
+                                    text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
+
+                                    text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || 'Course Name');
+
+                                    // Replace {{6}} with counselor name
+                                    text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned');
+
+                                    // Replace {{7}} with job name
+                                    text = text.replace(/\{\{7\}\}/g, selectedProfile?._job?.title || 'Job Title');
+
+                                    // Replace {{8}} with project name (college name)
+                                    text = text.replace(/\{\{8\}\}/g, selectedProfile?._project?.name || 'Project Name');
+
+                                    // Replace {{9}} with batch name
+                                    text = text.replace(/\{\{9\}\}/g, selectedProfile?._batch?.name || 'Batch Not Assigned');
+
+                                    // Replace {{10}} with lead owner name
+                                    text = text.replace(/\{\{10\}\}/g, selectedProfile?._registeredBy?.name || 'Self Registered');
+                                  }
+
+                                  return text;
+                                })()}
+                              </p>
+                            )}
+
+                            {/* Footer */}
+                            {footerComponent && (
+                              <p className="mb-2" style={{
+                                fontSize: '11px',
+                                color: '#6b7280',
+                                fontStyle: 'italic'
+                              }}>
+                                {footerComponent.text}
+                              </p>
+                            )}
+
+                            {/* Buttons */}
+                            {buttonsComponent && buttonsComponent.buttons && buttonsComponent.buttons.length > 0 && (
+                              <div style={{
+                                marginTop: '12px',
+                                paddingTop: '12px',
+                                borderTop: '1px solid #dee2e6'
+                              }}>
+                                {buttonsComponent.buttons.map((button, idx) => (
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      padding: '8px 12px',
+                                      marginBottom: '6px',
+                                      textAlign: 'center',
+                                      fontSize: '12px',
+                                      color: '#007bff',
+                                      border: '1px solid #007bff',
+                                      borderRadius: '6px',
+                                      backgroundColor: '#fff',
+                                      fontWeight: '500',
+                                      cursor: 'default'
+                                    }}
+                                  >
+                                    {button.type === 'QUICK_REPLY' && 'â†©ï¸ '}
+                                    {button.type === 'URL' && 'ðŸ”— '}
+                                    {button.type === 'PHONE_NUMBER' && 'ðŸ“ž '}
+                                    {button.text}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Footer Info */}
+                    <div className="d-flex align-items-center justify-content-between">
+                      <div className="d-flex align-items-center">
+                        <div
+                          className="rounded-circle me-2"
+                          style={{
+                            width: '8px',
+                            height: '8px',
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            boxShadow: '0 0 8px rgba(16, 185, 129, 0.5)',
+                            animation: 'pulse 2s ease-in-out infinite'
+                          }}
+                        ></div>
+                        <span style={{ fontSize: '11px', color: '#10b981', fontWeight: '600' }}>
+                          Ready to send
                         </span>
-                      </pre>
+                      </div>
+                      <div className="d-flex align-items-center">
+                        <i className="fas fa-check-circle me-1" style={{ color: '#10b981', fontSize: '10px' }}></i>
+                        <span style={{ fontSize: '10px', color: '#6b7280', fontWeight: '500' }}>
+                          Pre-approved
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+          )}
 
-            <div className="counselor-msg-container">
-              <div className="chatgroupdate"><span>04/07/2025</span></div>
-              <div className="counselor-msg-1 counselor-msg macro">
-                <div className="text text-r">
-                  <div className="d-flex">
-                    <pre className="text-message">
-                      <span className="message-header-name student-messages">Mr. Parveen Bansal</span><br />
-                      <span><h6>Hello</h6></span>
-                      <span className="messageTime text-message-time" id="time_1" style={{ marginTop: '7px' }}>
-                        04:28 PM
-                        <img src="/Assets/public_assets/images/whatapp/checked.png" style={{ marginLeft: '5px', marginBottom: '2px', width: '15px' }} alt="tick" />
-                      </span>
-                    </pre>
+          {/* Scroll anchor */}
+          <div ref={whatsappMessagesEndRef} />
+        </div>
+
+        {/* Bottom Input Area */}
+        <div className="bg-white border-top p-3">
+          <div className="d-flex align-items-center gap-2">
+            {/* File Upload Button */}
+            <div className="position-relative">
+              <button
+                className="btn whatsapp-file-trigger"
+                onClick={() => {
+                  setShowWhatsappFileMenu(!showWhatsappFileMenu);
+                  setShowWhatsappTemplateMenu(false);
+                  setShowWhatsappEmojiPicker(false);
+                }}
+                title="Attach File"
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  backgroundColor: 'transparent',
+                  color: '#54656F',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <i className="fas fa-paperclip" style={{ fontSize: '20px' }}></i>
+              </button>
+
+              {/* File Menu Dropdown */}
+              {showWhatsappFileMenu && (
+                <div className="whatsapp-file-menu position-absolute bottom-100 start-0 mb-2 bg-white rounded shadow-lg border" style={{ width: '200px', zIndex: 1050 }}>
+                  <div className="p-2">
+                    <input
+                      type="file"
+                      id="whatsapp-document-input"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+                      onChange={(e) => handleWhatsappFileUpload(e, 'document')}
+                      style={{ display: 'none' }}
+                    />
+                    <input
+                      type="file"
+                      id="whatsapp-image-input"
+                      accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                      onChange={(e) => handleWhatsappFileUpload(e, 'image')}
+                      style={{ display: 'none' }}
+                    />
+                    <input
+                      type="file"
+                      id="whatsapp-video-input"
+                      accept="video/mp4,video/mkv,video/mov,video/avi"
+                      onChange={(e) => handleWhatsappFileUpload(e, 'video')}
+                      style={{ display: 'none' }}
+                    />
+                    <input
+                      type="file"
+                      id="whatsapp-audio-input"
+                      accept="audio/mp3,audio/aac,audio/m4a,audio/amr,audio/ogg,audio/opus"
+                      onChange={(e) => handleWhatsappFileUpload(e, 'audio')}
+                      style={{ display: 'none' }}
+                    />
+
+                    <button
+                      className="btn btn-light w-100 text-start mb-2"
+                      onClick={() => document.getElementById('whatsapp-document-input').click()}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+                    >
+                      <i className="fas fa-file-alt" style={{ fontSize: '18px', color: '#7F66FF' }}></i>
+                      <span>Document</span>
+                    </button>
+
+                    <button
+                      className="btn btn-light w-100 text-start mb-2"
+                      onClick={() => document.getElementById('whatsapp-image-input').click()}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+                    >
+                      <i className="fas fa-image" style={{ fontSize: '18px', color: '#F02849' }}></i>
+                      <span>Image</span>
+                    </button>
+
+                    <button
+                      className="btn btn-light w-100 text-start mb-2"
+                      onClick={() => document.getElementById('whatsapp-video-input').click()}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+                    >
+                      <i className="fas fa-video" style={{ fontSize: '18px', color: '#00A884' }}></i>
+                      <span>Video</span>
+                    </button>
+
+                    <button
+                      className="btn btn-light w-100 text-start"
+                      onClick={() => document.getElementById('whatsapp-audio-input').click()}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+                    >
+                      <i className="fas fa-microphone" style={{ fontSize: '18px', color: '#FF6B35' }}></i>
+                      <span>Audio</span>
+                    </button>
                   </div>
                 </div>
-              </div>
+              )}
+            </div>
+            {/* <button
+              className="btn"
+              title="Attach File"
+              style={{
+                width: '42px',
+                height: '42px',
+                backgroundColor: 'transparent',
+                color: '#54656F',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <i className="fas fa-paperclip" style={{ fontSize: '20px' }}></i>
+            </button> */}
+
+            {/* Template Button */}
+            <div className="position-relative">
+              <button
+                className="btn whatsapp-template-trigger"
+                onClick={() => {
+                  setShowWhatsappTemplateMenu(!showWhatsappTemplateMenu);
+                  setShowWhatsappEmojiPicker(false);
+                }}
+                title="Templates"
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  backgroundColor: '#0B66E4',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <i className="fas fa-copy" style={{ fontSize: '18px' }}></i>
+              </button>
+
+              {/* Template Dropdown */}
+              {showWhatsappTemplateMenu && (
+                <div className="whatsapp-template-menu position-absolute bottom-100 start-0 mb-2 bg-white rounded shadow-lg border whatappMaxWidth" style={{ width: '300px', maxWidth: '300px', maxHeight: '400px', overflowY: 'auto', zIndex: 1050 }}>
+                  <div className="p-3 border-bottom bg-light">
+                    <h6 className="mb-0 fw-bold">Select Template to Send</h6>
+                    <p className="mb-0 small text-muted">Templates are approved by WhatsApp</p>
+                  </div>
+
+                  {whatsappTemplates.length === 0 ? (
+                    <div className="p-4 text-center">
+                      <div className="spinner-border spinner-border-sm text-primary mb-2" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                      </div>
+                      <p className="mb-0 small text-muted">Loading templates...</p>
+                    </div>
+                  ) : (
+                    whatsappTemplates.map(template => (
+                      <div
+                        key={template.id}
+                        className="p-3 border-bottom"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => handleWhatsappSelectTemplate(template)}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <div className="d-flex justify-content-between align-items-center">
+                          <h6 className="mb-0 fw-semibold">{template.name}</h6>
+                          <div className="d-flex gap-1">
+                            <span className="badge bg-primary" style={{ fontSize: '9px' }}>{template.category}</span>
+                            {template.language && (
+                              <span className="badge bg-secondary" style={{ fontSize: '9px' }}>{template.language.toUpperCase()}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
 
-            <div className="sessionExpiredMsg">
-              <span>Your session has come to end. It will start once you receive a WhatsApp from the lead.<br />Meanwhile, you can send a Business Initiated Messages (BIM).</span>
-            </div>
-          </ul>
-        </section>
+            {/* Message Input or Template Send Button */}
+            {selectedWhatsappTemplate ? (
+              // Template Selected - Show Send Button
+              <button
+                className="btn flex-grow-1"
+                onClick={handleWhatsappSendTemplate}
+                disabled={isSendingWhatsapp}
+                style={{
+                  height: '42px',
+                  backgroundColor: '#25D366',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '24px',
+                  fontWeight: '500',
+                  fontSize: '15px'
+                }}
+              >
+                {isSendingWhatsapp ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2"></span>
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-paper-plane me-2"></i>
+                    Send Template to {selectedProfile?._candidate?.name?.split(' ')[0] || 'User'}
+                  </>
+                )}
+              </button>
+            ) : sessionWindow.isOpen ? (
+              // Active Session - Show Input
+              <>
+                <div className="position-relative flex-grow-1">
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={whatsappNewMessage}
+                    onChange={(e) => setWhatsappNewMessage(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleWhatsappSendMessage()}
+                    placeholder={`Message ${selectedProfile?._candidate?.name?.split(' ')[0] }...`}
+                    style={{
+                      height: '42px',
+                      paddingRight: '50px',
+                      borderRadius: '24px',
+                      border: '1px solid #E9EDEF',
+                      fontSize: '15px',
+                      backgroundColor: '#F0F2F5'
+                    }}
+                  />
+                  <button
+                    className="btn whatsapp-emoji-trigger position-absolute end-0 top-0"
+                    onClick={() => {
+                      setShowWhatsappEmojiPicker(!showWhatsappEmojiPicker);
+                      setShowWhatsappTemplateMenu(false);
+                    }}
+                    style={{
+                      height: '42px',
+                      width: '42px',
+                      border: 'none',
+                      background: 'transparent',
+                      color: '#54656F'
+                    }}
+                  >
+                    <i className="far fa-smile" style={{ fontSize: '20px' }}></i>
+                  </button>
 
-        <section className="footer-container">
-          <div className="footer-box">
-            <div className="message-container" style={{ height: '36px', maxHeight: '128px' }}>
-              <textarea
-                placeholder="Choose a template"
-                className="disabled-style message-input"
-                disabled
-                rows="1"
-                id="message-input"
-                style={{ height: '36px', maxHeight: '128px', paddingTop: '8px', paddingBottom: '5px', marginBottom: '5px' }}
-              ></textarea>
-            </div>
-            <hr className="divider" />
-            <div className="message-container-input">
-              <div className="left-footer">
-                <span className="disabled-style margin-bottom-5">
-                  <a className="margin-right-10" href="#" title="Emoji">
-                    <img src="/Assets/public_assets/images/whatapp/refresh.svg" alt="Emoji" />
-                  </a>
-                </span>
-                <span className="disabled-style">
-                  <input name="fileUpload" type="file" title="Attach File" className="fileUploadIcon" />
-                </span>
-                <span className="input-template">
-                  <a title="Whatsapp Template">
-                    <img src="/Assets/public_assets/images/whatapp/orange-template-whatsapp.svg" alt="Whatsapp Template" />
-                  </a>
-                </span>
+                  {/* Emoji Picker */}
+                  {showWhatsappEmojiPicker && (
+                    <div className="whatsapp-emoji-menu position-absolute bottom-100 end-0 mb-2 bg-white rounded shadow-lg border p-3" style={{ zIndex: 1050 }}>
+                      <div className="d-flex flex-wrap gap-2 whatappemoji" style={{ width: '250px' }}>
+                        {emojis.map((emoji, index) => (
+                          <button
+                            key={index}
+                            className="btn btn-light"
+                            onClick={() => handleWhatsappEmojiClick(emoji)}
+                            style={{ fontSize: '20px', width: '25px', height: '25px', padding: 0 }}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Send/Voice Button */}
+                {whatsappNewMessage.trim() ? (
+                  <button
+                    onClick={handleWhatsappSendMessage}
+                    style={{
+                      width: '42px',
+                      height: '42px',
+                      minWidth: '42px',
+                      minHeight: '42px',
+                      backgroundColor: '#25D366',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '50%',
+                      padding: '0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      flexShrink: 0
+                    }}
+                  >
+                    <i className="fas fa-paper-plane" style={{ fontSize: '16px' }}></i>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setWhatsappMessages([...whatsappMessages, {
+                        id: whatsappMessages.length + 1,
+                        text: 'ðŸŽ¤ Voice message',
+                        sender: 'agent',
+                        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                        type: 'voice'
+                      }]);
+                    }}
+                    style={{
+                      width: '42px',
+                      height: '42px',
+                      minWidth: '42px',
+                      minHeight: '42px',
+                      backgroundColor: '#25D366',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '50%',
+                      padding: '0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      flexShrink: 0
+                    }}
+                    title="Voice Message"
+                  >
+                    <i className="fas fa-microphone" style={{ fontSize: '18px' }}></i>
+                  </button>
+                )}
+              </>
+            ) : (
+              // No Session - Disabled Input with Tooltip
+              <div
+                className="position-relative flex-grow-1"
+                title="No active 24-hour window. User ka reply milne par manual messages bhej sakte hain. Abhi sirf approved templates use kar sakte hain."
+              >
+                <input
+                  type="text"
+                  className="form-control"
+                  disabled
+                  placeholder="No active window - Use templates only"
+                  style={{
+                    height: '42px',
+                    borderRadius: '24px',
+                    border: '1px solid #E9EDEF',
+                    fontSize: '15px',
+                    backgroundColor: '#F5F5F5',
+                    color: '#8696A0',
+                    cursor: 'not-allowed'
+                  }}
+                />
               </div>
-              <div className="right-footer">
-                <span className="disabled-style">
-                  <a className="send-button" href="#" title="Send">
-                    <img className="send-img" src="/Assets/public_assets/images/whatapp/paper-plane.svg" alt="Send" />
-                  </a>
-                </span>
-              </div>
-            </div>
+            )}
           </div>
-        </section>
+        </div>
       </div>
     );
 
     if (isMobile) {
-      return showPanel === 'whatsapp' ? (
+      return showPanel === 'Whatsapp' ? (
         <div
           className='modal show d-block'
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
@@ -3186,17 +9641,1377 @@ const CRMDashboard = () => {
       ) : null;
     }
 
-    return showPanel === 'whatsapp' ? (
-      <div className="col-12 transition-col" id="whatsappPanel">
+    return showPanel === 'Whatsapp' ? (
+      <div className="col-11 transition-col" id="whatsappPanel">
         {panelContent}
       </div>
     ) : null;
   };
+  /************************************/
+  // Render Email Panel (Desktop Sidebar or Mobile Modal)
+  const renderEmailPanel = () => {
+    if (showPanel !== 'Email') return null;
+  
+    return (
+      <div className="col-11 transition-col" id="EmailPanel">
+        <div className="bg-white h-100 d-flex flex-column">
+  
+          {/* Header */}
+          <div className="border-bottom p-3 d-flex justify-content-between align-items-center">
+            <h5 className="mb-0 fw-bold">Send Email</h5>
+            <button
+              className="btn-close"
+               onClick={closePanel}
+                style={{ marginLeft: '8px' }}
+            />
+          </div>
+  
+          {/* Body */}
+          <div className="flex-grow-1 overflow-auto p-4">
+  
+            {/* Select Email */}
+            <div className="mb-4">
+              <h6 className="fw-bold mb-3">Select the Email to send</h6>
+              <div className="d-flex flex-column gap-2">
+                {['Primary Email', "Father's Email", "Mother's Email", 'Alternate Email'].map((emailType) => (
+                  <div key={emailType} className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      checked={selectedWhatsappNumbers.includes(emailType)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedWhatsappNumbers([...selectedWhatsappNumbers, emailType]);
+                        } else {
+                          setSelectedWhatsappNumbers(selectedWhatsappNumbers.filter(n => n !== emailType));
+                        }
+                      }}
+                    />
+                    <label className="form-check-label">
+                      {emailType}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+  
+            {/* Select Template */}
+            <div className="mb-4">
+              <label className="form-label fw-bold mb-2">
+                Select Email Template
+              </label>
+              <select
+                className="form-select"
+                value={selectedWhatsappTemplateModal}
+                onChange={(e) => setSelectedWhatsappTemplateModal(e.target.value)}
+              >
+                <option value="">Select Template</option>
+                {whatsappTemplates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+  
+          </div>
+  
+          {/* Footer */}
+          <div className="border-top p-3 d-flex justify-content-end gap-2">
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowPanel(null)}
+            >
+              Close
+            </button>
+  
+            <button
+              className="btn btn-primary"
+              onClick={handleBulkWhatsappSend}
+              disabled={isSendingBulkWhatsapp}
+            >
+              {isSendingBulkWhatsapp ? 'Sending...' : 'Send Message'}
+            </button>
+          </div>
+  
+        </div>
+      </div>
+    );
+  };
+  
+  // const renderEmailPanel = () => {
+  //   const panelContent = (
+  //     <div className="d-flex flex-column" style={{ height: '100%', backgroundColor: '#f0f2f5' }}>
+  //       {/* WhatsApp Header */}
+  //       <div className="bg-white border-bottom" style={{ padding: '16px 16px 12px 16px', position: 'relative' }}>
+
+  //         <div className="d-flex align-items-center mb-2">
+  //           <div
+  //             className="rounded-circle d-flex align-items-center justify-content-center text-white me-3"
+  //             style={{
+  //               width: '48px',
+  //               height: '48px',
+  //               fontSize: '20px',
+  //               fontWeight: '600',
+  //               background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+  //               flexShrink: 0
+  //             }}
+  //           >
+  //             {selectedProfile?._candidate?.name?.charAt(0)?.toUpperCase() || 'R'}
+  //           </div>
+  //           <div className="flex-grow-1">
+  //             <h6 className="mb-0 fw-bold" style={{ fontSize: '16px' }}>
+  //               {selectedProfile?._candidate?.name || 'N/A'}
+  //             </h6>
+  //             <p className="mb-0 text-muted" style={{ fontSize: '13px' }}>
+  //               {selectedProfile?._candidate?.mobile || 'N/A'}
+  //             </p>
+  //           </div>
+  //           <button
+  //             className="btn-close"
+  //             onClick={closePanel}
+  //             style={{ marginLeft: '8px' }}
+  //           ></button>
+  //         </div>
+
+  //         {/* Session Status Badge - Below name */}
+  //         <div className="d-flex align-items-center" style={{ paddingLeft: '64px' }}>
+  //           {sessionWindow.isOpen ? (
+  //             <div
+  //               className="d-flex align-items-center px-2 py-1 rounded"
+  //               style={{
+  //                 backgroundColor: '#D1F4E0',
+  //                 border: '1px solid #25D366',
+  //                 fontSize: '11px',
+  //                 whiteSpace: 'nowrap'
+  //               }}
+  //             >
+  //               <div
+  //                 className="rounded-circle me-1"
+  //                 style={{
+  //                   width: '6px',
+  //                   height: '6px',
+  //                   backgroundColor: '#25D366'
+  //                 }}
+  //               ></div>
+  //               <span className="fw-semibold" style={{ color: '#0A6E44' }}>
+  //                 <i className="fas fa-clock me-1" style={{ fontSize: '10px' }}></i>
+  //                 {sessionCountdown} remaining
+  //               </span>
+  //             </div>
+  //           ) : (
+  //             <div
+  //               className="d-flex align-items-center px-2 py-1 rounded"
+  //               style={{
+  //                 backgroundColor: '#FFF3CD',
+  //                 border: '1px solid #FFA500',
+  //                 fontSize: '11px',
+  //                 whiteSpace: 'nowrap'
+  //               }}
+  //             >
+  //               <i className="fas fa-clock me-1" style={{ color: '#FFA500', fontSize: '10px' }}></i>
+  //               <span className="fw-semibold" style={{ color: '#856404' }}>
+  //                 No Active Window
+  //               </span>
+  //             </div>
+  //           )}
+  //         </div>
+
+  //       </div>
+
+  //       {/* Messages Area */}
+  //       <div
+  //         className="flex-grow-1 overflow-auto p-3"
+  //         style={{
+  //           backgroundColor: '#ECE5DD',
+  //           backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 0h100v100H0z\' fill=\'%23ECE5DD\'/%3E%3Cpath d=\'M50 0L0 50h100L50 0z\' fill=\'%23E1DCD5\' fill-opacity=\'0.1\'/%3E%3C/svg%3E")',
+  //           maxHeight: '55vh',
+  //           minHeight: '300px'
+  //         }}
+  //       >
+  //         {/* Loading State */}
+  //         {isLoadingChatHistory && (
+  //           <div className="d-flex justify-content-center align-items-center h-100">
+  //             <div className="text-center">
+  //               <div className="spinner-border text-success mb-2" role="status" style={{ width: '40px', height: '40px' }}>
+  //                 <span className="visually-hidden">Loading...</span>
+  //               </div>
+  //               <p style={{ color: '#667781', fontSize: '14px' }}>Loading chat history...</p>
+  //             </div>
+  //           </div>
+  //         )}
+
+  //         {/* Messages */}
+  //         {!isLoadingChatHistory && whatsappMessages.map(message => (
+  //           <div key={message.id} className={`d-flex mb-2 ${message.sender === 'agent' ? 'justify-content-end' : 'justify-content-start'}`}>
+  //             <div style={{ maxWidth: message.type === 'template' ? '85%' : '75%' }}>
+  //               <div
+  //                 className={`${message.sender === 'agent'
+  //                   ? 'text-white'
+  //                   : 'bg-white text-dark'
+  //                   }`}
+  //                 style={{
+  //                   backgroundColor: message.sender === 'agent' ? '#DCF8C6' : '#FFFFFF',
+  //                   color: message.sender === 'agent' ? '#000' : '#000',
+  //                   borderRadius: '8px',
+  //                   borderBottomRightRadius: message.sender === 'agent' ? '2px' : '8px',
+  //                   borderBottomLeftRadius: message.sender === 'lead' ? '2px' : '8px',
+  //                   boxShadow: '0 1px 0.5px rgba(0,0,0,0.13)',
+  //                   padding: message.type === 'template' ? '6px 10px 8px' : '6px 10px 8px',
+  //                   overflow: 'hidden'
+  //                 }}
+  //               >
+  //                 {/* Render template message with components */}
+  //                 {message.type === 'template' && message.templateData ? (
+  //                   <>
+  //                     {renderTemplateMessage(message.templateData, true)}
+  //                     <div
+  //                       className="d-flex align-items-center justify-content-end"
+  //                       style={{
+  //                         fontSize: '11px',
+  //                         color: '#667781',
+  //                         marginTop: '4px'
+  //                       }}
+  //                     >
+  //                       <span>{message.time}</span>
+  //                       {message.sender === 'agent' && renderMessageStatus(message.status)}
+  //                     </div>
+  //                   </>
+  //                 ) : (
+  //                   /* Regular text/media message */
+  //                   <>
+  //                     {/* Render media if present */}
+  //                     {message.mediaUrl && message.type === 'image' && (
+  //                       <img
+  //                         src={message.mediaUrl}
+  //                         alt="Shared image"
+  //                         style={{
+  //                           maxWidth: '100%',
+  //                           borderRadius: '8px',
+  //                           marginBottom: message.text !== '[Image]' ? '8px' : '0',
+  //                           display: 'block'
+  //                         }}
+  //                       />
+  //                     )}
+  //                     {message.mediaUrl && message.type === 'video' && (
+  //                       <video
+  //                         controls
+  //                         style={{
+  //                           maxWidth: '100%',
+  //                           borderRadius: '8px',
+  //                           marginBottom: message.text !== '[Video]' ? '8px' : '0',
+  //                           display: 'block'
+  //                         }}
+  //                       >
+  //                         <source src={message.mediaUrl} type="video/mp4" />
+  //                         Your browser does not support the video tag.
+  //                       </video>
+  //                     )}
+  //                     {message.mediaUrl && message.type === 'audio' && (
+  //                       <audio
+  //                         controls
+  //                         style={{
+  //                           width: '100%',
+  //                           marginBottom: '4px'
+  //                         }}
+  //                       >
+  //                         <source src={message.mediaUrl} type="audio/mpeg" />
+  //                         Your browser does not support the audio tag.
+  //                       </audio>
+  //                     )}
+  //                     {message.mediaUrl && message.type === 'document' && (
+  //                       <a
+  //                         href={message.mediaUrl}
+  //                         target="_blank"
+  //                         rel="noopener noreferrer"
+  //                         className="d-flex align-items-center text-decoration-none"
+  //                         style={{
+  //                           padding: '8px',
+  //                           backgroundColor: 'rgba(0,0,0,0.05)',
+  //                           borderRadius: '4px',
+  //                           marginBottom: '4px'
+  //                         }}
+  //                       >
+  //                         <i className="fas fa-file-pdf me-2" style={{ fontSize: '20px', color: '#DC3545' }}></i>
+  //                         <span style={{ fontSize: '13px', color: '#000' }}>{message.text}</span>
+  //                       </a>
+  //                     )}
+
+  //                     {/* Render text if it's not a default placeholder */}
+  //                     {message.text && !['[Image]', '[Video]', '[Audio]', '[Document]'].includes(message.text) && (
+  //                       <p className="mb-0" style={{ fontSize: '14px', lineHeight: '1.4', wordWrap: 'break-word' }}>
+  //                         {message.text}
+  //                       </p>
+  //                     )}
+
+  //                     <div
+  //                       className="d-flex align-items-center justify-content-end"
+  //                       style={{
+  //                         fontSize: '11px',
+  //                         color: '#667781',
+  //                         marginTop: '4px'
+  //                       }}
+  //                     >
+  //                       <span>{message.time}</span>
+  //                       {message.sender === 'agent' && renderMessageStatus(message.status)}
+  //                     </div>
+  //                   </>
+  //                 )}
+  //               </div>
+  //               {message.sender === 'agent' && message.type === 'template' && (
+  //                 <p className="text-muted text-end mb-0 mt-1" style={{ fontSize: '10px', fontStyle: 'italic' }}>
+  //                   <i className="fas fa-file-alt me-1"></i>Template Message
+  //                 </p>
+  //               )}
+  //             </div>
+  //           </div>
+  //         ))}
+
+  //         {/* Selected Template Preview in Chat */}
+  //         {selectedWhatsappTemplate && (
+  //           <div className="d-flex justify-content-end mb-3" style={{ animation: 'slideInFromRight 0.3s ease-out' }}>
+  //             <div style={{ maxWidth: '85%', minWidth: '300px' }}>
+  //               <div
+  //                 className="rounded-3 overflow-hidden"
+  //                 style={{
+  //                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  //                   boxShadow: '0 8px 20px rgba(102, 126, 234, 0.3), 0 3px 10px rgba(0,0,0,0.15)',
+  //                   border: '2px solid rgba(255,255,255,0.3)',
+  //                   position: 'relative'
+  //                 }}
+  //               >
+  //                 {/* Decorative gradient overlay */}
+  //                 <div style={{
+  //                   position: 'absolute',
+  //                   top: 0,
+  //                   left: 0,
+  //                   right: 0,
+  //                   height: '100%',
+  //                   background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%)',
+  //                   pointerEvents: 'none'
+  //                 }}></div>
+
+  //                 {/* Header */}
+  //                 <div className="d-flex align-items-center justify-content-between p-3" style={{
+  //                   backgroundColor: 'rgba(255,255,255,0.15)',
+  //                   backdropFilter: 'blur(10px)',
+  //                   borderBottom: '1px solid rgba(255,255,255,0.2)'
+  //                 }}>
+  //                   <div className="d-flex align-items-center">
+  //                     <div
+  //                       className="rounded-circle d-flex align-items-center justify-content-center me-2"
+  //                       style={{
+  //                         width: '32px',
+  //                         height: '32px',
+  //                         backgroundColor: 'rgba(255,255,255,0.95)',
+  //                         boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+  //                       }}
+  //                     >
+  //                       <i className="fas fa-file-alt" style={{ color: '#667eea', fontSize: '14px' }}></i>
+  //                     </div>
+  //                     <div>
+  //                       <p className="mb-0" style={{ fontSize: '11px', color: 'rgba(255,255,255,0.9)', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+  //                         WhatsApp Template
+  //                       </p>
+  //                       <p className="mb-0" style={{ fontSize: '13px', color: '#fff', fontWeight: '600' }}>
+  //                         {selectedWhatsappTemplate.name}
+  //                       </p>
+  //                     </div>
+  //                   </div>
+  //                   <button
+  //                     className="btn btn-sm p-0"
+  //                     onClick={() => setSelectedWhatsappTemplate(null)}
+  //                     style={{
+  //                       width: '28px',
+  //                       height: '28px',
+  //                       backgroundColor: 'rgba(255,255,255,0.2)',
+  //                       border: '1px solid rgba(255,255,255,0.4)',
+  //                       borderRadius: '50%',
+  //                       color: '#fff',
+  //                       fontSize: '12px',
+  //                       display: 'flex',
+  //                       alignItems: 'center',
+  //                       justifyContent: 'center',
+  //                       transition: 'all 0.2s ease'
+  //                     }}
+  //                     onMouseEnter={(e) => {
+  //                       e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.35)';
+  //                       e.currentTarget.style.transform = 'rotate(90deg) scale(1.1)';
+  //                     }}
+  //                     onMouseLeave={(e) => {
+  //                       e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)';
+  //                       e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
+  //                     }}
+  //                     title="Remove Template"
+  //                   >
+  //                     <i className="fas fa-times"></i>
+  //                   </button>
+  //                 </div>
+
+  //                 {/* Content */}
+  //                 <div className="p-3" style={{ backgroundColor: '#fff', position: 'relative' }}>
+  //                   {/* Category Badge */}
+  //                   <div className="mb-2">
+  //                     <span className="badge" style={{
+  //                       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  //                       color: '#fff',
+  //                       fontSize: '10px',
+  //                       padding: '5px 12px',
+  //                       fontWeight: '600',
+  //                       borderRadius: '20px',
+  //                       letterSpacing: '0.3px'
+  //                     }}>
+  //                       <i className="fas fa-tag me-1" style={{ fontSize: '9px' }}></i>
+  //                       {selectedWhatsappTemplate.category}
+  //                     </span>
+  //                   </div>
+
+  //                   {/* Template Content */}
+  //                   <div
+  //                     className="rounded-3 p-3 mb-2"
+  //                     style={{
+  //                       backgroundColor: '#f8f9fa',
+  //                       border: '2px solid #e9ecef',
+  //                       borderLeft: '4px solid #667eea',
+  //                       position: 'relative'
+  //                     }}
+  //                   >
+  //                     {(() => {
+  //                       const components = selectedWhatsappTemplate.components || [];
+
+  //                       // Check if it's a carousel template
+  //                       const carouselComponent = components.find(c => c.type === 'CAROUSEL');
+  //                       if (carouselComponent && carouselComponent.cards) {
+  //                         return (
+  //                           <div>
+  //                             {/* Carousel Body Text (if exists outside carousel) */}
+  //                             {(() => {
+  //                               const bodyComp = components.find(c => c.type === 'BODY');
+  //                               if (bodyComp && bodyComp.text) {
+  //                                 return (
+  //                                   <p className="mb-3" style={{
+  //                                     fontSize: '13px',
+  //                                     color: '#2c3e50',
+  //                                     fontWeight: '500'
+  //                                   }}>
+  //                                     {bodyComp.text}
+  //                                   </p>
+  //                                 );
+  //                               }
+  //                             })()}
+
+  //                             <p className="mb-2 small fw-semibold" style={{ color: '#667eea' }}>
+  //                               <i className="fas fa-images me-1"></i>
+  //                               Carousel ({carouselComponent.cards.length} cards)
+  //                             </p>
+
+  //                             <div style={{
+  //                               display: 'flex',
+  //                               gap: '12px',
+  //                               overflowX: 'auto',
+  //                               paddingBottom: '10px',
+  //                               scrollbarWidth: 'thin'
+  //                             }}>
+  //                               {carouselComponent.cards.map((card, idx) => {
+  //                                 const cardHeader = card.components.find(c => c.type === 'HEADER');
+  //                                 const cardBody = card.components.find(c => c.type === 'BODY');
+  //                                 const cardButtons = card.components.find(c => c.type === 'BUTTONS');
+  //                                 const imageUrl = cardHeader?.example?.header_handle?.[0];
+
+  //                                 return (
+  //                                   <div key={idx} style={{
+  //                                     minWidth: '200px',
+  //                                     maxWidth: '200px',
+  //                                     border: '2px solid #dee2e6',
+  //                                     borderRadius: '12px',
+  //                                     overflow: 'hidden',
+  //                                     backgroundColor: '#fff',
+  //                                     boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+  //                                   }}>
+  //                                     {imageUrl && (
+  //                                       <>
+  //                                         <img
+  //                                           src={imageUrl}
+  //                                           alt={`Card ${idx + 1}`}
+  //                                           style={{
+  //                                             width: '100%',
+  //                                             height: '150px',
+  //                                             objectFit: 'cover'
+  //                                           }}
+  //                                           onError={(e) => {
+  //                                             e.target.style.display = 'none';
+  //                                             e.target.nextElementSibling.style.display = 'flex';
+  //                                           }}
+  //                                         />
+  //                                         <div style={{
+  //                                           display: 'none',
+  //                                           height: '150px',
+  //                                           alignItems: 'center',
+  //                                           justifyContent: 'center',
+  //                                           backgroundColor: '#e9ecef',
+  //                                           fontSize: '48px'
+  //                                         }}>
+  //                                           ðŸ–¼ï¸
+  //                                         </div>
+  //                                       </>
+  //                                     )}
+  //                                     <div style={{ padding: '12px' }}>
+  //                                       <p className="mb-2" style={{
+  //                                         fontSize: '12px',
+  //                                         lineHeight: '1.4',
+  //                                         color: '#2c3e50'
+  //                                       }}>
+  //                                         {(() => {
+  //                                           // Get candidate data for variable replacement
+  //                                           const candidate = selectedProfile?._candidate;
+  //                                           const registration = selectedProfile;
+
+  //                                           // Replace variables with actual candidate data
+  //                                           let text = cardBody?.text || '';
+
+  //                                           // Replace {{1}} with name
+  //                                           text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
+
+  //                                           // Replace {{2}} with gender
+  //                                           text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
+
+  //                                           // Replace {{3}} with mobile
+  //                                           text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
+
+  //                                           // Replace {{4}} with email
+  //                                           text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
+
+  //                                           // Replace {{5}} with course name
+  //                                           text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || 'Course Name');
+
+  //                                           // Replace {{6}} with counselor name
+  //                                           text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned');
+
+  //                                           // Replace {{7}} with job name
+  //                                           text = text.replace(/\{\{7\}\}/g, selectedProfile?._job?.title || 'Job Title');
+
+  //                                           // Replace {{8}} with project name (college name)
+  //                                           text = text.replace(/\{\{8\}\}/g, candidate?._college?.name || 'Project Name');
+
+  //                                           // Replace {{9}} with batch name
+  //                                           text = text.replace(/\{\{9\}\}/g, selectedProfile?._batch?.name || 'Batch Not Assigned');
+
+  //                                           // Replace {{10}} with lead owner name
+  //                                           text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Self Registered');
+
+  //                                           return text;
+  //                                         })()}
+  //                                       </p>
+  //                                       {cardButtons?.buttons && cardButtons.buttons.length > 0 && (
+  //                                         <div style={{
+  //                                           borderTop: '1px solid #dee2e6',
+  //                                           paddingTop: '8px',
+  //                                           marginTop: '8px'
+  //                                         }}>
+  //                                           {cardButtons.buttons.map((btn, bidx) => (
+  //                                             <div
+  //                                               key={bidx}
+  //                                               style={{
+  //                                                 padding: '6px',
+  //                                                 marginBottom: '4px',
+  //                                                 textAlign: 'center',
+  //                                                 fontSize: '11px',
+  //                                                 color: '#007bff',
+  //                                                 fontWeight: '500'
+  //                                               }}
+  //                                             >
+  //                                               {btn.type === 'QUICK_REPLY' && 'â†©ï¸ '}
+  //                                               {btn.text}
+  //                                             </div>
+  //                                           ))}
+  //                                         </div>
+  //                                       )}
+  //                                     </div>
+  //                                   </div>
+  //                                 );
+  //                               })}
+  //                             </div>
+  //                           </div>
+  //                         );
+  //                       }
+
+  //                       // Regular template with header (image/video), body, footer, buttons
+  //                       const headerComponent = components.find(c => c.type === 'HEADER');
+  //                       const bodyComponent = components.find(c => c.type === 'BODY');
+  //                       const footerComponent = components.find(c => c.type === 'FOOTER');
+  //                       const buttonsComponent = components.find(c => c.type === 'BUTTONS');
+
+  //                       return (
+  //                         <div>
+  //                           {/* Header - Image or Video */}
+  //                           {headerComponent && headerComponent.format === 'IMAGE' && headerComponent.example?.header_handle?.[0] && (
+  //                             <div style={{ marginBottom: '12px', marginLeft: '-12px', marginRight: '-12px', marginTop: '-12px' }}>
+  //                               <img
+  //                                 src={headerComponent.example.header_handle[0]}
+  //                                 alt="Template header"
+  //                                 style={{
+  //                                   width: '100%',
+  //                                   maxHeight: '200px',
+  //                                   objectFit: 'cover',
+  //                                   borderRadius: '12px 12px 0 0'
+  //                                 }}
+  //                                 onError={(e) => {
+  //                                   e.target.style.display = 'none';
+  //                                   e.target.nextElementSibling.style.display = 'flex';
+  //                                 }}
+  //                               />
+  //                               <div style={{
+  //                                 display: 'none',
+  //                                 height: '200px',
+  //                                 alignItems: 'center',
+  //                                 justifyContent: 'center',
+  //                                 backgroundColor: '#e9ecef',
+  //                                 fontSize: '64px'
+  //                               }}>
+  //                                 ðŸ–¼ï¸
+  //                               </div>
+  //                             </div>
+  //                           )}
+
+  //                           {headerComponent && headerComponent.format === 'VIDEO' && headerComponent.example?.header_handle?.[0] && (
+  //                             <div style={{ marginBottom: '12px', marginLeft: '-12px', marginRight: '-12px', marginTop: '-12px' }}>
+  //                               <video
+  //                                 src={headerComponent.example.header_handle[0]}
+  //                                 controls
+  //                                 style={{
+  //                                   width: '100%',
+  //                                   maxHeight: '200px',
+  //                                   borderRadius: '12px 12px 0 0',
+  //                                   backgroundColor: '#000'
+  //                                 }}
+  //                                 onError={(e) => {
+  //                                   e.target.style.display = 'none';
+  //                                   e.target.nextElementSibling.style.display = 'flex';
+  //                                 }}
+  //                               >
+  //                                 Your browser does not support the video tag.
+  //                               </video>
+  //                               <div style={{
+  //                                 display: 'none',
+  //                                 height: '200px',
+  //                                 alignItems: 'center',
+  //                                 justifyContent: 'center',
+  //                                 backgroundColor: '#000',
+  //                                 color: '#fff',
+  //                                 fontSize: '64px'
+  //                               }}>
+  //                                 ðŸŽ¥
+  //                               </div>
+  //                             </div>
+  //                           )}
+
+  //                           {headerComponent && headerComponent.format === 'TEXT' && (
+  //                             <p className="mb-2 fw-bold" style={{ fontSize: '14px', color: '#1a1a1a' }}>
+  //                               {headerComponent.text}
+  //                             </p>
+  //                           )}
+
+  //                           {/* Body */}
+  //                           {bodyComponent && (
+  //                             <p className={headerComponent?.format === 'IMAGE' || headerComponent?.format === 'VIDEO' ? 'mt-3 mb-2' : 'mb-2'} style={{
+  //                               fontSize: '13px',
+  //                               color: '#2c3e50',
+  //                               lineHeight: '1.6',
+  //                               whiteSpace: 'pre-wrap'
+  //                             }}>
+  //                               {(() => {
+  //                                 // Get candidate data for variable replacement
+  //                                 const candidate = selectedProfile?._candidate;
+  //                                 const registration = selectedProfile;
+
+  //                                 // Get template variable mappings from selectedWhatsappTemplate
+  //                                 const variableMappings = selectedWhatsappTemplate?.variableMappings || [];
+
+  //                                 // Replace variables with actual candidate data using stored mappings
+  //                                 let text = bodyComponent.text || '';
+
+  //                                 if (variableMappings && variableMappings.length > 0) {
+  //                                   // Use stored variable mappings from database
+
+  //                                   variableMappings.forEach(mapping => {
+  //                                     const position = mapping.position;
+  //                                     const variableName = mapping.variableName;
+
+  //                                     // Get value based on actual variable name from mapping
+  //                                     let value = '';
+
+  //                                     switch (variableName) {
+  //                                       case 'name':
+  //                                         value = candidate?.name || registration?.name || 'User';
+  //                                         break;
+  //                                       case 'gender':
+  //                                         value = candidate?.gender || 'Male';
+  //                                         break;
+  //                                       case 'mobile':
+  //                                         value = candidate?.mobile || registration?.mobile || 'Mobile';
+  //                                         break;
+  //                                       case 'email':
+  //                                         value = candidate?.email || registration?.email || 'Email';
+  //                                         break;
+  //                                       case 'course_name':
+  //                                         value = selectedProfile?._course?.name || 'Course Name';
+  //                                         break;
+  //                                       case 'counselor_name':
+  //                                         value = selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned';
+  //                                         break;
+  //                                       case 'job_name':
+  //                                         value = selectedProfile?._job?.title || 'Job Title';
+  //                                         break;
+  //                                       case 'project_name':
+  //                                         value = selectedProfile?._project?.name || 'Project Name';
+  //                                         break;
+  //                                       case 'batch_name':
+  //                                         value = selectedProfile?._batch?.name || 'Batch Not Assigned';
+  //                                         break;
+  //                                       case 'lead_owner_name':
+  //                                         value = selectedProfile?.registeredBy?.name || 'Self Registered';
+  //                                         break;
+  //                                       default:
+  //                                         // Try direct property access
+  //                                         value = candidate?.[variableName] || registration?.[variableName] || `[${variableName}]`;
+  //                                         break;
+  //                                     }
+
+  //                                     // Replace the numbered variable with actual value
+  //                                     text = text.replace(new RegExp(`\\{\\{${position}\\}\\}`, 'g'), value);
+
+  //                                   });
+  //                                 } else {
+  //                                   text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
+
+  //                                   text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
+
+  //                                   text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
+
+  //                                   text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
+
+  //                                   text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || 'Course Name');
+
+  //                                   // Replace {{6}} with counselor name
+  //                                   text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned');
+
+  //                                   // Replace {{7}} with job name
+  //                                   text = text.replace(/\{\{7\}\}/g, selectedProfile?._job?.title || 'Job Title');
+
+  //                                   // Replace {{8}} with project name (college name)
+  //                                   text = text.replace(/\{\{8\}\}/g, selectedProfile?._project?.name || 'Project Name');
+
+  //                                   // Replace {{9}} with batch name
+  //                                   text = text.replace(/\{\{9\}\}/g, selectedProfile?._batch?.name || 'Batch Not Assigned');
+
+  //                                   // Replace {{10}} with lead owner name
+  //                                   text = text.replace(/\{\{10\}\}/g, selectedProfile?._registeredBy?.name || 'Self Registered');
+  //                                 }
+
+  //                                 return text;
+  //                               })()}
+  //                             </p>
+  //                           )}
+
+  //                           {/* Footer */}
+  //                           {footerComponent && (
+  //                             <p className="mb-2" style={{
+  //                               fontSize: '11px',
+  //                               color: '#6b7280',
+  //                               fontStyle: 'italic'
+  //                             }}>
+  //                               {footerComponent.text}
+  //                             </p>
+  //                           )}
+
+  //                           {/* Buttons */}
+  //                           {buttonsComponent && buttonsComponent.buttons && buttonsComponent.buttons.length > 0 && (
+  //                             <div style={{
+  //                               marginTop: '12px',
+  //                               paddingTop: '12px',
+  //                               borderTop: '1px solid #dee2e6'
+  //                             }}>
+  //                               {buttonsComponent.buttons.map((button, idx) => (
+  //                                 <div
+  //                                   key={idx}
+  //                                   style={{
+  //                                     padding: '8px 12px',
+  //                                     marginBottom: '6px',
+  //                                     textAlign: 'center',
+  //                                     fontSize: '12px',
+  //                                     color: '#007bff',
+  //                                     border: '1px solid #007bff',
+  //                                     borderRadius: '6px',
+  //                                     backgroundColor: '#fff',
+  //                                     fontWeight: '500',
+  //                                     cursor: 'default'
+  //                                   }}
+  //                                 >
+  //                                   {button.type === 'QUICK_REPLY' && 'â†©ï¸ '}
+  //                                   {button.type === 'URL' && 'ðŸ”— '}
+  //                                   {button.type === 'PHONE_NUMBER' && 'ðŸ“ž '}
+  //                                   {button.text}
+  //                                 </div>
+  //                               ))}
+  //                             </div>
+  //                           )}
+  //                         </div>
+  //                       );
+  //                     })()}
+  //                   </div>
+
+  //                   {/* Footer Info */}
+  //                   <div className="d-flex align-items-center justify-content-between">
+  //                     <div className="d-flex align-items-center">
+  //                       <div
+  //                         className="rounded-circle me-2"
+  //                         style={{
+  //                           width: '8px',
+  //                           height: '8px',
+  //                           background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+  //                           boxShadow: '0 0 8px rgba(16, 185, 129, 0.5)',
+  //                           animation: 'pulse 2s ease-in-out infinite'
+  //                         }}
+  //                       ></div>
+  //                       <span style={{ fontSize: '11px', color: '#10b981', fontWeight: '600' }}>
+  //                         Ready to send
+  //                       </span>
+  //                     </div>
+  //                     <div className="d-flex align-items-center">
+  //                       <i className="fas fa-check-circle me-1" style={{ color: '#10b981', fontSize: '10px' }}></i>
+  //                       <span style={{ fontSize: '10px', color: '#6b7280', fontWeight: '500' }}>
+  //                         Pre-approved
+  //                       </span>
+  //                     </div>
+  //                   </div>
+  //                 </div>
+  //               </div>
+  //             </div>
+  //           </div>
+  //         )}
+
+  //         {/* Scroll anchor */}
+  //         <div ref={whatsappMessagesEndRef} />
+  //       </div>
+
+  //       {/* Bottom Input Area */}
+  //       <div className="bg-white border-top p-3">
+  //         <div className="d-flex align-items-center gap-2">
+  //           {/* File Upload Button */}
+  //           <div className="position-relative">
+  //             <button
+  //               className="btn whatsapp-file-trigger"
+  //               onClick={() => {
+  //                 setShowWhatsappFileMenu(!showWhatsappFileMenu);
+  //                 setShowWhatsappTemplateMenu(false);
+  //                 setShowWhatsappEmojiPicker(false);
+  //               }}
+  //               title="Attach File"
+  //               style={{
+  //                 width: '42px',
+  //                 height: '42px',
+  //                 backgroundColor: 'transparent',
+  //                 color: '#54656F',
+  //                 border: 'none',
+  //                 borderRadius: '8px',
+  //                 padding: '0',
+  //                 display: 'flex',
+  //                 alignItems: 'center',
+  //                 justifyContent: 'center'
+  //               }}
+  //             >
+  //               <i className="fas fa-paperclip" style={{ fontSize: '20px' }}></i>
+  //             </button>
+
+  //             {/* File Menu Dropdown */}
+  //             {showWhatsappFileMenu && (
+  //               <div className="whatsapp-file-menu position-absolute bottom-100 start-0 mb-2 bg-white rounded shadow-lg border" style={{ width: '200px', zIndex: 1050 }}>
+  //                 <div className="p-2">
+  //                   <input
+  //                     type="file"
+  //                     id="whatsapp-document-input"
+  //                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+  //                     onChange={(e) => handleWhatsappFileUpload(e, 'document')}
+  //                     style={{ display: 'none' }}
+  //                   />
+  //                   <input
+  //                     type="file"
+  //                     id="whatsapp-image-input"
+  //                     accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+  //                     onChange={(e) => handleWhatsappFileUpload(e, 'image')}
+  //                     style={{ display: 'none' }}
+  //                   />
+  //                   <input
+  //                     type="file"
+  //                     id="whatsapp-video-input"
+  //                     accept="video/mp4,video/mkv,video/mov,video/avi"
+  //                     onChange={(e) => handleWhatsappFileUpload(e, 'video')}
+  //                     style={{ display: 'none' }}
+  //                   />
+  //                   <input
+  //                     type="file"
+  //                     id="whatsapp-audio-input"
+  //                     accept="audio/mp3,audio/aac,audio/m4a,audio/amr,audio/ogg,audio/opus"
+  //                     onChange={(e) => handleWhatsappFileUpload(e, 'audio')}
+  //                     style={{ display: 'none' }}
+  //                   />
+
+  //                   <button
+  //                     className="btn btn-light w-100 text-start mb-2"
+  //                     onClick={() => document.getElementById('whatsapp-document-input').click()}
+  //                     style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+  //                   >
+  //                     <i className="fas fa-file-alt" style={{ fontSize: '18px', color: '#7F66FF' }}></i>
+  //                     <span>Document</span>
+  //                   </button>
+
+  //                   <button
+  //                     className="btn btn-light w-100 text-start mb-2"
+  //                     onClick={() => document.getElementById('whatsapp-image-input').click()}
+  //                     style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+  //                   >
+  //                     <i className="fas fa-image" style={{ fontSize: '18px', color: '#F02849' }}></i>
+  //                     <span>Image</span>
+  //                   </button>
+
+  //                   <button
+  //                     className="btn btn-light w-100 text-start mb-2"
+  //                     onClick={() => document.getElementById('whatsapp-video-input').click()}
+  //                     style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+  //                   >
+  //                     <i className="fas fa-video" style={{ fontSize: '18px', color: '#00A884' }}></i>
+  //                     <span>Video</span>
+  //                   </button>
+
+  //                   <button
+  //                     className="btn btn-light w-100 text-start"
+  //                     onClick={() => document.getElementById('whatsapp-audio-input').click()}
+  //                     style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+  //                   >
+  //                     <i className="fas fa-microphone" style={{ fontSize: '18px', color: '#FF6B35' }}></i>
+  //                     <span>Audio</span>
+  //                   </button>
+  //                 </div>
+  //               </div>
+  //             )}
+  //           </div>
+  //           {/* <button
+  //             className="btn"
+  //             title="Attach File"
+  //             style={{
+  //               width: '42px',
+  //               height: '42px',
+  //               backgroundColor: 'transparent',
+  //               color: '#54656F',
+  //               border: 'none',
+  //               borderRadius: '8px',
+  //               padding: '0',
+  //               display: 'flex',
+  //               alignItems: 'center',
+  //               justifyContent: 'center'
+  //             }}
+  //           >
+  //             <i className="fas fa-paperclip" style={{ fontSize: '20px' }}></i>
+  //           </button> */}
+
+  //           {/* Template Button */}
+  //           <div className="position-relative">
+  //             <button
+  //               className="btn whatsapp-template-trigger"
+  //               onClick={() => {
+  //                 setShowWhatsappTemplateMenu(!showWhatsappTemplateMenu);
+  //                 setShowWhatsappEmojiPicker(false);
+  //               }}
+  //               title="Templates"
+  //               style={{
+  //                 width: '42px',
+  //                 height: '42px',
+  //                 backgroundColor: '#0B66E4',
+  //                 color: '#fff',
+  //                 border: 'none',
+  //                 borderRadius: '8px',
+  //                 padding: '0',
+  //                 display: 'flex',
+  //                 alignItems: 'center',
+  //                 justifyContent: 'center'
+  //               }}
+  //             >
+  //               <i className="fas fa-copy" style={{ fontSize: '18px' }}></i>
+  //             </button>
+
+  //             {/* Template Dropdown */}
+  //             {showWhatsappTemplateMenu && (
+  //               <div className="whatsapp-template-menu position-absolute bottom-100 start-0 mb-2 bg-white rounded shadow-lg border whatappMaxWidth" style={{ width: '300px', maxWidth: '300px', maxHeight: '400px', overflowY: 'auto', zIndex: 1050 }}>
+  //                 <div className="p-3 border-bottom bg-light">
+  //                   <h6 className="mb-0 fw-bold">Select Template to Send</h6>
+  //                   <p className="mb-0 small text-muted">Templates are approved by WhatsApp</p>
+  //                 </div>
+
+  //                 {whatsappTemplates.length === 0 ? (
+  //                   <div className="p-4 text-center">
+  //                     <div className="spinner-border spinner-border-sm text-primary mb-2" role="status">
+  //                       <span className="visually-hidden">Loading...</span>
+  //                     </div>
+  //                     <p className="mb-0 small text-muted">Loading templates...</p>
+  //                   </div>
+  //                 ) : (
+  //                   whatsappTemplates.map(template => (
+  //                     <div
+  //                       key={template.id}
+  //                       className="p-3 border-bottom"
+  //                       style={{ cursor: 'pointer' }}
+  //                       onClick={() => handleWhatsappSelectTemplate(template)}
+  //                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+  //                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+  //                     >
+  //                       <div className="d-flex justify-content-between align-items-center">
+  //                         <h6 className="mb-0 fw-semibold">{template.name}</h6>
+  //                         <div className="d-flex gap-1">
+  //                           <span className="badge bg-primary" style={{ fontSize: '9px' }}>{template.category}</span>
+  //                           {template.language && (
+  //                             <span className="badge bg-secondary" style={{ fontSize: '9px' }}>{template.language.toUpperCase()}</span>
+  //                           )}
+  //                         </div>
+  //                       </div>
+  //                     </div>
+  //                   ))
+  //                 )}
+  //               </div>
+  //             )}
+  //           </div>
+
+  //           {/* Message Input or Template Send Button */}
+  //           {selectedWhatsappTemplate ? (
+  //             // Template Selected - Show Send Button
+  //             <button
+  //               className="btn flex-grow-1"
+  //               onClick={handleWhatsappSendTemplate}
+  //               disabled={isSendingWhatsapp}
+  //               style={{
+  //                 height: '42px',
+  //                 backgroundColor: '#25D366',
+  //                 color: '#fff',
+  //                 border: 'none',
+  //                 borderRadius: '24px',
+  //                 fontWeight: '500',
+  //                 fontSize: '15px'
+  //               }}
+  //             >
+  //               {isSendingWhatsapp ? (
+  //                 <>
+  //                   <span className="spinner-border spinner-border-sm me-2"></span>
+  //                   Sending...
+  //                 </>
+  //               ) : (
+  //                 <>
+  //                   <i className="fas fa-paper-plane me-2"></i>
+  //                   Send Template to {selectedProfile?._candidate?.name?.split(' ')[0] || 'User'}
+  //                 </>
+  //               )}
+  //             </button>
+  //           ) : sessionWindow.isOpen ? (
+  //             // Active Session - Show Input
+  //             <>
+  //               <div className="position-relative flex-grow-1">
+  //                 <input
+  //                   type="text"
+  //                   className="form-control"
+  //                   value={whatsappNewMessage}
+  //                   onChange={(e) => setWhatsappNewMessage(e.target.value)}
+  //                   onKeyPress={(e) => e.key === 'Enter' && handleWhatsappSendMessage()}
+  //                   placeholder={`Message ${selectedProfile?._candidate?.name?.split(' ')[0] }...`}
+  //                   style={{
+  //                     height: '42px',
+  //                     paddingRight: '50px',
+  //                     borderRadius: '24px',
+  //                     border: '1px solid #E9EDEF',
+  //                     fontSize: '15px',
+  //                     backgroundColor: '#F0F2F5'
+  //                   }}
+  //                 />
+  //                 <button
+  //                   className="btn whatsapp-emoji-trigger position-absolute end-0 top-0"
+  //                   onClick={() => {
+  //                     setShowWhatsappEmojiPicker(!showWhatsappEmojiPicker);
+  //                     setShowWhatsappTemplateMenu(false);
+  //                   }}
+  //                   style={{
+  //                     height: '42px',
+  //                     width: '42px',
+  //                     border: 'none',
+  //                     background: 'transparent',
+  //                     color: '#54656F'
+  //                   }}
+  //                 >
+  //                   <i className="far fa-smile" style={{ fontSize: '20px' }}></i>
+  //                 </button>
+
+  //                 {/* Emoji Picker */}
+  //                 {showWhatsappEmojiPicker && (
+  //                   <div className="whatsapp-emoji-menu position-absolute bottom-100 end-0 mb-2 bg-white rounded shadow-lg border p-3" style={{ zIndex: 1050 }}>
+  //                     <div className="d-flex flex-wrap gap-2 whatappemoji" style={{ width: '250px' }}>
+  //                       {emojis.map((emoji, index) => (
+  //                         <button
+  //                           key={index}
+  //                           className="btn btn-light"
+  //                           onClick={() => handleWhatsappEmojiClick(emoji)}
+  //                           style={{ fontSize: '20px', width: '25px', height: '25px', padding: 0 }}
+  //                         >
+  //                           {emoji}
+  //                         </button>
+  //                       ))}
+  //                     </div>
+  //                   </div>
+  //                 )}
+  //               </div>
+
+  //               {/* Send/Voice Button */}
+  //               {whatsappNewMessage.trim() ? (
+  //                 <button
+  //                   onClick={handleWhatsappSendMessage}
+  //                   style={{
+  //                     width: '42px',
+  //                     height: '42px',
+  //                     minWidth: '42px',
+  //                     minHeight: '42px',
+  //                     backgroundColor: '#25D366',
+  //                     color: '#fff',
+  //                     border: 'none',
+  //                     borderRadius: '50%',
+  //                     padding: '0',
+  //                     display: 'flex',
+  //                     alignItems: 'center',
+  //                     justifyContent: 'center',
+  //                     cursor: 'pointer',
+  //                     flexShrink: 0
+  //                   }}
+  //                 >
+  //                   <i className="fas fa-paper-plane" style={{ fontSize: '16px' }}></i>
+  //                 </button>
+  //               ) : (
+  //                 <button
+  //                   onClick={() => {
+  //                     setWhatsappMessages([...whatsappMessages, {
+  //                       id: whatsappMessages.length + 1,
+  //                       text: 'ðŸŽ¤ Voice message',
+  //                       sender: 'agent',
+  //                       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+  //                       type: 'voice'
+  //                     }]);
+  //                   }}
+  //                   style={{
+  //                     width: '42px',
+  //                     height: '42px',
+  //                     minWidth: '42px',
+  //                     minHeight: '42px',
+  //                     backgroundColor: '#25D366',
+  //                     color: '#fff',
+  //                     border: 'none',
+  //                     borderRadius: '50%',
+  //                     padding: '0',
+  //                     display: 'flex',
+  //                     alignItems: 'center',
+  //                     justifyContent: 'center',
+  //                     cursor: 'pointer',
+  //                     flexShrink: 0
+  //                   }}
+  //                   title="Voice Message"
+  //                 >
+  //                   <i className="fas fa-microphone" style={{ fontSize: '18px' }}></i>
+  //                 </button>
+  //               )}
+  //             </>
+  //           ) : (
+  //             // No Session - Disabled Input with Tooltip
+  //             <div
+  //               className="position-relative flex-grow-1"
+  //               title="No active 24-hour window. User ka reply milne par manual messages bhej sakte hain. Abhi sirf approved templates use kar sakte hain."
+  //             >
+  //               <input
+  //                 type="text"
+  //                 className="form-control"
+  //                 disabled
+  //                 placeholder="No active window - Use templates only"
+  //                 style={{
+  //                   height: '42px',
+  //                   borderRadius: '24px',
+  //                   border: '1px solid #E9EDEF',
+  //                   fontSize: '15px',
+  //                   backgroundColor: '#F5F5F5',
+  //                   color: '#8696A0',
+  //                   cursor: 'not-allowed'
+  //                 }}
+  //               />
+  //             </div>
+  //           )}
+  //         </div>
+  //       </div>
+  //     </div>
+  //   );
+
+  //   if (isMobile) {
+  //     return showPanel === 'Whatsapp' ? (
+  //       <div
+  //         className='modal show d-block'
+  //         style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+  //         onClick={(e) => {
+  //           if (e.target === e.currentTarget) closePanel();
+  //         }}
+  //       >
+  //         <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
+  //           <div className="modal-content" style={{ height: '80vh' }}>
+  //             {panelContent}
+  //           </div>
+  //         </div>
+  //       </div>
+  //     ) : null;
+  //   }
+
+  //   return showPanel === 'Email' ? (
+  //     <div className="col-11 transition-col" id="EmailPanel">
+  //       {panelContent}
+  //     </div>
+  //   ) : null;
+  // };
+  /************************************/
+  //lead history
+
+  const [leadHistory, setLeadHistory] = useState([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+
+
+
+  useEffect(() => {
+    if (showPanel === 'leadHistory' && selectedProfile) {
+      fetchLeadHistory();
+    }
+  }, [showPanel]);
+
+  const fetchLeadHistory = async () => {
+    try {
+      setIsHistoryLoading(true);
+      setLeadHistory([])
+      const response = await axios.get(`${backendUrl}/college/lead-history/${selectedProfile._id}`, {
+        headers: {
+          'x-auth': token,
+        }
+      });
+      if (response.data.success) {
+        setLeadHistory(response.data.data);
+      } else {
+        alert('Field to history load')
+      }
+    } catch (error) {
+      console.error('Error fetching lead history:', error);
+      alert('Field to history load')
+
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  }
+  /************************************/
+
+  // WhatsApp Templates Dropdown
+  const renderWhatsAppTemplatesDropdown = () => {
+    if (!showWhatsAppTemplates) return null;
+    return (
+      <div className="position-absolute" style={{
+        bottom: '100%',
+        left: '0',
+        width: '300px',
+        zIndex: 1000,
+        backgroundColor: 'white',
+        border: '1px solid #ddd',
+        borderRadius: '8px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        maxHeight: '300px',
+        overflow: 'auto',
+        marginBottom: '8px'
+      }}>
+        {isLoadingWhatsAppTemplates ? (
+          <div className="d-flex align-items-center justify-content-center py-3">
+            <div className="spinner-border spinner-border-sm" role="status">
+              <span className="visually-hidden">Loading...</span>
+            </div>
+            <span className="ms-2">Loading templates...</span>
+          </div>
+        ) : whatsAppTemplatesError ? (
+          <div className="alert alert-danger m-2">{whatsAppTemplatesError}</div>
+        ) : (
+          <div className="list-group list-group-flush">
+            {whatsAppTemplates.length === 0 ? (
+              <div className="p-3 text-center text-muted">No templates found.</div>
+            ) : (
+              whatsAppTemplates.map((tpl) => (
+                <div
+                  key={tpl.id || tpl.name}
+                  className="list-group-item list-group-item-action"
+                  style={{ cursor: 'pointer', border: 'none', padding: '12px 16px' }}
+                  onClick={() => {
+                    setSelectedTemplate(tpl);
+                    setShowWhatsAppTemplates(false);
+
+                    // Generate template preview from components
+                    let previewText = "";
+                    let hasMedia = false;
+                    let mediaType = "";
+                    let mediaUrl = "";
+
+                    if (tpl.components && Array.isArray(tpl.components)) {
+                      tpl.components.forEach(component => {
+                        if (component.type === 'HEADER') {
+                          if (component.text) {
+                            previewText += component.text + "\n\n";
+                          } else if (component.format) {
+                            hasMedia = true;
+                            mediaType = component.format.toLowerCase();
+                            if (component.example && component.example.header_handle) {
+                              mediaUrl = component.example.header_handle[0];
+                            }
+                          }
+                        } else if (component.type === 'BODY' && component.text) {
+                          previewText += component.text + "\n\n";
+                        } else if (component.type === 'FOOTER' && component.text) {
+                          previewText += component.text;
+                        }
+                      });
+                    }
+
+                    // If no components, use template name as preview
+                    if (!previewText.trim()) {
+                      previewText = `Template: ${tpl.name}`;
+                    }
+
+                    // Store template data for enhanced preview
+                    const templateData = {
+                      text: previewText.trim(),
+                      hasMedia,
+                      mediaType,
+                      mediaUrl,
+                      templateName: tpl.name,
+                      status: tpl.status,
+                      category: tpl.category
+                    };
+
+                    setTemplatePreview(JSON.stringify(templateData));
+                  }}
+                >
+                  <div className="fw-semibold text-dark">{tpl.name}</div>
+                  <div className="small text-muted">{tpl.category} â€¢ {tpl.language} â€¢ {tpl.status}</div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+  /************************************/
 
   // Render Edit Panel (Desktop Sidebar or Mobile Modal)
   const renderLeadHistoryPanel = () => {
     const panelContent = (
-      <div className="card border-0 shadow-sm h-100">
+      <div className="card col-12 border-0 shadow-sm h-100">
         <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
           <div className="d-flex align-items-center">
             <div className="me-2">
@@ -3207,102 +11022,109 @@ const CRMDashboard = () => {
           <button className="btn-close" type="button" onClick={closePanel}>
           </button>
         </div>
-
-        <div className="card-body p-0 d-flex flex-column h-100">
-          {/* Scrollable Content Area */}
-          <div
-            className="flex-grow-1 overflow-auto px-3 py-2"
-            style={{
-              maxHeight: isMobile ? '60vh' : '65vh',
-              minHeight: '200px'
-            }}
-          >
-            {selectedProfile?.logs && Array.isArray(selectedProfile.logs) && selectedProfile.logs.length > 0 ? (
-              <div className="timeline">
-                {selectedProfile.logs.map((log, index) => (
-                  <div key={index} className="timeline-item mb-4">
-                    <div className="timeline-marker">
-                      <div className="timeline-marker-icon">
-                        <i className="fas fa-circle text-primary" style={{ fontSize: '8px' }}></i>
+        {isHistoryLoading ? (
+          <div className="card-body p-0 d-flex flex-column h-100 d-flex align-items-center justify-content-center">
+            <div className="spinner-border" role="status">
+              <span className="visually-hidden">Loading...</span>
+            </div>
+            <span className="ms-2 mt-2">Loading...</span>
+          </div>
+        ) : (
+          <div className="card-body p-0 d-flex flex-column h-100">
+            {/* Scrollable Content Area */}
+            <div
+              className="flex-grow-1 overflow-auto px-3 py-2"
+              style={{
+                maxHeight: isMobile ? '60vh' : '65vh',
+                minHeight: '200px'
+              }}
+            >
+              {leadHistory && Array.isArray(leadHistory) && leadHistory.length > 0 ? (
+                <div className="timeline">
+                  {leadHistory.map((log, index) => (
+                    <div key={index} className="timeline-item mb-4">
+                      <div className="timeline-marker">
+                        <div className="timeline-marker-icon">
+                          <i className="fas fa-circle text-primary" style={{ fontSize: '8px' }}></i>
+                        </div>
+                        {index !== leadHistory.length - 1 && (
+                          <div className="timeline-line"></div>
+                        )}
                       </div>
-                      {index !== selectedProfile.logs.length - 1 && (
-                        <div className="timeline-line"></div>
-                      )}
-                    </div>
 
-                    <div className="timeline-content">
-                      <div className="card border-0 shadow-sm">
-                        <div className="card-body p-3">
-                          <div className="d-flex justify-content-between align-items-start mb-2" style={{ flexDirection: 'column' }}>
-                            <span className="bg-light text-dark border">
-                              {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              }) : 'Unknown Date'}
-                            </span>
-                            <small className="text-muted">
-                              <i className="fas fa-user me-1"></i>
-                              Modified By: {log.user?.name || 'Unknown User'}
-                            </small>
-                          </div>
-
-                          <div className="mb-2">
-                            <strong className="text-dark d-block mb-1">Action:</strong>
-                            <div className="text-muted small" style={{ lineHeight: '1.6' }}>
-                              {log.action ? (
-                                log.action.split(';').map((actionPart, actionIndex) => (
-                                  <div key={actionIndex} className="mb-1">
-                                    • {actionPart.trim()}
-                                  </div>
-                                ))
-                              ) : (
-                                <div className="text-muted">No action specified</div>
-                              )}
+                      <div className="timeline-content">
+                        <div className="card border-0 shadow-sm">
+                          <div className="card-body p-3">
+                            <div className="d-flex justify-content-between align-items-start mb-2" style={{ flexDirection: 'column' }}>
+                              <span className="bg-light text-dark border">
+                                {log.timestamp ? new Date(log.timestamp).toLocaleString('en-IN', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                }) : 'Unknown Date'}
+                              </span>
+                              <small className="text-muted">
+                                <i className="fas fa-user me-1"></i>
+                                Modified By: {log.user?.name || 'Unknown User'}
+                              </small>
                             </div>
-                          </div>
 
-                          {log.remarks && (
-                            <div>
-                              <strong className="text-dark d-block mb-1">Remarks:</strong>
-                              <p className="mb-0 text-muted small" style={{ lineHeight: '1.4' }}>
-                                {log.remarks}
-                              </p>
+                            <div className="mb-2">
+                              <strong className="text-dark d-block mb-1">Action:</strong>
+                              <div className="text-muted small" style={{ lineHeight: '1.6' }}>
+                                {log.action ? (
+                                  log.action.split(';').map((actionPart, actionIndex) => (
+                                    <div key={actionIndex} className="mb-1">
+                                      â€¢ {actionPart.trim()}
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="text-muted">No action specified</div>
+                                )}
+                              </div>
                             </div>
-                          )}
+
+                            {log.remarks && (
+                              <div>
+                                <strong className="text-dark d-block mb-1">Remarks:</strong>
+                                <p className="mb-0 text-muted small" style={{ lineHeight: '1.4' }}>
+                                  {log.remarks}
+                                </p>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
-                <div className="mb-3">
-                  <i className="fas fa-history text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
+                  ))}
                 </div>
-                <h6 className="text-muted mb-2">No History Available</h6>
-                <p className="text-muted small mb-0">No actions have been recorded for this lead yet.</p>
-              </div>
-            )}
-          </div>
-
-          {/* Fixed Footer */}
-          <div className="border-top px-3 py-3 bg-light">
-            <div className="d-flex justify-content-end">
-              <button
-                type="button"
-                className="btn btn-outline-secondary"
-                onClick={closePanel}
-              >
-                <i className="fas fa-times me-1"></i>
-                Close
-              </button>
+              ) : (
+                <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
+                  <div className="mb-3">
+                    <i className="fas fa-history text-muted" style={{ fontSize: '3rem', opacity: 0.5 }}></i>
+                  </div>
+                  <h6 className="text-muted mb-2">No History Available</h6>
+                  <p className="text-muted small mb-0">No actions have been recorded for this lead yet.</p>
+                </div>
+              )}
             </div>
-          </div>
-        </div>
+
+            {/* Fixed Footer */}
+            <div className="border-top px-3 py-3 bg-light">
+              <div className="d-flex justify-content-end">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={closePanel}
+                >
+                  <i className="fas fa-times me-1"></i>
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>)}
       </div>
     );
 
@@ -3325,7 +11147,7 @@ const CRMDashboard = () => {
     }
 
     return showPanel === 'leadHistory' ? (
-      <div className="col-12 transition-col" id="leadHistoryPanel" style={{ height: '80vh' }}>
+      <div className="col-11 transition-col" id="leadHistoryPanel" style={{ height: '80vh', width: '-webkit-fill-available' }}>
         {panelContent}
       </div>
     ) : null;
@@ -3354,15 +11176,15 @@ const CRMDashboard = () => {
               minHeight: '200px'
             }}
           >
-            {selectedProfile?.logs && Array.isArray(selectedProfile.logs) && selectedProfile.logs.length > 0 ? (
+            {leadHistory && Array.isArray(leadHistory) && leadHistory.length > 0 ? (
               <div className="timeline">
-                {selectedProfile.logs.map((log, index) => (
+                {leadHistory.map((log, index) => (
                   <div key={index} className="timeline-item mb-4">
                     <div className="timeline-marker">
                       <div className="timeline-marker-icon">
                         <i className="fas fa-circle text-primary" style={{ fontSize: '8px' }}></i>
                       </div>
-                      {index !== selectedProfile.logs.length - 1 && (
+                      {index !== leadHistory.length - 1 && (
                         <div className="timeline-line"></div>
                       )}
                     </div>
@@ -3426,7 +11248,7 @@ const CRMDashboard = () => {
                 <h6 className="text-muted mb-2">No Center Available</h6>
                 <p className="text-muted small mb-0">No actions have been recorded for this lead yet.</p>
 
-               
+
 
               </div>
             )}
@@ -3468,14 +11290,815 @@ const CRMDashboard = () => {
     }
 
     return showPanel === 'changeCenter' ? (
-      <div className="col-12 transition-col" id="changeCenterPanel" style={{ height: '80vh' }}>
+      <div className="col-11 transition-col" id="changeCenterPanel" style={{ height: '80vh' }}>
         {panelContent}
       </div>
     ) : null;
   };
 
+  const handleCycleFilterChange = (key, value) => {
+    let next = { ...cycleFilters, [key]: value };
+    if (key === 'department') {
+      next = { department: value, project: '', center: '', course: '', batch: '' };
+    } else if (key === 'project') {
+      next = { ...cycleFilters, project: value, center: '', course: '', batch: '' };
+    } else if (key === 'center') {
+      next = { ...cycleFilters, center: value, batch: '' };
+    } else if (key === 'course') {
+      next = { ...cycleFilters, course: value, batch: '' };
+    } else if (key === 'batch') {
+      next = { ...cycleFilters, batch: value };
+    }
+
+    setCycleFilters(next);
+    setFormData((fd) => ({
+      ...fd,
+      verticals: { ...fd.verticals, values: next.department ? [next.department] : [] },
+      projects: { ...fd.projects, values: next.project ? [next.project] : [] },
+      course: { ...fd.course, values: next.course ? [next.course] : [] },
+      center: { ...fd.center, values: next.center ? [next.center] : [] },
+    }));
+    setCurrentPage(1);
+    fetchProfileData(filterData, 1, next);
+    fetchRegistrationCrmFilterCounts(filterData, 1, null);
+  };
+
+  const renderCycleFilterDropdowns = (mobile = false) => (
+    <div className={`b2b-cycle-filters${mobile ? ' b2b-cycle-filters--mobile' : ''}`}>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="adm-filter-department">
+          <i className="fas fa-sitemap" aria-hidden="true" /> Department
+        </label>
+        <select
+          id="adm-filter-department"
+          className="b2b-cycle-filters__select"
+          value={cycleFilters.department || ''}
+          onChange={(e) => handleCycleFilterChange('department', e.target.value)}
+        >
+          <option value="">All</option>
+          {verticalOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="adm-filter-project">
+          <i className="fas fa-project-diagram" aria-hidden="true" /> Project
+        </label>
+        <select
+          id="adm-filter-project"
+          className="b2b-cycle-filters__select"
+          value={cycleFilters.project || ''}
+          onChange={(e) => handleCycleFilterChange('project', e.target.value)}
+        >
+          <option value="">All</option>
+          {cycleProjectOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="adm-filter-center">
+          <i className="fas fa-building" aria-hidden="true" /> Center
+        </label>
+        <select
+          id="adm-filter-center"
+          className="b2b-cycle-filters__select"
+          value={cycleFilters.center || ''}
+          onChange={(e) => handleCycleFilterChange('center', e.target.value)}
+        >
+          <option value="">All</option>
+          {centerOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="adm-filter-course">
+          <i className="fas fa-graduation-cap" aria-hidden="true" /> Course
+        </label>
+        <select
+          id="adm-filter-course"
+          className="b2b-cycle-filters__select"
+          value={cycleFilters.course || ''}
+          onChange={(e) => handleCycleFilterChange('course', e.target.value)}
+        >
+          <option value="">All</option>
+          {cycleCourseOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="adm-filter-batch">
+          <i className="fas fa-users" aria-hidden="true" /> Batch
+        </label>
+        <select
+          id="adm-filter-batch"
+          className="b2b-cycle-filters__select"
+          value={cycleFilters.batch || ''}
+          onChange={(e) => handleCycleFilterChange('batch', e.target.value)}
+        >
+          <option value="">All</option>
+          {batchOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+
+
+  const renderCrmDashboard = () => (
+    <div className="col-12 b2b-crm-dashboard px-0">
+      <div className="b2b-dash-section mt-2">
+        <span className="b2b-dash-section__label">My Leads</span>
+        <div className="b2b-mobile-hscroll d-flex gap-2 align-items-center pt-1">
+          <button
+            type="button"
+            className="b2b-perf-chip"
+            style={{
+              padding: '6px 14px',
+              fontSize: '12px',
+              fontWeight: 600,
+              borderRadius: '999px',
+              cursor: 'pointer',
+              color: leadViewTab === 'all' ? '#fff' : 'rgb(250, 85, 121)',
+              backgroundColor: leadViewTab === 'all' ? 'rgb(250, 85, 121)' : '#fff',
+              border: leadViewTab === 'all' ? 'none' : '1.5px solid rgb(250, 85, 121)',
+            }}
+            onClick={() => handleLeadViewTabChange('all')}
+          >
+            All Leads
+          </button>
+          <button
+            type="button"
+            className="b2b-perf-chip"
+            style={{
+              padding: '6px 14px',
+              fontSize: '12px',
+              fontWeight: 600,
+              borderRadius: '999px',
+              cursor: 'pointer',
+              color: leadViewTab === 'myRefer' ? '#fff' : 'rgb(250, 85, 121)',
+              backgroundColor: leadViewTab === 'myRefer' ? 'rgb(250, 85, 121)' : '#fff',
+              border: leadViewTab === 'myRefer' ? 'none' : '1.5px solid rgb(250, 85, 121)',
+            }}
+            onClick={() => handleLeadViewTabChange('myRefer')}
+          >
+            My Referred Leads ({myReferLeadsCount})
+          </button>
+        </div>
+      </div>
+
+      <div className="b2b-dash-section mt-2">
+        <span className="b2b-dash-section__label">Lead Approval</span>
+        <div className="b2b-mobile-hscroll b2b-mobile-hscroll--approval d-flex gap-2 align-items-stretch pt-1">
+          {[
+            { key: 'total', label: 'Total', value: approvalCounts.total, bg: '#5b4fc9', approval: null },
+            { key: 'approved', label: 'Approved', value: approvalCounts.approved, bg: '#10b981', approval: 'approved' },
+            { key: 'pending', label: 'Pending', value: approvalCounts.pending, bg: '#f59e0b', approval: 'pending' },
+            { key: 'rejected', label: 'Rejected', value: approvalCounts.rejected, bg: '#ef4444', approval: 'rejected' },
+          ].map((row) => {
+            const isSelected = selectedApprovalFilter === row.approval;
+            return (
+              <div
+                key={row.key}
+                role="button"
+                tabIndex={0}
+                className="b2b-dash-stat-card b2b-dash-stat-card--lead text-center text-white"
+                style={{
+                  background: row.bg,
+                  cursor: 'pointer',
+                  outline: isSelected ? '3px solid rgba(255,255,255,0.55)' : 'none',
+                  transform: isSelected ? 'translateY(-1px)' : 'none',
+                }}
+                onClick={() => handleApprovalCardClick(row.approval)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') handleApprovalCardClick(row.approval);
+                }}
+              >
+                <div className="b2b-dash-stat-card__label">{row.label}</div>
+                <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                <div className="b2b-dash-stat-card__value text-white">
+                  {String(row.value).padStart(2, '0')}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="b2b-dash-section mt-3">
+        <span className="b2b-dash-section__label">Performance</span>
+        <div className="b2b-mobile-hscroll b2b-mobile-hscroll--chips d-flex gap-2 align-items-center pt-1">
+          <button
+            type="button"
+            className="b2b-perf-chip"
+            style={{
+              padding: '6px 14px',
+              fontSize: '12px',
+              fontWeight: 600,
+              borderRadius: '999px',
+              cursor: 'pointer',
+              color: !activePerformanceId ? '#fff' : 'rgb(250, 85, 121)',
+              backgroundColor: !activePerformanceId ? 'rgb(250, 85, 121)' : '#fff',
+              border: !activePerformanceId ? 'none' : '1.5px solid rgb(250, 85, 121)',
+            }}
+            onClick={() => handlePerformanceChipClick(null)}
+          >
+            All ({performanceTotalCount})
+          </button>
+          {performanceFilters.map((filter, index) => {
+            const isSelected = activePerformanceId === filter._id;
+            return (
+              <button
+                key={filter._id || index}
+                type="button"
+                className="b2b-perf-chip"
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  borderRadius: '999px',
+                  cursor: 'pointer',
+                  color: isSelected ? '#fff' : 'rgb(250, 85, 121)',
+                  backgroundColor: isSelected ? 'rgb(250, 85, 121)' : '#fff',
+                  border: isSelected ? 'none' : '1.5px solid rgb(250, 85, 121)',
+                }}
+                onClick={() => handlePerformanceChipClick(filter._id)}
+              >
+                {(filter.name || 'Status').toUpperCase()} ({filter.count ?? 0})
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {(selectedFollowupBucket || selectedApprovalFilter) && (
+        <div className="d-flex flex-wrap align-items-center gap-2 mt-2 mb-1">
+          {selectedApprovalFilter && (
+            <span className="badge rounded-pill text-bg-light border" style={{ fontSize: '12px', fontWeight: 600 }}>
+              <i className="fas fa-filter me-1 text-danger" aria-hidden="true" />
+              Approval: {selectedApprovalFilter}
+            </span>
+          )}
+          {selectedFollowupBucket && (
+            <span className="badge rounded-pill text-bg-light border" style={{ fontSize: '12px', fontWeight: 600 }}>
+              <i className="fas fa-filter me-1 text-danger" aria-hidden="true" />
+              Call: {selectedFollowupBucket.replace('call:', '')}
+            </span>
+          )}
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-danger"
+            onClick={() => {
+              setSelectedApprovalFilter(null);
+              setSelectedFollowupBucket('');
+              const cleared = { ...filterData, followupStatus: '' };
+              delete cleared.leadStatus;
+              setFilterData(cleared);
+              setActiveCrmFilter(0);
+              fetchProfileData(cleared, 1);
+            }}
+            style={{ fontSize: '12px', fontWeight: 600, borderRadius: '999px' }}
+          >
+            <i className="fas fa-list me-1" aria-hidden="true" />
+            Show all leads
+          </button>
+        </div>
+      )}
+
+      <div className="row g-2 mt-1 b2b-followup-scroll-row">
+        <div className="col-12 col-lg-4 b2b-followup-scroll-col">
+          <div className="b2b-dash-section h-100">
+            <span className="b2b-dash-section__label">Followup Calling</span>
+            <div className="d-flex flex-wrap gap-2 pt-1">
+              {[
+                { key: 'fc-done', bucket: 'done', label: 'Done', value: followupDashCounts.call.done, bg: '#12b3ff' },
+                { key: 'fc-planned', bucket: 'planned', label: 'Planned', value: followupDashCounts.call.planned, bg: '#f59e0b' },
+                { key: 'fc-missed', bucket: 'missed', label: 'Missed', value: followupDashCounts.call.missed, bg: '#7c3d14' },
+              ].map((row) => {
+                const selected = isFollowupDashSelected('Call', row.bucket);
+                return (
+                  <button
+                    key={row.key}
+                    type="button"
+                    className={`b2b-dash-stat-card text-center text-white flex-grow-1 border-0${selected ? ' b2b-dash-stat-card--active' : ''}`}
+                    style={{ background: row.bg }}
+                    onClick={() => handleFollowupDashClick('Call', row.bucket)}
+                    title={`Filter leads: Call follow-ups — ${row.label}`}
+                  >
+                    <div className="b2b-dash-stat-card__label">{row.label}</div>
+                    <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                    <div className="b2b-dash-stat-card__value text-white">
+                      {String(row.value).padStart(2, '0')}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+        <div className="col-12 col-lg-4 b2b-followup-scroll-col">
+          <div className="b2b-dash-section h-100">
+            <span className="b2b-dash-section__label">Followup Visit</span>
+            <div className="d-flex flex-wrap gap-2 pt-1">
+              {[
+                { key: 'fv-done', bucket: 'done', label: 'Done', value: followupDashCounts.visit.done, bg: '#4b5563' },
+                { key: 'fv-planned', bucket: 'planned', label: 'Planned', value: followupDashCounts.visit.planned, bg: '#4b5563' },
+                { key: 'fv-missed', bucket: 'missed', label: 'Missed', value: followupDashCounts.visit.missed, bg: '#7c3d14' },
+              ].map((row) => {
+                const selected = isFollowupDashSelected('Visit', row.bucket);
+                return (
+                  <button
+                    key={row.key}
+                    type="button"
+                    className={`b2b-dash-stat-card text-center text-white flex-grow-1 border-0${selected ? ' b2b-dash-stat-card--active' : ''}`}
+                    style={{ background: row.bg }}
+                    onClick={() => handleFollowupDashClick('Visit', row.bucket)}
+                    title={`Filter leads: Visit follow-ups — ${row.label}`}
+                  >
+                    <div className="b2b-dash-stat-card__label">{row.label}</div>
+                    <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                    <div className="b2b-dash-stat-card__value text-white">
+                      {String(row.value).padStart(2, '0')}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+        <div className="col-12 col-lg-4 b2b-followup-scroll-col">
+          <div className="b2b-dash-section h-100">
+            <span className="b2b-dash-section__label">Documents</span>
+            <div className="d-flex flex-wrap gap-2 pt-1">
+              {[
+                { key: 'doc-done', label: 'Done', value: docDashCounts.done, bg: '#4b5563' },
+                { key: 'doc-pending', label: 'Pending', value: docDashCounts.pending, bg: '#4b5563' },
+              ].map((row) => (
+                <div
+                  key={row.key}
+                  className="b2b-dash-stat-card text-center text-white flex-grow-1"
+                  style={{ background: row.bg }}
+                >
+                  <div className="b2b-dash-stat-card__label">{row.label}</div>
+                  <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                  <div className="b2b-dash-stat-card__value text-white">
+                    {String(row.value).padStart(2, '0')}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <style>
+        {`
+          .b2b-crm-dashboard .b2b-dash-section {
+            position: relative;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 5px 7px 5px;
+            background: #fff;
+          }
+          .b2b-crm-dashboard .b2b-dash-section__label {
+            position: absolute;
+            top: -10px;
+            left: 12px;
+            padding: 0 6px;
+            background: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            color: #333;
+            line-height: 1.2;
+          }
+          .b2b-crm-dashboard .b2b-dash-stat-card {
+            border-radius: 8px;
+            padding: 5px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 45px;
+            box-sizing: border-box;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease, outline 0.15s ease;
+          }
+          .b2b-crm-dashboard .b2b-dash-stat-card:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+          }
+          .b2b-crm-dashboard .b2b-dash-stat-card--active {
+            outline: 3px solid rgb(250, 85, 121);
+            outline-offset: 2px;
+            box-shadow: 0 4px 12px rgba(250, 85, 121, 0.35);
+          }
+          .b2b-crm-dashboard .b2b-dash-stat-card--lead {
+            flex: 1 1 96px;
+            min-width: 50px;
+            max-width: 90px;
+          }
+          .b2b-crm-dashboard .b2b-dash-stat-card:not(.b2b-dash-stat-card--lead) {
+            min-width: 84px;
+            min-height: 45px;
+          }
+          .b2b-crm-dashboard .b2b-dash-stat-card__label {
+            font-size: 11px;
+            font-weight: 600;
+            margin: 0;
+            line-height: 1.2;
+            opacity: 0.98;
+          }
+          .b2b-crm-dashboard .b2b-dash-stat-card__divider {
+            width: 72%;
+            max-width: 52px;
+            height: 1px;
+            margin: 8px 0;
+            background: rgba(255, 255, 255, 0.95);
+            flex-shrink: 0;
+          }
+          .b2b-crm-dashboard .b2b-dash-stat-card__value {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.2;
+            min-width: 1.5em;
+          }
+          .b2b-crm-dashboard .b2b-mobile-hscroll{
+            min-width: 0;
+            max-width: 100%;
+          }
+          .b2b-crm-dashboard .b2b-perf-chip{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            line-height: 1.15;
+            min-height: 34px;
+          }
+          @media (max-width: 768px){
+            .b2b-crm-dashboard{
+              min-width: 0;
+              overflow: hidden;
+            }
+            .b2b-crm-dashboard .b2b-dash-section{
+              padding: 14px 8px 8px;
+            }
+            .b2b-crm-dashboard .b2b-dash-section__label{
+              top: 0px;
+              font-size: 12px;
+            }
+            .b2b-crm-dashboard .b2b-mobile-hscroll{
+              overflow-x: auto;
+              overflow-y: hidden;
+              flex-wrap: nowrap !important;
+              -webkit-overflow-scrolling: touch;
+              padding: 2px 2px 7px;
+              scrollbar-width: none;
+            }
+            .b2b-crm-dashboard .b2b-mobile-hscroll::-webkit-scrollbar{
+              display: none;
+            }
+            .b2b-crm-dashboard .b2b-mobile-hscroll > *{
+              flex: 0 0 auto !important;
+            }
+            .b2b-crm-dashboard .b2b-mobile-hscroll--approval .b2b-dash-stat-card--lead{
+              min-width: 72px;
+              max-width: none;
+            }
+            .b2b-crm-dashboard .b2b-mobile-hscroll--chips .b2b-perf-chip{
+              min-width: 62px;
+              max-width: 136px;
+              min-height: 42px;
+              white-space: normal;
+              word-break: keep-all;
+              padding: 7px 12px !important;
+            }
+            .b2b-crm-dashboard .b2b-followup-scroll-row{
+              display: flex;
+              flex-wrap: nowrap;
+              overflow-x: auto;
+              overflow-y: hidden;
+              margin-left: 0;
+              margin-right: 0;
+              padding: 2px 2px 8px;
+              -webkit-overflow-scrolling: touch;
+              scroll-snap-type: x proximity;
+              scrollbar-width: thin;
+            }
+            .b2b-crm-dashboard .b2b-followup-scroll-row::-webkit-scrollbar{
+              height: 4px;
+            }
+            .b2b-crm-dashboard .b2b-followup-scroll-row::-webkit-scrollbar-thumb{
+              background: #cbd5e1;
+              border-radius: 999px;
+            }
+            .b2b-crm-dashboard .b2b-followup-scroll-col{
+              flex: 0 0 min(330px, calc(100vw - 28px));
+              width: min(330px, calc(100vw - 28px));
+              max-width: none;
+              padding-left: 4px;
+              padding-right: 4px;
+              scroll-snap-align: start;
+            }
+            .b2b-crm-dashboard .b2b-followup-scroll-col .b2b-dash-section > .d-flex{
+              flex-wrap: nowrap !important;
+            }
+            .b2b-crm-dashboard .b2b-followup-scroll-col .b2b-dash-stat-card:not(.b2b-dash-stat-card--lead){
+              min-width: 84px;
+            }
+          }
+        `}
+      </style>
+    </div>
+  );
+
+
   return (
     <div className="container-fluid">
+      <div>
+      <style>
+        {`
+          .b2b-cycle-filters{
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            justify-content: flex-end;
+            gap: 8px 12px;
+            max-width: 100%;
+          }
+          .b2b-cycle-filters__item{
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            min-width: 0;
+          }
+          .b2b-cycle-filters__label{
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #6b7280;
+            margin: 0;
+            line-height: 1.2;
+            white-space: nowrap;
+          }
+          .b2b-cycle-filters__label i{
+            margin-right: 4px;
+            color: rgb(250, 85, 121);
+            font-size: 9px;
+          }
+          .b2b-cycle-filters__select{
+            font-size: 12px;
+            font-weight: 500;
+            line-height: 1.3;
+            padding: 6px 28px 6px 10px;
+            height: 34px;
+            min-width: 120px;
+            max-width: 155px;
+            border: 1.5px solid #e8eaed;
+            border-radius: 8px;
+            background-color: #f9fafb;
+            color: #1f2937;
+            cursor: pointer;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16'%3E%3Cpath fill='%236b7280' d='M4.427 6.427l3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 6H4.604a.25.25 0 0 0-.177.427z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 9px center;
+            background-size: 12px;
+          }
+          .b2b-cycle-filters__select:hover{
+            border-color: rgba(250, 85, 121, 0.4);
+            background-color: #fff;
+          }
+          .b2b-cycle-filters__select:focus{
+            outline: none;
+            border-color: rgb(250, 85, 121);
+            background-color: #fff;
+            box-shadow: 0 0 0 3px rgba(250, 85, 121, 0.14);
+          }
+          .b2b-cycle-filters--mobile{
+            flex-wrap: nowrap;
+            justify-content: flex-start;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 4px 2px 8px;
+            margin-bottom: 4px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+          }
+          .b2b-cycle-filters--mobile .b2b-cycle-filters__item{
+            flex: 0 0 auto;
+          }
+          .b2b-cycle-filters--mobile .b2b-cycle-filters__select{
+            min-width: 108px;
+            max-width: 130px;
+          }
+          .adm-cycle-header-nav{
+            border-bottom: 1px solid #eee;
+          }
+          .adm-cycle-toolbar__outer,
+          .adm-cycle-toolbar__inner{
+            min-width: 0;
+          }
+          .adm-cycle-search{
+            min-width: 180px;
+          }
+          .adm-cycle-action-btn{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            min-height: 36px;
+          }
+          .adm-crm-tabs{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding-top: 4px;
+          }
+          .adm-crm-tab{
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 999px;
+            border: 1.5px solid #e5e7eb;
+            background: #fff;
+            color: #374151;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+          }
+          .adm-crm-tab:hover{
+            border-color: rgba(250, 85, 121, 0.45);
+            color: rgb(250, 85, 121);
+          }
+          .adm-crm-tab.active{
+            background: linear-gradient(135deg, #fc567b 13%, #fc567b 50%);
+            border-color: rgb(250, 85, 121);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(250, 85, 121, 0.25);
+          }
+          @media (max-width: 767.98px) {
+            .adm-cycle-header-nav{
+              left: 8px;
+              right: 8px;
+              width: auto !important;
+              padding: 10px 10px 12px !important;
+              border: 1px solid #eef0f4;
+              border-top: 0;
+              border-radius: 0 0 12px 12px;
+              box-shadow: 0 8px 24px rgba(15, 23, 42, 0.10) !important;
+            }
+            .adm-cycle-header-nav .container-fluid{
+              padding-inline: 0;
+            }
+            .adm-cycle-mobile-title{
+              margin-bottom: 0 !important;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 10px;
+              min-width: 0;
+            }
+            .adm-cycle-mobile-title h5{
+              font-size: 1rem !important;
+              margin-bottom: 0 !important;
+              line-height: 1.2;
+              flex: 0 0 auto;
+            }
+            .adm-cycle-mobile-title nav{
+              flex: 1 1 auto;
+              min-width: 0;
+            }
+            .adm-cycle-mobile-title .breadcrumb{
+              display: flex;
+              align-items: center;
+              justify-content: flex-end;
+              flex-wrap: nowrap;
+              gap: 0;
+              font-size: 0.82rem;
+              line-height: 1.2;
+              margin: 0 !important;
+              padding: 0 0 0 10px !important;
+              overflow: hidden;
+              white-space: nowrap;
+            }
+            .adm-cycle-mobile-title .breadcrumb-item{
+              flex: 0 0 auto;
+              white-space: nowrap;
+            }
+            .adm-cycle-mobile-title .breadcrumb-item.active{
+              flex: 0 1 auto;
+              min-width: 0;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+            .adm-cycle-mobile-title .breadcrumb-item + .breadcrumb-item::before{
+              padding-right: 0.35rem;
+              padding-left: 0.25rem;
+            }
+            .adm-cycle-mobile-filter-wrap{
+              min-width: 0;
+            }
+            .b2b-cycle-filters--mobile{
+              gap: 6px;
+              margin: 0 -2px;
+              padding: 4px 2px 6px;
+              scrollbar-width: none;
+              scroll-snap-type: x proximity;
+            }
+            .b2b-cycle-filters--mobile::-webkit-scrollbar{
+              display: none;
+            }
+            .b2b-cycle-filters--mobile .b2b-cycle-filters__item{
+              flex: 0 0 clamp(96px, 30vw, 120px);
+              scroll-snap-align: start;
+            }
+            .b2b-cycle-filters--mobile .b2b-cycle-filters__label{
+              font-size: 8.5px;
+              letter-spacing: 0.045em;
+            }
+            .b2b-cycle-filters--mobile .b2b-cycle-filters__select{
+              width: 100%;
+              min-width: 0;
+              max-width: none;
+              height: 32px;
+              padding: 5px 24px 5px 8px;
+              font-size: 11px;
+              border-radius: 7px;
+              background-color: #fff;
+              background-position: right 7px center;
+            }
+            .adm-cycle-toolbar{
+              margin-top: 0 !important;
+              padding-top: 8px !important;
+            }
+            .adm-cycle-toolbar__outer,
+            .adm-cycle-toolbar__inner{
+              width: 100%;
+            }
+            .adm-cycle-toolbar__inner{
+              display: grid !important;
+              grid-template-columns: minmax(0, 1fr) auto auto;
+              align-items: center;
+              gap: 8px !important;
+              margin-left: 0 !important;
+            }
+            .adm-cycle-search{
+              grid-column: auto;
+              width: 100%;
+              min-width: 0;
+            }
+            .adm-cycle-search .form-control{
+              width: 100% !important;
+              min-width: 0 !important;
+              height: 38px;
+              font-size: 13px !important;
+            }
+            .adm-cycle-action-btn{
+              width: auto;
+              min-width: 82px;
+              min-height: 38px;
+              padding: 8px 10px !important;
+              border-radius: 8px !important;
+              font-size: 12px !important;
+              font-weight: 700 !important;
+            }
+            .adm-cycle-action-btn i{
+              margin-right: 0 !important;
+            }
+            @media (max-width: 360px){
+              .adm-cycle-toolbar__inner{
+                gap: 6px !important;
+              }
+              .adm-cycle-action-btn{
+                min-width: 74px;
+                padding-inline: 8px !important;
+                font-size: 11px !important;
+              }
+            }
+            .content-body.marginTopMobile{
+              margin-top: calc(var(--adm-cycle-nav-height, 220px) + 10px) !important;
+            }
+          }
+          @media (max-width: 768px) {
+            .whatappemoji {
+              width: auto !important;
+            }
+            .whatsapp-emoji-trigger.position-absolute.end-0 {
+              right: -60px !important;
+            }
+            .whatsapp-emoji-trigger.position-absolute.top-0 {
+              top: -5px !important;
+            }
+          }
+        `}
+      </style>
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
           <div
@@ -3502,106 +12125,147 @@ const CRMDashboard = () => {
             }}
           />
           <div className="position-relative" ref={widthRef} >
-            <nav ref={navRef} className="" style={{
-              zIndex: 11, backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})`, position: 'fixed', width: `${width}px`, backdropFilter: `blur(${blurIntensity}px)`,
-              WebkitBackdropFilter: `blur(${blurIntensity}px)`,
-              boxShadow: isScrolled
-                ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)'
-                : '0 4px 25px 0 #0000001a', paddingBlock: '10px',
-              transition: 'all 0.3s ease',
-            }}
+            <nav
+              ref={navRef}
+              className="adm-cycle-header-nav b2b-cycle-header-nav"
+              style={{
+                zIndex: 11,
+                backgroundColor: '#fff',
+                position: 'fixed',
+                width: `${width}px`,
+                boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)',
+                paddingBlock: '10px',
+                paddingInline: '4px',
+                transition: 'all 0.3s ease',
+              }}
             >
               <div className="container-fluid">
-                <div className="row align-items-center">
-                  <div className="col-md-6 d-md-block d-sm-none">
-                    <div className="d-flex align-items-center">
-                      <h4 className="fw-bold text-dark mb-0 me-3">Admission Cycle</h4>
-                      <nav aria-label="breadcrumb">
-                        <ol className="breadcrumb mb-0 small">
-                          <li className="breadcrumb-item">
-                            <a href="/institute/dashboard" className="text-decoration-none">Home</a>
-                          </li>
-                          <li className="breadcrumb-item active">Admission Cycle</li>
-                        </ol>
-                      </nav>
-                    </div>
+                <div className="row align-items-center gy-2">
+                  <div className="col-md-4 col-xl-3 d-none d-md-block">
+                    <h5 className="fw-bold text-dark mb-1" style={{ fontSize: '1.1rem' }}>Admission Cycle</h5>
+                    <nav aria-label="breadcrumb">
+                      <ol className="breadcrumb mb-0 small">
+                        <li className="breadcrumb-item">
+                          <a href="/institute/dashboard" className="text-decoration-none">Home</a>
+                        </li>
+                        <li className="breadcrumb-item active">Admission Cycle</li>
+                      </ol>
+                    </nav>
                   </div>
 
-                  <div className="col-md-6">
-                    <div className="d-flex justify-content-end align-items-center gap-2">
-                      <div className="input-group" style={{ maxWidth: '300px' }}>
-
-                        <input
-                          type="text"
-                          name="name"
-                          className="form-control border-start-0 m-0"
-                          placeholder="Quick search..."
-                          value={filterData.name}
-                          onChange={handleFilterChange}
-                        />
-                        <button
-                          onClick={() => fetchProfileData()}
-                          className={`btn btn-outline-primary`}
-                          style={{ whiteSpace: 'nowrap' }}
-                        >
-                          <i className={`fas fa-search me-1`}></i>
-                          Search
-
-                        </button>
-                      </div>
-
-
-                      <button
-                        onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
-                        className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
-                        style={{ whiteSpace: 'nowrap' }}
-                      >
-                        <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
-                        Filters
-                        {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
-                          <span className="bg-light text-dark ms-1">
-                            {Object.values(filterData).filter(val => val && val !== 'true').length}
-                          </span>
-                        )}
-                      </button>
-
-
-                    </div>
+                  <div className="col-12 d-md-none mb-1 adm-cycle-mobile-title">
+                    <h5 className="fw-bold text-dark mb-1" style={{ fontSize: '1.1rem' }}>Admission Cycle</h5>
+                    <nav aria-label="breadcrumb">
+                      <ol className="breadcrumb mb-0 small">
+                        <li className="breadcrumb-item">
+                          <a href="/institute/dashboard" className="text-decoration-none">Home</a>
+                        </li>
+                        <li className="breadcrumb-item active">Admission Cycle</li>
+                      </ol>
+                    </nav>
                   </div>
 
-                  {/* Filter Buttons Row */}
-                  <div className="col-12 mt-2">
-                    <div className="d-flex flex-wrap gap-2 align-items-center">
-                      {crmFilters.map((filter, index) => (
-                        <div key={index} className="d-flex align-items-center gap-1">
-                          <div className='d-flex position-relative'>
-                            <button
-                              className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'}`}
-                              onClick={() => handleCrmFilterClick(index)}
-                            >
-                              {filter.name}
-                              <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
-                                ({filter.count})
-                              </span>
-                            </button>
+                  <div className="col-md-8 col-xl-9 d-none d-md-flex justify-content-end align-items-center">
+                    {renderCycleFilterDropdowns()}
+                  </div>
 
-                            {filter.milestone && (
-                              <span
-                                className="position-absolute bg-success text-white px-2 py-1 rounded-pill"
-                                style={{
-                                  fontSize: '0.7rem',
-                                  top: '-8px',
-                                  right: '-10px',
-                                  transform: 'scale(0.8)'
+                  <div className="col-12 d-md-none adm-cycle-mobile-filter-wrap">
+                    {renderCycleFilterDropdowns(true)}
+                  </div>
+
+                  <div className="col-12 mt-1 pt-1 border-top adm-cycle-toolbar" style={{ borderColor: '#eee' }}>
+                    <div className="adm-cycle-toolbar__outer d-flex flex-wrap gap-2 align-items-center justify-content-between">
+                      <div className="adm-cycle-toolbar__inner d-flex align-items-center gap-2 ms-md-auto flex-wrap">
+                            <div className="position-relative adm-cycle-search">
+                              <input
+                                type="text"
+                                name="name"
+                                className="form-control form-control-sm"
+                                placeholder="Quick search..."
+                                value={filterData.name}
+                                onChange={handleFilterChange}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') fetchProfileData();
                                 }}
-                                title={`Milestone: ${filter.milestone}`}
-                              >
-                                🚩 {filter.milestone}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                                style={{
+                                  width: isMobile ? '100%' : '200px',
+                                  minWidth: '140px',
+                                  paddingRight: '30px',
+                                  paddingLeft: '12px',
+                                  paddingTop: '8px',
+                                  paddingBottom: '8px',
+                                  backgroundColor: '#ffffff',
+                                  border: '1.5px solid #ced4da',
+                                  fontSize: '13px',
+                                  borderRadius: '6px',
+                                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                                }}
+                              />
+                              {filterData.name && (
+                                <button
+                                  type="button"
+                                  className="btn btn-sm position-absolute"
+                                  onClick={() => {
+                                    const cleared = { ...filterData, name: '' };
+                                    setFilterData(cleared);
+                                    fetchProfileData(cleared, 1);
+                                  }}
+                                  style={{
+                                    right: '2px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    padding: '2px 6px',
+                                    backgroundColor: '#dc3545',
+                                    border: 'none',
+                                    color: 'white',
+                                    borderRadius: '50%',
+                                    width: '20px',
+                                    height: '20px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                  }}
+                                >
+                                  <i className="fas fa-times" style={{ fontSize: '8px' }}></i>
+                                </button>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-primary adm-cycle-action-btn adm-cycle-action-btn--search"
+                              onClick={() => fetchProfileData()}
+                              style={{
+                                background: 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)',
+                                borderColor: 'rgb(250, 85, 121)',
+                                color: 'white',
+                                fontWeight: '500',
+                                padding: '8px 16px',
+                                borderRadius: '6px',
+                                fontSize: '13px',
+                              }}
+                            >
+                              <i className="fas fa-search me-1"></i>
+                              <span className="adm-cycle-action-text">Search</span>
+                            </button>
+                            <button
+                              type="button"
+                              className={`btn btn-sm adm-cycle-action-btn adm-cycle-action-btn--filters ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-secondary'}`}
+                              onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+                              style={{
+                                background: !isFilterCollapsed ? 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)' : '#ffffff',
+                                color: !isFilterCollapsed ? '#ffffff' : 'rgb(250, 85, 121)',
+                                fontWeight: '500',
+                                padding: '8px 16px',
+                                borderRadius: '6px',
+                                fontSize: '13px',
+                                borderWidth: '1.5px',
+                                borderColor: 'rgb(250, 85, 121)',
+                              }}
+                            >
+                              <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
+                              <span className="adm-cycle-action-text">{isMobile ? 'Filters' : 'More'}</span>
+                            </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -3641,7 +12305,7 @@ const CRMDashboard = () => {
                           onClick={clearAllFilters}
                         >
                           <i className="fas fa-times-circle me-1"></i>
-                          Clear All
+                          Clear
                         </button>
                         <button
                           className="btn-close"
@@ -3669,8 +12333,8 @@ const CRMDashboard = () => {
                             onChange={handleFilterChange}
                           >
                             <option value="">All Types</option>
-                            <option value="Free">🆓 Free</option>
-                            <option value="Paid">💰 Paid</option>
+                            <option value="Free">ðŸ†“ Free</option>
+                            <option value="Paid">ðŸ’° Paid</option>
                           </select>
                         </div>
                       </div>
@@ -3741,6 +12405,64 @@ const CRMDashboard = () => {
                       </div>
                     </div>
 
+                    {/* status filters  */}
+                    <div className="row g-4 mt-3">
+                      <div className="col-12">
+                        <h6 className="text-dark fw-bold mb-3">
+                          <i className="fas fa-calendar-alt me-2 text-primary"></i>
+                          Status Filter
+                        </h6>
+                      </div>
+
+                      {/* Status Select */}
+                      <div className="col-12 col-md-6 mb-3 mb-md-0">
+                        <select
+                          className="form-select border-0  bgcolor"
+                          id="status"
+                          name="statuses"
+                          value={filterData.statuses}
+                          style={{
+                            height: '42px',
+                            paddingTop: '8px',
+                            paddingInline: '10px',
+                            width: '100%',
+                            backgroundColor: '#f1f2f6'
+                          }}
+                          onChange={(e) => handleFilterChange(e)}
+
+                        >
+                          <option value="">Select Status</option>
+                          {statuses.map((filter, index) => (
+                            <option value={filter._id}>{filter.name}</option>))}
+                        </select>
+                      </div>
+
+                      {/* Sub-Status Select */}
+                      <div className="col-12 col-md-6">
+                        <select
+                          className="form-select border-0  bgcolor"
+                          name="subStatuses"
+                          id="subStatus"
+                          value={filterData.subStatuses}
+                          style={{
+                            height: '42px',
+                            paddingTop: '8px',
+                            backgroundColor: '#f1f2f6',
+                            paddingInline: '10px',
+                            width: '100%'
+                          }}
+                          onChange={(e) => handleFilterChange(e)}
+
+                        >
+                          <option value="">Select Sub-Status</option>
+                          {subStatuses.map((filter, index) => (
+                            <option value={filter._id}>{filter.title}</option>))}
+                        </select>
+                      </div>
+
+                    </div>
+
+
                     {/* Date Filters Section */}
                     <div className="row g-4 mt-3">
                       <div className="col-12">
@@ -3751,14 +12473,14 @@ const CRMDashboard = () => {
                       </div>
 
                       {/* Created Date Range */}
-                      <div className="col-md-4">
+                      <div className="col-12 col-md-4 mb-3 mb-md-0">
                         <label className="form-label small fw-bold text-dark">
                           <i className="fas fa-calendar-plus me-1 text-success"></i>
                           Lead Creation Date Range
                         </label>
-                        <div className="card border-0 bg-light p-3">
+                        <div className="card border-0 bg-light p-1">
                           <div className="row g-2">
-                            <div className="col-6">
+                            <div className="col-12 col-sm-6 firstDatepicker fixDate">
                               <label className="form-label small">From Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
@@ -3770,7 +12492,7 @@ const CRMDashboard = () => {
                                 maxDate={filterData.createdToDate || new Date()}
                               />
                             </div>
-                            <div className="col-6">
+                            <div className="col-12 col-sm-6 fixDate">
                               <label className="form-label small">To Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'createdToDate')}
@@ -3801,26 +12523,27 @@ const CRMDashboard = () => {
                           {/* Clear button */}
                           <div className="mt-2">
                             <button
-                              className="btn btn-sm btn-outline-danger w-100"
+                              className="btn btn-sm btn-outline-danger w-100 CButton "
                               onClick={() => clearDateFilter('created')}
                               disabled={!filterData.createdFromDate && !filterData.createdToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear Created Date
+                              Clear
                             </button>
                           </div>
                         </div>
                       </div>
 
                       {/* Modified Date Range */}
-                      <div className="col-md-4">
+                      <div className="col-12 col-md-4 mb-3 mb-md-0">
                         <label className="form-label small fw-bold text-dark">
                           <i className="fas fa-calendar-edit me-1 text-warning"></i>
                           Lead Modification Date Range
                         </label>
-                        <div className="card border-0 bg-light p-3">
+
+                        <div className="card border-0 bg-light p-1">
                           <div className="row g-2">
-                            <div className="col-6">
+                            <div className="col-12 col-sm-6 fixDate">
                               <label className="form-label small">From Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'modifiedFromDate')}
@@ -3832,7 +12555,7 @@ const CRMDashboard = () => {
                                 maxDate={filterData.modifiedToDate || new Date()}
                               />
                             </div>
-                            <div className="col-6">
+                            <div className="col-12 col-sm-6 fixDate">
                               <label className="form-label small">To Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'modifiedToDate')}
@@ -3863,26 +12586,26 @@ const CRMDashboard = () => {
                           {/* Clear button */}
                           <div className="mt-2">
                             <button
-                              className="btn btn-sm btn-outline-danger w-100"
+                              className="btn btn-sm btn-outline-danger w-100 CButton"
                               onClick={() => clearDateFilter('modified')}
                               disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear Modified Date
+                              Clear
                             </button>
                           </div>
                         </div>
                       </div>
 
                       {/* Next Action Date Range */}
-                      <div className="col-md-4">
+                      <div className="col-12 col-md-4 mb-3 mb-md-0">
                         <label className="form-label small fw-bold text-dark">
                           <i className="fas fa-calendar-check me-1 text-info"></i>
                           Next Action Date Range
                         </label>
-                        <div className="card border-0 bg-light p-3">
+                        <div className="card border-0 bg-light p-1">
                           <div className="row g-2">
-                            <div className="col-6">
+                            <div className="col-12 col-sm-6 fixDate">
                               <label className="form-label small">From Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'nextActionFromDate')}
@@ -3894,7 +12617,7 @@ const CRMDashboard = () => {
                                 maxDate={filterData.nextActionToDate}
                               />
                             </div>
-                            <div className="col-6">
+                            <div className="col-12 col-sm-6 fixDate translateX">
                               <label className="form-label small">To Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
@@ -3924,17 +12647,30 @@ const CRMDashboard = () => {
                           {/* Clear button */}
                           <div className="mt-2">
                             <button
-                              className="btn btn-sm btn-outline-danger w-100"
+                              className="btn btn-sm btn-outline-danger w-100 CButton"
                               onClick={() => clearDateFilter('nextAction')}
                               disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
                             >
                               <i className="fas fa-times me-1"></i>
-                              Clear Next Action Date
+                              Clear
                             </button>
                           </div>
                         </div>
                       </div>
                     </div>
+
+                    <div className="row g-4 mt-3">
+                      <div className="col-12">
+                        <h6 className="text-dark fw-bold mb-3">
+                          <i className="fas fa-calendar-alt me-2 text-primary"></i>
+                          Range Count
+                        </h6>
+                      </div>
+
+
+                    </div>
+
+
 
                     {/* Results Summary */}
                     <div className="row mt-4">
@@ -4018,13 +12754,18 @@ const CRMDashboard = () => {
 
           {/* Main Content */}
           <div className="content-body marginTopMobile" style={{
+            '--adm-cycle-nav-height': `${navHeight}px`,
             marginTop: `${navHeight + 10}px`,
             transition: 'margin-top 0.2s ease-in-out'
           }}>
             <section className="list-view">
               <div className="row">
-                <div className="d-flex justify-content-end gap-2">
-
+                {renderCrmDashboard()}
+                {/* Desktop Layout */}
+                <div className="d-none flex-row-reverse d-md-flex justify-content-between align-items-center gap-2 crm-sticky-action">
+                 
+                  {/* Left side - Buttons */}
+                  <div style={{ display: "flex", gap: "8px" }}>
                   <button className="btn btn-sm btn-outline-primary" style={{
                     padding: "6px 12px",
                     fontSize: "11px",
@@ -4033,18 +12774,95 @@ const CRMDashboard = () => {
                     alignItems: "center",
                     gap: "4px"
                   }}
-                    onClick={() => {
-                      openRefferPanel(null, 'AddAllLeads');
-                      console.log('Add leads');
-                    }}
+                    onClick={downloadLeads}
                   >
-                    <i className="fas fa-plus" style={{ fontSize: "10px" }}></i>
-                    Add Leads
+                    <i className="fas fa-download" style={{ fontSize: "10px" }}></i>
+                    Download Leads
                   </button>
+                  <button className="btn btn-sm btn-outline-primary" style={{
+                    padding: "6px 12px",
+                    fontSize: "11px",
+                    fontWeight: "600",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px"
+                  }}
+                  onClick={() => {
+                    setShowBulkInputs(true);
+                    setBulkMode('whatsapp');
+                    setInput1Value('');
+                  }}
+                  >
+                    <i className="fas fa-download" style={{ fontSize: "10px" }}></i>
+                    Bulk Messages
+                  </button>
+                  {((permissions?.custom_permissions?.can_add_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                    <>
+                      <button className="btn btn-sm btn-outline-primary" style={{
+                        padding: "6px 12px",
+                        fontSize: "11px",
+                        fontWeight: "600",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px"
+                      }}
+                        onClick={() => {
+                          openPanel(null, 'AddAllLeads');
+                        }}
+                      >
+                        <i className="fas fa-plus" style={{ fontSize: "10px" }}></i>
+                        Add Leads
+                      </button>
+                    </>
+                  )}
+                  {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                    <>
+                      <button
+                        className="btn btn-sm btn-outline-primary"
+                        disabled={isLoadingProfiles || allProfiles.length === 0}
+                        style={{
+                          padding: "6px 12px",
+                          fontSize: "11px",
+                          fontWeight: "600",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px"
+                        }}
+                        onClick={() => {
+                          setShowBulkInputs(true);
+                          setBulkMode('bulkrefer');
+                          setInput1Value('');
+                          openPanel(null, 'RefferAllLeads');
+                        }}
+                      >
+                        <i className="fas fa-share-alt" style={{ fontSize: "10px" }}></i>
+                        Refer All Leads
+                      </button>
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        disabled={isLoadingProfiles || allProfiles.length === 0}
+                        style={{
+                          padding: "6px 12px",
+                          fontSize: "11px",
+                          fontWeight: "600",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px"
+                        }}
+                        onClick={() => { 
+                          setShowBulkInputs(true);
+                          setBulkMode('bulkaction');
+                          setInput1Value('');
+                          openEditPanel(null, 'bulkstatuschange');
+                        }}
+                      >
+                        <i className="fas fa-tasks" style={{ fontSize: "10px" }}></i>
+                        Bulk Action
+                      </button>
+                    </>)}
 
                   <button
-                    className="btn btn-sm btn-outline-primary"
-                    disabled={isLoadingProfiles || allProfiles.length === 0}
+                    className="btn btn-sm btn-outline-dark"
                     style={{
                       padding: "6px 12px",
                       fontSize: "11px",
@@ -4053,32 +12871,203 @@ const CRMDashboard = () => {
                       alignItems: "center",
                       gap: "4px"
                     }}
-                    onClick={() => {
-                      openRefferPanel(null, 'RefferAllLeads');
-                      console.log('selectedProfile', null);
-                    }}
+                    onClick={() => setShowAiSupervision(true)}
+                    title="Open unified AI Supervision view"
+                    disabled={allProfiles.length === 0}
                   >
-                    <i className="fas fa-share-alt" style={{ fontSize: "10px" }}></i>
-                    Refer All Leads
+                    <i className="fas fa-layer-group" style={{ fontSize: "10px" }}></i>
+                    AI Supervision
                   </button>
-                  <button
-                    className="btn btn-sm btn-outline-secondary"
-                    disabled={isLoadingProfiles || allProfiles.length === 0}
-                    style={{
-                      padding: "6px 12px",
-                      fontSize: "11px",
-                      fontWeight: "600",
+                  
+                  </div>
+
+                  {/* Right side - Input Fields */}
+                  {showBulkInputs && (
+                    <div style={{
                       display: "flex",
-                      alignItems: "center",
-                      gap: "4px"
-                    }}
-                    onClick={() => { openEditPanel(null, 'bulkstatuschange') }}
-                  >
-                    <i className="fas fa-tasks" style={{ fontSize: "10px" }}></i>
-                    Bulk Action
-                  </button>
+                      alignItems: "stretch",
+                      border: "1px solid #dee2e6",
+                      borderRadius: "4px",
+                      backgroundColor: "#fff",
+                      overflow: "hidden",
+                      width: "200px",
+                      height: "32px",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+                    }}>
+                      <input
+                        type="text"
+                        placeholder="Input 1"
+                        value={input1Value}
+                        onFocus={() => {
+                          if (bulkMode === 'whatsapp' || bulkMode === 'bulkaction' || bulkMode === 'bulkrefer') {
+                            runAiSupervisionForFirstN();
+                          }
+                        }}
+                        onClick={() => {
+                          if (bulkMode === 'whatsapp' || bulkMode === 'bulkaction' || bulkMode === 'bulkrefer') {
+                            runAiSupervisionForFirstN();
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          // Allow numbers, backspace, delete, arrows, tab, enter
+                          if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
+                            e.preventDefault();
+                          }
+                          // If Enter is pressed and bulk mode is 'whatsapp' and input has value
+                          if (e.key === 'Enter' && bulkMode === 'whatsapp' && input1Value) {
+                            e.preventDefault();
+                            const numValue = parseInt(input1Value, 10);
+                            const maxValue = crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0;
+                            if (numValue >= 1 && numValue <= maxValue) {
+                              setModalType('whatsapp');
+                            }
+                          }
+                        }}
+                        onChange={(e) => {
+                          // Get total available leads from CRM filter (shows total count like )
+                          const maxValue = crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0;
+                          let inputValue = e.target.value.replace(/[^0-9]/g, '');
+                          
+                          // Allow empty string for clearing the input
+                          if (inputValue === '') {
+                            setInput1Value('');
+                            return;
+                          }
+                          
+                          // Convert to number for validation
+                          const numValue = parseInt(inputValue, 10);
+                          
+                          // Prevent values less than 1 (minimum is 1)
+                          if (numValue < 1 || isNaN(numValue)) {
+                            inputValue = '1';
+                          }
+                          // Restrict maximum to total available candidates
+                          else if (numValue > maxValue) {
+                            inputValue = maxValue.toString();
+                          }
+                          
+                          setInput1Value(inputValue);
+                        }}
+                        style={{
+                          width: "50%",
+                          border: "none",
+                          borderRight: "1px solid #dee2e6",
+                          outline: "none",
+                          padding: "4px 10px",
+                          fontSize: "12px",
+                          backgroundColor: "transparent",
+                          height: "100%",
+                          boxSizing: "border-box"
+                        }}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Input 2"
+                        value={crmFilters[activeCrmFilter]?.count || 0}
+                        readOnly
+                        style={{
+                          width: "50%",
+                          border: "none",
+                          outline: "none",
+                          padding: "4px 10px",
+                          fontSize: "12px",
+                          backgroundColor: "transparent",
+                          height: "100%",
+                          boxSizing: "border-box",
+                          cursor: "default"
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
 
-
+                {/* Mobile Layout */}
+                <div className="d-md-none">
+                  <div className="row g-2">
+                    <div className="col-6">
+                      <button className="btn btn-sm btn-outline-primary w-100" style={{
+                        padding: "8px 6px",
+                        fontSize: "10px",
+                        fontWeight: "600",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "4px"
+                      }}
+                        onClick={downloadLeads}
+                      >
+                        <i className="fas fa-download" style={{ fontSize: "9px" }}></i>
+                        Download
+                      </button>
+                    </div>
+                    {((permissions?.custom_permissions?.can_add_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                      <div className="col-6">
+                        <button className="btn btn-sm btn-outline-primary w-100" style={{
+                          padding: "8px 6px",
+                          fontSize: "10px",
+                          fontWeight: "600",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "4px"
+                        }}
+                          onClick={() => {
+                            openPanel(null, 'AddAllLeads');
+                          }}
+                        >
+                          <i className="fas fa-plus" style={{ fontSize: "9px" }}></i>
+                          Add Leads
+                        </button>
+                      </div>
+                    )}
+                    {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                      <>
+                        <div className="col-6">
+                          <button
+                            className="btn btn-sm btn-outline-primary w-100"
+                            disabled={isLoadingProfiles || allProfiles.length === 0}
+                            style={{
+                              padding: "8px 6px",
+                              fontSize: "10px",
+                              fontWeight: "600",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "4px"
+                            }}
+                            onClick={() => {
+                              setShowBulkInputs(true);
+                              setBulkMode('bulkrefer');
+                              setInput1Value('');
+                              openPanel(null, 'RefferAllLeads');
+                            }}
+                          >
+                            <i className="fas fa-share-alt" style={{ fontSize: "9px" }}></i>
+                            Refer
+                          </button>
+                        </div>
+                        <div className="col-6">
+                          <button
+                            className="btn btn-sm btn-outline-secondary w-100"
+                            disabled={isLoadingProfiles || allProfiles.length === 0}
+                            style={{
+                              padding: "8px 6px",
+                              fontSize: "10px",
+                              fontWeight: "600",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "4px"
+                            }}
+                            onClick={() => { openEditPanel(null, 'bulkstatuschange') }}
+                          >
+                            <i className="fas fa-tasks" style={{ fontSize: "9px" }}></i>
+                            Bulk
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className='row'>
@@ -4086,6 +13075,18 @@ const CRMDashboard = () => {
                   <div className="col-12 rounded equal-height-2 coloumn-2">
                     <div className="card px-3">
                       <div className="row" id="crm-main-row">
+
+                        {/* Overdue follow-up alert */}
+                        {!isLoadingProfiles && overdueLeads.length > 0 && (
+                          <div className="col-12 mb-2">
+                            <div className="alert alert-warning d-flex align-items-center justify-content-between flex-wrap py-2 mb-0" role="alert">
+                              <span>
+                                <i className="fas fa-exclamation-triangle me-2"></i>
+                                <strong>{overdueLeads.length} lead{overdueLeads.length !== 1 ? 's' : ''}</strong> with overdue follow-up (next action date passed). Prioritize contact to reduce drop risk.
+                              </span>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Loading State */}
                         {isLoadingProfiles && (
@@ -4101,294 +13102,697 @@ const CRMDashboard = () => {
                         )}
 
                         {/* Profiles List */}
-                        {!isLoadingProfiles && allProfiles.map((profile, profileIndex) => (
+                        <div className="crm-leads-scrolls col-12">
+                        {!isLoadingProfiles && allProfiles && allProfiles.map((profile, profileIndex) => (
                           <div className={`card-content transition-col mb-2`} key={profileIndex}>
 
-                            {/* Profile Header Card */}
-                            <div className="card border-0 shadow-sm mb-0 mt-2">
-                              <div className="card-body px-1 py-0 my-2">
-                                <div className="row align-items-center">
-                                  <div className="col-md-7">
-                                    <div className="d-flex align-items-center">
-                                      <div className="form-check me-3">
-                                        <input onChange={(e) => handleCheckboxChange(profile, e.target.checked)} className="form-check-input" type="checkbox" />
-                                      </div>
-                                      <div className="me-3">
-                                        <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
-                                          <svg width="40" height="40">
-                                            <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
-                                            <circle className="circle-progress" cx="20" cy="20" r="16"></circle>
-                                          </svg>
-                                          <div className="progress-text"></div>
-                                        </div>
-                                      </div>
-                                      <div className="d-flex flex-column">
-                                        <h6 className="mb-0 fw-bold">{profile._candidate?.name || 'Your Name'}</h6>
-                                        <small className="text-muted">{profile._candidate?.mobile || 'Mobile Number'}</small>
-                                        <small className="text-muted">{profile._candidate?.email || 'Email'}</small>
-                                      </div>
-                                      <div style={{ marginLeft: '15px' }}>
-                                        <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
-                                          <a href={`tel:${profile._candidate?.mobile}`} target="_blank" rel="noopener noreferrer">
-                                            <i className="fas fa-phone"></i>
-                                          </a>
-                                        </button>
-
-                                        <a
-                                          className="btn btn-outline-success btn-sm border-0"
-                                          href={`https://wa.me/${profile._candidate?.mobile}`}
-                                          style={{ fontSize: '20px' }}
-                                          title="WhatsApp"
-                                          target="_blank"
-                                        >
-                                          <i className="fab fa-whatsapp"></i>
-                                        </a>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="col-md-3">
-                                    <div className="d-flex gap-2">
-                                      <div className="flex-grow-1">
-                                        <input
-                                          type="text"
-                                          className="form-control form-control-sm m-0"
-                                          style={{
-                                            cursor: 'pointer',
-                                            border: '1px solid #ddd',
-                                            borderRadius: '0px',
-                                            borderTopRightRadius: '5px',
-                                            borderTopLeftRadius: '5px',
-                                            width: '145px',
-                                            height: '20px',
-                                            fontSize: '10px'
-                                          }}
-                                          value={profile._leadStatus?.title}
-                                          readOnly
-                                          onClick={() => {
-                                            openEditPanel(profile, 'StatusChange');
-                                            console.log('selectedProfile', profile);
-                                          }}
-
-                                        />
-                                        <input
-                                          type="text"
-                                          className="form-control form-control-sm m-0"
-                                          value={profile.selectedSubstatus?.title}
-                                          style={{
-                                            cursor: 'pointer',
-                                            border: '1px solid #ddd',
-                                            borderRadius: '0px',
-                                            borderBottomRightRadius: '5px',
-                                            borderBottomLeftRadius: '5px',
-                                            width: '145px',
-                                            height: '20px',
-                                            fontSize: '10px'
-                                          }}
-                                          readOnly
-                                        />
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="col-md-1 text-end d-md-none d-sm-block d-block">
-                                    <div className="btn-group">
-
-                                      <div style={{ position: "relative", display: "inline-block" }}>
-                                        <button
-                                          className="btn btn-sm btn-outline-secondary border-0"
-                                          onClick={() => togglePopup(profileIndex)}
-                                          aria-label="Options"
-                                        >
-                                          <i className="fas fa-ellipsis-v"></i>
-                                        </button>
-
-                                        {/* Overlay for click outside */}
-                                        {showPopup === profileIndex && (
-                                          <div
-                                            onClick={() => setShowPopup(null)}
-                                            style={{
-                                              position: "fixed",
-                                              top: 0,
-                                              left: 0,
-                                              width: "100vw",
-                                              height: "100vh",
-                                              backgroundColor: "transparent",
-                                              zIndex: 8,
-                                            }}
-                                          ></div>
-                                        )}
-
-                                        <div
-                                          style={{
-                                            position: "absolute",
-                                            top: "28px", // button ke thoda niche
-                                            right: "-100px",
-                                            width: "170px",
-                                            backgroundColor: "white",
-                                            border: "1px solid #ddd",
-                                            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                            borderRadius: "4px",
-                                            padding: "8px 0",
-                                            zIndex: 9,
-                                            transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
-                                            transition: "transform 0.3s ease-in-out",
-                                            pointerEvents: showPopup ? "auto" : "none",
-                                            display: showPopup === profileIndex ? "block" : "none"
-                                          }}
-                                        >
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => (handleMoveToKyc(profile))}
-                                          >
-                                            Move To KYC List
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              openRefferPanel(profile, 'Reffer');
-                                              console.log('selectedProfile', profile);
-                                            }}
-                                          >
-                                            Reffer
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-
-                                            onClick={() => {
-                                              openleadHistoryPanel(profile);
-                                              console.log('selectedProfile', profile);
-                                            }}
-                                          >
-                                            History List
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              openRefferPanel(profile, 'SetFollowup');
-                                              console.log('selectedProfile', profile);
-                                            }}
-                                          >
-                                            Set Followup
-                                          </button>
-
-                                          {/* <button type="button" className="btn btn-primary border-0 text-black" data-bs-toggle="modal" data-bs-target={`#profileModal-${profile._id}`} style={{
-                                            width: "100%",
-                                            padding: "8px 16px",
-                                            border: "none",
-                                            background: "none",
-                                            textAlign: "left",
-                                            cursor: "pointer",
-                                            fontSize: "12px",
-                                            fontWeight: "600"
-                                          }}
-                                            onClick={() => {
-                                              handleFetchCandidate(profile);
-
-                                            }}
-                                          >
-
-                                            Profile Edit
-                                          </button> */}
-                                          <button
-                                            className="btn btn-primary border-0 text-black"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              handleFetchCandidate(profile);
-
-                                            }}
-                                          >
-                                            Profile Edit
-                                          </button>
-
-                                          <button
-                                            className="btn btn-primary border-0 text-black"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              openChangeCenterPanel(profile);
-                                              console.log('change center')
-
-                                            }}
-                                          >
-                                            Change Center
-                                          </button>
-
-
-                                        </div>
-                                      </div>
-
+                            {/* Lead Card (same design as B2B) */}
+                            <div className="lead-card">
+                              {isMobile ? (
+                                <div className="lead-header lead-header-v2">
+                                  {/* Floating labeled actions (mobile) */}
+                                  <div className="lhm__float-actions" role="toolbar" aria-label="Lead actions">
+                                    <button
+                                      type="button"
+                                      className="lhm__float-btn lhm__float-btn--wa"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        openPanel(profile, 'whatsapp');
+                                      }}
+                                      title="WhatsApp"
+                                      aria-label="WhatsApp"
+                                    >
+                                      <i className="fab fa-whatsapp" aria-hidden="true"></i>
+                                    </button>
+                                    <a
+                                      className="lhm__float-btn lhm__float-btn--call"
+                                      href={`tel:${profile._candidate?.mobile || ''}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                      title="Call"
+                                      aria-label="Call"
+                                    >
+                                      <i className="fas fa-phone" aria-hidden="true"></i>
+                                    </a>
+                                    <div className="lead-strip-v3__actions-wrap">
                                       <button
-                                        className="btn btn-sm btn-outline-secondary border-0"
-                                        onClick={() => setLeadDetailsVisible(profileIndex)}
+                                        type="button"
+                                        className="lhm__float-btn lhm__float-btn--more"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          togglePopup(profileIndex);
+                                        }}
+                                        title="More actions"
+                                        aria-label="More actions"
+                                        aria-expanded={showPopup === profileIndex}
                                       >
-                                        {leadDetailsVisible === profileIndex ? (
-                                          <i className="fas fa-chevron-up"></i>
-                                        ) : (
-                                          <i className="fas fa-chevron-down"></i>
-                                        )}
+                                        <i className="fas fa-ellipsis-h" aria-hidden="true"></i>
                                       </button>
+                                      {renderLeadActionsDropdown(profile, profileIndex)}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      className="lhm__float-btn lhm__float-btn--toggle"
+                                      aria-label={leadDetailsVisible === profileIndex ? 'Collapse lead' : 'Expand lead'}
+                                      title={leadDetailsVisible === profileIndex ? 'Collapse' : 'Expand'}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        toggleLeadDetails(profileIndex);
+                                      }}
+                                    >
+                                      <i className={leadDetailsVisible === profileIndex ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
+                                    </button>
+                                  </div>
+                                  <div className="lhm">
+                                    <div className="lhm__row1">
+                                      <div className="lhm__name" title={profile._candidate?.name || ''}>
+                                        <label className="lhm__check" title="Select">
+                                          <input
+                                            onChange={(e) => handleCheckboxChange(profile, e.target.checked)}
+                                            checked={selectedProfiles && Array.isArray(selectedProfiles) ? selectedProfiles.includes(profile._id) : false}
+                                            className="form-check-input"
+                                            type="checkbox"
+                                          />
+                                        </label>
+                                        <div className="lhm__doc" title="Docs completion">
+                                          <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
+                                            <svg width="34" height="34">
+                                              <circle className="circle-bg" cx="17" cy="17" r="14"></circle>
+                                              <circle className="circle-progress" cx="17" cy="17" r="14"></circle>
+                                            </svg>
+                                            <div className="progress-text"></div>
+                                          </div>
+                                        </div>
+                                        <i className="fas fa-user-circle lhm__name-icon" aria-hidden="true"></i>
+                                        <span className="text-capitalize lhm__name-text">{profile._candidate?.name || '—'}</span>
+                                        <span className="lhm__mobile-number" title={profile._candidate?.mobile || ''}>
+                                          <i className="fas fa-phone" aria-hidden="true"></i>
+                                          <span>{profile._candidate?.mobile || '—'}</span>
+                                        </span>
+                                      </div>
+
+                                    </div>
+
+                                    <div className="lhm__row2">
+                                      {(() => {
+                                        const approvalSafe = getProfileApprovalStatus(profile);
+                                        return (
+                                          <div className="lhm__panel lhm__panel--approval lead-strip-v3__approval-block">
+                                            <div className="lhm__panel-head">
+                                              <span className="lhm__panel-title">
+                                                <i className="fas fa-award" aria-hidden="true"></i>
+                                                Lead Approval
+                                              </span>
+                                              {canEditLeadsPermission && (
+                                                <button
+                                                  type="button"
+                                                  className="lhm__panel-edit"
+                                                  title="Change approval"
+                                                  aria-label="Change approval"
+                                                  aria-expanded={approvalEditProfileId === profile._id}
+                                                  onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    setApprovalEditProfileId((prev) => (prev === profile._id ? null : profile._id));
+                                                  }}
+                                                >
+                                                  <i className="fas fa-pen" aria-hidden="true"></i>
+                                                </button>
+                                              )}
+                                            </div>
+                                            <div className="lead-strip-v3__approval-row">
+                                              <button
+                                                type="button"
+                                                className={`lead-strip-v3__approval-pill lead-strip-v3__approval-pill--${approvalSafe}`}
+                                                title={`Approval: ${getProfileApprovalLabel(approvalSafe)}`}
+                                                onClick={() => handleApprovalCardClick(approvalSafe)}
+                                              >
+                                                {getProfileApprovalLabel(approvalSafe)}
+                                              </button>
+                                            </div>
+                                            {canEditLeadsPermission && (
+                                              <div
+                                                className={`lead-strip-v3__approval-dropdown ${approvalEditProfileId === profile._id ? 'is-open' : ''}`}
+                                                aria-hidden={approvalEditProfileId === profile._id ? 'false' : 'true'}
+                                              >
+                                                {approvalSafe === 'pending' ? (
+                                                  <div className="lead-strip-v3__approval-menu">
+                                                    <button
+                                                      type="button"
+                                                      className="lead-strip-v3__approval-action lead-strip-v3__approval-action--approve"
+                                                      onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        handleApproveLead(profile);
+                                                      }}
+                                                    >
+                                                      <i className="fas fa-check-circle" aria-hidden="true"></i>
+                                                      Approve
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      className="lead-strip-v3__approval-action lead-strip-v3__approval-action--reject"
+                                                      onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        handleRejectLeadClick(profile);
+                                                      }}
+                                                    >
+                                                      <i className="fas fa-times-circle" aria-hidden="true"></i>
+                                                      Reject
+                                                    </button>
+                                                  </div>
+                                                ) : (
+                                                  <div className="lead-strip-v3__approval-menu lead-strip-v3__approval-menu--readonly">
+                                                    {getProfileApprovalLabel(approvalSafe)}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })()}
+
+                                      <div className="lhm__panel lhm__panel--performance">
+                                        <div className="lhm__panel-head">
+                                          <span className="lhm__panel-title">
+                                            <i className="fas fa-chart-line" aria-hidden="true"></i>
+                                            Performance
+                                          </span>
+                                        </div>
+                                        <div className="lhm__kv">
+                                          <span className="lhm__kv-label">Status</span>
+                                          <button
+                                            type="button"
+                                            className="lhm__kv-pill"
+                                            onClick={() => openEditPanel(profile, 'StatusChange')}
+                                          >
+                                            {profile._leadStatus?.title || '—'}
+                                          </button>
+                                        </div>
+                                        <div className="lhm__kv">
+                                          <span className="lhm__kv-label">Sub-Status</span>
+                                          <button
+                                            type="button"
+                                            className="lhm__kv-pill"
+                                            onClick={() => openEditPanel(profile, 'StatusChange')}
+                                          >
+                                            {profile.selectedSubstatus?.title || '—'}
+                                          </button>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          className="lhm__panel-edit lhm__panel-edit--corner"
+                                          title="Edit Performance"
+                                          aria-label="Edit Performance"
+                                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(profile, 'StatusChange'); }}
+                                        >
+                                          <i className="fas fa-edit" aria-hidden="true"></i>
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    <div className="lhm__row3">
+                                      <div className="lhm__followup-box">
+                                        <span className="lhm__followup-title">Followup Calling</span>
+                                        <button
+                                          type="button"
+                                          className="lhm__editbtn"
+                                          title="Set Followup"
+                                          aria-label="Set Followup"
+                                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(profile, 'SetFollowup'); }}
+                                        >
+                                          <i className="fas fa-edit" aria-hidden="true"></i>
+                                        </button>
+                                        <div className="lhm__followup-cards">
+                                          {(() => {
+                                            const b = getProfileFollowupBucket(profile, 'Call');
+                                            return [
+                                              { label: 'Done', value: b === 'done' ? 1 : 0, bg: '#dbeafe', color: '#1d4ed8' },
+                                              { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#ffedd5', color: '#c2410c' },
+                                              { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#fee2e2', color: '#b91c1c' },
+                                            ];
+                                          })().map((s) => (
+                                            <div key={s.label} className="lhm__stat-card" style={{ background: s.bg, color: s.color || '#fff' }}>
+                                              <span className="lhm__stat-label">{s.label}</span>
+                                              <span className="lhm__stat-divider" />
+                                              <span className="lhm__stat-val">{String(s.value).padStart(2, '0')}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                        <div className="lhm__followup-date">
+                                          <span>Next Follow-up Date:</span><span>{getProfileFollowupDateLabel(profile, 'Call')}</span>
+                                        </div>
+                                      </div>
+
+                                      <div className="lhm__followup-box">
+                                        <span className="lhm__followup-title">Followup Visit</span>
+                                        <button
+                                          type="button"
+                                          className="lhm__editbtn"
+                                          title="Set Followup"
+                                          aria-label="Set Followup"
+                                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(profile, 'SetFollowup'); }}
+                                        >
+                                          <i className="fas fa-edit" aria-hidden="true"></i>
+                                        </button>
+                                        <div className="lhm__followup-cards">
+                                          {(() => {
+                                            const b = getProfileFollowupBucket(profile, 'Visit');
+                                            return [
+                                              { label: 'Done', value: b === 'done' ? 1 : 0, bg: '#d1fae5', color: '#047857' },
+                                              { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#ede9fe', color: '#6d28d9' },
+                                              { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#fee2e2', color: '#b91c1c' },
+                                            ];
+                                          })().map((s) => (
+                                            <div key={s.label} className="lhm__stat-card" style={{ background: s.bg, color: s.color || '#fff' }}>
+                                              <span className="lhm__stat-label">{s.label}</span>
+                                              <span className="lhm__stat-divider" />
+                                              <span className="lhm__stat-val">{String(s.value).padStart(2, '0')}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                        <div className="lhm__followup-date">
+                                          <span>Next Follow-up Date:</span><span>{getProfileFollowupDateLabel(profile, 'Visit')}</span>
+                                        </div>
+                                      </div>
+
+                                      <div className="lhm__followup-box">
+                                        <span className="lhm__followup-title">Documents</span>
+                                        <button
+                                          type="button"
+                                          className="lhm__editbtn"
+                                          title="Open Documents"
+                                          aria-label="Open Documents"
+                                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); openProfileDocumentsTab(profileIndex); }}
+                                        >
+                                          <i className="fas fa-edit" aria-hidden="true"></i>
+                                        </button>
+                                        <div className="lhm__followup-cards">
+                                          {(() => {
+                                            const b = getProfileDocumentsBucket(profile);
+                                            return [
+                                              { label: 'Done', value: b === 'done' ? 1 : 0, bg: '#4b5563' },
+                                              { label: 'Pending', value: b === 'pending' ? 1 : 0, bg: '#4b5563' },
+                                            ];
+                                          })().map((s) => (
+                                            <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
+                                              <span className="lhm__stat-label">{s.label}</span>
+                                              <span className="lhm__stat-divider" />
+                                              <span className="lhm__stat-val">{String(s.value).padStart(2, '0')}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                        <div className="lhm__followup-date"><span></span><span></span></div>
+                                      </div>
                                     </div>
                                   </div>
+                                </div>
+                              ) : (
+                                <div className="lead-strip-v3">
+                                  {(() => {
+                                    const approvalSafe = getProfileApprovalStatus(profile);
+                                    const callBucket = getProfileFollowupBucket(profile, 'Call');
+                                    const visitBucket = getProfileFollowupBucket(profile, 'Visit');
+                                    const docDone = Number(profile?.docCounts?.uploadedCount ?? 0);
+                                    const docTotal = Number(profile?.docCounts?.totalRequired ?? 0);
+                                    const docPending = Math.max(0, docTotal - docDone);
+                                    const renderStatGrid = (rows) => (
+                                      <div className="lead-strip-v3__stat-grid">
+                                        <div className="lead-strip-v3__stat-row">
+                                          {rows.map((row) => (
+                                            <div key={row.key} className="lead-strip-v3__stat" style={{ background: row.bg, color: row.color || '#fff' }}>
+                                              <span className="lead-strip-v3__stat-label">{row.label}</span>
+                                              <span className="lead-strip-v3__stat-val">{String(row.value).padStart(2, '0')}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    );
+                                    return (
+                                      <>
+                                        <div className="lead-strip-v3__profile">
+                                          {/* {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                                            <button
+                                              type="button"
+                                              className="lead-strip-v3__profile-edit"
+                                              aria-label="Edit lead"
+                                              title="Profile Edit"
+                                              onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                handleFetchCandidate(profile);
+                                              }}
+                                            >
+                                              <i className="fas fa-pen" aria-hidden="true"></i>
+                                            </button>
+                                          )} */}
+                                          <div className="lead-strip-v3__profile-top">
+                                            <label className="lead-strip-v3__check" title="Select">
+                                              <input
+                                                onChange={(e) => handleCheckboxChange(profile, e.target.checked)}
+                                                checked={selectedProfiles && Array.isArray(selectedProfiles) ? selectedProfiles.includes(profile._id) : false}
+                                                className="form-check-input"
+                                                type="checkbox"
+                                              />
+                                            </label>
+                                            
+                                            <div className="lead-strip-v3__profile-main">
+                                              <div className="lead-strip-v3__avatar" aria-hidden="true">
+                                                <i className="fas fa-user"></i>
+                                              </div>
+                                              <div className="lead-strip-v3__name text-capitalize" title={profile._candidate?.name || 'NA'}>
+                                                {profile._candidate?.name || '—'}
+                                                <span className="lead-strip-v3__mobile-inline" title={profile._candidate?.mobile || 'NA'}>
+                                                  {profile._candidate?.mobile ? ` • ${profile._candidate.mobile}` : ''}
+                                                </span>
+                                              </div>
+                                            </div>
+                                            <div className="lead-strip-v3__doc" title="Docs completion">
+                                              <div className="circular-progress-container" data-percent={profile.docCounts?.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
+                                                <svg width="32" height="32">
+                                                  <circle className="circle-bg" cx="16" cy="16" r="13"></circle>
+                                                  <circle className="circle-progress" cx="16" cy="16" r="13"></circle>
+                                                </svg>
+                                                <div className="progress-text"></div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                          <div className="lead-strip-v3__contact">
+                                            <div className="lead-strip-v3__contact-line" title={profile._candidate?.email || 'NA'}>
+                                              <i className="fas fa-envelope" aria-hidden="true"></i>
+                                              <span>{profile._candidate?.email || '—'}</span>
+                                            </div>
+                                            <div className="lead-strip-v3__contact-line lead-strip-v3__contact-line--phone" title={profile._candidate?.mobile || 'NA'}>
+                                              <i className="fas fa-phone" aria-hidden="true"></i>
+                                              <span>{profile._candidate?.mobile || '—'}</span>
+                                              <button
+                                                type="button"
+                                                className="lead-strip-v3__wa"
+                                                onClick={(e) => {
+                                                  e.preventDefault();
+                                                  e.stopPropagation();
+                                                  openPanel(profile, 'whatsapp');
+                                                }}
+                                                title="WhatsApp"
+                                                aria-label="WhatsApp"
+                                              >
+                                                <i className="fab fa-whatsapp" aria-hidden="true"></i>
+                                              </button>
+                                            </div>
+                                            <div className="lead-strip-v3__contact-line lead-strip-v3__contact-line--followup" title="Next Follow-up">
+                                              <i className="fas fa-calendar-alt" aria-hidden="true"></i>
+                                              <div className="lead-strip-v3__fu-wrap">
+                                                {(() => {
+                                                  const call = getProfileFollowupDateLabel(profile, 'Call');
+                                                  const visit = getProfileFollowupDateLabel(profile, 'Visit');
+                                                  if (call === '—' && visit === '—') {
+                                                    return <span className="lead-strip-v3__fu-line">FU: —</span>;
+                                                  }
+                                                  return (
+                                                    <>
+                                                      {call !== '—' && <span className="lead-strip-v3__fu-line">Call: {call}</span>}
+                                                      {visit !== '—' && <span className="lead-strip-v3__fu-line">Visit: {visit}</span>}
+                                                    </>
+                                                  );
+                                                })()}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
 
-                                  <div className="col-md-1 text-end d-md-block d-sm-none d-none">
+                                        <div className="lead-strip-v3__panel lead-strip-v3__panel--approval">
+                                          <div className="lead-strip-v3__approval-block">
+                                            <div className="lead-strip-v3__panel-head lead-strip-v3__panel-head--approval">
+                                              <span className="lead-strip-v3__panel-title">
+                                                <i className="fas fa-award" aria-hidden="true"></i> Lead Approval
+                                              </span>
+                                              {canEditLeadsPermission && (
+                                                <button
+                                                  type="button"
+                                                  className="lead-strip-v3__approval-edit"
+                                                  title="Change approval"
+                                                  aria-label="Change approval"
+                                                  aria-expanded={approvalEditProfileId === profile._id}
+                                                  onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    setApprovalEditProfileId((prev) => (prev === profile._id ? null : profile._id));
+                                                  }}
+                                                >
+                                                  <i className="fas fa-pen" aria-hidden="true"></i>
+                                                </button>
+                                              )}
+                                            </div>
+                                            <div className="lead-strip-v3__approval-row">
+                                              <button
+                                                type="button"
+                                                className={`lead-strip-v3__approval-pill lead-strip-v3__approval-pill--${approvalSafe}`}
+                                                title={`Approval: ${getProfileApprovalLabel(approvalSafe)}`}
+                                                onClick={() => handleApprovalCardClick(approvalSafe)}
+                                              >
+                                                {getProfileApprovalLabel(approvalSafe)}
+                                              </button>
+                                            </div>
+                                            {canEditLeadsPermission && (
+                                              <div
+                                                className={`lead-strip-v3__approval-dropdown ${approvalEditProfileId === profile._id ? 'is-open' : ''}`}
+                                                aria-hidden={approvalEditProfileId === profile._id ? 'false' : 'true'}
+                                              >
+                                                {approvalSafe === 'pending' ? (
+                                                  <div className="lead-strip-v3__approval-menu">
+                                                    <button
+                                                      type="button"
+                                                      className="lead-strip-v3__approval-action lead-strip-v3__approval-action--approve"
+                                                      onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        handleApproveLead(profile);
+                                                      }}
+                                                    >
+                                                      <i className="fas fa-check-circle" aria-hidden="true"></i>
+                                                      Approve
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      className="lead-strip-v3__approval-action lead-strip-v3__approval-action--reject"
+                                                      onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        handleRejectLeadClick(profile);
+                                                      }}
+                                                    >
+                                                      <i className="fas fa-times-circle" aria-hidden="true"></i>
+                                                      Reject
+                                                    </button>
+                                                  </div>
+                                                ) : (
+                                                  <div className="lead-strip-v3__approval-menu lead-strip-v3__approval-menu--readonly">
+                                                    {getProfileApprovalLabel(approvalSafe)}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        <div className="lead-strip-v3__panel lead-strip-v3__panel--performance">
+                                          <div className="lead-strip-v3__perf-block">
+                                            <div className="lead-strip-v3__panel-head">
+                                              <span className="lead-strip-v3__panel-title">
+                                                <i className="fas fa-chart-line" aria-hidden="true"></i> Performance
+                                              </span>
+                                            </div>
+                                            <div className="lead-strip-v3__kv">
+                                              <span className="lead-strip-v3__kv-label">Status</span>
+                                              <button
+                                                type="button"
+                                                className="lead-strip-v3__kv-pill"
+                                                onClick={() => openEditPanel(profile, 'StatusChange')}
+                                              >
+                                                {profile._leadStatus?.title || 'Untouch Lead'}
+                                              </button>
+                                            </div>
+                                            <div className="lead-strip-v3__kv">
+                                              <span className="lead-strip-v3__kv-label">Sub-Status</span>
+                                              <button
+                                                type="button"
+                                                className="lead-strip-v3__kv-pill"
+                                                onClick={() => openEditPanel(profile, 'StatusChange')}
+                                              >
+                                                {profile.selectedSubstatus?.title || 'Untouch Lead'}
+                                              </button>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              className="lead-strip-v3__panel-edit"
+                                              title="Edit Performance"
+                                              aria-label="Edit Performance"
+                                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(profile, 'StatusChange'); }}
+                                            >
+                                              <i className="fas fa-edit" aria-hidden="true"></i>
+                                            </button>
+                                          </div>
+                                        </div>
+
+                                        <div className="lead-strip-v3__panel">
+                                          <div className="lead-strip-v3__panel-head">
+                                            <span className="lead-strip-v3__panel-title">
+                                              <i className="fas fa-phone-alt" aria-hidden="true"></i> Followup Calling
+                                            </span>
+                                          </div>
+                                          {renderStatGrid([
+                                            { key: 'fc-done', label: 'Done', value: callBucket === 'done' ? 1 : 0, bg: '#dbeafe', color: '#1d4ed8' },
+                                            { key: 'fc-planned', label: 'Planned', value: callBucket === 'planned' ? 1 : 0, bg: '#ffedd5', color: '#c2410c' },
+                                            { key: 'fc-missed', label: 'Missed', value: callBucket === 'missed' ? 1 : 0, bg: '#fee2e2', color: '#b91c1c' },
+                                          ])}
+                                          <div className="lead-strip-v3__footer">
+                                            <span className="lead-strip-v3__footer-label">Next Follow-up Date:</span>
+                                            <span className="lead-strip-v3__footer-val">{getProfileFollowupDateLabel(profile, 'Call')}</span>
+                                            <button
+                                              type="button"
+                                              className="lead-strip-v3__footer-cal"
+                                              title="Set Followup"
+                                              aria-label="Set Followup"
+                                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(profile, 'SetFollowup'); }}
+                                            >
+                                              <i className="fas fa-edit" aria-hidden="true"></i>
+                                            </button>
+                                          </div>
+                                        </div>
+
+                                        <div className="lead-strip-v3__panel">
+                                          <div className="lead-strip-v3__panel-head">
+                                            <span className="lead-strip-v3__panel-title">
+                                              <i className="fas fa-user-check" aria-hidden="true"></i> Followup Visit
+                                            </span>
+                                          </div>
+                                          {renderStatGrid([
+                                            { key: 'fv-done', label: 'Done', value: visitBucket === 'done' ? 1 : 0, bg: '#d1fae5', color: '#047857' },
+                                            { key: 'fv-planned', label: 'Planned', value: visitBucket === 'planned' ? 1 : 0, bg: '#ede9fe', color: '#6d28d9' },
+                                            { key: 'fv-missed', label: 'Missed', value: visitBucket === 'missed' ? 1 : 0, bg: '#fee2e2', color: '#b91c1c' },
+                                          ])}
+                                          <div className="lead-strip-v3__footer">
+                                            <span className="lead-strip-v3__footer-label">Next Follow-up Date:</span>
+                                            <span className="lead-strip-v3__footer-val">{getProfileFollowupDateLabel(profile, 'Visit')}</span>
+                                            <button
+                                              type="button"
+                                              className="lead-strip-v3__footer-cal"
+                                              title="Set Followup"
+                                              aria-label="Set Followup"
+                                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(profile, 'SetFollowup'); }}
+                                            >
+                                              <i className="fas fa-edit" aria-hidden="true"></i>
+                                            </button>
+                                          </div>
+                                        </div>
+
+                                        <div className="lead-strip-v3__panel lead-strip-v3__panel--docs">
+                                          <div className="lead-strip-v3__panel-head lead-strip-v3__panel-head--actions">
+                                            <span className="lead-strip-v3__panel-title">
+                                              <i className="fas fa-folder-open" aria-hidden="true"></i> Documents
+                                            </span>
+                                            <div className="lead-strip-v3__head-actions">
+                                              <div className="lead-strip-v3__actions-wrap">
+                                                <button
+                                                  type="button"
+                                                  className="lead-strip-v3__icon-btn"
+                                                  title="More actions"
+                                                  aria-label="More actions"
+                                                  aria-expanded={showPopup === profileIndex}
+                                                  onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    togglePopup(profileIndex);
+                                                  }}
+                                                >
+                                                  <i className="fas fa-ellipsis-v" aria-hidden="true"></i>
+                                                </button>
+                                                {renderLeadActionsDropdown(profile, profileIndex)}
+                                              </div>
+                                              <button
+                                                type="button"
+                                                className="lead-strip-v3__icon-btn lead-strip-v3__icon-btn--collapse"
+                                                aria-label={leadDetailsVisible === profileIndex ? 'Collapse lead' : 'Expand lead'}
+                                                title={leadDetailsVisible === profileIndex ? 'Collapse' : 'Expand'}
+                                                onClick={(e) => {
+                                                  e.preventDefault();
+                                                  e.stopPropagation();
+                                                  toggleLeadDetails(profileIndex);
+                                                }}
+                                              >
+                                                <i className={leadDetailsVisible === profileIndex ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
+                                              </button>
+                                            </div>
+                                          </div>
+                                          <div className="lead-strip-v3__stat-row lead-strip-v3__stat-row--docs">
+                                            <div className="lead-strip-v3__stat" style={{ background: '#d1fae5', color: '#047857' }}>
+                                              <span className="lead-strip-v3__stat-label">Done</span>
+                                              <span className="lead-strip-v3__stat-val">{String(docDone).padStart(2, '0')}</span>
+                                            </div>
+                                            <div className="lead-strip-v3__stat" style={{ background: '#ffedd5', color: '#c2410c' }}>
+                                              <span className="lead-strip-v3__stat-label">Pending</span>
+                                              <span className="lead-strip-v3__stat-val">{String(docPending).padStart(2, '0')}</span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </>
+                                    );
+                                  })()}
+                                </div>
+                              )}
+                            </div>
+
+                                  {/* Overdue badge: next action date passed */}
+                                  {/* {(profile.followupDate && new Date(profile.followupDate) < new Date(new Date().setHours(0, 0, 0, 0))) && (
+                                    <div className="col-12 col-md-auto mt-1 mt-md-0">
+                                      <span className="badge bg-danger" title="Next action date has passed">
+                                        <i className="fas fa-clock me-1"></i>Overdue follow-up
+                                      </span>
+                                    </div>
+                                  )}
+                                  
+                                  <div className="col-12 mt-1">
+                                    {leadIntelMap[profile._id] ? (
+                                      <div className="d-flex flex-wrap align-items-center gap-2 small">
+                                        <span className="badge bg-primary">AI Score: {leadIntelMap[profile._id].score}/100</span>
+                                        <span className="text-muted">Intent: {leadIntelMap[profile._id].intent}</span>
+                                        {leadIntelMap[profile._id].suggestedAction && (
+                                          <span className="text-dark" title="Suggested action">
+                                            <i className="fas fa-lightbulb text-warning me-1"></i>
+                                            {leadIntelMap[profile._id].suggestedAction}
+                                          </span>
+                                        )}
+                                        <button
+                                          type="button"
+                                          className="btn btn-xs btn-outline-secondary"
+                                          style={{ padding: '2px 8px', fontSize: '11px' }}
+                                          onClick={() => fetchLeadIntelSingle(profile)}
+                                          disabled={loadingLeadIntel}
+                                          title="Refresh AI for this lead"
+                                        >
+                                          <i className="fas fa-robot me-1"></i>Refresh
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        className="btn btn-xs btn-outline-secondary"
+                                        style={{ padding: '2px 8px', fontSize: '11px' }}
+                                        onClick={() => fetchLeadIntelSingle(profile)}
+                                        disabled={loadingLeadIntel}
+                                        title="Load AI for this lead"
+                                      >
+                                        <i className="fas fa-robot me-1"></i>AI for this lead
+                                      </button>
+                                    )}
+                                  </div> */}
+
+                                  
+
+                                  <div className="col-md-1 text-end d-none">
                                     <div className="btn-group">
 
                                       <div style={{ position: "relative", display: "inline-block" }}>
@@ -4434,42 +13838,106 @@ const CRMDashboard = () => {
                                             display: showPopup === profileIndex ? "block" : "none"
                                           }}
                                         >
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => (handleMoveToKyc(profile))}
-                                          >
-                                            Move To KYC List
-                                          </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              setShowPopup(null)
-                                              openRefferPanel(profile, 'Reffer');
-                                              console.log('selectedProfile', profile);
-                                            }}
-                                          >
-                                            Reffer
-                                          </button>
+
+                                          {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                                            <>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => (handleMoveToKyc(profile))}
+                                              >
+                                                Move To KYC List
+                                              </button>
+
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  openEditPanel(profile, 'SetFollowup');
+                                                }}
+                                              >
+                                                Set Followup
+                                              </button>
+                                              <button
+                                                className="btn btn-primary border-0 text-black"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  handleFetchCandidate(profile);
+                                                  // open modal for this profile
+                                                }}
+                                              >
+                                                Profile Edit
+                                              </button>
+                                              <button
+                                                className="btn btn-primary border-0 text-black"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  getBranches(profile);
+                                                  setShowBranchModal(true);
+                                                }}
+                                              >
+                                                Change Branch
+                                              </button>
+                                            </>
+                                          )}
+
+                                          {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                                            <button
+                                              className="dropdown-item"
+                                              style={{
+                                                width: "100%",
+                                                padding: "8px 16px",
+                                                border: "none",
+                                                background: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontSize: "12px",
+                                                fontWeight: "600"
+                                              }}
+                                              onClick={() => {
+                                                openPanel(profile, 'Reffer');
+                                              }}
+                                            >
+                                              Reffer
+                                            </button>
+                                          )}
+
                                           <button
                                             className="dropdown-item"
                                             style={{
@@ -4486,81 +13954,8 @@ const CRMDashboard = () => {
                                           >
                                             History List
                                           </button>
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              openEditPanel(profile, 'SetFollowup');
-                                              console.log('selectedProfile', profile);
-                                            }}
-                                          >
-                                            Set Followup
-                                          </button>
-                                          {/* <button type="button" className="btn btn-primary border-0 text-black" data-bs-toggle="modal" data-bs-target={`profileModal-${profile._id}`} style={{
-                                            width: "100%",
-                                            padding: "8px 16px",
-                                            border: "none",
-                                            background: "none",
-                                            textAlign: "left",
-                                            cursor: "pointer",
-                                            fontSize: "12px",
-                                            fontWeight: "600"
-                                          }}
-                                            onClick={() => {
-                                              handleFetchCandidate(profile);
 
-                                            }}
-                                          >
-                                            Profile Edit
-                                          </button> */}
-                                          <button
-                                            className="btn btn-primary border-0 text-black"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              handleFetchCandidate(profile);
-                                              // open modal for this profile
-                                            }}
-                                          >
-                                            Profile Edit
-                                          </button>
-                                          <button
-                                            className="btn btn-primary border-0 text-black"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => {
-                                              openChangeCenterPanel(profile);
-                                              console.log('change center')
 
-                                            }}
-                                          >
-                                            Change Center
-                                          </button>
 
                                         </div>
                                       </div>
@@ -4579,19 +13974,43 @@ const CRMDashboard = () => {
                                       </button>
                                     </div>
                                   </div>
-                                </div>
-                              </div>
-                            </div>
 
                             {/* Tab Navigation and Content Card */}
                             <div className="card border-0 shadow-sm mb-4">
                               <div className="card-header bg-white border-bottom-0 py-3 mb-3">
-                                <ul className="nav nav-pills nav-pills-sm">
+                                <ul
+                                  className="nav nav-pills nav-pills-sm"
+                                  style={{
+                                    display: 'flex',
+                                    flexWrap: isMobile ? 'nowrap' : 'wrap',
+                                    overflowX: isMobile ? 'auto' : 'visible',
+                                    overflowY: 'hidden',
+                                    WebkitOverflowScrolling: 'touch',
+                                    scrollbarWidth: 'none',
+                                    msOverflowStyle: 'none',
+                                    gap: '8px',
+                                    paddingBottom: isMobile ? '8px' : '0'
+                                  }}
+                                >
                                   {tabs.map((tab, tabIndex) => (
-                                    <li className="nav-item" key={tabIndex}>
+                                    <li
+                                      className="nav-item"
+                                      key={tabIndex}
+                                      style={{
+                                        flexShrink: isMobile ? 0 : 1,
+                                        whiteSpace: 'nowrap'
+                                      }}
+                                    >
                                       <button
                                         className={`nav-link ${(activeTab[profileIndex] || 0) === tabIndex ? 'active' : ''}`}
-                                        onClick={() => handleTabClick(profileIndex, tabIndex)}
+                                        onClick={() => handleTabClick(profileIndex, tabIndex, profile)}
+                                        style={{
+                                          minWidth: isMobile ? 'auto' : 'unset',
+                                          padding: isMobile ? '8px 16px' : '0.5rem 1rem',
+                                          fontSize: isMobile ? '13px' : '14px',
+                                          borderRadius: '8px',
+                                          whiteSpace: 'nowrap'
+                                        }}
                                       >
                                         {tab}
                                       </button>
@@ -4602,233 +14021,296 @@ const CRMDashboard = () => {
 
                               {/* Tab Content - Only show if leadDetailsVisible is true */}
                               {leadDetailsVisible === profileIndex && (
-                                <div className="tab-content">
+                                isLoadingProfilesData ? (
+                                  <div className="text-center">
+                                    <div className="spinner-border" role="status">
+                                      <span className="visually-hidden">Loading...</span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="tab-content">
 
-                                  {/* Lead Details Tab */}
-                                  {/* {activeTab === 0 && ( */}
-                                  {(activeTab[profileIndex] || 0) === 0 && (
-                                    <div className="tab-pane active" id="lead-details">
-                                      {/* Your lead details content here */}
-                                      <div className="scrollable-container">
-                                        <div className="scrollable-content">
-                                          <div className="info-card">
-                                            <div className="info-group">
-                                              <div className="info-label">LEAD AGE</div>
-                                              <div className="info-value">{profile.createdAt ?
-                                                Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                : 'N/A'}</div>
+                                    {/* Lead Details Tab */}
+                                    {/* {activeTab === 0 && ( */}
+                                    {(activeTab[profileIndex] || 0) === 0 && (
+                                      <div className="tab-pane active" id="lead-details">
+                                        {/* Your lead details content here */}
+                                        <div className="scrollable-container">
+                                          <div className="scrollable-content">
+                                            <div className="info-card">
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD AGE</div>
+                                                <div className="info-value">{profile.createdAt ?
+                                                  Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                  : 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">PROJECT</div>
+                                                <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">NEXT ACTION </div>
+                                                <div className="info-value">
+                                                  {profile.followup?.followupDate ? (() => {
+                                                    const dateObj = new Date(profile.followup?.followupDate);
+                                                    const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                      day: '2-digit',
+                                                      month: 'short',
+                                                      year: 'numeric',
+                                                    }).replace(/ /g, '-');
+                                                    const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                      hour: '2-digit',
+                                                      minute: '2-digit',
+                                                      hour12: true,
+                                                    });
+                                                    return `${datePart}, ${timePart}`;
+                                                  })() : 'N/A'}
+                                                </div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD MODIFICATION BY</div>
+                                                <div className="info-value">{profile.logs?.length ? profile.logs[profile.logs.length - 1]?.user?.name || 'N/A' : 'N/A'}</div>
+                                              </div>
                                             </div>
-                                            <div className="info-group">
-                                              <div className="info-label">Lead Owner</div>
-                                              <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">COURSE / JOB NAME</div>
-                                              <div className="info-value">{profile._course?.name}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">BATCH NAME</div>
-                                              <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
-                                            </div>
-                                          </div>
 
-                                          <div className="info-card">
-                                            <div className="info-group">
-                                              <div className="info-label">TYPE OF PROJECT</div>
-                                              <div className="info-value">{profile._course?.typeOfProject}</div>
+                                            <div className="info-card">
+                                              <div className="info-group">
+                                                <div className="info-label">STATE</div>
+                                                <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">SECTOR</div>
+                                                <div className="info-value">{profile._course?.sectors || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD CREATION DATE</div>
+                                                <div className="info-value">
+                                                  {profile.createdAt ? (() => {
+                                                    const dateObj = new Date(profile.createdAt);
+                                                    const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                      day: '2-digit',
+                                                      month: 'short',
+                                                      year: 'numeric',
+                                                    }).replace(/ /g, '-');
+                                                    const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                      hour: '2-digit',
+                                                      minute: '2-digit',
+                                                      hour12: true,
+                                                    });
+                                                    return `${datePart}, ${timePart}`;
+                                                  })() : 'N/A'}
+                                                </div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">Counsellor Name</div>
+                                                <div className="info-value">{profile.leadAssignment && profile.leadAssignment.length > 0 ? profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A' : 'N/A'}</div>
+                                              </div>
                                             </div>
-                                            <div className="info-group">
-                                              <div className="info-label">PROJECT</div>
-                                              <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">SECTOR</div>
-                                              <div className="info-value">{profile.sector}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">LEAD CREATION DATE</div>
-                                              <div className="info-value">{profile.createdAt ?
-                                                new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                            </div>
-                                          </div>
 
-                                          <div className="info-card">
-                                            <div className="info-group">
-                                              <div className="info-label">STATE</div>
-                                              <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
+                                            <div className="info-card">
+                                              <div className="info-group">
+                                                <div className="info-label">CITY</div>
+                                                <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">COURSE / JOB NAME</div>
+                                                <div className="info-value">{profile._course?.name || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                <div className="info-value">
+                                                  {profile.updatedAt ? (() => {
+                                                    const dateObj = new Date(profile.updatedAt);
+                                                    const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                      day: '2-digit',
+                                                      month: 'short',
+                                                      year: 'numeric',
+                                                    }).replace(/ /g, '-');
+                                                    const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                      hour: '2-digit',
+                                                      minute: '2-digit',
+                                                      hour12: true,
+                                                    });
+                                                    return `${datePart}, ${timePart}`;
+                                                  })() : 'N/A'}
+                                                </div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD OWNER</div>
+                                                <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
+                                              </div>
                                             </div>
-                                            <div className="info-group">
-                                              <div className="info-label">City</div>
-                                              <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">BRANCH NAME</div>
-                                              <div className="info-value">{profile._center?.name || 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">LEAD MODIFICATION DATE</div>
-                                              <div className="info-value">{profile.updatedAt ?
-                                                new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
-                                            </div>
-                                            <div className="info-group">
-                                              <div className="info-label">Remarks</div>
-                                              <div className="info-value">{profile.remarks || 'N/A'}</div>
+
+                                            <div className="info-card">
+                                              <div className="info-group">
+                                                <div className="info-label">TYPE OF PROJECT</div>
+                                                <div className="info-value">{profile._course?.typeOfProject || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">BRANCH NAME</div>
+                                                <div className="info-value">{profile._center?.name || 'N/A'}</div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">Remarks</div>
+                                                <div className="info-value">{profile.remarks || 'N/A'}</div>
+                                              </div>
                                             </div>
                                           </div>
                                         </div>
-                                      </div>
 
 
-                                      <div className="scroll-arrow scroll-left d-md-none" onClick={scrollLeft}>&lt;</div>
-                                      <div className="scroll-arrow scroll-right d-md-none" onClick={scrollRight}>&gt;</div>
+                                        <div className="scroll-arrow scroll-left d-md-none" onClick={scrollLeft}>&lt;</div>
+                                        <div className="scroll-arrow scroll-right d-md-none" onClick={scrollRight}>&gt;</div>
 
 
-                                      <div className="desktop-view">
-                                        <div className="row g-4">
+                                        <div className="desktop-view">
+                                          <div className="row g-4">
 
-                                          <div className="col-12">
-                                            <div className="scrollable-container">
-                                              <div className="scrollable-content">
-                                                <div className="info-card">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD AGE</div>
-                                                    <div className="info-value">{profile.createdAt ?
-                                                      Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                      : 'N/A'}</div>
+                                            <div className="col-12">
+                                              <div className="scrollable-container">
+                                                <div className="scrollable-content">
+                                                  <div className="info-card">
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD AGE</div>
+                                                      <div className="info-value">{profile.createdAt ?
+                                                        Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                        : 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">Lead Owner</div>
+                                                      <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">COURSE / JOB NAME</div>
+                                                      <div className="info-value">{profile._course?.name}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">BATCH NAME</div>
+                                                      <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
+                                                    </div>
+                                                    {/* <div className="info-group">
+                                                      <div className="info-label">Source Contact Name</div>
+                                                      <div className="info-value">{profile._candidate?.sourceInfo?.sourceName || 'N/A'}</div>
+                                                    </div> */}
                                                   </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">Lead Owner</div>
-                                                    <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">COURSE / JOB NAME</div>
-                                                    <div className="info-value">{profile._course?.name}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">BATCH NAME</div>
-                                                    <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
-                                                  </div>
-                                                </div>
 
-                                                <div className="info-card">
-                                                  <div className="info-group">
-                                                    <div className="info-label">TYPE OF PROJECT</div>
-                                                    <div className="info-value">{profile._course?.typeOfProject}</div>
+                                                  <div className="info-card">
+                                                    <div className="info-group">
+                                                      <div className="info-label">TYPE OF PROJECT</div>
+                                                      <div className="info-value">{profile._course?.typeOfProject}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">PROJECT</div>
+                                                      <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">SECTOR</div>
+                                                      <div className="info-value">{profile._course?.sectors}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD CREATION DATE</div>
+                                                      <div className="info-value">{profile.createdAt ?
+                                                        new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
+                                                    </div>
                                                   </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">PROJECT</div>
-                                                    <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">SECTOR</div>
-                                                    <div className="info-value">{profile._course?.sectors}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD CREATION DATE</div>
-                                                    <div className="info-value">{profile.createdAt ?
-                                                      new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                                  </div>
-                                                </div>
 
-                                                <div className="info-card">
-                                                  <div className="info-group">
-                                                    <div className="info-label">STATE</div>
-                                                    <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">City</div>
-                                                    <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">BRANCH NAME</div>
-                                                    <div className="info-value">{profile._center?.name || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                    <div className="info-value">{profile.updatedAt ?
-                                                      new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">Remarks</div>
-                                                    <div className="info-value">{profile.remarks || 'N/A'}</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD MODIFICATION By</div>
-                                                    <div className="info-value">Mar 21, 2025 3:32 PM</div>
-                                                  </div>
-                                                  <div className="info-group">
-                                                    <div className="info-label">Counsellor Name</div>
-                                                    <div className="info-value">{profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div>
+                                                  <div className="info-card">
+                                                    <div className="info-group">
+                                                      <div className="info-label">STATE</div>
+                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">City</div>
+                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">BRANCH NAME</div>
+                                                      <div className="info-value">{profile._center?.name || 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                      <div className="info-value">{profile.updatedAt ?
+                                                        new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">Remarks</div>
+                                                      <div className="info-value">{profile.remarks || 'N/A'}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD MODIFICATION By</div>
+                                                      <div className="info-value">Mar 21, 2025 3:32 PM</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">Counsellor Name</div>
+                                                      <div className="info-value">{profile.leadAssignment && profile.leadAssignment.length > 0 ? profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A' : 'N/A'}</div>
+                                                    </div>
                                                   </div>
                                                 </div>
                                               </div>
-                                            </div>
-                                            <div className="scroll-arrow scroll-left d-md-none">&lt;</div>
-                                            <div className="scroll-arrow scroll-right  d-md-none">&gt;</div>
+                                              <div className="scroll-arrow scroll-left d-md-none">&lt;</div>
+                                              <div className="scroll-arrow scroll-right  d-md-none">&gt;</div>
 
-                                            <div className="desktop-view">
-                                              <div className="row">
-                                                <div className="col-xl-3 col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD AGE</div>
-                                                    <div className="info-value">{profile.createdAt ?
-                                                      Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                      : 'N/A'}</div>
+                                              <div className="desktop-view">
+                                                <div className="row">
+                                                  <div className="col-xl-3 col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD AGE</div>
+                                                      <div className="info-value">{profile.createdAt ?
+                                                        Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
+                                                        : 'N/A'}</div>
+                                                    </div>
                                                   </div>
-                                                </div>
 
-                                                <div className="col-xl-3 col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">STATE</div>
-                                                    <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
+                                                  <div className="col-xl-3 col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">STATE</div>
+                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
+                                                    </div>
                                                   </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">CITY</div>
-                                                    <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">CITY</div>
+                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
+                                                    </div>
                                                   </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">TYPE OF PROJECT</div>
-                                                    <div className="info-value">{profile._course?.typeOfProject}</div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">TYPE OF PROJECT</div>
+                                                      <div className="info-value">{profile._course?.typeOfProject}</div>
+                                                    </div>
                                                   </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">PROJECT</div>
-                                                    <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">PROJECT</div>
+                                                      <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
+                                                    </div>
                                                   </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">Sector</div>
-                                                    <div className="info-value">{profile._course?.sectors}</div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">Sector</div>
+                                                      <div className="info-value">{profile._course?.sectors}</div>
+                                                    </div>
                                                   </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">COURSE / JOB NAME</div>
-                                                    <div className="info-value">{profile._course?.name}</div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">COURSE / JOB NAME</div>
+                                                      <div className="info-value">{profile._course?.name}</div>
+                                                    </div>
                                                   </div>
-                                                </div>
 
 
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">BRANCH NAME</div>
-                                                    <div className="info-value">{profile._center?.name || 'N/A'}</div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">BRANCH NAME</div>
+                                                      <div className="info-value">{profile._center?.name || 'N/A'}</div>
+                                                    </div>
                                                   </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">NEXT ACTION DATE</div>
-                                                    <div className="info-value">
-                                                      {profile.followups?.length > 0
-                                                        ?
-                                                        (() => {
-                                                          const dateObj = new Date(profile.followups[profile.followups.length - 1].date);
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">NEXT ACTION DATE</div>
+                                                      <div className="info-value">
+                                                        {profile.followup?.followupDate ? (() => {
+                                                          const dateObj = new Date(profile.followup?.followupDate);
                                                           const datePart = dateObj.toLocaleDateString('en-GB', {
                                                             day: '2-digit',
                                                             month: 'short',
@@ -4840,922 +14322,941 @@ const CRMDashboard = () => {
                                                             hour12: true,
                                                           });
                                                           return `${datePart}, ${timePart}`;
-                                                        })()
-                                                        : 'N/A'}
+                                                        })() : 'N/A'}
+
+                                                      </div>
+
+                                                    </div>
+                                                  </div>
+
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD CREATION DATE</div>
+                                                      <div className="info-value">{profile.createdAt ? (() => {
+                                                        const dateObj = new Date(profile.createdAt);
+                                                        const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                          day: '2-digit',
+                                                          month: 'short',
+                                                          year: 'numeric',
+                                                        }).replace(/ /g, '-');
+                                                        const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                          hour: '2-digit',
+                                                          minute: '2-digit',
+                                                          hour12: true,
+                                                        });
+                                                        return `${datePart}, ${timePart}`;
+                                                      })() : 'N/A'}</div>
+                                                    </div>
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD MODIFICATION DATE</div>
+                                                      <div className="info-value">{profile.updatedAt ? (() => {
+                                                        const dateObj = new Date(profile.updatedAt);
+                                                        const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                          day: '2-digit',
+                                                          month: 'short',
+                                                          year: 'numeric',
+                                                        }).replace(/ /g, '-');
+                                                        const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                          hour: '2-digit',
+                                                          minute: '2-digit',
+                                                          hour12: true,
+                                                        });
+                                                        return `${datePart}, ${timePart}`;
+                                                      })() : 'N/A'}</div>
+                                                    </div>
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">Remarks</div>
+                                                      <div className="info-value">{profile.remarks || 'N/A'}</div>
+                                                    </div>
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD MODIFICATION BY</div>
+                                                      <div className="info-value">{profile.logs?.length ? profile.logs[profile.logs.length - 1]?.user?.name || '' : ''}
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">Counsellor Name</div>
+                                                      <div className="info-value"> {profile.leadAssignment && profile.leadAssignment.length > 0 ? profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A' : 'N/A'}</div>
+                                                    </div>
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD OWNER</div>
+                                                      <div className="info-value">{profile.registeredBy?.name || 'Self Registerd'}</div>
                                                     </div>
 
                                                   </div>
-                                                </div>
-
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD CREATION DATE</div>
-                                                    <div className="info-value">{profile.createdAt ? (() => {
-                                                      const dateObj = new Date(profile.createdAt);
-                                                      const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                        day: '2-digit',
-                                                        month: 'short',
-                                                        year: 'numeric',
-                                                      }).replace(/ /g, '-');
-                                                      const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit',
-                                                        hour12: true,
-                                                      });
-                                                      return `${datePart}, ${timePart}`;
-                                                    })() : 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                    <div className="info-value">{profile.updatedAt ? (() => {
-                                                      const dateObj = new Date(profile.updatedAt);
-                                                      const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                        day: '2-digit',
-                                                        month: 'short',
-                                                        year: 'numeric',
-                                                      }).replace(/ /g, '-');
-                                                      const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit',
-                                                        hour12: true,
-                                                      });
-                                                      return `${datePart}, ${timePart}`;
-                                                    })() : 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">Remarks</div>
-                                                    <div className="info-value">{profile.remarks || 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD MODIFICATION BY</div>
-                                                    <div className="info-value">{profile.logs?.length ? profile.logs[profile.logs.length - 1]?.user?.name || '' : ''}
+                                                  {/* <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">Source Contact Name</div>
+                                                      <div className="info-value">{profile._candidate?.sourceInfo?.sourceName || 'N/A'}</div>
                                                     </div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">Counsellor Name</div>
-                                                    <div className="info-value"> {profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A'}</div>
-                                                  </div>
-                                                </div>
-                                                <div className="col-xl- col-3">
-                                                  <div className="info-group">
-                                                    <div className="info-label">LEAD OWNER</div>
-                                                    <div className="info-value">{profile.registeredBy?.name || 'Self Registerd'}</div>
-                                                  </div>
+                                                  </div> */}
                                                 </div>
                                               </div>
                                             </div>
                                           </div>
                                         </div>
                                       </div>
-                                    </div>
-                                  )}
+                                    )}
 
-                                  {/* Profile Tab */}
-                                  {/* {activeTab === 1 && ( */}
-                                  {(activeTab[profileIndex] || 0) === 1 && (
-                                    <div className="tab-pane active" id="profile">
-                                      <div className="resume-preview-body">
-                                        <div id="resume-download" className="resume-document">
+                                    {/* Profile Tab */}
+                                    {/* {activeTab === 1 && ( */}
+                                    {(activeTab[profileIndex] || 0) === 1 && (
+                                      <div className="tab-pane active" id="profile">
+                                        <div className="resume-preview-body">
+                                          <div id="resume-download" className="resume-document">
 
-                                          <div className="resume-document-header">
-                                            <div className="resume-profile-section">
-                                              {profile._candidate?.personalInfo?.image ? (
-                                                <img
-                                                  src={`${profile._candidate?.personalInfo?.image}`}
-                                                  alt="Profile"
-                                                  className="resume-profile-image"
-                                                />
-                                              ) : (
-                                                <div className="resume-profile-placeholder">
-                                                  <i className="bi bi-person-circle"></i>
-                                                </div>
-                                              )}
-
-                                              <div className="resume-header-content">
-                                                <h1 className="resume-name">
-                                                  {profile._candidate?.name || 'Your Name'}
-                                                </h1>
-                                                <p className="resume-title">
-                                                  {profile._candidate?.personalInfo?.professionalTitle || 'Professional Title'}
-                                                </p>
-                                                <p className="resume-title">
-                                                  {profile._candidate?.sex || 'Sex'}
-                                                </p>
-
-                                                <div className="resume-contact-details">
-
-                                                  <div className="resume-contact-item">
-                                                    <i className="bi bi-telephone-fill"></i>
-                                                    <span>{profile._candidate?.mobile}</span>
+                                            <div className="resume-document-header">
+                                              <div className="resume-profile-section">
+                                                {profile._candidate?.personalInfo?.image ? (
+                                                  <img
+                                                    src={`${profile._candidate?.personalInfo?.image}`}
+                                                    alt="Profile"
+                                                    className="resume-profile-image"
+                                                  />
+                                                ) : (
+                                                  <div className="resume-profile-placeholder">
+                                                    <i className="bi bi-person-circle"></i>
                                                   </div>
+                                                )}
+
+                                                <div className="resume-header-content">
+                                                  <h1 className="resume-name">
+                                                    {profile._candidate?.name || 'Your Name'}
+                                                  </h1>
+                                                  <p className="resume-title">
+                                                    {profile._candidate?.personalInfo?.professionalTitle || 'Professional Title'}
+                                                  </p>
+                                                  <p className="resume-title">
+                                                    {profile._candidate?.sex || 'Sex'}
+                                                  </p>
+
+                                                  <div className="resume-contact-details">
+
+                                                    <div className="resume-contact-item">
+                                                      <i className="bi bi-telephone-fill"></i>
+                                                      <span>{profile._candidate?.mobile}</span>
+                                                    </div>
 
 
-                                                  <div className="resume-contact-item">
-                                                    <i className="bi bi-envelope-fill"></i>
-                                                    <span>{profile._candidate?.email}</span>
+                                                    <div className="resume-contact-item">
+                                                      <i className="bi bi-envelope-fill"></i>
+                                                      <span>{profile._candidate?.email}</span>
+                                                    </div>
+
+                                                    {profile._candidate?.dob && (
+                                                      <div className="resume-contact-item">
+                                                        <i className="bi bi-calendar-heart-fill"></i>
+                                                        {new Date(profile._candidate.dob).toLocaleDateString('en-IN', {
+                                                          day: '2-digit',
+                                                          month: 'long',
+                                                          year: 'numeric'
+                                                        })}
+                                                      </div>
+                                                    )}
+                                                    {profile._candidate?.personalInfo?.currentAddress?.city && (
+                                                      <div className="resume-contact-item">
+                                                        <i className="bi bi-geo-alt-fill"></i>
+                                                        <span>Current:{profile._candidate.personalInfo.currentAddress.fullAddress}</span>
+                                                      </div>
+                                                    )}
+                                                    {profile._candidate?.personalInfo?.permanentAddress?.city && (
+                                                      <div className="resume-contact-item">
+                                                        <i className="bi bi-house-fill"></i>
+                                                        <span>Permanent: {profile._candidate.personalInfo.permanentAddress.fullAddress}</span>
+                                                      </div>
+                                                    )}
                                                   </div>
-
-                                                  {profile._candidate?.dob && (
-                                                    <div className="resume-contact-item">
-                                                      <i className="bi bi-calendar-heart-fill"></i>
-                                                      {new Date(profile._candidate.dob).toLocaleDateString('en-IN', {
-                                                        day: '2-digit',
-                                                        month: 'long',
-                                                        year: 'numeric'
-                                                      })}
-                                                    </div>
-                                                  )}
-                                                  {profile._candidate?.personalInfo?.currentAddress?.city && (
-                                                    <div className="resume-contact-item">
-                                                      <i className="bi bi-geo-alt-fill"></i>
-                                                      <span>Current:{profile._candidate.personalInfo.currentAddress.fullAddress}</span>
-                                                    </div>
-                                                  )}
-                                                  {profile._candidate?.personalInfo?.permanentAddress?.city && (
-                                                    <div className="resume-contact-item">
-                                                      <i className="bi bi-house-fill"></i>
-                                                      <span>Permanent: {profile._candidate.personalInfo.permanentAddress.fullAddress}</span>
-                                                    </div>
-                                                  )}
                                                 </div>
+                                              </div>
+
+                                              <div className="resume-summary">
+                                                <h2 className="resume-section-title">Professional Summary</h2>
+                                                <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
                                               </div>
                                             </div>
 
-                                            <div className="resume-summary">
-                                              <h2 className="resume-section-title">Professional Summary</h2>
-                                              <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
-                                            </div>
-                                          </div>
 
+                                            <div className="resume-document-body">
 
-                                          <div className="resume-document-body">
+                                              <div className="resume-column resume-left-column">
 
-                                            <div className="resume-column resume-left-column">
-
-                                              {profile._candidate?.isExperienced === false ? (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Work Experience</h2>
-                                                  <div className="resume-experience-item">
-                                                    <div className="resume-item-header">
-                                                      <h3 className="resume-item-title">Fresher</h3>
-                                                    </div>
-                                                    <div className="resume-item-content">
-                                                      <p>Looking for opportunities to start my career</p>
-                                                    </div>
-                                                  </div>
-                                                </div>
-                                              ) : (
-                                                profile._candidate?.experiences?.length > 0 && (
+                                                {profile._candidate?.isExperienced === false ? (
                                                   <div className="resume-section">
                                                     <h2 className="resume-section-title">Work Experience</h2>
-                                                    {profile._candidate.experiences.map((exp, index) => (
-                                                      <div className="resume-experience-item" key={`resume-exp-${index}`}>
-                                                        <div className="resume-item-header">
-                                                          {exp.jobTitle && (
-                                                            <h3 className="resume-item-title">{exp.jobTitle}</h3>
-                                                          )}
-                                                          {exp.companyName && (
-                                                            <p className="resume-item-subtitle">{exp.companyName}</p>
-                                                          )}
-                                                          {(exp.from || exp.to || exp.currentlyWorking) && (
-                                                            <p className="resume-item-period">
-                                                              {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
-                                                                year: 'numeric',
-                                                                month: 'short',
-                                                              }) : 'Start Date'}
-                                                              {" - "}
-                                                              {exp.currentlyWorking ? 'Present' :
-                                                                exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
-                                                                  year: 'numeric',
-                                                                  month: 'short',
-                                                                }) : 'End Date'}
-                                                            </p>
-                                                          )}
-                                                        </div>
-                                                        {exp.jobDescription && (
-                                                          <div className="resume-item-content">
-                                                            <p>{exp.jobDescription}</p>
-                                                          </div>
-                                                        )}
-                                                      </div>
-                                                    ))}
-                                                  </div>
-                                                )
-                                              )}
-
-                                              {profile._candidate?.qualifications?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Education</h2>
-                                                  {profile._candidate.qualifications.map((edu, index) => (
-                                                    <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                                    <div className="resume-experience-item">
                                                       <div className="resume-item-header">
-                                                        {edu.education && (
-                                                          <h3 className="resume-item-title">{edu.education}</h3>
-                                                        )}
-                                                        {edu.course && (
-                                                          <h3 className="resume-item-title">{edu.course}</h3>
-                                                        )}
-                                                        {edu.universityName && (
-                                                          <p className="resume-item-subtitle">{edu.universityName}</p>
-                                                        )}
-                                                        {edu.schoolName && (
-                                                          <p className="resume-item-subtitle">{edu.schoolName}</p>
-                                                        )}
-                                                        {edu.collegeName && (
-                                                          <p className="resume-item-subtitle">{edu.collegeName}</p>
-                                                        )}
-                                                        {edu.passingYear && (
-                                                          <p className="resume-item-period">{edu.passingYear}</p>
-                                                        )}
+                                                        <h3 className="resume-item-title">Fresher</h3>
                                                       </div>
                                                       <div className="resume-item-content">
-                                                        {edu.marks && <p>Marks: {edu.marks}%</p>}
-                                                        {edu.specialization && <p>Specialization: {edu.specialization}</p>}
+                                                        <p>Looking for opportunities to start my career</p>
                                                       </div>
                                                     </div>
-                                                  ))}
-                                                </div>
-                                              )}
-                                            </div>
-
-
-                                            <div className="resume-column resume-right-column">
-
-                                              {profile._candidate?.personalInfo?.skills?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Skills</h2>
-                                                  <div className="resume-skills-list">
-                                                    {profile._candidate?.personalInfo?.skills?.map((skill, index) => (
-                                                      <div className="resume-skill-item" key={`resume-skill-${index}`}>
-                                                        <div className="resume-skill-name">{skill?.skillName || 'Skill'}</div>
-                                                        {skill?.skillPercent && (
-                                                          <div className="resume-skill-bar-container">
-                                                            <div
-                                                              className="resume-skill-bar"
-                                                              style={{ width: `${skill?.skillPercent || 0}%` }}
-                                                            ></div>
-                                                            <span className="resume-skill-percent">{skill?.skillPercent || 0}%</span>
+                                                  </div>
+                                                ) : (
+                                                  profile._candidate?.experiences?.length > 0 && (
+                                                    <div className="resume-section">
+                                                      <h2 className="resume-section-title">Work Experience</h2>
+                                                      {profile._candidate.experiences.map((exp, index) => (
+                                                        <div className="resume-experience-item" key={`resume-exp-${index}`}>
+                                                          <div className="resume-item-header">
+                                                            {exp.jobTitle && (
+                                                              <h3 className="resume-item-title">{exp.jobTitle}</h3>
+                                                            )}
+                                                            {exp.companyName && (
+                                                              <p className="resume-item-subtitle">{exp.companyName}</p>
+                                                            )}
+                                                            {(exp.from || exp.to || exp.currentlyWorking) && (
+                                                              <p className="resume-item-period">
+                                                                {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                                  year: 'numeric',
+                                                                  month: 'short',
+                                                                }) : 'Start Date'}
+                                                                {" - "}
+                                                                {exp.currentlyWorking ? 'Present' :
+                                                                  exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
+                                                                    year: 'numeric',
+                                                                    month: 'short',
+                                                                  }) : 'End Date'}
+                                                              </p>
+                                                            )}
                                                           </div>
-                                                        )}
-                                                      </div>
-                                                    ))}
-                                                  </div>
-                                                </div>
-                                              )}
-
-
-
-                                              {profile._candidate?.personalInfo?.languages?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Languages</h2>
-                                                  <div className="resume-languages-list">
-                                                    {profile._candidate.personalInfo.languages.map((lang, index) => (
-                                                      <div className="resume-language-item" key={`resume-lang-${index}`}>
-                                                        <div className="resume-language-name">{lang.name || lang.lname || 'Language'}</div>
-                                                        {lang.level && (
-                                                          <div className="resume-language-level">
-                                                            {[1, 2, 3, 4, 5].map(dot => (
-                                                              <span
-                                                                key={`resume-lang-dot-${index}-${dot}`}
-                                                                className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
-                                                              ></span>
-                                                            ))}
-                                                          </div>
-                                                        )}
-                                                      </div>
-                                                    ))}
-                                                  </div>
-                                                </div>
-                                              )}
-
-
-                                              {profile._candidate?.personalInfo?.certifications?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Certifications</h2>
-                                                  <ul className="resume-certifications-list">
-                                                    {profile._candidate.personalInfo.certifications.map((cert, index) => (
-                                                      <li key={`resume-cert-${index}`} className="resume-certification-item">
-                                                        <strong>{cert.certificateName || cert.name}</strong>
-                                                        {cert.orgName && (
-                                                          <span className="resume-cert-org"> - {cert.orgName}</span>
-                                                        )}
-                                                        {(cert.month || cert.year) && (
-                                                          <span className="resume-cert-date">
-                                                            {cert.month && cert.year ?
-                                                              ` (${cert.month}/${cert.year})` :
-                                                              cert.month ?
-                                                                ` (${cert.month})` :
-                                                                cert.year ?
-                                                                  ` (${cert.year})` :
-                                                                  ''}
-                                                          </span>
-                                                        )}
-                                                      </li>
-                                                    ))}
-                                                  </ul>
-                                                </div>
-                                              )}
-
-
-                                              {profile._candidate?.personalInfo?.projects?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Projects</h2>
-                                                  {profile._candidate.personalInfo.projects.map((proj, index) => (
-                                                    <div className="resume-project-item" key={`resume-proj-${index}`}>
-                                                      <div className="resume-item-header">
-                                                        <h3 className="resume-project-title">
-                                                          {proj.projectName || 'Project'}
-                                                          {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
-                                                        </h3>
-                                                      </div>
-                                                      {proj.description && (
-                                                        <div className="resume-item-content">
-                                                          <p>{proj.description}</p>
-                                                        </div>
-                                                      )}
-                                                    </div>
-                                                  ))}
-                                                </div>
-                                              )}
-
-
-                                              {profile._candidate?.personalInfo?.interest?.length > 0 && (
-                                                <div className="resume-section">
-                                                  <h2 className="resume-section-title">Interests</h2>
-                                                  <div className="resume-interests-tags">
-                                                    {profile._candidate.personalInfo.interest.map((interest, index) => (
-                                                      <span className="resume-interest-tag" key={`resume-interest-${index}`}>
-                                                        {interest}
-                                                      </span>
-                                                    ))}
-                                                  </div>
-                                                </div>
-                                              )}
-
-                                            </div>
-                                          </div>
-
-
-                                          {profile._candidate?.personalInfo?.declaration?.text && (
-                                            <div className="resume-declaration">
-                                              <h2 className="resume-section-title">Declaration</h2>
-                                              <p>{profile._candidate.personalInfo.declaration.text}</p>
-
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-
-
-                                  )}
-
-                                  {/* Job History Tab */}
-                                  {/* {activeTab === 2 && ( */}
-                                  {(activeTab[profileIndex] || 0) === 2 && (
-                                    <div className="tab-pane active" id="job-history">
-                                      <div className="section-card">
-                                        <div className="table-responsive">
-                                          <table className="table table-hover table-bordered job-history-table">
-                                            <thead className="table-light">
-                                              <tr>
-                                                <th>S.No</th>
-                                                <th>Company Name</th>
-                                                <th>Position</th>
-                                                <th>Duration</th>
-                                                <th>Location</th>
-                                                <th>Status</th>
-                                              </tr>
-                                            </thead>
-                                            <tbody>
-                                              {profile._candidate?.experiences?.map((job, index) => (
-                                                <tr key={index}>
-                                                  <td>{index + 1}</td>
-                                                  <td>{job.companyName}</td>
-                                                  <td>{job.jobTitle}</td>
-                                                  <td>
-                                                    {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
-                                                    {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
-                                                  </td>
-                                                  <td>Remote</td>
-                                                  <td><span className="text-success">Completed</span></td>
-                                                </tr>
-                                              ))}
-                                            </tbody>
-                                          </table>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Course History Tab */}
-                                  {/* {activeTab === 3 && ( */}
-                                  {(activeTab[profileIndex] || 0) === 3 && (
-                                    <div className="tab-pane active" id="course-history">
-                                      <div className="section-card">
-                                        <div className="table-responsive">
-                                          <table className="table table-hover table-bordered course-history-table">
-                                            <thead className="table-light">
-                                              <tr>
-                                                <th>S.No</th>
-                                                <th>Applied Date</th>
-                                                <th>Course Name</th>
-                                                <th>Lead Added By</th>
-                                                <th>Counsellor</th>
-                                                <th>Status</th>
-                                              </tr>
-                                            </thead>
-                                            <tbody>
-                                              {profile?._candidate?._appliedCourses && profile._candidate._appliedCourses.length > 0 ? (
-                                                profile._candidate._appliedCourses.map((course, index) => (
-                                                  <tr key={index}>
-                                                    <td>{index + 1}</td>
-                                                    <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
-                                                    <td>{course._course?.name || 'N/A'}</td>
-                                                    <td>{course.registeredBy?.name || 'Self Registered'}</td>
-                                                    <td>{course.month || ''} {course.year || ''}</td>
-                                                    <td><span className="text-success">{course._leadStatus?.title || '-'}</span></td>
-                                                  </tr>
-                                                ))
-                                              ) : (
-                                                <tr>
-                                                  <td colSpan={6} className="text-center">No course history available</td>
-                                                </tr>
-                                              )}
-
-                                            </tbody>
-                                          </table>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Documents Tab */}
-                                  {/* {activeTab === 4 && ( */}
-
-                                  {(activeTab[profileIndex] || 0) === 4 && (
-                                    <div className="tab-pane active" id='studentsDocuments'>
-                                      {(() => {
-                                        const documentsToDisplay = profile.uploadedDocs || [];
-                                        const totalRequired = profile?.docCounts?.totalRequired || 0;
-
-                                        // If no documents are required, show a message
-                                        if (totalRequired === 0) {
-                                          return (
-                                            <div className="col-12 text-center py-5">
-                                              <div className="text-muted">
-                                                <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
-                                                <h5 className="text-success">No Documents Required</h5>
-                                                <p>This course does not require any document verification.</p>
-                                              </div>
-                                            </div>
-
-                                          );
-                                        }
-
-                                        // If documents are required, show the full interface
-                                        return (
-                                          <div className="enhanced-documents-panel">
-                                            {/* Enhanced Stats Grid */}
-                                            <div className="stats-grid">
-                                              {(() => {
-                                                // Use backend counts only, remove static document fallback
-                                                const backendCounts = profile?.docCounts || {};
-                                                return (
-                                                  <>
-                                                    <div className="stat-card total-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-file-alt"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.totalRequired || 0}</h4>
-                                                        <p>Total Required</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-list"></i>
-                                                      </div>
-                                                    </div>
-
-                                                    <div className="stat-card uploaded-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-cloud-upload-alt"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.uploadedCount || 0}</h4>
-                                                        <p>Uploaded</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-arrow-up"></i>
-                                                      </div>
-                                                    </div>
-
-                                                    <div className="stat-card pending-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-clock"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.pendingVerificationCount || 0}</h4>
-                                                        <p>Pending Review</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-exclamation-triangle"></i>
-                                                      </div>
-                                                    </div>
-
-                                                    <div className="stat-card verified-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-check-circle"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.verifiedCount || 0}</h4>
-                                                        <p>Approved</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-thumbs-up"></i>
-                                                      </div>
-                                                    </div>
-
-                                                    <div className="stat-card rejected-docs">
-                                                      <div className="stat-icon">
-                                                        <i className="fas fa-times-circle"></i>
-                                                      </div>
-                                                      <div className="stat-info">
-                                                        <h4>{backendCounts.RejectedCount || 0}</h4>
-                                                        <p>Rejected</p>
-                                                      </div>
-                                                      <div className="stat-trend">
-                                                        <i className="fas fa-arrow-down"></i>
-                                                      </div>
-                                                    </div>
-                                                  </>
-                                                );
-                                              })()}
-                                            </div>
-
-                                            {/* Enhanced Filter Section */}
-                                            <div className="filter-section-enhanced">
-                                              <div className="filter-tabs-container">
-                                                <h5 className="filter-title">
-                                                  <i className="fas fa-filter me-2"></i>
-                                                  Filter Documents
-                                                </h5>
-                                                <div className="filter-tabs">
-                                                  {(() => {
-                                                    const backendCounts = profile?.docCounts || {};
-                                                    return (
-                                                      <>
-                                                        <button
-                                                          className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
-                                                          onClick={() => setStatusFilter('all')}
-                                                        >
-                                                          <i className="fas fa-list-ul"></i>
-                                                          All Documents
-                                                          <span className="badge">{backendCounts.totalRequired || 0}</span>
-                                                        </button>
-                                                        <button
-                                                          className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
-                                                          onClick={() => setStatusFilter('pending')}
-                                                        >
-                                                          <i className="fas fa-clock"></i>
-                                                          Pending
-                                                          <span className="badge">{backendCounts.pendingVerificationCount || 0}</span>
-                                                        </button>
-                                                        <button
-                                                          className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
-                                                          onClick={() => setStatusFilter('verified')}
-                                                        >
-                                                          <i className="fas fa-check-circle"></i>
-                                                          Verified
-                                                          <span className="badge">{backendCounts.verifiedCount || 0}</span>
-                                                        </button>
-                                                        <button
-                                                          className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
-                                                          onClick={() => setStatusFilter('rejected')}
-                                                        >
-                                                          <i className="fas fa-times-circle"></i>
-                                                          Rejected
-                                                          <span className="badge">{backendCounts.RejectedCount || 0}</span>
-                                                        </button>
-                                                      </>
-                                                    );
-                                                  })()}
-                                                </div>
-                                              </div>
-                                            </div>
-
-                                            {/* Enhanced Documents Grid */}
-                                            <div className="documents-grid-enhanced">
-                                              {(() => {
-                                                // Filter documents based on status filter
-                                                const filteredDocs = filterDocuments(documentsToDisplay);
-
-                                                if (filteredDocs.length === 0) {
-                                                  return (
-                                                    <div className="col-12 text-center py-5">
-                                                      <div className="text-muted">
-                                                        <i className="fas fa-filter fa-3x mb-3"></i>
-                                                        <h5>No Documents Found</h5>
-                                                        <p>No documents match the current filter criteria.</p>
-                                                      </div>
-                                                    </div>
-                                                  );
-                                                }
-
-                                                return filteredDocs.map((doc, index) => {
-                                                  // Check if this is a document with upload data or just uploaded file info
-                                                  const latestUpload = doc.uploads && doc.uploads.length > 0
-                                                    ? doc.uploads[doc.uploads.length - 1]
-                                                    : (doc.fileUrl && doc.status !== "Not Uploaded" ? doc : null);
-
-                                                  return (
-                                                    <div key={doc._id || index} className="document-card-enhanced">
-                                                      <div className="document-image-container">
-                                                        {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
-                                                          <>
-                                                            {(() => {
-                                                              const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
-                                                              const fileType = getFileType(fileUrl);
-
-                                                              if (fileType === 'image') {
-                                                                return (
-                                                                  <img
-                                                                    src={fileUrl}
-                                                                    alt="Document Preview"
-                                                                    className="document-image"
-                                                                  />
-                                                                );
-                                                              } else if (fileType === 'pdf') {
-                                                                return (
-                                                                  <div className="document-preview-icon">
-                                                                    <i className="fa-solid fa-file" style={{ fontSize: '100px', color: '#dc3545' }}></i>
-                                                                    <p style={{ fontSize: '12px', marginTop: '10px' }}>PDF Document</p>
-                                                                  </div>
-                                                                );
-                                                              } else {
-                                                                return (
-                                                                  <div className="document-preview-icon">
-                                                                    <i className={`fas ${fileType === 'pdf' ? 'fa-file-word' :
-                                                                      fileType === 'spreadsheet' ? 'fa-file-excel' : 'fa-file'
-                                                                      }`} style={{ fontSize: '40px', color: '#6c757d' }}></i>
-                                                                    <p style={{ fontSize: '12px', marginTop: '10px' }}>
-                                                                      {fileType === 'document' ? 'Document' :
-                                                                        fileType === 'spreadsheet' ? 'Spreadsheet' : 'File'}
-                                                                    </p>
-                                                                  </div>
-                                                                );
-                                                              }
-                                                            })()}
-                                                            <div className="image-overlay">
-                                                              <button
-                                                                className="preview-btn"
-                                                                onClick={() => openDocumentModal(doc)}
-                                                              >
-                                                                <i className="fas fa-search-plus"></i>
-                                                                Preview
-                                                              </button>
+                                                          {exp.jobDescription && (
+                                                            <div className="resume-item-content">
+                                                              <p>{exp.jobDescription}</p>
                                                             </div>
-                                                          </>
-                                                        ) : (
-                                                          <div className="no-document-placeholder">
-                                                            <i className="fas fa-file-upload"></i>
-                                                            <p>No Document</p>
+                                                          )}
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  )
+                                                )}
+
+                                                {profile._candidate?.qualifications?.length > 0 && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Education</h2>
+                                                    {profile._candidate.qualifications.map((edu, index) => (
+                                                      <div className="resume-education-item" key={`resume-edu-${index}`}>
+                                                        <div className="resume-item-header">
+                                                          {(() => {
+                                                            const isObjectIdLike = (v) =>
+                                                              typeof v === 'string' && /^[a-f0-9]{24}$/i.test(v.trim());
+                                                            const maybeTitle =
+                                                              (!isObjectIdLike(edu.education) && edu.education) ||
+                                                              (!isObjectIdLike(edu.course) && edu.course) ||
+                                                              null;
+                                                            return maybeTitle ? (
+                                                              <h3 className="resume-item-title">{maybeTitle}</h3>
+                                                            ) : null;
+                                                          })()}
+                                                          {edu.universityName && (
+                                                            <p className="resume-item-subtitle">{edu.universityName}</p>
+                                                          )}
+                                                          {edu.schoolName && (
+                                                            <p className="resume-item-subtitle">{edu.schoolName}</p>
+                                                          )}
+                                                          {edu.collegeName && (
+                                                            <p className="resume-item-subtitle">{edu.collegeName}</p>
+                                                          )}
+                                                          {edu.passingYear && (
+                                                            <p className="resume-item-period">{edu.passingYear}</p>
+                                                          )}
+                                                        </div>
+                                                        <div className="resume-item-content">
+                                                          {edu.marks && <p>Marks: {edu.marks}%</p>}
+                                                          {edu.specialization && <p>Specialization: {edu.specialization}</p>}
+                                                        </div>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                              </div>
+
+
+                                              <div className="resume-column resume-right-column">
+
+                                                {profile._candidate?.personalInfo?.skills?.length > 0 && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Skills</h2>
+                                                    <div className="resume-skills-list">
+                                                      {profile._candidate?.personalInfo?.skills?.map((skill, index) => (
+                                                        <div className="resume-skill-item" key={`resume-skill-${index}`}>
+                                                          <div className="resume-skill-name">{skill?.skillName || 'Skill'}</div>
+                                                          {skill?.skillPercent && (
+                                                            <div className="resume-skill-bar-container">
+                                                              <div
+                                                                className="resume-skill-bar"
+                                                                style={{ width: `${skill?.skillPercent || 0}%` }}
+                                                              ></div>
+                                                              <span className="resume-skill-percent">{skill?.skillPercent || 0}%</span>
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  </div>
+                                                )}
+
+
+
+                                                {profile._candidate?.personalInfo?.languages?.length > 0 && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Languages</h2>
+                                                    <div className="resume-languages-list">
+                                                      {profile._candidate.personalInfo.languages.map((lang, index) => (
+                                                        <div className="resume-language-item" key={`resume-lang-${index}`}>
+                                                          <div className="resume-language-name">{lang.name || lang.lname || 'Language'}</div>
+                                                          {lang.level && (
+                                                            <div className="resume-language-level">
+                                                              {[1, 2, 3, 4, 5].map(dot => (
+                                                                <span
+                                                                  key={`resume-lang-dot-${index}-${dot}`}
+                                                                  className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
+                                                                ></span>
+                                                              ))}
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  </div>
+                                                )}
+
+
+                                                {profile._candidate?.personalInfo?.certifications?.length > 0 && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Certifications</h2>
+                                                    <ul className="resume-certifications-list">
+                                                      {profile._candidate.personalInfo.certifications.map((cert, index) => (
+                                                        <li key={`resume-cert-${index}`} className="resume-certification-item">
+                                                          <strong>{cert.certificateName || cert.name}</strong>
+                                                          {cert.orgName && (
+                                                            <span className="resume-cert-org"> - {cert.orgName}</span>
+                                                          )}
+                                                          {(cert.month || cert.year) && (
+                                                            <span className="resume-cert-date">
+                                                              {cert.month && cert.year ?
+                                                                ` (${cert.month}/${cert.year})` :
+                                                                cert.month ?
+                                                                  ` (${cert.month})` :
+                                                                  cert.year ?
+                                                                    ` (${cert.year})` :
+                                                                    ''}
+                                                            </span>
+                                                          )}
+                                                        </li>
+                                                      ))}
+                                                    </ul>
+                                                  </div>
+                                                )}
+
+
+                                                {profile._candidate?.personalInfo?.projects?.length > 0 && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Projects</h2>
+                                                    {profile._candidate.personalInfo.projects.map((proj, index) => (
+                                                      <div className="resume-project-item" key={`resume-proj-${index}`}>
+                                                        <div className="resume-item-header">
+                                                          <h3 className="resume-project-title">
+                                                            {proj.projectName || 'Project'}
+                                                            {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
+                                                          </h3>
+                                                        </div>
+                                                        {proj.description && (
+                                                          <div className="resume-item-content">
+                                                            <p>{proj.description}</p>
                                                           </div>
                                                         )}
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                )}
 
-                                                        {/* Status Badge Overlay */}
-                                                        <div className="status-badge-overlay">
-                                                          {(latestUpload?.status === 'Pending' || doc.status === 'Pending') && (
-                                                            <span className="status-badge-new pending">
-                                                              <i className="fas fa-clock"></i>
-                                                              Pending
-                                                            </span>
-                                                          )}
-                                                          {(latestUpload?.status === 'Verified' || doc.status === 'Verified') && (
-                                                            <span className="status-badge-new verified">
-                                                              <i className="fas fa-check-circle"></i>
-                                                              Verified
-                                                            </span>
-                                                          )}
-                                                          {(latestUpload?.status === 'Rejected' || doc.status === 'Rejected') && (
-                                                            <span className="status-badge-new rejected">
-                                                              <i className="fas fa-times-circle"></i>
-                                                              Rejected
-                                                            </span>
-                                                          )}
-                                                          {(!latestUpload && doc.status === "Not Uploaded") && (
-                                                            <span className="status-badge-new not-uploaded">
-                                                              <i className="fas fa-upload"></i>
-                                                              Required
-                                                            </span>
-                                                          )}
+
+                                                {profile._candidate?.personalInfo?.interest?.length > 0 && (
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Interests</h2>
+                                                    <div className="resume-interests-tags">
+                                                      {profile._candidate.personalInfo.interest.map((interest, index) => (
+                                                        <span className="resume-interest-tag" key={`resume-interest-${index}`}>
+                                                          {interest}
+                                                        </span>
+                                                      ))}
+                                                    </div>
+                                                  </div>
+                                                )}
+
+                                              </div>
+                                            </div>
+
+
+                                            {profile._candidate?.personalInfo?.declaration?.text && (
+                                              <div className="resume-declaration">
+                                                <h2 className="resume-section-title">Declaration</h2>
+                                                <p>{profile._candidate.personalInfo.declaration.text}</p>
+
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+
+
+                                    )}
+
+                                    {/* Job History Tab */}
+                                    {/* {activeTab === 2 && ( */}
+                                    {(activeTab[profileIndex] || 0) === 2 && (
+                                      <div className="tab-pane active" id="job-history">
+                                        <div className="section-card">
+                                          <div className="table-responsive">
+                                            <table className="table table-hover table-bordered job-history-table">
+                                              <thead className="table-light">
+                                                <tr>
+                                                  <th>S.No</th>
+                                                  <th>Company Name</th>
+                                                  <th>Position</th>
+                                                  {/* <th>Duration</th>
+                                                  <th>Location</th>
+                                                  <th>Status</th> */}
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+
+                                                {jobHistory?.length > 0 ? (
+                                                  jobHistory?.map((job, index) => (
+                                                    <tr key={index}>
+                                                      <td>{index + 1}</td>
+                                                      <td>{job._job.displayCompanyName}</td>
+                                                      <td>{job._job.title}</td>
+                                                      {/* <td>
+                                                                  {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
+                                                                  {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
+                                                                </td>
+                                                                <td>Remote</td>
+                                                                <td><span className="text-success">Completed</span></td> */}
+                                                    </tr>
+                                                  ))
+                                                ) : (
+                                                  <tr>
+                                                    <td colSpan={6} className="text-center">No job history available</td>
+                                                  </tr>
+                                                )}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Course History Tab */}
+                                    {/* {activeTab === 3 && ( */}
+                                    {(activeTab[profileIndex] || 0) === 3 && (
+
+                                      <div className="tab-pane active" id="course-history">
+                                        <div className="section-card">
+                                          <div className="table-responsive">
+                                            <table className="table table-hover table-bordered course-history-table">
+                                              <thead className="table-light">
+                                                <tr>
+                                                  <th>S.No</th>
+                                                  <th>Applied Date</th>
+                                                  <th>Course Name</th>
+                                                  <th>Lead Added By</th>
+                                                  <th>Counsellor</th>
+                                                  <th>Status</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {courseHistory?.length > 0 ? (
+                                                  courseHistory?.map((course, index) => (
+                                                    <tr key={index}>
+                                                      <td>{index + 1}</td>
+                                                      <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
+                                                      <td>{course._course?.name || 'N/A'}</td>
+                                                      <td>{course.registeredBy?.name || 'Self Registered'}</td>
+                                                      <td>{course.month || ''} {course.year || ''}</td>
+                                                      <td><span className="text-success">{course._leadStatus?.title || '-'}</span></td>
+                                                    </tr>
+                                                  ))
+                                                ) : (
+                                                  <tr>
+                                                    <td colSpan={6} className="text-center">No course history available</td>
+                                                  </tr>
+                                                )}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Documents Tab */}
+                                    {/* {activeTab === 4 && ( */}
+
+                                    {(activeTab[profileIndex] || 0) === 4 && (
+                                      <div className="tab-pane active" id='studentsDocuments'>
+                                        {(() => {
+                                          const documentsToDisplay = profile.uploadedDocs || [];
+                                          const totalRequired = profile?.docCounts?.totalRequired || 0;
+
+                                          // If no documents are required, show a message
+                                          if (totalRequired === 0) {
+                                            return (
+                                              <div className="col-12 text-center py-5">
+                                                <div className="text-muted">
+                                                  <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
+                                                  <h5 className="text-success">No Documents Required</h5>
+                                                  <p>This course does not require any document verification.</p>
+                                                </div>
+                                              </div>
+
+                                            );
+                                          }
+
+                                          // If documents are required, show the full interface
+                                          return (
+                                            <div className="enhanced-documents-panel">
+                                              {/* Enhanced Stats Grid */}
+                                              <div className="stats-grid">
+                                                {(() => {
+                                                  // Use backend counts only, remove static document fallback
+                                                  const backendCounts = profile?.docCounts || {};
+                                                  return (
+                                                    <>
+                                                      <div className="stat-card total-docs docDetails">
+                                                        <div className="stat-icon d-md-block ">
+                                                          <i className="fas fa-file-alt docIcon"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.totalRequired || 0}</h4>
+                                                          <p>Total Required</p>
+                                                        </div>
+                                                        <div className="stat-trend d-md-block ">
+                                                          <i className="fas fa-list"></i>
                                                         </div>
                                                       </div>
 
-                                                      <div className="document-info-section">
-                                                        <div className="document-header">
-                                                          <h4 className="document-title">{doc.Name || `Document ${index + 1}`}</h4>
-                                                          <div className="document-actions">
-                                                            {(!latestUpload) ? (
-                                                              <button className="action-btn upload-btn" title="Upload Document" data-bs-toggle="modal" data-bs-target="#staticBackdrop" onClick={() => {
-                                                                setSelectedProfile(profile); // Set the current profile
-                                                                openUploadModal(doc);        // Open the upload modal
-                                                              }}>
-                                                                <i className="fas fa-cloud-upload-alt"></i>
-                                                                Upload
-                                                              </button>
-                                                            ) : (
-                                                              <button
-                                                                className="action-btn verify-btn"
-                                                                onClick={() => openDocumentModal(doc)}
-                                                                title="Verify Document"
-                                                              >
-                                                                <i className="fas fa-search"></i>
-                                                                PREVIEW
-                                                              </button>
+                                                      <div className="stat-card uploaded-docs docDetails">
+                                                        <div className="stat-icon d-md-block ">
+                                                          <i className="fas fa-cloud-upload-alt docIcon"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.uploadedCount || 0}</h4>
+                                                          <p>Uploaded</p>
+                                                        </div>
+                                                        <div className="stat-trend d-md-block ">
+                                                          <i className="fas fa-arrow-up"></i>
+                                                        </div>
+                                                      </div>
+
+                                                      <div className="stat-card pending-docs docDetails">
+                                                        <div className="stat-icon d-md-block ">
+                                                          <i className="fas fa-clock docIcon"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.pendingVerificationCount || 0}</h4>
+                                                          <p>Pending Review</p>
+                                                        </div>
+                                                        <div className="stat-trend d-md-block ">
+                                                          <i className="fas fa-exclamation-triangle"></i>
+                                                        </div>
+                                                      </div>
+
+                                                      <div className="stat-card verified-docs docDetails">
+                                                        <div className="stat-icon d-md-block ">
+                                                          <i className="fas fa-check-circle docIcon"></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.verifiedCount || 0}</h4>
+                                                          <p>Approved</p>
+                                                        </div>
+                                                        <div className="stat-trend d-md-block ">
+                                                          <i className="fas fa-thumbs-up"></i>
+                                                        </div>
+                                                      </div>
+
+                                                      <div className="stat-card rejected-docs docDetails">
+                                                        <div className="stat-icon d-md-block ">
+                                                          <i className="fas fa-times-circle docIcon "></i>
+                                                        </div>
+                                                        <div className="stat-info">
+                                                          <h4>{backendCounts.RejectedCount || 0}</h4>
+                                                          <p>Rejected</p>
+                                                        </div>
+                                                        <div className="stat-trend d-md-block ">
+                                                          <i className="fas fa-arrow-down"></i>
+                                                        </div>
+                                                      </div>
+                                                    </>
+                                                  );
+                                                })()}
+                                              </div>
+
+                                              {/* Enhanced Filter Section */}
+                                              <div className="filter-section-enhanced">
+                                                <div className="filter-tabs-container">
+                                                  <h5 className="filter-title">
+                                                    <i className="fas fa-filter me-2"></i>
+                                                    Filter Documents
+                                                  </h5>
+                                                  <div className="filter-tabs">
+                                                    {(() => {
+                                                      const backendCounts = profile?.docCounts || {};
+                                                      return (
+                                                        <>
+                                                          <button
+                                                            className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
+                                                            onClick={() => setStatusFilter('all')}
+                                                          >
+                                                            <i className="fas fa-list-ul"></i>
+                                                            All Documents
+                                                            <span className="badge">{backendCounts.totalRequired || 0}</span>
+                                                          </button>
+                                                          <button
+                                                            className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
+                                                            onClick={() => setStatusFilter('pending')}
+                                                          >
+                                                            <i className="fas fa-clock"></i>
+                                                            Pending
+                                                            <span className="badge">{backendCounts.pendingVerificationCount || 0}</span>
+                                                          </button>
+                                                          <button
+                                                            className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
+                                                            onClick={() => setStatusFilter('verified')}
+                                                          >
+                                                            <i className="fas fa-check-circle"></i>
+                                                            Verified
+                                                            <span className="badge">{backendCounts.verifiedCount || 0}</span>
+                                                          </button>
+                                                          <button
+                                                            className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
+                                                            onClick={() => setStatusFilter('rejected')}
+                                                          >
+                                                            <i className="fas fa-times-circle"></i>
+                                                            Rejected
+                                                            <span className="badge">{backendCounts.RejectedCount || 0}</span>
+                                                          </button>
+                                                        </>
+                                                      );
+                                                    })()}
+                                                  </div>
+                                                </div>
+                                              </div>
+
+                                              {/* Enhanced Documents Grid */}
+                                              <div className="documents-grid-enhanced">
+                                                {(() => {
+                                                  // Filter documents based on status filter
+                                                  const filteredDocs = filterDocuments(documentsToDisplay);
+
+                                                  if (filteredDocs.length === 0) {
+                                                    return (
+                                                      <div className="col-12 text-center py-5">
+                                                        <div className="text-muted">
+                                                          <i className="fas fa-filter fa-3x mb-3"></i>
+                                                          <h5>No Documents Found</h5>
+                                                          <p>No documents match the current filter criteria.</p>
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  }
+
+                                                  return filteredDocs.map((doc, index) => {
+                                                    // Check if this is a document with upload data or just uploaded file info
+                                                    const latestUpload = doc.uploads && doc.uploads.length > 0
+                                                      ? doc.uploads[doc.uploads.length - 1]
+                                                      : (doc.fileUrl && doc.status !== "Not Uploaded" ? doc : null);
+
+                                                    return (
+                                                      <div key={doc._id || index} className="document-card-enhanced">
+                                                        <div className="document-image-container">
+                                                          {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
+                                                            <>
+                                                              {(() => {
+                                                                const fileUrl = getDocFileUrl(latestUpload?.fileUrl || doc.fileUrl);
+                                                                const fileType = getFileType(fileUrl);
+
+                                                                if (fileType === 'image') {
+                                                                  return (
+                                                                    <img
+                                                                      src={fileUrl}
+                                                                      alt="Document Preview"
+                                                                      className="document-image"
+                                                                    />
+                                                                  );
+                                                                } else if (fileType === 'pdf') {
+                                                                  return (
+                                                                    <div className="document-preview-icon">
+                                                                      <i className="fa-solid fa-file" style={{ fontSize: '100px', color: '#dc3545' }}></i>
+                                                                      <p style={{ fontSize: '12px', marginTop: '10px' }}>PDF Document</p>
+                                                                    </div>
+                                                                  );
+                                                                } else {
+                                                                  return (
+                                                                    <div className="document-preview-icon">
+                                                                      <i className={`fas ${fileType === 'pdf' ? 'fa-file-word' :
+                                                                        fileType === 'spreadsheet' ? 'fa-file-excel' : 'fa-file'
+                                                                        }`} style={{ fontSize: '40px', color: '#6c757d' }}></i>
+                                                                      <p style={{ fontSize: '12px', marginTop: '10px' }}>
+                                                                        {fileType === 'document' ? 'Document' :
+                                                                          fileType === 'spreadsheet' ? 'Spreadsheet' : 'File'}
+                                                                      </p>
+                                                                    </div>
+                                                                  );
+                                                                }
+                                                              })()}
+                                                              <div className="image-overlay">
+                                                                <button
+                                                                  className="preview-btn"
+                                                                  onClick={() => openDocumentModal(doc)}
+                                                                >
+                                                                  <i className="fas fa-search-plus"></i>
+                                                                  Preview
+                                                                </button>
+                                                              </div>
+                                                            </>
+                                                          ) : (
+                                                            <div className="no-document-placeholder">
+                                                              <i className="fas fa-file-upload"></i>
+                                                              <p>No Document</p>
+                                                            </div>
+                                                          )}
+
+                                                          {/* Status Badge Overlay */}
+                                                          <div className="status-badge-overlay">
+                                                            {(latestUpload?.status === 'Pending' || doc.status === 'Pending') && (
+                                                              <span className="status-badge-new pending">
+                                                                <i className="fas fa-clock"></i>
+                                                                Pending
+                                                              </span>
+                                                            )}
+                                                            {(latestUpload?.status === 'Verified' || doc.status === 'Verified') && (
+                                                              <span className="status-badge-new verified">
+                                                                <i className="fas fa-check-circle"></i>
+                                                                Verified
+                                                              </span>
+                                                            )}
+                                                            {(latestUpload?.status === 'Rejected' || doc.status === 'Rejected') && (
+                                                              <span className="status-badge-new rejected">
+                                                                <i className="fas fa-times-circle"></i>
+                                                                Rejected
+                                                              </span>
+                                                            )}
+                                                            {(!latestUpload && doc.status === "Not Uploaded") && (
+                                                              <span className="status-badge-new not-uploaded">
+                                                                <i className="fas fa-upload"></i>
+                                                                Required
+                                                              </span>
                                                             )}
                                                           </div>
                                                         </div>
 
-                                                        <div className="document-meta">
-                                                          <div className="meta-item">
-                                                            <i className="fas fa-calendar-alt text-muted"></i>
-                                                            <span className="meta-text">
-                                                              {(latestUpload?.uploadedAt || doc.uploadedAt) ?
-                                                                new Date(latestUpload?.uploadedAt || doc.uploadedAt).toLocaleDateString('en-GB', {
-                                                                  day: '2-digit',
-                                                                  month: 'short',
-                                                                  year: 'numeric'
-                                                                }) :
-                                                                'Not uploaded'
-                                                              }
-                                                            </span>
+                                                        <div className="document-info-section">
+                                                          <div className="document-header">
+                                                            <h4 className="document-title">{doc.Name || `Document ${index + 1}`}</h4>
+                                                            <div className="document-actions">
+                                                              {(!latestUpload) ? (
+                                                                <button className="action-btn upload-btn" title="Upload Document" data-bs-toggle="modal" data-bs-target="#staticBackdrop" onClick={() => {
+                                                                  setSelectedProfile(profile); // Set the current profile
+                                                                  openUploadModal(doc);        // Open the upload modal
+                                                                }}>
+                                                                  <i className="fas fa-cloud-upload-alt"></i>
+                                                                  Upload
+                                                                </button>
+                                                              ) : (
+                                                                <button
+                                                                  className="action-btn verify-btn"
+                                                                  onClick={() => openDocumentModal(doc)}
+                                                                  title="Verify Document"
+                                                                >
+                                                                  <i className="fas fa-search"></i>
+                                                                  PREVIEW
+                                                                </button>
+                                                              )}
+                                                            </div>
                                                           </div>
 
-                                                          {latestUpload && (
+                                                          <div className="document-meta">
                                                             <div className="meta-item">
-                                                              <i className="fas fa-clock text-muted"></i>
+                                                              <i className="fas fa-calendar-alt text-muted"></i>
                                                               <span className="meta-text">
-                                                                {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
-                                                                  hour: '2-digit',
-                                                                  minute: '2-digit'
-                                                                })}
+                                                                {(latestUpload?.uploadedAt || doc.uploadedAt) ?
+                                                                  new Date(latestUpload?.uploadedAt || doc.uploadedAt).toLocaleDateString('en-GB', {
+                                                                    day: '2-digit',
+                                                                    month: 'short',
+                                                                    year: 'numeric'
+                                                                  }) :
+                                                                  'Not uploaded'
+                                                                }
                                                               </span>
                                                             </div>
-                                                          )}
-                                                        </div>
-                                                      </div>
-                                                    </div>
-                                                  );
-                                                });
-                                              })()}
-                                            </div>
 
-                                            {/* <DocumentModal /> */}
-                                            {showDocumentModal && (
-                                              <DocumentModal
-                                                showDocumentModal={showDocumentModal}
-                                                selectedDocument={selectedDocument}
-                                                closeDocumentModal={closeDocumentModal}
-                                                updateDocumentStatus={updateDocumentStatus}
-                                                getFileType={getFileType}
-                                              />
-                                            )}
-                                            <div className="modal fade w-100" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
-                                              <div className="modal-dialog d-flex  justify-content-center mx-auto w-100">
-                                                <div className="modal-content p-0 w-100">
-                                                  <div className="modal-header">
-                                                    <h3>
-                                                      <i className="fas fa-cloud-upload-alt me-2"></i>
-                                                      Upload {selectedDocumentForUpload?.Name || 'Document'}
-                                                    </h3>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onClick={closeUploadModal}></button>
-                                                  </div>
-                                                  <div className="modal-body">
-
-
-
-                                                    <div className="upload-section">
-                                                      {!selectedFile ? (
-                                                        <div className="file-drop-zone">
-                                                          <div className="drop-zone-content">
-                                                            <i className="fas fa-cloud-upload-alt upload-icon"></i>
-                                                            <h4>Choose a file to upload</h4>
-                                                            <p>Drag and drop a file here, or click to select</p>
-                                                            <div className="file-types">
-                                                              <span>Supported: JPG, PNG, GIF, PDF</span>
-                                                              <span>Max size: 10MB</span>
-                                                            </div>
-                                                            <input
-                                                              type="file"
-                                                              id="file-input"
-                                                              accept=".jpg,.jpeg,.png,.gif,.pdf"
-                                                              onChange={handleFileSelect}
-                                                              style={{ display: 'none' }}
-                                                            />
-                                                            <button
-                                                              className="btn btn-primary"
-
-                                                              onClick={() => document.getElementById('file-input').click()}
-                                                            >
-                                                              <i className="fas fa-folder-open me-2"></i>
-                                                              Choose File
-                                                            </button>
+                                                            {latestUpload && (
+                                                              <div className="meta-item">
+                                                                <i className="fas fa-clock text-muted"></i>
+                                                                <span className="meta-text">
+                                                                  {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit'
+                                                                  })}
+                                                                </span>
+                                                              </div>
+                                                            )}
                                                           </div>
                                                         </div>
-                                                      ) : (
-                                                        <div className="file-preview-section">
-                                                          <div className="selected-file-info">
-                                                            <h4>Selected File:</h4>
-                                                            <div className="file-details">
-                                                              <div className="file-icon">
-                                                                <i className={`fas ${selectedFile.type.startsWith('image/') ? 'fa-image' : 'fa-file-pdf'}`}></i>
+                                                      </div>
+                                                    );
+                                                  });
+                                                })()}
+                                              </div>
+
+                                              {/* <DocumentModal /> */}
+                                              {showDocumentModal && (
+                                                <DocumentModal
+                                                  showDocumentModal={showDocumentModal}
+                                                  selectedDocument={selectedDocument}
+                                                  closeDocumentModal={closeDocumentModal}
+                                                  updateDocumentStatus={updateDocumentStatus}
+                                                  getFileType={getFileType}
+                                                />
+                                              )}
+                                              <div className="modal fade w-100" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+                                                <div className="modal-dialog d-flex  justify-content-center mx-auto w-100">
+                                                  <div className="modal-content p-0 w-100">
+                                                    <div className="modal-header">
+                                                      <h3>
+                                                        <i className="fas fa-cloud-upload-alt me-2"></i>
+                                                        Upload {selectedDocumentForUpload?.Name || 'Document'}
+                                                      </h3>
+                                                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onClick={closeUploadModal}></button>
+                                                    </div>
+                                                    <div className="modal-body">
+
+
+
+                                                      <div className="upload-section">
+                                                        {!selectedFile ? (
+                                                          <div className="file-drop-zone">
+                                                            <div className="drop-zone-content">
+                                                              <i className="fas fa-cloud-upload-alt upload-icon"></i>
+                                                              <h4>Choose a file to upload</h4>
+                                                              <p>Drag and drop a file here, or click to select</p>
+                                                              <div className="file-types">
+                                                                <span>Supported: JPG, PNG, GIF, PDF</span>
+                                                                <span>Max size: 10MB</span>
                                                               </div>
-                                                              <div className="file-info">
-                                                                <p className="file-name">{selectedFile.name}</p>
-                                                                <p className="file-size">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                                                              </div>
+                                                              <input
+                                                                type="file"
+                                                                id="file-input"
+                                                                accept=".jpg,.jpeg,.png,.gif,.pdf"
+                                                                onChange={handleFileSelect}
+                                                                style={{ display: 'none' }}
+                                                              />
                                                               <button
-                                                                className="btn btn-sm btn-outline-secondary"
-                                                                onClick={() => {
-                                                                  setSelectedFile(null);
-                                                                  setUploadPreview(null);
-                                                                }}
+                                                                className="btn btn-primary"
+
+                                                                onClick={() => document.getElementById('file-input').click()}
                                                               >
-                                                                <i className="fas fa-trash"></i>
+                                                                <i className="fas fa-folder-open me-2"></i>
+                                                                Choose File
                                                               </button>
                                                             </div>
                                                           </div>
-
-                                                          {uploadPreview && (
-                                                            <div className="upload-preview">
-                                                              <h5>Preview:</h5>
-                                                              <img src={uploadPreview} alt="Upload Preview" className="preview-image" />
-                                                            </div>
-                                                          )}
-
-                                                          {isUploading && (
-                                                            <div className="upload-progress-section">
-                                                              <h5>Uploading...</h5>
-                                                              <div className="progress-bar-container">
-                                                                <div
-                                                                  className="progress-bar"
-                                                                  style={{ width: `${uploadProgress}%` }}
-                                                                ></div>
+                                                        ) : (
+                                                          <div className="file-preview-section">
+                                                            <div className="selected-file-info">
+                                                              <h4>Selected File:</h4>
+                                                              <div className="file-details">
+                                                                <div className="file-icon">
+                                                                  <i className={`fas ${selectedFile.type.startsWith('image/') ? 'fa-image' : 'fa-file-pdf'}`}></i>
+                                                                </div>
+                                                                <div className="file-info">
+                                                                  <p className="file-name">{selectedFile.name}</p>
+                                                                  <p className="file-size">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                                                                </div>
+                                                                <button
+                                                                  className="btn btn-sm btn-outline-secondary"
+                                                                  onClick={() => {
+                                                                    setSelectedFile(null);
+                                                                    setUploadPreview(null);
+                                                                  }}
+                                                                >
+                                                                  <i className="fas fa-trash"></i>
+                                                                </button>
                                                               </div>
-                                                              <p>{uploadProgress}% Complete</p>
                                                             </div>
-                                                          )}
-                                                        </div>
-                                                      )}
+
+                                                            {uploadPreview && (
+                                                              <div className="upload-preview">
+                                                                <h5>Preview:</h5>
+                                                                <img src={uploadPreview} alt="Upload Preview" className="preview-image" />
+                                                              </div>
+                                                            )}
+
+                                                            {isUploading && (
+                                                              <div className="upload-progress-section">
+                                                                <h5>Uploading...</h5>
+                                                                <div className="progress-bar-container">
+                                                                  <div
+                                                                    className="progress-bar"
+                                                                    style={{ width: `${uploadProgress}%` }}
+                                                                  ></div>
+                                                                </div>
+                                                                <p>{uploadProgress}% Complete</p>
+                                                              </div>
+                                                            )}
+                                                          </div>
+                                                        )}
+                                                      </div>
+
+
+
                                                     </div>
-
-
-
-                                                  </div>
-                                                  <div className="modal-footer">
-                                                    <button
-                                                      className="btn btn-secondary"
-                                                      onClick={closeUploadModal}
-                                                      disabled={isUploading}
-                                                    >
-                                                      Cancel
-                                                    </button>
-                                                    <button
-                                                      className="btn btn-primary"
-                                                      onClick={handleFileUpload}
-                                                      disabled={!selectedFile || isUploading}
-                                                    >
-                                                      {isUploading ? (
-                                                        <>
-                                                          <i className="fas fa-spinner fa-spin me-2"></i>
-                                                          Uploading...
-                                                        </>
-                                                      ) : (
-                                                        <>
-                                                          <i className="fas fa-upload me-2"></i>
-                                                          Upload Document
-                                                        </>
-                                                      )}
-                                                    </button>
+                                                    <div className="modal-footer">
+                                                      <button
+                                                        className="btn btn-secondary"
+                                                        onClick={closeUploadModal}
+                                                        disabled={isUploading}
+                                                      >
+                                                        Cancel
+                                                      </button>
+                                                      <button
+                                                        className="btn btn-primary"
+                                                        onClick={handleFileUpload}
+                                                        disabled={!selectedFile || isUploading}
+                                                      >
+                                                        {isUploading ? (
+                                                          <>
+                                                            <i className="fas fa-spinner fa-spin me-2"></i>
+                                                            Uploading...
+                                                          </>
+                                                        ) : (
+                                                          <>
+                                                            <i className="fas fa-upload me-2"></i>
+                                                            Upload Document
+                                                          </>
+                                                        )}
+                                                      </button>
+                                                    </div>
                                                   </div>
                                                 </div>
                                               </div>
                                             </div>
-                                          </div>
-                                        );
-                                      })()}
-                                    </div>
-                                  )}
+                                          );
+                                        })()}
+                                      </div>
+                                    )}
 
-                                </div>
+                                  </div>)
                               )}
                             </div>
 
@@ -5786,8 +15287,7 @@ const CRMDashboard = () => {
                                       <button type="button" className="btn-close" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}></button>
                                     </div>
                                     <div className="modal-body">
-                                      {console.log('Modal body rendering, candidateRef:', candidateRef)}
-                                      <CandidateProfile ref={candidateRef} />
+                                      <CandidateProfile ref={candidateRef} leadData={selectedProfile} />
                                     </div>
                                     <div className="modal-footer">
                                       <button type="button" className="btn btn-secondary" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}>Close</button>
@@ -5798,10 +15298,311 @@ const CRMDashboard = () => {
                               </div>
                             )}
 
+                            {showBranchModal && (
+                              <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                                <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+                                  <div className="modal-content">
+                                    <div className="modal-header">
+                                      <h1 className="modal-title fs-5">Select Branch</h1>
+                                      <button type="button" className="btn-close" onClick={() => setShowBranchModal(false)}></button>
+                                    </div>
+                                    <div className="modal-body">
+                                      <div className="position-relative">
+                                        <select
+                                          className="form-select border-0 shadow-sm"
+                                          id="course"
+                                          value={selectedBranch}
+                                          onChange={(e) => setSelectedBranch(e.target.value)}
+                                          style={{
+                                            height: '48px',
+                                            padding: '12px 16px',
+                                            backgroundColor: '#f8f9fa',
+                                            borderRadius: '8px',
+                                            fontSize: '14px',
+                                            transition: 'all 0.3s ease',
+                                            border: '1px solid #e9ecef',
+
+                                          }}
+
+                                        >
+                                          <option value="">Select Branch</option>
+                                          {branches && branches.data && branches.data.length > 0 && branches.data.map((branch, index) => (
+                                            <option key={branch._id || index} value={branch._id}>
+                                              {branch.name}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+
+
+                                    </div>
+                                    <div className="modal-footer">
+                                      <button type="button" className="btn btn-secondary" onClick={() => {
+                                        setShowBranchModal(false);
+                                        setSelectedBranch('');
+                                      }}>Close</button>
+                                      <button type="button" className="btn btn-primary" onClick={() => updateBranch(profile, selectedBranch)}>Save Branch</button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {modalType === 'whatsapp' && (
+                            <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                              <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered" style={{ maxWidth: '600px' }}>
+                                <div className="modal-content">
+                                  <div className="modal-header">
+                                    <h1 className="modal-title fs-5">Whatsapp Chat</h1>
+                                    <button type="button" className="btn-close" onClick={() => {
+                                      setModalType(null);
+                                      setSelectedSenderId('');
+                                      setSelectedWhatsappNumbers([]);
+                                      setResponseRecipient('sender');
+                                      setSelectedWhatsappTemplateModal('');
+                                      setWhatsappMessage('');
+                                      setShowBulkInputs(false);
+                                      setBulkMode(null);
+                                    }}></button>
+                                  </div>
+                                  <div className="modal-body" style={{ padding: '20px' }}>
+                                    
+                                    <div className="mb-4">
+                                      <h5 className="fw-bold mb-3">Select the whatsapp number to send</h5>
+                                      <div className="d-flex flex-column gap-2">
+                                        {['Primary Mobile', 'Father\'s Mobile', 'Mother\'s Mobile', 'Whatsapp Number'].map((numberType) => (
+                                          <div key={numberType} className="form-check">
+                                            <input
+                                              className="form-check-input"
+                                              type="checkbox"
+                                              id={`whatsappNumber-${numberType}`}
+                                              checked={selectedWhatsappNumbers.includes(numberType)}
+                                              onChange={(e) => {
+                                                if (e.target.checked) {
+                                                  setSelectedWhatsappNumbers([...selectedWhatsappNumbers, numberType]);
+                                                } else {
+                                                  setSelectedWhatsappNumbers(selectedWhatsappNumbers.filter(n => n !== numberType));
+                                                }
+                                              }}
+                                              style={{ cursor: 'pointer' }}
+                                            />
+                                            <label className="form-check-label" htmlFor={`whatsappNumber-${numberType}`} style={{ cursor: 'pointer' }}>
+                                              {numberType}
+                                            </label>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    {/* <div className="mb-4">
+                                      <h5 className="fw-bold mb-3">Select a user to receive students response</h5>
+                                      <div className="d-flex flex-column gap-2">
+                                        <div className="form-check">
+                                          <input
+                                            className="form-check-input"
+                                            type="radio"
+                                            name="responseRecipient"
+                                            id="responseRecipientSender"
+                                            value="sender"
+                                            checked={responseRecipient === 'sender'}
+                                            onChange={(e) => setResponseRecipient(e.target.value)}
+                                            style={{ cursor: 'pointer', accentColor: '#ff6b35' }}
+                                          />
+                                          <label className="form-check-label" htmlFor="responseRecipientSender" style={{ cursor: 'pointer' }}>
+                                            Sender
+                                          </label>
+                                        </div>
+                                        <div className="form-check">
+                                          <input
+                                            className="form-check-input"
+                                            type="radio"
+                                            name="responseRecipient"
+                                            id="responseRecipientLeadOwner"
+                                            value="leadOwner"
+                                            checked={responseRecipient === 'leadOwner'}
+                                            onChange={(e) => setResponseRecipient(e.target.value)}
+                                            style={{ cursor: 'pointer', accentColor: '#ff6b35' }}
+                                          />
+                                          <label className="form-check-label" htmlFor="responseRecipientLeadOwner" style={{ cursor: 'pointer' }}>
+                                            Lead Owner
+                                          </label>
+                                        </div>
+                                      </div>
+                                    </div> */}
+
+                                    {/* Select WhatsApp Template Section */}
+                                    <div className="mb-4">
+                                      <label htmlFor="whatsappTemplate" className="form-label fw-bold mb-2">Select WhatsApp Template</label>
+                                      <select
+                                        className="form-select border-0 shadow-sm"
+                                        id="whatsappTemplate"
+                                        value={selectedWhatsappTemplateModal}
+                                        onChange={(e) => setSelectedWhatsappTemplateModal(e.target.value)}
+                                        disabled={whatsappTemplates.length === 0}
+                                        style={{
+                                          height: '48px',
+                                          padding: '12px 16px',
+                                          backgroundColor: whatsappTemplates.length === 0 ? '#e9ecef' : '#f8f9fa',
+                                          borderRadius: '8px',
+                                          fontSize: '14px',
+                                          transition: 'all 0.3s ease',
+                                          border: '1px solid #e9ecef',
+                                          cursor: whatsappTemplates.length === 0 ? 'not-allowed' : 'pointer'
+                                        }}
+                                      >
+                                        <option value="">
+                                          {whatsappTemplates.length === 0 ? 'Loading templates...' : 'Select WhatsApp Template'}
+                                        </option>
+                                        {whatsappTemplates && whatsappTemplates.length > 0 && whatsappTemplates.map((template, index) => (
+                                          <option key={template.id || index} value={template.id || template.name}>
+                                            {template.name || template.id}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      {whatsappTemplates.length === 0 && (
+                                        <small className="text-muted d-block mt-1">
+                                          <i className="fas fa-spinner fa-spin me-1"></i>
+                                          Fetching templates...
+                                        </small>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="modal-footer">
+                                    <button type="button" className="btn btn-secondary" onClick={() => {
+                                      setModalType(null);
+                                      setSelectedSenderId('');
+                                      setSelectedWhatsappNumbers([]);
+                                      setResponseRecipient('sender');
+                                      setSelectedWhatsappTemplateModal('');
+                                      setWhatsappMessage('');
+                                    }}>Close</button>
+                                    <button type="button" className="btn btn-primary" onClick={handleBulkWhatsappSend} disabled={isSendingBulkWhatsapp}>
+                                      {isSendingBulkWhatsapp ? (
+                                        <>
+                                          <span className="spinner-border spinner-border-sm me-2"></span>
+                                          Sending...
+                                        </>
+                                      ) : (
+                                        'Send Message'
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            )}
+                            {modalType === 'email' && (
+                            <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                              <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered" style={{ maxWidth: '600px' }}>
+                                <div className="modal-content">
+                                  <div className="modal-header">
+                                    <h1 className="modal-title fs-5">Send Email</h1>
+                                    <button type="button" className="btn-close" onClick={() => {
+                                      setModalType(null);
+                                      setSelectedSenderId('');
+                                      setSelectedWhatsappNumbers([]);
+                                      setResponseRecipient('sender');
+                                      setSelectedWhatsappTemplateModal('');
+                                      setWhatsappMessage('');
+                                      setShowBulkInputs(false);
+                                      setBulkMode(null);
+                                    }}></button>
+                                  </div>
+                                  <div className="modal-body" style={{ padding: '20px' }}>
+                                    
+                                    <div className="mb-4">
+                                      <h5 className="fw-bold mb-3">Select the Email to send</h5>
+                                      <div className="d-flex flex-column gap-2">
+                                        {['Primary Email', 'Father\'s Email', 'Mother\'s Email', 'Alternate Email'].map((numberType) => (
+                                          <div key={numberType} className="form-check">
+                                            <input
+                                              className="form-check-input"
+                                              type="checkbox"
+                                              id={`whatsappNumber-${numberType}`}
+                                              checked={selectedWhatsappNumbers.includes(numberType)}
+                                              onChange={(e) => {
+                                                if (e.target.checked) {
+                                                  setSelectedWhatsappNumbers([...selectedWhatsappNumbers, numberType]);
+                                                } else {
+                                                  setSelectedWhatsappNumbers(selectedWhatsappNumbers.filter(n => n !== numberType));
+                                                }
+                                              }}
+                                              style={{ cursor: 'pointer' }}
+                                            />
+                                            <label className="form-check-label" htmlFor={`whatsappNumber-${numberType}`} style={{ cursor: 'pointer' }}>
+                                              {numberType}
+                                            </label>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                     
+
+                                    {/* Select WhatsApp Template Section */}
+                                    <div className="mb-4">
+                                      <label htmlFor="whatsappTemplate" className="form-label fw-bold mb-2">Select Email Template</label>
+                                      <select
+                                        className="form-select border-0 shadow-sm"
+                                        id="whatsappTemplate"
+                                        value={selectedWhatsappTemplateModal}
+                                        onChange={(e) => setSelectedWhatsappTemplateModal(e.target.value)}
+                                        disabled={whatsappTemplates.length === 0}
+                                        style={{
+                                          height: '48px',
+                                          padding: '12px 16px',
+                                          backgroundColor: whatsappTemplates.length === 0 ? '#e9ecef' : '#f8f9fa',
+                                          borderRadius: '8px',
+                                          fontSize: '14px',
+                                          transition: 'all 0.3s ease',
+                                          border: '1px solid #e9ecef',
+                                          cursor: whatsappTemplates.length === 0 ? 'not-allowed' : 'pointer'
+                                        }}
+                                      >
+                                        <option value="">
+                                          {whatsappTemplates.length === 0 ? 'Loading templates...' : 'Select WhatsApp Template'}
+                                        </option>
+                                        {whatsappTemplates && whatsappTemplates.length > 0 && whatsappTemplates.map((template, index) => (
+                                          <option key={template.id || index} value={template.id || template.name}>
+                                            {template.name || template.id}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      {whatsappTemplates.length === 0 && (
+                                        <small className="text-muted d-block mt-1">
+                                          <i className="fas fa-spinner fa-spin me-1"></i>
+                                          Fetching templates...
+                                        </small>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="modal-footer">
+                                    <button type="button" className="btn btn-secondary" onClick={() => {
+                                      setModalType(null);
+                                      setSelectedSenderId('');
+                                      setSelectedWhatsappNumbers([]);
+                                      setResponseRecipient('sender');
+                                      setSelectedWhatsappTemplateModal('');
+                                      setWhatsappMessage('');
+                                    }}>Close</button>
+                                    <button type="button" className="btn btn-primary" onClick={handleBulkWhatsappSend} disabled={isSendingBulkWhatsapp}>
+                                      {isSendingBulkWhatsapp ? (
+                                        <>
+                                          <span className="spinner-border spinner-border-sm me-2"></span>
+                                          Sending...
+                                        </>
+                                      ) : (
+                                        'Send Message'
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            )}
 
                             <style>
-                              {
-                                `.new-modal-content{
+                              {`.new-modal-content{
                                  width:1000px!important;
                                  transform: translateX(25%);
                                  }
@@ -5809,16 +15610,16 @@ const CRMDashboard = () => {
                                  @media(max-width:768px){
                                  .new-modal-content{
                                  width:100%!important;
-                                 transform: translateX(0%)
+                                 transform: translateX(0%);
                                  }
                                  }
-                                  `
-                              }
+                                  `}
                             </style>
                           </div>
 
 
                         ))}
+                        </div>
 
 
 
@@ -5896,13 +15697,16 @@ const CRMDashboard = () => {
         {!isMobile && (
           <div className="col-4">
             <div className="row " style={{
-              zIndex: 15,
+
               transition: 'margin-top 0.2s ease-in-out',
-              position: 'fixed'
+              position: 'fixed',
+              width: '-webkit-fill-available',
+              zIndex: '10'
             }}>
               {renderEditPanel()}
               {renderRefferPanel()}
               {renderWhatsAppPanel()}
+              {renderEmailPanel()}
               {renderLeadHistoryPanel()}
               {renderAllLeadPanel()}
               {renderChangeCenterPanel()}
@@ -5914,11 +15718,621 @@ const CRMDashboard = () => {
         {isMobile && renderEditPanel()}
         {isMobile && renderRefferPanel()}
         {isMobile && renderWhatsAppPanel()}
+        {isMobile && renderEmailPanel()}
         {isMobile && renderLeadHistoryPanel()}
         {isMobile && renderAllLeadPanel()}
         {isMobile && renderChangeCenterPanel()}
+        {renderActionsModal()}
       </div>
       <UploadModal />
+
+      {/* Unified AI Supervision Modal */}
+      {showAiSupervision && (
+        <div
+          className="modal show fade d-block"
+          tabIndex="-1"
+          role="dialog"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowAiSupervision(false);
+          }}
+        >
+          <div className="modal-dialog modal-xl modal-dialog-scrollable" role="document">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">AI Supervision (Leads + WhatsApp)</h5>
+                <button type="button" className="btn-close" onClick={() => setShowAiSupervision(false)}></button>
+              </div>
+              <div className="modal-body">
+                {/* Top info + segmented controls */}
+                <div className="mb-3">
+                  <div className="d-flex flex-wrap justify-content-between align-items-center mb-2">
+                    <div className="small text-muted">
+                      Visible leads: <strong>{allProfiles?.length || 0}</strong> Â· Selected:{' '}
+                      <strong>{selectedProfiles?.length || 0}</strong>
+                    </div>
+                    <div className="badge bg-light text-dark border small">
+                      AI Tools Â· Bulk Actions Â· WhatsApp
+                    </div>
+                  </div>
+
+                  <div className="d-flex flex-column flex-lg-row gap-2">
+                    {/* AI tools / first N */}
+                    <div className="card border-0 bg-light flex-grow-1">
+                      <div className="card-body py-2">
+                        <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                          <span className="small fw-semibold text-muted text-uppercase">AI tools Â· First N leads</span>
+                          <div className="d-flex align-items-center gap-2">
+                            <span className="small text-muted">First N</span>
+                            <input
+                              type="text"
+                              className="form-control form-control-sm"
+                              value={aiSupervisionCount}
+                              onChange={(e) =>
+                                setAiSupervisionCount((e.target.value || '').replace(/[^0-9]/g, '').slice(0, 4))
+                              }
+                              style={{ width: 72 }}
+                              placeholder="10"
+                              title="Run AI for first N visible leads"
+                            />
+                          </div>
+                        </div>
+                        <div className="btn-group w-100">
+                          <button
+                            className="btn btn-sm btn-outline-primary"
+                            disabled={loadingLeadIntel || !allProfiles?.length}
+                            onClick={async () => {
+                              const leads = selectFirstNForAiSupervision();
+                              await fetchLeadIntelBulk(leads);
+                            }}
+                          >
+                            <i className="fas fa-robot me-1"></i> AI score
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={!allProfiles?.length}
+                            onClick={async () => {
+                              const leads = selectFirstNForAiSupervision();
+                              for (const p of leads) {
+                                // eslint-disable-next-line no-await-in-loop
+                                await generateLeadSummaryForProfile(p);
+                              }
+                            }}
+                          >
+                            <i className="fas fa-file-alt me-1"></i> Summaries
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-dark"
+                            disabled={!allProfiles?.length}
+                            onClick={async () => {
+                              const leads = selectFirstNForAiSupervision();
+                              for (const p of leads) {
+                                // eslint-disable-next-line no-await-in-loop
+                                await generateNextBestActionsForProfile(p);
+                              }
+                            }}
+                          >
+                            <i className="fas fa-bolt me-1"></i> Next actions
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-success"
+                            disabled={!allProfiles?.length}
+                            onClick={async () => {
+                              const leads = selectFirstNForAiSupervision();
+                              for (const p of leads) {
+                                // eslint-disable-next-line no-await-in-loop
+                                await generateAiWhatsappSummaryForProfile(p);
+                              }
+                            }}
+                          >
+                            <i className="fab fa-whatsapp me-1"></i> WhatsApp AI
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bulk for all / selected */}
+                    <div className="card border-0 bg-light flex-grow-1">
+                      <div className="card-body py-2">
+                        <div className="small fw-semibold text-muted text-uppercase mb-2">Bulk for all / selected</div>
+                        <div className="btn-group w-100 mb-2">
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={loadingLeadIntel || !allProfiles?.length}
+                            onClick={fetchLeadIntelAll}
+                          >
+                            <i className="fas fa-layer-group me-1"></i> AI (all)
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={loadingLeadIntel || !selectedProfiles?.length}
+                            onClick={fetchLeadIntelSelected}
+                          >
+                            <i className="fas fa-check-square me-1"></i> AI (selected)
+                          </button>
+                        </div>
+                        <div className="btn-group w-100">
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={!selectedProfiles?.length}
+                            onClick={generateLeadSummaryForSelected}
+                          >
+                            <i className="fas fa-file-alt me-1"></i> Summaries
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={!selectedProfiles?.length}
+                            onClick={generateNextBestActionsForSelected}
+                          >
+                            <i className="fas fa-bolt me-1"></i> Next actions
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-success"
+                            disabled={!selectedProfiles?.length}
+                            onClick={generateAiWhatsappSummaryForSelected}
+                          >
+                            <i className="fab fa-whatsapp me-1"></i> WhatsApp AI
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="card border-0 bg-light mb-3">
+                  <div className="card-body py-3">
+                    <div className="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
+                      <div>
+                        <div className="fw-semibold">AI Supervision Action Queue</div>
+                        <div className="small text-muted">
+                          Showing {filteredAiSupervisionQueue.length} action item(s)
+                          {aiSupervisionSearchTerm ? ` for "${aiSupervisionSearchTerm}"` : ''}.
+                        </div>
+                      </div>
+                      <div className="d-flex gap-2 flex-wrap">
+                        <input
+                          type="text"
+                          className="form-control form-control-sm"
+                          style={{ minWidth: 240 }}
+                          placeholder="Search student, course, reason, phone..."
+                          value={aiSupervisionSearchTerm}
+                          onChange={(e) => setAiSupervisionSearchTerm(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={() => {
+                            setAiSupervisionQueueFilter('all');
+                            setAiSupervisionSearchTerm('');
+                          }}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="d-flex flex-wrap gap-2 mb-3">
+                      <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'all' ? 'btn-dark' : 'btn-outline-dark'}`} onClick={() => setAiSupervisionQueueFilter('all')}>All ({aiQueueCounts.all})</button>
+                      <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'kycRejected' ? 'btn-danger' : 'btn-outline-danger'}`} onClick={() => setAiSupervisionQueueFilter('kycRejected')}>Rejected ({aiQueueCounts.kycRejected})</button>
+                      <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'kycPendingVerification' ? 'btn-primary' : 'btn-outline-primary'}`} onClick={() => setAiSupervisionQueueFilter('kycPendingVerification')}>Pending Verification ({aiQueueCounts.kycPendingVerification})</button>
+                      <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'kycNoUpload' ? 'btn-secondary' : 'btn-outline-secondary'}`} onClick={() => setAiSupervisionQueueFilter('kycNoUpload')}>No Upload ({aiQueueCounts.kycNoUpload})</button>
+                      <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'admissionUnpaid' ? 'btn-warning text-dark' : 'btn-outline-warning'}`} onClick={() => setAiSupervisionQueueFilter('admissionUnpaid')}>Unpaid ({aiQueueCounts.admissionUnpaid})</button>
+                      <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'admissionNoBatch' ? 'btn-info text-dark' : 'btn-outline-info'}`} onClick={() => setAiSupervisionQueueFilter('admissionNoBatch')}>No Batch ({aiQueueCounts.admissionNoBatch})</button>
+                      <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'dropoutRisk' ? 'btn-danger' : 'btn-outline-danger'}`} onClick={() => setAiSupervisionQueueFilter('dropoutRisk')}>Dropouts ({aiQueueCounts.dropoutRisk})</button>
+                      <button type="button" className={`btn btn-sm ${aiSupervisionQueueFilter === 'overdueFollowup' ? 'btn-outline-dark active' : 'btn-outline-dark'}`} onClick={() => setAiSupervisionQueueFilter('overdueFollowup')}>Overdue ({aiQueueCounts.overdueFollowup})</button>
+                    </div>
+
+                    {filteredAiSupervisionQueue.length > 0 ? (
+                      <div className="table-responsive">
+                        <table className="table table-sm align-middle mb-0">
+                          <thead className="table-light">
+                            <tr>
+                              <th>Severity</th>
+                              <th>Student</th>
+                              <th>Course</th>
+                              <th>Center</th>
+                              <th>Issue</th>
+                              <th>Reason</th>
+                              <th>Recommended Action</th>
+                              <th>Open</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredAiSupervisionQueue.map((item) => (
+                              <tr key={item._id}>
+                                <td>
+                                  <span className={`badge ${item.severity === 'High' ? 'bg-danger' : item.severity === 'Medium' ? 'bg-warning text-dark' : 'bg-success'}`}>
+                                    {item.severity}
+                                  </span>
+                                </td>
+                                <td className="fw-semibold">{item.studentName}</td>
+                                <td>{item.courseName}</td>
+                                <td>{item.centerName}</td>
+                                <td>{item.label}</td>
+                                <td className="small text-muted">{item.reason}</td>
+                                <td className="small">{item.action}</td>
+                                <td>
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline-primary"
+                                    onClick={() => setAiSupervisionActiveLeadId(item.leadId)}
+                                  >
+                                    Open
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="small text-muted">No action items found for the current queue filter.</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Main layout: leads table + AI insights panel */}
+                <div className="row g-3">
+                  <div className="col-12 col-lg-7">
+                    <div className="table-responsive">
+                      <table className="table table-sm align-middle mb-0">
+                    <thead className="table-light">
+                      <tr>
+                        <th>Lead</th>
+                        <th>Course</th>
+                        <th>Status</th>
+                        <th>AI Score</th>
+                        <th>Intent</th>
+                        <th>Next step</th>
+                        <th style={{ width: 140 }}>Quick actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(allProfiles || []).map((p) => {
+                        const intel = leadIntelMap[p._id];
+                        const leadSummary = leadSummaryByProfileId[p._id];
+                        const leadSummaryLoading = !!leadSummaryLoadingByProfileId[p._id];
+                        const leadSummaryErr = leadSummaryErrorByProfileId[p._id];
+                        const wa = waSummaryByProfileId[p._id];
+                        const waLoading = !!waSummaryLoadingByProfileId[p._id];
+                        const waErr = waSummaryErrorByProfileId[p._id];
+                        const actions = nextActionsByProfileId[p._id];
+                        const actionsLoading = !!nextActionsLoadingByProfileId[p._id];
+                        const actionsErr = nextActionsErrorByProfileId[p._id];
+                        const nextAction = p.followupDate ? new Date(p.followupDate).toLocaleDateString() : 'â€”';
+                        const overdue = p.followupDate && new Date(p.followupDate) < new Date(new Date().setHours(0, 0, 0, 0));
+                        return (
+                          <tr
+                            key={p._id}
+                            style={{ cursor: 'pointer' }}
+                            className={aiSupervisionActiveLeadId === p._id ? 'table-primary' : ''}
+                            onClick={() => setAiSupervisionActiveLeadId(p._id)}
+                          >
+                            <td>
+                              <div className="fw-semibold">{p._candidate?.name || 'â€”'}</div>
+                              <div className="small text-muted">{p._candidate?.mobile || 'â€”'}</div>
+                            </td>
+                              <td className="small">
+                                <div>{p?._course?.name || 'Ã¢â‚¬â€'}</div>
+                                <div className="text-muted">{getProfileCenterName(p)}</div>
+                              </td>
+                              <td className="small">
+                              <div>
+                                <span
+                                  className={`badge rounded-pill ${
+                                    (p._leadStatus?.title || '').toLowerCase().includes('hot')
+                                      ? 'bg-danger-subtle text-danger border border-danger-subtle'
+                                      : (p._leadStatus?.title || '').toLowerCase().includes('warm')
+                                      ? 'bg-warning-subtle text-warning border border-warning-subtle'
+                                      : (p._leadStatus?.title || '').toLowerCase().includes('cold')
+                                      ? 'bg-secondary-subtle text-secondary border border-secondary-subtle'
+                                      : 'bg-light text-muted border'
+                                  }`}
+                                >
+                                  {p._leadStatus?.title || 'â€”'}
+                                </span>
+                              </div>
+                              {p.selectedSubstatus?.title && (
+                                <div className="small text-muted mt-1">{p.selectedSubstatus.title}</div>
+                              )}
+                            </td>
+                            <td className="small">
+                              {intel ? (
+                                <span
+                                  className={`badge rounded-pill ${
+                                    intel.score >= 70
+                                      ? 'bg-success-subtle text-success border border-success-subtle'
+                                      : intel.score >= 40
+                                      ? 'bg-warning-subtle text-warning border border-warning-subtle'
+                                      : 'bg-danger-subtle text-danger border border-danger-subtle'
+                                  }`}
+                                >
+                                  {intel.score}/100
+                                </span>
+                              ) : (
+                                <span className="text-muted">â€”</span>
+                              )}
+                            </td>
+                            <td className="small">{intel?.intent || 'â€”'}</td>
+                            <td className="small">
+                              {overdue && <span className="badge bg-danger me-1">Overdue</span>}
+                              <span className="text-muted">{nextAction}</span>
+                            </td>
+                            <td>
+                              <div className="d-flex flex-wrap gap-1">
+                                <button
+                                  className="btn btn-xs btn-light border"
+                                  title="Call"
+                                  type="button"
+                                  onClick={() => {
+                                    const phone = p._candidate?.mobile;
+                                    if (phone) window.open(`tel:${phone}`, '_self');
+                                  }}
+                                >
+                                  <i className="fas fa-phone"></i>
+                                </button>
+                                <button
+                                  className="btn btn-xs btn-light border"
+                                  title="Open WhatsApp chat"
+                                  type="button"
+                                  // onClick={() => {
+                                  //   setSelectedProfile(p);
+                                  //   openWhatsappPanel();
+                                  //   setShowAiSupervision(false);
+                                  // }}
+                                >
+                                  <i className="fab fa-whatsapp text-success"></i>
+                                </button>
+                                <button
+                                  className="btn btn-xs btn-light border"
+                                  title="Email (from candidate record)"
+                                  type="button"
+                                  onClick={() => {
+                                    const email = p._candidate?.email;
+                                    if (email) window.open(`mailto:${email}`);
+                                  }}
+                                >
+                                  <i className="fas fa-envelope"></i>
+                                </button>
+                                <button
+                                  className="btn btn-xs btn-light border"
+                                  title="Run AI for this lead"
+                                  type="button"
+                                  onClick={() => fetchLeadIntelSingle(p)}
+                                  disabled={loadingLeadIntel}
+                                >
+                                  <i className="fas fa-robot"></i>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="col-12 col-lg-5">
+                    {(() => {
+                      const activeId = aiSupervisionActiveLeadId || allProfiles?.[0]?._id;
+                      const active = (allProfiles || []).find(p => p._id === activeId) || null;
+                      if (!active) return (
+                        <div className="text-muted">Select a lead to view details.</div>
+                      );
+
+                      const summary = leadSummaryByProfileId[active._id];
+                      const summaryLoading = !!leadSummaryLoadingByProfileId[active._id];
+                      const summaryErr = leadSummaryErrorByProfileId[active._id];
+
+                      const actions = nextActionsByProfileId[active._id] || [];
+                      const actionsLoading = !!nextActionsLoadingByProfileId[active._id];
+                      const actionsErr = nextActionsErrorByProfileId[active._id];
+
+                      const wa = waSummaryByProfileId[active._id];
+                      const waLoading = !!waSummaryLoadingByProfileId[active._id];
+                      const waErr = waSummaryErrorByProfileId[active._id];
+
+                      return (
+                        <div className="position-sticky" style={{ top: 0 }}>
+                          <div className="card border-0 shadow-sm mb-3">
+                            <div className="card-header bg-light py-2 px-3 d-flex align-items-center justify-content-between">
+                              <div className="d-flex align-items-center">
+                                <i className="fas fa-user me-2 text-secondary"></i>
+                                <strong>{active._candidate?.name || 'Lead'}</strong>
+                              </div>
+                              <div className="small text-muted">{active._candidate?.mobile || ''}</div>
+                            </div>
+                              <div className="card-body py-2 px-3 small text-muted d-flex justify-content-between align-items-center">
+                                <div>
+                                  <div className="mb-1">{getProfileCenterName(active)} | {getProfileCounselorName(active)}</div>
+                                  <span
+                                    className={`badge rounded-pill me-2 ${
+                                      (active._leadStatus?.title || '').toLowerCase().includes('hot')
+                                      ? 'bg-danger-subtle text-danger border border-danger-subtle'
+                                      : (active._leadStatus?.title || '').toLowerCase().includes('warm')
+                                      ? 'bg-warning-subtle text-warning border border-warning-subtle'
+                                      : (active._leadStatus?.title || '').toLowerCase().includes('cold')
+                                      ? 'bg-secondary-subtle text-secondary border border-secondary-subtle'
+                                      : 'bg-light text-muted border'
+                                  }`}
+                                >
+                                  {active._leadStatus?.title || 'â€”'}
+                                </span>
+                                {active.selectedSubstatus?.title && (
+                                  <span className="text-muted">{active.selectedSubstatus.title}</span>
+                                )}
+                              </div>
+                              {leadIntelMap[active._id]?.score != null && (
+                                <span
+                                  className={`badge rounded-pill ${
+                                    leadIntelMap[active._id].score >= 70
+                                      ? 'bg-success-subtle text-success border border-success-subtle'
+                                      : leadIntelMap[active._id].score >= 40
+                                      ? 'bg-warning-subtle text-warning border border-warning-subtle'
+                                      : 'bg-danger-subtle text-danger border border-danger-subtle'
+                                  }`}
+                                  title="AI score"
+                                  >
+                                    AI {leadIntelMap[active._id].score}/100
+                                  </span>
+                                )}
+                              </div>
+                              <div className="px-3 pb-3 small">
+                                <div><strong>Course:</strong> {active?._course?.name || 'N/A'}</div>
+                                <div><strong>Batch:</strong> {getProfileBatchName(active) || 'Unassigned'}</div>
+                                <div><strong>KYC Bucket:</strong> {getProfileDocumentSnapshot(active).category}</div>
+                                <div><strong>Fee Status:</strong> {active?.registrationFee || 'Unknown'}</div>
+                              </div>
+                            </div>
+
+                          {/* Candidate Summary (AI) - same style as CandidateProfile */}
+                          <div className="card border-0 shadow-sm mb-3">
+                            <div className="card-header bg-light py-2 px-3 d-flex align-items-center justify-content-between">
+                              <div className="d-flex align-items-center">
+                                <i className="fas fa-robot text-primary me-2"></i>
+                                <strong>Candidate Summary (AI)</strong>
+                              </div>
+                              <button
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => generateLeadSummaryForProfile(active)}
+                                disabled={summaryLoading}
+                                title="Generate summary"
+                              >
+                                {summaryLoading ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="fas fa-wand-magic-sparkles me-1" />}
+                                {summaryLoading ? 'Generatingâ€¦' : 'Generate'}
+                              </button>
+                            </div>
+                            <div className="card-body py-3 px-3">
+                              {summaryLoading && (
+                                <div className="text-muted small d-flex align-items-center">
+                                  <span className="spinner-border spinner-border-sm me-2" role="status" />
+                                  Generating summaryâ€¦
+                                </div>
+                              )}
+                              {!summaryLoading && summaryErr && (
+                                <div className="text-danger small">{summaryErr}</div>
+                              )}
+                              {!summaryLoading && summary && (
+                                <div className="small">
+                                  <p className="mb-2">{summary.summary}</p>
+                                  {summary.goal && <p className="mb-1"><strong>Goal:</strong> {summary.goal}</p>}
+                                  {summary.interestArea && <p className="mb-1"><strong>Interest:</strong> {summary.interestArea}</p>}
+                                  {summary.budgetRange && <p className="mb-1"><strong>Budget:</strong> {summary.budgetRange}</p>}
+                                  {summary.urgency && <p className="mb-1"><strong>Urgency:</strong> {summary.urgency}</p>}
+                                  {Array.isArray(summary.concerns) && summary.concerns.length > 0 && (
+                                    <p className="mb-0"><strong>Concerns:</strong> {summary.concerns.join('; ')}</p>
+                                  )}
+                                </div>
+                              )}
+                              {!summaryLoading && !summary && !summaryErr && (
+                                <span className="text-muted small">Summary not available.</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Recommended actions - same style as CandidateProfile */}
+                          <div className="card border-0 shadow-sm mb-3">
+                            <div className="card-header bg-light py-2 px-3 d-flex align-items-center justify-content-between">
+                              <div className="d-flex align-items-center">
+                                <i className="fas fa-lightbulb text-warning me-2"></i>
+                                <strong>Recommended actions</strong>
+                              </div>
+                              <button
+                                className="btn btn-sm btn-outline-dark"
+                                onClick={() => generateNextBestActionsForProfile(active)}
+                                disabled={actionsLoading}
+                                title="Generate actions"
+                              >
+                                {actionsLoading ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="fas fa-bolt me-1" />}
+                                {actionsLoading ? 'Generatingâ€¦' : 'Generate'}
+                              </button>
+                            </div>
+                            <div className="card-body py-3 px-3">
+                              {actionsLoading && (
+                                <div className="text-muted small d-flex align-items-center">
+                                  <span className="spinner-border spinner-border-sm me-2" role="status" />
+                                  Generating actionsâ€¦
+                                </div>
+                              )}
+                              {!actionsLoading && actionsErr && (
+                                <div className="text-danger small">{actionsErr}</div>
+                              )}
+                              {!actionsLoading && Array.isArray(actions) && actions.length > 0 && (
+                                <ul className="mb-0 ps-3 small">
+                                  {actions.map((action, i) => (
+                                    <li key={i}>{action}</li>
+                                  ))}
+                                </ul>
+                              )}
+                              {!actionsLoading && (!actions || actions.length === 0) && !actionsErr && (
+                                <span className="text-muted small">No suggestions right now.</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* WhatsApp AI summary card */}
+                          <div className="card border-0 shadow-sm">
+                            <div className="card-header bg-light py-2 px-3 d-flex align-items-center justify-content-between">
+                              <div className="d-flex align-items-center">
+                                <i className="fab fa-whatsapp text-success me-2"></i>
+                                <strong>WhatsApp Summary (AI)</strong>
+                              </div>
+                              <button
+                                className="btn btn-sm btn-outline-success"
+                                onClick={() => generateAiWhatsappSummaryForProfile(active)}
+                                disabled={waLoading}
+                                title="Generate WhatsApp summary"
+                              >
+                                {waLoading ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="fas fa-wand-magic-sparkles me-1" />}
+                                {waLoading ? 'Generatingâ€¦' : 'Generate'}
+                              </button>
+                            </div>
+                            <div className="card-body py-3 px-3 small">
+                              {waLoading && <div className="text-muted d-flex align-items-center"><span className="spinner-border spinner-border-sm me-2" />Generatingâ€¦</div>}
+                              {!waLoading && waErr && <div className="text-danger">{waErr}</div>}
+                              {!waLoading && wa && (
+                                <>
+                                  <div className="text-muted" style={{ whiteSpace: 'pre-line' }}>{wa.summary}</div>
+                                  {Array.isArray(wa.objections) && wa.objections.length > 0 && (
+                                    <div className="mt-2"><strong>Objections:</strong> {wa.objections.join(', ')}</div>
+                                  )}
+                                  {wa.suggestedReply && (
+                                    <div className="mt-2">
+                                      <strong>Suggested reply:</strong>
+                                      <div className="d-flex gap-2 align-items-start mt-1">
+                                        <textarea className="form-control form-control-sm" rows={2} value={wa.suggestedReply} readOnly />
+                                        <button
+                                          type="button"
+                                          className="btn btn-sm btn-outline-primary"
+                                          onClick={() => {
+                                            try { navigator.clipboard.writeText(wa.suggestedReply); } catch (_) {}
+                                          }}
+                                          title="Copy reply"
+                                        >
+                                          <i className="fas fa-copy"></i>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                              {!waLoading && !wa && !waErr && <span className="text-muted">No summary yet.</span>}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowAiSupervision(false)}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* <div style={{ background: 'rgba(0, 0, 0, 0.5)', width: '100%', position: 'absolute', minHeight: '100vh', top: '0', zIndex: '13', position: 'fixed' }}>
         <div className='card' style={{ border: '1px solid red', width: '70%', height: '100%' }}>
@@ -6155,6 +16569,10 @@ const CRMDashboard = () => {
           height: 100%;
         }
         @media (max-width: 767px) {
+        .whatappMaxWidth{
+        width:300px!important;
+        max-width:300px!important;
+        }
           .scrollable-container {
             display: block;
             width: 100%;
@@ -6204,9 +16622,9 @@ const CRMDashboard = () => {
             border-radius: 10px;
           }
 
-          .btn-group {
-            flex-wrap: wrap;
-          }
+          // .btn-group {
+          //   flex-wrap: wrap;
+          // }
           
           .btn-group .btn {
             margin-bottom: 0.25rem;
@@ -6220,12 +16638,114 @@ const CRMDashboard = () => {
           display: flex;
           flex-direction: column;
         }
+        
+        /* Mobile: WhatsApp panel as full-screen modal */
+        @media (max-width: 992px) {
+          .whatsapp-chat {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 9999 !important;
+            min-width: 100vw !important;
+            animation: slideInRight 0.3s ease !important;
+          }
+        }
 
         .right-side-panel {
           background: #ffffff !important;
           box-shadow: 0px 4px 5px rgba(0, 0, 0, 0.12), 0px 1px 10px rgba(0, 0, 0, 0.12), 0px 2px 4px rgba(0, 0, 0, 0.04);
           width: 100%;
           height: 73dvh;
+        }
+        
+        /* Mobile: Make side panels full-screen modals */
+        @media (max-width: 992px) {
+          .right-side-panel {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 9999 !important;
+            border-radius: 0 !important;
+            animation: slideInRight 0.3s ease !important;
+            overflow-y: auto !important;
+          }
+          
+          /* Panel header sticky on mobile for easy close */
+          .right-side-panel .topbar-container,
+          .right-side-panel .panel-header {
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 10 !important;
+            background: white !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+          }
+          
+          /* Make close button more prominent on mobile */
+          .right-side-panel .close-btn,
+          .right-side-panel .btn-close {
+            min-width: 44px !important;
+            min-height: 44px !important;
+            font-size: 24px !important;
+          }
+          
+          /* Add backdrop for mobile panels */
+          .right-side-panel::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: -1;
+          }
+        }
+        
+        @keyframes slideInRight {
+          from {
+            transform: translateX(100%);
+          }
+          to {
+            transform: translateX(0);
+          }
+        }
+        
+        /* Generic mobile panel styles - apply to all col-4 panels on mobile */
+        @media (max-width: 992px) {
+          /* Make all col-4 columns (side panels) fullscreen on mobile */
+          .row > .col-4,
+          .row > .col-lg-4,
+          .row > .col-md-4,
+          [class*="col-4"] {
+            // position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            // width: 100vw !important;
+            // max-width: 100vw !important;
+            // height: 100vh !important;
+            // z-index: 9999 !important;
+            background: white !important;
+            animation: slideInRight 0.3s ease !important;
+            padding: 0 !important;
+            overflow-y: auto !important;
+          }
+          
+          /* Prevent body scroll when panel is open */
+          body.panel-open {
+            overflow: hidden !important;
+            position: fixed !important;
+            width: 100% !important;
+          }
         }
 
         .whatsapp-chat .topbar-container {
@@ -6335,6 +16855,17 @@ const CRMDashboard = () => {
         @keyframes message {
           to {
             transform: scale(1);
+          }
+        }
+
+        @keyframes slideUp {
+          from {
+            transform: translateY(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
           }
         }
 
@@ -6504,6 +17035,46 @@ const CRMDashboard = () => {
         }
 .nav-pills .nav-link.active{
 background: #fd2b5a;
+}
+
+/* Hide scrollbar for mobile tabs */
+.nav-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.nav-pills {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+}
+
+/* Mobile tab styling */
+@media (max-width: 768px) {
+  .nav-pills {
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .nav-pills .nav-item {
+    flex-shrink: 0;
+  }
+  
+  .nav-pills .nav-link {
+    white-space: nowrap;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+  }
+  
+  .nav-pills .nav-link.active {
+    background: #fd2b5a;
+    color: white;
+    box-shadow: 0 2px 8px rgba(253, 43, 90, 0.3);
+  }
 }
         .resume-document {
           max-width: 1200px;
@@ -7021,9 +17592,9 @@ background: #fd2b5a;
 @media (max-width: 576px) {
 
 
-    .btn-group {
-        flex-wrap: wrap;
-    }
+    // .btn-group {
+    //     flex-wrap: wrap;
+    // }
 
     .input-group {
         max-width: 100% !important;
@@ -7489,7 +18060,9 @@ background: #fd2b5a;
     border-radius: 4px;
     resize: vertical;
 }
-
+.whatsappbutton{
+margin-left:15px;
+}
 /* .document-history {
     overflow-y: auto;
 } */
@@ -7523,6 +18096,9 @@ background: #fd2b5a;
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
+ .whatsappbutton{
+    margin-left:5px;
+    }
     .document-modal-content {
         width: 98%;
         margin: 1rem;
@@ -8323,7 +18899,7 @@ background: #fd2b5a;
     }
 
     .stats-grid {
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
     }
 
     .documents-grid-enhanced {
@@ -8414,11 +18990,15 @@ background: #fd2b5a;
     z-index: 10;
 }
            #editFollowupPanel {
-    max-height: calc(100vh - 220px); /* Adjust based on your header height */
-    overflow-y: auto;
-    overflow-x: hidden;
-    scrollbar-width: thin; /* For Firefox */
-    scrollbar-color: #cbd5e0 #f7fafc; /* For Firefox */
+   height: -webkit-fill-available
+   
+}
+#editFollowupPanel .card-body {
+    height: 100dvh;
+    overflow: scroll;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e0 #f7fafc;
+    padding-bottom: 220px;
 }
 @media (min-width: 992px) {
     .site-header--sticky--register--panels:not(.mobile-sticky-enable) {
@@ -8756,7 +19336,7 @@ background: #fd2b5a;
 
 
         /* ========================================
-           🎯 NEW: Responsive Design (ADD THESE STYLES)
+           ðŸŽ¯ NEW: Responsive Design (ADD THESE STYLES)
            ======================================== */
         /* Responsive Design */
         @media(max-width:1920px) {
@@ -8791,7 +19371,10 @@ background: #fd2b5a;
             padding: 1px 6px;
           }
           .content-body{
-          margin-top: 30px!important;
+          margin-top: 175px!important;
+          }
+          html body .content .content-wrapper{
+          padding:1.8rem 0.9rem 0;
           }
         }
 
@@ -9048,10 +19631,8 @@ background: #fd2b5a;
         `}
       </style>
       <style>
-        {
-
-          `
-          
+        {`
+      
     /* Enhanced Multi-Select Dropdown Styles */
 .multi-select-container-new {
   position: relative;
@@ -9125,7 +19706,7 @@ background: #fd2b5a;
   overflow: hidden;
   animation: slideDown 0.2s ease;
 }
-
+    
 @keyframes slideDown {
   from {
     opacity: 0;
@@ -9178,7 +19759,6 @@ background: #fd2b5a;
   padding: 0.5rem;
   border-bottom: 1px solid #e9ecef;
 }
-
 .options-list-new {
   max-height: 180px;
   overflow-y: auto;
@@ -9283,7 +19863,6 @@ background: #fd2b5a;
   font-size: 0.75rem;
   padding: 0.25em 0.4em;
 }
-
 /* Animation for dropdown open/close */
 .multi-select-options-new {
   transform-origin: top;
@@ -9323,9 +19902,20 @@ background: #fd2b5a;
 .multi-select-loading .dropdown-arrow {
   animation: spin 1s linear infinite;
 }
+/* Desktop Date Picker Styles */
+.firstDatepicker .react-calendar {
+    width: 250px !important;
+    height: min-content !important;
+    transform: translateX(0px)!important;
+}
+// .translateX .react-calendar {
+//   height: min-content !important;
+//     transform: translateX(-110px) !important;
+//     width: 250px !important;
+// }
 .react-calendar{
-width:min-content !important;
-height:min-content !important;
+    height: min-content !important;
+    width: 250px !important;
 }
 @media (max-width: 768px) {
   .multi-select-options-new {
@@ -9358,18 +19948,55 @@ height:min-content !important;
                     display: none;
                   }
               }
-              .nav-tabs-main > li > button{
-              padding: 15px 9px;
-              }
+  //             .nav-tabs-main > li > button{
+  //             padding: 15px 9px;
+  //             }
+  
+  .firstDatepicker .react-calendar,
+  .translateX .react-calendar,
+  // .react-calendar {
+  //   // width: calc(100vw - 40px) !important;
+  //   max-width: 300px !important;
+  //   // position: fixed !important;
+  //   z-index: 9999 !important;
+  //   left: 50% !important;
+  //   right: 50% !important;
+  //   transform: translateX(-50%) translateY(-50%) !important;
+  //   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+  // }
+  
+  .row.g-4 > .col-12.col-md-4 {
+    margin-bottom: 1.5rem !important;
+  }
+  
+  .row.g-4 > .col-12.col-md-6 {
+    margin-bottom: 1rem !important;
+  }
+  
+  .card.bg-light .row.g-2 > .col-12 {
+    margin-bottom: 0.75rem;
+  }
+  
+  .modal-body.p-4 {
+    padding: 1rem !important;
+  }
+  
+  .modal-body .row.g-4 {
+    margin-left: -0.5rem !important;
+    margin-right: -0.5rem !important;
+  }
+  
+  .modal-body .row.g-4 > [class*="col-"] {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
 }
-
-    
-            `
-        }
-
+  `}
       </style>
-      <style> {
-        ` .bg-gradient-primary {
+<style>
+  {
+    `
+     .bg-gradient-primary {
               background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           }
 
@@ -9394,6 +20021,22 @@ height:min-content !important;
               margin-right: 0.25rem;
           }
 
+          .crm-sticky-actions {
+              position: sticky;
+              top: 0;
+              z-index: 8;
+              background: #fff;
+              padding-top: 6px;
+              padding-bottom: 6px;
+              border-bottom: 1px solid #eee;
+          }
+
+          .crm-leads-scroll {
+              max-height: calc(100vh - 260px);
+              overflow-y: auto;
+              padding-right: 4px;
+          }
+
           .card {
               transition: box-shadow 0.15s ease-in-out;
           }
@@ -9410,7 +20053,7 @@ height:min-content !important;
               width: 40px;
               height: 40px;
           }
-
+    
           .circular-progress-container svg {
               transform: rotate(-90deg);
           }
@@ -9540,8 +20183,7 @@ height:min-content !important;
               padding: 0;
               position: relative;
           }
-
-          .scrollable-container {
+ .scrollable-container {
               display: none;
           }
 
@@ -9609,7 +20251,6 @@ height:min-content !important;
               position: relative;
               justify-content: space-between;
           }
-
           .whatsapp-chat .topbar-container .left-topbar {
               display: flex;
               align-items: center;
@@ -9818,8 +20459,7 @@ height:min-content !important;
               margin-right: 15px;
               margin-left: 10px;
           }
-
-          .whatsapp-chat .footer-container .footer-box .message-container-input .left-footer .margin-right-10 {
+        .whatsapp-chat .footer-container .footer-box .message-container-input .left-footer .margin-right-10 {
               margin-right: 10px;
           }
 
@@ -9940,7 +20580,6 @@ height:min-content !important;
               flex-wrap: wrap;
               gap: 15px;
           }
-
           .resume-contact-item {
               display: flex;
               align-items: center;
@@ -10123,10 +20762,7 @@ height:min-content !important;
               color: #007bff;
               font-weight: bold;
           }
-
-
-
-          /* WhatsApp Panel Mobile Styles */
+           /* WhatsApp Panel Mobile Styles */
           .whatsapp-chat {
               height: 100%;
               display: flex;
@@ -10339,9 +20975,7 @@ height:min-content !important;
               padding: 8px;
           }
 
-          /* Responsive adjustments */
-
-
+          /* Responsive adjustments */ 
           /* Add this to your existing style tag or CSS file */
           .react-date-picker__wrapper {
               border: 1px solid #ced4da !important;
@@ -10372,13 +21006,9 @@ height:min-content !important;
           .react-date-picker__wrapper {
               background: white !important;
           }
-
-
           .no-scroll {
               overflow: hidden;
           }
-
-
           .doc-iframe {
               transform-origin: top left;
               transition: transform 0.3s ease;
@@ -10406,8 +21036,7 @@ height:min-content !important;
               background-color: #4a6fdc;
               color: white;
           }
-
-          .panel-header h2 {
+     .panel-header h2 {
               color: white;
               font-size: 1.5rem;
               margin: 0;
@@ -10447,8 +21076,7 @@ height:min-content !important;
 
           .candidate-details {
               flex-grow: 1;
-          }
-
+          }   
           .candidate-details h3 {
               margin: 0 0 5px 0;
               font-size: 22px;
@@ -10487,7 +21115,6 @@ height:min-content !important;
               font-size: 20px;
               font-weight: bold;
           }
-
           .document-list {
               overflow-x: auto;
               margin: 0 20px 20px 20px;
@@ -10533,8 +21160,7 @@ height:min-content !important;
               background-color: #fff3cd;
               color: #856404;
           }
-
-          .status-approved {
+        .status-approved {
               background-color: #d4edda;
               color: #155724;
           }
@@ -10557,7 +21183,7 @@ height:min-content !important;
               color: var(--primary-color);
           }
 
-          .view-btn:hover {
+      .view-btn:hover {
               background-color: rgba(74, 111, 220, 0.1);
           }
 
@@ -10590,7 +21216,7 @@ height:min-content !important;
           .reject-btn:hover {
               background-color: #f5c6cb;
           }
-
+        
           .document-modal-overlay {
               position: fixed;
               top: 0;
@@ -10628,8 +21254,7 @@ height:min-content !important;
                   transform: scale(1) translateY(0);
               }
           }
-
-          .document-modal-content .modal-header {
+.document-modal-content .modal-header {
               padding: 1.5rem 2rem;
               border-bottom: 1px solid #e9ecef;
               background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -10677,8 +21302,7 @@ height:min-content !important;
               flex: 2;
               min-width: 400px;
           }
-
-          .document-preview-container {
+         .document-preview-container {
               background: #f8f9fa;
               border-radius: 8px;
               height: 500px;
@@ -10710,7 +21334,6 @@ height:min-content !important;
               border-radius: 25px;
               box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
           }
-
           .control-btn {
               background: #007bff;
               color: white;
@@ -10783,8 +21406,7 @@ height:min-content !important;
               color: #6c757d;
               line-height: 1.5;
           }
-
-          .action-buttons {
+        .action-buttons {
               margin-top: 1.5rem;
               display: flex;
               gap: 10px;
@@ -10799,8 +21421,7 @@ height:min-content !important;
               gap: 8px;
               transition: all 0.2s;
           }
-
-          .rejection-form {
+         .rejection-form {
               background: #fff3cd;
               border: 1px solid #ffeaa7;
               border-radius: 8px;
@@ -10821,7 +21442,6 @@ height:min-content !important;
               border-radius: 4px;
               resize: vertical;
           }
-
           /* .document-history {
     overflow-y: auto;
 } */
@@ -11340,11 +21960,36 @@ height:min-content !important;
               font-weight: 600;
           }
 
-          .filter-tabs {
+                 .filter-tabs {
               display: flex;
               gap: 1rem;
-              flex-wrap: wrap;
-          }
+             flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #888 #f1f1f1;
+    padding-bottom: 0.5rem;
+}
+
+.filter-tabs::-webkit-scrollbar {
+    height: 6px;
+}
+
+.filter-tabs::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.filter-tabs::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+.filter-tabs::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
 
           .filter-btn {
               background: #f8f9fa;
@@ -11616,12 +22261,10 @@ height:min-content !important;
 
           /* Responsive Design */
 
-          .react-date-picker__calendar.react-date-picker__calendar--open {
-              inset: 0 !important;
-              width: 300px !important;
-          }
-
-          
+          // .react-date-picker__calendar.react-date-picker__calendar--open {
+          //     inset: 0 !important;
+          //     width: 300px !important;
+          // }
           .site-header--sticky--register:not(.mobile-sticky-enable) {
     /* position: absolute !important; */
     top: 97px;
@@ -11630,8 +22273,7 @@ height:min-content !important;
     .breadcrumb-item a, .card-body a {
     color: #fc2b5a;
 }
-
-          @media (max-width: 1200px) {
+    @media (max-width: 1200px) {
               .document-history .history-preview iframe.pdf-thumbnail {
                   height: auto !important;
                   max-height: 600px;
@@ -11642,6 +22284,50 @@ height:min-content !important;
         position: fixed !important;
         transition: 0.4s;
         background: white;
+    }
+}
+
+@media(max-width:992px){
+    .mobile-filter-scroll {
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: thin !important;
+        scrollbar-color: #007bff #f1f1f1 !important;
+        padding-bottom: 5px !important;
+        gap: 8px !important;
+        white-space: nowrap !important;
+    }
+    
+    .mobile-filter-scroll::-webkit-scrollbar {
+        height: 4px !important;
+    }
+    
+    .mobile-filter-scroll::-webkit-scrollbar-track {
+        background: #f1f1f1 !important;
+        border-radius: 10px !important;
+    }
+    
+    .mobile-filter-scroll::-webkit-scrollbar-thumb {
+        background: #007bff !important;
+        border-radius: 10px !important;
+    }
+    
+    .mobile-filter-scroll::-webkit-scrollbar-thumb:hover {
+        background: #0056b3 !important;
+    }
+    
+    .mobile-filter-scroll .d-flex {
+        flex-shrink: 0 !important;
+        white-space: nowrap !important;
+    }
+    
+    .btncrm {
+        font-size: 0.8rem !important;
+        padding: 0.4rem 0.8rem !important;
+        margin: 2px !important;
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
     }
 }
           @media (max-width: 768px) {
@@ -11661,16 +22347,23 @@ height:min-content !important;
               }
 
               .stats-grid {
-                  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
               }
 
               .documents-grid-enhanced {
                   grid-template-columns: 1fr;
               }
 
-              .filter-tabs {
-                  justify-content: center;
-              }
+                         .filter-tabs {
+        justify-content: flex-start;
+        gap: 0.75rem;
+    }
+    
+     .filter-btn {
+        flex-shrink: 0;
+        white-space: nowrap;
+        padding: 0.75rem 0.5rem;
+    }
 
               .document-header {
                   flex-direction: column;
@@ -11747,9 +22440,9 @@ height:min-content !important;
                   border-radius: 10px;
               }
 
-              .btn-group {
-                  flex-wrap: wrap;
-              }
+              // .btn-group {
+              //     flex-wrap: wrap;
+              // }
 
               .btn-group .btn {
                   margin-bottom: 0.25rem;
@@ -11832,9 +22525,12 @@ height:min-content !important;
               .mobileResponsive{
               padding: 0;
               }
-              .content-body{
-               margin-top: 30px!important;
-              }
+             .content-body{
+          margin-top: 175px!important;
+          }
+          html body .content .content-wrapper{
+          padding:1.8rem 0.9rem 0!important;
+          }
               .nav-tabs-main{
                   white-space: nowrap;
                   flex-wrap: nowrap;
@@ -11850,12 +22546,12 @@ height:min-content !important;
               }
           }
 
-          @media (max-width: 576px) {
+ @media (max-width: 576px) {
 
 
-              .btn-group {
-                  flex-wrap: wrap;
-              }
+              // .btn-group {
+              //     flex-wrap: wrap;
+              // }
 
               .input-group {
                   max-width: 100% !important;
@@ -11877,15 +22573,11 @@ height:min-content !important;
                   min-height: 200px;
               }
           }
-
-          `
-      }
-
-      </style>
-
-      <style>
-        {
-          `
+    `
+  }
+</style>      
+<style>
+        {`
           input[type="text"], 
 input[type="email"], 
 input[type="number"],
@@ -12707,6 +23399,17 @@ animation: pulse 1.5s infinite;
 100% { transform: scale(1); }
 }
 
+@keyframes slideInFromRight {
+0% { 
+  opacity: 0; 
+  transform: translateX(30px); 
+}
+100% { 
+  opacity: 1; 
+  transform: translateX(0); 
+}
+}
+
 .recordings-list {
 margin-top: 30px;
 }
@@ -13392,11 +24095,1912 @@ max-width: 600px;
   .pac-container {
     z-index: 10000 !important;
   }
-
-  
-          `
-        }
+  .react-date-picker__calendar--open{
+  position: sticky!important
+  }
+        `}
       </style>
+
+      <style>{`
+  .fixDate {
+    box-sizing: border-box;
+    font-size: 13px;
+    white-space: nowrap;
+    width: 100%;
+  }
+    .docIcon{
+padding:12px;
+}
+
+  @media (max-width: 768px) {
+    .CButton {
+      font-size: 13px;
+      padding: 2px;
+      white-space:nowrap;
+    }
+      ..docDetails{
+         display: block !important;
+        text-align: -webkit-center;
+        position: relative;
+        height: 177px;
+        width: 105px;
+        padding: 13px;
+    } 
+  }
+
+
+  .CourseType{
+        font-size: 13px;
+        text-wrap: auto;
+        white-space: nowrap;
+        margin-bottom:8px;
+}
+        
+@media (max-width: 768px) {
+    .small {
+         display: block !important; 
+    }
+}
+`}</style>
+
+      {/* Lead card v2 styles (matched to B2B) */}
+      <style>{`
+        .lead-card{
+          --lead-card-radius: 20px;
+          background: #fff;
+          border-radius: var(--lead-card-radius);
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+          border: 1px solid #f0f0f0;
+          overflow: hidden;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          margin-bottom: 0.5rem;
+          position: relative;
+        }
+        .lead-card:hover{
+          transform: translateY(-4px);
+          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Lead strip v3 — card row layout (reference UI) */
+        .lead-strip-v3{
+          display: flex;
+          align-items: stretch;
+          gap: 6px;
+          padding: 8px;
+          background: linear-gradient(145deg, #0b5ed7 0%, #1aa3ff 55%, #2dd4ff 100%);
+          flex-wrap: nowrap;
+          overflow-x: auto;
+          overflow-y: visible;
+        }
+
+        .lead-strip-v3__profile{
+          position: relative;
+          /* Dynamic width (shrinks/grows with screen) */
+          flex: 0 1 clamp(180px, 22vw, 240px);
+          min-width: 160px;
+          background: linear-gradient(145deg, #0b5ed7 0%, #1aa3ff 55%, #2dd4ff 100%);
+          border-radius: 14px;
+          padding: 8px;
+          color: #fff;
+          box-shadow: 0 4px 14px rgba(11, 94, 215, 0.25);
+          overflow: hidden;
+        }
+
+        .lead-strip-v3__profile-edit{
+          position: absolute;
+          top: 0px;
+          left: 0px;
+          width: 15px;
+          height: 15px;
+          border-radius: 999px;
+          border: 1px solid rgba(255,255,255,0.85);
+          background: rgba(255,255,255,0.95);
+          color: #0b5ed7;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          font-size: 10px;
+          z-index: 2;
+        }
+
+        .lead-strip-v3__profile-top{
+          display: flex;
+          align-items: flex-start;
+          gap: 6px;
+          margin-bottom: 6px;
+          padding-top: 2px;
+        }
+
+        .lead-strip-v3__check{ display: inline-flex; margin-top: 4px; }
+        .lead-strip-v3__check .form-check-input{ margin: 0; }
+
+        .lead-strip-v3__profile-main{
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          text-align: left;
+          gap: 6px;
+        }
+
+        .lead-strip-v3__avatar{
+          width: 14px;
+          height: 14px;
+          min-width: 14px;
+          border-radius: 999px;
+          background: rgba(255,255,255,0.95);
+          color: #0b5ed7;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 9px;
+          flex-shrink: 0;
+          box-shadow: none;
+        }
+
+        .lead-strip-v3__name{
+          font-size: 14px;
+          font-weight: 800;
+          line-height: 1.2;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          width: auto;
+          flex: 1;
+          min-width: 0;
+        }
+
+        .lead-strip-v3__mobile-inline{
+          font-size: 12px;
+          font-weight: 700;
+          opacity: 0.92;
+          white-space: nowrap;
+        }
+
+        @media (min-width: 769px){
+          /* Desktop: phone already shown inline with name */
+          .lead-strip-v3__contact-line--phone{ display: none; }
+        }
+
+        .lead-strip-v3__badges{
+          display: flex;
+          flex-wrap: wrap;
+          gap: 4px;
+          margin-top: 6px;
+        }
+
+        .lead-strip-v3__badge{
+          border: none;
+          border-radius: 999px;
+          padding: 2px 8px;
+          font-size: 9px;
+          font-weight: 800;
+          line-height: 1.4;
+          white-space: nowrap;
+        }
+
+        .lead-strip-v3__badge--tag{
+          background: rgba(255,255,255,0.22);
+          color: #fff;
+          cursor: default;
+        }
+
+        .lead-strip-v3__badge--pending{
+          background: #f59e0b;
+          color: #fff;
+          cursor: pointer;
+        }
+        .lead-strip-v3__badge--approved{
+          background: #10b981;
+          color: #fff;
+          cursor: pointer;
+        }
+        .lead-strip-v3__badge--rejected{
+          background: #ef4444;
+          color: #fff;
+          cursor: pointer;
+        }
+
+        .lead-strip-v3__doc{ flex-shrink: 0; }
+
+        .lead-strip-v3__contact{
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .lead-strip-v3__contact-line{
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 10px;
+          font-weight: 600;
+          min-width: 0;
+        }
+
+        .lead-strip-v3__contact-line i{
+          width: 14px;
+          text-align: center;
+          opacity: 0.9;
+          flex-shrink: 0;
+        }
+
+        .lead-strip-v3__contact-line span{
+          flex: 1;
+          min-width: 0;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .lead-strip-v3__contact-line--phone{
+          background: rgba(0,0,0,0.12);
+          border-radius: 6px;
+          padding: 3px 6px;
+        }
+
+        .lead-strip-v3__contact-line--followup{
+          background: rgba(0,0,0,0.10);
+          border-radius: 6px;
+          padding: 3px 6px;
+          align-items: flex-start;
+        }
+
+        .lead-strip-v3__contact-line--followup i{
+          margin-top: 1px;
+        }
+
+        .lead-strip-v3__fu-wrap{
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 1px;
+        }
+
+        .lead-strip-v3__fu-line{
+          display: block;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          line-height: 1.25;
+          font-size: 10px;
+        }
+
+        .lead-strip-v3__wa{
+          width: 28px;
+          height: 28px;
+          min-width: 28px;
+          border: none;
+          border-radius: 8px;
+          background: #25d366;
+          color: #fff;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          font-size: 14px;
+        }
+
+        .lead-strip-v3__panel{
+          position: relative;
+          /* Dynamic panels: auto-adjust to available width */
+          flex: 1 1 160px;
+          min-width: 130px;
+          background: #fff;
+          border: 1px solid #e8edf3;
+          border-radius: 12px;
+          padding: 8px 8px 6px;
+          box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .lead-strip-v3__panel--docs{
+          flex: 1 1 clamp(150px, 14vw, 190px);
+          min-width: 130px;
+          overflow: visible;
+        }
+
+        .lead-strip-v3__panel--approval{
+          flex: 1 1 clamp(120px, 11vw, 155px);
+          min-width: 110px;
+          overflow: visible;
+        }
+
+        .lead-strip-v3__panel--performance{
+          flex: 1 1 clamp(170px, 15vw, 210px);
+          min-width: 140px;
+          gap: 8px;
+        }
+
+        .lead-strip-v3__approval-block{
+          position: relative;
+        }
+
+        .lead-strip-v3__panel-head--approval{
+          margin-bottom: 2px;
+          padding-right: 34px; /* room for corner edit button */
+        }
+
+        .lead-strip-v3__approval-edit{
+          width: 15px;
+          height: 15px;
+          border-radius: 8px;
+          border: 1px solid #e2e8f0;
+          background: #fff;
+          color: #2563eb;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          font-size: 11px;
+          padding: 0;
+          flex-shrink: 0;
+          position: absolute;
+          top: -9px;
+          left: -9px;
+        }
+
+        @media (max-width: 768px){
+          /* Mobile: allow cards to wrap so dropdown isn't clipped */
+          .lead-strip-v3{
+            flex-wrap: wrap;
+            overflow-x: visible;
+          }
+
+          .lead-strip-v3__profile{
+            flex: 1 1 100%;
+            min-width: 0;
+          }
+
+          .lead-strip-v3__panel{
+            flex: 1 1 calc(50% - 10px);
+            min-width: 0;
+          }
+
+          .lead-strip-v3__panel--approval{
+            flex: 1 1 calc(50% - 10px);
+            min-width: 0;
+          }
+
+          .lead-strip-v3__approval-menu{
+            padding: 6px;
+            gap: 6px;
+          }
+
+          .lead-strip-v3__approval-action{
+            padding: 7px 8px;
+            font-size: 11px;
+            gap: 6px;
+          }
+        }
+
+        .lead-strip-v3__approval-edit:hover{
+          background: #eff6ff;
+          border-color: #bfdbfe;
+        }
+
+        .lead-strip-v3__approval-row{
+          display: flex;
+          align-items: center;
+          justify-content: flex-start;
+        }
+
+        .lead-strip-v3__approval-pill{
+          border: none;
+          border-radius: 999px;
+          padding: 3px 10px;
+          font-size: 10px;
+          font-weight: 800;
+          line-height: 1.3;
+          white-space: nowrap;
+          cursor: pointer;
+        }
+
+        /* Extra compact approval panel (reduces empty feel) */
+        .lead-strip-v3__panel--approval{
+          padding: 6px 6px 5px;
+          gap: 4px;
+        }
+
+        .lead-strip-v3__panel--approval .lead-strip-v3__panel-title{
+          font-size: 10px;
+        }
+
+        .lead-strip-v3__panel--approval .lead-strip-v3__panel-title i{
+          font-size: 10px;
+        }
+
+        .lead-strip-v3__approval-pill--pending{
+          background: #ffedd5;
+          color: #c2410c;
+        }
+
+        .lead-strip-v3__approval-pill--approved{
+          background: #d1fae5;
+          color: #047857;
+        }
+
+        .lead-strip-v3__approval-pill--rejected{
+          background: #fee2e2;
+          color: #b91c1c;
+        }
+
+        .lead-strip-v3__approval-dropdown{
+          position: absolute;
+          top: calc(100% + 4px);
+          left: 0;
+          right: 0;
+          z-index: 1200;
+          opacity: 0;
+          transform: translateY(-6px) scale(0.98);
+          pointer-events: none;
+          visibility: hidden;
+          transition: opacity 160ms ease, transform 160ms ease, visibility 0s linear 160ms;
+        }
+
+        /* Mobile: open approval menu upwards so it stays visible */
+        @media (max-width: 768px){
+          .lead-strip-v3__panel--approval{ z-index: 1200; }
+
+          .lead-strip-v3__approval-dropdown{
+            top: auto;
+            bottom: calc(100% + 6px);
+            transform: translateY(6px) scale(0.98);
+          }
+
+          .lead-strip-v3__approval-dropdown.is-open{
+            transform: translateY(0) scale(1);
+          }
+        }
+
+        .lead-strip-v3__approval-dropdown.is-open{
+          opacity: 1;
+          transform: translateY(0) scale(1);
+          pointer-events: auto;
+          visibility: visible;
+          transition: opacity 180ms ease, transform 180ms ease;
+        }
+
+        .lead-strip-v3__approval-menu{
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          padding: 8px;
+          border-radius: 12px;
+          border: 1px solid #e2e8f0;
+          background: #fff;
+          box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+        }
+
+        .lead-strip-v3__approval-menu--readonly{
+          font-size: 11px;
+          font-weight: 800;
+          color: #64748b;
+          text-align: center;
+        }
+
+        .lead-strip-v3__approval-action{
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          border-radius: 10px;
+          border: 1.5px solid transparent;
+          padding: 8px 10px;
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
+          background: #fff;
+        }
+
+        .lead-strip-v3__approval-action--approve{
+          border-color: #10b981;
+          color: #059669;
+        }
+
+        .lead-strip-v3__approval-action--approve:hover{
+          background: #ecfdf5;
+        }
+
+        .lead-strip-v3__approval-action--reject{
+          border-color: #ef4444;
+          color: #dc2626;
+        }
+
+        .lead-strip-v3__approval-action--reject:hover{
+          background: #fef2f2;
+        }
+
+        .lead-strip-v3__section-divider{
+          height: 1px;
+          background: #e8edf3;
+          margin: 2px 0;
+        }
+
+        .lead-strip-v3__perf-block{
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          flex: 1;
+        }
+
+        .lead-strip-v3__panel-head{
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 6px;
+          margin-bottom: 2px;
+        }
+
+        .lead-strip-v3__panel-head--actions{
+          margin-bottom: 4px;
+        }
+
+        .lead-strip-v3__panel-title{
+          font-size: 11px;
+          font-weight: 800;
+          color: #1e293b;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          white-space: nowrap;
+        }
+
+        .lead-strip-v3__panel-title i{
+          color: #3b82f6;
+          font-size: 11px;
+        }
+
+        .lead-strip-v3__head-actions{
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          flex-shrink: 0;
+        }
+
+        .lead-strip-v3__actions-wrap{
+          position: relative;
+        }
+
+        .lead-strip-v3__actions-backdrop{
+          position: fixed;
+          inset: 0;
+          z-index: 1040;
+          background: transparent;
+        }
+
+        .lead-strip-v3__actions-dropdown{
+          position: absolute;
+          top: auto;
+          // bottom: calc(100% + 6px);
+          right: 0;
+          z-index: 1050;
+          min-width: 170px;
+          max-width: 210px;
+        }
+
+        /* Desktop-only tightening */
+        @media (min-width: 992px){
+          .lead-strip-v3{
+            padding: 8px;
+          }
+
+          .lead-strip-v3__profile{
+            padding: 10px;
+          }
+
+          .lead-strip-v3__kv{ gap: 6px; }
+          .lead-strip-v3__kv-pill{ padding: 3px 8px; }
+
+          .lead-strip-v3__stat-grid{ gap: 5px; }
+          .lead-strip-v3__stat-row{ gap: 6px; }
+          .lead-strip-v3__stat{ padding: 6px 8px; }
+
+          .lead-strip-v3__footer{
+            gap: 6px;
+            margin-top: 4px;
+          }
+        }
+
+        .lead-strip-v3__actions-menu{
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          padding: 6px;
+          border-radius: 10px;
+          border: 1px solid #e2e8f0;
+          background: #fff;
+          box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+        }
+
+        .lead-strip-v3__actions-item{
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          border: none;
+          background: transparent;
+          border-radius: 8px;
+          padding: 7px 10px;
+          font-size: 11px;
+          font-weight: 700;
+          color: #334155;
+          text-align: left;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .lead-strip-v3__actions-item:hover{
+          background: #f8fafc;
+        }
+
+        .lead-strip-v3__actions-item i{
+          width: 14px;
+          text-align: center;
+          flex-shrink: 0;
+          font-size: 11px;
+        }
+
+        .lhm__actions .lead-strip-v3__actions-dropdown{
+          right: 0;
+          left: auto;
+        }
+
+        .lead-strip-v3__icon-btn{
+          width: 28px;
+          height: 28px;
+          border-radius: 8px;
+          border: 1px solid #e2e8f0;
+          background: #f8fafc;
+          color: #475569;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          font-size: 12px;
+          padding: 0;
+        }
+
+        .lead-strip-v3__icon-btn:hover{
+          background: #eff6ff;
+          color: #2563eb;
+          border-color: #bfdbfe;
+        }
+
+        .lead-strip-v3__icon-btn--collapse{
+          background: #1e293b;
+          color: #fff;
+          border-color: #1e293b;
+        }
+
+        .lead-strip-v3__icon-btn--collapse:hover{
+          background: #0f172a;
+          color: #fff;
+        }
+
+        .lead-strip-v3__kv{
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          min-width: 0;
+        }
+
+        .lead-strip-v3__kv-label{
+          font-size: 9px;
+          font-weight: 700;
+          color: #64748b;
+          flex-shrink: 0;
+        }
+
+        .lead-strip-v3__kv-pill{
+          flex: 1;
+          min-width: 0;
+          border: 1px solid #bfdbfe;
+          background: #eff6ff;
+          color: #1d4ed8;
+          border-radius: 999px;
+          padding: 3px 10px;
+          font-size: 10px;
+          font-weight: 700;
+          text-align: left;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          cursor: pointer;
+        }
+
+        .lead-strip-v3__panel-edit{
+          position: absolute;
+          right: -8px;
+          bottom: -8px;
+          width: 18px;
+          height: 18px;
+          border-radius: 8px;
+          border: 1px solid #bfdbfe;
+          background: #eff6ff;
+          color: #2563eb;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          font-size: 12px;
+        }
+
+        .lead-strip-v3__stat-grid{
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          flex: 1;
+        }
+
+        .lead-strip-v3__stat-row{
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 6px;
+        }
+
+        .lead-strip-v3__stat-row--docs{
+          margin-top: 4px;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .lead-strip-v3__stat{
+          border-radius: 10px;
+          padding: 6px 8px;
+          text-align: center;
+          min-height: 44px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 2px;
+        }
+
+        .lead-strip-v3__stat--wide{
+          width: 100%;
+        }
+
+        .lead-strip-v3__stat-label{
+          font-size: 10px;
+          font-weight: 800;
+          line-height: 1.1;
+        }
+
+        .lead-strip-v3__stat-val{
+          font-size: 14px;
+          font-weight: 900;
+          line-height: 1;
+        }
+
+        .lead-strip-v3__footer{
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          margin-top: auto;
+          padding-top: 6px;
+          border-top: 1px solid #f1f5f9;
+          font-size: 10px;
+          min-width: 0;
+        }
+
+        .lead-strip-v3__footer-label{
+          font-weight: 700;
+          color: #64748b;
+          white-space: nowrap;
+        }
+
+        .lead-strip-v3__footer-val{
+          font-weight: 800;
+          color: #334155;
+          flex: 1;
+          min-width: 0;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .lead-strip-v3__footer-cal{
+          width: 26px;
+          height: 26px;
+          border: none;
+          border-radius: 8px;
+          background: #eff6ff;
+          color: #2563eb;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          flex-shrink: 0;
+          font-size: 11px;
+        }
+
+        @media (max-width: 1200px){
+          /* Keep one-row layout (no wrap). Let cards shrink and scroll if needed. */
+          .lead-strip-v3{ flex-wrap: nowrap; }
+          .lead-strip-v3__panel{ min-width: 120px; }
+          .lead-strip-v3__panel--performance{ min-width: 130px; }
+        }
+
+        .lead-header{ color: #fff; position: relative; overflow: hidden; }
+        .lead-header-v2{
+          background: linear-gradient(145deg, #0b5ed7 0%, #1aa3ff 55%, #2dd4ff 100%);
+          padding: 8px 10px;
+          position: relative;
+          --lead-header-v2-block-h: 92px;
+          overflow: hidden;
+          z-index: 2;
+        }
+
+        .lead-header-v2__float-actions{
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          z-index: 10;
+        }
+
+        .lead-header-v2__float-icon{
+          width: 34px;
+          height: 34px;
+          border-radius: 999px;
+          border: 1px solid rgba(255,255,255,0.85);
+          background: rgba(255,255,255,0.92);
+          color: #0b5ed7;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          backdrop-filter: blur(6px);
+          box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+          flex-shrink: 0;
+        }
+
+        .lead-header-v2__float-icon:hover{
+          background: rgba(255,255,255,0.98);
+        }
+
+        .lead-header-v2__row{
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:8px;
+          flex-wrap: nowrap;
+        }
+
+        .lead-header-v2__left{
+          display:flex;
+          flex-direction: column;
+          align-items: stretch;
+          gap: 6px;
+          min-width: 168px;
+          flex: 0 0 168px;
+          position: relative;
+          border: 1px solid rgba(255, 255, 255, 0.35);
+          border-radius: 10px;
+          padding: 10px 10px 8px;
+          background: rgba(255, 255, 255, 0.14);
+          backdrop-filter: blur(6px);
+        }
+
+        .lead-header-v2__left-meta{
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding-bottom: 6px;
+          border-bottom: 1px solid rgba(255,255,255,0.22);
+        }
+
+        .lead-header-v2__contact-list{
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+          min-width: 0;
+        }
+
+        .lead-header-v2__contact-row{
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          min-width: 0;
+        }
+
+        .lead-header-v2__contact-icon{
+          width: 16px;
+          text-align: center;
+          opacity: 0.92;
+          flex-shrink: 0;
+          font-size: 12px;
+          color: #fff;
+        }
+
+        .lead-header-v2__contact-value{
+          flex: 1 1 auto;
+          min-width: 0;
+          font-size: 12px;
+          font-weight: 700;
+          line-height: 1.2;
+          color: #fff;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .lead-header-v2__contact-row--phone{
+          gap: 6px;
+        }
+
+        .lead-header-v2__wa-btn{
+          width: 28px;
+          height: 28px;
+          min-width: 28px;
+          border-radius: 8px;
+          border: 1px solid rgba(255,255,255,0.35);
+          background: #25d366;
+          color: #fff;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          flex-shrink: 0;
+          font-size: 14px;
+          padding: 0;
+          box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+
+        .lead-header-v2__wa-btn:hover{
+          background: #1ebe57;
+          color: #fff;
+        }
+
+        .lead-header-v2__left-edit{
+          position: absolute;
+          top: -6px;
+          left: -6px;
+          z-index: 3;
+          width: 22px;
+          height: 22px;
+          min-width: 22px;
+          border-radius: 999px;
+          border: 1px solid rgba(255,255,255,0.85);
+          background: rgba(255,255,255,0.92);
+          color: #0b5ed7;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          padding: 0;
+          font-size: 10px;
+        }
+
+        .lead-header-v2__right{
+          display:flex;
+          align-items:stretch;
+          gap:8px;
+          flex-wrap: nowrap;
+          justify-content:flex-end;
+          flex: 1 1 auto;
+          min-width: 0;
+          white-space: nowrap;
+          position: relative;
+        }
+
+        .lead-header-v2__approval{
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          flex: 0 0 auto;
+          width: fit-content;
+          min-width: 0;
+          gap: 4px;
+          padding: 8px 6px 6px;
+          border-radius: 10px;
+          background: rgba(255, 255, 255, 0.14);
+          border: 1px solid rgba(255,255,255,0.28);
+          backdrop-filter: blur(6px);
+          align-self: center;
+        }
+        .lead-header-v2__approval-label{
+          position: absolute;
+          top: -9px;
+          left: 50%;
+          transform: translateX(-50%);
+          padding: 0 6px;
+          border-radius: 999px;
+          background: rgba(11, 94, 215, 0.95);
+          border: 1px solid rgba(255, 255, 255, 0.35);
+          color: #fff;
+          font-size: 9px;
+          font-weight: 900;
+          line-height: 16px;
+          white-space: nowrap;
+        }
+        .lead-approval-v2__row{
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: auto;
+        }
+        .lead-approval-v2__pill{
+          border: 1px solid rgba(255,255,255,0.35);
+          color: #fff;
+          border-radius: 999px;
+          padding: 4px 8px;
+          height: 26px;
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: 0.02em;
+          background: rgba(255,255,255,0.18);
+          text-transform: uppercase;
+          min-width: 0;
+          width: auto;
+          white-space: nowrap;
+        }
+        .lead-approval-v2__pill--pending{
+          background: rgba(245, 158, 11, 0.28);
+          border-color: rgba(245, 158, 11, 0.55);
+        }
+        .lead-approval-v2__pill--approved{
+          background: rgba(16, 185, 129, 0.28);
+          border-color: rgba(16, 185, 129, 0.55);
+        }
+        .lead-approval-v2__pill--rejected{
+          background: rgba(239, 68, 68, 0.26);
+          border-color: rgba(239, 68, 68, 0.55);
+        }
+
+        .lead-meta-v2__pill{
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          width: 34px;
+          height: 34px;
+          padding: 0;
+          border-radius: 12px;
+          border: 1px solid rgba(255,255,255,0.35);
+          background: rgba(255,59,48,0.95);
+          color: #fff;
+          cursor: pointer;
+          text-decoration: none;
+          box-shadow: 0 8px 18px rgba(0,0,0,0.18);
+        }
+        .lead-meta-v2__pill:hover{
+          background: rgba(255,59,48,1);
+          color: #fff;
+          text-decoration: none;
+        }
+
+        .lead-header-v2__perf-block{
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+          flex-shrink: 0;
+          min-width: 148px;
+          position: relative;
+          border: 1px solid rgba(255, 255, 255, 0.35);
+          border-radius: 10px;
+          padding: 10px 10px 8px;
+          background: rgba(255, 255, 255, 0.14);
+          backdrop-filter: blur(6px);
+          min-height: var(--lead-header-v2-block-h);
+        }
+        .lead-header-v2__perf-title{
+          position: absolute;
+          top: -10px;
+          left: 10px;
+          padding: 0 8px;
+          border-radius: 999px;
+          background: rgba(11, 94, 215, 0.95);
+          border: 1px solid rgba(255, 255, 255, 0.35);
+          color: #fff;
+          font-size: 11px;
+          font-weight: 900;
+          line-height: 18px;
+          white-space: nowrap;
+        }
+        .lead-header-v2__perf-row{ display: flex; align-items: center; gap: 6px; }
+        .lead-header-v2__perf-label{
+          font-size: 10px;
+          font-weight: 800;
+          color: rgba(255,255,255,0.9);
+          white-space: nowrap;
+          min-width: 58px;
+        }
+        .lead-header-v2__perf-input{
+          cursor: pointer;
+          height: 22px !important;
+          font-size: 10px !important;
+          border-radius: 6px !important;
+          border: 1px solid rgba(255,255,255,0.35) !important;
+          background: rgba(255,255,255,0.18) !important;
+          color: #fff !important;
+          font-weight: 700 !important;
+          padding: 0 6px !important;
+          min-width: 0;
+          flex: 1 1 auto;
+        }
+
+        .lead-header-v2__editbtn{
+          position: absolute;
+          right: 0;
+          bottom: 0;
+          width: 20px;
+          height: 20px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 999px;
+          border: 1px solid rgba(255,255,255,0.35);
+          background: rgba(255,255,255,0.18);
+          color: #fff;
+          padding: 0;
+          cursor: pointer;
+          z-index: 2;
+        }
+
+        .lead-header-v2__dash{
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 10px;
+          width: clamp(480px, 48vw, 700px);
+          min-width: 0;
+          flex: 1 1 auto;
+        }
+        .lead-header-v2__dash-col{ width: auto; min-width: 0; display: flex; align-items: stretch; }
+
+        .lead-header-v2 .b2b-dash-section{
+          position: relative;
+          border: 1px solid rgba(255,255,255,0.35);
+          border-radius: 10px;
+          padding: 8px 8px 6px;
+          background: rgba(255,255,255,0.14);
+          backdrop-filter: blur(6px);
+          width: 100%;
+          min-height: var(--lead-header-v2-block-h);
+          display: flex;
+          flex-direction: column;
+        }
+        .lead-header-v2 .b2b-dash-section__label{
+          position: absolute;
+          top: -10px;
+          left: 10px;
+          padding: 0 8px;
+          border-radius: 999px;
+          background: rgba(11, 94, 215, 0.95);
+          border: 1px solid rgba(255,255,255,0.35);
+          color: #fff;
+          font-size: 11px;
+          font-weight: 900;
+          line-height: 18px;
+          white-space: nowrap;
+        }
+        .lead-header-v2 .b2b-dash-stat-card{
+          border-radius: 8px;
+          padding: 5px 5px 4px;
+          min-height: 48px;
+          display:flex;
+          flex-direction:column;
+          align-items:center;
+          justify-content:center;
+          box-shadow: 0 6px 14px rgba(0,0,0,0.14);
+          min-width: 0;
+        }
+        .lead-header-v2 .b2b-dash-stat-card__label{
+          font-size: 9px;
+          font-weight: 800;
+          line-height: 1.05;
+        }
+        .lead-header-v2 .b2b-dash-stat-card__divider{
+          width: 72%;
+          max-width: 56px;
+          height: 1px;
+          margin: 4px 0;
+          background: rgba(255,255,255,0.95);
+        }
+        .lead-header-v2 .b2b-dash-stat-card__value{
+          font-size: 13px;
+          font-weight: 900;
+          line-height: 1.05;
+        }
+        .lead-header-v2 .ActionsDates{
+          display:flex;
+          justify-content:left;
+          gap:10px;
+          margin-top: 6px;
+          padding-top: 6px;
+          border-top: 1px solid rgba(255,255,255,0.22);
+          color: rgba(255,255,255,0.95);
+          font-size: 11px;
+          font-weight: 800;
+          white-space: normal;
+          min-width: 0;
+        }
+        .lead-header-v2 .b2b-dash-section > .d-flex{ flex: 1 1 auto; min-height: 0; align-items: center; }
+        .lead-header-v2 .b2b-dash-section > .ActionsDates{ margin-top: auto; }
+
+        /* Checkbox + docs ring inside header */
+        .lead-header-v2__check{ display:inline-flex; align-items:center; }
+        .lead-header-v2__check .form-check-input{ margin: 0; }
+        .lead-header-v2__doc{ display:inline-flex; align-items:center; }
+
+        /* Mobile header layout (LHM) */
+        .lhm{ display: flex; flex-direction: column; gap: 8px; }
+        .lhm__row1{ display: flex; align-items: center; gap: 8px; }
+        .lhm__name{
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex: 0 1 clamp(160px, 48vw, 260px);
+          max-width: clamp(160px, 48vw, 260px);
+          min-width: 0;
+          background: rgba(255,255,255,0.15);
+          border: 1px solid rgba(255,255,255,0.3);
+          border-radius: 10px;
+          padding: 6px 10px;
+          overflow: hidden;
+          position: relative;
+        }
+        .lhm__check{ display:inline-flex; align-items:center; margin-right: 2px; }
+        .lhm__check .form-check-input{ margin: 0; }
+        .lhm__doc{ display:inline-flex; align-items:center; }
+        .lhm__name-icon{ font-size: 15px; color: #fff; opacity: 0.9; flex-shrink: 0; }
+        .lhm__name-text{
+          font-size: 13px;
+          font-weight: 800;
+          color: #fff;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          min-width: 0;
+        }
+        .lhm__mobile-number{ display: none; }
+        .lhm__pills{ display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+        .lhm__status-block{
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+          flex-shrink: 0;
+          background: rgba(255,255,255,0.15);
+          border: 1px solid rgba(255,255,255,0.3);
+          border-radius: 10px;
+          padding: 5px 8px;
+          cursor: pointer;
+          min-width: 145px;
+          position: relative;
+        }
+        .lhm__editbtn{
+          position: absolute;
+          top: -6px;
+          right: -6px;
+          width: 22px;
+          height: 22px;
+          border-radius: 999px;
+          border: 1px solid rgba(255,255,255,0.85);
+          background: rgba(255,255,255,0.92);
+          color: #0b5ed7;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          padding: 0;
+          font-size: 10px;
+          line-height: 1;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+        }
+        .lhm__status-row{ display: flex; align-items: center; gap: 4px; }
+        .lhm__status-label{
+          font-size: 9px;
+          font-weight: 900;
+          color: rgba(255,255,255,0.75);
+          white-space: nowrap;
+          min-width: 30px;
+        }
+        .lhm__status-val{
+          font-size: 10px;
+          font-weight: 700;
+          color: #fff;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 92px;
+        }
+        .lhm__row2{ display: flex; align-items: center; gap: 8px; }
+        .lhm__phone{
+          flex: 1 1 auto;
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          background: rgba(255,255,255,0.15);
+          border: 1px solid rgba(255,255,255,0.3);
+          border-radius: 10px;
+          padding: 7px 12px;
+          font-size: 13px;
+          font-weight: 800;
+          color: #fff;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          min-width: 0;
+        }
+        .lhm__phone i{ font-size: 12px; opacity: 0.85; flex-shrink: 0; }
+        .lhm__actions{ display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+        .lhm__action-btn{
+          height: 34px;
+          padding: 0 12px;
+          border-radius: 10px;
+          border: 1px solid rgba(255,255,255,0.35);
+          background: rgba(255,255,255,0.18);
+          color: #fff;
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        /* Floating labeled actions (mobile header top-right) */
+        .lhm__float-actions{
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          z-index: 6;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+          max-width: calc(100% - 16px);
+        }
+        .lhm__float-btn{
+          width: 32px;
+          height: 32px;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 0;
+          border-radius: 999px;
+          border: 1px solid rgba(255,255,255,0.75);
+          background: rgba(255,255,255,0.92);
+          color: #0b5ed7;
+          font-size: 11px;
+          font-weight: 900;
+          line-height: 1;
+          text-decoration: none;
+          cursor: pointer;
+          backdrop-filter: blur(6px);
+          box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+          white-space: nowrap;
+          align-items: center;
+    justify-content: center;
+        }
+        .lhm__float-btn i{ font-size: 13px; }
+        .lhm__float-btn--wa{
+          background: rgba(37, 211, 102, 0.95);
+          border-color: rgba(37, 211, 102, 0.95);
+          color: #fff;
+        }
+        .lhm__float-btn--call{
+          background: rgba(255,255,255,0.92);
+          border-color: rgba(255,255,255,0.75);
+          color: #0b5ed7;
+        }
+        .lhm__float-btn--more{
+          background: rgba(15, 23, 42, 0.85);
+          border-color: rgba(15, 23, 42, 0.85);
+          color: #fff;
+        }
+        .lhm__float-btn--toggle{
+          background: rgba(30, 41, 59, 0.92);
+          border-color: rgba(30, 41, 59, 0.92);
+          color: #fff;
+        }
+
+        /* Give header some space for floating buttons */
+        .lead-header-v2 .lhm{ padding-top: 34px; }
+
+        .lhm__row3{
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+        .lhm__followup-box{
+          position: relative;
+          border: 1px solid rgba(255,255,255,0.3);
+          border-radius: 10px;
+          padding: 8px 8px 6px;
+          background: rgba(255,255,255,0.12);
+        }
+        .lhm__followup-title{
+          display: block;
+          font-size: 10px;
+          font-weight: 900;
+          color: rgba(255,255,255,0.95);
+          margin-bottom: 6px;
+        }
+        .lhm__followup-cards{
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+        .lhm__stat-card{
+          flex: 1 1 0;
+          min-width: 72px;
+          border-radius: 8px;
+          padding: 6px 4px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          color: #fff;
+        }
+        .lhm__stat-label{ font-size: 9px; font-weight: 800; }
+        .lhm__stat-divider{
+          width: 70%;
+          height: 1px;
+          background: rgba(255,255,255,0.9);
+          margin: 4px 0;
+        }
+        .lhm__stat-val{ font-size: 12px; font-weight: 900; }
+        .lhm__followup-date{
+          margin-top: 6px;
+          padding-top: 6px;
+          border-top: 1px solid rgba(255,255,255,0.22);
+          font-size: 10px;
+          font-weight: 800;
+          color: rgba(255,255,255,0.95);
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+
+        @media (max-width: 1360px){
+          .lead-header-v2__dash{ width: clamp(480px, 48vw, 680px); gap: 8px; }
+        }
+        @media (max-width: 1200px){
+          .lead-header-v2__dash{ width: clamp(420px, 46vw, 620px); }
+        }
+        @media (max-width: 1100px){
+          .lead-header-v2__dash{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+
+        @media (max-width: 768px){
+          .lead-header-v2__row{ flex-wrap: wrap; align-items: flex-start; }
+          .lead-header-v2__left{ flex: 1 1 100%; min-width: 0; }
+          .lead-header-v2__contact-list{ gap: 4px; }
+          .lead-header-v2__right{
+            flex: 1 1 100%;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+            white-space: normal;
+          }
+          .lead-header-v2__dash{ width: 100%; grid-template-columns: 1fr; }
+          .lhm__pills .lead-meta-v2__pill{
+            width: 34px;
+            height: 34px;
+            padding: 0;
+            background: rgba(255,255,255,0.16);
+            border: 1px solid rgba(255,255,255,0.35);
+          }
+        }
+
+        @media (max-width: 992px){
+          .lead-card .lead-header-v2{
+            background: #fff;
+            color: #0f172a;
+            padding: 0;
+            border-radius: 16px;
+            overflow: hidden;
+          }
+
+          .lhm{
+            gap: 0;
+            background: #fff;
+          }
+
+          .lhm__row1{
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: start;
+            column-gap: 8px;
+            row-gap: 10px;
+            padding: 12px;
+            background: linear-gradient(135deg, #0b8cf0 0%, #1fb7f4 100%);
+          }
+
+          .lhm__name{
+            grid-column: 1;
+            grid-row: 1;
+            display: grid;
+            grid-template-columns: auto auto auto minmax(0, 1fr);
+            flex: none;
+            max-width: 100%;
+            width: 100%;
+            background: transparent;
+            border: 0;
+            border-radius: 0;
+            padding: 0;
+            column-gap: 8px;
+            row-gap: 4px;
+          }
+
+          .lhm__check{
+            grid-column: 1;
+            grid-row: 1 / span 2;
+            align-self: center;
+          }
+
+          .lhm__doc{
+            grid-column: 2;
+            grid-row: 1 / span 2;
+            align-self: center;
+          }
+
+          .lhm__name-icon{
+            grid-column: 3;
+            grid-row: 1 / span 2;
+            align-self: center;
+          }
+
+          .lhm__name-text{
+            grid-column: 4;
+            grid-row: 1;
+            font-size: 14px;
+            line-height: 1.2;
+          }
+
+          .lhm__mobile-number{
+            grid-column: 4;
+            grid-row: 2;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            max-width: 100%;
+            color: rgba(255,255,255,0.95);
+            font-size: 12px;
+            font-weight: 800;
+            line-height: 1.15;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+
+          .lhm__mobile-number i{
+            font-size: 11px;
+            opacity: 0.9;
+            flex-shrink: 0;
+          }
+
+          .lhm__actions{
+            grid-column: 2;
+            grid-row: 1;
+            align-self: start;
+            width: auto;
+            min-width: 0;
+            justify-content: flex-end;
+            gap: 6px;
+          }
+
+          .lhm__actions .lead-meta-v2__pill{
+            width: 36px;
+            min-width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            padding: 0;
+            box-shadow: none;
+            color: #fff;
+          }
+
+          .lhm__contact-btn--whatsapp,
+          .lhm__contact-btn--whatsapp:hover{
+            background: #22c55e;
+            border-color: #22c55e;
+            color: #fff;
+          }
+
+          .lhm__contact-btn--phone,
+          .lhm__contact-btn--phone:hover{
+            background: #38bdf8;
+            border-color: #38bdf8;
+            color: #fff;
+          }
+
+          .lhm__action-btn{
+            width: 36px;
+            min-width: 36px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            border: 1px solid #111827;
+            background: #111827;
+            color: #fff;
+            padding: 0;
+          }
+
+          .lhm__action-btn--toggle{
+            background: #fff;
+            color: #111827;
+            border-color: #cbd5e1;
+          }
+
+          .lhm__row2{
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 10px;
+            padding: 12px;
+            background: #f8fafc;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            scroll-snap-type: x proximity;
+            scrollbar-width: thin;
+          }
+
+          .lhm__row2::-webkit-scrollbar,
+          .lhm__row3::-webkit-scrollbar{
+            height: 4px;
+          }
+
+          .lhm__row2::-webkit-scrollbar-thumb,
+          .lhm__row3::-webkit-scrollbar-thumb{
+            background: #cbd5e1;
+            border-radius: 999px;
+          }
+
+          .lhm__panel{
+            position: relative;
+            flex: 0 0 176px;
+            min-height: 96px;
+            padding: 12px 10px 10px;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+            background: #fff;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+            scroll-snap-align: start;
+          }
+
+          .lhm__panel--performance{
+            flex-basis: 190px;
+          }
+
+          .lhm__panel-head{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding-bottom: 8px;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #e5e7eb;
+          }
+
+          .lhm__panel-title{
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-width: 0;
+            color: #020617;
+            font-size: 13px;
+            font-weight: 900;
+            line-height: 1.1;
+            white-space: nowrap;
+          }
+
+          .lhm__panel-title i{
+            color: #2563eb;
+            font-size: 12px;
+          }
+
+          .lhm__panel-edit{
+            width: 28px;
+            min-width: 28px;
+            height: 28px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            border: 1px solid #dbeafe;
+            background: #f8fbff;
+            color: #2563eb;
+            padding: 0;
+            cursor: pointer;
+          }
+
+          .lhm__panel-edit--corner{
+            position: absolute;
+            right: 8px;
+            bottom: 8px;
+          }
+
+          .lhm__kv{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+            margin-bottom: 8px;
+          }
+
+          .lhm__kv-label{
+            width: 52px;
+            flex-shrink: 0;
+            color: #475569;
+            font-size: 10px;
+            font-weight: 800;
+          }
+
+          .lhm__kv-pill{
+            flex: 1 1 auto;
+            min-width: 0;
+            height: 24px;
+            border: 1px solid #bfdbfe;
+            border-radius: 999px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            padding: 0 10px;
+            font-size: 10px;
+            font-weight: 800;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: pointer;
+          }
+
+          .lhm__row3{
+            display: grid !important;
+            grid-auto-flow: column;
+            grid-auto-columns: minmax(176px, 46vw);
+            grid-template-columns: none !important;
+            gap: 10px;
+            width: 100%;
+            max-width: 100%;
+            padding: 0 12px 12px;
+            background: #f8fafc;
+            overflow-x: auto !important;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            scroll-snap-type: x proximity;
+            scrollbar-width: thin;
+          }
+
+          .lhm__followup-box{
+            width: 100%;
+            min-width: 0;
+            min-height: 174px;
+            padding: 12px 10px 10px;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            background: #fff;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+            scroll-snap-align: start;
+          }
+
+          .lhm__followup-title{
+            color: #020617;
+            font-size: 13px;
+            font-weight: 900;
+            line-height: 1.1;
+            padding-right: 28px;
+            margin-bottom: 8px;
+          }
+
+          .lhm__followup-box .lhm__editbtn{
+            top: auto;
+            right: 8px;
+            bottom: 8px;
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            border-color: #dbeafe;
+            background: #f8fbff;
+            color: #2563eb;
+            box-shadow: none;
+          }
+
+          .lhm__followup-cards{
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 7px;
+            flex-wrap: nowrap;
+          }
+
+          .lhm__followup-box:nth-child(1) .lhm__stat-card:nth-child(3),
+          .lhm__followup-box:nth-child(2) .lhm__stat-card:nth-child(3){
+            grid-column: 1 / -1;
+          }
+
+          .lhm__stat-card{
+            min-width: 0;
+            min-height: 46px;
+            border-radius: 8px;
+            padding: 7px 5px;
+            box-shadow: none;
+          }
+
+          .lhm__stat-label{
+            font-size: 10px;
+            line-height: 1.05;
+          }
+
+          .lhm__stat-divider{
+            width: 70%;
+            height: 1px;
+            margin: 4px 0;
+            background: currentColor;
+            opacity: 0.75;
+          }
+
+          .lhm__stat-val{
+            font-size: 16px;
+            line-height: 1;
+          }
+
+          .lhm__followup-date{
+            align-items: center;
+            justify-content: flex-start;
+            flex-wrap: nowrap;
+            gap: 5px;
+            min-height: 30px;
+            margin-top: 8px;
+            padding-top: 9px;
+            padding-right: 32px;
+            border-top: 1px solid #e5e7eb;
+            color: #64748b;
+            font-size: 10px;
+            line-height: 1.1;
+          }
+
+          .lhm__followup-date span{
+            min-width: 0;
+            white-space: nowrap;
+          }
+
+          .lhm__followup-date span:first-child{
+            font-weight: 900;
+          }
+        }
+
+        @media (max-width: 380px){
+          .lhm__row1{
+            gap: 8px;
+            padding: 11px;
+          }
+
+          .lhm__name{
+            column-gap: 6px;
+          }
+
+          .lhm__actions{
+            gap: 5px;
+          }
+
+          .lhm__actions .lead-meta-v2__pill,
+          .lhm__action-btn{
+            width: 34px;
+            min-width: 34px;
+            height: 34px;
+          }
+
+          .lhm__row2{
+            padding: 11px;
+          }
+
+          .lhm__row3{
+            grid-auto-columns: minmax(168px, 48vw);
+            padding: 0 11px 11px;
+          }
+        }
+      `}</style>
+      </div>
     </div>
   );
 };

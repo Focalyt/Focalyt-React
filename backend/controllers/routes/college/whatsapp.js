@@ -21,6 +21,7 @@ AWS.config.update({
 	region,
 });
 const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
+const { normalizeStorageKey, resolvePublicUrl } = require('../../../helpers/s3Storage');
 
 const allowedVideoExtensions = ['mp4', 'mkv', 'mov', 'avi', 'wmv'];
 const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
@@ -712,12 +713,12 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 			
 			savedHeaderMedia = {
 				mediaType: mediaType,
-				s3Url: uploadResult.Location,
+				s3Url: key,
 				s3Key: key,
 				fileName: fileName
 			};
 			
-			console.log(`  ✓ Header media saved to S3: ${uploadResult.Location}`);
+			console.log(`  ✓ Header media saved to S3: ${key}`);
 		} catch (s3Error) {
 			console.error(`  ❌ Header media S3 upload failed:`, s3Error.message);
 		}
@@ -772,11 +773,11 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 					savedCarouselMedia.push({
 						cardIndex: cardIndex,
 						mediaType: mediaType,
-						s3Url: uploadResult.Location,
+						s3Url: key,
 						s3Key: key,
 						fileName: fileName
 					});
-					console.log(`  ✓ Card ${cardIndex} saved to S3: ${uploadResult.Location}`);
+					console.log(`  ✓ Card ${cardIndex} saved to S3: ${key}`);
 				}).catch((s3Error) => {
 					console.error(`  ❌ Card ${cardIndex} S3 upload failed:`, s3Error.message);
 				})
@@ -4009,9 +4010,10 @@ router.post('/send-audio', isCollege, upload.single('audio'), async (req, res) =
 		};
 
 		const uploadResult = await s3.upload(s3Params).promise();
-		const s3Url = uploadResult.Location;
+		const storageKey = normalizeStorageKey(uploadResult.Key || key);
+		const publicUrl = resolvePublicUrl(storageKey);
 		
-		console.log(`✅ Audio uploaded to S3: ${s3Url}`);
+		console.log(`✅ Audio uploaded to S3: ${storageKey}`);
 
 		// Step 2: Send audio via WhatsApp API
 		// const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_API_TOKEN;
@@ -4030,7 +4032,7 @@ router.post('/send-audio', isCollege, upload.single('audio'), async (req, res) =
 			to: formattedPhone,
 			type: 'audio',
 			audio: {
-				link: s3Url
+				link: publicUrl
 			}
 		};
 
@@ -4057,12 +4059,12 @@ router.post('/send-audio', isCollege, upload.single('audio'), async (req, res) =
 			direction: 'outgoing',
 			status: 'sent',
 			timestamp: new Date(),
-			mediaUrl: s3Url,
+			mediaUrl: storageKey,
 			metadata: {
 				wamid: response.data.messages?.[0]?.id,
 				fileName: audioFile.originalname,
 				fileSize: audioFile.size,
-				s3Key: key
+				s3Key: storageKey
 			}
 		};
 
@@ -4085,7 +4087,7 @@ router.post('/send-audio', isCollege, upload.single('audio'), async (req, res) =
 			data: {
 				messageId: response.data.messages?.[0]?.id,
 				phone: formattedPhone,
-				s3Url: s3Url
+				s3Url: storageKey
 			}
 		});
 
@@ -4177,9 +4179,10 @@ router.post('/send-file', isCollege, upload.single('file'), async (req, res) => 
 		};
 
 		const uploadResult = await s3.upload(s3Params).promise();
-		const s3Url = uploadResult.Location;
+		const storageKey = normalizeStorageKey(uploadResult.Key || key);
+		const publicUrl = resolvePublicUrl(storageKey);
 		
-		console.log(`✅ File uploaded to S3: ${s3Url}`);
+		console.log(`✅ File uploaded to S3: ${storageKey}`);
 
 		// Step 2: Send file via WhatsApp API
 		// const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_API_TOKEN;
@@ -4203,7 +4206,7 @@ router.post('/send-file', isCollege, upload.single('file'), async (req, res) => 
 
 		// Add media object based on type
 		messageData[messageType] = {
-			link: s3Url
+			link: publicUrl
 		};
 
 		// Add caption if provided
@@ -4240,12 +4243,12 @@ router.post('/send-file', isCollege, upload.single('file'), async (req, res) => 
 			direction: 'outgoing',
 			status: 'sent',
 			timestamp: new Date(),
-			mediaUrl: s3Url,
+			mediaUrl: storageKey,
 			metadata: {
 				wamid: response.data.messages?.[0]?.id,
 				fileName: file.originalname,
 				fileSize: file.size,
-				s3Key: key,
+				s3Key: storageKey,
 				caption: caption
 			}
 		};
@@ -4269,7 +4272,7 @@ router.post('/send-file', isCollege, upload.single('file'), async (req, res) => 
 			data: {
 				messageId: response.data.messages?.[0]?.id,
 				phone: formattedPhone,
-				s3Url: s3Url,
+				s3Url: storageKey,
 				messageType: messageType
 			}
 		});

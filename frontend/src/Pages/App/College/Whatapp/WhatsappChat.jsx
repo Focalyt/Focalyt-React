@@ -10,6 +10,7 @@ import axios from 'axios'
 import useWebsocket from '../../../../utils/websocket';
 import { useWhatsAppContext } from '../../../../contexts/WhatsAppContext';
 import { useLocation } from 'react-router-dom';
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
@@ -4398,7 +4399,7 @@ const WhatsappChat = () => {
                       <div style={{ position: 'relative', width: '100%', height: '140px' }}>
                         {cardMedia.mediaType === 'IMAGE' ? (
                           <img
-                            src={cardMedia.s3Url}
+                            src={resolveMediaUrl(bucketUrl, cardMedia.s3Url)}
                             alt={`Card ${cardIndex + 1}`}
                             style={{
                               width: '100%',
@@ -4415,7 +4416,7 @@ const WhatsappChat = () => {
                               objectFit: 'cover'
                             }}
                           >
-                            <source src={cardMedia.s3Url} type="video/mp4" />
+                            <source src={resolveMediaUrl(bucketUrl, cardMedia.s3Url)} type="video/mp4" />
                           </video>
                         )}
                       </div>
@@ -4572,7 +4573,7 @@ const WhatsappChat = () => {
                 )}
                 {headerComponent.format === 'IMAGE' && templateData.headerMedia?.s3Url && (
                   <img
-                    src={templateData.headerMedia.s3Url}
+                    src={resolveMediaUrl(bucketUrl, templateData.headerMedia.s3Url)}
                     alt="Header"
                     style={{
                       width: '100%',
@@ -4601,7 +4602,7 @@ const WhatsappChat = () => {
                       width: 'calc(100% + 20px)'
                     }}
                   >
-                    <source src={templateData.headerMedia.s3Url} type="video/mp4" />
+                    <source src={resolveMediaUrl(bucketUrl, templateData.headerMedia.s3Url)} type="video/mp4" />
                   </video>
                 )}
                 {headerComponent.format === 'DOCUMENT' && templateData.headerMedia?.s3Url && (

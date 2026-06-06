@@ -132,11 +132,24 @@
 .footer-v2.footer-padding-default.footer-l02 a,
 .footer-v2.footer-padding-default.footer-l02 .footer-list a {
   color: var(--ftr-muted) !important;
+  color: #fff;
   font-family: 'Orbitron', sans-serif;
 }
 .footer-v2.footer-padding-default.footer-l02 a:hover,
 .footer-v2.footer-padding-default.footer-l02 .footer-list a:hover {
   color: var(--ftr-accent-1) !important;
+  color: #fff;
+}
+
+.footer-v2.footer-padding-default.footer-l02 .ftr-download-card .ftr-playstore-button,
+.footer-v2.footer-padding-default.footer-l02 .ftr-download-card .ftr-playstore-button:hover {
+  color: #ffffff !important;
+}
+
+.footer-v2.footer-padding-default.footer-l02 .foc-app-download__btn,
+.footer-v2.footer-padding-default.footer-l02 .foc-app-download__btn:hover,
+.footer-v2.footer-padding-default.footer-l02 .foc-app-download__btn i {
+  color: #ffffff !important;
 }
 
 /* “pink” headings should follow theme accent */
@@ -300,6 +313,98 @@ font-size: 1.2em;}
   background: color-mix(in srgb, var(--ftr-accent-1) 18%, var(--ftr-surface));
 }
 
+/* Download app card — layout like reference, colors from theme tokens */
+.ftr-download-card {
+  width: 100%;
+  max-width: 320px;
+  margin-top: 6px;
+  padding: 18px 20px 20px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ftr-accent-1) 10%, var(--ftr-bg));
+  border: 1px solid color-mix(in srgb, var(--ftr-accent-1) 22%, var(--ftr-border));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 40%, transparent);
+}
+
+.ftr-download-heading {
+  margin: 0 0 14px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+  color: var(--ftr-text) !important;
+}
+
+.ftr-download-card .ftr-playstore-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  max-width: 220px;
+  border: none;
+  border-radius: 10px;
+  background: var(--ftr-text);
+  padding: 10px 16px;
+  text-align: left;
+  color: #ffffff !important;
+  outline: 0;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  text-decoration: none;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--ftr-text) 25%, transparent);
+}
+
+.ftr-download-card .ftr-playstore-button:hover {
+  transform: translateY(-2px);
+  color: #ffffff !important;
+  background: linear-gradient(90deg, var(--ftr-accent-1), var(--ftr-accent-2));
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--ftr-accent-1) 35%, transparent);
+}
+
+.ftr-download-card .ftr-playstore-button:hover .ftr-playstore-text-1,
+.ftr-download-card .ftr-playstore-button:hover .ftr-playstore-text-2,
+.ftr-download-card .ftr-playstore-button:hover .ftr-playstore-icon {
+  color: #ffffff !important;
+  fill: #ffffff;
+}
+
+.ftr-download-card .ftr-playstore-button .ftr-playstore-text-1,
+.ftr-download-card .ftr-playstore-button .ftr-playstore-text-2 {
+  color: #ffffff !important;
+}
+
+.ftr-download-card .ftr-playstore-icon {
+  height: 1.75rem;
+  width: 1.75rem;
+  flex-shrink: 0;
+  color: #ffffff;
+  fill: #ffffff;
+}
+
+.ftr-download-card .ftr-playstore-texts {
+  margin-left: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.1;
+}
+
+.ftr-download-card .ftr-playstore-text-1 {
+  margin-bottom: 2px;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+.ftr-download-card .ftr-playstore-text-2 {
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
 .ftr-heading {
   font-size: 14px;
   font-weight: 800;
@@ -458,6 +563,10 @@ font-size: 1.2em;}
     flex-wrap: wrap;
     align-items: center;
   }
+  .ftr-download-card {
+    max-width: 100%;
+    /* flex: 1 1 280px; */
+  }
   .ftr-tagline {
     flex: 1 1 100%;
   }
@@ -478,5 +587,363 @@ font-size: 1.2em;}
   }
   .ftr-brand img {
     width: 150px;
+  }
+}
+
+/* Career modal — Sky Magenta theme */
+#careerModal {
+  --cm-cyan: var(--foc-cyan);
+  --cm-red: var(--foc-magenta);
+  --cm-bg: var(--foc-color-bg);
+  --cm-surface: var(--foc-color-surface);
+  --cm-border: rgba(4, 25, 45, 0.12);
+  --cm-text: var(--foc-color-text);
+  --cm-muted: var(--foc-color-text-muted);
+  --cm-muted2: var(--foc-color-text-muted-2);
+  --cm-r: 14px;
+  --cm-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --cm-shadow: rgba(27, 167, 255, 0.18);
+  --cm-shadow-hover: rgba(255, 45, 170, 0.16);
+  font-family: var(--foc-font-sans);
+}
+
+#careerModal .career-modal-dialog {
+  max-width: 720px;
+  width: calc(100% - 2rem);
+  max-height: calc(100vh - 2rem);
+  margin: 1rem auto;
+}
+
+#careerModal .career-modal-content {
+  border: 1px solid var(--cm-border);
+  border-radius: var(--cm-r);
+  max-height: calc(100vh - 2rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 18px 46px var(--cm-shadow);
+  background: var(--cm-surface);
+}
+
+#careerModal .career-modal-header {
+  background: linear-gradient(90deg, var(--cm-cyan), var(--cm-red));
+  border: none;
+  padding: 20px 22px 18px;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+#careerModal .career-modal-header::before,
+#careerModal .career-modal-header::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0.2;
+}
+
+#careerModal .career-modal-header::before {
+  width: 100px;
+  height: 100px;
+  background: var(--foc-color-surface);
+  top: -40px;
+  right: -16px;
+}
+
+#careerModal .career-modal-header::after {
+  width: 56px;
+  height: 56px;
+  background: var(--cm-cyan);
+  bottom: -24px;
+  left: 10px;
+  opacity: 0.25;
+}
+
+#careerModal .career-modal-header-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+#careerModal .career-modal-emoji {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+#careerModal .career-modal-title {
+  margin: 0;
+  font-family: var(--foc-font-display), Orbitron, sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--foc-color-text-inverse);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+#careerModal .career-modal-tagline {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+#careerModal .career-modal-close {
+  position: relative;
+  z-index: 2;
+  opacity: 0.92;
+  filter: brightness(0) invert(1);
+  transition: transform 0.2s var(--cm-ease), opacity 0.2s ease;
+}
+
+#careerModal .career-modal-close:hover {
+  transform: scale(1.08);
+  opacity: 1;
+}
+
+#careerModal .career-modal-body {
+  padding: 20px 22px 24px;
+  background: var(--cm-bg);
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(27, 167, 255, 0.45) transparent;
+}
+
+#careerModal .career-modal-body::-webkit-scrollbar {
+  width: 5px;
+}
+
+#careerModal .career-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(27, 167, 255, 0.35);
+  border-radius: 999px;
+}
+
+#careerModal .career-modal-intro {
+  font-family: var(--foc-font-sans);
+  font-size: 0.85rem;
+  color: var(--cm-muted);
+  line-height: 1.6;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  background: rgba(27, 167, 255, 0.06);
+  border-radius: var(--cm-r);
+  border: 1px solid var(--cm-border);
+}
+
+#careerModal .career-section-title {
+  font-family: var(--foc-font-display), Orbitron, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cm-text);
+  margin: 0 0 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--cm-border);
+}
+
+#careerModal .career-section-title .career-section-accent {
+  background: linear-gradient(90deg, var(--cm-cyan), var(--cm-red));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+#careerModal .career-field {
+  margin-bottom: 12px;
+}
+
+#careerModal .career-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--foc-font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--cm-muted);
+  margin-bottom: 6px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+#careerModal .career-label svg {
+  color: var(--cm-cyan);
+  flex-shrink: 0;
+}
+
+#careerModal .career-label-required::after {
+  content: "*";
+  color: var(--cm-red);
+  margin-left: 3px;
+}
+
+#careerModal #careerForm input:not([type="checkbox"]):not([type="file"]),
+#careerModal #careerForm select,
+#careerModal #careerForm textarea {
+  width: 100%;
+  border: 1px solid var(--cm-border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-size: 0.88rem;
+  font-family: var(--foc-font-sans);
+  background: var(--cm-surface);
+  color: var(--cm-text);
+  transition: border-color 0.2s var(--cm-ease), box-shadow 0.2s var(--cm-ease);
+  height: auto;
+}
+
+#careerModal #careerForm select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231BA7FF' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+#careerModal #careerForm input[type="file"] {
+  width: 100%;
+  font-family: var(--foc-font-sans);
+  font-size: 0.82rem;
+  color: var(--cm-muted);
+  padding: 8px 0;
+  background: transparent;
+  border: none;
+}
+
+#careerModal #careerForm input[type="file"]::file-selector-button {
+  margin-right: 12px;
+  padding: 8px 14px;
+  border: 1px solid var(--cm-border);
+  border-radius: 4px;
+  background: var(--cm-surface);
+  color: var(--cm-text);
+  font-family: var(--foc-font-sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.2s var(--cm-ease), background 0.2s var(--cm-ease);
+}
+
+#careerModal #careerForm input[type="file"]::file-selector-button:hover {
+  border-color: rgba(27, 167, 255, 0.45);
+  background: rgba(27, 167, 255, 0.06);
+}
+
+#careerModal #careerForm input::placeholder,
+#careerModal #careerForm textarea::placeholder {
+  color: var(--cm-muted2);
+}
+
+#careerModal #careerForm input:not([type="checkbox"]):not([type="file"]):focus,
+#careerModal #careerForm select:focus,
+#careerModal #careerForm textarea:focus {
+  outline: none;
+  border-color: rgba(27, 167, 255, 0.45);
+  box-shadow: 0 0 0 3px rgba(27, 167, 255, 0.15);
+}
+
+#careerModal #careerForm textarea {
+  resize: vertical;
+  min-height: 110px;
+}
+
+#careerModal .career-hint {
+  font-size: 0.75rem;
+  color: var(--cm-muted2);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+#careerModal .career-file-name {
+  font-size: 0.8rem;
+  color: var(--cm-cyan);
+  margin: 6px 0 0;
+  font-weight: 500;
+}
+
+#careerModal .career-terms {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 8px 0 4px;
+  padding: 12px;
+  background: var(--cm-surface);
+  border: 1px solid var(--cm-border);
+  border-radius: var(--cm-r);
+}
+
+#careerModal .career-terms input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--cm-red);
+  cursor: pointer;
+}
+
+#careerModal .career-terms label {
+  font-size: 0.8rem;
+  color: var(--cm-muted);
+  line-height: 1.5;
+  cursor: pointer;
+  margin: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+
+#careerModal .career-modal-footer {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+#careerModal .career-modal-submit {
+  width: 100%;
+  max-width: 300px;
+  padding: 12px 28px;
+  border: none;
+  border-radius: 4px;
+  font-family: var(--foc-font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--foc-color-text-inverse);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  background: linear-gradient(90deg, var(--cm-cyan), var(--cm-red));
+  box-shadow: 0 14px 34px var(--cm-shadow);
+  cursor: pointer;
+  transition: transform 0.25s var(--cm-ease), box-shadow 0.25s var(--cm-ease);
+}
+
+#careerModal .career-modal-submit:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 46px var(--cm-shadow-hover);
+}
+
+#careerModal .career-modal-submit:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+@media (max-width: 576px) {
+  #careerModal .career-modal-body {
+    padding: 16px;
   }
 }

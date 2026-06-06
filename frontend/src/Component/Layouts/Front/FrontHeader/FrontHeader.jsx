@@ -27,6 +27,15 @@ function scrollToHomeSection(sectionId) {
   window.history.replaceState(null, "", `/#${sectionId}`);
 }
 
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function normalizePath(path) {
+  const p = path.replace(/\/$/, "") || "/";
+  return p;
+}
+
 const FrontHeader = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -248,13 +257,25 @@ const FrontHeader = () => {
     return path === "/" || path === "/home";
   };
 
-  const handlePartnerWithUs = (e) => {
+  const handlePartnerWithUs = () => {
     if (isMenuActive) {
       toggleMenu();
     }
-    if (isHomePage()) return;
-    e.preventDefault();
-    navigate("/", { state: { openPartnerModal: true } });
+  };
+
+  const handleNavLinkClick = (e, targetPath) => {
+    if (isMenuActive) {
+      toggleMenu();
+    }
+    const current = normalizePath(location.pathname);
+    const target = normalizePath(targetPath);
+    if (current === target) {
+      e.preventDefault();
+      if (location.hash) {
+        window.history.replaceState(null, "", targetPath);
+      }
+      scrollToTop();
+    }
   };
 
   const handleSubTabClick = (e, tab) => {
@@ -275,7 +296,7 @@ const FrontHeader = () => {
           <div className="container">
             <nav className="navbar site-navbar">
               <div className="brand-logo">
-                <Link to="/" aria-label="Focalyt Home">
+                <Link to="/" aria-label="Focalyt Home" onClick={(e) => handleNavLinkClick(e, "/")}>
                   <img className="logo-light" src={logo} alt="brand logo" />
                   <img className="logo-dark" src={logo} alt="brand logo" />
                 </Link>
@@ -303,10 +324,10 @@ const FrontHeader = () => {
                   
                   <ul className="site-menu-main" ref={menuMainRef} onClick={handleMenuClick}>
                     <li className="nav-item">
-                      <Link className='nav-link-item drop-trigger' to="/">Home</Link>
+                      <Link className='nav-link-item drop-trigger' to="/" onClick={(e) => handleNavLinkClick(e, "/")}>Home</Link>
                     </li>
                     <li className="nav-item nav-item-has-children">
-                      <Link to="/about" className="nav-link-item drop-trigger">About Us</Link>
+                      <Link to="/about" className="nav-link-item drop-trigger" onClick={(e) => handleNavLinkClick(e, "/about")}>About Us</Link>
                     </li>
                     {/* <li className="nav-item">
                       <Link className='nav-link-item drop-trigger' to="/socialimpact">Social Impact</Link>
@@ -327,8 +348,8 @@ const FrontHeader = () => {
                       <button
                         type="button"
                         className="nav-link-item drop-trigger"
-                        data-bs-toggle={isHomePage() ? "modal" : undefined}
-                        data-bs-target={isHomePage() ? "#partnerModal" : undefined}
+                        data-bs-toggle="modal"
+                        data-bs-target="#partnerModal"
                         onClick={handlePartnerWithUs}
                       >
                         Partner with Us
@@ -338,8 +359,8 @@ const FrontHeader = () => {
                       <button
                         type="button"
                         className="nav-link-item drop-trigger"
-                        data-bs-toggle={isHomePage() ? "modal" : undefined}
-                        data-bs-target={isHomePage() ? "#partnerModal" : undefined}
+                        data-bs-toggle="modal"
+                        data-bs-target="#partnerModal"
                         onClick={handlePartnerWithUs}
                       >
                         Partner with Us

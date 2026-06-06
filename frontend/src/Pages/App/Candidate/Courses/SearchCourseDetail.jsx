@@ -4,6 +4,7 @@ import axios from 'axios';
 import { trackMetaConversion } from "../../../../utils/conversionTrakingRoutes";
 import moment from 'moment';
 import PopupModelApply from "../../../../Component/Layouts/App/Candidates/PopupModelApply/PopupModelApply"
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 const CourseDetails = () => {
 
   const { courseId } = useParams();
@@ -44,18 +45,8 @@ const CourseDetails = () => {
   
 
   const getFileUrl = (file) => {
-
-    if (typeof file === 'string') {
-      // Check if the file is already a URL starting with Amazon bucket URL
-      if (file.includes(bucketUrl) || file.includes('http') || file.includes('blob')) {
-        return file; // Return the file URL as is if it starts with the bucket URL
-      } else {
-        return `${bucketUrl}/${file}`; // Prepend the bucket URL to the file path if it's not already a complete URL
-      }
-    } else if (file instanceof File) {
-      // For new video files, create an object URL
-      return URL.createObjectURL(file);
-    }
+    if (file instanceof File) return URL.createObjectURL(file);
+    if (typeof file === 'string') return resolveMediaUrl(bucketUrl, file);
     return '';
   };
 
@@ -490,7 +481,7 @@ const CourseDetails = () => {
                                 <div key={i} className={`carousel-item ${i === 0 ? 'active' : ''}`}>
                                   <img
                                     className="d-block w-100 rounded shadow"
-                                    src={photo ? `${bucketUrl}/${photo}` : '/public_assets/images/newjoblisting/banner1.jpg'}
+                                    src={photo ? getFileUrl(photo) : '/public_assets/images/newjoblisting/banner1.jpg'}
                                     alt={`Course slide ${i + 1}`}
                                   />
                                 </div>
@@ -548,7 +539,7 @@ const CourseDetails = () => {
                                   <div key={i} className={`carousel-item ${i === 0 ? 'active' : ''}`}>
                                     <img
                                       className="d-block w-100"
-                                      src={photo ? `${bucketUrl}/${photo}` : '/Assets/public_assets/images/newjoblisting/course_img.svg'}
+                                      src={photo ? getFileUrl(photo) : '/Assets/public_assets/images/newjoblisting/course_img.svg'}
                                       alt={`Slide ${i + 1}`}
                                     />
                                   </div>
@@ -590,7 +581,7 @@ const CourseDetails = () => {
                               href="#"
                               onClick={(e) => {
                                 e.preventDefault();
-                                handleVideoModal(`${bucketUrl}/${course.videos[0]}`);
+                                handleVideoModal(getFileUrl(course.videos[0]));
                               }}
                               className="video-bttn position-relative d-block"
                             >
@@ -613,7 +604,7 @@ const CourseDetails = () => {
                               href="#"
                               onClick={(e) => {
                                 e.preventDefault();
-                                handleVideoModal(`${bucketUrl}/${course.videos[0]}`);
+                                handleVideoModal(getFileUrl(course.videos[0]));
                               }}
                               className="video-bttn position-relative d-block"
                             >
@@ -881,7 +872,7 @@ const CourseDetails = () => {
                     </span>
 
                     <span className="text-capitalize px-0 py-1">
-                      <a href={`${bucketUrl}/${course.brochure}`} target="_blank" rel="noopener noreferrer">
+                      <a href={getFileUrl(course.brochure)} target="_blank" rel="noopener noreferrer">
                         <i className="la la-download"></i>
                         <strong><em>Download Brochure</em></strong>
                       </a>
@@ -1454,6 +1445,9 @@ const CourseDetails = () => {
       <style>
         {
           `
+          .video-fluid {
+    width: 100%;
+}
     .contact-info {
     display: inline-block}
     

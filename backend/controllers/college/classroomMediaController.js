@@ -148,9 +148,9 @@ const uploadMedia = async (req, res) => {
             };
 
             uploadPromises.push(
-                s3.upload(params).promise().then((uploadResult) => {
+                s3.upload(params).promise().then(() => {
                     fileDataArray.push({
-                        fileUrl: uploadResult.Location,
+                        fileUrl: key,
                         mediaType:fileType,
                     });
                 })

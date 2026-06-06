@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import moment from 'moment';
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 
 const RegisterForInterview = () => {
+  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const [jobs, setJobs] = useState([]);
   const [pagination, setPagination] = useState({
     page: 1,
@@ -137,7 +139,7 @@ const RegisterForInterview = () => {
     if (job._company &&
       Array.isArray(job._company) &&
       job._company[0]?.logo) {
-      return `${process.env.REACT_APP_BUCKET_URL}/${job._company[0].logo}`;
+      return resolveMediaUrl(bucketUrl, job._company[0].logo);
     }
     return '/Assets/images/logo90.png';
   };

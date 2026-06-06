@@ -42,9 +42,27 @@ function CollegeLayout({ children }) {
   const [b2bImminentSoon, setB2bImminentSoon] = useState(false);
   const upcomingB2cRef = useRef([]);
   const upcomingB2bRef = useRef([]);
-  /** Map key → last toast time (ms); cleared when follow-up time passes */
-  const b2cFollowupLastToastRef = useRef(new Map());
-  const b2bFollowupLastToastRef = useRef(new Map());
+  const followupToastShownRef = useRef((() => {
+    try {
+      const raw = sessionStorage.getItem('foc_followup_toast_shown');
+      return new Set(raw ? JSON.parse(raw) : []);
+    } catch {
+      return new Set();
+    }
+  })());
+
+  const persistFollowupToastShown = useCallback(() => {
+    try {
+      sessionStorage.setItem(
+        'foc_followup_toast_shown',
+        JSON.stringify([...followupToastShownRef.current])
+      );
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }, []);
+
+  const currentCounsellorId = userData?._id ? String(userData._id) : '';
   const location = useLocation();
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
@@ -210,13 +228,12 @@ function CollegeLayout({ children }) {
   }, [token, backendUrl, refreshAllFollowupInsights]);
 
   /**
-   * From 20 min before follow-up until start: toast every 5 min (first when entering T−20).
-   * Stops when follow-up time has passed. Badge blink ~15–25 min before.
+   * One reminder per follow-up when ~20 min remain (first tick at T−20 or below).
+   * Never repeats for the same lead. Badge blink ~15–25 min before.
    */
   useEffect(() => {
     if (!token) return;
-    const WINDOW_MINUTES = 20;
-    const REPEAT_MS = 5 * 60 * 1000;
+    const REMINDER_AT_MINUTES = 20;
     const IMMINENT_LO = 15;
     const IMMINENT_HI = 25;
 
@@ -224,15 +241,19 @@ function CollegeLayout({ children }) {
       const now = Date.now();
       let imminentB2c = false;
       let imminentB2b = false;
+      const shown = followupToastShownRef.current;
+      let shownDirty = false;
 
       const runRow = (row, kind) => {
         const ms = new Date(row.start).getTime();
         if (Number.isNaN(ms)) return;
-        const lastMap = kind === 'b2c' ? b2cFollowupLastToastRef.current : b2bFollowupLastToastRef.current;
         const key = `${kind}-${row.id}-${ms}`;
 
         if (now >= ms) {
-          lastMap.delete(key);
+          if (shown.has(key)) {
+            shown.delete(key);
+            shownDirty = true;
+          }
           return;
         }
 
@@ -242,19 +263,27 @@ function CollegeLayout({ children }) {
           else imminentB2b = true;
         }
 
-        if (minutesUntil > WINDOW_MINUTES) return;
+        /* ~20 min window only (19–20 min left); skip if user opens app later */
+        if (minutesUntil > REMINDER_AT_MINUTES || minutesUntil < REMINDER_AT_MINUTES - 1) return;
+        if (shown.has(key)) return;
 
-        const lastToast = lastMap.get(key);
-        if (lastToast != null && now - lastToast < REPEAT_MS) return;
+        if (kind === 'b2c' && currentCounsellorId) {
+          const ownerId = row.counsellorId ? String(row.counsellorId) : '';
+          if (ownerId && ownerId !== currentCounsellorId) return;
+        }
 
-        lastMap.set(key, now);
+        shown.add(key);
+        shownDirty = true;
+
         const name = row.candidateName || row.title || 'Follow-up';
-        const mins = Math.max(1, Math.round(minutesUntil));
+        const mobile =
+          row.candidateMobile && row.candidateMobile !== 'Unknown'
+            ? String(row.candidateMobile)
+            : '—';
         const toastKey =
-          kind === 'b2c'
-            ? 'followup_reminder_toast_repeat'
-            : 'followup_b2b_reminder_toast_repeat';
-        toast.info(t(toastKey, { name, minutes: mins }), {
+          kind === 'b2c' ? 'followup_reminder_toast' : 'followup_b2b_reminder_toast';
+        toast.info(t(toastKey, { name, mobile }), {
+          toastId: key,
           position: 'top-right',
           autoClose: 12000,
           style: { background: '#fc2b5a', color: '#fff' },
@@ -269,6 +298,8 @@ function CollegeLayout({ children }) {
         runRow(row, 'b2b');
       }
 
+      if (shownDirty) persistFollowupToastShown();
+
       setB2cImminentSoon((prev) => (prev === imminentB2c ? prev : imminentB2c));
       setB2bImminentSoon((prev) => (prev === imminentB2b ? prev : imminentB2b));
     };
@@ -276,7 +307,7 @@ function CollegeLayout({ children }) {
     tick();
     const id = window.setInterval(tick, 25000);
     return () => window.clearInterval(id);
-  }, [token, t]);
+  }, [token, t, currentCounsellorId, persistFollowupToastShown]);
 
   // Listen for logo updates from profile page
   useEffect(() => {
@@ -1251,15 +1282,7 @@ function CollegeLayout({ children }) {
                         opacity: submenuMaxHeight.dropdown === '0px' ? 0 : 1
                       }}
                     >
-                      {(permissions?.permission_type === 'Admin' ||
-                        (permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_edit_lead_type_b2b)) && (
-                        <li className={`nav-item ${location.pathname === '/institute/typeOfB2b' ? 'active' : ''}`}>
-                          <Link to="/institute/typeOfB2b" onClick={() => handleSidebarClose()}>
-                            <FontAwesomeIcon icon={faIndustry} />
-                            <span className="menu-title">{t('type_of_b2b')}</span>
-                          </Link>
-                        </li>
-                      )}
+                      
                       {(permissions?.permission_type === 'Admin' ||
                         (permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_edit_b2b_department)) && (
                         <li className={`nav-item ${location.pathname === '/institute/b2bDepartment' ? 'active' : ''}`}>
@@ -1275,6 +1298,15 @@ function CollegeLayout({ children }) {
                           <Link to="/institute/b2bProject" onClick={() => handleSidebarClose()}>
                             <FontAwesomeIcon icon={faProjectDiagram} />
                             <span className="menu-title">{t('b2b_project')}</span>
+                          </Link>
+                        </li>
+                      )}
+                      {(permissions?.permission_type === 'Admin' ||
+                        (permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_edit_lead_type_b2b)) && (
+                        <li className={`nav-item ${location.pathname === '/institute/typeOfB2b' ? 'active' : ''}`}>
+                          <Link to="/institute/typeOfB2b" onClick={() => handleSidebarClose()}>
+                            <FontAwesomeIcon icon={faIndustry} />
+                            <span className="menu-title">{t('type_of_b2b')}</span>
                           </Link>
                         </li>
                       )}
@@ -1295,6 +1327,7 @@ function CollegeLayout({ children }) {
                       </li>
                     </ul>
                   </li>
+                  
 
                   <li className={`nav-item ${location.pathname === '/institute/dripmarketing' ? 'active' : ''}`}>
                     <Link to="/institute/dripmarketing" onClick={() => handleSidebarClose()}>

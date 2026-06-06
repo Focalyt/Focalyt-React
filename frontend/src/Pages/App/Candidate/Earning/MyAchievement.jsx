@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 const MyAchievement = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -140,7 +141,7 @@ const MyAchievement = () => {
 
       if (uploadResponse.status === 200) {
         // Step 3: Get the full image URL
-        const imageUrl = `${bucketUrl}/${key}`;
+        const imageUrl = resolveMediaUrl(bucketUrl, key);
         
         // Save to state
         setUploadedImages(prev => ({

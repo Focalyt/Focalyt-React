@@ -270,6 +270,16 @@ const useScrollBlur = (navbarHeight = 140) => {
 
   return { isScrolled, scrollY, contentRef };
 };
+
+const profileMatchesSearch = (profile, searchTerm) => {
+  if (!searchTerm || !String(searchTerm).trim()) return true;
+  const q = String(searchTerm).trim().toLowerCase();
+  const name = String(profile?.name ?? profile?._candidate?.name ?? '').toLowerCase();
+  const mobile = String(profile?.mobile ?? profile?._candidate?.mobile ?? '').toLowerCase();
+  const email = String(profile?.email ?? profile?._candidate?.email ?? '').toLowerCase();
+  return name.includes(q) || mobile.includes(q) || email.includes(q);
+};
+
 const MyFollowups = () => {
   //Calendar Stats
   // State management
@@ -1455,52 +1465,18 @@ const MyFollowups = () => {
 
 
   const handleSearch = (searchTerm) => {
-    if (!searchTerm.trim()) {
-      applyFilters();
-      return;
-    }
-
-    const searchFiltered = allProfilesData.filter(profile => {
-      try {
-        const name = profile._candidate?.name ? String(profile._candidate.name).toLowerCase() : '';
-        const mobile = profile._candidate?.mobile ? String(profile._candidate.mobile).toLowerCase() : '';
-        const email = profile._candidate?.email ? String(profile._candidate.email).toLowerCase() : '';
-        const searchLower = searchTerm.toLowerCase();
-
-        return name.includes(searchLower) ||
-          mobile.includes(searchLower) ||
-          email.includes(searchLower);
-      } catch (error) {
-        console.error('Search filter error for profile:', profile, error);
-        return false;
-      }
-    });
-
-    setAllProfiles(searchFiltered);
+    applyFilters({ ...filterData, name: searchTerm }, allProfilesData);
   };
 
-  const applyFilters = (filters = filterData) => {
+  const applyFilters = (filters = filterData, source = allProfilesData) => {
     console.log('Applying filters with data:', filters);
 
-    let filtered = [...allProfilesData];
+    let filtered = [...source];
 
     try {
-      // Search filter
+      // Search filter (name, mobile, email)
       if (filters.name && filters.name.trim()) {
-        const searchTerm = filters.name.toLowerCase();
-        filtered = filtered.filter(profile => {
-          try {
-            const name = profile._candidate?.name ? String(profile._candidate.name).toLowerCase() : '';
-            const mobile = profile._candidate?.mobile ? String(profile._candidate.mobile).toLowerCase() : '';
-            const email = profile._candidate?.email ? String(profile._candidate.email).toLowerCase() : '';
-
-            return name.includes(searchTerm) ||
-              mobile.includes(searchTerm) ||
-              email.includes(searchTerm);
-          } catch (error) {
-            return false;
-          }
-        });
+        filtered = filtered.filter(profile => profileMatchesSearch(profile, filters.name));
       }
 
       // Course type filter
@@ -1667,7 +1643,6 @@ const MyFollowups = () => {
     })
     fetchProfileData()
     setCurrentPage(1);
-    setAllProfiles(allProfilesData);
   };
 
   const handleStatusChange = (e) => {
@@ -1891,11 +1866,61 @@ const MyFollowups = () => {
   const [user, setUser] = useState({});
 
 
+  const followupApiFilterKey = useMemo(
+    () =>
+      JSON.stringify({
+        fromDate: filterData.fromDate,
+        toDate: filterData.toDate,
+        courseType: filterData.courseType,
+        status: filterData.status,
+        leadStatus: filterData.leadStatus,
+        sector: filterData.sector,
+        createdFromDate: filterData.createdFromDate,
+        createdToDate: filterData.createdToDate,
+        modifiedFromDate: filterData.modifiedFromDate,
+        modifiedToDate: filterData.modifiedToDate,
+        nextActionFromDate: filterData.nextActionFromDate,
+        nextActionToDate: filterData.nextActionToDate,
+        projects: formData?.projects?.values,
+        verticals: formData?.verticals?.values,
+        course: formData?.course?.values,
+        center: formData?.center?.values,
+        counselor: formData?.counselor?.values,
+        activeFollowupStatus,
+      }),
+    [
+      filterData.fromDate,
+      filterData.toDate,
+      filterData.courseType,
+      filterData.status,
+      filterData.leadStatus,
+      filterData.sector,
+      filterData.createdFromDate,
+      filterData.createdToDate,
+      filterData.modifiedFromDate,
+      filterData.modifiedToDate,
+      filterData.nextActionFromDate,
+      filterData.nextActionToDate,
+      formData?.projects?.values,
+      formData?.verticals?.values,
+      formData?.course?.values,
+      formData?.center?.values,
+      formData?.counselor?.values,
+      activeFollowupStatus,
+    ]
+  );
+
   useEffect(() => {
     console.log(messages || 'no messages', 'messages');
     console.log(updates || 'no updates', 'updates');
     fetchProfileData();
-  }, [filterData, activeFollowupStatus, messages, updates]);
+  }, [followupApiFilterKey, messages, updates]);
+
+  useEffect(() => {
+    if (allProfilesData.length > 0) {
+      applyFilters(filterData, allProfilesData);
+    }
+  }, [filterData.name]);
 
   const [isLoadingAllProfiles, setIsLoadingAllProfiles] = useState(false);
 
@@ -1941,11 +1966,13 @@ const MyFollowups = () => {
 
       if (response.data.success && response.data.data) {
         const data = response.data.data;
-        setAllProfiles(response.data.data);
+        setAllProfilesData(data);
+        applyFilters(filters, data);
         setTotalPages(response.data.totalPages);
         setCurrentPage(response.data.page);
 
       } else {
+        setAllProfilesData([]);
         console.error('Failed to fetch followups data', response.data.message);
         setAllProfiles([]);
       }
@@ -2193,11 +2220,8 @@ const MyFollowups = () => {
       const newFilterData = { ...filterData, [name]: value };
       setFilterData(newFilterData);
 
-      // Apply search if there's a search term
-      if (newFilterData.name) {
-        handleSearch(newFilterData.name);
-      } else {
-        applyFilters(newFilterData);
+      if (name === 'name') {
+        applyFilters(newFilterData, allProfilesData);
       }
     } catch (error) {
       console.error('Filter change error:', error);

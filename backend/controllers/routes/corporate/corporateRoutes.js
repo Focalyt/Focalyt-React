@@ -1357,9 +1357,9 @@ router.post('/editJobs/:jobId', isCompany, async (req, res) => {
 
         // Upload to S3
         uploadPromises.push(
-          s3.upload(params).promise().then((uploadResult) => {
+          s3.upload(params).promise().then(() => {
             uploadedFiles.push({
-              fileURL: uploadResult.Location,
+              fileURL: key,
               fileType,
             });
           })
@@ -1406,9 +1406,9 @@ router.post('/editJobs/:jobId', isCompany, async (req, res) => {
 
         // Upload to S3
         uploadThumbnailPromises.push(
-          s3.upload(params).promise().then((uploadResult) => {
+          s3.upload(params).promise().then(() => {
             uploadedThumbnailFiles.push({
-              fileURL: uploadResult.Location,
+              fileURL: key,
               fileType,
             });
           })
@@ -1551,9 +1551,9 @@ router
 
           // Upload to S3
           uploadPromises.push(
-            s3.upload(params).promise().then((uploadResult) => {
+            s3.upload(params).promise().then(() => {
               uploadedFiles.push({
-                fileURL: uploadResult.Location,
+                fileURL: key,
                 fileType,
               });
             })
@@ -1600,9 +1600,9 @@ router
 
           // Upload to S3
           uploadThumbnailPromises.push(
-            s3.upload(params).promise().then((uploadResult) => {
+            s3.upload(params).promise().then(() => {
               uploadedThumbnailFiles.push({
-                fileURL: uploadResult.Location,
+                fileURL: key,
                 fileType,
               });
             })

@@ -8,9 +8,9 @@
                 
                 <div class="contain">
                     <label for="image">Add Image</label>
-                    <% if (teamMember.image && teamMember.image.fileURL) { %>
+                    <% if (imageUrl) { %>
                         <div style="margin-bottom: 10px;">
-                            <img src="<%= teamMember.image.fileURL %>" alt="Current Image" 
+                            <img src="<%= imageUrl %>" alt="Current Image" 
                                  style="width: 100px; height: 100px; object-fit: cover; border-radius: 5px; border: 1px solid #ccc;">
                             <p style="font-size: 12px; color: #666; margin-top: 5px;">Current Image (Upload new to replace)</p>
                         </div>
@@ -195,13 +195,22 @@
                 processData: false,
                 contentType: false,
                 success: function (response) {
-                    console.log("Response:", response);
-                    alert("Team Member updated successfully!");
-                    window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/team/view";
+                    const data = typeof response === "string" ? JSON.parse(response) : response;
+                    if (data.status) {
+                        alert(data.message || "Team Member updated successfully!");
+                        window.location.href = "<%= process.env.MIPIE_BACKEND_URL %>/admin/team/view";
+                    } else {
+                        alert(data.message || "Failed to update team member.");
+                        $("button[type=submit]").text("Update").attr("disabled", false);
+                    }
                 },
-                error: function (xhr, status, error) {
-                    console.error("Error:", error);
-                    alert("Failed to update team member. Please try again.");
+                error: function (xhr) {
+                    let msg = "Failed to update team member. Please try again.";
+                    try {
+                        const data = xhr.responseJSON || JSON.parse(xhr.responseText);
+                        if (data?.message) msg = data.message;
+                    } catch (e) { /* ignore */ }
+                    alert(msg);
                     $("button[type=submit]").text("Update").attr("disabled", false);
                 },
             });

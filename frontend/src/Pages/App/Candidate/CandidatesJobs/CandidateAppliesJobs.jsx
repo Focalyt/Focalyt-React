@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
 import moment from "moment";
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 // import "./AppliedJobs.css";
 
 const CandidateAppliedJobs = () => {
@@ -9,6 +10,7 @@ const CandidateAppliedJobs = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
 
   useEffect(() => {
     fetchAppliedJobs();
@@ -53,7 +55,7 @@ const CandidateAppliedJobs = () => {
                         <img
                           src={
                             company.logo
-                              ? `${process.env.REACT_APP_MIPIE_BUCKET_URL}/${company.logo}`
+                              ? resolveMediaUrl(bucketUrl, company.logo)
                               : "/images/logo90.png"
                           }
                           alt="Company Logo"

@@ -96,7 +96,7 @@ module.exports.uploadSinglefile = async (file, folder = "cv") => {
     };
 
     const result = await s3.upload(params).promise(); // 👈 using promise
-  return result.Location;
+  return result.Key;
 
   
 };

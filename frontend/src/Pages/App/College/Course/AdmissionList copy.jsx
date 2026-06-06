@@ -1,12 +1,53 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import DatePicker from 'react-date-picker';
 
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
+const isObjectIdLike = (value) => {
+  if (value == null) return false;
+  if (typeof value === 'object') return false;
+  return /^[a-f0-9]{24}$/i.test(String(value).trim());
+};
+
+const labelFromRefField = (field) => {
+  if (field == null || field === '') return '';
+  if (typeof field === 'object') return field.name || field.title || field.label || '';
+  if (isObjectIdLike(field)) return '';
+  return String(field).trim();
+};
+
+const getResumeSummary = (candidate) => {
+  const summary = candidate?.personalInfo?.professionalSummary || candidate?.personalInfo?.summary || '';
+  return typeof summary === 'string' ? summary.trim() : '';
+};
+
+const getVisibleSkills = (skills = []) =>
+  skills.filter((skill) => (typeof skill === 'string' ? skill.trim() : skill?.skillName?.trim()));
+
+const getSkillLabel = (skill) => (typeof skill === 'string' ? skill : skill?.skillName || '');
+
+const getVisibleProjects = (projects = []) =>
+  projects.filter((proj) => proj?.projectName?.trim() || proj?.description?.trim());
+
+const getVisibleCertifications = (certs = []) =>
+  certs.filter((cert) => cert?.certificateName?.trim() || cert?.name?.trim());
+
+const getInterestLabel = (interest) => {
+  if (typeof interest === 'string') return interest;
+  if (interest && typeof interest === 'object') return interest.name || interest.title || interest.interest || '';
+  return '';
+};
+
+const getQualificationTitle = (edu) =>
+  labelFromRefField(edu?.education) || labelFromRefField(edu?.course) || '';
+
+const DOC_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
+const getDocFileUrl = (fileUrl) => resolveMediaUrl(DOC_BUCKET_URL, fileUrl);
 
 // Add this at the top of the file, after imports
 const RejectionForm = React.memo(({ onConfirm, onCancel }) => {
@@ -55,59 +96,98 @@ const RejectionForm = React.memo(({ onConfirm, onCancel }) => {
 const useNavHeight = (dependencies = []) => {
   const navRef = useRef(null);
   const [navHeight, setNavHeight] = useState(140);
-  const [navWidth, setNavWidth] = useState('100%');
 
-  const calculateHeightAndWidth = useCallback(() => {
-    // console.log('🔍 Calculating nav height and width...');
-
+  const calculateHeight = useCallback(() => {
     if (navRef.current) {
-      // Calculate Height
       const height = navRef.current.offsetHeight;
-      // console.log('📏 Found height:', height);
-
       if (height > 0) {
         setNavHeight(height);
-        // console.log('✅ Height set to:', height + 'px');
       }
-
-      // Calculate Width from parent (position-relative container)
-      const parentContainer = navRef.current.closest('.position-relative');
-      if (parentContainer) {
-        const parentWidth = parentContainer.offsetWidth;
-        // console.log('📐 Parent width:', parentWidth);
-
-        if (parentWidth > 0) {
-          setNavWidth(parentWidth + 'px');
-          // console.log('✅ Width set to:', parentWidth + 'px');
-        }
-      }
-    } else {
-      console.log('❌ navRef.current is null');
     }
   }, []);
 
   useEffect(() => {
-    // Calculate immediately and with delays
-    calculateHeightAndWidth();
-    setTimeout(calculateHeightAndWidth, 100);
-    setTimeout(calculateHeightAndWidth, 500);
+    calculateHeight();
+    const handleResize = () => setTimeout(calculateHeight, 100);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [calculateHeight]);
 
-    // Resize listener
-    const handleResize = () => {
-      setTimeout(calculateHeightAndWidth, 100);
+  useEffect(() => {
+    calculateHeight();
+    setTimeout(calculateHeight, 100);
+    setTimeout(calculateHeight, 300);
+  }, dependencies);
+
+  return { navRef, navHeight };
+};
+
+const useMainWidth = (dependencies = []) => {
+  const widthRef = useRef(null);
+  const [width, setWidth] = useState(0);
+  const [leftOffset, setLeftOffset] = useState(0);
+
+  const calculateWidth = useCallback(() => {
+    if (widthRef.current) {
+      const rect = widthRef.current.getBoundingClientRect();
+      setWidth(rect.width);
+      setLeftOffset(rect.left);
+    }
+  }, []);
+
+  useEffect(() => {
+    calculateWidth();
+
+    const handleResize = () => setTimeout(calculateWidth, 100);
+    const handleSidebarResize = () => {
+      calculateWidth();
+      setTimeout(calculateWidth, 50);
+      setTimeout(calculateWidth, 350);
+    };
+
+    let resizeObserver;
+    let mutationObserver;
+
+    const attachObservers = () => {
+      const el = widthRef.current;
+      if (!el) return;
+
+      if (typeof ResizeObserver !== 'undefined' && !resizeObserver) {
+        resizeObserver = new ResizeObserver(() => calculateWidth());
+        resizeObserver.observe(el);
+      }
+
+      if (!mutationObserver) {
+        mutationObserver = new MutationObserver(() => setTimeout(calculateWidth, 50));
+        mutationObserver.observe(el, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+        });
+      }
     };
 
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [calculateHeightAndWidth]);
+    window.addEventListener('college-sidebar-resize', handleSidebarResize);
 
-  // Recalculate when dependencies change
+    attachObservers();
+    const attachTimer = setTimeout(attachObservers, 100);
+
+    return () => {
+      clearTimeout(attachTimer);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('college-sidebar-resize', handleSidebarResize);
+      resizeObserver?.disconnect();
+      mutationObserver?.disconnect();
+    };
+  }, [calculateWidth]);
+
   useEffect(() => {
-    setTimeout(calculateHeightAndWidth, 100);
-    setTimeout(calculateHeightAndWidth, 300);
+    setTimeout(calculateWidth, 50);
+    setTimeout(calculateWidth, 200);
   }, dependencies);
 
-  return { navRef, navHeight, navWidth };
+  return { widthRef, width, leftOffset, calculateWidth };
 };
 
 const MultiSelectCheckbox = ({
@@ -119,13 +199,24 @@ const MultiSelectCheckbox = ({
   isOpen,
   onToggle
 }) => {
+  const [searchTerm, setSearchTerm] = useState('')
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchTerm('')
+    }
+  }, [isOpen])
   const handleCheckboxChange = (value) => {
     const newValues = selectedValues.includes(value)
       ? selectedValues.filter(v => v !== value)
       : [...selectedValues, value];
     onChange(newValues);
   };
-
+  // Filter options based on search term
+  const filteredOptions = [...options]
+  .sort((a, b) => (a?.label || '').localeCompare((b?.label || ''), undefined, { sensitivity: 'base' }))
+  .filter(option =>
+    (option?.label || '').toLowerCase().includes(searchTerm.toLowerCase())
+  );
   // Get display text for selected items
   const getDisplayText = () => {
     if (selectedValues.length === 0) {
@@ -179,6 +270,8 @@ const MultiSelectCheckbox = ({
                   type="text"
                   className="form-control"
                   placeholder={`Search ${title.toLowerCase()}...`}
+                  value={searchTerm}
+                  onChange={(e) => { setSearchTerm(e.target.value) }}
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
@@ -186,7 +279,7 @@ const MultiSelectCheckbox = ({
 
             {/* Options List */}
             <div className="options-list-new">
-              {options.map((option) => (
+              {filteredOptions.map((option) => (
                 <label key={option.value} className="option-item-new">
                   <input
                     type="checkbox"
@@ -202,10 +295,10 @@ const MultiSelectCheckbox = ({
                 </label>
               ))}
 
-              {options.length === 0 && (
+              {filteredOptions.length === 0 && (
                 <div className="no-options">
                   <i className="fas fa-info-circle me-2"></i>
-                  No {title.toLowerCase()} available
+                  {searchTerm ? `No ${title.toLowerCase()} found for "${searchTerm}"` : `No ${title.toLowerCase()} available`}
                 </div>
               )}
             </div>
@@ -214,7 +307,8 @@ const MultiSelectCheckbox = ({
             {selectedValues.length > 0 && (
               <div className="options-footer">
                 <small className="text-muted">
-                  {selectedValues.length} of {options.length} selected
+                  {selectedValues.length} of {filteredOptions.length} selected
+                  {searchTerm && ` (filtered from ${options.length} total)`}
                 </small>
               </div>
             )}
@@ -260,7 +354,7 @@ const useScrollBlur = (navbarHeight = 140) => {
 
   return { isScrolled, scrollY, contentRef };
 };
-const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
+const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null }) => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
@@ -268,13 +362,13 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
 
   const candidateRef = useRef();
 
-  // const fetchProfile = (id) => {
-  //   if (candidateRef.current) {
-  //     console.log('start fetching', id)
-  //     candidateRef.current.fetchProfile(id);
-  //     fetchProfileData();
-  //   }
-  // };
+  const fetchProfile = (id) => {
+    if (candidateRef.current) {
+      console.log('start fetching', id);
+      candidateRef.current.fetchProfile(id);
+      fetchProfileData();
+    }
+  };
 
 
   // const handleSaveCV = async () => {
@@ -287,30 +381,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
   //   }
   // };
 
-  // useEffect(() => {
-  //   const handleClickOutside = (event) => {
-  //     // Check if click is outside any multi-select dropdown
-  //     const isMultiSelectClick = event.target.closest('.multi-select-container-new');
 
-  //     if (!isMultiSelectClick) {
-  //       // Close all dropdowns
-  //       setDropdownStates(prev =>
-  //         Object.keys(prev).reduce((acc, key) => {
-  //           acc[key] = false;
-  //           return acc;
-  //         }, {})
-  //       );
-  //     }
-  //   };
-
-  //   // Add event listener
-  //   document.addEventListener('mousedown', handleClickOutside);
-
-  //   // Cleanup
-  //   return () => {
-  //     document.removeEventListener('mousedown', handleClickOutside);
-  //   };
-  // }, []);
 
   const handleSaveCV = async () => {
     if (candidateRef.current) {
@@ -319,7 +390,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
       console.log(result, 'result')
       if (result.isvalid === true) {
         // Find and update the candidate in allProfiles
-        setAllProfiles(prevProfiles => 
+        setAllProfiles(prevProfiles =>
           prevProfiles.map(profile => {
             if (profile._id === selectedProfile._id) {
               // Update the _candidate data with the updated profile from result
@@ -331,10 +402,30 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
             return profile;
           })
         );
-        setOpenModalId(null); 
+        setOpenModalId(null);
         setSelectedProfile(null)
       }
     }
+  };
+
+  const handleProfileImageUpdated = (imageKey) => {
+    if (!selectedProfile?._id || !imageKey) return;
+    const mergeImage = (profile) => ({
+      ...profile,
+      _candidate: {
+        ...profile._candidate,
+        personalInfo: {
+          ...(profile._candidate?.personalInfo || {}),
+          image: imageKey,
+        },
+      },
+    });
+    setAllProfiles(prevProfiles =>
+      prevProfiles.map(profile =>
+        profile._id === selectedProfile._id ? mergeImage(profile) : profile
+      )
+    );
+    setSelectedProfile(prev => (prev?._id === selectedProfile._id ? mergeImage(prev) : prev));
   };
 
   // ========================================
@@ -418,6 +509,132 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
   const [courseOptions, setCourseOptions] = useState([]);
   const [centerOptions, setCenterOptions] = useState([]);
   const [counselorOptions, setCounselorOptions] = useState([]);
+  const [batchOptions, setBatchOptions] = useState([]);
+  const [allCoursesMeta, setAllCoursesMeta] = useState([]);
+  const [cycleFilters, setCycleFilters] = useState({
+    department: '',
+    project: '',
+    center: '',
+    course: '',
+    batch: '',
+  });
+
+  const cycleProjectOptions = useMemo(() => {
+    if (!cycleFilters.department) return projectOptions;
+    const projectIds = new Set(
+      allCoursesMeta
+        .filter((c) => String(c.vertical?._id || c.vertical) === String(cycleFilters.department))
+        .map((c) => String(c.project?._id || c.project))
+    );
+    return projectOptions.filter((p) => projectIds.has(String(p.value)));
+  }, [cycleFilters.department, projectOptions, allCoursesMeta]);
+
+  const cycleCourseOptions = useMemo(() => {
+    let list = courseOptions;
+    if (cycleFilters.department) {
+      const ids = new Set(
+        allCoursesMeta
+          .filter((c) => String(c.vertical?._id || c.vertical) === String(cycleFilters.department))
+          .map((c) => String(c._id))
+      );
+      list = list.filter((c) => ids.has(String(c.value)));
+    }
+    if (cycleFilters.project) {
+      const ids = new Set(
+        allCoursesMeta
+          .filter((c) => String(c.project?._id || c.project) === String(cycleFilters.project))
+          .map((c) => String(c._id))
+      );
+      list = list.filter((c) => ids.has(String(c.value)));
+    }
+    return list;
+  }, [cycleFilters.department, cycleFilters.project, courseOptions, allCoursesMeta]);
+
+  //course history
+  const [courseHistory, setCourseHistory] = useState([]);
+  const [jobHistory, setJobHistory] = useState([]);
+
+  const [branches, setBranches] = useState([]);
+  const [selectedBranch, setSelectedBranch] = useState('');
+  const [showBranchModal, setShowBranchModal] = useState(false);
+
+
+  const getBranches = async (profile) => {
+    // Check if profile and course exist
+    if (!profile || !profile._course || !profile._course._id) {
+      alert('Profile or course information is missing. Cannot fetch branches.');
+      return;
+    }
+
+    const courseId = profile._course._id;
+    const response = await axios.get(`${backendUrl}/college/courses/get-branches?courseId=${courseId}`, {
+      headers: {
+        'x-auth': token,
+        'Content-Type': 'multipart/form-data',
+      }
+    });
+    console.log('res..', response)
+    if (response.data.status) {
+      setBranches(response.data);
+      setSelectedBranch('');
+    } else {
+      alert('Failed to fetch branches');
+    }
+  }
+
+  const updateBranch = async (profile, selectedBranchId) => {
+    console.log("updateBranch")
+    if (!selectedBranchId) {
+      alert('Please select a branch first');
+      return;
+    }
+
+    const profileId = profile._id;
+    console.log("profile", profileId)
+    console.log("profileId", profileId)
+    console.log("selectedBranchId", selectedBranchId)
+
+    try {
+      const response = await axios.put(`${backendUrl}/college/courses/update-branch/${profileId}`, {
+        centerId: selectedBranchId
+      }, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'application/json',
+        }
+      });
+      console.log('response', response)
+      if (response.data.success) {
+        alert('Branch updated successfully!');
+        // Optionally refresh the data or close modal
+        setShowBranchModal(false);
+
+        // const selectedBranchDetails = branches.data?.find(branch => branch._id === selectedBranchId);
+        // setAllProfiles(prevProfiles => 
+        //   prevProfiles.map(p => 
+        //     p._id === profile._id 
+        //       ? {
+        //           ...p,
+        //           _center: selectedBranchDetails || { _id: selectedBranchId, name: 'Updated Branch' }
+        //         }
+        //       : p
+        //   )
+        // );
+
+        setSelectedBranch('');
+
+
+
+        await fetchProfileData();
+      } else {
+        alert('Failed to update branch');
+      }
+    } catch (error) {
+      console.error('Error updating branch:', error);
+      alert('Failed to update branch: ' + (error.response?.data?.message || error.message));
+    }
+  }
+
   // Fetch filter options from backend API on mount
   useEffect(() => {
     const fetchFilterOptions = async () => {
@@ -432,8 +649,32 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
           setVerticalOptions(res.data.verticals.map(v => ({ value: v._id, label: v.name })));
           setProjectOptions(res.data.projects.map(p => ({ value: p._id, label: p.name })));
           setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
-          setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
-          setCounselorOptions(res.data.counselors.map(c => ({ value: c._id, label: c.name })));
+          try {
+            const centersRes = await axios.get(`${backendUrl}/college/list_all_centers`, {
+              headers: { 'x-auth': token }
+            });
+            if (centersRes.data.success && centersRes.data.data) {
+              setCenterOptions(centersRes.data.data.map(c => ({ value: c._id, label: c.name })));
+            } else {
+              setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
+            }
+          } catch {
+            setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
+          }
+          const activeCounselors = (res.data.counselors || []).filter(
+            (c) => c?.status === true || c?.status === 'active'
+          );
+          setCounselorOptions(activeCounselors.map(c => ({ value: c._id, label: c.name })));
+        }
+        try {
+          const coursesMetaRes = await axios.get(`${backendUrl}/college/all_courses`, {
+            headers: { 'x-auth': token }
+          });
+          if (coursesMetaRes.data?.success) {
+            setAllCoursesMeta(coursesMetaRes.data.data || []);
+          }
+        } catch (metaErr) {
+          console.error('Failed to fetch courses meta:', metaErr);
         }
       } catch (err) {
         console.error('Failed to fetch filter options:', err);
@@ -441,6 +682,31 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     };
     fetchFilterOptions();
   }, []);
+
+  useEffect(() => {
+    const fetchBatchesForCycle = async () => {
+      try {
+        const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
+        const authToken = userData.token;
+        const apiUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+        const params = new URLSearchParams();
+        if (cycleFilters.center) params.set('centerId', cycleFilters.center);
+        if (cycleFilters.course) params.set('courseId', cycleFilters.course);
+        const res = await axios.get(`${apiUrl}/college/get_batches?${params.toString()}`, {
+          headers: { 'x-auth': authToken }
+        });
+        if (res.data?.success) {
+          setBatchOptions((res.data.data || []).map((b) => ({ value: b._id, label: b.name })));
+        } else {
+          setBatchOptions([]);
+        }
+      } catch (err) {
+        console.error('Failed to fetch batches:', err);
+        setBatchOptions([]);
+      }
+    };
+    fetchBatchesForCycle();
+  }, [cycleFilters.center, cycleFilters.course]);
 
 
 
@@ -507,9 +773,6 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     });
   }, [allProfiles]);
 
-
-
-
   // ========================================
   // 🎯 All Admission Filters Configuration
   // ========================================
@@ -523,14 +786,606 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     { _id: 'dropout', name: 'Dropout', count: 0, milestone: '' }
   ]);
 
-  const { navRef, navHeight, navWidth } = useNavHeight([admissionFilters, showEditPanel,
+  const docDashCounts = useMemo(() => {
+    let done = 0;
+    let pending = 0;
+    (allProfiles || []).forEach((p) => {
+      const total = Number(p?.docCounts?.totalRequired ?? 0);
+      const uploaded = Number(p?.docCounts?.uploadedCount ?? 0);
+      done += uploaded;
+      pending += Math.max(0, total - uploaded);
+    });
+    return { done, pending };
+  }, [allProfiles]);
+
+  const admissionSummaryCards = useMemo(() => {
+    const palette = ['#0b5ed7', '#16a34a', '#9333ea', '#ea580c', '#dc2626', '#64748b'];
+    return admissionFilters
+      .filter((f) => f._id && f._id !== 'alladmission')
+      .map((f, idx) => ({
+        key: f._id,
+        label: f.name,
+        value: f.count ?? 0,
+        bg: palette[idx % palette.length],
+        filterId: f._id,
+      }));
+  }, [admissionFilters]);
+
+  const { navRef, navHeight } = useNavHeight([
+    admissionFilters,
+    cycleFilters,
+    showEditPanel,
     showFollowupPanel,
     leadHistoryPanel,
     showWhatsappPanel,
-    mainContentClass , isPanelOpen]);
+    mainContentClass,
+    isPanelOpen,
+  ]);
+  const { widthRef, width, leftOffset, calculateWidth } = useMainWidth([
+    admissionFilters,
+    cycleFilters,
+    showEditPanel,
+    showFollowupPanel,
+    leadHistoryPanel,
+    showWhatsappPanel,
+    mainContentClass,
+    isPanelOpen,
+  ]);
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
   const blurIntensity = Math.min(scrollY / 10, 15);
   const navbarOpacity = Math.min(0.85 + scrollY / 1000, 0.98);
+  const isNavCompact = Boolean(isPanelOpen) || (width > 0 && width < 1100);
+  const navBarStyle = {
+    zIndex: 11,
+    backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})`,
+    position: 'fixed',
+    width: width > 0 ? `${width}px` : '100%',
+    left: width > 0 ? `${leftOffset}px` : 0,
+    backdropFilter: `blur(${blurIntensity}px)`,
+    WebkitBackdropFilter: `blur(${blurIntensity}px)`,
+    boxShadow: isScrolled
+      ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)'
+      : '0 4px 25px 0 #0000001a',
+    paddingBlock: '10px',
+    transition: 'all 0.3s ease',
+  };
+
+  useEffect(() => {
+    if (isPanelOpen) {
+      calculateWidth();
+      setTimeout(calculateWidth, 50);
+      setTimeout(calculateWidth, 350);
+    }
+  }, [isPanelOpen, calculateWidth]);
+
+  const admissionNavStyles = `
+    .admission-filter-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      overflow: visible;
+      max-width: 100%;
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+    .admission-filter-tabs .nav-item {
+      flex-shrink: 0;
+    }
+    .admission-filter-tabs .btn {
+      white-space: nowrap;
+      font-size: 0.8125rem;
+      padding: 0.35rem 0.65rem;
+    }
+    .admission-search-input-group {
+      max-width: 280px;
+      width: auto;
+      flex: 0 0 auto;
+    }
+    .admission-search-input-group .form-control {
+      min-width: 0;
+    }
+    .admission-nav-actions-row {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .b2b-cycle-filters {
+      display: flex;
+      align-items: flex-end;
+      justify-content: flex-end;
+      gap: 8px 12px;
+      max-width: 100%;
+      flex-wrap: wrap;
+    }
+    .b2b-cycle-filters--mobile {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      justify-content: flex-start;
+      padding-bottom: 4px;
+      scrollbar-width: thin;
+    }
+    .b2b-cycle-filters__item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+      flex-shrink: 0;
+    }
+    .b2b-cycle-filters__label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #6b7280;
+      margin: 0;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+    .b2b-cycle-filters__label i {
+      margin-right: 4px;
+      color: rgb(250, 85, 121);
+      font-size: 9px;
+    }
+    .b2b-cycle-filters__select {
+      font-size: 12px;
+      font-weight: 500;
+      padding: 6px 28px 6px 10px;
+      height: 34px;
+      min-width: 120px;
+      max-width: 155px;
+      border: 1.5px solid #e8eaed;
+      border-radius: 8px;
+      background-color: #f9fafb;
+      color: #1f2937;
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16'%3E%3Cpath fill='%236b7280' d='M4.427 6.427l3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 6H4.604a.25.25 0 0 0-.177.427z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 9px center;
+    }
+    .adm-cycle-toolbar__inner {
+      min-width: 0;
+    }
+    .adm-cycle-search {
+      min-width: 140px;
+    }
+    .adm-cycle-action-btn--search {
+      background: linear-gradient(135deg, #fc567b, #fc2b5a) !important;
+      border-color: rgb(250, 85, 121) !important;
+      color: #fff !important;
+    }
+    .adm-cycle-action-btn--filters {
+      border-color: rgb(250, 85, 121) !important;
+      color: rgb(250, 85, 121);
+    }
+    .adm-cycle-action-btn--filters.btn-primary {
+      background: linear-gradient(135deg, #fc567b, #fc2b5a) !important;
+      color: #fff !important;
+    }
+    .adm-cycle-mobile-filter-wrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    @media (max-width: 575.98px) {
+      .admission-filter-tabs--mobile-scroll {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        padding-bottom: 4px;
+      }
+    }
+    .lead-list-body,
+    .lead-list-body .card-content {
+      overflow-anchor: none;
+    }
+    .b2b-crm-dashboard .b2b-dash-section {
+      position: relative;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      padding: 5px 7px 5px;
+      background: #fff;
+    }
+    .b2b-crm-dashboard .b2b-dash-section__label {
+      position: absolute;
+      top: -10px;
+      left: 12px;
+      padding: 0 6px;
+      background: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+    }
+    .b2b-crm-dashboard .b2b-dash-stat-card {
+      border-radius: 8px;
+      padding: 5px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 45px;
+      cursor: pointer;
+    }
+    .b2b-crm-dashboard .b2b-dash-stat-card--lead {
+      flex: 1 1 96px;
+      min-width: 50px;
+      max-width: 90px;
+    }
+    .b2b-crm-dashboard .b2b-dash-stat-card__label {
+      font-size: 11px;
+      font-weight: 600;
+      margin: 0;
+    }
+    .b2b-crm-dashboard .b2b-dash-stat-card__divider {
+      width: 72%;
+      height: 1px;
+      margin: 8px 0;
+      background: rgba(255, 255, 255, 0.95);
+    }
+    .b2b-crm-dashboard .b2b-dash-stat-card__value {
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .b2b-crm-dashboard .b2b-mobile-hscroll {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+    }
+    .b2b-adm-summary-row { flex-wrap: nowrap; }
+    @media (min-width: 992px) {
+      .b2b-adm-summary-row > .b2b-adm-summary-row__col:first-child {
+        flex: 1 1 0;
+        min-width: 0;
+        max-width: 66.666%;
+      }
+      .b2b-adm-summary-row > .b2b-adm-summary-row__col:last-child {
+        flex: 0 0 33.333%;
+        max-width: 33.333%;
+      }
+    }
+    @media (max-width: 991.98px) {
+      .b2b-adm-summary-row {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .b2b-adm-summary-row__col {
+        flex: 0 0 min(92vw, 520px);
+        max-width: min(92vw, 520px);
+      }
+    }
+    .adm-lead-card.lead-card {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      background: linear-gradient(180deg, #eef6fc 0%, #f8fbff 100%);
+      border-radius: 16px;
+      border: 2px solid #b6d9f7;
+      box-shadow: 0 6px 20px rgba(11, 94, 215, 0.1);
+      padding: 10px;
+      overflow: visible;
+      margin-bottom: 0.75rem;
+    }
+    .adm-lead-card .lead-strip-v3 {
+      display: flex;
+      flex: 1 1 auto;
+      width: 100%;
+      margin: 0;
+    }
+    .adm-lead-strip-v3.lead-strip-v3 {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      align-items: stretch;
+      justify-content: flex-start;
+      gap: 8px;
+      width: 100%;
+      padding: 0;
+      background: transparent;
+      overflow: visible;
+    }
+    .adm-lead-strip-v3__content {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      align-items: stretch;
+      gap: 8px;
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+    }
+    .adm-lead-strip-v3__actions.lead-strip-v3__head-actions--corner {
+      display: flex;
+      flex-direction: column;
+      flex: 0 0 auto;
+      align-items: center;
+      justify-content: center;
+      align-self: center;
+      gap: 6px;
+      margin-left: auto;
+      padding: 6px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+      z-index: 3;
+      overflow: visible;
+    }
+    .adm-lead-strip-v3__actions .lead-strip-v3__actions-wrap {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow: visible;
+    }
+    .adm-lead-strip-v3__actions .lead-strip-v3__actions-dropdown {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      left: auto;
+      z-index: 1050;
+      min-width: 200px;
+      max-width: 230px;
+    }
+    .lead-strip-v3__actions-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1040;
+      background: transparent;
+    }
+    .lead-strip-v3__actions-backdrop--mobile {
+      background: rgba(0, 0, 0, 0.45);
+    }
+    .lead-strip-v3__actions-menu {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 6px;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      background: #fff;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+    }
+    .lead-strip-v3__actions-item {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #334155;
+      text-align: left;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .lead-strip-v3__actions-item:hover { background: #f8fafc; }
+    .adm-lead-actions-sheet {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 1051;
+      padding: 12px 12px 24px;
+      background: #fff;
+      border-radius: 16px 16px 0 0;
+      box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.18);
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__profile {
+      flex: 0 1 clamp(200px, 28vw, 280px);
+      min-width: 200px;
+      background: linear-gradient(145deg, #0b5ed7 0%, #1aa3ff 55%, #2dd4ff 100%);
+      border-radius: 14px;
+      padding: 10px;
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(11, 94, 215, 0.22);
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__profile-top {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__profile-main {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__avatar {
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.95);
+      color: #0b5ed7;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__name {
+      font-size: 15px;
+      font-weight: 800;
+      line-height: 1.2;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__doc .circular-progress-container {
+      width: 36px;
+      height: 36px;
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__contact {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-top: 8px;
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__contact-line {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      min-width: 0;
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__contact-line span {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__contact-line--phone {
+      background: rgba(0,0,0,0.14);
+      border-radius: 8px;
+      padding: 4px 8px;
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__wa {
+      width: 28px;
+      height: 28px;
+      min-width: 28px;
+      border: none;
+      border-radius: 8px;
+      background: #25d366;
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__panel {
+      flex: 1 1 140px;
+      min-width: 130px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 10px 10px 8px;
+      box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__panel--batch {
+      flex: 0 1 clamp(130px, 14vw, 170px);
+      min-width: 125px;
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__panel--docs {
+      flex: 0 1 clamp(150px, 16vw, 190px);
+      min-width: 140px;
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__panel-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: #1e293b;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__panel-title i { color: #3b82f6; font-size: 12px; }
+    .adm-lead-strip-v3 .lead-strip-v3__approval-pill {
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__approval-pill--pending {
+      background: #ffedd5;
+      color: #c2410c;
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__approval-pill--approved {
+      background: #d1fae5;
+      color: #047857;
+    }
+    .adm-lead-strip-v3 .adm-batch-name {
+      font-size: 10px;
+      font-weight: 600;
+      color: #64748b;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .adm-lead-strip-v3 .adm-assign-batch-btn {
+      width: 100%;
+      margin-top: auto;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #fc567b, #fc2b5a);
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(252, 43, 90, 0.35);
+    }
+    .adm-lead-strip-v3 .adm-assign-batch-btn:disabled {
+      background: #86efac;
+      color: #166534;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__stat-row--docs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: auto;
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__stat {
+      border-radius: 10px;
+      padding: 8px 6px;
+      min-height: 48px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__stat-label { font-size: 10px; font-weight: 800; }
+    .adm-lead-strip-v3 .lead-strip-v3__stat-val { font-size: 16px; font-weight: 900; }
+    .adm-lead-strip-v3 .lead-strip-v3__icon-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #475569;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+    }
+    .adm-lead-strip-v3 .lead-strip-v3__icon-btn--collapse {
+      background: #1e293b;
+      color: #fff;
+      border-color: #1e293b;
+    }
+    .admission-nav-actions-row .btn-outline-primary {
+      border-color: rgb(250, 85, 121);
+      color: rgb(250, 85, 121);
+    }
+    .admission-nav-actions-row .btn-outline-primary:hover,
+    .admission-nav-actions-row .btn-primary {
+      background: linear-gradient(135deg, #fc567b, #fc2b5a);
+      border-color: #fc2b5a;
+      color: #fff;
+    }
+  `;
   // open model for upload documents 
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedDocumentForUpload, setSelectedDocumentForUpload] = useState(null);
@@ -612,13 +1467,13 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     if (showDocumentModal || showUploadModal || showEditPanel || showWhatsappPanel || showAssignBatchPanel) {
       // Store the current scroll position
       const scrollY = window.scrollY;
-      
+
       // Add styles to prevent scrolling
       document.body.style.position = 'fixed';
       document.body.style.top = `-${scrollY}px`;
       document.body.style.width = '100%';
       document.body.style.overflow = 'hidden';
-      
+
       // Return function to restore scrolling when modal closes
       return () => {
         document.body.style.position = '';
@@ -948,7 +1803,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     setFilterData({
       name: '',
       courseType: '',
-      status: 'true',
+      status: 'alladmission',
       leadStatus: '',
       sector: '',
       createdFromDate: null,
@@ -966,6 +1821,14 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
       counselor: { type: "includes", values: [] },
       sector: { type: "includes", values: [] }
     });
+    setCycleFilters({
+      department: '',
+      project: '',
+      center: '',
+      course: '',
+      batch: '',
+    });
+    setActiveCrmFilter(0);
   };
 
   const handleStatusChange = (e) => {
@@ -1116,6 +1979,52 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
   };
 
 
+  useEffect(() => {
+    fetchCourseHistory();
+  }, [selectedProfile]);
+
+  useEffect(() => {
+    fetchJobHistory();
+  }, [selectedProfile]);
+
+  const fetchCourseHistory = async () => {
+    try {
+
+      if (!selectedProfile) {
+        return;
+      }
+      setCourseHistory([]);
+      const response = await axios.get(`${backendUrl}/college/candidate/appliedCourses/${selectedProfile._candidate._id}`, {
+        headers: { 'x-auth': token }
+      });
+      console.log("response", response);
+      if (response.data && response.data.courses) {
+        setCourseHistory(response.data.courses);
+      }
+    } catch (error) {
+      console.log("error", error);
+    }
+  }
+
+  const fetchJobHistory = async () => {
+    try {
+
+      if (!selectedProfile) {
+        return;
+      }
+      setJobHistory([]);
+      const response = await axios.get(`${backendUrl}/college/candidate/appliedJobs/${selectedProfile._candidate._id}`, {
+        headers: { 'x-auth': token }
+      });
+      console.log("response", response);
+      if (response.data && response.data.jobs) {
+        setJobHistory(response.data.jobs);
+      }
+    } catch (error) {
+      console.log("error", error);
+    }
+  }
+
 
   const [user, setUser] = useState({
     image: '',
@@ -1126,186 +2035,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     fetchProfileData();
   }, [activeCrmFilter]);
 
-  const handleUpdateStatus = async () => {
-    console.log('Function called');
 
-    try {
-      if (showEditPanel) {
-        // Validation checks
-        if (!selectedProfile || !selectedProfile._id) {
-          alert('No profile selected');
-          return;
-        }
-
-        if (!seletectedStatus) {
-          alert('Please select a status');
-          return;
-        }
-
-        // Combine date and time into a single Date object (if both are set)
-        let followupDateTime = '';
-        if (followupDate && followupTime) {
-          // Create proper datetime string
-          const dateStr = followupDate instanceof Date
-            ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
-            : followupDate;
-
-          followupDateTime = new Date(`${dateStr}T${followupTime}`);
-
-          // Validate the datetime
-          if (isNaN(followupDateTime.getTime())) {
-            alert('Invalid date/time combination');
-            return;
-          }
-        }
-
-        // Prepare the request body
-        const data = {
-          _leadStatus: typeof seletectedStatus === 'object' ? seletectedStatus._id : seletectedStatus,
-          _leadSubStatus: seletectedSubStatus?._id || null,
-          followup: followupDateTime ? followupDateTime.toISOString() : null,
-          remarks: remarks || ''
-        };
-
-
-
-        // Check if backend URL and token exist
-        if (!backendUrl) {
-          alert('Backend URL not configured');
-          return;
-        }
-
-        if (!token) {
-          alert('Authentication token missing');
-          return;
-        }
-
-        // Send PUT request to backend API
-        const response = await axios.put(
-          `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
-          data,
-          {
-            headers: {
-              'x-auth': token,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        console.log('API response:', response.data);
-
-        if (response.data.success) {
-          alert('Status updated successfully!');
-
-          // Reset form
-          setSelectedStatus('');
-          setSelectedSubStatus(null);
-          setFollowupDate('');
-          setFollowupTime('');
-          setRemarks('');
-
-          // Refresh data and close panel
-          await fetchProfileData();
-          closeEditPanel();
-        } else {
-          console.error('API returned error:', response.data);
-          alert(response.data.message || 'Failed to update status');
-        }
-
-      }
-      if (showFollowupPanel) {
-
-
-        // Combine date and time into a single Date object (if both are set)
-        let followupDateTime = '';
-        if (followupDate && followupTime) {
-          // Create proper datetime string
-          const dateStr = followupDate instanceof Date
-            ? followupDate.toISOString().split('T')[0]  // Get YYYY-MM-DD format
-            : followupDate;
-
-          followupDateTime = new Date(`${dateStr}T${followupTime}`);
-
-          // Validate the datetime
-          if (isNaN(followupDateTime.getTime())) {
-            alert('Invalid date/time combination');
-            return;
-          }
-        }
-
-        // Prepare the request body
-        const data = {
-          followup: followupDateTime ? followupDateTime.toISOString() : null,
-          remarks: remarks || ''
-        };
-
-
-
-        // Check if backend URL and token exist
-        if (!backendUrl) {
-          alert('Backend URL not configured');
-          return;
-        }
-
-        if (!token) {
-          alert('Authentication token missing');
-          return;
-        }
-
-        // Send PUT request to backend API
-        const response = await axios.put(
-          `${backendUrl}/college/lead/status_change/${selectedProfile._id}`,
-          data,
-          {
-            headers: {
-              'x-auth': token,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        console.log('API response:', response.data);
-
-        if (response.data.success) {
-          alert('Status updated successfully!');
-
-          // Reset form
-          setSelectedStatus('');
-          setSelectedSubStatus(null);
-          setFollowupDate('');
-          setFollowupTime('');
-          setRemarks('');
-
-          // Refresh data and close panel
-          await fetchProfileData();
-          closeEditPanel();
-        } else {
-          console.error('API returned error:', response.data);
-          alert(response.data.message || 'Failed to update status');
-        }
-
-      }
-    }
-    catch (error) {
-      console.error('Error updating status:', error);
-
-      // More detailed error handling
-      if (error.response) {
-        // Server responded with error status
-        console.error('Error Response:', error.response.data);
-        console.error('Error Status:', error.response.status);
-        alert(`Server Error: ${error.response.data.message || 'Failed to update status'}`);
-      } else if (error.request) {
-        // Request was made but no response received
-        console.error('No response received:', error.request);
-        alert('Network error: Unable to reach server');
-      } else {
-        // Something else happened
-        console.error('Error:', error.message);
-        alert(`Error: ${error.message}`);
-      }
-    }
-  };
 
 
   const fetchBatches = async (profile) => {
@@ -1381,18 +2111,16 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
   }
 
 
-  const fetchProfileData = async (filters = filterData, page = currentPage) => {
+  const fetchProfileData = async (filters = filterData, page = currentPage, cycleOverride = null) => {
     try {
       setIsLoadingProfiles(true);
-
+      const cycle = cycleOverride || cycleFilters;
 
       if (!token) {
         console.warn('No token found in session storage.');
         setIsLoadingProfiles(false);
         return;
       }
-      console.log('filters', filters)
-      console.log('formData', formData)
       const queryParams = new URLSearchParams({
         page: page.toString(),
         ...(filters?.name && { name: filters.name }),
@@ -1407,11 +2135,11 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
         ...(filters?.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
         ...(filters?.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
         ...(filters?.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
-        // Multi-select filters
-        ...(formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
-        ...(formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
-        ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
-        ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
+        ...(cycle.project ? { projects: JSON.stringify([cycle.project]) } : formData?.projects?.values?.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+        ...(cycle.department ? { verticals: JSON.stringify([cycle.department]) } : formData?.verticals?.values?.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+        ...(cycle.course ? { course: JSON.stringify([cycle.course]) } : formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
+        ...(cycle.center ? { center: JSON.stringify([cycle.center]) } : formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
+        ...(cycle.batch ? { batch: JSON.stringify([cycle.batch]) } : {}),
         ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
       });
 
@@ -1500,7 +2228,8 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     setShowPopup(prev => prev === profileIndex ? null : profileIndex);
   };
 
-  const handleTabClick = (profileIndex, tabIndex) => {
+  const handleTabClick = (profileIndex, tabIndex, profile) => {
+    setSelectedProfile(profile)
     setActiveTab(prevTabs => ({
       ...prevTabs,
       [profileIndex]: tabIndex
@@ -1579,6 +2308,13 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     setOpenModalId(profile._id);
   }
 
+  useEffect(() => {
+    // console.log('useeffect', selectedProfile);
+    if (selectedProfile && selectedProfile._candidate && selectedProfile._candidate._id) {
+      fetchProfile(selectedProfile._candidate._id);
+    }
+  }, [selectedProfile]);
+
 
 
   const openWhatsappPanel = () => {
@@ -1614,9 +2350,28 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     }
   };
 
-  const toggleLeadDetails = (profileIndex) => {
-    setLeadDetailsVisible(prev => prev === profileIndex ? null : profileIndex);
+  const leadCardRefs = useRef({});
+  const scrollToLeadIdRef = useRef(null);
+
+  const toggleLeadDetails = (profile) => {
+    const profileId = profile?._id;
+    if (!profileId) return;
+    setLeadDetailsVisible((prev) => {
+      const next = prev === profileId ? null : profileId;
+      if (next) scrollToLeadIdRef.current = next;
+      return next;
+    });
   };
+
+  useLayoutEffect(() => {
+    const id = scrollToLeadIdRef.current;
+    if (!id || leadDetailsVisible !== id) return;
+    const el = leadCardRefs.current[id];
+    if (el) {
+      el.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+    }
+    scrollToLeadIdRef.current = null;
+  }, [leadDetailsVisible]);
 
   const closeleadHistoryPanel = () => {
     setLeadHistoryPanel(false)
@@ -1681,6 +2436,515 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     return range;
   };
 
+  const handleCycleFilterChange = (key, value) => {
+    let next = { ...cycleFilters, [key]: value };
+    if (key === 'department') {
+      next = { department: value, project: '', center: '', course: '', batch: '' };
+    } else if (key === 'project') {
+      next = { ...cycleFilters, project: value, center: '', course: '', batch: '' };
+    } else if (key === 'center') {
+      next = { ...cycleFilters, center: value, batch: '' };
+    } else if (key === 'course') {
+      next = { ...cycleFilters, course: value, batch: '' };
+    } else if (key === 'batch') {
+      next = { ...cycleFilters, batch: value };
+    }
+    setCycleFilters(next);
+    setCurrentPage(1);
+    fetchProfileData(filterData, 1, next);
+  };
+
+  const renderCycleFilterDropdowns = (mobile = false) => (
+    <div className={`b2b-cycle-filters${mobile ? ' b2b-cycle-filters--mobile' : ''}`}>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="adm-filter-department">
+          <i className="fas fa-sitemap" aria-hidden="true" /> Department
+        </label>
+        <select
+          id="adm-filter-department"
+          className="b2b-cycle-filters__select"
+          value={cycleFilters.department || ''}
+          onChange={(e) => handleCycleFilterChange('department', e.target.value)}
+        >
+          <option value="">All</option>
+          {verticalOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="adm-filter-project">
+          <i className="fas fa-project-diagram" aria-hidden="true" /> Project
+        </label>
+        <select
+          id="adm-filter-project"
+          className="b2b-cycle-filters__select"
+          value={cycleFilters.project || ''}
+          onChange={(e) => handleCycleFilterChange('project', e.target.value)}
+        >
+          <option value="">All</option>
+          {cycleProjectOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="adm-filter-center">
+          <i className="fas fa-building" aria-hidden="true" /> Center
+        </label>
+        <select
+          id="adm-filter-center"
+          className="b2b-cycle-filters__select"
+          value={cycleFilters.center || ''}
+          onChange={(e) => handleCycleFilterChange('center', e.target.value)}
+        >
+          <option value="">All</option>
+          {centerOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="adm-filter-course">
+          <i className="fas fa-graduation-cap" aria-hidden="true" /> Course
+        </label>
+        <select
+          id="adm-filter-course"
+          className="b2b-cycle-filters__select"
+          value={cycleFilters.course || ''}
+          onChange={(e) => handleCycleFilterChange('course', e.target.value)}
+        >
+          <option value="">All</option>
+          {cycleCourseOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="adm-filter-batch">
+          <i className="fas fa-users" aria-hidden="true" /> Batch
+        </label>
+        <select
+          id="adm-filter-batch"
+          className="b2b-cycle-filters__select"
+          value={cycleFilters.batch || ''}
+          onChange={(e) => handleCycleFilterChange('batch', e.target.value)}
+        >
+          <option value="">All</option>
+          {batchOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+
+  const renderAdmissionNavSearchToolbar = () => (
+    <div className="adm-cycle-toolbar__inner d-flex align-items-center gap-2 ms-lg-auto flex-wrap justify-content-lg-end w-100">
+      <div className="position-relative adm-cycle-search flex-grow-1 flex-lg-grow-0">
+        <input
+          type="text"
+          name="name"
+          className="form-control form-control-sm"
+          placeholder="Quick search..."
+          value={filterData.name}
+          onChange={handleFilterChange}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') fetchProfileData();
+          }}
+        />
+      </div>
+      <button
+        type="button"
+        className="btn btn-sm btn-primary adm-cycle-action-btn adm-cycle-action-btn--search"
+        onClick={() => fetchProfileData()}
+      >
+        <i className="fas fa-search me-1"></i>
+        Search
+      </button>
+      <button
+        type="button"
+        className={`btn btn-sm adm-cycle-action-btn adm-cycle-action-btn--filters ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
+        onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+      >
+        <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
+        {isMobile ? 'Filters' : 'More'}
+        {Object.values(filterData).filter((val) => val && val !== 'true').length + totalSelected > 0 && (
+          <span className="bg-light text-dark ms-1">
+            {Object.values(filterData).filter((val) => val && val !== 'true').length + totalSelected}
+          </span>
+        )}
+      </button>
+    </div>
+  );
+
+  const renderAdmissionStatusTabs = () => (
+    <ul className={`nav nav-tabs nav-tabs-main border-0 admission-filter-tabs ${isMobile ? 'admission-filter-tabs--mobile-scroll' : ''}`}>
+      {getCurrentFilters().map((filter, index) => (
+        <li className="nav-item" key={filter._id || index}>
+          <button
+            type="button"
+            className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
+            onClick={() => handleCrmFilterClick(filter._id, index)}
+          >
+            {filter.name}
+            <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
+              ({filter.count})
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+
+  const renderAdmissionDashboard = () => (
+    <div className="col-12 b2b-crm-dashboard px-0 mb-2">
+      <div className="b2b-dash-section mt-2">
+        <span className="b2b-dash-section__label">Admission Status</span>
+        <div className="b2b-mobile-hscroll b2b-mobile-hscroll--chips d-flex gap-2 align-items-center pt-1 flex-wrap">
+          {getCurrentFilters().map((filter, index) => {
+            const isActive = activeCrmFilter === index;
+            return (
+              <button
+                key={filter._id || index}
+                type="button"
+                className="b2b-perf-chip"
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  borderRadius: '999px',
+                  cursor: 'pointer',
+                  color: isActive ? '#fff' : 'rgb(250, 85, 121)',
+                  backgroundColor: isActive ? 'rgb(250, 85, 121)' : '#fff',
+                  border: isActive ? 'none' : '1.5px solid rgb(250, 85, 121)',
+                }}
+                onClick={() => handleCrmFilterClick(filter._id, index)}
+              >
+                {filter.name} ({filter.count})
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="row g-2 mt-2 align-items-stretch b2b-adm-summary-row">
+        <div className="col-12 col-lg-8 b2b-adm-summary-row__col">
+          <div className="b2b-dash-section h-100">
+            <span className="b2b-dash-section__label">Admission Summary</span>
+            <div className="b2b-mobile-hscroll d-flex flex-nowrap gap-2 align-items-stretch pt-1">
+              {admissionSummaryCards.map((row) => {
+                const idx = admissionFilters.findIndex((x) => x._id === row.filterId);
+                return (
+                  <div
+                    key={row.key}
+                    role="button"
+                    tabIndex={0}
+                    className="b2b-dash-stat-card b2b-dash-stat-card--lead text-center text-white flex-shrink-0"
+                    style={{ background: row.bg }}
+                    onClick={() => idx >= 0 && handleCrmFilterClick(row.filterId, idx)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && idx >= 0) handleCrmFilterClick(row.filterId, idx);
+                    }}
+                  >
+                    <div className="b2b-dash-stat-card__label">{row.label}</div>
+                    <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                    <div className="b2b-dash-stat-card__value text-white">
+                      {String(row.value).padStart(2, '0')}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+        <div className="col-12 col-lg-4 b2b-adm-summary-row__col">
+          <div className="b2b-dash-section h-100">
+            <span className="b2b-dash-section__label">Documents</span>
+            <div className="d-flex flex-nowrap gap-2 pt-1">
+              {[
+                { label: 'Done', value: docDashCounts.done, bg: '#4b5563' },
+                { label: 'Pending', value: docDashCounts.pending, bg: '#4b5563' },
+              ].map((row) => (
+                <div
+                  key={row.label}
+                  className="b2b-dash-stat-card text-center text-white flex-grow-1 flex-shrink-0"
+                  style={{ background: row.bg, minWidth: '84px' }}
+                >
+                  <div className="b2b-dash-stat-card__label">{row.label}</div>
+                  <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                  <div className="b2b-dash-stat-card__value text-white">
+                    {String(row.value).padStart(2, '0')}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderAdmissionLeadActionsMenu = (profile, onClose) => (
+    <div className="lead-strip-v3__actions-menu">
+      <button
+        type="button"
+        className="lead-strip-v3__actions-item"
+        onClick={() => {
+          onClose();
+          handleDownloadAdmissionForm(profile);
+        }}
+      >
+        <i className="fas fa-download text-primary" aria-hidden="true"></i>
+        Download Admission Form
+      </button>
+      <button
+        type="button"
+        className="lead-strip-v3__actions-item"
+        onClick={() => {
+          onClose();
+          handleMarkDropout(profile);
+        }}
+      >
+        <i className="fas fa-user-slash text-danger" aria-hidden="true"></i>
+        Mark Dropout
+      </button>
+      <button
+        type="button"
+        className="lead-strip-v3__actions-item"
+        onClick={() => {
+          onClose();
+          openPanel('SetFollowup', profile);
+        }}
+      >
+        <i className="fas fa-calendar text-warning" aria-hidden="true"></i>
+        Set Followup
+      </button>
+      <button
+        type="button"
+        className="lead-strip-v3__actions-item"
+        onClick={() => {
+          onClose();
+          handleFetchCandidate(profile);
+        }}
+      >
+        <i className="fas fa-user-edit text-info" aria-hidden="true"></i>
+        Edit Profile
+      </button>
+      <button
+        type="button"
+        className="lead-strip-v3__actions-item"
+        onClick={() => {
+          onClose();
+          openAssignBatchPanel(profile);
+        }}
+      >
+        <i className="fas fa-users text-success" aria-hidden="true"></i>
+        Assign Batch
+      </button>
+      <button
+        type="button"
+        className="lead-strip-v3__actions-item"
+        onClick={() => {
+          onClose();
+          setSelectedProfile(profile);
+          getBranches(profile);
+          setShowBranchModal(true);
+        }}
+      >
+        <i className="fas fa-building text-success" aria-hidden="true"></i>
+        Change Branch
+      </button>
+      <button
+        type="button"
+        className="lead-strip-v3__actions-item"
+        onClick={() => {
+          onClose();
+          openPanel('leadHistory', profile);
+        }}
+      >
+        <i className="fas fa-history text-secondary" aria-hidden="true"></i>
+        History List
+      </button>
+    </div>
+  );
+
+  const renderAdmissionLeadActionsDropdown = (profile, profileIndex) => {
+    if (showPopup !== profileIndex) return null;
+
+    if (isMobile) {
+      return (
+        <>
+          <div
+            className="lead-strip-v3__actions-backdrop lead-strip-v3__actions-backdrop--mobile"
+            onClick={() => setShowPopup(null)}
+            aria-hidden="true"
+          />
+          <div className="adm-lead-actions-sheet" role="menu">
+            {renderAdmissionLeadActionsMenu(profile, () => setShowPopup(null))}
+          </div>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <div
+          className="lead-strip-v3__actions-backdrop"
+          onClick={() => setShowPopup(null)}
+          aria-hidden="true"
+        />
+        <div className="lead-strip-v3__actions-dropdown is-open" role="menu">
+          {renderAdmissionLeadActionsMenu(profile, () => setShowPopup(null))}
+        </div>
+      </>
+    );
+  };
+
+  const renderAdmissionLeadStrip = (profile, profileIndex) => {
+    const docTotal = Number(profile?.docCounts?.totalRequired ?? 0);
+    const docDone = Number(profile?.docCounts?.uploadedCount ?? 0);
+    const docPending = Math.max(0, docTotal - docDone);
+    const uploadPct = docTotal > 0 ? profile.docCounts.uploadPercentage : 'NA';
+    const batchAssigned = Boolean(profile.batch);
+    const batchLabel = batchAssigned ? 'Assigned' : 'Pending';
+    const batchPillClass = batchAssigned ? 'approved' : 'pending';
+    const batchName = profile._course?.batchName || profile.batch?.name || '';
+
+    return (
+      <div className="lead-strip-v3 adm-lead-strip-v3">
+        <div className="adm-lead-strip-v3__content">
+          <div className="lead-strip-v3__profile">
+            <div className="lead-strip-v3__profile-top">
+              <div className="lead-strip-v3__profile-main">
+                <div className="lead-strip-v3__avatar" aria-hidden="true">
+                  <i className="fas fa-user" aria-hidden="true"></i>
+                </div>
+                <div className="lead-strip-v3__name text-capitalize" title={profile._candidate?.name || ''}>
+                  {profile._candidate?.name || '—'}
+                </div>
+              </div>
+              <div className="lead-strip-v3__doc" title="Docs completion">
+                <div className="circular-progress-container" data-percent={uploadPct}>
+                  <svg width="36" height="36">
+                    <circle className="circle-bg" cx="18" cy="18" r="14"></circle>
+                    <circle className="circle-progress" cx="18" cy="18" r="14"></circle>
+                  </svg>
+                  <div className="progress-text"></div>
+                </div>
+              </div>
+            </div>
+            <div className="lead-strip-v3__contact">
+              <div className="lead-strip-v3__contact-line" title={profile._candidate?.email || ''}>
+                <i className="fas fa-envelope" aria-hidden="true"></i>
+                <span>{profile._candidate?.email || '—'}</span>
+              </div>
+              <div className="lead-strip-v3__contact-line lead-strip-v3__contact-line--phone">
+                <i className="fas fa-phone" aria-hidden="true"></i>
+                <span>{profile._candidate?.mobile || '—'}</span>
+                {/* <button
+                  type="button"
+                  className="lead-strip-v3__wa"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openPanel('Whatsapp', profile);
+                  }}
+                  title="WhatsApp"
+                  aria-label="WhatsApp"
+                >
+                  <i className="fab fa-whatsapp" aria-hidden="true"></i>
+                </button> */}
+              </div>
+            </div>
+          </div>
+
+          <div className="lead-strip-v3__panel lead-strip-v3__panel--batch">
+            <div className="lead-strip-v3__approval-block">
+              <div className="lead-strip-v3__panel-head">
+                <span className="lead-strip-v3__panel-title">
+                  <i className="fas fa-users" aria-hidden="true"></i> Batch Status
+                </span>
+              </div>
+              <div className="lead-strip-v3__approval-row">
+                <span className={`lead-strip-v3__approval-pill lead-strip-v3__approval-pill--${batchPillClass}`}>
+                  {batchLabel}
+                </span>
+              </div>
+              {batchName ? (
+                <div className="adm-batch-name" title={batchName}>{batchName}</div>
+              ) : null}
+              <button
+                type="button"
+                className="adm-assign-batch-btn"
+                disabled={batchAssigned}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  openAssignBatchPanel(profile);
+                }}
+              >
+                Assign Batch
+              </button>
+            </div>
+          </div>
+
+          <div className="lead-strip-v3__panel lead-strip-v3__panel--docs">
+            <div className="lead-strip-v3__panel-head">
+              <span className="lead-strip-v3__panel-title">
+                <i className="fas fa-folder-open" aria-hidden="true"></i> Documents
+              </span>
+            </div>
+            <div className="lead-strip-v3__stat-row lead-strip-v3__stat-row--docs">
+              <div className="lead-strip-v3__stat" style={{ background: '#4b5563', color: '#fff' }}>
+                <span className="lead-strip-v3__stat-label">Done</span>
+                <span className="lead-strip-v3__stat-val">{String(docDone).padStart(2, '0')}</span>
+              </div>
+              <div className="lead-strip-v3__stat" style={{ background: '#4b5563', color: '#fff' }}>
+                <span className="lead-strip-v3__stat-label">Pending</span>
+                <span className="lead-strip-v3__stat-val">{String(docPending).padStart(2, '0')}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="lead-strip-v3__head-actions lead-strip-v3__head-actions--corner adm-lead-strip-v3__actions">
+          <div className="lead-strip-v3__actions-wrap">
+            <button
+              type="button"
+              className="lead-strip-v3__icon-btn"
+              title="More actions"
+              aria-label="More actions"
+              aria-expanded={showPopup === profileIndex}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                togglePopup(profileIndex);
+              }}
+            >
+              <i className="fas fa-ellipsis-v" aria-hidden="true"></i>
+            </button>
+            {renderAdmissionLeadActionsDropdown(profile, profileIndex)}
+          </div>
+          <button
+            type="button"
+            className="lead-strip-v3__icon-btn lead-strip-v3__icon-btn--collapse"
+            title={leadDetailsVisible === profile._id ? 'Collapse' : 'Expand'}
+            aria-label={leadDetailsVisible === profile._id ? 'Collapse lead' : 'Expand lead'}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              toggleLeadDetails(profile);
+              setSelectedProfile(profile);
+            }}
+          >
+            <i className={leadDetailsVisible === profile._id ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   const today = new Date();
 
   const DocumentControls = React.memo(({
@@ -1700,7 +2964,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
           style={{ whiteSpace: 'nowrap' }}
           title="Zoom In"
         >
-          <i className="fas fa-search-plus"></i> 
+          <i className="fas fa-search-plus"></i>
         </button>
 
         <button
@@ -1720,7 +2984,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
             style={{ whiteSpace: 'nowrap' }}
             title="Rotate 90°"
           >
-            <i className="fas fa-redo"></i> 
+            <i className="fas fa-redo"></i>
           </button>
         )}
 
@@ -1731,7 +2995,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
           style={{ whiteSpace: 'nowrap' }}
           title="Reset View"
         >
-          <i className="fas fa-sync-alt"></i> 
+          <i className="fas fa-sync-alt"></i>
         </button>
 
         {/* Download Button */}
@@ -1799,7 +3063,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
       setDocumentRotation(0);
     }, []);
 
-    const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+    const fileUrl = getDocFileUrl(latestUpload?.fileUrl || selectedDocument?.fileUrl);
     const fileType = fileUrl ? getFileType(fileUrl) : null;
 
     const handleRejectClick = useCallback(() => {
@@ -1822,7 +3086,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
 
     // Helper function to render document preview thumbnail using iframe/img
     const renderDocumentThumbnail = (upload, isSmall = true) => {
-      const fileUrl = upload?.fileUrl;
+      const fileUrl = getDocFileUrl(upload?.fileUrl);
       if (!fileUrl) {
         return (
           <div className={`document-thumbnail ${isSmall ? 'small' : ''}`} style={{
@@ -1987,7 +3251,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                       console.log('selectedDocument:', selectedDocument);
                       console.log('latestUpload:', latestUpload);
 
-                      const fileUrl = latestUpload?.fileUrl || selectedDocument?.fileUrl;
+                      const fileUrl = getDocFileUrl(latestUpload?.fileUrl || selectedDocument?.fileUrl);
                       const hasDocument = fileUrl ||
                         (selectedDocument?.status && selectedDocument?.status !== "Not Uploaded" && selectedDocument?.status !== "No Uploads");
 
@@ -2142,7 +3406,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                           {upload.fileUrl && (
                             <div className="history-actions" style={{ marginTop: '8px' }}>
                               <a
-                                href={upload.fileUrl}
+                                href={getDocFileUrl(upload.fileUrl)}
                                 download
                                 className="btn btn-sm btn-outline-primary"
                                 target="_blank"
@@ -2213,7 +3477,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
 
   const UploadModal = () => {
     if (!showUploadModal || !selectedDocumentForUpload) return null;
-// console.log("upload modal render....")
+    // console.log("upload modal render....")
     return (
       <div className="upload-modal-overlay" onClick={closeUploadModal}>
         <div className="upload-modal-content" onClick={(e) => e.stopPropagation()}>
@@ -2332,6 +3596,35 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     );
   };
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const isMultiSelectClick = event.target.closest('.multi-select-container-new');
+      const isAnyModalOpen = showDocumentModal || showUploadModal || openModalId !== null || showEditPanel || showFollowupPanel || showWhatsappPanel;
+
+      if (isAnyModalOpen) {
+        return; // Do nothing if any modal is open
+      }
+
+      if (!isMultiSelectClick) {
+        setDropdownStates(prev =>
+          Object.keys(prev).reduce((acc, key) => {
+            acc[key] = false;
+            return acc;
+          }, {})
+        );
+      }
+    };
+
+    // Add event listener
+    document.addEventListener('mousedown', handleClickOutside);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showDocumentModal, showUploadModal, openModalId, showEditPanel, showFollowupPanel, showWhatsappPanel]); // Add modal states to dependencies
+
+
   const scrollLeft = () => {
     const container = document.querySelector('.scrollable-content');
     if (container) {
@@ -2348,7 +3641,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
     }
   };
 
-;
+  ;
 
 
   const handleRejectionReasonChange = (e) => {
@@ -2411,6 +3704,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
 
   return (
     <div className="container-fluid">
+      <style>{admissionNavStyles}</style>
       <div className="row">
         <div className={isMobile ? 'col-12' : mainContentClass}>
           {/* Header */}
@@ -2419,8 +3713,8 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
             style={{
               position: 'fixed',
               top: 180,
-              left: 0,
-              right: 0,
+              left: width > 0 ? leftOffset : 0,
+              width: width > 0 ? width : '100%',
               height: `${navHeight + 50}px`,
               background: `linear-gradient(
                 180deg,
@@ -2437,78 +3731,34 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
               opacity: isScrolled ? 1 : 0
             }}
           />
-          <div className="position-relative" >
-            <nav ref={navRef} style={{
-              zIndex: 11, backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})`, position: 'fixed', width: `${navWidth}`, backdropFilter: `blur(${blurIntensity}px)`,
-              WebkitBackdropFilter: `blur(${blurIntensity}px)`,
-              boxShadow: isScrolled
-                ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)'
-                : '0 4px 25px 0 #0000001a', paddingBlock: '10px',
-              transition: 'all 0.3s ease'
-            }}>
+          <div
+            className={`position-relative ${isNavCompact ? 'admission-nav-compact' : ''}`}
+            ref={widthRef}
+          >
+            <nav ref={navRef} className="admission-list-nav adm-cycle-header-nav" style={navBarStyle}>
               <div className="container-fluid py-2">
-                <div className="row align-items-center justify-content-between">
-                  <div className="col-md-7 d-md-block d-sm-none">
-                    <div className="main-tabs-container">
-                      <ul className="nav nav-tabs nav-tabs-main border-0 gap-1">
-
-                        {/* All Admission Tab */}
-                        {getCurrentFilters().map((filter, index) => (
-                          <li className="nav-item">
-                            <button
-                              className={`btn btn-sm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'} position-relative`}
-                              onClick={() => handleCrmFilterClick(filter._id, index)}
-                            >
-
-                              {filter.name}
-                              <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
-                                ({filter.count})
-                              </span>
-                            </button>
-                          </li>))}
-                      </ul>
-                    </div>
+                <div className="row align-items-center gy-2">
+                  <div className="col-12 d-md-none mb-1">
+                    <h5 className="fw-bold text-dark mb-0" style={{ fontSize: '1.1rem' }}>Admission List</h5>
                   </div>
 
-                  <div className="col-md-4">
-                    <div className="d-flex justify-content-end align-items-center gap-2">
-                      <div className="input-group" style={{ maxWidth: '300px' }}>
+                  <div className="col-12 col-lg-9 d-none d-md-flex justify-content-lg-end">
+                    {renderCycleFilterDropdowns()}
+                  </div>
+                  <div className="col-12 d-md-none adm-cycle-mobile-filter-wrap">
+                    {renderCycleFilterDropdowns(true)}
+                  </div>
 
-                        <input
-                          type="text"
-                          name="name"
-                          className="form-control border-start-0 m-0"
-                          placeholder="Quick search..."
-                          value={filterData.name}
-                          onChange={handleFilterChange}
-                        />
-                        <button
-                          onClick={() => fetchProfileData()}
-                          className={`btn btn-outline-primary`}
-                          style={{ whiteSpace: 'nowrap' }}
-                        >
-                          <i className={`fas fa-search me-1`}></i>
-                          Search
-
-                        </button>
+                  <div className="col-12 mt-1 pt-2 border-top adm-cycle-toolbar" style={{ borderColor: '#eee' }}>
+                    <div className="row align-items-center g-2">
+                      <div className="col-12 col-lg-7">
+                        <div className="main-tabs-container">
+                          {renderAdmissionStatusTabs()}
+                        </div>
                       </div>
-
-
-                      <button
-                        onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
-                        className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
-                        style={{ whiteSpace: 'nowrap' }}
-                      >
-                        <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
-                        Filters
-                        {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
-                          <span className="bg-light text-dark ms-1">
-                            {Object.values(filterData).filter(val => val && val !== 'true').length}
-                          </span>
-                        )}
-                      </button>
-
-
+                      <div className="col-12 col-lg-5">
+                        {renderAdmissionNavSearchToolbar()}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2801,7 +4051,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                 maxDate={filterData.nextActionToDate}
                               />
                             </div>
-                            <div className="col-6">
+                            <div className="col-6 lastDatepicker">
                               <label className="form-label small">To Date</label>
                               <DatePicker
                                 onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
@@ -2923,12 +4173,13 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
           )}
 
           {/* Main Content */}
-          <div className="content-body" style={{ marginTop: `${navHeight + 10}px` }}>
+          <div className="content-body lead-list-body" style={{ marginTop: `${navHeight + 10}px` }}>
             <section className="list-view">
               <div className='row'>
+                {renderAdmissionDashboard()}
                 <div>
                   <div className="col-12 rounded equal-height-2 coloumn-2">
-                    <div className="card px-3">
+                    <div className="card px-md-3 px-sm-0 px-0">
                       <div className="row" id="crm-main-row">
                         {isLoadingProfiles ? (
                           <div className="col-12 text-center py-5">
@@ -2942,17 +4193,30 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                         ) : (<>
                           {allProfiles && allProfiles.length > 0 ? (
                             allProfiles.map((profile, profileIndex) => (
-                              <div className={`card-content transition-col mb-2`} key={profileIndex}>
-                                {/* Profile Header Card */}
+                              <div
+                                className={`card-content transition-col mb-2`}
+                                key={profile._id || profileIndex}
+                                ref={(el) => {
+                                  const id = profile._id;
+                                  if (!id) return;
+                                  if (el) leadCardRefs.current[id] = el;
+                                  else delete leadCardRefs.current[id];
+                                }}
+                              >
+                                <div className="lead-card adm-lead-card mb-0 mt-2">
+                                  {renderAdmissionLeadStrip(profile, profileIndex)}
+                                </div>
+                                <div className="d-none">
+                                {/* Legacy profile header */}
                                 <div className="card border-0 shadow-sm mb-0 mt-2">
                                   <div className="card-body px-1 py-0 my-2">
                                     <div className="row align-items-center justify-content-between">
                                       <div className="col-md-7">
                                         <div className="d-flex align-items-center">
-                                          <div className="form-check me-3">
+                                          <div className="form-check me-md-3 me-sm-1 me-1">
                                             <input className="form-check-input" type="checkbox" />
                                           </div>
-                                          <div className="me-3">
+                                          <div className="me-md-3 me-sm-1 me-1">
                                             <div className="circular-progress-container" data-percent={profile.docCounts?.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
                                               <svg width="40" height="40">
                                                 <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
@@ -2965,8 +4229,8 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                             <h6 className="mb-0 fw-bold">{profile._candidate?.name || 'Your Name'}</h6>
                                             <small className="text-muted">{profile._candidate?.mobile || 'Mobile Number'}</small>
                                           </div>
-                                          <div style={{ marginLeft: '15px' }}>
-                                            <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
+                                          <div className="ekycImg">
+                                            <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px', marginBottom: '8px' }}>
                                               <i className="fas fa-phone"></i>
                                             </button>
                                             <img
@@ -2986,15 +4250,211 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                             />
                                           </div>
 
-                                          <div>
+                                          <div className="d-md-none d-sm-block d-block">
+                                            <div className="btn-group">
+                                              <div style={{ position: "relative", display: "inline-block" }}>
+                                                <button
+                                                  className="btn btn-sm btn-outline-secondary border-0"
+                                                  onClick={() => togglePopup(profileIndex)}
+                                                  aria-label="Options"
+                                                >
+                                                  <i className="fas fa-ellipsis-v"></i>
+                                                </button>
 
+                                                {showPopup === profileIndex && (
+                                                  <div
+                                                    onClick={() => setShowPopup(null)}
+                                                    style={{
+                                                      position: "fixed",
+                                                      top: 0,
+                                                      left: 0,
+                                                      width: "100vw",
+                                                      height: "100vh",
+                                                      backgroundColor: "transparent",
+                                                      zIndex: 8,
+                                                    }}
+                                                  ></div>
+                                                )}
+
+                                                <div
+                                                  style={{
+                                                    position: "absolute",
+                                                    top: "28px",
+                                                    right: "-100px",
+                                                    width: "170px",
+                                                    backgroundColor: "white",
+                                                    border: "1px solid #ddd",
+                                                    boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                                    borderRadius: "4px",
+                                                    padding: "8px 0",
+                                                    zIndex: 8,
+                                                    transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
+                                                    transition: "transform 0.3s ease-in-out",
+                                                    pointerEvents: showPopup === profileIndex ? "auto" : "none",
+                                                    display: showPopup === profileIndex ? "block" : "none"
+                                                  }}
+                                                >
+                                                  <button
+                                                    className="dropdown-item"
+                                                    style={{
+                                                      width: "100%",
+                                                      padding: "8px 16px",
+                                                      border: "none",
+                                                      background: "none",
+                                                      textAlign: "left",
+                                                      cursor: "pointer",
+                                                      fontSize: "12px",
+                                                      fontWeight: "600"
+                                                    }}
+                                                    onClick={() => handleDownloadAdmissionForm(profile)}
+                                                  >
+                                                    Download Admission Form
+                                                  </button>
+                                                  <button
+                                                    className="dropdown-item"
+                                                    style={{
+                                                      width: "100%",
+                                                      padding: "8px 16px",
+                                                      border: "none",
+                                                      background: "none",
+                                                      textAlign: "left",
+                                                      cursor: "pointer",
+                                                      fontSize: "12px",
+                                                      fontWeight: "600"
+                                                    }}
+                                                    onClick={() => handleMarkDropout(profile)}
+                                                  >
+                                                    Mark Dropout
+                                                  </button>
+                                                  <button
+                                                    className="dropdown-item"
+                                                    style={{
+                                                      width: "100%",
+                                                      padding: "8px 16px",
+                                                      border: "none",
+                                                      background: "none",
+                                                      textAlign: "left",
+                                                      cursor: "pointer",
+                                                      fontSize: "12px",
+                                                      fontWeight: "600"
+                                                    }}
+                                                    // onClick={() => openleadHistoryPanel(profile)}
+                                                    onClick={() => {
+                                                      setShowPopup(null)
+                                                      openPanel('leadHistory', profile)
+                                                    }}
+                                                  >
+                                                    History List
+                                                  </button>
+                                                  <button
+                                                    className="dropdown-item"
+                                                    style={{
+                                                      width: "100%",
+                                                      padding: "8px 16px",
+                                                      border: "none",
+                                                      background: "none",
+                                                      textAlign: "left",
+                                                      cursor: "pointer",
+                                                      fontSize: "12px",
+                                                      fontWeight: "600"
+                                                    }}
+                                                    // onClick={() => {
+                                                    //   openEditPanel(profile, 'SetFollowup');
+                                                    //   console.log('selectedProfile', profile);
+                                                    // }}
+                                                    onClick={() => {
+                                                      setShowPopup(null)
+                                                      openPanel('SetFollowup', profile)
+                                                    }}
+                                                  >
+                                                    Set Followup
+                                                  </button>
+                                                  <button
+                                                    className="dropdown-item"
+                                                    style={{
+                                                      width: "100%",
+                                                      padding: "8px 16px",
+                                                      border: "none",
+                                                      background: "none",
+                                                      textAlign: "left",
+                                                      cursor: "pointer",
+                                                      fontSize: "12px",
+                                                      fontWeight: "600"
+                                                    }}
+                                                    onClick={() => {
+                                                      handleFetchCandidate(profile);
+                                                      console.log('selectedProfile', profile);
+                                                    }}
+                                                  >
+                                                    Edit Profile
+                                                  </button>
+                                                  {/* <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  openAssignBatchPanel(profile);
+                                                  console.log('selectedProfile', profile);
+                                                }}
+                                               
+                                              >
+                                                Assign Batch
+                                              </button> */}
+                                                  <button
+                                                    className="btn btn-primary border-0 text-black"
+                                                    style={{
+                                                      width: "100%",
+                                                      padding: "8px 16px",
+                                                      border: "none",
+                                                      background: "none",
+                                                      textAlign: "left",
+                                                      cursor: "pointer",
+                                                      fontSize: "12px",
+                                                      fontWeight: "600"
+                                                    }}
+                                                    onClick={() => {
+                                                      setSelectedProfile(profile);
+                                                      getBranches(profile);
+                                                      setShowBranchModal(true);
+
+
+                                                    }}
+                                                  >
+                                                    Change Branch
+                                                  </button>
+                                                </div>
+                                              </div>
+
+                                              <button
+                                                className="btn btn-sm btn-outline-secondary border-0"
+                                                onMouseDown={(e) => e.preventDefault()}
+                                                onClick={() => toggleLeadDetails(profile)}
+                                              >
+                                                {leadDetailsVisible === profile._id ? (
+                                                  <i className="fas fa-chevron-up"></i>
+                                                ) : (
+                                                  <i className="fas fa-chevron-down"></i>
+                                                )}
+                                              </button>
+                                            </div>
                                           </div>
                                         </div>
+
                                       </div>
 
-                                      <div className="col-md-2 text-end d-md-none d-sm-block d-block">
+
+
+                                      <div className="col-md-2 text-end d-md-block d-sm-none d-none">
                                         <div className="btn-group">
-                                           <div style={{ position: "relative", display: "inline-block" }}>
+                                          <div style={{ position: "relative", display: "inline-block" }}>
                                             <button
                                               className="btn btn-sm btn-outline-secondary border-0"
                                               onClick={() => togglePopup(profileIndex)}
@@ -3016,338 +4476,178 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                   zIndex: 8,
                                                 }}
                                               ></div>
-                                                                                      )}
+                                            )}
 
-                                          <div
-                                            style={{
-                                              position: "absolute",
-                                              top: "28px",
-                                              right: "-100px",
-                                              width: "170px",
-                                              backgroundColor: "white",
-                                              border: "1px solid #ddd",
-                                              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                              borderRadius: "4px",
-                                              padding: "8px 0",
-                                              zIndex: 8,
-                                              transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
-                                              transition: "transform 0.3s ease-in-out",
-                                              pointerEvents: showPopup ? "auto" : "none",
-                                              display: showPopup === profileIndex ? "block" : "none"
-                                            }}
-                                          >
-                                            <button
-                                              className="dropdown-item"
+                                            <div
                                               style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => handleDownloadAdmissionForm(profile)}
-                                            >
-                                              Download Admission Form
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => handleMarkDropout(profile)}
-                                            >
-                                              Mark Dropout
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              // onClick={() => {
-                                              //   openleadHistoryPanel(profile);
-                                              //   console.log('selectedProfile', profile);
-                                              // }}
-                                              onClick={() => {
-                                                setShowPopup(null)
-                                                openPanel('leadHistory', profile)
+                                                position: "absolute",
+                                                top: "28px",
+                                                right: "-100px",
+                                                width: "170px",
+                                                backgroundColor: "white",
+                                                border: "1px solid #ddd",
+                                                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                                borderRadius: "4px",
+                                                padding: "8px 0",
+                                                zIndex: 8,
+                                                transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
+                                                transition: "transform 0.3s ease-in-out",
+                                                pointerEvents: showPopup === profileIndex ? "auto" : "none",
+                                                display: showPopup === profileIndex ? "block" : "none"
                                               }}
                                             >
-                                              History List
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              // onClick={() => {
-                                              //   openEditPanel(profile, 'SetFollowup');
-                                              //   console.log('selectedProfile', profile);
-                                              // }}
-                                              onClick={() => {
-                                                setShowPopup(null)
-                                                openPanel('SetFollowup', profile)
-                                              }}
-                                            >
-                                              Set Followup
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                                  onClick={() => {
-                                                    handleFetchCandidate(profile);
-                                                    console.log('selectedProfile', profile);
-                                                  }}
-                                            >
-                                              Edit Profile
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                                //  onClick={() => {
-                                                //   openAssignBatchPanel(profile);
-                                                //   console.log('selectedProfile', profile);
-                                                //  }}
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => handleDownloadAdmissionForm(profile)}
+                                              >
+                                                Download Admission Form
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => handleMarkDropout(profile)}
+                                              >
+                                                Mark Dropout
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                // onClick={() => openleadHistoryPanel(profile)}
                                                 onClick={() => {
                                                   setShowPopup(null)
-                                                  openPanel('SetFollowup', profile)
+                                                  openPanel('leadHistory', profile)
                                                 }}
-                                            >
-                                              Assign Batch
-                                            </button>
-                                          </div>
-                                        </div> 
-
-                                        <button
-                                          className="btn btn-sm btn-outline-secondary border-0"
-                                          onClick={() => setLeadDetailsVisible(profileIndex)}
-                                        >
-                                          {leadDetailsVisible === profileIndex ? (
-                                            <i className="fas fa-chevron-up"></i>
-                                          ) : (
-                                            <i className="fas fa-chevron-down"></i>
-                                          )}
-                                        </button>
-                                      </div>
-                                    </div>
-
-                                     <div className="col-md-2 text-end d-md-block d-sm-none d-none">
-                                      <div className="btn-group">
-                                        <div style={{ position: "relative", display: "inline-block" }}>
-                                          <button
-                                            className="btn btn-sm btn-outline-secondary border-0"
-                                            onClick={() => togglePopup(profileIndex)}
-                                            aria-label="Options"
-                                          >
-                                            <i className="fas fa-ellipsis-v"></i>
-                                          </button>
-
-                                          {showPopup === profileIndex && (
-                                            <div
-                                              onClick={() => setShowPopup(null)}
-                                              style={{
-                                                position: "fixed",
-                                                top: 0,
-                                                left: 0,
-                                                width: "100vw",
-                                                height: "100vh",
-                                                backgroundColor: "transparent",
-                                                zIndex: 8,
-                                              }}
-                                            ></div>
-                                          )}
-
-                                          <div
-                                            style={{
-                                              position: "absolute",
-                                              top: "28px",
-                                              right: "-100px",
-                                              width: "170px",
-                                              backgroundColor: "white",
-                                              border: "1px solid #ddd",
-                                              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                              borderRadius: "4px",
-                                              padding: "8px 0",
-                                              zIndex: 8,
-                                              transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
-                                              transition: "transform 0.3s ease-in-out",
-                                              pointerEvents: showPopup === profileIndex ? "auto" : "none",
-                                              display: showPopup === profileIndex ? "block" : "none"
-                                            }}
-                                          >
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => handleDownloadAdmissionForm(profile)}
-                                            >
-                                              Download Admission Form
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => handleMarkDropout(profile)}
-                                            >
-                                              Mark Dropout
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              // onClick={() => openleadHistoryPanel(profile)}
-                                               onClick={() => {
-                                                    setShowPopup(null)
-                                                    openPanel('leadHistory', profile)
-                                                  }}
-                                            >
-                                              History List
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              // onClick={() => {
-                                              //   openEditPanel(profile, 'SetFollowup');
-                                              //   console.log('selectedProfile', profile);
-                                              // }}
-                                              onClick={() => {
-                                                setShowPopup(null)
-                                                openPanel('SetFollowup', profile)
-                                              }}
-                                            >
-                                              Set Followup
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                                  onClick={() => {
-                                                    handleFetchCandidate(profile);
-                                                    console.log('selectedProfile', profile);
-                                                  }}
-                                            >
-                                              Edit Profile
-                                            </button>
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
+                                              >
+                                                History List
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
                                                 // onClick={() => {
-                                                //   openAssignBatchPanel(profile);
+                                                //   openEditPanel(profile, 'SetFollowup');
                                                 //   console.log('selectedProfile', profile);
                                                 // }}
                                                 onClick={() => {
                                                   setShowPopup(null)
-                                                  openPanel('AssignBatch', profile)
+                                                  openPanel('SetFollowup', profile)
                                                 }}
                                               >
+                                                Set Followup
+                                              </button>
+                                              <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  handleFetchCandidate(profile);
+                                                  console.log('selectedProfile', profile);
+                                                }}
+                                              >
+                                                Edit Profile
+                                              </button>
+                                              {/* <button
+                                                className="dropdown-item"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  openAssignBatchPanel(profile);
+                                                  console.log('selectedProfile', profile);
+                                                }}
+                                               
+                                              >
                                                 Assign Batch
+                                              </button> */}
+                                              <button
+                                                className="btn btn-primary border-0 text-black"
+                                                style={{
+                                                  width: "100%",
+                                                  padding: "8px 16px",
+                                                  border: "none",
+                                                  background: "none",
+                                                  textAlign: "left",
+                                                  cursor: "pointer",
+                                                  fontSize: "12px",
+                                                  fontWeight: "600"
+                                                }}
+                                                onClick={() => {
+                                                  setSelectedProfile(profile);
+                                                  getBranches(profile);
+                                                  setShowBranchModal(true);
+
+
+                                                }}
+                                              >
+                                                Change Branch
                                               </button>
                                             </div>
                                           </div>
 
                                           <button
                                             className="btn btn-sm btn-outline-secondary border-0"
-                                            onClick={() => setLeadDetailsVisible(profileIndex)}
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={() => toggleLeadDetails(profile)}
                                           >
-                                            {leadDetailsVisible === profileIndex ? (
+                                            {leadDetailsVisible === profile._id ? (
                                               <i className="fas fa-chevron-up"></i>
                                             ) : (
                                               <i className="fas fa-chevron-down"></i>
                                             )}
                                           </button>
                                         </div>
-                                      </div> 
+                                      </div>
 
                                       {/* <div className="col-md-2 text-end d-md-block d-sm-none d-none">
                                         <div className="btn-group">
@@ -3503,9 +4803,10 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
 
                                           <button
                                             className="btn btn-sm btn-outline-secondary border-0"
-                                            onClick={() => toggleLeadDetails(profileIndex)}
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={() => toggleLeadDetails(profile)}
                                           >
-                                            {leadDetailsVisible === profileIndex ? (
+                                            {leadDetailsVisible === profile._id ? (
                                               <i className="fas fa-chevron-up"></i>
                                             ) : (
                                               <i className="fas fa-chevron-down"></i>
@@ -3516,6 +4817,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                     </div>
                                   </div>
                                 </div>
+                                </div>
 
                                 {/* Tab Navigation and Content Card */}
                                 <div className="card border-0 shadow-sm mb-4">
@@ -3525,7 +4827,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                         <li className="nav-item" key={tabIndex}>
                                           <button
                                             className={`nav-link ${(activeTab[profileIndex] || 0) === tabIndex ? 'active' : ''}`}
-                                            onClick={() => handleTabClick(profileIndex, tabIndex)}
+                                            onClick={() => handleTabClick(profileIndex, tabIndex, profile)}
                                           >
                                             {tab}
                                           </button>
@@ -3534,8 +4836,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                     </ul>
                                   </div>
 
-                                  {/* Tab Content - Only show if leadDetailsVisible is true */}
-                                  {leadDetailsVisible === profileIndex && (
+                                  {leadDetailsVisible === profile._id && (
                                     <div className="tab-content">
                                       {/* Lead Details Tab */}
                                       {(activeTab[profileIndex] || 0) === 0 && (
@@ -3727,22 +5028,20 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                       <div className="info-group">
                                                         <div className="info-label">NEXT ACTION DATE</div>
                                                         <div className="info-value">
-                                                          {profile.followups.length > 0
-                                                            ? (() => {
-                                                              const dateObj = new Date(profile.followups[profile.followups.length - 1].date);
-                                                              const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                                day: '2-digit',
-                                                                month: 'short',
-                                                                year: 'numeric',
-                                                              }).replace(/ /g, '/');
-                                                              const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                                hour: '2-digit',
-                                                                minute: '2-digit',
-                                                                hour12: true,
-                                                              });
-                                                              return `${datePart}, ${timePart}`;
-                                                            })()
-                                                            : 'N/A'}
+                                                          {profile.followup?.followupDate ? (() => {
+                                                            const dateObj = new Date(profile.followup?.followupDate);
+                                                            const datePart = dateObj.toLocaleDateString('en-GB', {
+                                                              day: '2-digit',
+                                                              month: 'short',
+                                                              year: 'numeric',
+                                                            }).replace(/ /g, '-');
+                                                            const timePart = dateObj.toLocaleTimeString('en-US', {
+                                                              hour: '2-digit',
+                                                              minute: '2-digit',
+                                                              hour12: true,
+                                                            });
+                                                            return `${datePart}, ${timePart}`;
+                                                          })() : 'N/A'}
                                                         </div>
 
                                                       </div>
@@ -3798,7 +5097,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                 <div className="resume-profile-section">
                                                   {profile._candidate?.personalInfo?.image ? (
                                                     <img
-                                                      src={`${profile._candidate?.personalInfo?.image}`}
+                                                      src={resolveMediaUrl(bucketUrl, profile._candidate.personalInfo.image)}
                                                       alt="Profile"
                                                       className="resume-profile-image"
                                                     />
@@ -3858,15 +5157,17 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
 
                                                 <div className="resume-summary">
                                                   <h2 className="resume-section-title">Professional Summary <i className="fa fa-clock-o" aria-hidden="true" style={{ fontSize: "16px" }}></i> </h2>
-                                                  <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
+                                                  <p className={getResumeSummary(profile._candidate) ? '' : 'resume-empty-hint'}>
+                                                    {getResumeSummary(profile._candidate) || 'No summary provided'}
+                                                  </p>
                                                 </div>
                                               </div>
 
                                               <div className="resume-document-body">
                                                 <div className="resume-column resume-left-column">
-                                                  {profile._candidate?.isExperienced === false ? (
-                                                    <div className="resume-section">
-                                                      <h2 className="resume-section-title">Work Experience</h2>
+                                                  <div className="resume-section">
+                                                    <h2 className="resume-section-title">Work Experience</h2>
+                                                    {profile._candidate?.isExperienced === false ? (
                                                       <div className="resume-experience-item">
                                                         <div className="resume-item-header">
                                                           <h3 className="resume-item-title">Fresher</h3>
@@ -3875,45 +5176,42 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                           <p>Looking for opportunities to start my career</p>
                                                         </div>
                                                       </div>
-                                                    </div>
-                                                  ) : (
-                                                    profile._candidate?.experiences && profile._candidate.experiences.length > 0 && (
-                                                      <div className="resume-section">
-                                                        <h2 className="resume-section-title">Work Experience</h2>
-                                                        {profile._candidate.experiences.map((exp, index) => (
-                                                          <div className="resume-experience-item" key={`resume-exp-${index}`}>
-                                                            <div className="resume-item-header">
-                                                              {exp.jobTitle && (
-                                                                <h3 className="resume-item-title">{exp.jobTitle}</h3>
-                                                              )}
-                                                              {exp.companyName && (
-                                                                <p className="resume-item-subtitle">{exp.companyName}</p>
-                                                              )}
-                                                              {(exp.from || exp.to || exp.currentlyWorking) && (
-                                                                <p className="resume-item-period">
-                                                                  {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                    ) : profile._candidate?.experiences?.length > 0 ? (
+                                                      profile._candidate.experiences.map((exp, index) => (
+                                                        <div className="resume-experience-item" key={`resume-exp-${index}`}>
+                                                          <div className="resume-item-header">
+                                                            {exp.jobTitle && (
+                                                              <h3 className="resume-item-title">{exp.jobTitle}</h3>
+                                                            )}
+                                                            {exp.companyName && (
+                                                              <p className="resume-item-subtitle">{exp.companyName}</p>
+                                                            )}
+                                                            {(exp.from || exp.to || exp.currentlyWorking) && (
+                                                              <p className="resume-item-period">
+                                                                {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
+                                                                  year: 'numeric',
+                                                                  month: 'short',
+                                                                }) : 'Start Date'}
+                                                                {" - "}
+                                                                {exp.currentlyWorking ? 'Present' :
+                                                                  exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
                                                                     year: 'numeric',
                                                                     month: 'short',
-                                                                  }) : 'Start Date'}
-                                                                  {" - "}
-                                                                  {exp.currentlyWorking ? 'Present' :
-                                                                    exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
-                                                                      year: 'numeric',
-                                                                      month: 'short',
-                                                                    }) : 'End Date'}
-                                                                </p>
-                                                              )}
-                                                            </div>
-                                                            {exp.jobDescription && (
-                                                              <div className="resume-item-content">
-                                                                <p>{exp.jobDescription}</p>
-                                                              </div>
+                                                                  }) : 'End Date'}
+                                                              </p>
                                                             )}
                                                           </div>
-                                                        ))}
-                                                      </div>
-                                                    )
-                                                  )}
+                                                          {exp.jobDescription && (
+                                                            <div className="resume-item-content">
+                                                              <p>{exp.jobDescription}</p>
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      ))
+                                                    ) : (
+                                                      <p className="resume-empty-hint">No work experience added</p>
+                                                    )}
+                                                  </div>
 
                                                   {profile._candidate?.qualifications && profile._candidate.qualifications.length > 0 && (
                                                     <div className="resume-section">
@@ -3921,11 +5219,8 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                       {profile._candidate.qualifications.map((edu, index) => (
                                                         <div className="resume-education-item" key={`resume-edu-${index}`}>
                                                           <div className="resume-item-header">
-                                                            {edu.education && (
-                                                              <h3 className="resume-item-title">{edu.education}</h3>
-                                                            )}
-                                                            {edu.course && (
-                                                              <h3 className="resume-item-title">{edu.course}</h3>
+                                                            {getQualificationTitle(edu) && (
+                                                              <h3 className="resume-item-title">{getQualificationTitle(edu)}</h3>
                                                             )}
                                                             {edu.universityName && (
                                                               <p className="resume-item-subtitle">{edu.universityName}</p>
@@ -3951,14 +5246,14 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                 </div>
 
                                                 <div className="resume-column resume-right-column">
-                                                  {profile._candidate?.personalInfo?.skills && profile._candidate.personalInfo.skills.length > 0 && (
+                                                  {getVisibleSkills(profile._candidate?.personalInfo?.skills).length > 0 && (
                                                     <div className="resume-section">
                                                       <h2 className="resume-section-title">Skills</h2>
                                                       <div className="resume-skills-list">
-                                                        {profile._candidate.personalInfo.skills.map((skill, index) => (
+                                                        {getVisibleSkills(profile._candidate.personalInfo.skills).map((skill, index) => (
                                                           <div className="resume-skill-item" key={`resume-skill-${index}`}>
-                                                            <div className="resume-skill-name">{skill.skillName || skill}</div>
-                                                            {skill.skillPercent && (
+                                                            <div className="resume-skill-name">{getSkillLabel(skill)}</div>
+                                                            {Number(skill?.skillPercent) > 0 && (
                                                               <div className="resume-skill-bar-container">
                                                                 <div
                                                                   className="resume-skill-bar"
@@ -3979,7 +5274,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                       <div className="resume-languages-list">
                                                         {profile._candidate.personalInfo.languages.map((lang, index) => (
                                                           <div className="resume-language-item" key={`resume-lang-${index}`}>
-                                                            <div className="resume-language-name">{lang.name || lang.lname || lang}</div>
+                                                            <div className="resume-language-name">{lang?.name || lang?.lname || (typeof lang === 'string' ? lang : 'Language')}</div>
                                                             {lang.level && (
                                                               <div className="resume-language-level">
                                                                 {[1, 2, 3, 4, 5].map(dot => (
@@ -3996,11 +5291,11 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                     </div>
                                                   )}
 
-                                                  {profile._candidate?.personalInfo?.certifications && profile._candidate.personalInfo.certifications.length > 0 && (
+                                                  {getVisibleCertifications(profile._candidate?.personalInfo?.certifications).length > 0 && (
                                                     <div className="resume-section">
                                                       <h2 className="resume-section-title">Certifications</h2>
                                                       <ul className="resume-certifications-list">
-                                                        {profile._candidate.personalInfo.certifications.map((cert, index) => (
+                                                        {getVisibleCertifications(profile._candidate.personalInfo.certifications).map((cert, index) => (
                                                           <li key={`resume-cert-${index}`} className="resume-certification-item">
                                                             <strong>{cert.certificateName || cert.name}</strong>
                                                             {cert.orgName && (
@@ -4023,14 +5318,14 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                     </div>
                                                   )}
 
-                                                  {profile._candidate?.personalInfo?.projects && profile._candidate.personalInfo.projects.length > 0 && (
+                                                  {getVisibleProjects(profile._candidate?.personalInfo?.projects).length > 0 && (
                                                     <div className="resume-section">
                                                       <h2 className="resume-section-title">Projects</h2>
-                                                      {profile._candidate.personalInfo.projects.map((proj, index) => (
+                                                      {getVisibleProjects(profile._candidate.personalInfo.projects).map((proj, index) => (
                                                         <div className="resume-project-item" key={`resume-proj-${index}`}>
                                                           <div className="resume-item-header">
                                                             <h3 className="resume-project-title">
-                                                              {proj.projectName || 'Project'}
+                                                              {proj.projectName}
                                                               {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
                                                             </h3>
                                                           </div>
@@ -4048,11 +5343,15 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                     <div className="resume-section">
                                                       <h2 className="resume-section-title">Interests</h2>
                                                       <div className="resume-interests-tags">
-                                                        {profile._candidate.personalInfo.interest.map((interest, index) => (
+                                                        {profile._candidate.personalInfo.interest.map((interest, index) => {
+                                                          const label = getInterestLabel(interest);
+                                                          if (!label) return null;
+                                                          return (
                                                           <span className="resume-interest-tag" key={`resume-interest-${index}`}>
-                                                            {interest}
+                                                            {label}
                                                           </span>
-                                                        ))}
+                                                          );
+                                                        })}
                                                       </div>
                                                     </div>
                                                   )}
@@ -4081,25 +5380,31 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                     <th>S.No</th>
                                                     <th>Company Name</th>
                                                     <th>Position</th>
-                                                    <th>Duration</th>
+                                                    {/* <th>Duration</th>
                                                     <th>Location</th>
-                                                    <th>Status</th>
+                                                    <th>Status</th> */}
                                                   </tr>
                                                 </thead>
                                                 <tbody>
-                                                  {experiences.map((job, index) => (
-                                                    <tr key={index}>
-                                                      <td>{index + 1}</td>
-                                                      <td>{job.companyName}</td>
-                                                      <td>{job.jobTitle}</td>
-                                                      <td>
-                                                        {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
-                                                        {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
-                                                      </td>
-                                                      <td>Remote</td>
-                                                      <td><span className="text-success">Completed</span></td>
+                                                  {jobHistory?.length > 0 ? (
+                                                    jobHistory?.map((job, index) => (
+                                                      <tr key={index}>
+                                                        <td>{index + 1}</td>
+                                                        <td>{job._job.displayCompanyName}</td>
+                                                        <td>{job._job.title}</td>
+                                                        {/* <td>
+                                                                  {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
+                                                                  {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
+                                                                </td>
+                                                                <td>Remote</td>
+                                                                <td><span className="text-success">Completed</span></td> */}
+                                                      </tr>
+                                                    ))
+                                                  ) : (
+                                                    <tr>
+                                                      <td colSpan={6} className="text-center">No job history available</td>
                                                     </tr>
-                                                  ))}
+                                                  )}
                                                 </tbody>
                                               </table>
                                             </div>
@@ -4124,8 +5429,8 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                   </tr>
                                                 </thead>
                                                 <tbody>
-                                                  {profile?._candidate?._appliedCourses && profile._candidate._appliedCourses.length > 0 ? (
-                                                    profile._candidate._appliedCourses.map((course, index) => (
+                                                  {courseHistory?.length > 0 ? (
+                                                    courseHistory?.map((course, index) => (
                                                       <tr key={index}>
                                                         <td>{index + 1}</td>
                                                         <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
@@ -4180,66 +5485,66 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                     return (
                                                       <>
                                                         <div className="stat-card total-docs">
-                                                          <div className="stat-icon">
+                                                          <div className="stat-icon  d-md-block d-sm-none d-none">
                                                             <i className="fas fa-file-alt"></i>
                                                           </div>
                                                           <div className="stat-info">
                                                             <h4>{backendCounts.totalRequired || 0}</h4>
                                                             <p>Total Required</p>
                                                           </div>
-                                                          <div className="stat-trend">
+                                                          <div className="stat-trend d-md-block d-sm-none d-none">
                                                             <i className="fas fa-list"></i>
                                                           </div>
                                                         </div>
 
                                                         <div className="stat-card uploaded-docs">
-                                                          <div className="stat-icon">
+                                                          <div className="stat-icon d-md-block d-sm-none d-none">
                                                             <i className="fas fa-cloud-upload-alt"></i>
                                                           </div>
                                                           <div className="stat-info">
                                                             <h4>{backendCounts.uploadedCount || 0}</h4>
                                                             <p>Uploaded</p>
                                                           </div>
-                                                          <div className="stat-trend">
+                                                          <div className="stat-trend d-md-block d-sm-none d-none">
                                                             <i className="fas fa-arrow-up"></i>
                                                           </div>
                                                         </div>
 
                                                         <div className="stat-card pending-docs">
-                                                          <div className="stat-icon">
+                                                          <div className="stat-icon d-md-block d-sm-none d-none">
                                                             <i className="fas fa-clock"></i>
                                                           </div>
                                                           <div className="stat-info">
                                                             <h4>{backendCounts.pendingVerificationCount || 0}</h4>
                                                             <p>Pending Review</p>
                                                           </div>
-                                                          <div className="stat-trend">
+                                                          <div className="stat-trend d-md-block d-sm-none d-none">
                                                             <i className="fas fa-exclamation-triangle"></i>
                                                           </div>
                                                         </div>
 
                                                         <div className="stat-card verified-docs">
-                                                          <div className="stat-icon">
+                                                          <div className="stat-icon d-md-block d-sm-none d-none">
                                                             <i className="fas fa-check-circle"></i>
                                                           </div>
                                                           <div className="stat-info">
                                                             <h4>{backendCounts.verifiedCount || 0}</h4>
                                                             <p>Approved</p>
                                                           </div>
-                                                          <div className="stat-trend">
+                                                          <div className="stat-trend d-md-block d-sm-none d-none">
                                                             <i className="fas fa-thumbs-up"></i>
                                                           </div>
                                                         </div>
 
                                                         <div className="stat-card rejected-docs">
-                                                          <div className="stat-icon">
+                                                          <div className="stat-icon d-md-block d-sm-none d-none">
                                                             <i className="fas fa-times-circle"></i>
                                                           </div>
                                                           <div className="stat-info">
                                                             <h4>{backendCounts.RejectedCount || 0}</h4>
                                                             <p>Rejected</p>
                                                           </div>
-                                                          <div className="stat-trend">
+                                                          <div className="stat-trend d-md-block d-sm-none d-none">
                                                             <i className="fas fa-arrow-down"></i>
                                                           </div>
                                                         </div>
@@ -4336,7 +5641,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                             {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
                                                               <>
                                                                 {(() => {
-                                                                  const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
+                                                                  const fileUrl = getDocFileUrl(latestUpload?.fileUrl || doc.fileUrl);
                                                                   const fileType = getFileType(fileUrl);
 
                                                                   if (fileType === 'image') {
@@ -4421,7 +5726,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                                                                 {(!latestUpload) ? (
                                                                   <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
                                                                     setSelectedProfile(profile); // Set the current profile
-                                                                    openUploadModal(doc);   
+                                                                    openUploadModal(doc);
                                                                     console.log("opening modal")     // Open the upload modal
                                                                   }}>
                                                                     <i className="fas fa-cloud-upload-alt"></i>
@@ -4590,7 +5895,7 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
                   <button type="button" className="btn-close" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}></button>
                 </div>
                 <div className="modal-body">
-                  <CandidateProfile ref={candidateRef} />
+                  <CandidateProfile ref={candidateRef} bucketUrl={DOC_BUCKET_URL} onProfileImageUpdated={handleProfileImageUpdated} />
                 </div>
                 <div className="modal-footer">
                   <button type="button" className="btn btn-secondary" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}>Close</button>
@@ -4602,15 +5907,77 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
         )}
 
       </div>
+
+
+      {showBranchModal && (
+        <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered" style={{ margin: 'auto' }}>
+            <div className="modal-content p-0">
+              <div className="modal-header">
+                <h1 className="modal-title fs-5">Select Branch</h1>
+                <button type="button" className="btn-close" onClick={() => {
+                  setShowBranchModal(false);
+                  setSelectedProfile(null);
+                }}></button>
+              </div>
+              <div className="modal-body">
+                <div className="position-relative">
+                  <select
+                    className="form-select border-0 shadow-sm"
+                    id="course"
+                    value={selectedBranch}
+                    onChange={(e) => setSelectedBranch(e.target.value)}
+                    style={{
+                      height: '48px',
+                      padding: '12px 16px',
+                      backgroundColor: '#f8f9fa',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      transition: 'all 0.3s ease',
+                      border: '1px solid #e9ecef',
+
+                    }}
+
+                  >
+                    <option value="">Select Branch</option>
+                    {branches && branches.data && branches.data.length > 0 && branches.data.map((branch, index) => (
+                      <option key={branch._id || index} value={branch._id}>
+                        {branch.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => {
+                  setShowBranchModal(false);
+                  setSelectedBranch('');
+                  setSelectedProfile(null);
+                }}>Close</button>
+                <button type="button" className="btn btn-primary" onClick={() => updateBranch(selectedProfile, selectedBranch)}>Save Branch</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+
       <style>
         {
           `
             #editFollowupPanel {
-    max-height: calc(100vh - 220px); /* Adjust based on your header height */
-    overflow-y: auto;
-    overflow-x: hidden;
-    scrollbar-width: thin; /* For Firefox */
-    scrollbar-color: #cbd5e0 #f7fafc; /* For Firefox */
+   height: -webkit-fill-available
+   
+}
+#editFollowupPanel .card-body {
+    height: 100dvh;
+    overflow: scroll;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e0 #f7fafc;
+    padding-bottom: 220px;
 }
           .site-header--sticky--admission--list--post:not(.mobile-sticky-enable){
           top: 170px;
@@ -4887,15 +6254,17 @@ const AdmissionList = ({openPanel=null, closePanel=null, isPanelOpen=null}) => {
             border-radius: 10px;
           }
 
-          .btn-group {
-            flex-wrap: wrap;
-          }
+          // .btn-group {
+          //   flex-wrap: wrap;
+          // }
           
           .btn-group .btn {
             margin-bottom: 0.25rem;
           }
         }
-
+.ekycImg{
+margin-left: 15px;
+}
         .whatsapp-chat {
           height: 100%;
           min-width: 300px;
@@ -5265,6 +6634,26 @@ background: #fd2b5a;
           border-radius: 8px;
         }
 
+        .resume-summary p,
+        .resume-empty-hint,
+        .resume-item-content,
+        .resume-item-content p {
+          font-size: 14px;
+          line-height: 1.5;
+          color: #444;
+        }
+
+        .resume-empty-hint {
+          font-style: italic;
+          color: #666;
+          margin: 0;
+        }
+
+        .resume-document .resume-contact-item span {
+          font-size: 14px;
+          color: #444;
+        }
+
         .resume-section-title {
           font-size: 18px;
           font-weight: bold;
@@ -5435,6 +6824,78 @@ background: #fd2b5a;
         }
 
         @media (max-width: 768px) {
+        html body .content .content-wrapper{
+         padding: 1.0rem 1.2rem 0;
+        }
+        .stat-card{
+          padding:0.5rem;
+        }
+ .card-header {
+            position: relative;
+            overflow: visible;
+          }
+          
+          /* Scroll Indicator - Right Side Gradient */
+          .card-header::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 30px;
+            background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.95));
+            pointer-events: none;
+            z-index: 2;
+          }
+          
+          .nav.nav-pills {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            padding-bottom: 10px !important;
+            padding-right: 30px !important;
+            margin-bottom: 0 !important;
+            scroll-behavior: smooth;
+            scroll-snap-type: x proximity;
+          }
+          
+          .nav.nav-pills::-webkit-scrollbar {
+            display: none;
+          }
+          
+          .nav.nav-pills .nav-item {
+            flex: 0 0 auto !important;
+            white-space: nowrap !important;
+            margin-right: 8px;
+            scroll-snap-align: start;
+          }
+          
+          .nav.nav-pills .nav-link {
+            white-space: nowrap !important;
+            padding: 10px 16px !important;
+            font-size: 13px !important;
+            border-radius: 20px !important;
+            min-width: fit-content !important;
+            display: inline-block !important;
+            transition: all 0.3s ease;
+          }
+          
+          .nav.nav-pills .nav-link.active {
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(253, 43, 90, 0.3);
+          }
+
+        .ekycImg{
+        margin-left:5px
+        }
+        .ekycImg img{
+        margin: 0px !important;
+        width: 90px !important;
+        }
           .resume-document-body {
             flex-direction: column;
           }
@@ -5720,22 +7181,9 @@ background: #fd2b5a;
 
 /* Additional mobile optimizations */
 @media (max-width: 576px) {
-    .container-fluid.py-2 {
-        padding: 0.5rem !important;
-    }
-
-    .card-body.px-1.py-0.my-2 {
-        padding: 0.5rem !important;
-    }
-
-    .d-flex.align-items-center {
-        flex-wrap: wrap;
-        gap: 0.5rem;
-    }
-
-    .btn-group {
-        flex-wrap: wrap;
-    }
+        // .btn-group {
+    //     flex-wrap: wrap;
+    // }
 
     .input-group {
         max-width: 100% !important;
@@ -5779,14 +7227,6 @@ background: #fd2b5a;
     overflow: hidden;
 }
 
-.modal-content {
-    background-color: #fff;
-    max-height: 90vh;
-    width: 80%;
-    overflow-y: auto;
-    padding: 20px;
-    border-radius: 8px;
-}
 
 .doc-iframe {
     transform-origin: top left;
@@ -5954,7 +7394,7 @@ background: #fd2b5a;
 }
 
 .action-btn {
-    background: none;
+    // background: none;
     border: none;
     cursor: pointer;
     padding: 5px 8px;
@@ -6777,9 +8217,33 @@ background: #fd2b5a;
 
 .filter-tabs {
     display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
+              gap: 1rem;
+             flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #888 #f1f1f1;
+    padding-bottom: 0.5rem;
 }
+    .filter-tabs::-webkit-scrollbar {
+    height: 6px;
+}
+
+.filter-tabs::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.filter-tabs::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+.filter-tabs::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
 
 .filter-btn {
     background: #f8f9fa;
@@ -7079,8 +8543,15 @@ background: #fd2b5a;
         grid-template-columns: 1fr;
     }
 
-    .filter-tabs {
-        justify-content: center;
+        .filter-tabs {
+        justify-content: flex-start;
+        gap: 0.75rem;
+    }
+    
+    .filter-btn {
+        flex-shrink: 0;
+        white-space: nowrap;
+        padding: 0.75rem 0.5rem;
     }
 
     .document-header {
@@ -7457,10 +8928,14 @@ background: #fd2b5a;
     height: min-content !important;
     transform: translateX(0px)!important;
 }
+.lastDatepicker .react-calendar {
+    width: 250px !important;
+    height: min-content !important;
+    transform: translateX(-110px)!important;
+}
 .react-calendar{
 // width:min-content !important;
 height:min-content !important;
-transform: translateX(-110px)!important;
     width: 250px !important;
 }
 @media (max-width: 768px) {
@@ -7495,7 +8970,10 @@ transform: translateX(-110px)!important;
                   }
               }
               .nav-tabs-main > li > button{
-              padding: 15px 9px;
+              padding: 5px 8px;
+              }
+              .nav-tabs-main{
+              margin-bottom: 8px!important;
               }
 }
 
@@ -8166,6 +9644,46 @@ animation: pulse 1.5s infinite;
 0% { transform: scale(1); }
 50% { transform: scale(1.05); }
 100% { transform: scale(1); }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUpMobile {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Mobile Bottom Sheet Dropdown Item Hover/Active Effects */
+@media (max-width: 768px) {
+  .dropdown-item:active {
+    background-color: #f5f5f5 !important;
+    transform: scale(0.98);
+  }
+  
+  .dropdown-item:hover {
+    background-color: #f9f9f9 !important;
+  }
+  
+  /* Improve touch targets on mobile */
+  .dropdown-item {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    transition: all 0.2s ease;
+  }
 }
 
 .recordings-list {
