@@ -29,6 +29,15 @@ const moment = require("moment");
 const {uploadSinglefile} = require('./functions/images')
 const { resolvePublicUrl } = require('../../helpers/s3Storage');
 const AppliedCourses = require('../models/appliedCourses');
+const commonFunc = require('./functions/common');
+
+// Production nginx often strips `/api` before Node — mirror OTP routes at root.
+router.post('/sendOtp', commonFunc.sendOtp);
+router.post('/otpCollegeLogin', commonFunc.loginAsCollege);
+router.post('/verifyOtp', commonFunc.verifyOtp);
+router.post('/otpCandidateLogin', commonFunc.otpCandidateLogin);
+router.post('/otpCompanyLogin', commonFunc.otpCompanyLogin);
+router.post('/otpTrainerLogin', commonFunc.loginAsTrainer);
 
 router.use('/', frontRoutes);
 router.use('/', conversionTrakingRoutes);

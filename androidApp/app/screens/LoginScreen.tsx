@@ -27,7 +27,8 @@ import {
 import { college } from '../theme/college';
 import { useAuth } from '../auth/AuthContext';
 import { saveUser } from '../auth/authStorage';
-import type { AuthUser } from '../auth/authTypes';
+import { normalizeAuthUser } from '../auth/normalizeAuthUser';
+import { refreshUserPermissions } from '../auth/refreshUserPermissions';
 
 const WEB_APP_ORIGIN = __DEV__
   ? Platform.OS === 'android'
@@ -309,9 +310,12 @@ export function LoginScreen() {
         setShowOtpBtn(false);
         setShowOtpField(true);
         setIsUserInputDisabled(true);
-        setSuccessMessage(
-          typeof data.message === 'string' ? data.message : 'OTP sent',
-        );
+        const baseMsg =
+          typeof data.message === 'string' ? data.message : 'OTP sent';
+        const emailHint = userInput.includes('@')
+          ? ' OTP aapke registered mobile number par bheja gaya hai.'
+          : '';
+        setSuccessMessage(`${baseMsg}${emailHint}`);
       } else {
         setSuccessMessage('');
         setErrorMessage(apiErrorMessage(data) || 'Failed to send OTP !!!');
@@ -349,8 +353,9 @@ export function LoginScreen() {
           userInput.trim(),
           password,
         );
-        const userPayload = data.userData as AuthUser | undefined;
-        if (data.status === true && userPayload && typeof userPayload === 'object') {
+        let userPayload = normalizeAuthUser(data.userData);
+        if (data.status === true && userPayload) {
+          userPayload = await refreshUserPermissions(userPayload);
           await saveUser(userPayload);
           setUser(userPayload);
           setSuccessMessage(
@@ -389,8 +394,9 @@ export function LoginScreen() {
         userInput.trim(),
         otp.trim(),
       );
-      const userPayload = data.userData as AuthUser | undefined;
-      if (data.status === true && userPayload && typeof userPayload === 'object') {
+      let userPayload = normalizeAuthUser(data.userData);
+      if (data.status === true && userPayload) {
+        userPayload = await refreshUserPermissions(userPayload);
         await saveUser(userPayload);
         setUser(userPayload);
         setSuccessMessage(
