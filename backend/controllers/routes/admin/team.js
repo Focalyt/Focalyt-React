@@ -3,36 +3,17 @@ const router = express.Router();
 const { isAdmin } = require("../../../helpers");
 // const mongoose = require('mongoose');
 const Team = require('../../models/team'); // PostSchema import करें
-const AWS = require('aws-sdk');
 const multer = require('multer');
 const fs = require('fs');
 const uuid = require('uuid/v1');
 const path = require('path');
 
-// Middleware to ensure the user is an admin
-// router.use(isAdmin);
-
-
-
 const {
-  accessKeyId,
-  secretAccessKey,
-  region,
   bucketName,
   mimetypes,
 } = require('../../../config');
 const { resolvePublicUrl, storageKeyFromUpload } = require('../../../helpers/s3Storage');
-
-
-
-AWS.config.update({
-  accessKeyId,
-  secretAccessKey,
-  region,
-});
-
-
-const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
+const s3 = require('../../../helpers/objectStorage');
 const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
 
 const destination = path.resolve(__dirname, '..', '..', '..', 'public', 'temp');

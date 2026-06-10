@@ -5,6 +5,7 @@ const B2cFollowupSchema = new Schema({
   appliedCourseId: { type: Types.ObjectId, ref: 'AppliedCourses', required: true },
   collegeId: { type: Types.ObjectId, ref: 'College', required: true },
   followupDate: { type: Date, required: true },
+  // followUpType: { type: String, enum: ['Call', 'Visit'], default: 'Call' },
 
   status: { type: String, enum: ['planned', 'missed', 'done'], default: 'planned' },
   updatedBy: { type: Types.ObjectId, ref: 'User' },

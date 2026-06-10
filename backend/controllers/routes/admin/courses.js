@@ -14,24 +14,15 @@ const { candidateCashbackEventName } = require('../../db/constant');
 const router = express.Router();
 router.use(isAdmin);
 
-const AWS = require("aws-sdk");
 const multer = require('multer');
 const {
-	accessKeyId,
-	secretAccessKey,
 	bucketName,
-	region,
 	authKey,
 	msg91WelcomeTemplate,
 } = require("../../../config");
 const courses = require("../../models/courses");
 
-AWS.config.update({
-	accessKeyId,
-	secretAccessKey,
-	region,
-});
-const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
+const s3 = require("../../../helpers/objectStorage");
 const allowedVideoExtensions = ['mp4', 'mkv', 'mov', 'avi', 'wmv'];
 const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
 const allowedDocumentExtensions = ['pdf', 'doc', 'docx']; // ✅ PDF aur DOC types allow karein

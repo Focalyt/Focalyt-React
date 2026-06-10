@@ -1,25 +1,21 @@
-const AWS = require('aws-sdk');
 const multer = require('multer');
 const fs = require('fs');
 const uuid = require('uuid/v1');
 const path = require('path');
 
 const {
-  accessKeyId,
-  secretAccessKey,
-  region,
   bucketName,
   mimetypes,
 } = require('../../../config');
 
+const s3 = require('../../../helpers/objectStorage');
 
-AWS.config.update({
-  accessKeyId,
-  secretAccessKey,
-  region,
-});
-
-const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
+class InvalidParameterError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'InvalidParameterError';
+  }
+}
 
 const destination = path.resolve(__dirname, '..', '..', '..', 'public', 'temp');
 if (!fs.existsSync(destination)) fs.mkdirSync(destination);

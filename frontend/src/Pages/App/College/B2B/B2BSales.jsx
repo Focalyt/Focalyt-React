@@ -143,6 +143,10 @@ function buildLeadRemarkSuggestion({ leadFormData, leadCategoryOptions, typeOfB2
   return lines.join('\n');
 }
 
+function getFollowupDescription(followUpType) {
+  return String(followUpType || 'Call').toLowerCase() === 'visit' ? 'Followup Visit' : 'Followup Calling';
+}
+
 function buildFollowupNotesSuggestion({ followupFormData, selectedProfile, seletectedStatus, seletectedSubStatus, statuses }) {
   const leadName = pickFirstNonEmpty(selectedProfile?.businessName, selectedProfile?.name);
   const followType = pickFirstNonEmpty(followupFormData?.followUpType, 'Call');
@@ -1038,7 +1042,7 @@ const B2BSales = () => {
             followUpType: followupFormData.followUpType || 'Call',
             description:
               followupFormData.description ||
-              ((followupFormData.followUpType || 'Call') === 'Visit' ? 'Follow-up visit' : 'Follow-up call'),
+              getFollowupDescription(followupFormData.followUpType),
             scheduledDate: followupDateValue,
             scheduledTime: followupFormData.followupTime,
             remarks: followupFormData.remarks || '',
@@ -1077,11 +1081,14 @@ const B2BSales = () => {
       : (lead?.followUpCall || null);
     if (bySlot?.scheduledDate) return formatFollowupDate(bySlot.scheduledDate);
 
-    // fallback to legacy followUp if it matches type
-    const legacy = lead?.followUp || null;
-    if (legacy?.scheduledDate && String(legacy?.followUpType || '').toLowerCase() === t) {
-      return formatFollowupDate(legacy.scheduledDate);
+    const legacy = lead?.followup || lead?.followUp || null;
+    if (legacy?.scheduledDate) {
+      const legacyType = String(legacy?.followUpType || legacy?.type || 'call').toLowerCase();
+      if ((t === 'visit' && legacyType === 'visit') || (t === 'call' && legacyType !== 'visit')) {
+        return formatFollowupDate(legacy.scheduledDate);
+      }
     }
+    if (legacy?.followupDate) return formatFollowupDate(legacy.followupDate);
     return '—';
   };
 
@@ -1104,11 +1111,12 @@ const B2BSales = () => {
     const slotBucket = getFollowupBucket(slot);
     if (slotBucket) return slotBucket;
 
-    const legacy = lead?.followUp || null;
-    if (legacy && String(legacy?.followUpType || '').toLowerCase() === t) {
-      return getFollowupBucket(legacy);
-    }
-    return null;
+    const legacy = lead?.followup || lead?.followUp || null;
+    if (!legacy) return null;
+    const legacyType = String(legacy?.followUpType || legacy?.type || 'call').toLowerCase();
+    if (t === 'visit' && legacyType !== 'visit') return null;
+    if (t === 'call' && legacyType === 'visit') return null;
+    return getFollowupBucket(legacy);
   };
 
   const getLeadDocumentsBucket = (lead) => {
@@ -1707,7 +1715,21 @@ const B2BSales = () => {
     }
     return Array.from(byRoot.values()).map((group) => {
       const cached = crossSaleCache[group.rootId];
-      const merged = (cached?.length ? cached : group.membersFromList);
+      const freshById = new Map(group.membersFromList.map((l) => [String(l._id), l]));
+      let merged;
+      if (cached?.length) {
+        // Prefer main leads list (followUpCall/Visit populated); use cache only for missing cross-sale rows
+        const cachedById = new Map(cached.map((l) => [String(l._id), l]));
+        const allIds = new Set([...freshById.keys(), ...cachedById.keys()]);
+        merged = [...allIds].map((id) => {
+          const fresh = freshById.get(id);
+          const cached = cachedById.get(id);
+          if (fresh && cached) return { ...cached, ...fresh };
+          return fresh || cached;
+        }).filter(Boolean);
+      } else {
+        merged = group.membersFromList;
+      }
       const unique = [...new Map(merged.map((l) => [String(l._id), l])).values()];
       const sorted = unique.sort((a, b) => {
         const aPrimary = !a.parentLeadId;
@@ -1882,6 +1904,7 @@ const B2BSales = () => {
   // When a follow-up is saved, refresh the list so dates update per-lead
   useEffect(() => {
     const handler = () => {
+      setCrossSaleCache({});
       fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
       if (leadViewTab === 'all') {
         fetchStatusCounts();
@@ -2041,7 +2064,7 @@ const B2BSales = () => {
 
   const toCsv = (arr) => (Array.isArray(arr) ? arr.filter(Boolean).join(',') : '');
 
-  const appendLeadFilterParams = (params, eff) => {
+  const appendLeadFilterParams = (params, eff, options = {}) => {
     if (eff.search) params.search = eff.search;
     if (Array.isArray(eff.leadCategory) && eff.leadCategory.length) {
       params.leadCategoryIn = toCsv(eff.leadCategory);
@@ -2065,8 +2088,10 @@ const B2BSales = () => {
     if (Array.isArray(eff.documentsStatus) && eff.documentsStatus.length) {
       params.documentsStatusIn = toCsv(eff.documentsStatus);
     }
-    const approval = eff.approvalStatus ?? selectedApprovalStatus;
-    if (approval) params.approvalStatus = approval;
+    if (!options.skipApprovalStatus) {
+      const approval = eff.approvalStatus ?? selectedApprovalStatus;
+      if (approval) params.approvalStatus = approval;
+    }
     if (eff.referredByMe === true || eff.referredByMe === 'true') {
       params.referredByMe = true;
     }
@@ -2247,6 +2272,8 @@ const B2BSales = () => {
       // Build query parameters
       const params = {
         page: page,
+        sortBy: 'updatedAt',
+        sortOrder: 'desc',
         // limit: 10,           
       };
 
@@ -2383,7 +2410,7 @@ const B2BSales = () => {
       setApprovalCountsLoading(true);
       const eff = { ...filters, ...filterOverrides };
       const baseParams = {};
-      appendLeadFilterParams(baseParams, eff);
+      appendLeadFilterParams(baseParams, eff, { skipApprovalStatus: true });
 
       const [allRes, approvedRes, pendingRes, rejectedRes] = await Promise.all([
         axios.get(`${backendUrl}/college/b2b/leads/status-count`, { headers: { 'x-auth': token }, params: baseParams }),
@@ -2392,10 +2419,12 @@ const B2BSales = () => {
         axios.get(`${backendUrl}/college/b2b/leads/status-count`, { headers: { 'x-auth': token }, params: { ...baseParams, approvalStatus: 'REJECTED' } }),
       ]);
 
-      const safeTotal = allRes?.data?.status ? (allRes.data.data?.totalLeads || 0) : 0;
       const safeApproved = approvedRes?.data?.status ? (approvedRes.data.data?.totalLeads || 0) : 0;
       const safePending = pendingRes?.data?.status ? (pendingRes.data.data?.totalLeads || 0) : 0;
       const safeRejected = rejectedRes?.data?.status ? (rejectedRes.data.data?.totalLeads || 0) : 0;
+      const safeTotal = allRes?.data?.status
+        ? (allRes.data.data?.totalLeads || 0)
+        : (safeApproved + safePending + safeRejected);
 
       setApprovalCounts({ total: safeTotal, approved: safeApproved, pending: safePending, rejected: safeRejected });
     } catch (error) {
@@ -2422,6 +2451,8 @@ const B2BSales = () => {
         { headers: { 'x-auth': token } }
       );
       if (res?.data?.status) {
+        setApprovalEditLeadId(null);
+        setCrossSaleCache({});
         await fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
         await fetchStatusCounts();
         await fetchApprovalCounts();
@@ -2443,6 +2474,8 @@ const B2BSales = () => {
         { headers: { 'x-auth': token } }
       );
       if (res?.data?.status) {
+        setApprovalEditLeadId(null);
+        setCrossSaleCache({});
         await fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
         await fetchStatusCounts();
         await fetchApprovalCounts();
@@ -2604,7 +2637,7 @@ const B2BSales = () => {
       });
 
       if (response.data.status) {
-        const updatedLead = response?.data?.data || null;
+        const updatedLead = response?.data?.data?.lead || response?.data?.data || null;
 
         if (updatedLead && updatedLead._id) {
           setLeads((prev) => {
@@ -3496,7 +3529,7 @@ const B2BSales = () => {
       setFollowupFormData(prev => ({
         ...prev,
         followUpType: followUpType || prev.followUpType || 'Call',
-        description: (followUpType || prev.followUpType) === 'Visit' ? 'Follow-up visit' : 'Follow-up call',
+        description: getFollowupDescription(followUpType || prev.followUpType),
       }));
       setShowPanel('followUp')
     }

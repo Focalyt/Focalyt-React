@@ -11,25 +11,13 @@ const mongoose = require("mongoose");
 const csv = require("fast-csv");
 const uuid = require('uuid/v1');
 const multer = require('multer');
-const AWS = require('aws-sdk');
 
 const {
-	accessKeyId,
-
-	secretAccessKey,
-	region,
 	bucketName,
 	mimetypes,
 } = require('../../../config');
 
-
-AWS.config.update({
-	accessKeyId,
-	secretAccessKey,
-	region,
-});
-
-const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
+const s3 = require('../../../helpers/objectStorage');
 
 const destination = path.resolve(__dirname, '..', '..', '..', 'public', 'temp');
 if (!fs.existsSync(destination)) fs.mkdirSync(destination);

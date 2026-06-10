@@ -4,11 +4,7 @@ const uuid = require('uuid/v1');
 
 const { bucketName, region } = require('../../config');
 const fs = require('fs');
-const AWS = require("aws-sdk");
-
-
-// Get media type from MIME type
-const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
+const s3 = require('../../helpers/objectStorage');
 
 const getMediaType = (mimetype) => {
     if (mimetype.startsWith('image/')) return 'image';

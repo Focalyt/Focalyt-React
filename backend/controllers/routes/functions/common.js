@@ -9,7 +9,6 @@ const { headerAuthKey, jwtSecret } = require('../../../config');
 // const voucherCodes = require('voucher-code-generator');
 // const { hashSync } = require('bcryptjs');
 const axios = require('axios').default;
-const AWS = require('aws-sdk');
 const multer = require('multer');
 const fs = require('fs');
 const uuid = require('uuid/v1');
@@ -18,22 +17,13 @@ const path = require('path');
 // const SendOtp = require('sendotp');
 
 const {
-  accessKeyId,
-  secretAccessKey,
-  region,
   bucketName,
   mimetypes,
   authKey,
   templateId,
   msg91Url
 } = require('../../../config');
-// const sendOtp = new SendOtp(authKey,'Otp for your order is {{otp}}, please do not share it with anybody');
-AWS.config.update({
-  accessKeyId,
-  secretAccessKey,
-  region,
-});
-const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
+const s3 = require('../../../helpers/objectStorage');
 
 const destination = path.resolve(__dirname, '..', '..', '..', 'public', 'temp');
 if (!fs.existsSync(destination)) fs.mkdirSync(destination);

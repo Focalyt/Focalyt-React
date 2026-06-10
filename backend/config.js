@@ -25,6 +25,8 @@ module.exports = {
   templateId:process.env.TEMPLATE_ID,
   msg91Url: process.env.MYPIE_MSG91_URL,
   bucketURL:process.env.MIPIE_BUCKET_URL,
+  localUploadDir: process.env.LOCAL_UPLOAD_DIR,
+  storageType: process.env.STORAGE_TYPE || 'local',
   msg91WelcomeTemplate:process.env.MIPIE_MSG91_WELCOME_TEMPLATE,
   msg91SmsUrl : process.env.MIPIE_MSG91_SMS_URL,
   msg91ShortlistedTemplate:process.env.MIPIE_MSG91_SHORTLISTED,

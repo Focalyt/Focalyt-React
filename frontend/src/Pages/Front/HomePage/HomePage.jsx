@@ -4091,6 +4091,98 @@ const STYLES = `
   }
 }
 
+/* Mobile landscape — width often >768px but viewport height is very short */
+@media (orientation: landscape) and (max-height: 540px) {
+  .foc-cyber-home section.hero {
+    min-height: auto;
+    padding: 108px 0 18px;
+    overflow: visible;
+  }
+  .foc-cyber-home section.hero .marquee-bar {
+    display: none;
+  }
+  .foc-cyber-home section.hero .container {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .hero-inner {
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+    gap: 14px;
+    align-items: center;
+  }
+  .foc-cyber-home section.hero .hero-inner > div:first-child {
+    display: block;
+    text-align: left;
+  }
+  .hero-topbar {
+    margin-bottom: 6px;
+  }
+  .hero-eyebrow {
+    margin-top: 0;
+    margin-bottom: 8px;
+    padding: 4px 10px;
+    font-size: 8px;
+    line-height: 1.25;
+    max-width: 100%;
+  }
+  .hero-h1 {
+    font-size: clamp(1.05rem, 3.2vw, 1.45rem);
+    margin-bottom: 8px;
+    line-height: 1.06;
+    letter-spacing: 0.01em;
+  }
+  .hero-btns {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+  }
+  .hero-btns .btn-primary {
+    width: 100%;
+    min-height: 34px;
+    padding: 6px 12px;
+    font-size: 9px;
+    border-radius: 8px;
+  }
+  .hero-right {
+    margin-top: 0;
+    gap: 8px;
+    align-items: stretch;
+    width: 100%;
+  }
+  .foc-cyber-home section.hero .hero-kicker {
+    display: none;
+  }
+  .hero-tiles {
+    margin-top: 0;
+  }
+  .hero-tiles-inner {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .hero-tile {
+    min-height: 56px;
+    padding: 10px 8px;
+    border-radius: 10px;
+    border-width: 1.5px;
+  }
+  .hero-tile-text {
+    font-size: clamp(8px, 1.6vw, 10px);
+    letter-spacing: 0.05em;
+    line-height: 1.08;
+  }
+  .foc-cyber-home section.hero .hero-right-cta {
+    width: 100%;
+    max-width: none;
+    min-height: 34px;
+    padding: 6px 12px;
+    font-size: 9px;
+    border-radius: 8px;
+  }
+}
+
 /* ── Geographic reach map (Leaflet) ── */
 @keyframes focMapPinPulse {
   0%, 100% { transform: scale(1); }

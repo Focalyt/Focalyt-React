@@ -6,16 +6,12 @@ const { Event, AppliedEvent , Qualification , EventType} = require("../../models
 const fs = require('fs');
 const multer = require('multer');
 const templates = require("../../models/templates")
-const AWS = require("aws-sdk");
 
 const uuid = require("uuid/v1");
 const puppeteer = require("puppeteer");
 const path = require("path");
 const {
-    accessKeyId,
-    secretAccessKey,
     bucketName,
-    region,
     msg91ShortlistedTemplate,
     msg91Rejected,
     msg91Hired,
@@ -24,21 +20,7 @@ const {
     env
 } = require("../../../config");
 
-AWS.config.update({
-    accessKeyId: accessKeyId, // id
-    secretAccessKey: secretAccessKey, // secret password
-    region: region,
-});
-
-// Define the custom error
-class InvalidParameterError extends Error {
-    constructor(message) {
-        super(message);
-        this.name = 'InvalidParameterError';
-    }
-}
-
-const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
+const s3 = require("../../../helpers/objectStorage");
 const allowedVideoExtensions = ['mp4', 'mkv', 'mov', 'avi', 'wmv'];
 const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
 

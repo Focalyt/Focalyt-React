@@ -32,9 +32,6 @@ function storageKeyFromUpload(uploadResult, explicitKey) {
 /** Build a public URL for external APIs (WhatsApp, email links). DB should store keys only. */
 function resolvePublicUrl(storageKeyOrUrl) {
   if (!storageKeyOrUrl || typeof storageKeyOrUrl !== 'string') return '';
-  if (/^https?:\/\//i.test(storageKeyOrUrl.trim())) {
-    return storageKeyOrUrl.trim();
-  }
   const key = normalizeStorageKey(storageKeyOrUrl);
   if (!key) return '';
   const base = getBucketBaseUrl();

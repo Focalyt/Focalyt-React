@@ -1,29 +1,15 @@
-const AWS = require('aws-sdk');
 const multer = require('multer');
 const fs = require('fs');
 const uuid = require('uuid/v1');
 const path = require('path');
-// const mongoose = require('mongoose');
-const Team = require('../../models/team'); // PostSchema import करें
+const Team = require('../../models/team');
 
 const {
-  accessKeyId,
-  secretAccessKey,
-  region,
   bucketName,
   mimetypes,
 } = require('../../../config');
 
-
-
-AWS.config.update({
-  accessKeyId,
-  secretAccessKey,
-  region,
-});
-
-
-const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
+const s3 = require('../../../helpers/objectStorage');
 const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
 
 const destination = path.resolve(__dirname, '..', '..', '..', 'public', 'temp');

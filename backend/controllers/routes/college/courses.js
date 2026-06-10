@@ -15,24 +15,14 @@ const { candidateCashbackEventName } = require('../../db/constant');
 const router = express.Router();
 // router.use(isAdmin);
 
-const AWS = require("aws-sdk");
 const multer = require('multer');
 const {
-	accessKeyId,
-	secretAccessKey,
 	bucketName,
-	region,
 	authKey,
 	msg91WelcomeTemplate,
 } = require("../../../config");
 
-
-AWS.config.update({
-	accessKeyId,
-	secretAccessKey,
-	region,
-});
-const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
+const s3 = require("../../../helpers/objectStorage");
 const { normalizeStorageKey } = require('../../../helpers/s3Storage');
 const allowedVideoExtensions = ['mp4', 'mkv', 'mov', 'avi', 'wmv'];
 const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];

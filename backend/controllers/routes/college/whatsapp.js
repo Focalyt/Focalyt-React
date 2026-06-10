@@ -1,26 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
-const AWS = require("aws-sdk");
 const uuid = require('uuid/v1');
 const multer = require('multer');
 const FormData = require('form-data');
 const { College, WhatsAppMessage, WhatsAppTemplate, Candidate } = require('../../models');
 const { isCollege } = require('../../../helpers');
 const {
-	accessKeyId,
-	secretAccessKey,
 	bucketName,
-	region,
 } = require("../../../config");
 
-// Configure AWS S3
-AWS.config.update({
-	accessKeyId,
-	secretAccessKey,
-	region,
-});
-const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
+const s3 = require("../../../helpers/objectStorage");
 const { normalizeStorageKey, resolvePublicUrl } = require('../../../helpers/s3Storage');
 
 const allowedVideoExtensions = ['mp4', 'mkv', 'mov', 'avi', 'wmv'];
