@@ -2801,21 +2801,6 @@ const CRMDashboard = () => {
           return;
         }
 
-
-       
-        if (remarks && remarks.trim()) {
-          const improved = await checkAndImproveRemarkIfWeak({
-            remarkText: remarks,
-            context: {
-              mode: 'bulk_status_change',
-              status: seletectedStatus?.title || seletectedStatus,
-              substatus: seletectedSubStatus?.title,
-              followupRequired: !!hasFollowupRequired
-            }
-          });
-          if (improved.changed) setRemarks(improved.finalRemark);
-        }
-
         // Prepare the request body
         const data = {
           selectedProfiles,
@@ -2911,21 +2896,6 @@ const CRMDashboard = () => {
             alert('Invalid date/time combination');
             return;
           }
-        }
-
-        // Weak remark detection (optional improvement)
-        if (remarks && remarks.trim()) {
-          const improved = await checkAndImproveRemarkIfWeak({
-            remarkText: remarks,
-            context: {
-              mode: 'single_status_change',
-              candidate: selectedProfile?._candidate?.name,
-              status: seletectedStatus?.title || seletectedStatus,
-              substatus: seletectedSubStatus?.title,
-              followupRequired: !!hasFollowupRequired
-            }
-          });
-          if (improved.changed) setRemarks(improved.finalRemark);
         }
 
         // Prepare the request body
@@ -3524,29 +3494,6 @@ console.log('API Response:', response.data);
       riskContext: aiProfile.riskContext,
     };
   }, [buildAiSupervisionProfile]);
-
-  const checkAndImproveRemarkIfWeak = useCallback(async ({ remarkText, context }) => {
-    const text = String(remarkText || '').trim();
-    if (!text || !token) return { finalRemark: text, changed: false };
-    try {
-      const res = await axios.post(
-        `${backendUrl}/api/ai/remark-quality`,
-        { remark: text, context: context || {} },
-        { headers: { 'x-auth': token } }
-      );
-      const data = res.data?.data;
-      if (res.data?.success && data?.isWeak && data?.improvedRemark) {
-        const ok = window.confirm(
-          `Remark looks too short/weak.\n\nSuggested improved remark:\n\n${data.improvedRemark}\n\nUse this improved remark?`
-        );
-        if (ok) return { finalRemark: data.improvedRemark, changed: true };
-      }
-      return { finalRemark: text, changed: false };
-    } catch (err) {
-      console.warn('Remark quality check failed:', err?.message || err);
-      return { finalRemark: text, changed: false };
-    }
-  }, [backendUrl, token]);
 
   const chunkArray = useCallback((arr, size) => {
     const chunks = [];
