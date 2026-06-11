@@ -55,6 +55,28 @@ function extractStorageKey(path, bucketUrl) {
   return normalizeStorageKey(key).replace(/^\//, '');
 }
 
+/** Avoid mixed-content blocks: use HTTPS / same-origin paths when the app is on HTTPS. */
+function alignMediaUrl(url) {
+  if (!url || typeof url !== 'string' || url.startsWith('blob:')) return url;
+  if (typeof window === 'undefined') return url;
+  if (!/^https?:\/\//i.test(url)) return url;
+
+  try {
+    const parsed = new URL(url);
+    if (window.location.protocol === 'https:' && parsed.protocol === 'http:') {
+      parsed.protocol = 'https:';
+    }
+    if (parsed.host === window.location.host) {
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    }
+    return parsed.href;
+  } catch {
+    if (window.location.protocol === 'https:' && url.startsWith('http://')) {
+      return url.replace(/^http:\/\//i, 'https://');
+    }
+    return url;
+  }
+}
 
 export function resolveMediaUrl(bucketUrl, path) {
   if (!path || typeof path !== 'string') return '';
@@ -63,10 +85,10 @@ export function resolveMediaUrl(bucketUrl, path) {
 
   const key = extractStorageKey(trimmed, bucketUrl);
   if (!key || key.startsWith('blob:')) return key;
-  if (/^https?:\/\//i.test(key)) return key;
+  if (/^https?:\/\//i.test(key)) return alignMediaUrl(key);
 
   const base = getMediaBaseUrl(bucketUrl);
-  return base ? `${base}/${key}` : key;
+  return alignMediaUrl(base ? `${base}/${key}` : key);
 }
 
 export default resolveMediaUrl;

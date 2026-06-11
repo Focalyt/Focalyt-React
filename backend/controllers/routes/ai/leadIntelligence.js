@@ -13,11 +13,42 @@ function getAnthropicClient() {
   return new Anthropic({ apiKey });
 }
 
-function getModel() {
+const DEFAULT_ANTHROPIC_MODELS = [
+  "claude-haiku-4-5-20251001",
+  "claude-3-5-sonnet-20241022",
+  "claude-sonnet-4-20250514",
+];
+
+function getModelList() {
   if (process.env.ANTHROPIC_MODEL) {
-    return process.env.ANTHROPIC_MODEL.split(",").map((m) => m.trim())[0];
+    return process.env.ANTHROPIC_MODEL.split(",").map((m) => m.trim()).filter(Boolean);
   }
-  return "claude-3-haiku-20240307";
+  return DEFAULT_ANTHROPIC_MODELS;
+}
+
+function getModel() {
+  return getModelList()[0];
+}
+
+async function createAnthropicMessage(anthropic, params) {
+  const models = getModelList();
+  let lastError = null;
+
+  for (const model of models) {
+    try {
+      return await anthropic.messages.create({ ...params, model });
+    } catch (err) {
+      lastError = err;
+      const isNotFound =
+        err?.status === 404 ||
+        err?.error?.type === "not_found_error" ||
+        String(err?.message || "").includes("not_found_error");
+      if (!isNotFound) throw err;
+      console.warn(`[AI lead-intel] Model ${model} unavailable, trying next...`);
+    }
+  }
+
+  throw lastError || new Error("No Anthropic model available");
 }
 
 router.post("/conversation-summary", async (req, res) => {
@@ -81,8 +112,7 @@ Return JSON in exactly this shape:
 }
 `;
 
-    const message = await anthropic.messages.create({
-      model: getModel(),
+    const message = await createAnthropicMessage(anthropic, {
       max_tokens: 650,
       temperature: 0.2,
       system: systemPrompt,
@@ -192,8 +222,7 @@ Return JSON with exactly this shape:
 }
 `;
 
-    const message = await anthropic.messages.create({
-      model: getModel(),
+    const message = await createAnthropicMessage(anthropic, {
       max_tokens: 400,
       temperature: 0.2,
       system: systemPrompt,
@@ -274,8 +303,7 @@ ${(notes || []).join("\n\n")}
 Return JSON: { "actions": ["action1", "action2", ...] }
 `;
 
-    const message = await anthropic.messages.create({
-      model: getModel(),
+    const message = await createAnthropicMessage(anthropic, {
       max_tokens: 300,
       temperature: 0.2,
       system: systemPrompt,
@@ -380,8 +408,7 @@ Return JSON in exactly this shape:
 }
 `;
 
-    const message = await anthropic.messages.create({
-      model: getModel(),
+    const message = await createAnthropicMessage(anthropic, {
       max_tokens: 500,
       temperature: 0.2,
       system: systemPrompt,
@@ -471,8 +498,7 @@ Highlights (optional list):
 ${Array.isArray(highlights) ? highlights.join("\n") : ""}
 `;
 
-    const message = await anthropic.messages.create({
-      model: getModel(),
+    const message = await createAnthropicMessage(anthropic, {
       max_tokens: 600,
       temperature: 0.2,
       system: systemPrompt,
@@ -556,8 +582,7 @@ Remark:
 ${text}
 `;
 
-    const message = await anthropic.messages.create({
-      model: getModel(),
+    const message = await createAnthropicMessage(anthropic, {
       max_tokens: 250,
       temperature: 0.2,
       system: systemPrompt,
@@ -655,8 +680,7 @@ Lead profile (JSON):
 ${JSON.stringify(lead, null, 2)}
 `;
 
-        const message = await anthropic.messages.create({
-          model: getModel(),
+        const message = await createAnthropicMessage(anthropic, {
           max_tokens: 200,
           temperature: 0.2,
           system: systemPrompt,
@@ -815,8 +839,7 @@ ${langInstruction}`;
     }
     messages.push({ role: "user", content: String(message).trim() });
 
-    const response = await anthropic.messages.create({
-      model: getModel(),
+    const response = await createAnthropicMessage(anthropic, {
       max_tokens: 1024,
       temperature: 0.4,
       system: systemPrompt,
