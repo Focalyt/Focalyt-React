@@ -39,14 +39,8 @@ const candidateServices = require('../services/candidate')
 const users = require("../../models/users");
 const multer = require('multer');
 const templates = require("../../models/templates")
-const AWS = require("aws-sdk");
-const { crypto, randomBytes } = require("crypto");
-const { promisify } = require("util");
 const {
-  accessKeyId,
-  secretAccessKey,
   bucketName,
-  region,
   msg91ShortlistedTemplate,
   msg91Rejected,
   msg91Hired,
@@ -54,6 +48,10 @@ const {
   msg91OnHoldTemplate,
   env
 } = require("../../../config");
+
+const s3 = require("../../../helpers/objectStorage");
+const { crypto, randomBytes } = require("crypto");
+const { promisify } = require("util");
 
 const router = express.Router();
 const uuid = require("uuid/v1");
@@ -64,23 +62,14 @@ const candidate = require("../../models/candidateProfile");
 const { urlencoded } = require("body-parser");
 const skills = require("../../models/skills");
 const { validateHeaderValue } = require("http");
-const { sendNotification } = require('../services/notification')
+const { sendNotification } = require('../services/notification');
 
-AWS.config.update({
-  accessKeyId: accessKeyId, // id
-  secretAccessKey: secretAccessKey, // secret password
-  region: region,
-});
-
-// Define the custom error
 class InvalidParameterError extends Error {
   constructor(message) {
     super(message);
     this.name = 'InvalidParameterError';
   }
 }
-
-const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
 const allowedVideoExtensions = ['mp4', 'mkv', 'mov', 'avi', 'wmv'];
 const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
 
@@ -1116,51 +1105,22 @@ router.get("/jobs/:id", isCompany, async (req, res) => {
   res.render(`${req.vPath}/app/corporate/view-jd`, { menu, jd, appliedCandidates, qualifications });
 });
 async function getUploadedURL() {
-  let regionName = region;
-  let bucket = bucketName;
-  let accessKey = accessKeyId;
-  let secretKey = secretAccessKey;
-  const s = new AWS.S3({
-    regionName,
-    accessKey,
-    secretKey,
-    signatureVersion: "v4",
-  });
   const rawBytes = await randomBytes(16);
   const imageName = rawBytes.toString("hex");
   const params = {
-    Bucket: bucket,
+    Bucket: bucketName,
     Key: imageName,
     Expires: 60,
   };
-  const uploadURL = await s.getSignedUrlPromise("putObject", params);
+  const uploadURL = await s3.getSignedUrlPromise("putObject", params);
   return uploadURL;
 }
 router.get("/upload-on-s3", isCompany, async (req, res) => {
   const { type, ext, email } = req.query;
   const user = await users.findOne({ email: email });
-  let regionName = region;
-  let bucket = bucketName;
-  let accessKey = accessKeyId;
-  let secretKey = secretAccessKey;
-  const s3 = new AWS.S3({
-    regionName,
-    accessKey,
-    secretKey,
-    signatureVersion: "v4",
-  });
-  // const rawBytes=await randomBytes(16);
-  // const imageName=rawBytes.toString('hex');
-  // const params=({
-  //     Bucket:bucket,
-  //     Key:imageName,
-  //     Expires:60
-  // })
-  // const uploadURL=await s.getSignedUrlPromise('putObject',params);
-  // return uploadURL;
   const key = `uploads/${user._id}/${uuid()}.${ext}`;
   const params = {
-    Bucket: bucket,
+    Bucket: bucketName,
     ContentType: type,
     Key: key,
   };

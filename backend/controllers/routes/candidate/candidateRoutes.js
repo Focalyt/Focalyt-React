@@ -73,7 +73,6 @@ const {
 
 const Candidate = require("../../models/candidateProfile")
 const users = require("../../models/users");
-const AWS = require("aws-sdk");
 const multer = require('multer');
 const crypto = require("crypto");
 const {
@@ -89,10 +88,7 @@ const {
 } = require("../../../helpers");
 const router = express.Router();
 const {
-  accessKeyId,
-  secretAccessKey,
   bucketName,
-  region,
   authKey,
   msg91WelcomeTemplate,
 } = require("../../../config");
@@ -112,20 +108,7 @@ const { CandidateValidators } = require('../../../helpers/validators');
 const FB_API_VERSION = 'v21.0';
 const FB_GRAPH_API = `https://graph.facebook.com/${FB_API_VERSION}/${fbConversionPixelId}/events`;
 
-AWS.config.update({
-  accessKeyId,
-  secretAccessKey,
-  region,
-});
-// Define the custom error
-class InvalidParameterError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = 'InvalidParameterError';
-  }
-}
-
-const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
+const s3 = require("../../../helpers/objectStorage");
 const allowedVideoExtensions = ['mp4', 'mkv', 'mov', 'avi', 'wmv'];
 const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
 const allowedDocumentExtensions = ['pdf', 'doc', 'docx']; // ✅ PDF aur DOC types allow karein
@@ -2376,24 +2359,13 @@ router.get("/getSubQualification", async (req, res) => {
 });
 
 async function getUploadedURL() {
-  let regionName = region;
-  let bucket = bucketName;
-  let accessKey = accessKeyId;
-  let secretKey = secretAccessKey;
-  const s = new AWS.S3({
-    regionName,
-    accessKey,
-    secretKey,
-    signatureVersion: "v4",
-  });
-  const rawBytes = await randomBytes(16);
-  const imageName = rawBytes.toString("hex");
+  const imageName = crypto.randomBytes(16).toString("hex");
   const params = {
-    Bucket: bucket,
+    Bucket: bucketName,
     Key: imageName,
     Expires: 60,
   };
-  const uploadURL = await s.getSignedUrlPromise("putObject", params);
+  const uploadURL = await s3.getSignedUrlPromise("putObject", params);
   return uploadURL;
 }
 router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {

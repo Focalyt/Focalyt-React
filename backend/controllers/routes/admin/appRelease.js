@@ -2,14 +2,13 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-const AWS = require('aws-sdk');
 const { AppRelease } = require('../../models');
 const { isAdmin } = require('../../../helpers');
 const { bucketName, bucketURL } = require('../../../config');
+const s3 = require('../../../helpers/objectStorage');
 
 const router = express.Router();
 router.use(isAdmin);
-
 const ANDROID_GRADLE_PATH = path.join(
   __dirname,
   '../../../../androidApp/android/app/build.gradle',
@@ -63,14 +62,7 @@ function resolveUploadVersion(lastRelease) {
   };
 }
 
-const s3 = new AWS.S3({
-  accessKeyId: process.env.AWS_ACCESS_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: process.env.AWS_REGION_NAME,
-});
-
-router.route('/').get(async (req, res) => {
-  try {
+router.route('/').get(async (req, res) => {  try {
     const releases = await AppRelease.find({ platform: 'android' })
       .sort({ versionCode: -1 })
       .limit(20)

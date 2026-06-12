@@ -10,38 +10,51 @@ import { toast } from 'react-toastify';
 import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/googleOAuth';
 
 import useWebsocket from '../../../../utils/websocket';
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
+const isObjectIdLike = (value) => {
+  if (value == null) return false;
+  if (typeof value === 'object') return false;
+  return /^[a-f0-9]{24}$/i.test(String(value).trim());
+};
+
+const labelFromRefField = (field) => {
+  if (field == null || field === '') return '';
+  if (typeof field === 'object') return field.name || field.title || field.label || '';
+  if (isObjectIdLike(field)) return '';
+  return String(field).trim();
+};
+
+const getResumeSummary = (candidate) => {
+  const summary = candidate?.personalInfo?.professionalSummary || candidate?.personalInfo?.summary || '';
+  return typeof summary === 'string' ? summary.trim() : '';
+};
+
+const getVisibleSkills = (skills = []) =>
+  skills.filter((skill) => (typeof skill === 'string' ? skill.trim() : skill?.skillName?.trim()));
+
+const getSkillLabel = (skill) => (typeof skill === 'string' ? skill : skill?.skillName || '');
+
+const getVisibleProjects = (projects = []) =>
+  projects.filter((proj) => proj?.projectName?.trim() || proj?.description?.trim());
+
+const getVisibleCertifications = (certs = []) =>
+  certs.filter((cert) => cert?.certificateName?.trim() || cert?.name?.trim());
+
+const getInterestLabel = (interest) => {
+  if (typeof interest === 'string') return isObjectIdLike(interest) ? '' : interest;
+  if (interest && typeof interest === 'object') return interest.name || interest.title || interest.interest || '';
+  return '';
+};
+
+const getQualificationTitle = (edu) =>
+  labelFromRefField(edu?.education) || labelFromRefField(edu?.course) || '';
+
 const DOC_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
 
-const DOC_COURSE_PREFIX = /^Documents for course\/?/i;
-
-const normalizeDocStorageKey = (fileUrl) => {
-  if (!fileUrl) return '';
-  let key = String(fileUrl).trim();
-  if (key.startsWith('blob:')) return key;
-  if (key.startsWith('http://') || key.startsWith('https://')) {
-    const bucketBase = DOC_BUCKET_URL.replace(/\/$/, '');
-    if (bucketBase && key.startsWith(bucketBase)) {
-      key = key.slice(bucketBase.length);
-    } else {
-      const s3Match = key.match(/amazonaws\.com\/(.+)$/i);
-      if (s3Match) key = decodeURIComponent(s3Match[1]);
-      else return key;
-    }
-  }
-  return key.replace(/^\//, '').replace(DOC_COURSE_PREFIX, '');
-};
-
-const getDocFileUrl = (fileUrl) => {
-  const key = normalizeDocStorageKey(fileUrl);
-  if (!key) return '';
-  if (key.startsWith('blob:') || key.startsWith('http://') || key.startsWith('https://')) {
-    return key;
-  }
-  return `${DOC_BUCKET_URL}/${key}`;
-};
+const getDocFileUrl = (fileUrl) => resolveMediaUrl(DOC_BUCKET_URL, fileUrl);
 
 const MultiSelectCheckbox = ({
   title,
@@ -258,7 +271,7 @@ const DocumentModal = memo(({
           fontSize: isSmall ? '16px' : '24px',
           color: '#6c757d'
         }}>
-          ðŸ“„
+          📄
         </div>
       );
     }
@@ -329,8 +342,8 @@ const DocumentModal = memo(({
               // Disable pointer events
               pointerEvents: 'none'
             }}>
-              {fileType === 'document' ? 'ðŸ“„' :
-                fileType === 'spreadsheet' ? 'ðŸ“Š' : 'ðŸ“'}
+              {fileType === 'document' ? '📄' :
+                fileType === 'spreadsheet' ? '📊' : '📁'}
             </div>
           )}
         </div>
@@ -399,8 +412,8 @@ const DocumentModal = memo(({
                           return (
                             <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
                               <div style={{ fontSize: '60px', marginBottom: '20px' }}>
-                                {fileType === 'document' ? 'ðŸ“„' :
-                                  fileType === 'spreadsheet' ? 'ðŸ“Š' : 'ðŸ“'}
+                                {fileType === 'document' ? '📄' :
+                                  fileType === 'spreadsheet' ? '📊' : '📁'}
                               </div>
                               <h4>Document Preview</h4>
                               <p>Click download to view this file</p>
@@ -432,7 +445,7 @@ const DocumentModal = memo(({
                         // Document exists but no file URL - show document uploaded message
                         return (
                           <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
-                            <div style={{ fontSize: '60px', marginBottom: '20px' }}>ðŸ“„</div>
+                            <div style={{ fontSize: '60px', marginBottom: '20px' }}>📄</div>
                             <h4>Document Uploaded</h4>
                             <p>Document is available for verification</p>
                             <p><strong>Status:</strong> {selectedDocument?.status}</p>
@@ -761,26 +774,6 @@ const CRMDashboard = () => {
   const [centerOptions, setCenterOptions] = useState([]);
   const [counselorOptions, setCounselorOptions] = useState([]);
   const [sources, setSources] = useState([]);
-  const [batchOptions, setBatchOptions] = useState([]);
-  const [allCoursesMeta, setAllCoursesMeta] = useState([]);
-  const [cycleFilters, setCycleFilters] = useState({
-    department: '',
-    project: '',
-    center: '',
-    course: '',
-    batch: '',
-  });
-  const [leadViewTab, setLeadViewTab] = useState('all');
-  const [myReferLeadsCount, setMyReferLeadsCount] = useState(0);
-  const [approvalCounts, setApprovalCounts] = useState({ total: 0, approved: 0, pending: 0, rejected: 0 });
-  const [selectedApprovalFilter, setSelectedApprovalFilter] = useState(null);
-  const [followupDashCounts, setFollowupDashCounts] = useState({
-    call: { done: 0, planned: 0, missed: 0 },
-    visit: { done: 0, planned: 0, missed: 0 },
-  });
-  const [docDashCounts, setDocDashCounts] = useState({ done: 0, pending: 0 });
-  const [selectedFollowupBucket, setSelectedFollowupBucket] = useState('');
-  const [approvalEditProfileId, setApprovalEditProfileId] = useState(null);
 
   // Google Maps initialization
 
@@ -814,12 +807,12 @@ const CRMDashboard = () => {
                 value: c._id, 
                 label: c.name 
               }));
-              // console.log('ðŸ¢ ALL CENTERS DEBUG - All centers from list_all_centers:', allCentersMapped);
+              // console.log('🏢 ALL CENTERS DEBUG - All centers from list_all_centers:', allCentersMapped);
               setCenterOptions(allCentersMapped);
             } else {
               // Fallback to centers from filters-data if list_all_centers fails
               const centersMapped = res.data.centers.map(c => ({ value: c._id, label: c.name }));
-              // console.log('ðŸ¢ CENTERS DEBUG - Mapped centers for filter (fallback):', centersMapped);
+              // console.log('🏢 CENTERS DEBUG - Mapped centers for filter (fallback):', centersMapped);
               setCenterOptions(centersMapped);
             }
           } catch (centerErr) {
@@ -834,45 +827,12 @@ const CRMDashboard = () => {
           );
           setCounselorOptions(activeCounselors.map(c => ({ value: c._id, label: c.name })));
         }
-
-        try {
-          const coursesMetaRes = await axios.get(`${backendUrl}/college/all_courses`, {
-            headers: { 'x-auth': token }
-          });
-          if (coursesMetaRes.data?.success) {
-            setAllCoursesMeta(coursesMetaRes.data.data || []);
-          }
-        } catch (metaErr) {
-          console.error('Failed to fetch courses meta:', metaErr);
-        }
       } catch (err) {
         console.error('Failed to fetch filter options:', err);
       }
     };
     fetchFilterOptions();
   }, []);
-
-  useEffect(() => {
-    const fetchBatches = async () => {
-      try {
-        const params = new URLSearchParams();
-        if (cycleFilters.center) params.set('centerId', cycleFilters.center);
-        if (cycleFilters.course) params.set('courseId', cycleFilters.course);
-        const res = await axios.get(`${backendUrl}/college/get_batches?${params.toString()}`, {
-          headers: { 'x-auth': token }
-        });
-        if (res.data?.success) {
-          setBatchOptions((res.data.data || []).map((b) => ({ value: b._id, label: b.name })));
-        } else {
-          setBatchOptions([]);
-        }
-      } catch (err) {
-        console.error('Failed to fetch batches:', err);
-        setBatchOptions([]);
-      }
-    };
-    fetchBatches();
-  }, [cycleFilters.center, cycleFilters.course, token, backendUrl]);
 
 
   const handleSaveCV = async () => {
@@ -1153,11 +1113,11 @@ const CRMDashboard = () => {
 
   // Handle incoming messages from users
   const handleIncomingMessage = useCallback((data) => {
-    console.log('ðŸ“¬ Processing incoming message:', data);
+    console.log('📬 Processing incoming message:', data);
 
     // Check if this message is for the currently opened chat
     if (!selectedProfile?._candidate?.mobile) {
-      console.log('âš ï¸ No chat currently open');
+      console.log('⚠️ No chat currently open');
       return;
     }
 
@@ -1165,7 +1125,7 @@ const CRMDashboard = () => {
     const incomingFrom = String(data.from).replace(/\D/g, '');
 
     if (!incomingFrom.includes(currentChatPhone) && !currentChatPhone.includes(incomingFrom)) {
-      console.log('âš ï¸ Message not for current chat:', { currentChatPhone, incomingFrom });
+      console.log('⚠️ Message not for current chat:', { currentChatPhone, incomingFrom });
       return;
     }
 
@@ -1178,7 +1138,7 @@ const CRMDashboard = () => {
       );
 
       if (exists) {
-        console.log('âš ï¸ Message already exists in chat');
+        console.log('⚠️ Message already exists in chat');
         return prevMessages;
       }
 
@@ -1198,7 +1158,7 @@ const CRMDashboard = () => {
         timestamp: data.sentAt
       };
 
-      console.log('âœ… Adding incoming message to chat:', {
+      console.log('✅ Adding incoming message to chat:', {
         from: data.from,
         type: data.messageType,
         text: data.message.substring(0, 50)
@@ -1215,7 +1175,7 @@ const CRMDashboard = () => {
         expiresAt: data.sessionWindow.expiresAt,
         remainingTimeMs: new Date(data.sessionWindow.expiresAt) - new Date()
       });
-      console.log('âœ… 24-hour session window opened:', {
+      console.log('✅ 24-hour session window opened:', {
         expiresAt: data.sessionWindow.expiresAt
       });
     }
@@ -1231,7 +1191,7 @@ const CRMDashboard = () => {
 
   // Handle message status updates from Socket.io
   const handleMessageStatusUpdate = useCallback((data) => {
-    console.log('ðŸ“© Received status update:', data);
+    console.log('📩 Received status update:', data);
 
     // Update messages in state
     setWhatsappMessages((prevMessages) => {
@@ -1247,7 +1207,7 @@ const CRMDashboard = () => {
         const isMatchingMessage = matchById || matchByText;
 
         if (isMatchingMessage && msg.sender === 'agent') {
-          console.log('âœ… Updating message status:', {
+          console.log('✅ Updating message status:', {
             messageId: msg.id,
             wamid: msg.wamid,
             matchedWith: data.id,
@@ -1269,15 +1229,15 @@ const CRMDashboard = () => {
       // Log if no message was updated
       const wasUpdated = updatedMessages.some((msg, idx) => msg !== prevMessages[idx]);
       if (!wasUpdated) {
-        console.warn('âš ï¸ No message found to update');
-        console.log('ðŸ“¨ Received data:', {
+        console.warn('⚠️ No message found to update');
+        console.log('📨 Received data:', {
           id: data.id,
           wamid: data.wamid,
           messageId: data.messageId,
           status: data.status,
           recipient_id: data.recipient_id
         });
-        console.log('ðŸ’¬ Current messages:', prevMessages.map(m => ({
+        console.log('💬 Current messages:', prevMessages.map(m => ({
           id: m.id,
           dbId: m.dbId,
           wamid: m.wamid,
@@ -1292,21 +1252,21 @@ const CRMDashboard = () => {
 
     // Show notification (optional)
     if (data.status === 'delivered') {
-      console.log('âœ“âœ“ Message delivered', {
+      console.log('✓✓ Message delivered', {
         candidateName: data.candidateName,
         candidateId: data.candidateId,
         to: data.to || data.recipient_id,
         messageId: data.id
       });
     } else if (data.status === 'read') {
-      console.log('âœ“âœ“ Message read', {
+      console.log('✓✓ Message read', {
         candidateName: data.candidateName,
         candidateId: data.candidateId,
         to: data.to || data.recipient_id,
         messageId: data.id
       });
     } else if (data.status === 'failed') {
-      console.error('âŒ Message failed:', {
+      console.error('❌ Message failed:', {
         candidateName: data.candidateName,
         candidateId: data.candidateId,
         to: data.to || data.recipient_id,
@@ -1317,7 +1277,7 @@ const CRMDashboard = () => {
   }, []);
 
   useEffect(() => {
-    console.log('ðŸ“© WhatsApp message status updates:', updates);
+    console.log('📩 WhatsApp message status updates:', updates);
 
     // Process each update individually (updates is an array)
     if (updates && updates.length > 0) {
@@ -1337,12 +1297,12 @@ const CRMDashboard = () => {
           if (update.status === 'delivered' || update.status === 'read') {
             if (!bulkWhatsappTrackerRef.current.deliveredMessageIds.has(wamid)) {
               bulkWhatsappTrackerRef.current.deliveredMessageIds.add(wamid);
-              console.log(`ðŸ“¦ âœ… Delivered (bulk): ${candidateName} | to=${to} | messageId=${wamid}`);
+              console.log(`📦 ✅ Delivered (bulk): ${candidateName} | to=${to} | messageId=${wamid}`);
             }
           } else if (update.status === 'failed') {
             if (!bulkWhatsappTrackerRef.current.failedMessageIds.has(wamid)) {
               bulkWhatsappTrackerRef.current.failedMessageIds.add(wamid);
-              console.error(`ðŸ“¦ âŒ Failed (bulk): ${candidateName} | to=${to} | messageId=${wamid} | reason=${update?.errorMessage || update?.errors?.[0]?.title || 'Message failed'}`);
+              console.error(`📦 ❌ Failed (bulk): ${candidateName} | to=${to} | messageId=${wamid} | reason=${update?.errorMessage || update?.errors?.[0]?.title || 'Message failed'}`);
             }
           }
 
@@ -1350,7 +1310,7 @@ const CRMDashboard = () => {
           const now = Date.now();
           if (now - bulkWhatsappTrackerRef.current.lastSummaryAt > 2000) {
             bulkWhatsappTrackerRef.current.lastSummaryAt = now;
-            console.log('ðŸ“Š Bulk WhatsApp live totals =>', {
+            console.log('📊 Bulk WhatsApp live totals =>', {
               delivered: bulkWhatsappTrackerRef.current.deliveredMessageIds.size,
               failed: bulkWhatsappTrackerRef.current.failedMessageIds.size,
               tracked: Object.keys(bulkWhatsappTrackerRef.current.messageIdToRecipient).length
@@ -1365,7 +1325,7 @@ const CRMDashboard = () => {
 
   // Handle incoming messages from users
   useEffect(() => {
-    console.log('ðŸ“¬ WhatsApp incoming messages:', messages);
+    console.log('📬 WhatsApp incoming messages:', messages);
 
     if (messages && messages.length > 0) {
       messages.forEach(message => {
@@ -1763,7 +1723,7 @@ const CRMDashboard = () => {
             onClick={onRotate}
             className="control-btn"
             style={{ whiteSpace: 'nowrap' }}
-            title="Rotate 90Â°"
+            title="Rotate 90°"
           >
             <i className="fas fa-redo"></i> Rotate
           </button>
@@ -2212,53 +2172,6 @@ const CRMDashboard = () => {
     formDataRef.current = formData;
   }, [formData]);
 
-  const cycleProjectOptions = useMemo(() => {
-    if (!cycleFilters.department) return projectOptions;
-    const projectIds = new Set(
-      allCoursesMeta
-        .filter((c) => String(c.vertical?._id || c.vertical) === String(cycleFilters.department))
-        .map((c) => String(c.project?._id || c.project))
-    );
-    return projectOptions.filter((p) => projectIds.has(String(p.value)));
-  }, [cycleFilters.department, projectOptions, allCoursesMeta]);
-
-  const cycleCourseOptions = useMemo(() => {
-    let list = courseOptions;
-    if (cycleFilters.department) {
-      const courseIds = new Set(
-        allCoursesMeta
-          .filter((c) => String(c.vertical?._id || c.vertical) === String(cycleFilters.department))
-          .map((c) => String(c._id))
-      );
-      list = list.filter((c) => courseIds.has(String(c.value)));
-    }
-    if (cycleFilters.project) {
-      const courseIds = new Set(
-        allCoursesMeta
-          .filter((c) => String(c.project?._id || c.project) === String(cycleFilters.project))
-          .map((c) => String(c._id))
-      );
-      list = list.filter((c) => courseIds.has(String(c.value)));
-    }
-    return list;
-  }, [cycleFilters.department, cycleFilters.project, courseOptions, allCoursesMeta]);
-
-  const buildListFilterQueryParts = useCallback((fd = formDataRef.current || formData, cycle = cycleFilters) => {
-    const projectsValues = cycle.project ? [cycle.project] : (fd.projects?.values || []);
-    const verticalsValues = cycle.department ? [cycle.department] : (fd.verticals?.values || []);
-    const courseValues = cycle.course ? [cycle.course] : (fd.course?.values || []);
-    const centerValues = cycle.center ? [cycle.center] : (fd.center?.values || []);
-    const batchValues = cycle.batch ? [cycle.batch] : [];
-    return {
-      ...(projectsValues.length > 0 && { projects: JSON.stringify(projectsValues) }),
-      ...(verticalsValues.length > 0 && { verticals: JSON.stringify(verticalsValues) }),
-      ...(courseValues.length > 0 && { course: JSON.stringify(courseValues) }),
-      ...(centerValues.length > 0 && { center: JSON.stringify(centerValues) }),
-      ...(batchValues.length > 0 && { batch: JSON.stringify(batchValues) }),
-      ...(fd.counselor?.values?.length > 0 && { counselor: JSON.stringify(fd.counselor.values) }),
-    };
-  }, [formData, cycleFilters]);
-
   // Dropdown open state
   const [dropdownStates, setDropdownStates] = useState({
     projects: false,
@@ -2532,7 +2445,6 @@ const CRMDashboard = () => {
     status: 'true',
     leadStatus: '',
     sector: '',
-    followupStatus: '',
     // Date filter states
     createdFromDate: null,
     createdToDate: null,
@@ -2544,8 +2456,6 @@ const CRMDashboard = () => {
     statuses: null,
 
   });
-
-  const MOVED_IN_KYC_STATUS_ID = '6894825c9fc1425f4d5e2fc5';
   // Add dropdown visibility states
   const [showCreatedDatePicker, setShowCreatedDatePicker] = useState(false);
   const [showModifiedDatePicker, setShowModifiedDatePicker] = useState(false);
@@ -2555,10 +2465,6 @@ const CRMDashboard = () => {
     { _id: '', name: '', count: 0, milestone: '' },
 
   ]);
-  const performanceFilters = useMemo(
-    () => crmFilters.filter((f) => f._id && f._id !== 'all'),
-    [crmFilters]
-  );
   const [statuses, setStatuses] = useState([
     { _id: '', name: '', count: 0 },
 
@@ -2678,7 +2584,6 @@ const CRMDashboard = () => {
       nextActionToDate: null,
       subStatuses: null,
       statuses: null,
-      followupStatus: '',
     };
 
     setFilterData(clearedFilters);
@@ -2690,16 +2595,6 @@ const CRMDashboard = () => {
       counselor: { type: "includes", values: [] },
       sector: { type: "includes", values: [] },
     });
-    setCycleFilters({
-      department: '',
-      project: '',
-      center: '',
-      course: '',
-      batch: '',
-    });
-    setLeadViewTab('all');
-    setSelectedApprovalFilter(null);
-    setSelectedFollowupBucket('');
 
     setCurrentPage(1);
     // Explicitly call fetchProfileData with cleared filters to ensure data is fetched
@@ -2745,10 +2640,10 @@ const CRMDashboard = () => {
   const handleSubStatusChange = (e) => {
     const selectedSubStatusId = e.target.value;
 
-    // ID à¤¸à¥‡ à¤ªà¥‚à¤°à¤¾ object find à¤•à¤°à¥‡à¤‚
+    // ID से पूरा object find करें
     const selectedSubStatusObject = subStatuses.find(status => status._id === selectedSubStatusId);
 
-    // à¤ªà¥‚à¤°à¤¾ object set à¤•à¤°à¥‡à¤‚
+    // पूरा object set करें
     setSelectedSubStatus(selectedSubStatusObject || null);
   };
 
@@ -3346,60 +3241,9 @@ console.log('API Response:', response.data);
         return { ...filter, count: 0 };
       });
     });
-
-    const movedInKycId = '6894825c9fc1425f4d5e2fc5';
-    const approved = backendCounts?.[movedInKycId]?.count || 0;
-    setApprovalCounts({
-      total: allCount,
-      approved,
-      pending: Math.max(0, allCount - approved),
-      rejected: 0,
-    });
-    setDocDashCounts({
-      done: approved,
-      pending: Math.max(0, allCount - approved),
-    });
   };
 
-  const fetchDashboardCounts = async (filters = filterData) => {
-    if (!token) return;
-    try {
-      const listParts = buildListFilterQueryParts(formDataRef.current || formData);
-      const followupParams = new URLSearchParams({ allTime: 'true', ...listParts });
-      const followupRes = await axios.get(`${backendUrl}/college/followupcounts?${followupParams}`, {
-        headers: { 'x-auth': token },
-      });
-      if (followupRes.data?.success && followupRes.data?.data) {
-        const fc = followupRes.data.data;
-        setFollowupDashCounts({
-          call: {
-            done: fc.done || 0,
-            planned: fc.planned || 0,
-            missed: fc.missed || 0,
-          },
-          visit: { done: 0, planned: 0, missed: 0 },
-        });
-      }
-
-      if (userData?._id) {
-        const referParams = new URLSearchParams({
-          page: '1',
-          registeredByMe: userData._id,
-          ...listParts,
-        });
-        const referRes = await axios.get(`${backendUrl}/college/appliedCandidates?${referParams}`, {
-          headers: { 'x-auth': token },
-        });
-        if (referRes.data?.success) {
-          setMyReferLeadsCount(referRes.data.totalCount || 0);
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching dashboard counts:', err);
-    }
-  };
-
-  const fetchProfileData = async (filters = filterData, page = currentPage, cycleOverride = null) => {
+  const fetchProfileData = async (filters = filterData, page = currentPage) => {
     setIsLoadingProfiles(true);
     closePanel();
     setLeadDetailsVisible(null);
@@ -3443,9 +3287,12 @@ console.log('API Response:', response.data);
       ...(nextActionFromDateFormatted && { nextActionFromDate: nextActionFromDateFormatted }),
       ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
-      ...(filters.followupStatus && { followupStatus: filters.followupStatus }),
-      ...(leadViewTab === 'myRefer' && userData?._id && { registeredByMe: userData._id }),
-      ...buildListFilterQueryParts(fd, cycleOverride || cycleFilters),
+      // Multi-select filters
+      ...(fd.projects.values.length > 0 && { projects: JSON.stringify(fd.projects.values) }),
+      ...(fd.verticals.values.length > 0 && { verticals: JSON.stringify(fd.verticals.values) }),
+      ...(fd.course.values.length > 0 && { course: JSON.stringify(fd.course.values) }),
+      ...(fd.center.values.length > 0 && { center: JSON.stringify(fd.center.values) }),
+      ...(fd.counselor.values.length > 0 && { counselor: JSON.stringify(fd.counselor.values) })
     });
 
     try {
@@ -3468,7 +3315,6 @@ console.log('API Response:', response.data);
         //   updateCrmFiltersFromBackend(data.crmFilterCounts);
         // }
         await fetchRegistrationCrmFilterCounts(filters, page, null);
-        await fetchDashboardCounts(filters);
 
       } else {
         console.error('Failed to fetch profile data', response.data.message);
@@ -3821,7 +3667,12 @@ console.log('API Response:', response.data);
       ...(nextActionFromDateFormatted && { nextActionFromDate: nextActionFromDateFormatted }),
       ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
-      ...buildListFilterQueryParts(formData, cycleFilters),
+      // Multi-select filters
+      ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+      ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+      ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
+      ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
+      ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
     });
 
     try {
@@ -3832,7 +3683,7 @@ console.log('API Response:', response.data);
         `${backendUrl}/college/downloadleads?${queryParams}`,
         {
           headers: { 'x-auth': token },
-          responseType: "blob"   // ðŸ‘ˆ yeh zaroori hai
+          responseType: "blob"   // 👈 yeh zaroori hai
         }
       );
 
@@ -3889,7 +3740,11 @@ console.log('API Response:', response.data);
       ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       // Multi-select filters
-      ...buildListFilterQueryParts(formData, cycleFilters),
+      ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+      ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+      ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
+      ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
+      ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
     });
 
     try {
@@ -3926,7 +3781,7 @@ console.log('API Response:', response.data);
       // No selected profile - don't fetch
       return;
     }
-  }, [leadDetailsVisible, showPanel]); // âœ… Removed selectedProfile to prevent infinite loop
+  }, [leadDetailsVisible, showPanel]); // ✅ Removed selectedProfile to prevent infinite loop
   const fetchLeadDetails = async () => {
     try {
       setIsLoadingProfilesData(true);
@@ -4096,169 +3951,9 @@ console.log('API Response:', response.data);
       delete newFilterData.leadStatus;
     }
 
-    newFilterData.followupStatus = '';
-    setSelectedFollowupBucket('');
-    setSelectedApprovalFilter(null);
     setFilterData(newFilterData);
     fetchProfileData(newFilterData, 1);
   };
-
-  const handleLeadViewTabChange = (tab) => {
-    setLeadViewTab(tab);
-    setCurrentPage(1);
-    fetchProfileData(filterData, 1);
-  };
-
-  const handleApprovalCardClick = (approval) => {
-    const togglingOff = selectedApprovalFilter === approval;
-    const next = togglingOff ? null : approval;
-    setSelectedApprovalFilter(next);
-    setSelectedFollowupBucket('');
-    setCurrentPage(1);
-
-    const newFilterData = { ...filterData, followupStatus: '' };
-    if (next === 'approved') {
-      newFilterData.leadStatus = MOVED_IN_KYC_STATUS_ID;
-    } else {
-      delete newFilterData.leadStatus;
-    }
-    setFilterData(newFilterData);
-    setActiveCrmFilter(0);
-    fetchProfileData(newFilterData, 1);
-  };
-
-  const handlePerformanceChipClick = (filterId) => {
-    if (!filterId) {
-      const allIndex = crmFilters.findIndex((f) => f._id === 'all' || !f._id);
-      handleCrmFilterClick(allIndex >= 0 ? allIndex : 0);
-      return;
-    }
-    const index = crmFilters.findIndex((f) => f._id === filterId);
-    if (index >= 0) {
-      setSelectedApprovalFilter(null);
-      handleCrmFilterClick(index);
-    }
-  };
-
-  const handleFollowupDashClick = (type, bucket) => {
-    if (type === 'Visit') return;
-    const key = `call:${bucket}`;
-    const togglingOff = selectedFollowupBucket === key;
-    setSelectedFollowupBucket(togglingOff ? '' : key);
-    setSelectedApprovalFilter(null);
-    setCurrentPage(1);
-    const newFilterData = {
-      ...filterData,
-      followupStatus: togglingOff ? '' : bucket,
-    };
-    setFilterData(newFilterData);
-    fetchProfileData(newFilterData, 1);
-  };
-
-  const isFollowupDashSelected = (type, bucket) => {
-    if (type === 'Visit') return false;
-    return selectedFollowupBucket === `call:${bucket}`;
-  };
-
-  const formatFollowupDate = (dateLike) => {
-    if (!dateLike) return '—';
-    const dt = new Date(dateLike);
-    if (Number.isNaN(dt.getTime())) return '—';
-    return dt.toLocaleDateString('en-GB');
-  };
-
-  const getFollowupBucket = (followUpLike) => {
-    if (!followUpLike) return null;
-    const status = String(followUpLike?.status || '').trim().toLowerCase();
-    if (status === 'completed') return 'done';
-    const dt = followUpLike?.scheduledDate ? new Date(followUpLike.scheduledDate) : null;
-    if (!dt || Number.isNaN(dt.getTime())) return null;
-    return dt.getTime() < Date.now() ? 'missed' : 'planned';
-  };
-
-  const getProfileFollowupBucket = (profile, type) => {
-    const t = String(type || '').toLowerCase();
-    const slot = t === 'visit' ? (profile?.followUpVisit || null) : (profile?.followUpCall || null);
-    const slotBucket = getFollowupBucket(slot);
-    if (slotBucket) return slotBucket;
-    const legacy = profile?.followup || profile?.followUp || null;
-    if (!legacy) return null;
-    const legacyType = String(legacy?.followUpType || legacy?.type || 'call').toLowerCase();
-    if (t === 'visit' && legacyType !== 'visit') return null;
-    if (t === 'call' && legacyType === 'visit') return null;
-    return getFollowupBucket(legacy);
-  };
-
-  const getProfileFollowupDateLabel = (profile, type) => {
-    const t = String(type || '').toLowerCase();
-    const bySlot = t === 'visit' ? (profile?.followUpVisit || null) : (profile?.followUpCall || null);
-    if (bySlot?.scheduledDate) return formatFollowupDate(bySlot.scheduledDate);
-    const legacy = profile?.followup || profile?.followUp || null;
-    if (legacy?.scheduledDate) {
-      const legacyType = String(legacy?.followUpType || legacy?.type || 'call').toLowerCase();
-      if ((t === 'visit' && legacyType === 'visit') || (t === 'call' && legacyType !== 'visit')) {
-        return formatFollowupDate(legacy.scheduledDate);
-      }
-    }
-    if (legacy?.followupDate) return formatFollowupDate(legacy.followupDate);
-    return '—';
-  };
-
-  const getProfileDocumentsBucket = (profile) => {
-    const total = profile?.docCounts?.totalRequired || 0;
-    if (total === 0) return null;
-    const pct = Number(profile?.docCounts?.uploadPercentage ?? 0);
-    return pct >= 100 ? 'done' : 'pending';
-  };
-
-  const getProfileApprovalStatus = (profile) => {
-    if (profile?.kyc) return 'approved';
-    if (String(profile?._leadStatus?._id || '') === MOVED_IN_KYC_STATUS_ID) return 'approved';
-    return 'pending';
-  };
-
-  const getProfileApprovalLabel = (status) => {
-    const safe = String(status || 'pending').toLowerCase();
-    return safe.charAt(0).toUpperCase() + safe.slice(1);
-  };
-
-  const canEditLeadsPermission =
-    (permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') ||
-    permissions?.permission_type === 'Admin';
-
-  const handleApproveLead = async (profile) => {
-    setApprovalEditProfileId(null);
-    await handleMoveToKyc(profile);
-  };
-
-  const handleRejectLeadClick = (profile) => {
-    setApprovalEditProfileId(null);
-    openEditPanel(profile, 'StatusChange');
-  };
-
-  useEffect(() => {
-    if (!approvalEditProfileId) return undefined;
-    const closeApprovalMenu = (event) => {
-      if (!event.target.closest('.lead-strip-v3__approval-block')) {
-        setApprovalEditProfileId(null);
-      }
-    };
-    // pointerdown works for both mouse + touch (mobile)
-    document.addEventListener('pointerdown', closeApprovalMenu);
-    return () => document.removeEventListener('pointerdown', closeApprovalMenu);
-  }, [approvalEditProfileId]);
-
-  const openProfileDocumentsTab = (profileIndex) => {
-    if (leadDetailsVisible !== profileIndex) toggleLeadDetails(profileIndex);
-    setActiveTab((prev) => ({ ...prev, [profileIndex]: 4 }));
-  };
-
-  const performanceTotalCount = approvalCounts.total || crmFilters[0]?.count || 0;
-  const activePerformanceId = (() => {
-    const id = crmFilters[activeCrmFilter]?._id;
-    if (!id || id === 'all') return null;
-    return id;
-  })();
 
   // Auto-select profiles based on Input 1 value (bulk WhatsApp, bulk Refer, bulk Action)
   useEffect(() => {
@@ -4319,7 +4014,11 @@ console.log('API Response:', response.data);
             ...(nextActionFromDateFormatted && { nextActionFromDate: nextActionFromDateFormatted }),
             ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
             ...(filterData.subStatuses && { subStatuses: filterData.subStatuses }),
-            ...buildListFilterQueryParts(formData, cycleFilters),
+            ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+            ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+            ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
+            ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
+            ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
           });
 
           const response = await axios.get(`${backendUrl}/college/appliedCandidates?${queryParams}`, {
@@ -4333,7 +4032,7 @@ console.log('API Response:', response.data);
             setSelectedProfiles(profilesToSelect);
             
             // Console log: Show selected profiles count and names
-            // console.log(`âœ… Selected ${profilesToSelect.length} profiles:`);
+            // console.log(`✅ Selected ${profilesToSelect.length} profiles:`);
             // selectedProfilesData.forEach((profile, index) => {
             //   const candidateName = profile._candidate?.name || profile.candidate?.name || 'N/A';
             //   const profileId = profile._id;
@@ -4348,7 +4047,7 @@ console.log('API Response:', response.data);
           setSelectedProfiles(profilesToSelect);
           
           // Console log: Show selected profiles count and names (fallback)
-          // console.log(`âš ï¸ Using fallback - Selected ${profilesToSelect.length} profiles from current page:`);
+          // console.log(`⚠️ Using fallback - Selected ${profilesToSelect.length} profiles from current page:`);
           selectedProfilesData.forEach((profile, index) => {
             const candidateName = profile._candidate?.name || profile.candidate?.name || 'N/A';
             const profileId = profile._id;
@@ -4370,7 +4069,7 @@ console.log('API Response:', response.data);
       setSelectedProfiles(profilesToSelect);
       
       // Console log: Show selected profiles count and names
-      // console.log(`âœ… Selected ${profilesToSelect.length} profiles from current page:`);
+      // console.log(`✅ Selected ${profilesToSelect.length} profiles from current page:`);
       selectedProfilesData.forEach((profile, index) => {
         const candidateName = profile._candidate?.name || profile.candidate?.name || 'N/A';
         const profileId = profile._id;
@@ -4601,7 +4300,7 @@ console.log('API Response:', response.data);
   const fetchWhatsappHistory = async (phoneNumber) => {
     try {
       if (!phoneNumber || !token) {
-        console.error('âŒ Phone number or token missing:', { phoneNumber, hasToken: !!token });
+        console.error('❌ Phone number or token missing:', { phoneNumber, hasToken: !!token });
         return;
       }
 
@@ -4617,8 +4316,8 @@ console.log('API Response:', response.data);
       );
 
       if (response.data.success) {
-        console.log('ðŸ“¥ Fetched chat history from backend:', response.data.data.length, 'messages');
-        console.log('ðŸ“¥ Sample message from backend:', response.data.data[0]);
+        console.log('📥 Fetched chat history from backend:', response.data.data.length, 'messages');
+        console.log('📥 Sample message from backend:', response.data.data[0]);
 
         // Convert database messages to chat format
         const formattedMessages = response.data.data.map((msg, index) => ({
@@ -4640,7 +4339,7 @@ console.log('API Response:', response.data);
           readAt: msg.readAt
         }));
 
-        console.log('ðŸ“¤ Formatted messages for state:', formattedMessages.map(m => ({
+        console.log('📤 Formatted messages for state:', formattedMessages.map(m => ({
           id: m.id,
           wamid: m.wamid,
           whatsappMessageId: m.whatsappMessageId,
@@ -4655,7 +4354,7 @@ console.log('API Response:', response.data);
         setAiSuggestedReplyDraft('');
       }
     } catch (error) {
-      console.error('âŒ Error fetching chat history:', error.response?.data || error.message);
+      console.error('❌ Error fetching chat history:', error.response?.data || error.message);
 
       // Show error to user
       if (error.response?.status === 401) {
@@ -4663,7 +4362,7 @@ console.log('API Response:', response.data);
       } else if (error.response?.status === 400) {
         alert('Invalid phone number or missing information');
       } else {
-        console.warn('âš ï¸ Could not fetch chat history. Starting with empty chat.');
+        console.warn('⚠️ Could not fetch chat history. Starting with empty chat.');
       }
 
       // Start with empty messages on error
@@ -5026,7 +4725,7 @@ console.log('API Response:', response.data);
   const checkSessionWindow = async (phoneNumber) => {
     try {
       if (!phoneNumber || !token) {
-        console.error('âŒ Phone number or token missing');
+        console.error('❌ Phone number or token missing');
         return;
       }
 
@@ -5048,7 +4747,7 @@ console.log('API Response:', response.data);
           remainingTimeMs: sw.remainingTimeMs
         });
 
-        console.log('âœ… Session window status:', {
+        console.log('✅ Session window status:', {
           isOpen: sw.isOpen,
           canSendManualMessages: response.data.messaging.canSendManualMessages,
           requiresTemplate: response.data.messaging.requiresTemplate,
@@ -5056,7 +4755,7 @@ console.log('API Response:', response.data);
         });
       }
     } catch (error) {
-      console.error('âŒ Error checking session window:', error.response?.data || error.message);
+      console.error('❌ Error checking session window:', error.response?.data || error.message);
       // Set default state if error
       setSessionWindow({
         isOpen: false,
@@ -5586,7 +5285,7 @@ console.log('API Response:', response.data);
         return;
       }
 
-      // âœ… Use our backend API instead of direct Meta API
+      // ✅ Use our backend API instead of direct Meta API
       const response = await axios.get(`${backendUrl}/college/whatsapp/templates`, {
         headers: { 'x-auth': token }
       });
@@ -5595,11 +5294,11 @@ console.log('API Response:', response.data);
         const templates = response.data.data || [];
         setWhatsappTemplates(Array.isArray(templates) ? templates : []);
       } else {
-        console.error('âŒ Backend API error:', response.data.message);
+        console.error('❌ Backend API error:', response.data.message);
         setWhatsappTemplates([]);
       }
     } catch (error) {
-      console.error('âŒ Error fetching WhatsApp templates:', error);
+      console.error('❌ Error fetching WhatsApp templates:', error);
       setWhatsappTemplates([]);
     }
   };
@@ -5616,7 +5315,7 @@ console.log('API Response:', response.data);
   };
 
 
-  const emojis = ['ðŸ˜Š', 'ðŸ˜‚', 'â¤ï¸', 'ðŸ‘', 'ðŸ™', 'ðŸ˜', 'ðŸŽ‰', 'ðŸ‘', 'ðŸ”¥', 'ðŸ’¯', 'âœ…', 'ðŸš€', 'ðŸ’ª', 'ðŸ™Œ', 'ðŸ˜Ž', 'ðŸ¤', 'ðŸ’¼', 'ðŸ“±', 'â­', 'âœ¨'];
+  const emojis = ['😊', '😂', '❤️', '👍', '🙏', '😍', '🎉', '👏', '🔥', '💯', '✅', '🚀', '💪', '🙌', '😎', '🤝', '💼', '📱', '⭐', '✨'];
 
   const handleWhatsappSendMessage = async () => {
     if (!whatsappNewMessage.trim()) return;
@@ -5675,10 +5374,10 @@ console.log('API Response:', response.data);
           )
         );
 
-        console.log('âœ… Message sent successfully:', response.data);
+        console.log('✅ Message sent successfully:', response.data);
       }
     } catch (error) {
-      console.error('âŒ Error sending message:', error);
+      console.error('❌ Error sending message:', error);
 
       // Update message status to failed
       setWhatsappMessages(prev =>
@@ -5707,7 +5406,7 @@ console.log('API Response:', response.data);
     setShowWhatsappFileMenu(false);
 
     // Validate that a chat is selected
-    console.log('ðŸ“‹ Selected Profile:', selectedProfile);
+    console.log('📋 Selected Profile:', selectedProfile);
 
     if (!selectedProfile) {
       alert('Please select a candidate to send the file to.');
@@ -5715,7 +5414,7 @@ console.log('API Response:', response.data);
       return;
     }
 
-    console.log('ðŸ” Selected Profile:', selectedProfile);
+    console.log('🔍 Selected Profile:', selectedProfile);
 
 
     // Handle different profile structures
@@ -5723,7 +5422,7 @@ console.log('API Response:', response.data);
 
     if (!candidate || !candidate.mobile) {
       alert('Candidate mobile number not found. Please select a valid candidate.');
-      console.error('âŒ Invalid candidate structure:', { selectedProfile, candidate });
+      console.error('❌ Invalid candidate structure:', { selectedProfile, candidate });
       event.target.value = '';
       return;
     }
@@ -5770,14 +5469,14 @@ console.log('API Response:', response.data);
       formData.append('candidateId', candidateId);
       formData.append('candidateName', candidateName);
 
-      console.log('ðŸ” Pre-send validation:');
+      console.log('🔍 Pre-send validation:');
       console.log('  - phoneNumber:', formData.phoneNumber);
       console.log('  - candidateId:', formData.candidateId);
       console.log('  - file exists:', !!file);
       console.log('  - file name:', file.name);
       console.log('  - file size:', file.size);
 
-      console.log('ðŸ“¤ Sending file:', {
+      console.log('📤 Sending file:', {
         fileType,
         fileName: file.name,
         fileSize: file.size,
@@ -5787,7 +5486,7 @@ console.log('API Response:', response.data);
       });
 
       // Debug: Log FormData contents
-      console.log('ðŸ“‹ FormData contents:');
+      console.log('📋 FormData contents:');
       for (let pair of formData.entries()) {
         console.log(`  - ${pair[0]}:`, typeof pair[1] === 'object' ? pair[1].name : pair[1]);
       }
@@ -5820,10 +5519,10 @@ console.log('API Response:', response.data);
           )
         );
 
-        console.log(`âœ… ${fileType} sent successfully:`, response.data);
+        console.log(`✅ ${fileType} sent successfully:`, response.data);
       }
     } catch (error) {
-      console.error(`âŒ Error sending ${fileType}:`, error);
+      console.error(`❌ Error sending ${fileType}:`, error);
       console.error('Error response:', error.response?.data);
 
       // Update message status to failed
@@ -6615,10 +6314,10 @@ console.log('API Response:', response.data);
       const sendindData = {
         templateName: selectedWhatsappTemplate.name,  // Template name
         to: selectedProfile?._candidate?.mobile,       // Phone number
-        candidateId: selectedProfile?._candidate?._id, // âœ… For automatic variable filling
-        registrationId: selectedProfile?._id,          // âœ… Fallback if no candidateId
-        collegeId: userData.college || userData.collegeId,  // âœ… College ID
-        variableValues: variableValues  // âœ… Send actual values from frontend (same as preview)
+        candidateId: selectedProfile?._candidate?._id, // ✅ For automatic variable filling
+        registrationId: selectedProfile?._id,          // ✅ Fallback if no candidateId
+        collegeId: userData.college || userData.collegeId,  // ✅ College ID
+        variableValues: variableValues  // ✅ Send actual values from frontend (same as preview)
       }
 
 
@@ -6633,7 +6332,7 @@ console.log('API Response:', response.data);
 
 
       if (response.data.success) {
-        console.log('âœ… Template sent successfully. Backend response:', {
+        console.log('✅ Template sent successfully. Backend response:', {
           messageId: response.data.data.messageId,
           to: response.data.data.to,
           templateName: response.data.data.templateName,
@@ -6680,27 +6379,27 @@ console.log('API Response:', response.data);
                   value = candidate?.email || registration?.email || 'Email';
                   break;
                 case 'course_name':
-                  // âœ… Same as preview logic
+                  // ✅ Same as preview logic
                   value = candidate?.appliedCourses?.[0]?.courseName || selectedProfile?.course?.name || 'Course Name';
                   break;
                 case 'counselor_name':
-                  // âœ… Same as preview logic
+                  // ✅ Same as preview logic
                   value = selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned';
                   break;
                 case 'job_name':
-                  // âœ… Same as preview logic
+                  // ✅ Same as preview logic
                   value = selectedProfile?.appliedJobs?.[0]?.title || 'Job Title';
                   break;
                 case 'project_name':
-                  // âœ… Same as preview logic
+                  // ✅ Same as preview logic
                   value = selectedProfile?.project?.name || 'Project Name';
                   break;
                 case 'batch_name':
-                  // âœ… Same as preview logic
+                  // ✅ Same as preview logic
                   value = selectedProfile?.batch?.name || 'Batch Not Assigned';
                   break;
                 case 'lead_owner_name':
-                  // âœ… Same as preview logic
+                  // ✅ Same as preview logic
                   value = selectedProfile?.registeredBy?.name || 'Self Registered';
                   break;
                 default:
@@ -6717,7 +6416,7 @@ console.log('API Response:', response.data);
             text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
             text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
             text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
-            // âœ… Same as preview logic
+            // ✅ Same as preview logic
             text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || selectedProfile?.course?.name || 'Course Name');
             text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned');
             text = text.replace(/\{\{7\}\}/g, selectedProfile?.appliedJobs?.[0]?.title || 'Job Title');
@@ -6749,7 +6448,7 @@ console.log('API Response:', response.data);
           readAt: null
         };
 
-        console.log('âœ… Adding new message to state:', {
+        console.log('✅ Adding new message to state:', {
           id: templateMessage.id,
           wamid: templateMessage.wamid,
           whatsappMessageId: templateMessage.whatsappMessageId,
@@ -6759,7 +6458,7 @@ console.log('API Response:', response.data);
 
         setWhatsappMessages([...whatsappMessages, templateMessage]);
 
-        // âœ… Close the template preview
+        // ✅ Close the template preview
         setSelectedWhatsappTemplate(null);
 
         // Close the modal
@@ -6916,7 +6615,11 @@ console.log('API Response:', response.data);
         ...(filterData.nextActionFromDate && { nextActionFromDate: filterData.nextActionFromDate.toISOString() }),
         ...(filterData.nextActionToDate && { nextActionToDate: filterData.nextActionToDate.toISOString() }),
         ...(filterData.subStatuses && { subStatuses: filterData.subStatuses }),
-        ...buildListFilterQueryParts(formData, cycleFilters),
+        ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
+        ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+        ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
+        ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
+        ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
       });
 
       const allProfilesResponse = await axios.get(`${backendUrl}/college/appliedCandidates?${queryParams}`, {
@@ -6945,7 +6648,7 @@ console.log('API Response:', response.data);
       }
 
       // Console log: Show profiles that will receive messages
-      // console.log(`ðŸ“¤ Preparing to send messages to ${profilesToSend.length} profiles:`);
+      // console.log(`📤 Preparing to send messages to ${profilesToSend.length} profiles:`);
       // profilesToSend.forEach((profile, index) => {
       //   const candidateName = profile._candidate?.name || profile.candidate?.name || 'N/A';
       //   const mobile = profile._candidate?.mobile || profile.candidate?.mobile || 'N/A';
@@ -7105,11 +6808,11 @@ console.log('API Response:', response.data);
               sentMessageIds.push(messageId);
               recipientMap[messageId] = recipient;
               bulkWhatsappTrackerRef.current.messageIdToRecipient[messageId] = recipient;
-              console.log(`âœ… Successfully sent template to ${recipient.phone}, messageId: ${messageId}`);
+              console.log(`✅ Successfully sent template to ${recipient.phone}, messageId: ${messageId}`);
             } else {
               const errorMsg = response.data.message || response.data.data?.error || 'Failed to send message';
               errors.push(`${recipient.phone}: ${errorMsg}`);
-              console.error(`âŒ Failed to send template to ${recipient.phone}:`, {
+              console.error(`❌ Failed to send template to ${recipient.phone}:`, {
                 status: response.status,
                 success: response.data.success,
                 hasMessageId: !!(response.data.data && response.data.data.messageId),
@@ -7132,11 +6835,11 @@ console.log('API Response:', response.data);
               sentMessageIds.push(messageId);
               recipientMap[messageId] = recipient;
               bulkWhatsappTrackerRef.current.messageIdToRecipient[messageId] = recipient;
-              console.log(`âœ… Successfully sent message to ${recipient.phone}, messageId: ${messageId}`);
+              console.log(`✅ Successfully sent message to ${recipient.phone}, messageId: ${messageId}`);
             } else {
               const errorMsg = response.data.message || response.data.data?.error || 'Failed to send message';
               errors.push(`${recipient.phone}: ${errorMsg}`);
-              console.error(`âŒ Failed to send message to ${recipient.phone}:`, {
+              console.error(`❌ Failed to send message to ${recipient.phone}:`, {
                 status: response.status,
                 success: response.data.success,
                 hasMessageId: !!(response.data.data && response.data.data.messageId),
@@ -7162,7 +6865,7 @@ console.log('API Response:', response.data);
           }
           
           errors.push(`${recipient.phone}: ${errorMessage}`);
-          console.error(`âŒ Error sending to ${recipient.phone}:`, {
+          console.error(`❌ Error sending to ${recipient.phone}:`, {
             error: error.message,
             response: error.response?.data,
             status: error.response?.status
@@ -7172,7 +6875,7 @@ console.log('API Response:', response.data);
 
       // Wait a bit for status updates from WhatsApp webhook
       if (sentMessageIds.length > 0) {
-        console.log(`â³ Waiting 3 seconds for status updates... (${sentMessageIds.length} messages sent)`);
+        console.log(`⏳ Waiting 3 seconds for status updates... (${sentMessageIds.length} messages sent)`);
         await new Promise(resolve => setTimeout(resolve, 3000));
       }
 
@@ -7213,7 +6916,7 @@ console.log('API Response:', response.data);
                     messageId,
                     reason: statusInfo.errorMessage || 'Message failed'
                   });
-                  console.error(`ðŸ“¦ âŒ Failed (DB status): ${candidateName} | to=${recipient?.phone} | messageId=${messageId} | reason=${statusInfo.errorMessage || 'No error message'}`);
+                  console.error(`📦 ❌ Failed (DB status): ${candidateName} | to=${recipient?.phone} | messageId=${messageId} | reason=${statusInfo.errorMessage || 'No error message'}`);
                 } else {
                   // Status is 'sent', 'delivered', 'read', 'sending', 'received' - all considered success
                   successCount++;
@@ -7232,11 +6935,11 @@ console.log('API Response:', response.data);
                       status: statusInfo.status
                     });
                   }
-                  console.log(`ðŸ“¦ âœ… Status (DB): ${candidateName} | to=${recipient?.phone} | messageId=${messageId} | status=${statusInfo.status}`);
+                  console.log(`📦 ✅ Status (DB): ${candidateName} | to=${recipient?.phone} | messageId=${messageId} | status=${statusInfo.status}`);
                 }
               } else {
                 // Message not found in database - might still be processing
-                console.warn(`âš ï¸ Message ${messageId} not found in database yet`);
+                console.warn(`⚠️ Message ${messageId} not found in database yet`);
                 // Count as success for now (might be delayed)
                 successCount++;
                 pendingList.push({
@@ -7249,15 +6952,15 @@ console.log('API Response:', response.data);
             });
 
             // High-signal summary for bulk run (frontend console)
-            console.log('ðŸ“Š Bulk WhatsApp summary (DB snapshot) =>', {
+            console.log('📊 Bulk WhatsApp summary (DB snapshot) =>', {
               deliveredOrRead: deliveredList.length,
               failed: failedList.length,
               pendingOrSent: pendingList.length,
               totalSent: sentMessageIds.length
             });
-            if (deliveredList.length) console.log('âœ… Delivered/Read candidates =>', deliveredList);
-            if (failedList.length) console.log('âŒ Failed candidates =>', failedList);
-            if (pendingList.length) console.log('â³ Pending/Sent candidates =>', pendingList);
+            if (deliveredList.length) console.log('✅ Delivered/Read candidates =>', deliveredList);
+            if (failedList.length) console.log('❌ Failed candidates =>', failedList);
+            if (pendingList.length) console.log('⏳ Pending/Sent candidates =>', pendingList);
           } else {
             console.error('Failed to fetch message statuses from database');
             // Fallback: count all sent messages as success
@@ -7775,84 +7478,128 @@ useEffect(() => {
     ) : null;
   };
 
-  // Render compact lead actions menu (three-dots dropdown)
-  const renderLeadActionsMenu = (profile, onClose) => (
-    <div className="lead-strip-v3__actions-menu">
-      {canEditLeadsPermission && (
-        <>
-          <button
-            type="button"
-            className="lead-strip-v3__actions-item"
-            onClick={() => { handleMoveToKyc(profile); onClose(); }}
-          >
-            <i className="fas fa-arrow-right text-primary" aria-hidden="true"></i>
-            Move To KYC List
-          </button>
-          <button
-            type="button"
-            className="lead-strip-v3__actions-item"
-            onClick={() => { openEditPanel(profile, 'SetFollowup'); onClose(); }}
-          >
-            <i className="fas fa-calendar text-warning" aria-hidden="true"></i>
-            Set Followup
-          </button>
-          <button
-            type="button"
-            className="lead-strip-v3__actions-item"
-            onClick={() => { handleFetchCandidate(profile); onClose(); }}
-          >
-            <i className="fas fa-user-edit text-info" aria-hidden="true"></i>
-            Profile Edit
-          </button>
-          <button
-            type="button"
-            className="lead-strip-v3__actions-item"
-            onClick={() => { getBranches(profile); setShowBranchModal(true); onClose(); }}
-          >
-            <i className="fas fa-building text-success" aria-hidden="true"></i>
-            Change Branch
-          </button>
-        </>
-      )}
-      {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-        <button
-          type="button"
-          className="lead-strip-v3__actions-item"
-          onClick={() => { openPanel(profile, 'Reffer'); onClose(); }}
-        >
-          <i className="fas fa-user-plus text-secondary" aria-hidden="true"></i>
-          Refer to Counselor
-        </button>
-      )}
-      <button
-        type="button"
-        className="lead-strip-v3__actions-item"
-        onClick={() => { openleadHistoryPanel(profile); onClose(); }}
-      >
-        <i className="fas fa-history text-secondary" aria-hidden="true"></i>
-        History List
-      </button>
-    </div>
-  );
+  // Render Actions Modal for Mobile (Three-dot menu)
+  const renderActionsModal = () => {
+    if (!isMobile || showPopup === null) return null;
 
-  const renderLeadActionsDropdown = (profile, profileIndex) => {
-    if (showPopup !== profileIndex) return null;
+    const profile = allProfiles[showPopup];
+    if (!profile) return null;
+
     return (
-      <>
+      <div
+        className="modal show d-block"
+        style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}
+        onClick={() => setShowPopup(null)}
+      >
         <div
-          className="lead-strip-v3__actions-backdrop"
-          onClick={() => setShowPopup(null)}
-          aria-hidden="true"
-        />
-        <div className="lead-strip-v3__actions-dropdown is-open">
-          {renderLeadActionsMenu(profile, () => setShowPopup(null))}
+          className="modal-dialog modal-dialog-bottom"
+          style={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            margin: 0,
+            maxWidth: '100%',
+            animation: 'slideUp 0.3s ease-out'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="modal-content" style={{ borderRadius: '20px 20px 0 0' }}>
+            <div className="modal-header border-0 pb-0">
+              <h6 className="modal-title fw-semibold">Lead Actions</h6>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={() => setShowPopup(null)}
+              ></button>
+            </div>
+            <div className="modal-body pt-2">
+              <div className="list-group list-group-flush">
+                {/* Move To KYC List */}
+                {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                  <>
+                    <button
+                      className="list-group-item list-group-item-action border-0 py-3"
+                      onClick={() => {
+                        handleMoveToKyc(profile);
+                        setShowPopup(null);
+                      }}
+                    >
+                      <i className="fas fa-arrow-right me-3 text-primary"></i>
+                      <span className="fw-medium">Move To KYC List</span>
+                    </button>
+
+                    {/* Set Followup */}
+                    <button
+                      className="list-group-item list-group-item-action border-0 py-3"
+                      onClick={() => {
+                        openEditPanel(profile, 'SetFollowup');
+                        setShowPopup(null);
+                      }}
+                    >
+                      <i className="fas fa-calendar me-3 text-warning"></i>
+                      <span className="fw-medium">Set Followup</span>
+                    </button>
+
+                    {/* Profile Edit */}
+                    <button
+                      className="list-group-item list-group-item-action border-0 py-3"
+                      onClick={() => {
+                        handleFetchCandidate(profile);
+                        setShowPopup(null);
+                      }}
+                    >
+                      <i className="fas fa-user-edit me-3 text-info"></i>
+                      <span className="fw-medium">Profile Edit</span>
+                    </button>
+
+                    {/* Change Branch */}
+                    <button
+                      className="list-group-item list-group-item-action border-0 py-3"
+                      onClick={() => {
+                        getBranches(profile);
+                        setShowBranchModal(true);
+                        setShowPopup(null);
+                      }}
+                    >
+                      <i className="fas fa-building me-3 text-success"></i>
+                      <span className="fw-medium">Change Branch</span>
+                    </button>
+                  </>
+                )}
+
+                {/* Refer */}
+                {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                  <button
+                    className="list-group-item list-group-item-action border-0 py-3"
+                    onClick={() => {
+                      openPanel(profile, 'Reffer');
+                      setShowPopup(null);
+                    }}
+                  >
+                    <i className="fas fa-user-plus me-3 text-secondary"></i>
+                    <span className="fw-medium">Refer to Counselor</span>
+                  </button>
+                )}
+
+                {/* History List */}
+                <button
+                  className="list-group-item list-group-item-action border-0 py-3"
+                  onClick={() => {
+                    openleadHistoryPanel(profile);
+                    setShowPopup(null);
+                  }}
+                >
+                  <i className="fas fa-history me-3" style={{ color: '#6c757d' }}></i>
+                  <span className="fw-medium">History List</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      </>
+      </div>
     );
   };
-
-  // Render Actions Modal for Mobile (Three-dot menu) — replaced by compact dropdown
-  const renderActionsModal = () => null;
 
   const renderAllLeadPanel = () => {
     const panelContent = (
@@ -8925,7 +8672,7 @@ useEffect(() => {
                                             backgroundColor: '#e9ecef',
                                             fontSize: '48px'
                                           }}>
-                                            ðŸ–¼ï¸
+                                            🖼️
                                           </div>
                                         </>
                                       )}
@@ -8994,7 +8741,7 @@ useEffect(() => {
                                                   fontWeight: '500'
                                                 }}
                                               >
-                                                {btn.type === 'QUICK_REPLY' && 'â†©ï¸ '}
+                                                {btn.type === 'QUICK_REPLY' && '↩️ '}
                                                 {btn.text}
                                               </div>
                                             ))}
@@ -9042,7 +8789,7 @@ useEffect(() => {
                                   backgroundColor: '#e9ecef',
                                   fontSize: '64px'
                                 }}>
-                                  ðŸ–¼ï¸
+                                  🖼️
                                 </div>
                               </div>
                             )}
@@ -9074,7 +8821,7 @@ useEffect(() => {
                                   color: '#fff',
                                   fontSize: '64px'
                                 }}>
-                                  ðŸŽ¥
+                                  🎥
                                 </div>
                               </div>
                             )}
@@ -9221,9 +8968,9 @@ useEffect(() => {
                                       cursor: 'default'
                                     }}
                                   >
-                                    {button.type === 'QUICK_REPLY' && 'â†©ï¸ '}
-                                    {button.type === 'URL' && 'ðŸ”— '}
-                                    {button.type === 'PHONE_NUMBER' && 'ðŸ“ž '}
+                                    {button.type === 'QUICK_REPLY' && '↩️ '}
+                                    {button.type === 'URL' && '🔗 '}
+                                    {button.type === 'PHONE_NUMBER' && '📞 '}
                                     {button.text}
                                   </div>
                                 ))}
@@ -9567,7 +9314,7 @@ useEffect(() => {
                     onClick={() => {
                       setWhatsappMessages([...whatsappMessages, {
                         id: whatsappMessages.length + 1,
-                        text: 'ðŸŽ¤ Voice message',
+                        text: '🎤 Voice message',
                         sender: 'agent',
                         time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
                         type: 'voice'
@@ -10151,7 +9898,7 @@ useEffect(() => {
   //                                           backgroundColor: '#e9ecef',
   //                                           fontSize: '48px'
   //                                         }}>
-  //                                           ðŸ–¼ï¸
+  //                                           🖼️
   //                                         </div>
   //                                       </>
   //                                     )}
@@ -10220,7 +9967,7 @@ useEffect(() => {
   //                                                 fontWeight: '500'
   //                                               }}
   //                                             >
-  //                                               {btn.type === 'QUICK_REPLY' && 'â†©ï¸ '}
+  //                                               {btn.type === 'QUICK_REPLY' && '↩️ '}
   //                                               {btn.text}
   //                                             </div>
   //                                           ))}
@@ -10268,7 +10015,7 @@ useEffect(() => {
   //                                 backgroundColor: '#e9ecef',
   //                                 fontSize: '64px'
   //                               }}>
-  //                                 ðŸ–¼ï¸
+  //                                 🖼️
   //                               </div>
   //                             </div>
   //                           )}
@@ -10300,7 +10047,7 @@ useEffect(() => {
   //                                 color: '#fff',
   //                                 fontSize: '64px'
   //                               }}>
-  //                                 ðŸŽ¥
+  //                                 🎥
   //                               </div>
   //                             </div>
   //                           )}
@@ -10447,9 +10194,9 @@ useEffect(() => {
   //                                     cursor: 'default'
   //                                   }}
   //                                 >
-  //                                   {button.type === 'QUICK_REPLY' && 'â†©ï¸ '}
-  //                                   {button.type === 'URL' && 'ðŸ”— '}
-  //                                   {button.type === 'PHONE_NUMBER' && 'ðŸ“ž '}
+  //                                   {button.type === 'QUICK_REPLY' && '↩️ '}
+  //                                   {button.type === 'URL' && '🔗 '}
+  //                                   {button.type === 'PHONE_NUMBER' && '📞 '}
   //                                   {button.text}
   //                                 </div>
   //                               ))}
@@ -10793,7 +10540,7 @@ useEffect(() => {
   //                   onClick={() => {
   //                     setWhatsappMessages([...whatsappMessages, {
   //                       id: whatsappMessages.length + 1,
-  //                       text: 'ðŸŽ¤ Voice message',
+  //                       text: '🎤 Voice message',
   //                       sender: 'agent',
   //                       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
   //                       type: 'voice'
@@ -10997,7 +10744,7 @@ useEffect(() => {
                   }}
                 >
                   <div className="fw-semibold text-dark">{tpl.name}</div>
-                  <div className="small text-muted">{tpl.category} â€¢ {tpl.language} â€¢ {tpl.status}</div>
+                  <div className="small text-muted">{tpl.category} • {tpl.language} • {tpl.status}</div>
                 </div>
               ))
             )}
@@ -11077,7 +10824,7 @@ useEffect(() => {
                                 {log.action ? (
                                   log.action.split(';').map((actionPart, actionIndex) => (
                                     <div key={actionIndex} className="mb-1">
-                                      â€¢ {actionPart.trim()}
+                                      • {actionPart.trim()}
                                     </div>
                                   ))
                                 ) : (
@@ -11296,796 +11043,11 @@ useEffect(() => {
     ) : null;
   };
 
-  const handleCycleFilterChange = (key, value) => {
-    let next = { ...cycleFilters, [key]: value };
-    if (key === 'department') {
-      next = { department: value, project: '', center: '', course: '', batch: '' };
-    } else if (key === 'project') {
-      next = { ...cycleFilters, project: value, center: '', course: '', batch: '' };
-    } else if (key === 'center') {
-      next = { ...cycleFilters, center: value, batch: '' };
-    } else if (key === 'course') {
-      next = { ...cycleFilters, course: value, batch: '' };
-    } else if (key === 'batch') {
-      next = { ...cycleFilters, batch: value };
-    }
-
-    setCycleFilters(next);
-    setFormData((fd) => ({
-      ...fd,
-      verticals: { ...fd.verticals, values: next.department ? [next.department] : [] },
-      projects: { ...fd.projects, values: next.project ? [next.project] : [] },
-      course: { ...fd.course, values: next.course ? [next.course] : [] },
-      center: { ...fd.center, values: next.center ? [next.center] : [] },
-    }));
-    setCurrentPage(1);
-    fetchProfileData(filterData, 1, next);
-    fetchRegistrationCrmFilterCounts(filterData, 1, null);
-  };
-
-  const renderCycleFilterDropdowns = (mobile = false) => (
-    <div className={`b2b-cycle-filters${mobile ? ' b2b-cycle-filters--mobile' : ''}`}>
-      <div className="b2b-cycle-filters__item">
-        <label className="b2b-cycle-filters__label" htmlFor="adm-filter-department">
-          <i className="fas fa-sitemap" aria-hidden="true" /> Department
-        </label>
-        <select
-          id="adm-filter-department"
-          className="b2b-cycle-filters__select"
-          value={cycleFilters.department || ''}
-          onChange={(e) => handleCycleFilterChange('department', e.target.value)}
-        >
-          <option value="">All</option>
-          {verticalOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-      </div>
-      <div className="b2b-cycle-filters__item">
-        <label className="b2b-cycle-filters__label" htmlFor="adm-filter-project">
-          <i className="fas fa-project-diagram" aria-hidden="true" /> Project
-        </label>
-        <select
-          id="adm-filter-project"
-          className="b2b-cycle-filters__select"
-          value={cycleFilters.project || ''}
-          onChange={(e) => handleCycleFilterChange('project', e.target.value)}
-        >
-          <option value="">All</option>
-          {cycleProjectOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-      </div>
-      <div className="b2b-cycle-filters__item">
-        <label className="b2b-cycle-filters__label" htmlFor="adm-filter-center">
-          <i className="fas fa-building" aria-hidden="true" /> Center
-        </label>
-        <select
-          id="adm-filter-center"
-          className="b2b-cycle-filters__select"
-          value={cycleFilters.center || ''}
-          onChange={(e) => handleCycleFilterChange('center', e.target.value)}
-        >
-          <option value="">All</option>
-          {centerOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-      </div>
-      <div className="b2b-cycle-filters__item">
-        <label className="b2b-cycle-filters__label" htmlFor="adm-filter-course">
-          <i className="fas fa-graduation-cap" aria-hidden="true" /> Course
-        </label>
-        <select
-          id="adm-filter-course"
-          className="b2b-cycle-filters__select"
-          value={cycleFilters.course || ''}
-          onChange={(e) => handleCycleFilterChange('course', e.target.value)}
-        >
-          <option value="">All</option>
-          {cycleCourseOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-      </div>
-      <div className="b2b-cycle-filters__item">
-        <label className="b2b-cycle-filters__label" htmlFor="adm-filter-batch">
-          <i className="fas fa-users" aria-hidden="true" /> Batch
-        </label>
-        <select
-          id="adm-filter-batch"
-          className="b2b-cycle-filters__select"
-          value={cycleFilters.batch || ''}
-          onChange={(e) => handleCycleFilterChange('batch', e.target.value)}
-        >
-          <option value="">All</option>
-          {batchOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-      </div>
-    </div>
-  );
-
-
-  const renderCrmDashboard = () => (
-    <div className="col-12 b2b-crm-dashboard px-0">
-      <div className="b2b-dash-section mt-2">
-        <span className="b2b-dash-section__label">My Leads</span>
-        <div className="b2b-mobile-hscroll d-flex gap-2 align-items-center pt-1">
-          <button
-            type="button"
-            className="b2b-perf-chip"
-            style={{
-              padding: '6px 14px',
-              fontSize: '12px',
-              fontWeight: 600,
-              borderRadius: '999px',
-              cursor: 'pointer',
-              color: leadViewTab === 'all' ? '#fff' : 'rgb(250, 85, 121)',
-              backgroundColor: leadViewTab === 'all' ? 'rgb(250, 85, 121)' : '#fff',
-              border: leadViewTab === 'all' ? 'none' : '1.5px solid rgb(250, 85, 121)',
-            }}
-            onClick={() => handleLeadViewTabChange('all')}
-          >
-            All Leads
-          </button>
-          <button
-            type="button"
-            className="b2b-perf-chip"
-            style={{
-              padding: '6px 14px',
-              fontSize: '12px',
-              fontWeight: 600,
-              borderRadius: '999px',
-              cursor: 'pointer',
-              color: leadViewTab === 'myRefer' ? '#fff' : 'rgb(250, 85, 121)',
-              backgroundColor: leadViewTab === 'myRefer' ? 'rgb(250, 85, 121)' : '#fff',
-              border: leadViewTab === 'myRefer' ? 'none' : '1.5px solid rgb(250, 85, 121)',
-            }}
-            onClick={() => handleLeadViewTabChange('myRefer')}
-          >
-            My Referred Leads ({myReferLeadsCount})
-          </button>
-        </div>
-      </div>
-
-      <div className="b2b-dash-section mt-2">
-        <span className="b2b-dash-section__label">Lead Approval</span>
-        <div className="b2b-mobile-hscroll b2b-mobile-hscroll--approval d-flex gap-2 align-items-stretch pt-1">
-          {[
-            { key: 'total', label: 'Total', value: approvalCounts.total, bg: '#5b4fc9', approval: null },
-            { key: 'approved', label: 'Approved', value: approvalCounts.approved, bg: '#10b981', approval: 'approved' },
-            { key: 'pending', label: 'Pending', value: approvalCounts.pending, bg: '#f59e0b', approval: 'pending' },
-            { key: 'rejected', label: 'Rejected', value: approvalCounts.rejected, bg: '#ef4444', approval: 'rejected' },
-          ].map((row) => {
-            const isSelected = selectedApprovalFilter === row.approval;
-            return (
-              <div
-                key={row.key}
-                role="button"
-                tabIndex={0}
-                className="b2b-dash-stat-card b2b-dash-stat-card--lead text-center text-white"
-                style={{
-                  background: row.bg,
-                  cursor: 'pointer',
-                  outline: isSelected ? '3px solid rgba(255,255,255,0.55)' : 'none',
-                  transform: isSelected ? 'translateY(-1px)' : 'none',
-                }}
-                onClick={() => handleApprovalCardClick(row.approval)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') handleApprovalCardClick(row.approval);
-                }}
-              >
-                <div className="b2b-dash-stat-card__label">{row.label}</div>
-                <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
-                <div className="b2b-dash-stat-card__value text-white">
-                  {String(row.value).padStart(2, '0')}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="b2b-dash-section mt-3">
-        <span className="b2b-dash-section__label">Performance</span>
-        <div className="b2b-mobile-hscroll b2b-mobile-hscroll--chips d-flex gap-2 align-items-center pt-1">
-          <button
-            type="button"
-            className="b2b-perf-chip"
-            style={{
-              padding: '6px 14px',
-              fontSize: '12px',
-              fontWeight: 600,
-              borderRadius: '999px',
-              cursor: 'pointer',
-              color: !activePerformanceId ? '#fff' : 'rgb(250, 85, 121)',
-              backgroundColor: !activePerformanceId ? 'rgb(250, 85, 121)' : '#fff',
-              border: !activePerformanceId ? 'none' : '1.5px solid rgb(250, 85, 121)',
-            }}
-            onClick={() => handlePerformanceChipClick(null)}
-          >
-            All ({performanceTotalCount})
-          </button>
-          {performanceFilters.map((filter, index) => {
-            const isSelected = activePerformanceId === filter._id;
-            return (
-              <button
-                key={filter._id || index}
-                type="button"
-                className="b2b-perf-chip"
-                style={{
-                  padding: '6px 14px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  borderRadius: '999px',
-                  cursor: 'pointer',
-                  color: isSelected ? '#fff' : 'rgb(250, 85, 121)',
-                  backgroundColor: isSelected ? 'rgb(250, 85, 121)' : '#fff',
-                  border: isSelected ? 'none' : '1.5px solid rgb(250, 85, 121)',
-                }}
-                onClick={() => handlePerformanceChipClick(filter._id)}
-              >
-                {(filter.name || 'Status').toUpperCase()} ({filter.count ?? 0})
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {(selectedFollowupBucket || selectedApprovalFilter) && (
-        <div className="d-flex flex-wrap align-items-center gap-2 mt-2 mb-1">
-          {selectedApprovalFilter && (
-            <span className="badge rounded-pill text-bg-light border" style={{ fontSize: '12px', fontWeight: 600 }}>
-              <i className="fas fa-filter me-1 text-danger" aria-hidden="true" />
-              Approval: {selectedApprovalFilter}
-            </span>
-          )}
-          {selectedFollowupBucket && (
-            <span className="badge rounded-pill text-bg-light border" style={{ fontSize: '12px', fontWeight: 600 }}>
-              <i className="fas fa-filter me-1 text-danger" aria-hidden="true" />
-              Call: {selectedFollowupBucket.replace('call:', '')}
-            </span>
-          )}
-          <button
-            type="button"
-            className="btn btn-sm btn-outline-danger"
-            onClick={() => {
-              setSelectedApprovalFilter(null);
-              setSelectedFollowupBucket('');
-              const cleared = { ...filterData, followupStatus: '' };
-              delete cleared.leadStatus;
-              setFilterData(cleared);
-              setActiveCrmFilter(0);
-              fetchProfileData(cleared, 1);
-            }}
-            style={{ fontSize: '12px', fontWeight: 600, borderRadius: '999px' }}
-          >
-            <i className="fas fa-list me-1" aria-hidden="true" />
-            Show all leads
-          </button>
-        </div>
-      )}
-
-      <div className="row g-2 mt-1 b2b-followup-scroll-row">
-        <div className="col-12 col-lg-4 b2b-followup-scroll-col">
-          <div className="b2b-dash-section h-100">
-            <span className="b2b-dash-section__label">Followup Calling</span>
-            <div className="d-flex flex-wrap gap-2 pt-1">
-              {[
-                { key: 'fc-done', bucket: 'done', label: 'Done', value: followupDashCounts.call.done, bg: '#12b3ff' },
-                { key: 'fc-planned', bucket: 'planned', label: 'Planned', value: followupDashCounts.call.planned, bg: '#f59e0b' },
-                { key: 'fc-missed', bucket: 'missed', label: 'Missed', value: followupDashCounts.call.missed, bg: '#7c3d14' },
-              ].map((row) => {
-                const selected = isFollowupDashSelected('Call', row.bucket);
-                return (
-                  <button
-                    key={row.key}
-                    type="button"
-                    className={`b2b-dash-stat-card text-center text-white flex-grow-1 border-0${selected ? ' b2b-dash-stat-card--active' : ''}`}
-                    style={{ background: row.bg }}
-                    onClick={() => handleFollowupDashClick('Call', row.bucket)}
-                    title={`Filter leads: Call follow-ups — ${row.label}`}
-                  >
-                    <div className="b2b-dash-stat-card__label">{row.label}</div>
-                    <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
-                    <div className="b2b-dash-stat-card__value text-white">
-                      {String(row.value).padStart(2, '0')}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-        <div className="col-12 col-lg-4 b2b-followup-scroll-col">
-          <div className="b2b-dash-section h-100">
-            <span className="b2b-dash-section__label">Followup Visit</span>
-            <div className="d-flex flex-wrap gap-2 pt-1">
-              {[
-                { key: 'fv-done', bucket: 'done', label: 'Done', value: followupDashCounts.visit.done, bg: '#4b5563' },
-                { key: 'fv-planned', bucket: 'planned', label: 'Planned', value: followupDashCounts.visit.planned, bg: '#4b5563' },
-                { key: 'fv-missed', bucket: 'missed', label: 'Missed', value: followupDashCounts.visit.missed, bg: '#7c3d14' },
-              ].map((row) => {
-                const selected = isFollowupDashSelected('Visit', row.bucket);
-                return (
-                  <button
-                    key={row.key}
-                    type="button"
-                    className={`b2b-dash-stat-card text-center text-white flex-grow-1 border-0${selected ? ' b2b-dash-stat-card--active' : ''}`}
-                    style={{ background: row.bg }}
-                    onClick={() => handleFollowupDashClick('Visit', row.bucket)}
-                    title={`Filter leads: Visit follow-ups — ${row.label}`}
-                  >
-                    <div className="b2b-dash-stat-card__label">{row.label}</div>
-                    <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
-                    <div className="b2b-dash-stat-card__value text-white">
-                      {String(row.value).padStart(2, '0')}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-        <div className="col-12 col-lg-4 b2b-followup-scroll-col">
-          <div className="b2b-dash-section h-100">
-            <span className="b2b-dash-section__label">Documents</span>
-            <div className="d-flex flex-wrap gap-2 pt-1">
-              {[
-                { key: 'doc-done', label: 'Done', value: docDashCounts.done, bg: '#4b5563' },
-                { key: 'doc-pending', label: 'Pending', value: docDashCounts.pending, bg: '#4b5563' },
-              ].map((row) => (
-                <div
-                  key={row.key}
-                  className="b2b-dash-stat-card text-center text-white flex-grow-1"
-                  style={{ background: row.bg }}
-                >
-                  <div className="b2b-dash-stat-card__label">{row.label}</div>
-                  <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
-                  <div className="b2b-dash-stat-card__value text-white">
-                    {String(row.value).padStart(2, '0')}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <style>
-        {`
-          .b2b-crm-dashboard .b2b-dash-section {
-            position: relative;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 5px 7px 5px;
-            background: #fff;
-          }
-          .b2b-crm-dashboard .b2b-dash-section__label {
-            position: absolute;
-            top: -10px;
-            left: 12px;
-            padding: 0 6px;
-            background: #fff;
-            font-size: 13px;
-            font-weight: 600;
-            color: #333;
-            line-height: 1.2;
-          }
-          .b2b-crm-dashboard .b2b-dash-stat-card {
-            border-radius: 8px;
-            padding: 5px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 45px;
-            box-sizing: border-box;
-            cursor: pointer;
-            transition: transform 0.15s ease, box-shadow 0.15s ease, outline 0.15s ease;
-          }
-          .b2b-crm-dashboard .b2b-dash-stat-card:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
-          }
-          .b2b-crm-dashboard .b2b-dash-stat-card--active {
-            outline: 3px solid rgb(250, 85, 121);
-            outline-offset: 2px;
-            box-shadow: 0 4px 12px rgba(250, 85, 121, 0.35);
-          }
-          .b2b-crm-dashboard .b2b-dash-stat-card--lead {
-            flex: 1 1 96px;
-            min-width: 50px;
-            max-width: 90px;
-          }
-          .b2b-crm-dashboard .b2b-dash-stat-card:not(.b2b-dash-stat-card--lead) {
-            min-width: 84px;
-            min-height: 45px;
-          }
-          .b2b-crm-dashboard .b2b-dash-stat-card__label {
-            font-size: 11px;
-            font-weight: 600;
-            margin: 0;
-            line-height: 1.2;
-            opacity: 0.98;
-          }
-          .b2b-crm-dashboard .b2b-dash-stat-card__divider {
-            width: 72%;
-            max-width: 52px;
-            height: 1px;
-            margin: 8px 0;
-            background: rgba(255, 255, 255, 0.95);
-            flex-shrink: 0;
-          }
-          .b2b-crm-dashboard .b2b-dash-stat-card__value {
-            margin: 0;
-            font-size: 15px;
-            font-weight: 700;
-            line-height: 1.2;
-            min-width: 1.5em;
-          }
-          .b2b-crm-dashboard .b2b-mobile-hscroll{
-            min-width: 0;
-            max-width: 100%;
-          }
-          .b2b-crm-dashboard .b2b-perf-chip{
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            line-height: 1.15;
-            min-height: 34px;
-          }
-          @media (max-width: 768px){
-            .b2b-crm-dashboard{
-              min-width: 0;
-              overflow: hidden;
-            }
-            .b2b-crm-dashboard .b2b-dash-section{
-              padding: 14px 8px 8px;
-            }
-            .b2b-crm-dashboard .b2b-dash-section__label{
-              top: 0px;
-              font-size: 12px;
-            }
-            .b2b-crm-dashboard .b2b-mobile-hscroll{
-              overflow-x: auto;
-              overflow-y: hidden;
-              flex-wrap: nowrap !important;
-              -webkit-overflow-scrolling: touch;
-              padding: 2px 2px 7px;
-              scrollbar-width: none;
-            }
-            .b2b-crm-dashboard .b2b-mobile-hscroll::-webkit-scrollbar{
-              display: none;
-            }
-            .b2b-crm-dashboard .b2b-mobile-hscroll > *{
-              flex: 0 0 auto !important;
-            }
-            .b2b-crm-dashboard .b2b-mobile-hscroll--approval .b2b-dash-stat-card--lead{
-              min-width: 72px;
-              max-width: none;
-            }
-            .b2b-crm-dashboard .b2b-mobile-hscroll--chips .b2b-perf-chip{
-              min-width: 62px;
-              max-width: 136px;
-              min-height: 42px;
-              white-space: normal;
-              word-break: keep-all;
-              padding: 7px 12px !important;
-            }
-            .b2b-crm-dashboard .b2b-followup-scroll-row{
-              display: flex;
-              flex-wrap: nowrap;
-              overflow-x: auto;
-              overflow-y: hidden;
-              margin-left: 0;
-              margin-right: 0;
-              padding: 2px 2px 8px;
-              -webkit-overflow-scrolling: touch;
-              scroll-snap-type: x proximity;
-              scrollbar-width: thin;
-            }
-            .b2b-crm-dashboard .b2b-followup-scroll-row::-webkit-scrollbar{
-              height: 4px;
-            }
-            .b2b-crm-dashboard .b2b-followup-scroll-row::-webkit-scrollbar-thumb{
-              background: #cbd5e1;
-              border-radius: 999px;
-            }
-            .b2b-crm-dashboard .b2b-followup-scroll-col{
-              flex: 0 0 min(330px, calc(100vw - 28px));
-              width: min(330px, calc(100vw - 28px));
-              max-width: none;
-              padding-left: 4px;
-              padding-right: 4px;
-              scroll-snap-align: start;
-            }
-            .b2b-crm-dashboard .b2b-followup-scroll-col .b2b-dash-section > .d-flex{
-              flex-wrap: nowrap !important;
-            }
-            .b2b-crm-dashboard .b2b-followup-scroll-col .b2b-dash-stat-card:not(.b2b-dash-stat-card--lead){
-              min-width: 84px;
-            }
-          }
-        `}
-      </style>
-    </div>
-  );
-
 
   return (
     <div className="container-fluid">
-      <div>
       <style>
         {`
-          .b2b-cycle-filters{
-            display: flex;
-            flex-wrap: wrap;
-            align-items: flex-end;
-            justify-content: flex-end;
-            gap: 8px 12px;
-            max-width: 100%;
-          }
-          .b2b-cycle-filters__item{
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-            min-width: 0;
-          }
-          .b2b-cycle-filters__label{
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #6b7280;
-            margin: 0;
-            line-height: 1.2;
-            white-space: nowrap;
-          }
-          .b2b-cycle-filters__label i{
-            margin-right: 4px;
-            color: rgb(250, 85, 121);
-            font-size: 9px;
-          }
-          .b2b-cycle-filters__select{
-            font-size: 12px;
-            font-weight: 500;
-            line-height: 1.3;
-            padding: 6px 28px 6px 10px;
-            height: 34px;
-            min-width: 120px;
-            max-width: 155px;
-            border: 1.5px solid #e8eaed;
-            border-radius: 8px;
-            background-color: #f9fafb;
-            color: #1f2937;
-            cursor: pointer;
-            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-            transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16'%3E%3Cpath fill='%236b7280' d='M4.427 6.427l3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 6H4.604a.25.25 0 0 0-.177.427z'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 9px center;
-            background-size: 12px;
-          }
-          .b2b-cycle-filters__select:hover{
-            border-color: rgba(250, 85, 121, 0.4);
-            background-color: #fff;
-          }
-          .b2b-cycle-filters__select:focus{
-            outline: none;
-            border-color: rgb(250, 85, 121);
-            background-color: #fff;
-            box-shadow: 0 0 0 3px rgba(250, 85, 121, 0.14);
-          }
-          .b2b-cycle-filters--mobile{
-            flex-wrap: nowrap;
-            justify-content: flex-start;
-            overflow-x: auto;
-            overflow-y: hidden;
-            padding: 4px 2px 8px;
-            margin-bottom: 4px;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: thin;
-          }
-          .b2b-cycle-filters--mobile .b2b-cycle-filters__item{
-            flex: 0 0 auto;
-          }
-          .b2b-cycle-filters--mobile .b2b-cycle-filters__select{
-            min-width: 108px;
-            max-width: 130px;
-          }
-          .adm-cycle-header-nav{
-            border-bottom: 1px solid #eee;
-          }
-          .adm-cycle-toolbar__outer,
-          .adm-cycle-toolbar__inner{
-            min-width: 0;
-          }
-          .adm-cycle-search{
-            min-width: 180px;
-          }
-          .adm-cycle-action-btn{
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            min-height: 36px;
-          }
-          .adm-crm-tabs{
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            padding-top: 4px;
-          }
-          .adm-crm-tab{
-            padding: 6px 14px;
-            font-size: 12px;
-            font-weight: 600;
-            border-radius: 999px;
-            border: 1.5px solid #e5e7eb;
-            background: #fff;
-            color: #374151;
-            transition: all 0.2s ease;
-            white-space: nowrap;
-          }
-          .adm-crm-tab:hover{
-            border-color: rgba(250, 85, 121, 0.45);
-            color: rgb(250, 85, 121);
-          }
-          .adm-crm-tab.active{
-            background: linear-gradient(135deg, #fc567b 13%, #fc567b 50%);
-            border-color: rgb(250, 85, 121);
-            color: #fff;
-            box-shadow: 0 2px 8px rgba(250, 85, 121, 0.25);
-          }
-          @media (max-width: 767.98px) {
-            .adm-cycle-header-nav{
-              left: 8px;
-              right: 8px;
-              width: auto !important;
-              padding: 10px 10px 12px !important;
-              border: 1px solid #eef0f4;
-              border-top: 0;
-              border-radius: 0 0 12px 12px;
-              box-shadow: 0 8px 24px rgba(15, 23, 42, 0.10) !important;
-            }
-            .adm-cycle-header-nav .container-fluid{
-              padding-inline: 0;
-            }
-            .adm-cycle-mobile-title{
-              margin-bottom: 0 !important;
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              gap: 10px;
-              min-width: 0;
-            }
-            .adm-cycle-mobile-title h5{
-              font-size: 1rem !important;
-              margin-bottom: 0 !important;
-              line-height: 1.2;
-              flex: 0 0 auto;
-            }
-            .adm-cycle-mobile-title nav{
-              flex: 1 1 auto;
-              min-width: 0;
-            }
-            .adm-cycle-mobile-title .breadcrumb{
-              display: flex;
-              align-items: center;
-              justify-content: flex-end;
-              flex-wrap: nowrap;
-              gap: 0;
-              font-size: 0.82rem;
-              line-height: 1.2;
-              margin: 0 !important;
-              padding: 0 0 0 10px !important;
-              overflow: hidden;
-              white-space: nowrap;
-            }
-            .adm-cycle-mobile-title .breadcrumb-item{
-              flex: 0 0 auto;
-              white-space: nowrap;
-            }
-            .adm-cycle-mobile-title .breadcrumb-item.active{
-              flex: 0 1 auto;
-              min-width: 0;
-              overflow: hidden;
-              text-overflow: ellipsis;
-            }
-            .adm-cycle-mobile-title .breadcrumb-item + .breadcrumb-item::before{
-              padding-right: 0.35rem;
-              padding-left: 0.25rem;
-            }
-            .adm-cycle-mobile-filter-wrap{
-              min-width: 0;
-            }
-            .b2b-cycle-filters--mobile{
-              gap: 6px;
-              margin: 0 -2px;
-              padding: 4px 2px 6px;
-              scrollbar-width: none;
-              scroll-snap-type: x proximity;
-            }
-            .b2b-cycle-filters--mobile::-webkit-scrollbar{
-              display: none;
-            }
-            .b2b-cycle-filters--mobile .b2b-cycle-filters__item{
-              flex: 0 0 clamp(96px, 30vw, 120px);
-              scroll-snap-align: start;
-            }
-            .b2b-cycle-filters--mobile .b2b-cycle-filters__label{
-              font-size: 8.5px;
-              letter-spacing: 0.045em;
-            }
-            .b2b-cycle-filters--mobile .b2b-cycle-filters__select{
-              width: 100%;
-              min-width: 0;
-              max-width: none;
-              height: 32px;
-              padding: 5px 24px 5px 8px;
-              font-size: 11px;
-              border-radius: 7px;
-              background-color: #fff;
-              background-position: right 7px center;
-            }
-            .adm-cycle-toolbar{
-              margin-top: 0 !important;
-              padding-top: 8px !important;
-            }
-            .adm-cycle-toolbar__outer,
-            .adm-cycle-toolbar__inner{
-              width: 100%;
-            }
-            .adm-cycle-toolbar__inner{
-              display: grid !important;
-              grid-template-columns: minmax(0, 1fr) auto auto;
-              align-items: center;
-              gap: 8px !important;
-              margin-left: 0 !important;
-            }
-            .adm-cycle-search{
-              grid-column: auto;
-              width: 100%;
-              min-width: 0;
-            }
-            .adm-cycle-search .form-control{
-              width: 100% !important;
-              min-width: 0 !important;
-              height: 38px;
-              font-size: 13px !important;
-            }
-            .adm-cycle-action-btn{
-              width: auto;
-              min-width: 82px;
-              min-height: 38px;
-              padding: 8px 10px !important;
-              border-radius: 8px !important;
-              font-size: 12px !important;
-              font-weight: 700 !important;
-            }
-            .adm-cycle-action-btn i{
-              margin-right: 0 !important;
-            }
-            @media (max-width: 360px){
-              .adm-cycle-toolbar__inner{
-                gap: 6px !important;
-              }
-              .adm-cycle-action-btn{
-                min-width: 74px;
-                padding-inline: 8px !important;
-                font-size: 11px !important;
-              }
-            }
-            .content-body.marginTopMobile{
-              margin-top: calc(var(--adm-cycle-nav-height, 220px) + 10px) !important;
-            }
-          }
           @media (max-width: 768px) {
             .whatappemoji {
               width: auto !important;
@@ -12125,147 +11087,107 @@ useEffect(() => {
             }}
           />
           <div className="position-relative" ref={widthRef} >
-            <nav
-              ref={navRef}
-              className="adm-cycle-header-nav b2b-cycle-header-nav"
-              style={{
-                zIndex: 11,
-                backgroundColor: '#fff',
-                position: 'fixed',
-                width: `${width}px`,
-                boxShadow: '0 2px 12px rgba(0, 0, 0, 0.08)',
-                paddingBlock: '10px',
-                paddingInline: '4px',
-                transition: 'all 0.3s ease',
-              }}
+            <nav ref={navRef} className="" style={{
+              zIndex: 11, backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})`, position: 'fixed', width: `${width}px`, backdropFilter: `blur(${blurIntensity}px)`,
+              WebkitBackdropFilter: `blur(${blurIntensity}px)`,
+              boxShadow: isScrolled
+                ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)'
+                : '0 4px 25px 0 #0000001a', paddingBlock: '10px',
+              transition: 'all 0.3s ease',
+            }}
             >
               <div className="container-fluid">
-                <div className="row align-items-center gy-2">
-                  <div className="col-md-4 col-xl-3 d-none d-md-block">
-                    <h5 className="fw-bold text-dark mb-1" style={{ fontSize: '1.1rem' }}>Admission Cycle</h5>
-                    <nav aria-label="breadcrumb">
-                      <ol className="breadcrumb mb-0 small">
-                        <li className="breadcrumb-item">
-                          <a href="/institute/dashboard" className="text-decoration-none">Home</a>
-                        </li>
-                        <li className="breadcrumb-item active">Admission Cycle</li>
-                      </ol>
-                    </nav>
+                <div className="row align-items-center">
+                  <div className="col-md-6 d-md-block d-sm-none">
+                    <div className="d-flex align-items-center">
+                      <h4 className="fw-bold text-dark mb-0 me-3">Admission Cycle</h4>
+                      <nav aria-label="breadcrumb">
+                        <ol className="breadcrumb mb-0 small">
+                          <li className="breadcrumb-item">
+                            <a href="/institute/dashboard" className="text-decoration-none">Home</a>
+                          </li>
+                          <li className="breadcrumb-item active">Admission Cycle</li>
+                        </ol>
+                      </nav>
+                    </div>
                   </div>
 
-                  <div className="col-12 d-md-none mb-1 adm-cycle-mobile-title">
-                    <h5 className="fw-bold text-dark mb-1" style={{ fontSize: '1.1rem' }}>Admission Cycle</h5>
-                    <nav aria-label="breadcrumb">
-                      <ol className="breadcrumb mb-0 small">
-                        <li className="breadcrumb-item">
-                          <a href="/institute/dashboard" className="text-decoration-none">Home</a>
-                        </li>
-                        <li className="breadcrumb-item active">Admission Cycle</li>
-                      </ol>
-                    </nav>
-                  </div>
+                  <div className="col-md-6">
+                    <div className="d-flex justify-content-end align-items-center gap-2">
+                      <div className="input-group" style={{ maxWidth: '300px' }}>
 
-                  <div className="col-md-8 col-xl-9 d-none d-md-flex justify-content-end align-items-center">
-                    {renderCycleFilterDropdowns()}
-                  </div>
+                        <input
+                          type="text"
+                          name="name"
+                          className="form-control border-start-0 m-0"
+                          placeholder="Quick search..."
+                          value={filterData.name}
+                          onChange={handleFilterChange}
+                        />
+                        <button
+                          onClick={() => fetchProfileData()}
+                          className={`btn btn-outline-primary`}
+                          style={{ whiteSpace: 'nowrap' }}
+                        >
+                          <i className={`fas fa-search me-1`}></i>
+                          Search
 
-                  <div className="col-12 d-md-none adm-cycle-mobile-filter-wrap">
-                    {renderCycleFilterDropdowns(true)}
-                  </div>
-
-                  <div className="col-12 mt-1 pt-1 border-top adm-cycle-toolbar" style={{ borderColor: '#eee' }}>
-                    <div className="adm-cycle-toolbar__outer d-flex flex-wrap gap-2 align-items-center justify-content-between">
-                      <div className="adm-cycle-toolbar__inner d-flex align-items-center gap-2 ms-md-auto flex-wrap">
-                            <div className="position-relative adm-cycle-search">
-                              <input
-                                type="text"
-                                name="name"
-                                className="form-control form-control-sm"
-                                placeholder="Quick search..."
-                                value={filterData.name}
-                                onChange={handleFilterChange}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') fetchProfileData();
-                                }}
-                                style={{
-                                  width: isMobile ? '100%' : '200px',
-                                  minWidth: '140px',
-                                  paddingRight: '30px',
-                                  paddingLeft: '12px',
-                                  paddingTop: '8px',
-                                  paddingBottom: '8px',
-                                  backgroundColor: '#ffffff',
-                                  border: '1.5px solid #ced4da',
-                                  fontSize: '13px',
-                                  borderRadius: '6px',
-                                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                                }}
-                              />
-                              {filterData.name && (
-                                <button
-                                  type="button"
-                                  className="btn btn-sm position-absolute"
-                                  onClick={() => {
-                                    const cleared = { ...filterData, name: '' };
-                                    setFilterData(cleared);
-                                    fetchProfileData(cleared, 1);
-                                  }}
-                                  style={{
-                                    right: '2px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    padding: '2px 6px',
-                                    backgroundColor: '#dc3545',
-                                    border: 'none',
-                                    color: 'white',
-                                    borderRadius: '50%',
-                                    width: '20px',
-                                    height: '20px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                  }}
-                                >
-                                  <i className="fas fa-times" style={{ fontSize: '8px' }}></i>
-                                </button>
-                              )}
-                            </div>
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-primary adm-cycle-action-btn adm-cycle-action-btn--search"
-                              onClick={() => fetchProfileData()}
-                              style={{
-                                background: 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)',
-                                borderColor: 'rgb(250, 85, 121)',
-                                color: 'white',
-                                fontWeight: '500',
-                                padding: '8px 16px',
-                                borderRadius: '6px',
-                                fontSize: '13px',
-                              }}
-                            >
-                              <i className="fas fa-search me-1"></i>
-                              <span className="adm-cycle-action-text">Search</span>
-                            </button>
-                            <button
-                              type="button"
-                              className={`btn btn-sm adm-cycle-action-btn adm-cycle-action-btn--filters ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-secondary'}`}
-                              onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
-                              style={{
-                                background: !isFilterCollapsed ? 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)' : '#ffffff',
-                                color: !isFilterCollapsed ? '#ffffff' : 'rgb(250, 85, 121)',
-                                fontWeight: '500',
-                                padding: '8px 16px',
-                                borderRadius: '6px',
-                                fontSize: '13px',
-                                borderWidth: '1.5px',
-                                borderColor: 'rgb(250, 85, 121)',
-                              }}
-                            >
-                              <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
-                              <span className="adm-cycle-action-text">{isMobile ? 'Filters' : 'More'}</span>
-                            </button>
+                        </button>
                       </div>
+
+
+                      <button
+                        onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+                        className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
+                        Filters
+                        {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
+                          <span className="bg-light text-dark ms-1">
+                            {Object.values(filterData).filter(val => val && val !== 'true').length}
+                          </span>
+                        )}
+                      </button>
+
+
+                    </div>
+                  </div>
+
+                  {/* Filter Buttons Row */}
+                  <div className="col-12 mt-2">
+                    <div className={`d-flex gap-2 align-items-center ${isMobile ? 'mobile-filter-scroll' : 'flex-wrap mediaCrmFilters'}`}>
+                      {crmFilters.map((filter, index) => (
+                        <div key={index} className="d-flex align-items-center gap-1">
+                          <div className='d-flex position-relative'>
+                            <button
+                              className={`btn btn-sm btncrm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'}`}
+                              onClick={() => handleCrmFilterClick(index)}
+                              style={isMobile ? { whiteSpace: 'nowrap', flexShrink: 0 } : {}}
+                            >
+                              {filter.name}
+                              <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
+                                ({filter.count})
+                              </span>
+                            </button>
+
+                            {filter.milestone && (
+                              <span
+                                className="position-absolute bg-success text-white px-2 py-1 rounded-pill"
+                                style={{
+                                  fontSize: '0.7rem',
+                                  top: '-8px',
+                                  right: '-10px',
+                                  transform: 'scale(0.8)'
+                                }}
+                                title={`Milestone: ${filter.milestone}`}
+                              >
+                                🚩 {filter.milestone}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -12333,8 +11255,8 @@ useEffect(() => {
                             onChange={handleFilterChange}
                           >
                             <option value="">All Types</option>
-                            <option value="Free">ðŸ†“ Free</option>
-                            <option value="Paid">ðŸ’° Paid</option>
+                            <option value="Free">🆓 Free</option>
+                            <option value="Paid">💰 Paid</option>
                           </select>
                         </div>
                       </div>
@@ -12754,13 +11676,11 @@ useEffect(() => {
 
           {/* Main Content */}
           <div className="content-body marginTopMobile" style={{
-            '--adm-cycle-nav-height': `${navHeight}px`,
             marginTop: `${navHeight + 10}px`,
             transition: 'margin-top 0.2s ease-in-out'
           }}>
             <section className="list-view">
               <div className="row">
-                {renderCrmDashboard()}
                 {/* Desktop Layout */}
                 <div className="d-none flex-row-reverse d-md-flex justify-content-between align-items-center gap-2 crm-sticky-action">
                  
@@ -13106,644 +12026,137 @@ useEffect(() => {
                         {!isLoadingProfiles && allProfiles && allProfiles.map((profile, profileIndex) => (
                           <div className={`card-content transition-col mb-2`} key={profileIndex}>
 
-                            {/* Lead Card (same design as B2B) */}
-                            <div className="lead-card">
-                              {isMobile ? (
-                                <div className="lead-header lead-header-v2">
-                                  {/* Floating labeled actions (mobile) */}
-                                  <div className="lhm__float-actions" role="toolbar" aria-label="Lead actions">
-                                    <button
-                                      type="button"
-                                      className="lhm__float-btn lhm__float-btn--wa"
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        openPanel(profile, 'whatsapp');
-                                      }}
-                                      title="WhatsApp"
-                                      aria-label="WhatsApp"
-                                    >
-                                      <i className="fab fa-whatsapp" aria-hidden="true"></i>
-                                    </button>
-                                    <a
-                                      className="lhm__float-btn lhm__float-btn--call"
-                                      href={`tel:${profile._candidate?.mobile || ''}`}
-                                      onClick={(e) => e.stopPropagation()}
-                                      title="Call"
-                                      aria-label="Call"
-                                    >
-                                      <i className="fas fa-phone" aria-hidden="true"></i>
-                                    </a>
-                                    <div className="lead-strip-v3__actions-wrap">
+                            {/* Profile Header Card */}
+                            <div className="card border-0 shadow-sm mb-0 mt-2">
+                              <div className="card-body px-1 py-0 my-2">
+                                <div className="row align-items-center justify-content-around">
+                                  <div className="col-md-7">
+                                    <div className="d-flex align-items-center">
+                                      <div className="form-check me-md-3 me-sm-1 me-1">
+                                        <input 
+                                          onChange={(e) => handleCheckboxChange(profile, e.target.checked)} 
+                                          checked={selectedProfiles && Array.isArray(selectedProfiles) ? selectedProfiles.includes(profile._id) : false}
+                                          className="form-check-input" 
+                                          type="checkbox" 
+                                        />
+                                      </div>
+                                      <div className="me-md-3 me-sm-1 me-1">
+                                        <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
+                                          <svg width="40" height="40">
+                                            <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
+                                            <circle className="circle-progress" cx="20" cy="20" r="16"></circle>
+                                          </svg>
+                                          <div className="progress-text"></div>
+                                        </div>
+                                      </div>
+                                      <div className="d-flex flex-column">
+                                        <h6 className="mb-0 fw-bold">{profile._candidate?.name || 'Your Name'}</h6>
+                                        <small className="text-muted">{profile._candidate?.mobile || 'Mobile Number'}</small>
+                                        <small className="text-muted">{profile._candidate?.email || 'Email'}</small>
+                                      </div>
+                                      <div className='whatsappbutton'>
+                                        <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
+                                          <a href={`tel:${profile._candidate?.mobile}`} target="_blank" rel="noopener noreferrer">
+                                            <i className="fas fa-phone"></i>
+                                          </a>
+                                        </button>
+
+                                        {/* <a
+                                          className="btn btn-outline-success btn-sm border-0"
+                                          href={`https://wa.me/${profile._candidate?.mobile}`}
+                                          style={{ fontSize: '20px' }}
+                                          title="WhatsApp"
+                                          target="_blank"
+                                        >
+                                          <i className="fab fa-whatsapp"></i>
+                                        </a> */}
+                                        <a
+                                          className="btn btn-outline-success btn-sm border-0"
+                                          onClick={() => openPanel(profile, 'whatsapp')}
+                                          style={{ fontSize: '20px' }}
+                                          title="WhatsApp"
+                                        >
+                                          <i className="fab fa-whatsapp"></i>
+                                        </a>
+                                        {/* <a
+                                          className="btn btn-outline-success btn-sm border-0"
+                                          onClick={() => openPanel(profile, 'email')}
+                                          style={{ fontSize: '20px' }}
+                                          title="Email"
+                                        >
+                                          <i className="fas fa-envelope"></i>
+                                        </a> */}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="col-md-3 mt-3">
+                                    <div className="d-flex gap-2">
+                                      <div className="flex-grow-1">
+                                        <input
+                                          type="text"
+                                          className="form-control form-control-sm m-0"
+                                          style={{
+                                            cursor: 'pointer',
+                                            border: '1px solid #ddd',
+                                            borderRadius: '0px',
+                                            borderTopRightRadius: '5px',
+                                            borderTopLeftRadius: '5px',
+                                            width: '145px',
+                                            height: '20px',
+                                            fontSize: '10px'
+                                          }}
+                                          value={profile._leadStatus?.title}
+                                          readOnly
+                                          onClick={() => {
+                                            openEditPanel(profile, 'StatusChange');
+                                          }}
+
+                                        />
+                                        <input
+                                          type="text"
+                                          className="form-control form-control-sm m-0"
+                                          value={profile.selectedSubstatus?.title}
+                                          style={{
+                                            cursor: 'pointer',
+                                            border: '1px solid #ddd',
+                                            borderRadius: '0px',
+                                            borderBottomRightRadius: '5px',
+                                            borderBottomLeftRadius: '5px',
+                                            width: '145px',
+                                            height: '20px',
+                                            fontSize: '10px'
+                                          }}
+                                          readOnly
+                                        />
+                                      </div>
+<div className="col-md-1 text-end d-md-none d-sm-block d-block">
+                                    <div className="btn-group">
+                                      {/* Three-dot button for mobile - Opens Modal */}
                                       <button
-                                        type="button"
-                                        className="lhm__float-btn lhm__float-btn--more"
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          e.stopPropagation();
-                                          togglePopup(profileIndex);
-                                        }}
-                                        title="More actions"
-                                        aria-label="More actions"
-                                        aria-expanded={showPopup === profileIndex}
+                                        className="btn btn-sm btn-outline-secondary border-0"
+                                        onClick={() => togglePopup(profileIndex)}
+                                        aria-label="Options"
                                       >
-                                        <i className="fas fa-ellipsis-h" aria-hidden="true"></i>
+                                        <i className="fas fa-ellipsis-v"></i>
                                       </button>
-                                      {renderLeadActionsDropdown(profile, profileIndex)}
-                                    </div>
-                                    <button
-                                      type="button"
-                                      className="lhm__float-btn lhm__float-btn--toggle"
-                                      aria-label={leadDetailsVisible === profileIndex ? 'Collapse lead' : 'Expand lead'}
-                                      title={leadDetailsVisible === profileIndex ? 'Collapse' : 'Expand'}
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        toggleLeadDetails(profileIndex);
-                                      }}
-                                    >
-                                      <i className={leadDetailsVisible === profileIndex ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
-                                    </button>
-                                  </div>
-                                  <div className="lhm">
-                                    <div className="lhm__row1">
-                                      <div className="lhm__name" title={profile._candidate?.name || ''}>
-                                        <label className="lhm__check" title="Select">
-                                          <input
-                                            onChange={(e) => handleCheckboxChange(profile, e.target.checked)}
-                                            checked={selectedProfiles && Array.isArray(selectedProfiles) ? selectedProfiles.includes(profile._id) : false}
-                                            className="form-check-input"
-                                            type="checkbox"
-                                          />
-                                        </label>
-                                        <div className="lhm__doc" title="Docs completion">
-                                          <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
-                                            <svg width="34" height="34">
-                                              <circle className="circle-bg" cx="17" cy="17" r="14"></circle>
-                                              <circle className="circle-progress" cx="17" cy="17" r="14"></circle>
-                                            </svg>
-                                            <div className="progress-text"></div>
-                                          </div>
-                                        </div>
-                                        <i className="fas fa-user-circle lhm__name-icon" aria-hidden="true"></i>
-                                        <span className="text-capitalize lhm__name-text">{profile._candidate?.name || '—'}</span>
-                                        <span className="lhm__mobile-number" title={profile._candidate?.mobile || ''}>
-                                          <i className="fas fa-phone" aria-hidden="true"></i>
-                                          <span>{profile._candidate?.mobile || '—'}</span>
-                                        </span>
-                                      </div>
 
-                                    </div>
-
-                                    <div className="lhm__row2">
-                                      {(() => {
-                                        const approvalSafe = getProfileApprovalStatus(profile);
-                                        return (
-                                          <div className="lhm__panel lhm__panel--approval lead-strip-v3__approval-block">
-                                            <div className="lhm__panel-head">
-                                              <span className="lhm__panel-title">
-                                                <i className="fas fa-award" aria-hidden="true"></i>
-                                                Lead Approval
-                                              </span>
-                                              {canEditLeadsPermission && (
-                                                <button
-                                                  type="button"
-                                                  className="lhm__panel-edit"
-                                                  title="Change approval"
-                                                  aria-label="Change approval"
-                                                  aria-expanded={approvalEditProfileId === profile._id}
-                                                  onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    setApprovalEditProfileId((prev) => (prev === profile._id ? null : profile._id));
-                                                  }}
-                                                >
-                                                  <i className="fas fa-pen" aria-hidden="true"></i>
-                                                </button>
-                                              )}
-                                            </div>
-                                            <div className="lead-strip-v3__approval-row">
-                                              <button
-                                                type="button"
-                                                className={`lead-strip-v3__approval-pill lead-strip-v3__approval-pill--${approvalSafe}`}
-                                                title={`Approval: ${getProfileApprovalLabel(approvalSafe)}`}
-                                                onClick={() => handleApprovalCardClick(approvalSafe)}
-                                              >
-                                                {getProfileApprovalLabel(approvalSafe)}
-                                              </button>
-                                            </div>
-                                            {canEditLeadsPermission && (
-                                              <div
-                                                className={`lead-strip-v3__approval-dropdown ${approvalEditProfileId === profile._id ? 'is-open' : ''}`}
-                                                aria-hidden={approvalEditProfileId === profile._id ? 'false' : 'true'}
-                                              >
-                                                {approvalSafe === 'pending' ? (
-                                                  <div className="lead-strip-v3__approval-menu">
-                                                    <button
-                                                      type="button"
-                                                      className="lead-strip-v3__approval-action lead-strip-v3__approval-action--approve"
-                                                      onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        handleApproveLead(profile);
-                                                      }}
-                                                    >
-                                                      <i className="fas fa-check-circle" aria-hidden="true"></i>
-                                                      Approve
-                                                    </button>
-                                                    <button
-                                                      type="button"
-                                                      className="lead-strip-v3__approval-action lead-strip-v3__approval-action--reject"
-                                                      onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        handleRejectLeadClick(profile);
-                                                      }}
-                                                    >
-                                                      <i className="fas fa-times-circle" aria-hidden="true"></i>
-                                                      Reject
-                                                    </button>
-                                                  </div>
-                                                ) : (
-                                                  <div className="lead-strip-v3__approval-menu lead-strip-v3__approval-menu--readonly">
-                                                    {getProfileApprovalLabel(approvalSafe)}
-                                                  </div>
-                                                )}
-                                              </div>
-                                            )}
-                                          </div>
-                                        );
-                                      })()}
-
-                                      <div className="lhm__panel lhm__panel--performance">
-                                        <div className="lhm__panel-head">
-                                          <span className="lhm__panel-title">
-                                            <i className="fas fa-chart-line" aria-hidden="true"></i>
-                                            Performance
-                                          </span>
-                                        </div>
-                                        <div className="lhm__kv">
-                                          <span className="lhm__kv-label">Status</span>
-                                          <button
-                                            type="button"
-                                            className="lhm__kv-pill"
-                                            onClick={() => openEditPanel(profile, 'StatusChange')}
-                                          >
-                                            {profile._leadStatus?.title || '—'}
-                                          </button>
-                                        </div>
-                                        <div className="lhm__kv">
-                                          <span className="lhm__kv-label">Sub-Status</span>
-                                          <button
-                                            type="button"
-                                            className="lhm__kv-pill"
-                                            onClick={() => openEditPanel(profile, 'StatusChange')}
-                                          >
-                                            {profile.selectedSubstatus?.title || '—'}
-                                          </button>
-                                        </div>
-                                        <button
-                                          type="button"
-                                          className="lhm__panel-edit lhm__panel-edit--corner"
-                                          title="Edit Performance"
-                                          aria-label="Edit Performance"
-                                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(profile, 'StatusChange'); }}
-                                        >
-                                          <i className="fas fa-edit" aria-hidden="true"></i>
-                                        </button>
-                                      </div>
-                                    </div>
-
-                                    <div className="lhm__row3">
-                                      <div className="lhm__followup-box">
-                                        <span className="lhm__followup-title">Followup Calling</span>
-                                        <button
-                                          type="button"
-                                          className="lhm__editbtn"
-                                          title="Set Followup"
-                                          aria-label="Set Followup"
-                                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(profile, 'SetFollowup'); }}
-                                        >
-                                          <i className="fas fa-edit" aria-hidden="true"></i>
-                                        </button>
-                                        <div className="lhm__followup-cards">
-                                          {(() => {
-                                            const b = getProfileFollowupBucket(profile, 'Call');
-                                            return [
-                                              { label: 'Done', value: b === 'done' ? 1 : 0, bg: '#dbeafe', color: '#1d4ed8' },
-                                              { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#ffedd5', color: '#c2410c' },
-                                              { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#fee2e2', color: '#b91c1c' },
-                                            ];
-                                          })().map((s) => (
-                                            <div key={s.label} className="lhm__stat-card" style={{ background: s.bg, color: s.color || '#fff' }}>
-                                              <span className="lhm__stat-label">{s.label}</span>
-                                              <span className="lhm__stat-divider" />
-                                              <span className="lhm__stat-val">{String(s.value).padStart(2, '0')}</span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                        <div className="lhm__followup-date">
-                                          <span>Next Follow-up Date:</span><span>{getProfileFollowupDateLabel(profile, 'Call')}</span>
-                                        </div>
-                                      </div>
-
-                                      <div className="lhm__followup-box">
-                                        <span className="lhm__followup-title">Followup Visit</span>
-                                        <button
-                                          type="button"
-                                          className="lhm__editbtn"
-                                          title="Set Followup"
-                                          aria-label="Set Followup"
-                                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(profile, 'SetFollowup'); }}
-                                        >
-                                          <i className="fas fa-edit" aria-hidden="true"></i>
-                                        </button>
-                                        <div className="lhm__followup-cards">
-                                          {(() => {
-                                            const b = getProfileFollowupBucket(profile, 'Visit');
-                                            return [
-                                              { label: 'Done', value: b === 'done' ? 1 : 0, bg: '#d1fae5', color: '#047857' },
-                                              { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#ede9fe', color: '#6d28d9' },
-                                              { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#fee2e2', color: '#b91c1c' },
-                                            ];
-                                          })().map((s) => (
-                                            <div key={s.label} className="lhm__stat-card" style={{ background: s.bg, color: s.color || '#fff' }}>
-                                              <span className="lhm__stat-label">{s.label}</span>
-                                              <span className="lhm__stat-divider" />
-                                              <span className="lhm__stat-val">{String(s.value).padStart(2, '0')}</span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                        <div className="lhm__followup-date">
-                                          <span>Next Follow-up Date:</span><span>{getProfileFollowupDateLabel(profile, 'Visit')}</span>
-                                        </div>
-                                      </div>
-
-                                      <div className="lhm__followup-box">
-                                        <span className="lhm__followup-title">Documents</span>
-                                        <button
-                                          type="button"
-                                          className="lhm__editbtn"
-                                          title="Open Documents"
-                                          aria-label="Open Documents"
-                                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); openProfileDocumentsTab(profileIndex); }}
-                                        >
-                                          <i className="fas fa-edit" aria-hidden="true"></i>
-                                        </button>
-                                        <div className="lhm__followup-cards">
-                                          {(() => {
-                                            const b = getProfileDocumentsBucket(profile);
-                                            return [
-                                              { label: 'Done', value: b === 'done' ? 1 : 0, bg: '#4b5563' },
-                                              { label: 'Pending', value: b === 'pending' ? 1 : 0, bg: '#4b5563' },
-                                            ];
-                                          })().map((s) => (
-                                            <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
-                                              <span className="lhm__stat-label">{s.label}</span>
-                                              <span className="lhm__stat-divider" />
-                                              <span className="lhm__stat-val">{String(s.value).padStart(2, '0')}</span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                        <div className="lhm__followup-date"><span></span><span></span></div>
-                                      </div>
+                                      {/* Expand/Collapse button */}
+                                      <button
+                                        className="btn btn-sm btn-outline-secondary border-0"
+                                        onClick={() => toggleLeadDetails(profileIndex)}
+                                      >
+                                        {leadDetailsVisible === profileIndex ? (
+                                          <i className="fas fa-chevron-up"></i>
+                                        ) : (
+                                          <i className="fas fa-chevron-down"></i>
+                                        )}
+                                      </button>
                                     </div>
                                   </div>
-                                </div>
-                              ) : (
-                                <div className="lead-strip-v3">
-                                  {(() => {
-                                    const approvalSafe = getProfileApprovalStatus(profile);
-                                    const callBucket = getProfileFollowupBucket(profile, 'Call');
-                                    const visitBucket = getProfileFollowupBucket(profile, 'Visit');
-                                    const docDone = Number(profile?.docCounts?.uploadedCount ?? 0);
-                                    const docTotal = Number(profile?.docCounts?.totalRequired ?? 0);
-                                    const docPending = Math.max(0, docTotal - docDone);
-                                    const renderStatGrid = (rows) => (
-                                      <div className="lead-strip-v3__stat-grid">
-                                        <div className="lead-strip-v3__stat-row">
-                                          {rows.map((row) => (
-                                            <div key={row.key} className="lead-strip-v3__stat" style={{ background: row.bg, color: row.color || '#fff' }}>
-                                              <span className="lead-strip-v3__stat-label">{row.label}</span>
-                                              <span className="lead-strip-v3__stat-val">{String(row.value).padStart(2, '0')}</span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    );
-                                    return (
-                                      <>
-                                        <div className="lead-strip-v3__profile">
-                                          {/* {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-                                            <button
-                                              type="button"
-                                              className="lead-strip-v3__profile-edit"
-                                              aria-label="Edit lead"
-                                              title="Profile Edit"
-                                              onClick={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                handleFetchCandidate(profile);
-                                              }}
-                                            >
-                                              <i className="fas fa-pen" aria-hidden="true"></i>
-                                            </button>
-                                          )} */}
-                                          <div className="lead-strip-v3__profile-top">
-                                            <label className="lead-strip-v3__check" title="Select">
-                                              <input
-                                                onChange={(e) => handleCheckboxChange(profile, e.target.checked)}
-                                                checked={selectedProfiles && Array.isArray(selectedProfiles) ? selectedProfiles.includes(profile._id) : false}
-                                                className="form-check-input"
-                                                type="checkbox"
-                                              />
-                                            </label>
-                                            
-                                            <div className="lead-strip-v3__profile-main">
-                                              <div className="lead-strip-v3__avatar" aria-hidden="true">
-                                                <i className="fas fa-user"></i>
-                                              </div>
-                                              <div className="lead-strip-v3__name text-capitalize" title={profile._candidate?.name || 'NA'}>
-                                                {profile._candidate?.name || '—'}
-                                                <span className="lead-strip-v3__mobile-inline" title={profile._candidate?.mobile || 'NA'}>
-                                                  {profile._candidate?.mobile ? ` • ${profile._candidate.mobile}` : ''}
-                                                </span>
-                                              </div>
-                                            </div>
-                                            <div className="lead-strip-v3__doc" title="Docs completion">
-                                              <div className="circular-progress-container" data-percent={profile.docCounts?.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
-                                                <svg width="32" height="32">
-                                                  <circle className="circle-bg" cx="16" cy="16" r="13"></circle>
-                                                  <circle className="circle-progress" cx="16" cy="16" r="13"></circle>
-                                                </svg>
-                                                <div className="progress-text"></div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                          <div className="lead-strip-v3__contact">
-                                            <div className="lead-strip-v3__contact-line" title={profile._candidate?.email || 'NA'}>
-                                              <i className="fas fa-envelope" aria-hidden="true"></i>
-                                              <span>{profile._candidate?.email || '—'}</span>
-                                            </div>
-                                            <div className="lead-strip-v3__contact-line lead-strip-v3__contact-line--phone" title={profile._candidate?.mobile || 'NA'}>
-                                              <i className="fas fa-phone" aria-hidden="true"></i>
-                                              <span>{profile._candidate?.mobile || '—'}</span>
-                                              <button
-                                                type="button"
-                                                className="lead-strip-v3__wa"
-                                                onClick={(e) => {
-                                                  e.preventDefault();
-                                                  e.stopPropagation();
-                                                  openPanel(profile, 'whatsapp');
-                                                }}
-                                                title="WhatsApp"
-                                                aria-label="WhatsApp"
-                                              >
-                                                <i className="fab fa-whatsapp" aria-hidden="true"></i>
-                                              </button>
-                                            </div>
-                                            <div className="lead-strip-v3__contact-line lead-strip-v3__contact-line--followup" title="Next Follow-up">
-                                              <i className="fas fa-calendar-alt" aria-hidden="true"></i>
-                                              <div className="lead-strip-v3__fu-wrap">
-                                                {(() => {
-                                                  const call = getProfileFollowupDateLabel(profile, 'Call');
-                                                  const visit = getProfileFollowupDateLabel(profile, 'Visit');
-                                                  if (call === '—' && visit === '—') {
-                                                    return <span className="lead-strip-v3__fu-line">FU: —</span>;
-                                                  }
-                                                  return (
-                                                    <>
-                                                      {call !== '—' && <span className="lead-strip-v3__fu-line">Call: {call}</span>}
-                                                      {visit !== '—' && <span className="lead-strip-v3__fu-line">Visit: {visit}</span>}
-                                                    </>
-                                                  );
-                                                })()}
-                                              </div>
-                                            </div>
-                                          </div>
-                                        </div>
 
-                                        <div className="lead-strip-v3__panel lead-strip-v3__panel--approval">
-                                          <div className="lead-strip-v3__approval-block">
-                                            <div className="lead-strip-v3__panel-head lead-strip-v3__panel-head--approval">
-                                              <span className="lead-strip-v3__panel-title">
-                                                <i className="fas fa-award" aria-hidden="true"></i> Lead Approval
-                                              </span>
-                                              {canEditLeadsPermission && (
-                                                <button
-                                                  type="button"
-                                                  className="lead-strip-v3__approval-edit"
-                                                  title="Change approval"
-                                                  aria-label="Change approval"
-                                                  aria-expanded={approvalEditProfileId === profile._id}
-                                                  onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    setApprovalEditProfileId((prev) => (prev === profile._id ? null : profile._id));
-                                                  }}
-                                                >
-                                                  <i className="fas fa-pen" aria-hidden="true"></i>
-                                                </button>
-                                              )}
-                                            </div>
-                                            <div className="lead-strip-v3__approval-row">
-                                              <button
-                                                type="button"
-                                                className={`lead-strip-v3__approval-pill lead-strip-v3__approval-pill--${approvalSafe}`}
-                                                title={`Approval: ${getProfileApprovalLabel(approvalSafe)}`}
-                                                onClick={() => handleApprovalCardClick(approvalSafe)}
-                                              >
-                                                {getProfileApprovalLabel(approvalSafe)}
-                                              </button>
-                                            </div>
-                                            {canEditLeadsPermission && (
-                                              <div
-                                                className={`lead-strip-v3__approval-dropdown ${approvalEditProfileId === profile._id ? 'is-open' : ''}`}
-                                                aria-hidden={approvalEditProfileId === profile._id ? 'false' : 'true'}
-                                              >
-                                                {approvalSafe === 'pending' ? (
-                                                  <div className="lead-strip-v3__approval-menu">
-                                                    <button
-                                                      type="button"
-                                                      className="lead-strip-v3__approval-action lead-strip-v3__approval-action--approve"
-                                                      onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        handleApproveLead(profile);
-                                                      }}
-                                                    >
-                                                      <i className="fas fa-check-circle" aria-hidden="true"></i>
-                                                      Approve
-                                                    </button>
-                                                    <button
-                                                      type="button"
-                                                      className="lead-strip-v3__approval-action lead-strip-v3__approval-action--reject"
-                                                      onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        handleRejectLeadClick(profile);
-                                                      }}
-                                                    >
-                                                      <i className="fas fa-times-circle" aria-hidden="true"></i>
-                                                      Reject
-                                                    </button>
-                                                  </div>
-                                                ) : (
-                                                  <div className="lead-strip-v3__approval-menu lead-strip-v3__approval-menu--readonly">
-                                                    {getProfileApprovalLabel(approvalSafe)}
-                                                  </div>
-                                                )}
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-
-                                        <div className="lead-strip-v3__panel lead-strip-v3__panel--performance">
-                                          <div className="lead-strip-v3__perf-block">
-                                            <div className="lead-strip-v3__panel-head">
-                                              <span className="lead-strip-v3__panel-title">
-                                                <i className="fas fa-chart-line" aria-hidden="true"></i> Performance
-                                              </span>
-                                            </div>
-                                            <div className="lead-strip-v3__kv">
-                                              <span className="lead-strip-v3__kv-label">Status</span>
-                                              <button
-                                                type="button"
-                                                className="lead-strip-v3__kv-pill"
-                                                onClick={() => openEditPanel(profile, 'StatusChange')}
-                                              >
-                                                {profile._leadStatus?.title || 'Untouch Lead'}
-                                              </button>
-                                            </div>
-                                            <div className="lead-strip-v3__kv">
-                                              <span className="lead-strip-v3__kv-label">Sub-Status</span>
-                                              <button
-                                                type="button"
-                                                className="lead-strip-v3__kv-pill"
-                                                onClick={() => openEditPanel(profile, 'StatusChange')}
-                                              >
-                                                {profile.selectedSubstatus?.title || 'Untouch Lead'}
-                                              </button>
-                                            </div>
-                                            <button
-                                              type="button"
-                                              className="lead-strip-v3__panel-edit"
-                                              title="Edit Performance"
-                                              aria-label="Edit Performance"
-                                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(profile, 'StatusChange'); }}
-                                            >
-                                              <i className="fas fa-edit" aria-hidden="true"></i>
-                                            </button>
-                                          </div>
-                                        </div>
-
-                                        <div className="lead-strip-v3__panel">
-                                          <div className="lead-strip-v3__panel-head">
-                                            <span className="lead-strip-v3__panel-title">
-                                              <i className="fas fa-phone-alt" aria-hidden="true"></i> Followup Calling
-                                            </span>
-                                          </div>
-                                          {renderStatGrid([
-                                            { key: 'fc-done', label: 'Done', value: callBucket === 'done' ? 1 : 0, bg: '#dbeafe', color: '#1d4ed8' },
-                                            { key: 'fc-planned', label: 'Planned', value: callBucket === 'planned' ? 1 : 0, bg: '#ffedd5', color: '#c2410c' },
-                                            { key: 'fc-missed', label: 'Missed', value: callBucket === 'missed' ? 1 : 0, bg: '#fee2e2', color: '#b91c1c' },
-                                          ])}
-                                          <div className="lead-strip-v3__footer">
-                                            <span className="lead-strip-v3__footer-label">Next Follow-up Date:</span>
-                                            <span className="lead-strip-v3__footer-val">{getProfileFollowupDateLabel(profile, 'Call')}</span>
-                                            <button
-                                              type="button"
-                                              className="lead-strip-v3__footer-cal"
-                                              title="Set Followup"
-                                              aria-label="Set Followup"
-                                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(profile, 'SetFollowup'); }}
-                                            >
-                                              <i className="fas fa-edit" aria-hidden="true"></i>
-                                            </button>
-                                          </div>
-                                        </div>
-
-                                        <div className="lead-strip-v3__panel">
-                                          <div className="lead-strip-v3__panel-head">
-                                            <span className="lead-strip-v3__panel-title">
-                                              <i className="fas fa-user-check" aria-hidden="true"></i> Followup Visit
-                                            </span>
-                                          </div>
-                                          {renderStatGrid([
-                                            { key: 'fv-done', label: 'Done', value: visitBucket === 'done' ? 1 : 0, bg: '#d1fae5', color: '#047857' },
-                                            { key: 'fv-planned', label: 'Planned', value: visitBucket === 'planned' ? 1 : 0, bg: '#ede9fe', color: '#6d28d9' },
-                                            { key: 'fv-missed', label: 'Missed', value: visitBucket === 'missed' ? 1 : 0, bg: '#fee2e2', color: '#b91c1c' },
-                                          ])}
-                                          <div className="lead-strip-v3__footer">
-                                            <span className="lead-strip-v3__footer-label">Next Follow-up Date:</span>
-                                            <span className="lead-strip-v3__footer-val">{getProfileFollowupDateLabel(profile, 'Visit')}</span>
-                                            <button
-                                              type="button"
-                                              className="lead-strip-v3__footer-cal"
-                                              title="Set Followup"
-                                              aria-label="Set Followup"
-                                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(profile, 'SetFollowup'); }}
-                                            >
-                                              <i className="fas fa-edit" aria-hidden="true"></i>
-                                            </button>
-                                          </div>
-                                        </div>
-
-                                        <div className="lead-strip-v3__panel lead-strip-v3__panel--docs">
-                                          <div className="lead-strip-v3__panel-head lead-strip-v3__panel-head--actions">
-                                            <span className="lead-strip-v3__panel-title">
-                                              <i className="fas fa-folder-open" aria-hidden="true"></i> Documents
-                                            </span>
-                                            <div className="lead-strip-v3__head-actions">
-                                              <div className="lead-strip-v3__actions-wrap">
-                                                <button
-                                                  type="button"
-                                                  className="lead-strip-v3__icon-btn"
-                                                  title="More actions"
-                                                  aria-label="More actions"
-                                                  aria-expanded={showPopup === profileIndex}
-                                                  onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    togglePopup(profileIndex);
-                                                  }}
-                                                >
-                                                  <i className="fas fa-ellipsis-v" aria-hidden="true"></i>
-                                                </button>
-                                                {renderLeadActionsDropdown(profile, profileIndex)}
-                                              </div>
-                                              <button
-                                                type="button"
-                                                className="lead-strip-v3__icon-btn lead-strip-v3__icon-btn--collapse"
-                                                aria-label={leadDetailsVisible === profileIndex ? 'Collapse lead' : 'Expand lead'}
-                                                title={leadDetailsVisible === profileIndex ? 'Collapse' : 'Expand'}
-                                                onClick={(e) => {
-                                                  e.preventDefault();
-                                                  e.stopPropagation();
-                                                  toggleLeadDetails(profileIndex);
-                                                }}
-                                              >
-                                                <i className={leadDetailsVisible === profileIndex ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
-                                              </button>
-                                            </div>
-                                          </div>
-                                          <div className="lead-strip-v3__stat-row lead-strip-v3__stat-row--docs">
-                                            <div className="lead-strip-v3__stat" style={{ background: '#d1fae5', color: '#047857' }}>
-                                              <span className="lead-strip-v3__stat-label">Done</span>
-                                              <span className="lead-strip-v3__stat-val">{String(docDone).padStart(2, '0')}</span>
-                                            </div>
-                                            <div className="lead-strip-v3__stat" style={{ background: '#ffedd5', color: '#c2410c' }}>
-                                              <span className="lead-strip-v3__stat-label">Pending</span>
-                                              <span className="lead-strip-v3__stat-val">{String(docPending).padStart(2, '0')}</span>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </>
-                                    );
-                                  })()}
-                                </div>
-                              )}
-                            </div>
+                                    </div>  
+                                  </div>
 
                                   {/* Overdue badge: next action date passed */}
                                   {/* {(profile.followupDate && new Date(profile.followupDate) < new Date(new Date().setHours(0, 0, 0, 0))) && (
@@ -13792,7 +12205,7 @@ useEffect(() => {
 
                                   
 
-                                  <div className="col-md-1 text-end d-none">
+                                  <div className="col-md-1 text-end d-md-block d-sm-none d-none">
                                     <div className="btn-group">
 
                                       <div style={{ position: "relative", display: "inline-block" }}>
@@ -13974,6 +12387,9 @@ useEffect(() => {
                                       </button>
                                     </div>
                                   </div>
+                                </div>
+                              </div>
+                            </div>
 
                             {/* Tab Navigation and Content Card */}
                             <div className="card border-0 shadow-sm mb-4">
@@ -14418,7 +12834,7 @@ useEffect(() => {
                                               <div className="resume-profile-section">
                                                 {profile._candidate?.personalInfo?.image ? (
                                                   <img
-                                                    src={`${profile._candidate?.personalInfo?.image}`}
+                                                    src={resolveMediaUrl(bucketUrl, profile._candidate.personalInfo.image)}
                                                     alt="Profile"
                                                     className="resume-profile-image"
                                                   />
@@ -14480,7 +12896,9 @@ useEffect(() => {
 
                                               <div className="resume-summary">
                                                 <h2 className="resume-section-title">Professional Summary</h2>
-                                                <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
+                                                <p className={getResumeSummary(profile._candidate) ? '' : 'resume-empty-hint'}>
+                                                  {getResumeSummary(profile._candidate) || 'No summary provided'}
+                                                </p>
                                               </div>
                                             </div>
 
@@ -14546,17 +12964,9 @@ useEffect(() => {
                                                     {profile._candidate.qualifications.map((edu, index) => (
                                                       <div className="resume-education-item" key={`resume-edu-${index}`}>
                                                         <div className="resume-item-header">
-                                                          {(() => {
-                                                            const isObjectIdLike = (v) =>
-                                                              typeof v === 'string' && /^[a-f0-9]{24}$/i.test(v.trim());
-                                                            const maybeTitle =
-                                                              (!isObjectIdLike(edu.education) && edu.education) ||
-                                                              (!isObjectIdLike(edu.course) && edu.course) ||
-                                                              null;
-                                                            return maybeTitle ? (
-                                                              <h3 className="resume-item-title">{maybeTitle}</h3>
-                                                            ) : null;
-                                                          })()}
+                                                          {getQualificationTitle(edu) && (
+                                                            <h3 className="resume-item-title">{getQualificationTitle(edu)}</h3>
+                                                          )}
                                                           {edu.universityName && (
                                                             <p className="resume-item-subtitle">{edu.universityName}</p>
                                                           )}
@@ -14583,14 +12993,14 @@ useEffect(() => {
 
                                               <div className="resume-column resume-right-column">
 
-                                                {profile._candidate?.personalInfo?.skills?.length > 0 && (
+                                                {getVisibleSkills(profile._candidate?.personalInfo?.skills).length > 0 && (
                                                   <div className="resume-section">
                                                     <h2 className="resume-section-title">Skills</h2>
                                                     <div className="resume-skills-list">
-                                                      {profile._candidate?.personalInfo?.skills?.map((skill, index) => (
+                                                      {getVisibleSkills(profile._candidate.personalInfo.skills).map((skill, index) => (
                                                         <div className="resume-skill-item" key={`resume-skill-${index}`}>
-                                                          <div className="resume-skill-name">{skill?.skillName || 'Skill'}</div>
-                                                          {skill?.skillPercent && (
+                                                          <div className="resume-skill-name">{getSkillLabel(skill)}</div>
+                                                          {Number(skill?.skillPercent) > 0 && (
                                                             <div className="resume-skill-bar-container">
                                                               <div
                                                                 className="resume-skill-bar"
@@ -14631,11 +13041,11 @@ useEffect(() => {
                                                 )}
 
 
-                                                {profile._candidate?.personalInfo?.certifications?.length > 0 && (
+                                                {getVisibleCertifications(profile._candidate?.personalInfo?.certifications).length > 0 && (
                                                   <div className="resume-section">
                                                     <h2 className="resume-section-title">Certifications</h2>
                                                     <ul className="resume-certifications-list">
-                                                      {profile._candidate.personalInfo.certifications.map((cert, index) => (
+                                                      {getVisibleCertifications(profile._candidate.personalInfo.certifications).map((cert, index) => (
                                                         <li key={`resume-cert-${index}`} className="resume-certification-item">
                                                           <strong>{cert.certificateName || cert.name}</strong>
                                                           {cert.orgName && (
@@ -14659,14 +13069,14 @@ useEffect(() => {
                                                 )}
 
 
-                                                {profile._candidate?.personalInfo?.projects?.length > 0 && (
+                                                {getVisibleProjects(profile._candidate?.personalInfo?.projects).length > 0 && (
                                                   <div className="resume-section">
                                                     <h2 className="resume-section-title">Projects</h2>
-                                                    {profile._candidate.personalInfo.projects.map((proj, index) => (
+                                                    {getVisibleProjects(profile._candidate.personalInfo.projects).map((proj, index) => (
                                                       <div className="resume-project-item" key={`resume-proj-${index}`}>
                                                         <div className="resume-item-header">
                                                           <h3 className="resume-project-title">
-                                                            {proj.projectName || 'Project'}
+                                                            {proj.projectName}
                                                             {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
                                                           </h3>
                                                         </div>
@@ -14685,11 +13095,15 @@ useEffect(() => {
                                                   <div className="resume-section">
                                                     <h2 className="resume-section-title">Interests</h2>
                                                     <div className="resume-interests-tags">
-                                                      {profile._candidate.personalInfo.interest.map((interest, index) => (
+                                                      {profile._candidate.personalInfo.interest.map((interest, index) => {
+                                                        const label = getInterestLabel(interest);
+                                                        if (!label) return null;
+                                                        return (
                                                         <span className="resume-interest-tag" key={`resume-interest-${index}`}>
-                                                          {interest}
+                                                          {label}
                                                         </span>
-                                                      ))}
+                                                        );
+                                                      })}
                                                     </div>
                                                   </div>
                                                 )}
@@ -15717,7 +14131,6 @@ useEffect(() => {
         {/* Mobile Modals */}
         {isMobile && renderEditPanel()}
         {isMobile && renderRefferPanel()}
-        {isMobile && renderWhatsAppPanel()}
         {isMobile && renderEmailPanel()}
         {isMobile && renderLeadHistoryPanel()}
         {isMobile && renderAllLeadPanel()}
@@ -15748,11 +14161,11 @@ useEffect(() => {
                 <div className="mb-3">
                   <div className="d-flex flex-wrap justify-content-between align-items-center mb-2">
                     <div className="small text-muted">
-                      Visible leads: <strong>{allProfiles?.length || 0}</strong> Â· Selected:{' '}
+                      Visible leads: <strong>{allProfiles?.length || 0}</strong> · Selected:{' '}
                       <strong>{selectedProfiles?.length || 0}</strong>
                     </div>
                     <div className="badge bg-light text-dark border small">
-                      AI Tools Â· Bulk Actions Â· WhatsApp
+                      AI Tools · Bulk Actions · WhatsApp
                     </div>
                   </div>
 
@@ -15761,7 +14174,7 @@ useEffect(() => {
                     <div className="card border-0 bg-light flex-grow-1">
                       <div className="card-body py-2">
                         <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                          <span className="small fw-semibold text-muted text-uppercase">AI tools Â· First N leads</span>
+                          <span className="small fw-semibold text-muted text-uppercase">AI tools · First N leads</span>
                           <div className="d-flex align-items-center gap-2">
                             <span className="small text-muted">First N</span>
                             <input
@@ -15999,7 +14412,7 @@ useEffect(() => {
                         const actions = nextActionsByProfileId[p._id];
                         const actionsLoading = !!nextActionsLoadingByProfileId[p._id];
                         const actionsErr = nextActionsErrorByProfileId[p._id];
-                        const nextAction = p.followupDate ? new Date(p.followupDate).toLocaleDateString() : 'â€”';
+                        const nextAction = p.followupDate ? new Date(p.followupDate).toLocaleDateString() : '—';
                         const overdue = p.followupDate && new Date(p.followupDate) < new Date(new Date().setHours(0, 0, 0, 0));
                         return (
                           <tr
@@ -16009,11 +14422,11 @@ useEffect(() => {
                             onClick={() => setAiSupervisionActiveLeadId(p._id)}
                           >
                             <td>
-                              <div className="fw-semibold">{p._candidate?.name || 'â€”'}</div>
-                              <div className="small text-muted">{p._candidate?.mobile || 'â€”'}</div>
+                              <div className="fw-semibold">{p._candidate?.name || '—'}</div>
+                              <div className="small text-muted">{p._candidate?.mobile || '—'}</div>
                             </td>
                               <td className="small">
-                                <div>{p?._course?.name || 'Ã¢â‚¬â€'}</div>
+                                <div>{p?._course?.name || 'â€”'}</div>
                                 <div className="text-muted">{getProfileCenterName(p)}</div>
                               </td>
                               <td className="small">
@@ -16029,7 +14442,7 @@ useEffect(() => {
                                       : 'bg-light text-muted border'
                                   }`}
                                 >
-                                  {p._leadStatus?.title || 'â€”'}
+                                  {p._leadStatus?.title || '—'}
                                 </span>
                               </div>
                               {p.selectedSubstatus?.title && (
@@ -16050,10 +14463,10 @@ useEffect(() => {
                                   {intel.score}/100
                                 </span>
                               ) : (
-                                <span className="text-muted">â€”</span>
+                                <span className="text-muted">—</span>
                               )}
                             </td>
-                            <td className="small">{intel?.intent || 'â€”'}</td>
+                            <td className="small">{intel?.intent || '—'}</td>
                             <td className="small">
                               {overdue && <span className="badge bg-danger me-1">Overdue</span>}
                               <span className="text-muted">{nextAction}</span>
@@ -16157,7 +14570,7 @@ useEffect(() => {
                                       : 'bg-light text-muted border'
                                   }`}
                                 >
-                                  {active._leadStatus?.title || 'â€”'}
+                                  {active._leadStatus?.title || '—'}
                                 </span>
                                 {active.selectedSubstatus?.title && (
                                   <span className="text-muted">{active.selectedSubstatus.title}</span>
@@ -16200,14 +14613,14 @@ useEffect(() => {
                                 title="Generate summary"
                               >
                                 {summaryLoading ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="fas fa-wand-magic-sparkles me-1" />}
-                                {summaryLoading ? 'Generatingâ€¦' : 'Generate'}
+                                {summaryLoading ? 'Generating…' : 'Generate'}
                               </button>
                             </div>
                             <div className="card-body py-3 px-3">
                               {summaryLoading && (
                                 <div className="text-muted small d-flex align-items-center">
                                   <span className="spinner-border spinner-border-sm me-2" role="status" />
-                                  Generating summaryâ€¦
+                                  Generating summary…
                                 </div>
                               )}
                               {!summaryLoading && summaryErr && (
@@ -16245,14 +14658,14 @@ useEffect(() => {
                                 title="Generate actions"
                               >
                                 {actionsLoading ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="fas fa-bolt me-1" />}
-                                {actionsLoading ? 'Generatingâ€¦' : 'Generate'}
+                                {actionsLoading ? 'Generating…' : 'Generate'}
                               </button>
                             </div>
                             <div className="card-body py-3 px-3">
                               {actionsLoading && (
                                 <div className="text-muted small d-flex align-items-center">
                                   <span className="spinner-border spinner-border-sm me-2" role="status" />
-                                  Generating actionsâ€¦
+                                  Generating actions…
                                 </div>
                               )}
                               {!actionsLoading && actionsErr && (
@@ -16285,11 +14698,11 @@ useEffect(() => {
                                 title="Generate WhatsApp summary"
                               >
                                 {waLoading ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="fas fa-wand-magic-sparkles me-1" />}
-                                {waLoading ? 'Generatingâ€¦' : 'Generate'}
+                                {waLoading ? 'Generating…' : 'Generate'}
                               </button>
                             </div>
                             <div className="card-body py-3 px-3 small">
-                              {waLoading && <div className="text-muted d-flex align-items-center"><span className="spinner-border spinner-border-sm me-2" />Generatingâ€¦</div>}
+                              {waLoading && <div className="text-muted d-flex align-items-center"><span className="spinner-border spinner-border-sm me-2" />Generating…</div>}
                               {!waLoading && waErr && <div className="text-danger">{waErr}</div>}
                               {!waLoading && wa && (
                                 <>
@@ -19336,7 +17749,7 @@ margin-left:15px;
 
 
         /* ========================================
-           ðŸŽ¯ NEW: Responsive Design (ADD THESE STYLES)
+           🎯 NEW: Responsive Design (ADD THESE STYLES)
            ======================================== */
         /* Responsive Design */
         @media(max-width:1920px) {
@@ -24101,7 +22514,8 @@ max-width: 600px;
         `}
       </style>
 
-      <style>{`
+      <style>
+{`
   .fixDate {
     box-sizing: border-box;
     font-size: 13px;
@@ -24141,1866 +22555,8 @@ padding:12px;
          display: block !important; 
     }
 }
-`}</style>
-
-      {/* Lead card v2 styles (matched to B2B) */}
-      <style>{`
-        .lead-card{
-          --lead-card-radius: 20px;
-          background: #fff;
-          border-radius: var(--lead-card-radius);
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-          border: 1px solid #f0f0f0;
-          overflow: hidden;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          margin-bottom: 0.5rem;
-          position: relative;
-        }
-        .lead-card:hover{
-          transform: translateY(-4px);
-          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-        }
-
-        /* Lead strip v3 — card row layout (reference UI) */
-        .lead-strip-v3{
-          display: flex;
-          align-items: stretch;
-          gap: 6px;
-          padding: 8px;
-          background: linear-gradient(145deg, #0b5ed7 0%, #1aa3ff 55%, #2dd4ff 100%);
-          flex-wrap: nowrap;
-          overflow-x: auto;
-          overflow-y: visible;
-        }
-
-        .lead-strip-v3__profile{
-          position: relative;
-          /* Dynamic width (shrinks/grows with screen) */
-          flex: 0 1 clamp(180px, 22vw, 240px);
-          min-width: 160px;
-          background: linear-gradient(145deg, #0b5ed7 0%, #1aa3ff 55%, #2dd4ff 100%);
-          border-radius: 14px;
-          padding: 8px;
-          color: #fff;
-          box-shadow: 0 4px 14px rgba(11, 94, 215, 0.25);
-          overflow: hidden;
-        }
-
-        .lead-strip-v3__profile-edit{
-          position: absolute;
-          top: 0px;
-          left: 0px;
-          width: 15px;
-          height: 15px;
-          border-radius: 999px;
-          border: 1px solid rgba(255,255,255,0.85);
-          background: rgba(255,255,255,0.95);
-          color: #0b5ed7;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          font-size: 10px;
-          z-index: 2;
-        }
-
-        .lead-strip-v3__profile-top{
-          display: flex;
-          align-items: flex-start;
-          gap: 6px;
-          margin-bottom: 6px;
-          padding-top: 2px;
-        }
-
-        .lead-strip-v3__check{ display: inline-flex; margin-top: 4px; }
-        .lead-strip-v3__check .form-check-input{ margin: 0; }
-
-        .lead-strip-v3__profile-main{
-          flex: 1;
-          min-width: 0;
-          display: flex;
-          flex-direction: row;
-          align-items: center;
-          text-align: left;
-          gap: 6px;
-        }
-
-        .lead-strip-v3__avatar{
-          width: 14px;
-          height: 14px;
-          min-width: 14px;
-          border-radius: 999px;
-          background: rgba(255,255,255,0.95);
-          color: #0b5ed7;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 9px;
-          flex-shrink: 0;
-          box-shadow: none;
-        }
-
-        .lead-strip-v3__name{
-          font-size: 14px;
-          font-weight: 800;
-          line-height: 1.2;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          width: auto;
-          flex: 1;
-          min-width: 0;
-        }
-
-        .lead-strip-v3__mobile-inline{
-          font-size: 12px;
-          font-weight: 700;
-          opacity: 0.92;
-          white-space: nowrap;
-        }
-
-        @media (min-width: 769px){
-          /* Desktop: phone already shown inline with name */
-          .lead-strip-v3__contact-line--phone{ display: none; }
-        }
-
-        .lead-strip-v3__badges{
-          display: flex;
-          flex-wrap: wrap;
-          gap: 4px;
-          margin-top: 6px;
-        }
-
-        .lead-strip-v3__badge{
-          border: none;
-          border-radius: 999px;
-          padding: 2px 8px;
-          font-size: 9px;
-          font-weight: 800;
-          line-height: 1.4;
-          white-space: nowrap;
-        }
-
-        .lead-strip-v3__badge--tag{
-          background: rgba(255,255,255,0.22);
-          color: #fff;
-          cursor: default;
-        }
-
-        .lead-strip-v3__badge--pending{
-          background: #f59e0b;
-          color: #fff;
-          cursor: pointer;
-        }
-        .lead-strip-v3__badge--approved{
-          background: #10b981;
-          color: #fff;
-          cursor: pointer;
-        }
-        .lead-strip-v3__badge--rejected{
-          background: #ef4444;
-          color: #fff;
-          cursor: pointer;
-        }
-
-        .lead-strip-v3__doc{ flex-shrink: 0; }
-
-        .lead-strip-v3__contact{
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-        }
-
-        .lead-strip-v3__contact-line{
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 10px;
-          font-weight: 600;
-          min-width: 0;
-        }
-
-        .lead-strip-v3__contact-line i{
-          width: 14px;
-          text-align: center;
-          opacity: 0.9;
-          flex-shrink: 0;
-        }
-
-        .lead-strip-v3__contact-line span{
-          flex: 1;
-          min-width: 0;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .lead-strip-v3__contact-line--phone{
-          background: rgba(0,0,0,0.12);
-          border-radius: 6px;
-          padding: 3px 6px;
-        }
-
-        .lead-strip-v3__contact-line--followup{
-          background: rgba(0,0,0,0.10);
-          border-radius: 6px;
-          padding: 3px 6px;
-          align-items: flex-start;
-        }
-
-        .lead-strip-v3__contact-line--followup i{
-          margin-top: 1px;
-        }
-
-        .lead-strip-v3__fu-wrap{
-          flex: 1;
-          min-width: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 1px;
-        }
-
-        .lead-strip-v3__fu-line{
-          display: block;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          line-height: 1.25;
-          font-size: 10px;
-        }
-
-        .lead-strip-v3__wa{
-          width: 28px;
-          height: 28px;
-          min-width: 28px;
-          border: none;
-          border-radius: 8px;
-          background: #25d366;
-          color: #fff;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          font-size: 14px;
-        }
-
-        .lead-strip-v3__panel{
-          position: relative;
-          /* Dynamic panels: auto-adjust to available width */
-          flex: 1 1 160px;
-          min-width: 130px;
-          background: #fff;
-          border: 1px solid #e8edf3;
-          border-radius: 12px;
-          padding: 8px 8px 6px;
-          box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-
-        .lead-strip-v3__panel--docs{
-          flex: 1 1 clamp(150px, 14vw, 190px);
-          min-width: 130px;
-          overflow: visible;
-        }
-
-        .lead-strip-v3__panel--approval{
-          flex: 1 1 clamp(120px, 11vw, 155px);
-          min-width: 110px;
-          overflow: visible;
-        }
-
-        .lead-strip-v3__panel--performance{
-          flex: 1 1 clamp(170px, 15vw, 210px);
-          min-width: 140px;
-          gap: 8px;
-        }
-
-        .lead-strip-v3__approval-block{
-          position: relative;
-        }
-
-        .lead-strip-v3__panel-head--approval{
-          margin-bottom: 2px;
-          padding-right: 34px; /* room for corner edit button */
-        }
-
-        .lead-strip-v3__approval-edit{
-          width: 15px;
-          height: 15px;
-          border-radius: 8px;
-          border: 1px solid #e2e8f0;
-          background: #fff;
-          color: #2563eb;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          font-size: 11px;
-          padding: 0;
-          flex-shrink: 0;
-          position: absolute;
-          top: -9px;
-          left: -9px;
-        }
-
-        @media (max-width: 768px){
-          /* Mobile: allow cards to wrap so dropdown isn't clipped */
-          .lead-strip-v3{
-            flex-wrap: wrap;
-            overflow-x: visible;
-          }
-
-          .lead-strip-v3__profile{
-            flex: 1 1 100%;
-            min-width: 0;
-          }
-
-          .lead-strip-v3__panel{
-            flex: 1 1 calc(50% - 10px);
-            min-width: 0;
-          }
-
-          .lead-strip-v3__panel--approval{
-            flex: 1 1 calc(50% - 10px);
-            min-width: 0;
-          }
-
-          .lead-strip-v3__approval-menu{
-            padding: 6px;
-            gap: 6px;
-          }
-
-          .lead-strip-v3__approval-action{
-            padding: 7px 8px;
-            font-size: 11px;
-            gap: 6px;
-          }
-        }
-
-        .lead-strip-v3__approval-edit:hover{
-          background: #eff6ff;
-          border-color: #bfdbfe;
-        }
-
-        .lead-strip-v3__approval-row{
-          display: flex;
-          align-items: center;
-          justify-content: flex-start;
-        }
-
-        .lead-strip-v3__approval-pill{
-          border: none;
-          border-radius: 999px;
-          padding: 3px 10px;
-          font-size: 10px;
-          font-weight: 800;
-          line-height: 1.3;
-          white-space: nowrap;
-          cursor: pointer;
-        }
-
-        /* Extra compact approval panel (reduces empty feel) */
-        .lead-strip-v3__panel--approval{
-          padding: 6px 6px 5px;
-          gap: 4px;
-        }
-
-        .lead-strip-v3__panel--approval .lead-strip-v3__panel-title{
-          font-size: 10px;
-        }
-
-        .lead-strip-v3__panel--approval .lead-strip-v3__panel-title i{
-          font-size: 10px;
-        }
-
-        .lead-strip-v3__approval-pill--pending{
-          background: #ffedd5;
-          color: #c2410c;
-        }
-
-        .lead-strip-v3__approval-pill--approved{
-          background: #d1fae5;
-          color: #047857;
-        }
-
-        .lead-strip-v3__approval-pill--rejected{
-          background: #fee2e2;
-          color: #b91c1c;
-        }
-
-        .lead-strip-v3__approval-dropdown{
-          position: absolute;
-          top: calc(100% + 4px);
-          left: 0;
-          right: 0;
-          z-index: 1200;
-          opacity: 0;
-          transform: translateY(-6px) scale(0.98);
-          pointer-events: none;
-          visibility: hidden;
-          transition: opacity 160ms ease, transform 160ms ease, visibility 0s linear 160ms;
-        }
-
-        /* Mobile: open approval menu upwards so it stays visible */
-        @media (max-width: 768px){
-          .lead-strip-v3__panel--approval{ z-index: 1200; }
-
-          .lead-strip-v3__approval-dropdown{
-            top: auto;
-            bottom: calc(100% + 6px);
-            transform: translateY(6px) scale(0.98);
-          }
-
-          .lead-strip-v3__approval-dropdown.is-open{
-            transform: translateY(0) scale(1);
-          }
-        }
-
-        .lead-strip-v3__approval-dropdown.is-open{
-          opacity: 1;
-          transform: translateY(0) scale(1);
-          pointer-events: auto;
-          visibility: visible;
-          transition: opacity 180ms ease, transform 180ms ease;
-        }
-
-        .lead-strip-v3__approval-menu{
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-          padding: 8px;
-          border-radius: 12px;
-          border: 1px solid #e2e8f0;
-          background: #fff;
-          box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
-        }
-
-        .lead-strip-v3__approval-menu--readonly{
-          font-size: 11px;
-          font-weight: 800;
-          color: #64748b;
-          text-align: center;
-        }
-
-        .lead-strip-v3__approval-action{
-          width: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          border-radius: 10px;
-          border: 1.5px solid transparent;
-          padding: 8px 10px;
-          font-size: 12px;
-          font-weight: 800;
-          cursor: pointer;
-          background: #fff;
-        }
-
-        .lead-strip-v3__approval-action--approve{
-          border-color: #10b981;
-          color: #059669;
-        }
-
-        .lead-strip-v3__approval-action--approve:hover{
-          background: #ecfdf5;
-        }
-
-        .lead-strip-v3__approval-action--reject{
-          border-color: #ef4444;
-          color: #dc2626;
-        }
-
-        .lead-strip-v3__approval-action--reject:hover{
-          background: #fef2f2;
-        }
-
-        .lead-strip-v3__section-divider{
-          height: 1px;
-          background: #e8edf3;
-          margin: 2px 0;
-        }
-
-        .lead-strip-v3__perf-block{
-          position: relative;
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-          flex: 1;
-        }
-
-        .lead-strip-v3__panel-head{
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 6px;
-          margin-bottom: 2px;
-        }
-
-        .lead-strip-v3__panel-head--actions{
-          margin-bottom: 4px;
-        }
-
-        .lead-strip-v3__panel-title{
-          font-size: 11px;
-          font-weight: 800;
-          color: #1e293b;
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          white-space: nowrap;
-        }
-
-        .lead-strip-v3__panel-title i{
-          color: #3b82f6;
-          font-size: 11px;
-        }
-
-        .lead-strip-v3__head-actions{
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          flex-shrink: 0;
-        }
-
-        .lead-strip-v3__actions-wrap{
-          position: relative;
-        }
-
-        .lead-strip-v3__actions-backdrop{
-          position: fixed;
-          inset: 0;
-          z-index: 1040;
-          background: transparent;
-        }
-
-        .lead-strip-v3__actions-dropdown{
-          position: absolute;
-          top: auto;
-          // bottom: calc(100% + 6px);
-          right: 0;
-          z-index: 1050;
-          min-width: 170px;
-          max-width: 210px;
-        }
-
-        /* Desktop-only tightening */
-        @media (min-width: 992px){
-          .lead-strip-v3{
-            padding: 8px;
-          }
-
-          .lead-strip-v3__profile{
-            padding: 10px;
-          }
-
-          .lead-strip-v3__kv{ gap: 6px; }
-          .lead-strip-v3__kv-pill{ padding: 3px 8px; }
-
-          .lead-strip-v3__stat-grid{ gap: 5px; }
-          .lead-strip-v3__stat-row{ gap: 6px; }
-          .lead-strip-v3__stat{ padding: 6px 8px; }
-
-          .lead-strip-v3__footer{
-            gap: 6px;
-            margin-top: 4px;
-          }
-        }
-
-        .lead-strip-v3__actions-menu{
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-          padding: 6px;
-          border-radius: 10px;
-          border: 1px solid #e2e8f0;
-          background: #fff;
-          box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
-        }
-
-        .lead-strip-v3__actions-item{
-          width: 100%;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          border: none;
-          background: transparent;
-          border-radius: 8px;
-          padding: 7px 10px;
-          font-size: 11px;
-          font-weight: 700;
-          color: #334155;
-          text-align: left;
-          cursor: pointer;
-          white-space: nowrap;
-        }
-
-        .lead-strip-v3__actions-item:hover{
-          background: #f8fafc;
-        }
-
-        .lead-strip-v3__actions-item i{
-          width: 14px;
-          text-align: center;
-          flex-shrink: 0;
-          font-size: 11px;
-        }
-
-        .lhm__actions .lead-strip-v3__actions-dropdown{
-          right: 0;
-          left: auto;
-        }
-
-        .lead-strip-v3__icon-btn{
-          width: 28px;
-          height: 28px;
-          border-radius: 8px;
-          border: 1px solid #e2e8f0;
-          background: #f8fafc;
-          color: #475569;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          font-size: 12px;
-          padding: 0;
-        }
-
-        .lead-strip-v3__icon-btn:hover{
-          background: #eff6ff;
-          color: #2563eb;
-          border-color: #bfdbfe;
-        }
-
-        .lead-strip-v3__icon-btn--collapse{
-          background: #1e293b;
-          color: #fff;
-          border-color: #1e293b;
-        }
-
-        .lead-strip-v3__icon-btn--collapse:hover{
-          background: #0f172a;
-          color: #fff;
-        }
-
-        .lead-strip-v3__kv{
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          min-width: 0;
-        }
-
-        .lead-strip-v3__kv-label{
-          font-size: 9px;
-          font-weight: 700;
-          color: #64748b;
-          flex-shrink: 0;
-        }
-
-        .lead-strip-v3__kv-pill{
-          flex: 1;
-          min-width: 0;
-          border: 1px solid #bfdbfe;
-          background: #eff6ff;
-          color: #1d4ed8;
-          border-radius: 999px;
-          padding: 3px 10px;
-          font-size: 10px;
-          font-weight: 700;
-          text-align: left;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          cursor: pointer;
-        }
-
-        .lead-strip-v3__panel-edit{
-          position: absolute;
-          right: -8px;
-          bottom: -8px;
-          width: 18px;
-          height: 18px;
-          border-radius: 8px;
-          border: 1px solid #bfdbfe;
-          background: #eff6ff;
-          color: #2563eb;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          font-size: 12px;
-        }
-
-        .lead-strip-v3__stat-grid{
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-          flex: 1;
-        }
-
-        .lead-strip-v3__stat-row{
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 6px;
-        }
-
-        .lead-strip-v3__stat-row--docs{
-          margin-top: 4px;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .lead-strip-v3__stat{
-          border-radius: 10px;
-          padding: 6px 8px;
-          text-align: center;
-          min-height: 44px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 2px;
-        }
-
-        .lead-strip-v3__stat--wide{
-          width: 100%;
-        }
-
-        .lead-strip-v3__stat-label{
-          font-size: 10px;
-          font-weight: 800;
-          line-height: 1.1;
-        }
-
-        .lead-strip-v3__stat-val{
-          font-size: 14px;
-          font-weight: 900;
-          line-height: 1;
-        }
-
-        .lead-strip-v3__footer{
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          margin-top: auto;
-          padding-top: 6px;
-          border-top: 1px solid #f1f5f9;
-          font-size: 10px;
-          min-width: 0;
-        }
-
-        .lead-strip-v3__footer-label{
-          font-weight: 700;
-          color: #64748b;
-          white-space: nowrap;
-        }
-
-        .lead-strip-v3__footer-val{
-          font-weight: 800;
-          color: #334155;
-          flex: 1;
-          min-width: 0;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .lead-strip-v3__footer-cal{
-          width: 26px;
-          height: 26px;
-          border: none;
-          border-radius: 8px;
-          background: #eff6ff;
-          color: #2563eb;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          flex-shrink: 0;
-          font-size: 11px;
-        }
-
-        @media (max-width: 1200px){
-          /* Keep one-row layout (no wrap). Let cards shrink and scroll if needed. */
-          .lead-strip-v3{ flex-wrap: nowrap; }
-          .lead-strip-v3__panel{ min-width: 120px; }
-          .lead-strip-v3__panel--performance{ min-width: 130px; }
-        }
-
-        .lead-header{ color: #fff; position: relative; overflow: hidden; }
-        .lead-header-v2{
-          background: linear-gradient(145deg, #0b5ed7 0%, #1aa3ff 55%, #2dd4ff 100%);
-          padding: 8px 10px;
-          position: relative;
-          --lead-header-v2-block-h: 92px;
-          overflow: hidden;
-          z-index: 2;
-        }
-
-        .lead-header-v2__float-actions{
-          position: absolute;
-          top: 10px;
-          right: 10px;
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          z-index: 10;
-        }
-
-        .lead-header-v2__float-icon{
-          width: 34px;
-          height: 34px;
-          border-radius: 999px;
-          border: 1px solid rgba(255,255,255,0.85);
-          background: rgba(255,255,255,0.92);
-          color: #0b5ed7;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          backdrop-filter: blur(6px);
-          box-shadow: 0 6px 16px rgba(0,0,0,0.18);
-          flex-shrink: 0;
-        }
-
-        .lead-header-v2__float-icon:hover{
-          background: rgba(255,255,255,0.98);
-        }
-
-        .lead-header-v2__row{
-          display:flex;
-          align-items:center;
-          justify-content:space-between;
-          gap:8px;
-          flex-wrap: nowrap;
-        }
-
-        .lead-header-v2__left{
-          display:flex;
-          flex-direction: column;
-          align-items: stretch;
-          gap: 6px;
-          min-width: 168px;
-          flex: 0 0 168px;
-          position: relative;
-          border: 1px solid rgba(255, 255, 255, 0.35);
-          border-radius: 10px;
-          padding: 10px 10px 8px;
-          background: rgba(255, 255, 255, 0.14);
-          backdrop-filter: blur(6px);
-        }
-
-        .lead-header-v2__left-meta{
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding-bottom: 6px;
-          border-bottom: 1px solid rgba(255,255,255,0.22);
-        }
-
-        .lead-header-v2__contact-list{
-          display: flex;
-          flex-direction: column;
-          gap: 5px;
-          min-width: 0;
-        }
-
-        .lead-header-v2__contact-row{
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          min-width: 0;
-        }
-
-        .lead-header-v2__contact-icon{
-          width: 16px;
-          text-align: center;
-          opacity: 0.92;
-          flex-shrink: 0;
-          font-size: 12px;
-          color: #fff;
-        }
-
-        .lead-header-v2__contact-value{
-          flex: 1 1 auto;
-          min-width: 0;
-          font-size: 12px;
-          font-weight: 700;
-          line-height: 1.2;
-          color: #fff;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .lead-header-v2__contact-row--phone{
-          gap: 6px;
-        }
-
-        .lead-header-v2__wa-btn{
-          width: 28px;
-          height: 28px;
-          min-width: 28px;
-          border-radius: 8px;
-          border: 1px solid rgba(255,255,255,0.35);
-          background: #25d366;
-          color: #fff;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          flex-shrink: 0;
-          font-size: 14px;
-          padding: 0;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-        }
-
-        .lead-header-v2__wa-btn:hover{
-          background: #1ebe57;
-          color: #fff;
-        }
-
-        .lead-header-v2__left-edit{
-          position: absolute;
-          top: -6px;
-          left: -6px;
-          z-index: 3;
-          width: 22px;
-          height: 22px;
-          min-width: 22px;
-          border-radius: 999px;
-          border: 1px solid rgba(255,255,255,0.85);
-          background: rgba(255,255,255,0.92);
-          color: #0b5ed7;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          padding: 0;
-          font-size: 10px;
-        }
-
-        .lead-header-v2__right{
-          display:flex;
-          align-items:stretch;
-          gap:8px;
-          flex-wrap: nowrap;
-          justify-content:flex-end;
-          flex: 1 1 auto;
-          min-width: 0;
-          white-space: nowrap;
-          position: relative;
-        }
-
-        .lead-header-v2__approval{
-          position: relative;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          flex: 0 0 auto;
-          width: fit-content;
-          min-width: 0;
-          gap: 4px;
-          padding: 8px 6px 6px;
-          border-radius: 10px;
-          background: rgba(255, 255, 255, 0.14);
-          border: 1px solid rgba(255,255,255,0.28);
-          backdrop-filter: blur(6px);
-          align-self: center;
-        }
-        .lead-header-v2__approval-label{
-          position: absolute;
-          top: -9px;
-          left: 50%;
-          transform: translateX(-50%);
-          padding: 0 6px;
-          border-radius: 999px;
-          background: rgba(11, 94, 215, 0.95);
-          border: 1px solid rgba(255, 255, 255, 0.35);
-          color: #fff;
-          font-size: 9px;
-          font-weight: 900;
-          line-height: 16px;
-          white-space: nowrap;
-        }
-        .lead-approval-v2__row{
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: auto;
-        }
-        .lead-approval-v2__pill{
-          border: 1px solid rgba(255,255,255,0.35);
-          color: #fff;
-          border-radius: 999px;
-          padding: 4px 8px;
-          height: 26px;
-          font-size: 10px;
-          font-weight: 900;
-          letter-spacing: 0.02em;
-          background: rgba(255,255,255,0.18);
-          text-transform: uppercase;
-          min-width: 0;
-          width: auto;
-          white-space: nowrap;
-        }
-        .lead-approval-v2__pill--pending{
-          background: rgba(245, 158, 11, 0.28);
-          border-color: rgba(245, 158, 11, 0.55);
-        }
-        .lead-approval-v2__pill--approved{
-          background: rgba(16, 185, 129, 0.28);
-          border-color: rgba(16, 185, 129, 0.55);
-        }
-        .lead-approval-v2__pill--rejected{
-          background: rgba(239, 68, 68, 0.26);
-          border-color: rgba(239, 68, 68, 0.55);
-        }
-
-        .lead-meta-v2__pill{
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-          width: 34px;
-          height: 34px;
-          padding: 0;
-          border-radius: 12px;
-          border: 1px solid rgba(255,255,255,0.35);
-          background: rgba(255,59,48,0.95);
-          color: #fff;
-          cursor: pointer;
-          text-decoration: none;
-          box-shadow: 0 8px 18px rgba(0,0,0,0.18);
-        }
-        .lead-meta-v2__pill:hover{
-          background: rgba(255,59,48,1);
-          color: #fff;
-          text-decoration: none;
-        }
-
-        .lead-header-v2__perf-block{
-          display: flex;
-          flex-direction: column;
-          gap: 5px;
-          flex-shrink: 0;
-          min-width: 148px;
-          position: relative;
-          border: 1px solid rgba(255, 255, 255, 0.35);
-          border-radius: 10px;
-          padding: 10px 10px 8px;
-          background: rgba(255, 255, 255, 0.14);
-          backdrop-filter: blur(6px);
-          min-height: var(--lead-header-v2-block-h);
-        }
-        .lead-header-v2__perf-title{
-          position: absolute;
-          top: -10px;
-          left: 10px;
-          padding: 0 8px;
-          border-radius: 999px;
-          background: rgba(11, 94, 215, 0.95);
-          border: 1px solid rgba(255, 255, 255, 0.35);
-          color: #fff;
-          font-size: 11px;
-          font-weight: 900;
-          line-height: 18px;
-          white-space: nowrap;
-        }
-        .lead-header-v2__perf-row{ display: flex; align-items: center; gap: 6px; }
-        .lead-header-v2__perf-label{
-          font-size: 10px;
-          font-weight: 800;
-          color: rgba(255,255,255,0.9);
-          white-space: nowrap;
-          min-width: 58px;
-        }
-        .lead-header-v2__perf-input{
-          cursor: pointer;
-          height: 22px !important;
-          font-size: 10px !important;
-          border-radius: 6px !important;
-          border: 1px solid rgba(255,255,255,0.35) !important;
-          background: rgba(255,255,255,0.18) !important;
-          color: #fff !important;
-          font-weight: 700 !important;
-          padding: 0 6px !important;
-          min-width: 0;
-          flex: 1 1 auto;
-        }
-
-        .lead-header-v2__editbtn{
-          position: absolute;
-          right: 0;
-          bottom: 0;
-          width: 20px;
-          height: 20px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 999px;
-          border: 1px solid rgba(255,255,255,0.35);
-          background: rgba(255,255,255,0.18);
-          color: #fff;
-          padding: 0;
-          cursor: pointer;
-          z-index: 2;
-        }
-
-        .lead-header-v2__dash{
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 10px;
-          width: clamp(480px, 48vw, 700px);
-          min-width: 0;
-          flex: 1 1 auto;
-        }
-        .lead-header-v2__dash-col{ width: auto; min-width: 0; display: flex; align-items: stretch; }
-
-        .lead-header-v2 .b2b-dash-section{
-          position: relative;
-          border: 1px solid rgba(255,255,255,0.35);
-          border-radius: 10px;
-          padding: 8px 8px 6px;
-          background: rgba(255,255,255,0.14);
-          backdrop-filter: blur(6px);
-          width: 100%;
-          min-height: var(--lead-header-v2-block-h);
-          display: flex;
-          flex-direction: column;
-        }
-        .lead-header-v2 .b2b-dash-section__label{
-          position: absolute;
-          top: -10px;
-          left: 10px;
-          padding: 0 8px;
-          border-radius: 999px;
-          background: rgba(11, 94, 215, 0.95);
-          border: 1px solid rgba(255,255,255,0.35);
-          color: #fff;
-          font-size: 11px;
-          font-weight: 900;
-          line-height: 18px;
-          white-space: nowrap;
-        }
-        .lead-header-v2 .b2b-dash-stat-card{
-          border-radius: 8px;
-          padding: 5px 5px 4px;
-          min-height: 48px;
-          display:flex;
-          flex-direction:column;
-          align-items:center;
-          justify-content:center;
-          box-shadow: 0 6px 14px rgba(0,0,0,0.14);
-          min-width: 0;
-        }
-        .lead-header-v2 .b2b-dash-stat-card__label{
-          font-size: 9px;
-          font-weight: 800;
-          line-height: 1.05;
-        }
-        .lead-header-v2 .b2b-dash-stat-card__divider{
-          width: 72%;
-          max-width: 56px;
-          height: 1px;
-          margin: 4px 0;
-          background: rgba(255,255,255,0.95);
-        }
-        .lead-header-v2 .b2b-dash-stat-card__value{
-          font-size: 13px;
-          font-weight: 900;
-          line-height: 1.05;
-        }
-        .lead-header-v2 .ActionsDates{
-          display:flex;
-          justify-content:left;
-          gap:10px;
-          margin-top: 6px;
-          padding-top: 6px;
-          border-top: 1px solid rgba(255,255,255,0.22);
-          color: rgba(255,255,255,0.95);
-          font-size: 11px;
-          font-weight: 800;
-          white-space: normal;
-          min-width: 0;
-        }
-        .lead-header-v2 .b2b-dash-section > .d-flex{ flex: 1 1 auto; min-height: 0; align-items: center; }
-        .lead-header-v2 .b2b-dash-section > .ActionsDates{ margin-top: auto; }
-
-        /* Checkbox + docs ring inside header */
-        .lead-header-v2__check{ display:inline-flex; align-items:center; }
-        .lead-header-v2__check .form-check-input{ margin: 0; }
-        .lead-header-v2__doc{ display:inline-flex; align-items:center; }
-
-        /* Mobile header layout (LHM) */
-        .lhm{ display: flex; flex-direction: column; gap: 8px; }
-        .lhm__row1{ display: flex; align-items: center; gap: 8px; }
-        .lhm__name{
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          flex: 0 1 clamp(160px, 48vw, 260px);
-          max-width: clamp(160px, 48vw, 260px);
-          min-width: 0;
-          background: rgba(255,255,255,0.15);
-          border: 1px solid rgba(255,255,255,0.3);
-          border-radius: 10px;
-          padding: 6px 10px;
-          overflow: hidden;
-          position: relative;
-        }
-        .lhm__check{ display:inline-flex; align-items:center; margin-right: 2px; }
-        .lhm__check .form-check-input{ margin: 0; }
-        .lhm__doc{ display:inline-flex; align-items:center; }
-        .lhm__name-icon{ font-size: 15px; color: #fff; opacity: 0.9; flex-shrink: 0; }
-        .lhm__name-text{
-          font-size: 13px;
-          font-weight: 800;
-          color: #fff;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          min-width: 0;
-        }
-        .lhm__mobile-number{ display: none; }
-        .lhm__pills{ display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
-        .lhm__status-block{
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-          flex-shrink: 0;
-          background: rgba(255,255,255,0.15);
-          border: 1px solid rgba(255,255,255,0.3);
-          border-radius: 10px;
-          padding: 5px 8px;
-          cursor: pointer;
-          min-width: 145px;
-          position: relative;
-        }
-        .lhm__editbtn{
-          position: absolute;
-          top: -6px;
-          right: -6px;
-          width: 22px;
-          height: 22px;
-          border-radius: 999px;
-          border: 1px solid rgba(255,255,255,0.85);
-          background: rgba(255,255,255,0.92);
-          color: #0b5ed7;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          padding: 0;
-          font-size: 10px;
-          line-height: 1;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-        }
-        .lhm__status-row{ display: flex; align-items: center; gap: 4px; }
-        .lhm__status-label{
-          font-size: 9px;
-          font-weight: 900;
-          color: rgba(255,255,255,0.75);
-          white-space: nowrap;
-          min-width: 30px;
-        }
-        .lhm__status-val{
-          font-size: 10px;
-          font-weight: 700;
-          color: #fff;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          max-width: 92px;
-        }
-        .lhm__row2{ display: flex; align-items: center; gap: 8px; }
-        .lhm__phone{
-          flex: 1 1 auto;
-          display: flex;
-          align-items: center;
-          gap: 7px;
-          background: rgba(255,255,255,0.15);
-          border: 1px solid rgba(255,255,255,0.3);
-          border-radius: 10px;
-          padding: 7px 12px;
-          font-size: 13px;
-          font-weight: 800;
-          color: #fff;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          min-width: 0;
-        }
-        .lhm__phone i{ font-size: 12px; opacity: 0.85; flex-shrink: 0; }
-        .lhm__actions{ display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-        .lhm__action-btn{
-          height: 34px;
-          padding: 0 12px;
-          border-radius: 10px;
-          border: 1px solid rgba(255,255,255,0.35);
-          background: rgba(255,255,255,0.18);
-          color: #fff;
-          font-size: 12px;
-          font-weight: 800;
-          cursor: pointer;
-        }
-
-        /* Floating labeled actions (mobile header top-right) */
-        .lhm__float-actions{
-          position: absolute;
-          top: 8px;
-          right: 8px;
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          z-index: 6;
-          flex-wrap: wrap;
-          justify-content: flex-end;
-          max-width: calc(100% - 16px);
-        }
-        .lhm__float-btn{
-          width: 32px;
-          height: 32px;
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 0;
-          border-radius: 999px;
-          border: 1px solid rgba(255,255,255,0.75);
-          background: rgba(255,255,255,0.92);
-          color: #0b5ed7;
-          font-size: 11px;
-          font-weight: 900;
-          line-height: 1;
-          text-decoration: none;
-          cursor: pointer;
-          backdrop-filter: blur(6px);
-          box-shadow: 0 6px 16px rgba(0,0,0,0.18);
-          white-space: nowrap;
-          align-items: center;
-    justify-content: center;
-        }
-        .lhm__float-btn i{ font-size: 13px; }
-        .lhm__float-btn--wa{
-          background: rgba(37, 211, 102, 0.95);
-          border-color: rgba(37, 211, 102, 0.95);
-          color: #fff;
-        }
-        .lhm__float-btn--call{
-          background: rgba(255,255,255,0.92);
-          border-color: rgba(255,255,255,0.75);
-          color: #0b5ed7;
-        }
-        .lhm__float-btn--more{
-          background: rgba(15, 23, 42, 0.85);
-          border-color: rgba(15, 23, 42, 0.85);
-          color: #fff;
-        }
-        .lhm__float-btn--toggle{
-          background: rgba(30, 41, 59, 0.92);
-          border-color: rgba(30, 41, 59, 0.92);
-          color: #fff;
-        }
-
-        /* Give header some space for floating buttons */
-        .lead-header-v2 .lhm{ padding-top: 34px; }
-
-        .lhm__row3{
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 8px;
-        }
-        .lhm__followup-box{
-          position: relative;
-          border: 1px solid rgba(255,255,255,0.3);
-          border-radius: 10px;
-          padding: 8px 8px 6px;
-          background: rgba(255,255,255,0.12);
-        }
-        .lhm__followup-title{
-          display: block;
-          font-size: 10px;
-          font-weight: 900;
-          color: rgba(255,255,255,0.95);
-          margin-bottom: 6px;
-        }
-        .lhm__followup-cards{
-          display: flex;
-          gap: 6px;
-          flex-wrap: wrap;
-        }
-        .lhm__stat-card{
-          flex: 1 1 0;
-          min-width: 72px;
-          border-radius: 8px;
-          padding: 6px 4px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          color: #fff;
-        }
-        .lhm__stat-label{ font-size: 9px; font-weight: 800; }
-        .lhm__stat-divider{
-          width: 70%;
-          height: 1px;
-          background: rgba(255,255,255,0.9);
-          margin: 4px 0;
-        }
-        .lhm__stat-val{ font-size: 12px; font-weight: 900; }
-        .lhm__followup-date{
-          margin-top: 6px;
-          padding-top: 6px;
-          border-top: 1px solid rgba(255,255,255,0.22);
-          font-size: 10px;
-          font-weight: 800;
-          color: rgba(255,255,255,0.95);
-          display: flex;
-          gap: 6px;
-          flex-wrap: wrap;
-        }
-
-        @media (max-width: 1360px){
-          .lead-header-v2__dash{ width: clamp(480px, 48vw, 680px); gap: 8px; }
-        }
-        @media (max-width: 1200px){
-          .lead-header-v2__dash{ width: clamp(420px, 46vw, 620px); }
-        }
-        @media (max-width: 1100px){
-          .lead-header-v2__dash{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        }
-
-        @media (max-width: 768px){
-          .lead-header-v2__row{ flex-wrap: wrap; align-items: flex-start; }
-          .lead-header-v2__left{ flex: 1 1 100%; min-width: 0; }
-          .lead-header-v2__contact-list{ gap: 4px; }
-          .lead-header-v2__right{
-            flex: 1 1 100%;
-            justify-content: flex-start;
-            flex-wrap: wrap;
-            white-space: normal;
-          }
-          .lead-header-v2__dash{ width: 100%; grid-template-columns: 1fr; }
-          .lhm__pills .lead-meta-v2__pill{
-            width: 34px;
-            height: 34px;
-            padding: 0;
-            background: rgba(255,255,255,0.16);
-            border: 1px solid rgba(255,255,255,0.35);
-          }
-        }
-
-        @media (max-width: 992px){
-          .lead-card .lead-header-v2{
-            background: #fff;
-            color: #0f172a;
-            padding: 0;
-            border-radius: 16px;
-            overflow: hidden;
-          }
-
-          .lhm{
-            gap: 0;
-            background: #fff;
-          }
-
-          .lhm__row1{
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            align-items: start;
-            column-gap: 8px;
-            row-gap: 10px;
-            padding: 12px;
-            background: linear-gradient(135deg, #0b8cf0 0%, #1fb7f4 100%);
-          }
-
-          .lhm__name{
-            grid-column: 1;
-            grid-row: 1;
-            display: grid;
-            grid-template-columns: auto auto auto minmax(0, 1fr);
-            flex: none;
-            max-width: 100%;
-            width: 100%;
-            background: transparent;
-            border: 0;
-            border-radius: 0;
-            padding: 0;
-            column-gap: 8px;
-            row-gap: 4px;
-          }
-
-          .lhm__check{
-            grid-column: 1;
-            grid-row: 1 / span 2;
-            align-self: center;
-          }
-
-          .lhm__doc{
-            grid-column: 2;
-            grid-row: 1 / span 2;
-            align-self: center;
-          }
-
-          .lhm__name-icon{
-            grid-column: 3;
-            grid-row: 1 / span 2;
-            align-self: center;
-          }
-
-          .lhm__name-text{
-            grid-column: 4;
-            grid-row: 1;
-            font-size: 14px;
-            line-height: 1.2;
-          }
-
-          .lhm__mobile-number{
-            grid-column: 4;
-            grid-row: 2;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            max-width: 100%;
-            color: rgba(255,255,255,0.95);
-            font-size: 12px;
-            font-weight: 800;
-            line-height: 1.15;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          }
-
-          .lhm__mobile-number i{
-            font-size: 11px;
-            opacity: 0.9;
-            flex-shrink: 0;
-          }
-
-          .lhm__actions{
-            grid-column: 2;
-            grid-row: 1;
-            align-self: start;
-            width: auto;
-            min-width: 0;
-            justify-content: flex-end;
-            gap: 6px;
-          }
-
-          .lhm__actions .lead-meta-v2__pill{
-            width: 36px;
-            min-width: 36px;
-            height: 36px;
-            border-radius: 10px;
-            padding: 0;
-            box-shadow: none;
-            color: #fff;
-          }
-
-          .lhm__contact-btn--whatsapp,
-          .lhm__contact-btn--whatsapp:hover{
-            background: #22c55e;
-            border-color: #22c55e;
-            color: #fff;
-          }
-
-          .lhm__contact-btn--phone,
-          .lhm__contact-btn--phone:hover{
-            background: #38bdf8;
-            border-color: #38bdf8;
-            color: #fff;
-          }
-
-          .lhm__action-btn{
-            width: 36px;
-            min-width: 36px;
-            height: 36px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 10px;
-            border: 1px solid #111827;
-            background: #111827;
-            color: #fff;
-            padding: 0;
-          }
-
-          .lhm__action-btn--toggle{
-            background: #fff;
-            color: #111827;
-            border-color: #cbd5e1;
-          }
-
-          .lhm__row2{
-            display: flex;
-            flex-wrap: nowrap;
-            gap: 10px;
-            padding: 12px;
-            background: #f8fafc;
-            overflow-x: auto;
-            overflow-y: hidden;
-            -webkit-overflow-scrolling: touch;
-            scroll-snap-type: x proximity;
-            scrollbar-width: thin;
-          }
-
-          .lhm__row2::-webkit-scrollbar,
-          .lhm__row3::-webkit-scrollbar{
-            height: 4px;
-          }
-
-          .lhm__row2::-webkit-scrollbar-thumb,
-          .lhm__row3::-webkit-scrollbar-thumb{
-            background: #cbd5e1;
-            border-radius: 999px;
-          }
-
-          .lhm__panel{
-            position: relative;
-            flex: 0 0 176px;
-            min-height: 96px;
-            padding: 12px 10px 10px;
-            border-radius: 12px;
-            border: 1px solid #e5e7eb;
-            background: #fff;
-            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
-            scroll-snap-align: start;
-          }
-
-          .lhm__panel--performance{
-            flex-basis: 190px;
-          }
-
-          .lhm__panel-head{
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 8px;
-            padding-bottom: 8px;
-            margin-bottom: 8px;
-            border-bottom: 1px solid #e5e7eb;
-          }
-
-          .lhm__panel-title{
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            min-width: 0;
-            color: #020617;
-            font-size: 13px;
-            font-weight: 900;
-            line-height: 1.1;
-            white-space: nowrap;
-          }
-
-          .lhm__panel-title i{
-            color: #2563eb;
-            font-size: 12px;
-          }
-
-          .lhm__panel-edit{
-            width: 28px;
-            min-width: 28px;
-            height: 28px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 8px;
-            border: 1px solid #dbeafe;
-            background: #f8fbff;
-            color: #2563eb;
-            padding: 0;
-            cursor: pointer;
-          }
-
-          .lhm__panel-edit--corner{
-            position: absolute;
-            right: 8px;
-            bottom: 8px;
-          }
-
-          .lhm__kv{
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            min-width: 0;
-            margin-bottom: 8px;
-          }
-
-          .lhm__kv-label{
-            width: 52px;
-            flex-shrink: 0;
-            color: #475569;
-            font-size: 10px;
-            font-weight: 800;
-          }
-
-          .lhm__kv-pill{
-            flex: 1 1 auto;
-            min-width: 0;
-            height: 24px;
-            border: 1px solid #bfdbfe;
-            border-radius: 999px;
-            background: #eff6ff;
-            color: #1d4ed8;
-            padding: 0 10px;
-            font-size: 10px;
-            font-weight: 800;
-            text-align: center;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            cursor: pointer;
-          }
-
-          .lhm__row3{
-            display: grid !important;
-            grid-auto-flow: column;
-            grid-auto-columns: minmax(176px, 46vw);
-            grid-template-columns: none !important;
-            gap: 10px;
-            width: 100%;
-            max-width: 100%;
-            padding: 0 12px 12px;
-            background: #f8fafc;
-            overflow-x: auto !important;
-            overflow-y: hidden;
-            -webkit-overflow-scrolling: touch;
-            scroll-snap-type: x proximity;
-            scrollbar-width: thin;
-          }
-
-          .lhm__followup-box{
-            width: 100%;
-            min-width: 0;
-            min-height: 174px;
-            padding: 12px 10px 10px;
-            border: 1px solid #e5e7eb;
-            border-radius: 12px;
-            background: #fff;
-            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
-            scroll-snap-align: start;
-          }
-
-          .lhm__followup-title{
-            color: #020617;
-            font-size: 13px;
-            font-weight: 900;
-            line-height: 1.1;
-            padding-right: 28px;
-            margin-bottom: 8px;
-          }
-
-          .lhm__followup-box .lhm__editbtn{
-            top: auto;
-            right: 8px;
-            bottom: 8px;
-            width: 28px;
-            height: 28px;
-            border-radius: 8px;
-            border-color: #dbeafe;
-            background: #f8fbff;
-            color: #2563eb;
-            box-shadow: none;
-          }
-
-          .lhm__followup-cards{
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 7px;
-            flex-wrap: nowrap;
-          }
-
-          .lhm__followup-box:nth-child(1) .lhm__stat-card:nth-child(3),
-          .lhm__followup-box:nth-child(2) .lhm__stat-card:nth-child(3){
-            grid-column: 1 / -1;
-          }
-
-          .lhm__stat-card{
-            min-width: 0;
-            min-height: 46px;
-            border-radius: 8px;
-            padding: 7px 5px;
-            box-shadow: none;
-          }
-
-          .lhm__stat-label{
-            font-size: 10px;
-            line-height: 1.05;
-          }
-
-          .lhm__stat-divider{
-            width: 70%;
-            height: 1px;
-            margin: 4px 0;
-            background: currentColor;
-            opacity: 0.75;
-          }
-
-          .lhm__stat-val{
-            font-size: 16px;
-            line-height: 1;
-          }
-
-          .lhm__followup-date{
-            align-items: center;
-            justify-content: flex-start;
-            flex-wrap: nowrap;
-            gap: 5px;
-            min-height: 30px;
-            margin-top: 8px;
-            padding-top: 9px;
-            padding-right: 32px;
-            border-top: 1px solid #e5e7eb;
-            color: #64748b;
-            font-size: 10px;
-            line-height: 1.1;
-          }
-
-          .lhm__followup-date span{
-            min-width: 0;
-            white-space: nowrap;
-          }
-
-          .lhm__followup-date span:first-child{
-            font-weight: 900;
-          }
-        }
-
-        @media (max-width: 380px){
-          .lhm__row1{
-            gap: 8px;
-            padding: 11px;
-          }
-
-          .lhm__name{
-            column-gap: 6px;
-          }
-
-          .lhm__actions{
-            gap: 5px;
-          }
-
-          .lhm__actions .lead-meta-v2__pill,
-          .lhm__action-btn{
-            width: 34px;
-            min-width: 34px;
-            height: 34px;
-          }
-
-          .lhm__row2{
-            padding: 11px;
-          }
-
-          .lhm__row3{
-            grid-auto-columns: minmax(168px, 48vw);
-            padding: 0 11px 11px;
-          }
-        }
-      `}</style>
-      </div>
+`}
+</style>
     </div>
   );
 };

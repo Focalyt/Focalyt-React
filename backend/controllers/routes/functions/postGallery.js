@@ -1,4 +1,3 @@
-const AWS = require('aws-sdk');
 const multer = require('multer');
 const fs = require('fs');
 const uuid = require('uuid/v1');
@@ -7,29 +6,18 @@ const path = require('path');
 const Post = require('../../models/post'); // PostSchema import करें
 
 const {
-  accessKeyId,
-  secretAccessKey,
-  region,
   bucketName,
   mimetypes,
 } = require('../../../config');
 
+const s3 = require('../../../helpers/objectStorage');
 
-
-AWS.config.update({
-  accessKeyId,
-  secretAccessKey,
-  region,
-});
-// Define the custom error
 class InvalidParameterError extends Error {
   constructor(message) {
     super(message);
     this.name = 'InvalidParameterError';
   }
 }
-
-const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
 const allowedVideoExtensions = ['mp4', 'mkv', 'mov', 'avi', 'wmv'];
 const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
 

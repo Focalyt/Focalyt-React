@@ -8871,16 +8871,34 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			aggregationPipeline.push({ $match: additionalMatches });
 		}
 
-		// Sort by creation date
-		aggregationPipeline.push({
-			$sort: { updatedAt: -1 }
+		aggregationPipeline.push(
+			{ $sort: { updatedAt: -1 } },
+			{ $skip: skip },
+			{ $limit: limit }
+		);
+
+		const crmFilterCounts = await calculateKycFilterCounts(teamMembers, college._id, {
+			name,
+			courseType,
+			kyc,
+			leadStatus,
+			sector,
+			createdFromDate,
+			createdToDate,
+			modifiedFromDate,
+			modifiedToDate,
+			nextActionFromDate,
+			nextActionToDate,
+			projectsArray,
+			verticalsArray,
+			courseArray,
+			centerArray,
+			counselorArray
 		});
 
-		// Execute aggregation
-
-
-
-		const allFilteredResults = await AppliedCourses.aggregate(aggregationPipeline);
+		const allFilteredResults = await AppliedCourses
+			.aggregate(aggregationPipeline)
+			.allowDiskUse(true);
 
 		// Process results for document counts and other formatting
 		const results = allFilteredResults.map(doc => {
@@ -9004,31 +9022,10 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			};
 		});
 
-		// Calculate KYC specific counts
-		const totalCount = results.length;
-		const pendingKycCount = results.filter(doc => doc.kycStage === true && doc.kyc === false).length;
-		const doneKycCount = results.filter(doc => doc.kyc === true).length;
-
-		// Calculate CRM filter counts (if needed for additional status filters)
-		const crmFilterCounts = await calculateKycFilterCounts(teamMembers, college._id, {
-			name,
-			courseType,
-			sector,
-			createdFromDate,
-			createdToDate,
-			modifiedFromDate,
-			modifiedToDate,
-			nextActionFromDate,
-			nextActionToDate,
-			projectsArray,
-			verticalsArray,
-			courseArray,
-			centerArray,
-			counselorArray
-		});
-
-		// Apply pagination
-		const paginatedResult = results.slice(skip, skip + limit);
+		const totalCount = crmFilterCounts.all || 0;
+		const pendingKycCount = crmFilterCounts.pendingKyc || 0;
+		const doneKycCount = crmFilterCounts.doneKyc || 0;
+		const paginatedResult = results;
 
 		for (const result of paginatedResult) {
 			const followup = await B2cFollowup
@@ -9126,6 +9123,14 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 				toDate.setHours(23, 59, 59, 999);
 				baseMatchStage.followupDate.$lte = toDate;
 			}
+		}
+
+		if (appliedFilters.leadStatus) {
+			baseMatchStage._leadStatus = new mongoose.Types.ObjectId(appliedFilters.leadStatus);
+		}
+
+		if (appliedFilters.kyc !== undefined && appliedFilters.kyc !== '' && String(appliedFilters.kyc).toLowerCase() !== 'all') {
+			baseMatchStage.kyc = appliedFilters.kyc === 'true' || appliedFilters.kyc === true;
 		}
 
 		basePipeline.push({ $match: baseMatchStage });
@@ -9238,7 +9243,7 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 		const allKycAggregation = await AppliedCourses.aggregate([
 			...basePipeline,
 			{ $count: "total" }
-		]);
+		]).allowDiskUse(true);
 
 		const allKycCount = allKycAggregation[0]?.total || 0;
 		counts.all += allKycCount;
@@ -9272,7 +9277,7 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 					count: { $sum: 1 }
 				}
 			}
-		]);
+		]).allowDiskUse(true);
 
 		// Update KYC counts based on effective status
 		kycStatusAggregation.forEach(kycGroup => {
@@ -10646,8 +10651,33 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		if (Object.keys(additionalMatches).length > 0) {
 			aggregationPipeline.push({ $match: additionalMatches });
 		}
-		aggregationPipeline.push({ $sort: { updatedAt: -1 } });
-		const allFilteredResults = await AppliedCourses.aggregate(aggregationPipeline);
+
+		aggregationPipeline.push(
+			{ $sort: { updatedAt: -1 } },
+			{ $skip: skip },
+			{ $limit: limit }
+		);
+
+		const crmFilterCounts = await calculateAdmissionFilterCounts(teamMembers, college._id, {
+			name,
+			courseType,
+			sector,
+			createdFromDate,
+			createdToDate,
+			modifiedFromDate,
+			modifiedToDate,
+			nextActionFromDate,
+			nextActionToDate,
+			projectsArray,
+			verticalsArray,
+			courseArray,
+			centerArray,
+			counselorArray
+		});
+
+		const allFilteredResults = await AppliedCourses
+			.aggregate(aggregationPipeline)
+			.allowDiskUse(true);
 
 		const results = allFilteredResults.map(doc => {
 			let selectedSubstatus = null;
@@ -10732,25 +10762,10 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 				}
 			};
 		});
-		const totalCount = results.length;
-		// Example: You can add more status-based counts here as needed
-		const crmFilterCounts = await calculateAdmissionFilterCounts(teamMembers, college._id, {
-			name,
-			courseType,
-			sector,
-			createdFromDate,
-			createdToDate,
-			modifiedFromDate,
-			modifiedToDate,
-			nextActionFromDate,
-			nextActionToDate,
-			projectsArray,
-			verticalsArray,
-			courseArray,
-			centerArray,
-			counselorArray
-		});
-		const paginatedResult = results.slice(skip, skip + limit);
+		const totalCount = (status && crmFilterCounts[status] != null)
+			? crmFilterCounts[status]
+			: (crmFilterCounts.all || 0);
+		const paginatedResult = results;
 		for (const result of paginatedResult) {
 			const followup = await B2cFollowup
 				.findOne({ appliedCourseId: result._id, status: 'planned' })
@@ -11195,7 +11210,7 @@ async function calculateAdmissionFilterCounts(teamMembers, collegeId, appliedFil
 			basePipeline.push({ $match: additionalMatches });
 		}
 		// Get all admissions for this member/college/filters
-		const allAdmissions = await AppliedCourses.aggregate(basePipeline);
+		const allAdmissions = await AppliedCourses.aggregate(basePipeline).allowDiskUse(true);
 		// Calculate each status count
 		counts.pendingBatchAssign += allAdmissions.filter(doc =>
 			(!doc.batch || doc.batch === null) &&

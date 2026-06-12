@@ -89,6 +89,20 @@ const appliedCoursesSchema = new Schema(
 
     kycDoneAt: { type: Date },
     kycDoneBy: { type: ObjectId, ref: "User" },
+
+    approval: {
+      status: {
+        type: String,
+        enum: ['PENDING', 'APPROVED', 'REJECTED'],
+        default: 'PENDING',
+        index: true,
+      },
+      approvedBy: { type: ObjectId, ref: 'User' },
+      approvedAt: { type: Date },
+      rejectedBy: { type: ObjectId, ref: 'User' },
+      rejectedAt: { type: Date },
+      rejectionReason: { type: String, trim: true },
+    },
     
     admissionDone: { type: Boolean, default: false },
     admissionDate: { type: Date },
@@ -138,6 +152,8 @@ const appliedCoursesSchema = new Schema(
     followupDate: {
       type: Date,
     },
+    followUpCall: { type: ObjectId, ref: 'B2cFollowup' },
+    followUpVisit: { type: ObjectId, ref: 'B2cFollowup' },
     followups: [{
       date: {
         type: Date,

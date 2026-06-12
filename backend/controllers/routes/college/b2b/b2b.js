@@ -10,24 +10,12 @@ const readXlsxFile = require("read-excel-file/node");
 const mongoose = require("mongoose");
 const uuid = require('uuid/v1');
 const multer = require('multer');
-const AWS = require('aws-sdk');
 const {
-	accessKeyId,
-
-	secretAccessKey,
-	region,
 	bucketName,
 	mimetypes,
 } = require('../../../../config');
 
-
-AWS.config.update({
-	accessKeyId,
-	secretAccessKey,
-	region,
-});
-
-const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
+const s3 = require('../../../../helpers/objectStorage');
 
 const destination = path.resolve(__dirname, '..', '..', '..', 'public', 'temp');
 if (!fs.existsSync(destination)) fs.mkdirSync(destination);
@@ -2177,7 +2165,7 @@ router.get('/leads', isCollege, async (req, res) => {
 			b2bDepartment,
 			b2bDepartmentIn,
 			search,
-			sortBy = 'createdAt',
+			sortBy = 'updatedAt',
 			sortOrder = 'desc',
 			subStatus,
 			subStatusIn,
@@ -2558,6 +2546,9 @@ router.get('/leads/:id/cross-sales', isCollege, async (req, res) => {
 			Lead.find(buildCrossSaleGroupQuery(rootId))
 		)
 			.populate('status', 'name title substatuses')
+			.populate('followUp', 'followUpType scheduledDate status')
+			.populate('followUpCall', 'followUpType description status scheduledDate completedDate')
+			.populate('followUpVisit', 'followUpType description status scheduledDate completedDate')
 			.populate('leadOwner', 'name email')
 			.populate('leadAddedBy', 'name email')
 			.sort({ createdAt: 1 })
@@ -3500,6 +3491,246 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 	}
 });
 
+// router.put('/leads/:id/status', isCollege, async (req, res) => {
+// 	try {
+// 		console.log('[B2B Update Status] Step 1: Request received', { method: req.method, path: req.path });
+// 		const { id } = req.params;
+// 		const {
+// 			status,
+// 			subStatus,
+// 			remarks,
+// 			followUpDate,
+// 			followUpTime,
+// 			followUpType = 'Call',
+// 			googleCalendarEvent = false
+// 		} = req.body;
+// 		console.log('[B2B Update Status] Step 2: Params & body', {
+// 			leadId: id,
+// 			status,
+// 			subStatus,
+// 			hasRemarks: !!remarks,
+// 			hasFollowUp: !!(followUpDate && followUpTime)
+// 		});
+
+// 		// Validate required fields
+// 		if (!status) {
+// 			console.log('[B2B Update Status] Step 3: Validation failed - status is required');
+// 			return res.status(400).json({
+// 				status: false,
+// 				message: 'Status is required'
+// 			});
+// 		}
+
+// 		// Find the lead
+// 		const lead = await Lead.findById(id);
+// 		console.log('[B2B Update Status] Step 4: Lead lookup', { leadFound: !!lead, leadId: id });
+
+// 		if (!lead) {
+// 			console.log('[B2B Update Status] Step 5: Exiting - lead not found');
+// 			return res.status(404).json({
+// 				status: false,
+// 				message: 'Lead not found'
+// 			});
+// 		}
+
+// 		if (typeof Lead.normalizeApproval === 'function') {
+// 			lead.approval = Lead.normalizeApproval(lead.approval);
+// 		}
+// 		// Check if user is Admin - Admin can update any lead
+// 		const isAdmin = () => {
+// 			const permissionType = req.user.permissions?.permission_type;
+// 			return permissionType === 'Admin';
+// 		};
+
+// 		console.log('[B2B Update Status] Step 6: User & permission check', {
+// 			userId: req.user?._id?.toString(),
+// 			userName: req.user?.name,
+// 			permissionType: req.user?.permissions?.permission_type,
+// 			isAdminResult: isAdmin()
+// 		});
+
+// 		// If not Admin, check ownership
+// 		if (!isAdmin()) {
+// 			let teamMembers = await getAllTeamMembers(req.user._id);
+// 			const isOwner = teamMembers.some(member =>
+// 				lead.leadAddedBy.toString() === member.toString() ||
+// 				lead.leadOwner.toString() === member.toString()
+// 			);
+// 			console.log('[B2B Update Status] Step 7: Ownership check (non-admin)', {
+// 				leadAddedBy: lead.leadAddedBy?.toString(),
+// 				leadOwner: lead.leadOwner?.toString(),
+// 				teamMembersCount: teamMembers?.length,
+// 				isOwner
+// 			});
+
+// 			if (!isOwner) {
+// 				console.log('[B2B Update Status] Step 8: Exiting - permission denied (not owner)');
+// 				return res.status(403).json({
+// 					status: false,
+// 					message: 'You do not have permission to update this lead'
+// 				});
+// 			}
+// 		} else {
+// 			console.log('[B2B Update Status] Step 7: Skipped ownership check (admin)');
+// 		}
+
+// 		// Get old status for logging
+// 		const oldStatus = lead.status;
+// 		const oldSubStatus = lead.subStatus;
+
+// 		// Get status names for better logging
+// 		let oldStatusName = 'No Status';
+// 		let oldSubStatusName = 'No Sub-Status';
+// 		let newStatusName = 'Unknown';
+// 		let newSubStatusName = 'No Sub-Status';
+
+// 		if (oldStatus) {
+// 			const oldStatusDoc = await StatusB2b.findById(oldStatus);
+// 			oldStatusName = oldStatusDoc ? oldStatusDoc.title : 'Unknown Status';
+// 		}
+
+// 		if (oldSubStatus) {
+// 			// Find substatus within the old status
+// 			if (oldStatus) {
+// 				const oldStatusDoc = await StatusB2b.findById(oldStatus);
+// 				if (oldStatusDoc && oldStatusDoc.substatuses) {
+// 					const oldSubStatusDoc = oldStatusDoc.substatuses.find(sub => sub._id.toString() === oldSubStatus.toString());
+// 					oldSubStatusName = oldSubStatusDoc ? oldSubStatusDoc.title : 'Unknown Sub-Status';
+// 				}
+// 			}
+// 		}
+
+// 		// Get new status names
+// 		const newStatusDoc = await StatusB2b.findById(status);
+// 		newStatusName = newStatusDoc ? newStatusDoc.title : 'Unknown Status';
+
+// 		if (subStatus) {
+// 			// Find substatus within the new status
+// 			if (newStatusDoc && newStatusDoc.substatuses) {
+// 				const newSubStatusDoc = newStatusDoc.substatuses.find(sub => sub._id.toString() === subStatus.toString());
+// 				newSubStatusName = newSubStatusDoc ? newSubStatusDoc.title : 'Unknown Sub-Status';
+// 			}
+// 		}
+
+// 		// Update the lead
+// 		lead.status = status;
+// 		lead.subStatus = subStatus;
+// 		lead.updatedBy = req.user._id;
+
+// 		if (remarks) {
+// 			lead.remark = remarks;
+// 		}
+
+// 		// Add to logs with detailed status change information
+// 		lead.logs.push({
+// 			user: req.user._id,
+// 			timestamp: new Date(),
+// 			action: `Status changed from ${oldStatusName} (${oldSubStatusName}) to ${newStatusName} (${newSubStatusName})`,
+// 			remarks: remarks || `Status updated from ${oldStatusName} to ${newStatusName}`
+// 		});
+
+// 		let savedFollowUp = null;
+// 		let scheduledDateTime = null;
+// 		if (followUpDate && followUpTime) {
+// 			const [hours, minutes] = String(followUpTime).split(':');
+// 			scheduledDateTime = /^\d{4}-\d{2}-\d{2}$/.test(String(followUpDate))
+// 				? new Date(`${followUpDate}T00:00:00`)
+// 				: new Date(followUpDate);
+// 			scheduledDateTime.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+
+// 			const normalizedType = String(followUpType || 'Call').trim();
+// 			savedFollowUp = new FollowUp({
+// 				leadId: id,
+// 				followUpType: normalizedType,
+// 				description: `Status changed to ${newStatusName}`,
+// 				scheduledDate: scheduledDateTime,
+// 				addedBy: req.user._id
+// 			});
+// 			await savedFollowUp.save();
+
+// 			lead.followUp = savedFollowUp._id;
+// 			if (normalizedType.toLowerCase() === 'visit') {
+// 				lead.followUpVisit = savedFollowUp._id;
+// 			} else {
+// 				lead.followUpCall = savedFollowUp._id;
+// 			}
+
+// 			lead.logs.push({
+// 				user: req.user._id,
+// 				timestamp: new Date(),
+// 				action: `${normalizedType} follow-up scheduled for ${scheduledDateTime.toLocaleDateString()} at ${followUpTime}`,
+// 				remarks: remarks || ''
+// 			});
+// 		}
+
+// 		await lead.save();
+// 		console.log('[B2B Update Status] Step 9: Lead saved', {
+// 			leadId: id,
+// 			newStatus: status,
+// 			newSubStatus: subStatus || '(none)',
+// 			followUpSet: !!savedFollowUp
+// 		});
+
+// 		if (googleCalendarEvent && savedFollowUp && scheduledDateTime && req.user.googleAuthToken?.accessToken) {
+// 			try {
+// 				const { createGoogleCalendarEvent } = require('../../services/googleservice');
+// 				const googleEvent = await createGoogleCalendarEvent({
+// 					user: req.user,
+// 					event: {
+// 						summary: `B2B Follow-up: ${lead.businessName}`,
+// 						description: `Status Change Follow-up with ${lead.concernPersonName} (${lead.designation || 'N/A'})\n\nBusiness: ${lead.businessName}\nContact: ${lead.mobile}\nEmail: ${lead.email}\nStatus: ${newStatusName}\n\nRemarks: ${remarks || 'No remarks'}`,
+// 						start: {
+// 							dateTime: scheduledDateTime.toISOString(),
+// 							timeZone: 'Asia/Kolkata',
+// 						},
+// 						end: {
+// 							dateTime: new Date(scheduledDateTime.getTime() + 30 * 60000).toISOString(),
+// 							timeZone: 'Asia/Kolkata',
+// 						},
+// 						reminders: {
+// 							useDefault: false,
+// 							overrides: [
+// 								{ method: 'email', minutes: 24 * 60 },
+// 								{ method: 'popup', minutes: 15 },
+// 							],
+// 						},
+// 					}
+// 				});
+// 				const eventId = googleEvent?.event?.id || googleEvent?.data?.id;
+// 				if (eventId) {
+// 					savedFollowUp.googleCalendarEventId = eventId;
+// 					await savedFollowUp.save();
+// 				}
+// 			} catch (googleError) {
+// 				console.error('Google Calendar Error (status update):', googleError);
+// 			}
+// 		}
+
+// 		// Populate the updated lead
+// 		const updatedLead = await applyLeadCorePopulates(Lead.findById(id))
+// 			.populate('status', 'name title substatuses')
+// 			.populate('followUp', 'followUpType scheduledDate status')
+// 			.populate('followUpCall', 'followUpType description status scheduledDate completedDate')
+// 			.populate('followUpVisit', 'followUpType description status scheduledDate completedDate')
+// 			.populate('leadAddedBy', 'name email')
+// 			.populate('leadOwner', 'name email');
+
+// 		console.log('[B2B Update Status] Step 10: Success - sending response');
+// 		res.json({
+// 			status: true,
+// 			data: updatedLead,
+// 			message: 'Lead status updated successfully' + (savedFollowUp ? ' with follow-up scheduled' : '')
+// 		});
+// 	} catch (error) {
+// 		console.error('[B2B Update Status] Error:', error);
+// 		res.status(500).json({
+// 			status: false,
+// 			message: 'Failed to update lead status',
+// 			error: error.message
+// 		});
+// 	}
+// });
+
 // Update lead
 router.put('/leads/:id', isCollege, async (req, res) => {
 	try {
@@ -3845,7 +4076,7 @@ router.post('/leads/:id/followup', isCollege, async (req, res) => {
 		const newFollowUp = new FollowUp({
 			leadId: req.params.id,
 			followUpType: followUpType || 'Call',
-			description: description || 'Follow-up call',
+			description: description || (String(followUpType || 'Call').toLowerCase() === 'visit' ? 'Followup Visit' : 'Followup Calling'),
 			scheduledDate: scheduledDateTime,
 			remarks: remarks,
 			addedBy: req.user._id
@@ -3977,205 +4208,6 @@ router.put('/leads/:id/followup/:followUpId', isCollege, async (req, res) => {
 		res.status(500).json({
 			status: false,
 			message: 'Failed to update follow-up',
-			error: error.message
-		});
-	}
-});
-
-// Change lead status with optional follow-up
-router.put('/leads/:id/status', isCollege, async (req, res) => {
-	try {
-		console.log('[B2B Update Status v2] Step 1: Request received', { method: req.method, path: req.path, leadId: req.params.id });
-		const {
-			status,
-			subStatus,
-			followUpDate,
-			followUpTime,
-			remarks,
-			googleCalendarEvent = false
-		} = req.body;
-		console.log('[B2B Update Status v2] Step 2: Body', { status, subStatus, followUpDate, followUpTime, hasRemarks: !!remarks });
-
-		if (!status) {
-			console.log('[B2B Update Status v2] Step 3: Validation failed - status required');
-			return res.status(400).json({
-				status: false,
-				message: 'Status is required'
-			});
-		}
-
-		// Check if user is Admin - Admin can update any lead
-		const isAdmin = () => {
-			const permissionType = req.user.permissions?.permission_type;
-			return permissionType === 'Admin';
-		};
-		console.log('[B2B Update Status v2] Step 4: User check', {
-			userId: req.user?._id?.toString(),
-			userName: req.user?.name,
-			permissionType: req.user?.permissions?.permission_type,
-			isAdminResult: isAdmin()
-		});
-
-		// Check if lead exists
-		let lead;
-		if (isAdmin()) {
-			lead = await Lead.findById(req.params.id);
-			console.log('[B2B Update Status v2] Step 5: Admin path - lead lookup', { leadFound: !!lead });
-		} else {
-			lead = await Lead.findById(req.params.id);
-			if (lead) {
-				let teamMembers = await getAllTeamMembers(req.user._id);
-				const isOwner = teamMembers.some(member =>
-					lead.leadAddedBy.toString() === member.toString() ||
-					lead.leadOwner.toString() === member.toString()
-				);
-				console.log('[B2B Update Status v2] Step 5: Non-admin ownership', {
-					leadFound: true,
-					leadAddedBy: lead.leadAddedBy?.toString(),
-					leadOwner: lead.leadOwner?.toString(),
-					teamMembersCount: teamMembers?.length,
-					isOwner
-				});
-				if (!isOwner) {
-					lead = null;
-				}
-			} else {
-				console.log('[B2B Update Status v2] Step 5: Lead not found');
-			}
-		}
-
-		if (!lead) {
-			console.log('[B2B Update Status v2] Step 6: Exiting - lead not found or no permission');
-			return res.status(404).json({
-				status: false,
-				message: 'Lead not found'
-			});
-		}
-		console.log('[B2B Update Status v2] Step 6: Lead found, proceeding to update');
-
-		// Prepare update data
-		const updateData = {
-			status,
-			subStatus
-		};
-
-		// Add follow-up if provided
-		let followUp = null;
-		if (followUpDate && followUpTime) {
-			const [hours, minutes] = followUpTime.split(':');
-			const scheduledDateTime = new Date(followUpDate);
-			scheduledDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-
-			followUp = new FollowUp({
-				leadId: req.params.id,
-				followUpType: 'Status Change Follow-up',
-				description: `Status changed to ${status}`,
-				scheduledDate: scheduledDateTime,
-				remarks: remarks,
-				addedBy: req.user._id
-			});
-
-			await followUp.save();
-			updateData.followUp = followUp._id;
-		}
-
-		// Update lead status and add to logs
-		const updatedLead = await Lead.findByIdAndUpdate(
-			req.params.id,
-			updateData,
-			{ new: true }
-		).populate([
-			{ path: 'leadCategory', select: 'name' },
-			{ path: 'typeOfB2B', select: 'name' },
-			{ path: 'status', select: 'name' },
-			{ path: 'leadAddedBy', select: 'name email' }
-		]);
-
-		if (remarks) {
-			updatedLead.remark = remarks;
-		}
-
-		// Add to logs
-		updatedLead.logs.push({
-			user: req.user._id,
-			timestamp: new Date(),
-			action: `Status changed to ${status}`,
-			remarks: remarks
-		});
-
-		if (followUp) {
-			updatedLead.logs.push({
-				user: req.user._id,
-				timestamp: new Date(),
-				action: `Follow-up scheduled for ${scheduledDateTime.toLocaleDateString()} at ${followUpTime}`,
-				remarks: remarks
-			});
-		}
-
-		await updatedLead.save();
-		console.log('[B2B Update Status v2] Step 7: Lead status updated and saved', { leadId: req.params.id, status, subStatus: subStatus || '(none)' });
-
-		// Create Google Calendar event if requested (optional)
-		let googleEvent = null;
-		if (googleCalendarEvent && followUp && req.user.googleAuthToken?.accessToken) {
-			try {
-				const { createGoogleCalendarEvent } = require('../../services/googleservice');
-
-				const event = {
-					summary: `B2B Follow-up: ${lead.businessName}`,
-					description: `Status Change Follow-up with ${lead.concernPersonName} (${lead.designation || 'N/A'})\n\nBusiness: ${lead.businessName}\nContact: ${lead.mobile}\nEmail: ${lead.email}\nStatus: ${status}\n\nRemarks: ${remarks || 'No remarks'}`,
-					start: {
-						dateTime: scheduledDateTime.toISOString(),
-						timeZone: 'Asia/Kolkata',
-					},
-					end: {
-						dateTime: new Date(scheduledDateTime.getTime() + 30 * 60000).toISOString(), // 30 minutes duration
-						timeZone: 'Asia/Kolkata',
-					},
-					reminders: {
-						useDefault: false,
-						overrides: [
-							{ method: 'email', minutes: 24 * 60 }, // 1 day before
-							{ method: 'popup', minutes: 15 }, // 15 minutes before
-						],
-					},
-				};
-
-				googleEvent = await createGoogleCalendarEvent({
-					user: req.user,
-					event: event
-				});
-
-				// Update follow-up with Google Calendar event ID (only if present)
-				const eventIdStatus = googleEvent?.event?.id || googleEvent?.data?.id;
-				if (eventIdStatus) {
-					followUp.googleCalendarEventId = eventIdStatus;
-					await followUp.save();
-				} else {
-					console.warn('Google Calendar event created but no ID returned (status change):', googleEvent);
-				}
-
-			} catch (googleError) {
-				console.error('Google Calendar Error:', googleError);
-				// Don't fail the entire request if Google Calendar fails
-			}
-		}
-
-		console.log('[B2B Update Status v2] Step 8: Success - sending response');
-		res.json({
-			status: true,
-			data: {
-				lead: updatedLead,
-				followUp: followUp,
-				googleEvent: googleEvent?.data || null
-			},
-			message: 'Lead status updated successfully' + (followUp ? ' with follow-up scheduled' : '') + (googleEvent ? ' and added to Google Calendar' : '')
-		});
-	} catch (error) {
-		console.error('[B2B Update Status v2] Error:', error);
-		res.status(500).json({
-			status: false,
-			message: 'Failed to update lead status',
 			error: error.message
 		});
 	}

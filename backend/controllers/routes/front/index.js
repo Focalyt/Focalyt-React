@@ -1,5 +1,4 @@
 const express = require("express");
-const AWS = require("aws-sdk");
 const uuid = require("uuid/v1");
 const moment = require("moment");
 // const pdf = require('pdf-parse');
@@ -34,21 +33,16 @@ const bcrypt = require("bcryptjs");
 const router = express.Router();
 const {
 	bucketName,
-	accessKeyId,
-	secretAccessKey,
-	region,
 	mimetypes,
 	bucketURL
 } = require("../../../config");
+const s3 = require("../../../helpers/objectStorage");
 const CompanyExecutive = require("../../models/companyExecutive");
 const collegeRepresentative = require("../../models/collegeRepresentative");
 const { generatePassword, sendMail } = require("../../../helpers");
 const { Translate } = require('@google-cloud/translate').v2;
 const { translateProjectId, translateKey } = require('../../../config');
 const { getCourseShareDescription } = require('../ai/courseShareMeta');
-
-AWS.config.update({ accessKeyId, secretAccessKey, region });
-const s3 = new AWS.S3({ region, signatureVersion: "v4" });
 
 const nodemailer = require("nodemailer");
 const { ObjectId } = require("mongoose").Types;
