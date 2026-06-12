@@ -1,25 +1,11 @@
-import { getApiBaseSafe, getWebAppBaseSafe } from './collegeApi';
+import { buildApiUrl } from './collegeApi';
 
 type Json = Record<string, unknown>;
 type QueryValue = string | number | boolean | null | undefined;
 type Query = Record<string, QueryValue>;
 
 function buildUrl(pathname: string, params?: Query): string {
-  const apiBase = getApiBaseSafe();
-  if (!apiBase) {
-    throw new Error('Set API_URL in androidApp/.env');
-  }
-  const path = pathname.startsWith('/') ? pathname : `/${pathname}`;
-
-  let origin = apiBase;
-  let routePath = path;
-  if (path.startsWith('/college')) {
-    origin = getWebAppBaseSafe() ?? apiBase.replace(/\/api$/i, '');
-  } else if (/\/api$/i.test(apiBase) && path.startsWith('/api/')) {
-    routePath = path.slice(4);
-  }
-
-  const url = `${origin}${routePath}`;
+  const url = buildApiUrl(pathname);
   if (!params) return url;
   const qs = Object.entries(params)
     .filter(([, v]) => v !== undefined && v !== null && v !== '')
@@ -31,13 +17,30 @@ function buildUrl(pathname: string, params?: Query): string {
   return qs ? `${url}?${qs}` : url;
 }
 
+function parseErrorBody(text: string, status: number): Error {
+  const plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  if (
+    text.startsWith('<!') ||
+    text.includes('<!doctype') ||
+    text.includes('<html')
+  ) {
+    return new Error(
+      'Server returned web page instead of API data. Check API_URL in .env.',
+    );
+  }
+  if (/cannot (get|post)/i.test(plain) || status === 404) {
+    return new Error('API route not found. Contact support.');
+  }
+  return new Error(plain.slice(0, 200) || 'Invalid response from server');
+}
+
 async function readBody(res: Response): Promise<Json> {
   const text = await res.text();
   if (!text) return {};
   try {
     return JSON.parse(text) as Json;
   } catch {
-    throw new Error(text.slice(0, 200) || 'Invalid response from server');
+    throw parseErrorBody(text, res.status);
   }
 }
 

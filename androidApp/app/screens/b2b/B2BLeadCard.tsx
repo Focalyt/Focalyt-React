@@ -3,6 +3,7 @@ import {
   Linking,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -22,6 +23,9 @@ import {
 
 type Props = {
   lead: B2BLead;
+  /** Cross-sale group leads — project tabs render inside the card */
+  groupLeads?: B2BLead[];
+  onSelectGroupLead?: (leadId: string) => void;
   onStatusChange: () => void;
   onFollowup: (type: 'Call' | 'Visit') => void;
   onHistory: () => void;
@@ -36,6 +40,14 @@ type Props = {
 
 const HEADER_BG = '#0b5ed7';
 const PINK = 'rgb(250, 85, 121)';
+
+function projectTabLabel(l: B2BLead): string {
+  const name = getLeadB2bProjectName(l);
+  if (typeof name === 'string' && name.trim() && name.trim() !== '—') {
+    return name.trim();
+  }
+  return 'Project';
+}
 
 function approvalColors(status: string) {
   const s = status.toUpperCase();
@@ -124,12 +136,10 @@ function LeadActionMenu({
   visible,
   onClose,
   onHistory,
-  onCrossSale,
 }: {
   visible: boolean;
   onClose: () => void;
   onHistory: () => void;
-  onCrossSale: () => void;
 }) {
   const insets = useSafeAreaInsets();
 
@@ -171,20 +181,6 @@ function LeadActionMenu({
               <Text style={menuStyles.itemLabel}>History</Text>
               <Icon name="chevron-right" size={12} color="#94a3b8" />
             </Pressable>
-
-            <Pressable
-              style={menuStyles.item}
-              onPress={() => {
-                onClose();
-                onCrossSale();
-              }}
-            >
-              <View style={menuStyles.itemIcon}>
-                <Icon name="project-diagram" size={14} color={HEADER_BG} solid />
-              </View>
-              <Text style={menuStyles.itemLabel}>Cross Sale</Text>
-              <Icon name="chevron-right" size={12} color="#94a3b8" />
-            </Pressable>
           </View>
         </Pressable>
       </Pressable>
@@ -214,6 +210,8 @@ function LeadQuickAction({
 
 export function B2BLeadCard({
   lead,
+  groupLeads,
+  onSelectGroupLead,
   onStatusChange,
   onFollowup,
   onHistory,
@@ -258,24 +256,58 @@ export function B2BLeadCard({
     return Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
   }, [lead.createdAt]);
 
-  const showProjectTab =
-    typeof projectName === 'string' &&
-    projectName.trim() !== '' &&
-    projectName.trim() !== '—';
+  const tabLeads =
+    groupLeads && groupLeads.length > 1 ? groupLeads : [lead];
+  const multiGroup = tabLeads.length > 1;
 
   return (
     <View style={styles.card}>
-      {showProjectTab ? (
-        <View style={styles.projectTabs}>
-          <View style={styles.projectTab}>
-            <Text style={styles.projectTabText} numberOfLines={1}>
-              {projectName}
+      <View style={styles.projectTabs}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.projectTabsScroll}
+        >
+          {tabLeads.map(l => {
+            const selected = String(l._id) === String(lead._id);
+            return (
+              <Pressable
+                key={l._id}
+                onPress={() => {
+                  if (multiGroup && onSelectGroupLead) {
+                    onSelectGroupLead(String(l._id));
+                  }
+                }}
+                disabled={!multiGroup}
+                style={[
+                  styles.projectTab,
+                  multiGroup && !selected && styles.projectTabInactive,
+                  multiGroup && selected && styles.projectTabActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.projectTabText,
+                    multiGroup && !selected && styles.projectTabTextInactive,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {projectTabLabel(l)}
+                </Text>
+              </Pressable>
+            );
+          })}
+          <Pressable
+            style={styles.crossSaleChip}
+            onPress={onCrossSale}
+            accessibilityLabel="Add cross sale"
+          >
+            <Text style={styles.crossSaleChipText} numberOfLines={1}>
+              + Cross Sale
             </Text>
-          </View>
-        </View>
-      ) : (
-        <View style={styles.projectTabsPlaceholder} />
-      )}
+          </Pressable>
+        </ScrollView>
+      </View>
 
       <View style={styles.header}>
         <View style={styles.headerActions}>
@@ -509,7 +541,6 @@ export function B2BLeadCard({
         visible={actionMenuOpen}
         onClose={() => setActionMenuOpen(false)}
         onHistory={onHistory}
-        onCrossSale={onCrossSale}
       />
     </View>
   );
@@ -563,29 +594,54 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   projectTabs: {
-    paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: 8,
     backgroundColor: '#fff9fb',
   },
-  projectTabsPlaceholder: {
+  projectTabsScroll: {
     paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 8,
-    backgroundColor: '#fff9fb',
+    gap: 8,
+    alignItems: 'center',
   },
   projectTab: {
-    alignSelf: 'flex-start',
-    maxWidth: '100%',
+    maxWidth: 180,
     backgroundColor: PINK,
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 5,
   },
+  projectTabActive: {
+    backgroundColor: PINK,
+    borderWidth: 1,
+    borderColor: PINK,
+  },
+  projectTabInactive: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: 'rgba(250, 85, 121, 0.35)',
+  },
   projectTabText: {
     color: '#fff',
     fontSize: 12,
     fontWeight: '700',
+  },
+  projectTabTextInactive: {
+    color: '#0f172a',
+    fontWeight: '800',
+  },
+  crossSaleChip: {
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: PINK,
+  },
+  crossSaleChipText: {
+    color: PINK,
+    fontWeight: '900',
+    fontSize: 12,
   },
   header: {
     backgroundColor: HEADER_BG,
