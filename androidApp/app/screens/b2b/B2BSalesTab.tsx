@@ -47,26 +47,36 @@ function getLeadGroupRootId(lead: B2BLead): string {
   return String(lead.crossSaleRootId || lead.parentLeadId || lead._id || '');
 }
 
-function getLeadProjectName(lead: B2BLead): string {
-  const p = lead.b2bProject;
-  if (!p) return 'Project';
-  if (typeof p === 'object') return p.name || 'Project';
-  return 'Project';
+function phoneDigitsOnly(raw: string | number | undefined): string {
+  if (raw == null || raw === '') return '';
+  return String(raw).replace(/[^\d]/g, '');
 }
 
-function normalizePhoneDigits(raw: string | number | undefined): string {
-  if (raw == null || raw === '') return '';
-  let digits = String(raw).replace(/[^\d]/g, '');
-  if (digits.length === 10) digits = `91${digits}`;
-  else if (digits.length === 11 && digits.startsWith('0')) {
-    digits = `91${digits.slice(1)}`;
+/** Dialer: 10-digit local number (no 91 prefix). */
+function normalizeDialNumber(raw: string | number | undefined): string {
+  let digits = phoneDigitsOnly(raw);
+  if (digits.length === 12 && digits.startsWith('91')) {
+    digits = digits.slice(2);
+  }
+  if (digits.length === 11 && digits.startsWith('0')) {
+    digits = digits.slice(1);
+  }
+  return digits;
+}
+
+/** WhatsApp requires country code without + */
+function normalizeWhatsAppNumber(raw: string | number | undefined): string {
+  let digits = phoneDigitsOnly(raw);
+  if (digits.length === 10) return `91${digits}`;
+  if (digits.length === 11 && digits.startsWith('0')) {
+    return `91${digits.slice(1)}`;
   }
   return digits;
 }
 
 async function dialNumber(raw: string | number | undefined) {
-  const digits = normalizePhoneDigits(raw);
-  if (!digits) {
+  const digits = normalizeDialNumber(raw);
+  if (digits.length < 10) {
     Alert.alert('Invalid number', 'Mobile number missing.');
     return;
   }
@@ -82,7 +92,7 @@ async function dialNumber(raw: string | number | undefined) {
 }
 
 async function openWhatsApp(raw: string | number | undefined) {
-  const digits = normalizePhoneDigits(raw);
+  const digits = normalizeWhatsAppNumber(raw);
   if (!digits) {
     Alert.alert('Invalid number', 'WhatsApp number missing.');
     return;
@@ -807,57 +817,16 @@ export function B2BSalesTab() {
 
             return (
               <View style={styles.groupWrap}>
-                <View style={styles.groupTabsRow}>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.groupTabs}
-                  >
-                    {group.leads.map(l => {
-                      const selected = String(l._id) === String(activeLeadId);
-                      return (
-                        <Pressable
-                          key={l._id}
-                          onPress={() =>
-                            setActiveProjectByGroup(prev => ({
-                              ...prev,
-                              [group.rootId]: l._id,
-                            }))
-                          }
-                          style={[
-                            styles.groupTab,
-                            selected && styles.groupTabActive,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.groupTabText,
-                              selected && styles.groupTabTextActive,
-                            ]}
-                            numberOfLines={1}
-                          >
-                            {getLeadProjectName(l) || 'Project'}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-
-                    <Pressable
-                      style={styles.groupCrossSaleChip}
-                      onPress={() => activeLead && setCrossSaleLead(activeLead)}
-                      disabled={!activeLead}
-                      accessibilityLabel="Add cross sale"
-                    >
-                      <Text style={styles.groupCrossSaleChipText} numberOfLines={1}>
-                        + Cross Sale
-                      </Text>
-                    </Pressable>
-                  </ScrollView>
-                </View>
-
                 {activeLead ? (
                   <B2BLeadCard
                     lead={activeLead}
+                    groupLeads={group.leads}
+                    onSelectGroupLead={leadId =>
+                      setActiveProjectByGroup(prev => ({
+                        ...prev,
+                        [group.rootId]: leadId,
+                      }))
+                    }
               onDial={dialNumber}
               onWhatsApp={openWhatsApp}
               onFollowup={type => {
@@ -1270,56 +1239,6 @@ const styles = StyleSheet.create({
   groupWrap: {
     borderRadius: 20,
     overflow: 'hidden',
-  },
-  groupTabsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff9fb',
-    paddingLeft: 10,
-    paddingRight: 10,
-    paddingTop: 8,
-    paddingBottom: 6,
-    gap: 8,
-  },
-  groupTabs: {
-    paddingRight: 8,
-    gap: 8,
-  },
-  groupTab: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: 'rgba(250, 85, 121, 0.35)',
-    maxWidth: 180,
-  },
-  groupTabActive: {
-    backgroundColor: 'rgb(250, 85, 121)',
-    borderColor: 'rgb(250, 85, 121)',
-  },
-  groupTabText: {
-    color: '#0f172a',
-    fontWeight: '800',
-    fontSize: 12,
-  },
-  groupTabTextActive: {
-    color: '#fff',
-  },
-  groupCrossSaleChip: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: 'rgb(250, 85, 121)',
-    maxWidth: 180,
-  },
-  groupCrossSaleChipText: {
-    color: 'rgb(250, 85, 121)',
-    fontWeight: '900',
-    fontSize: 12,
   },
   errorBox: {
     backgroundColor: '#fee2e2',

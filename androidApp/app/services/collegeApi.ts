@@ -104,20 +104,22 @@ export function normalizeOtpUserInput(raw: string): string {
   return digits.length === 10 ? digits : trimmed;
 }
 
-/** Paths under express `router.use('/api', apiRoutes)` when API_URL ends with `/api`. */
-function resolveApiPath(pathname: string): string {
-  const path = pathname.startsWith('/') ? pathname : `/${pathname}`;
+/**
+ * Build request URL on API_URL (e.g. https://focalyt.com/api/college/...).
+ * Production nginx strips `/api` before Node — do NOT use WEB_APP_URL for JSON APIs.
+ */
+export function buildApiUrl(pathname: string): string {
   const base = requireBase();
+  const path = pathname.startsWith('/') ? pathname : `/${pathname}`;
+  let routePath = path;
   if (/\/api$/i.test(base) && path.startsWith('/api/')) {
-    return path.slice(4);
+    routePath = path.slice(4);
   }
-  return path;
+  return `${base}${routePath}`;
 }
 
 async function postJson(pathname: string, body: Json): Promise<Json> {
-  const base = requireBase();
-  const path = resolveApiPath(pathname);
-  const url = `${base}${path}`;
+  const url = buildApiUrl(pathname);
   let res: Response;
   try {
     res = await fetch(url, {
@@ -153,39 +155,6 @@ async function postJson(pathname: string, body: Json): Promise<Json> {
   return data;
 }
 
-async function postPortalJson(pathname: string, body: Json): Promise<Json> {
-  const portal = getWebAppBaseSafe();
-  if (!portal) {
-    throw new Error('Set API_URL or WEB_APP_URL in androidApp/.env');
-  }
-  const path = pathname.startsWith('/') ? pathname : `/${pathname}`;
-  const url = `${portal}${path}`;
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Network error';
-    throw new Error(msg);
-  }
-  const text = await res.text();
-  let data: Json = {};
-  if (text) {
-    try {
-      data = JSON.parse(text) as Json;
-    } catch {
-      throw new Error(text.slice(0, 200) || 'Invalid response from server');
-    }
-  }
-  return data;
-}
-
 export async function fetchCollegePermissions(token: string): Promise<Json> {
   return getJson('/college/permission', token);
 }
@@ -194,7 +163,7 @@ export async function collegePasswordLogin(
   userInput: string,
   password: string,
 ): Promise<Json> {
-  return postPortalJson('/college/login', {
+  return postJson('/college/login', {
     userInput,
     password,
     module: 'college',
