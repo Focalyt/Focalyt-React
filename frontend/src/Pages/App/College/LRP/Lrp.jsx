@@ -1,7 +1,85 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 
-const PARTNER_TYPES = ["LRP", "Channel Partner"];
+const pickRefId = (ref) => {
+  if (ref == null || ref === "") return "";
+  if (typeof ref === "object") return String(ref._id || ref.id || ref.$oid || "").trim();
+  return String(ref).trim();
+};
+
+const pickRefName = (ref) => {
+  if (!ref) return "";
+  if (typeof ref === "object") return String(ref.name || ref.title || "").trim();
+  return "";
+};
+
+const pickOptionLabel = (id, options) => {
+  const needle = String(id || "").trim();
+  if (!needle || !Array.isArray(options)) return "";
+  const hit = options.find((o) => String(o?.value || o?._id || "").trim() === needle);
+  return hit ? String(hit.label || hit.name || "").trim() : "";
+};
+
+const parseB2bLeadContext = (lead) => {
+  if (!lead || typeof lead !== "object") return null;
+
+  const cat = lead.leadCategory;
+  const typ = lead.typeOfB2B || (typeof cat === "object" ? cat.typeOfB2B : null);
+  const proj = lead.b2bProject || (typeof cat === "object" ? cat.b2bProject : null);
+  const dept = lead.b2bDepartment || (typeof cat === "object" ? cat.b2bDepartment : null);
+
+  const catId = pickRefId(cat);
+  const typeId = pickRefId(typ);
+  const projId = pickRefId(proj);
+  const deptId = pickRefId(dept) || pickRefId(proj?.department) || pickRefId(typ?.department);
+
+  const department =
+    pickRefName(dept) || pickRefName(proj?.department) || pickRefName(typ?.department);
+  const project = pickRefName(proj);
+  const leadSource = pickRefName(cat);
+  const b2bType = pickRefName(typ);
+
+  const questions =
+    cat && typeof cat === "object" && Array.isArray(cat.questions)
+      ? cat.questions.filter((q) => q && String(q.question || "").trim())
+      : [];
+
+  return {
+    ids: {
+      leadCategory: catId,
+      b2bDepartment: deptId,
+      b2bProject: projId,
+      typeOfB2B: typeId,
+    },
+    labels: {
+      department,
+      project,
+      leadSource,
+      b2bType,
+    },
+    questions,
+    state: String(lead.state || "").trim(),
+    district: String(lead.city || lead.district || "").trim(),
+  };
+};
+
+const enrichLeadLabels = (ctx, { departments = [], projects = [], categories = [], types = [] } = {}) => {
+  if (!ctx) return null;
+  const deptOpts = departments.map((d) => ({ value: d._id, label: d.name }));
+  const projOpts = projects.map((p) => ({ value: p._id, label: p.name }));
+  const catOpts = categories.map((c) => ({ value: c.value || c._id, label: c.label || c.name }));
+  const typeOpts = types.map((t) => ({ value: t._id, label: t.name }));
+
+  return {
+    ...ctx,
+    labels: {
+      department: ctx.labels.department || pickOptionLabel(ctx.ids.b2bDepartment, deptOpts),
+      project: ctx.labels.project || pickOptionLabel(ctx.ids.b2bProject, projOpts),
+      leadSource: ctx.labels.leadSource || pickOptionLabel(ctx.ids.leadCategory, catOpts),
+      b2bType: ctx.labels.b2bType || pickOptionLabel(ctx.ids.typeOfB2B, typeOpts),
+    },
+  };
+};
 
 const MAX_STEPS = 3;
 
@@ -37,6 +115,38 @@ const createInitialForm = () => ({
   state: "",
   district: "",
 });
+
+const ReadOnlyField = ({ label, value }) => (
+  <div style={{ flex: "1 1 240px", minWidth: 220, marginBottom: 4 }}>
+    <div
+      style={{
+        display: "block",
+        fontSize: "11px",
+        fontWeight: 700,
+        color: "#64748b",
+        textTransform: "uppercase",
+        letterSpacing: "0.05em",
+        marginBottom: "5px",
+      }}
+    >
+      {label}
+    </div>
+    <div
+      style={{
+        fontSize: 14,
+        color: "#0f172a",
+        fontWeight: 600,
+        padding: "10px 12px",
+        background: "#f8fafc",
+        border: "1px solid #e2e8f0",
+        borderRadius: 10,
+        minHeight: 42,
+      }}
+    >
+      {value || "—"}
+    </div>
+  </div>
+);
 
 const Card = ({ number, title, children }) => (
   <div
@@ -173,6 +283,7 @@ function Lrp() {
   const [allB2bDepartments, setAllB2bDepartments] = useState([]);
   const [allB2bProjects, setAllB2bProjects] = useState([]);
   const [allTypeOfB2BRaw, setAllTypeOfB2BRaw] = useState([]);
+  const [partnerTypeOptions, setPartnerTypeOptions] = useState([]);
   const typeOfB2BOptions = useMemo(() => {
     const raw = Array.isArray(allTypeOfB2BRaw) ? allTypeOfB2BRaw : [];
     const deptId = String(form.b2bDepartment || "").trim();
@@ -187,12 +298,33 @@ function Lrp() {
   const [leadSourceAnswers, setLeadSourceAnswers] = useState({});
   const [loadingB2bLeadContext, setLoadingB2bLeadContext] = useState(false);
   const [b2bLeadLoadError, setB2bLeadLoadError] = useState("");
+  const [b2bLeadDisplay, setB2bLeadDisplay] = useState({
+    department: "",
+    project: "",
+    leadSource: "",
+    b2bType: "",
+  });
   const [viewLeadSourceQA, setViewLeadSourceQA] = useState(null);
   const stateInputRef = useRef(null);
   const districtInputRef = useRef(null);
   const stateAutoRef = useRef(null);
   const districtAutoRef = useRef(null);
   const [googleReady, setGoogleReady] = useState(Boolean(window.google && window.google.maps && window.google.maps.places));
+  const b2bOptionsRef = useRef({
+    departments: [],
+    projects: [],
+    categories: [],
+    types: [],
+  });
+
+  useEffect(() => {
+    b2bOptionsRef.current = {
+      departments: allB2bDepartments,
+      projects: allB2bProjects,
+      categories: leadCategoryOptions,
+      types: allTypeOfB2BRaw,
+    };
+  }, [allB2bDepartments, allB2bProjects, leadCategoryOptions, allTypeOfB2BRaw]);
 
   // Load Google Maps Places library (India-only autocomplete for state/district)
   useEffect(() => {
@@ -266,51 +398,78 @@ function Lrp() {
   }, [googleReady, step]);
 
   useEffect(() => {
-    const loadB2BOptions = async () => {
+    const loadOptions = async () => {
       const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
       const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
       const token = userData.token;
       if (!backendUrl || !token) return;
+
+      const headers = { "x-auth": token };
+      const fromLinkedLead = Boolean(linkedB2bLeadId);
+
       try {
-        const [catRes, deptRes, projRes, typeRes] = await Promise.all([
-          fetch(`${backendUrl}/college/b2b/lead-categories?status=true`, {
-            headers: { "x-auth": token },
-          }),
-          fetch(`${backendUrl}/college/b2b/b2b-departments?status=true`, {
-            headers: { "x-auth": token },
-          }),
-          fetch(`${backendUrl}/college/b2b/b2b-projects?status=true`, {
-            headers: { "x-auth": token },
-          }),
-          fetch(`${backendUrl}/college/b2b/type-of-b2b?status=true`, {
-            headers: { "x-auth": token },
-          }),
-        ]);
-        const catJson = await catRes.json();
-        const deptJson = await deptRes.json();
-        const projJson = await projRes.json();
-        const typeJson = await typeRes.json();
-        if (catJson.status && Array.isArray(catJson.data)) {
-          setLeadCategoryOptions(
-            catJson.data
-              .filter((c) => c.isActive !== false)
-              .map((c) => ({ value: c._id, label: c.name || c.title }))
+        const requests = [
+          fetch(`${backendUrl}/college/users/partners`, { headers }),
+        ];
+
+        if (!fromLinkedLead) {
+          requests.unshift(
+            fetch(`${backendUrl}/college/b2b/lead-categories?status=true`, { headers }),
+            fetch(`${backendUrl}/college/b2b/b2b-departments?status=true`, { headers }),
+            fetch(`${backendUrl}/college/b2b/b2b-projects?status=true`, { headers }),
+            fetch(`${backendUrl}/college/b2b/type-of-b2b?status=true`, { headers })
           );
         }
-        if (deptJson?.status && Array.isArray(deptJson.data)) {
-          setAllB2bDepartments(deptJson.data.filter((d) => d && d.isActive !== false));
+
+        const responses = await Promise.all(requests);
+
+        if (!fromLinkedLead) {
+          const [catRes, deptRes, projRes, typeRes, partnersRes] = responses;
+          const catJson = await catRes.json();
+          const deptJson = await deptRes.json();
+          const projJson = await projRes.json();
+          const typeJson = await typeRes.json();
+          const partnersJson = await partnersRes.json();
+
+          if (catJson.status && Array.isArray(catJson.data)) {
+            setLeadCategoryOptions(
+              catJson.data
+                .filter((c) => c.isActive !== false)
+                .map((c) => ({ value: c._id, label: c.name || c.title }))
+            );
+          }
+          if (deptJson?.status && Array.isArray(deptJson.data)) {
+            setAllB2bDepartments(deptJson.data.filter((d) => d && d.isActive !== false));
+          }
+          if (projJson?.status && Array.isArray(projJson.data)) {
+            setAllB2bProjects(projJson.data.filter((p) => p && p.isActive !== false));
+          }
+          if (typeJson.status && Array.isArray(typeJson.data)) setAllTypeOfB2BRaw(typeJson.data);
+          if ((partnersJson.status || partnersJson.success) && Array.isArray(partnersJson.data)) {
+            setPartnerTypeOptions(
+              partnersJson.data
+                .filter((p) => p && p.status !== false)
+                .map((p) => ({ value: p.name, label: p.name }))
+            );
+          }
+        } else {
+          const [partnersRes] = responses;
+          const partnersJson = await partnersRes.json();
+          if ((partnersJson.status || partnersJson.success) && Array.isArray(partnersJson.data)) {
+            setPartnerTypeOptions(
+              partnersJson.data
+                .filter((p) => p && p.status !== false)
+                .map((p) => ({ value: p.name, label: p.name }))
+            );
+          }
         }
-        if (projJson?.status && Array.isArray(projJson.data)) {
-          setAllB2bProjects(projJson.data.filter((p) => p && p.isActive !== false));
-        }
-        if (typeJson.status && Array.isArray(typeJson.data)) setAllTypeOfB2BRaw(typeJson.data);
       } catch (e) {
         // eslint-disable-next-line no-console
-        console.error("[LRP] B2B dropdowns load failed", e);
+        console.error("[LRP] options load failed", e);
       }
     };
-    loadB2BOptions();
-  }, []);
+    loadOptions();
+  }, [linkedB2bLeadId]);
 
 
   useEffect(() => {
@@ -329,68 +488,95 @@ function Lrp() {
     setCategoryQuestions([]);
     setLeadSourceAnswers({});
     setB2bLeadLoadError("");
+    setB2bLeadDisplay({ department: "", project: "", leadSource: "", b2bType: "" });
   }, [mode, linkedB2bLeadId]);
+
+  const applyB2bLeadContext = useCallback(
+    (lead) => {
+      const opts = b2bOptionsRef.current;
+      const parsed = enrichLeadLabels(parseB2bLeadContext(lead), {
+        departments: opts.departments,
+        projects: opts.projects,
+        categories: opts.categories,
+        types: opts.types,
+      });
+      if (!parsed) return;
+
+      setCategoryQuestions(parsed.questions);
+      setLeadSourceAnswers({});
+      setB2bLeadDisplay(parsed.labels);
+
+      setForm((prev) => ({
+        ...prev,
+        b2bLeadId: linkedB2bLeadId,
+        leadCategory: parsed.ids.leadCategory || prev.leadCategory,
+        b2bDepartment: parsed.ids.b2bDepartment || prev.b2bDepartment,
+        b2bProject: parsed.ids.b2bProject || prev.b2bProject,
+        typeOfB2B: parsed.ids.typeOfB2B || prev.typeOfB2B,
+        state: parsed.state || prev.state || "Punjab",
+        district: parsed.district || prev.district,
+      }));
+    },
+    [linkedB2bLeadId]
+  );
 
   useEffect(() => {
     if (mode !== "add" || !linkedB2bLeadId) return;
 
+    const stateLead = location.state?.b2bLead;
+    const hasStateLead =
+      stateLead && pickRefId(stateLead._id || stateLead.id) === linkedB2bLeadId;
+
+    if (hasStateLead) {
+      applyB2bLeadContext(stateLead);
+      setLoadingB2bLeadContext(false);
+      setB2bLeadLoadError("");
+      return;
+    }
+
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
     const token = userData.token;
-    if (!backendUrl || !token) return;
+    if (!backendUrl || !token) {
+      setB2bLeadLoadError("Login required to load lead details.");
+      return;
+    }
+
+    let cancelled = false;
 
     const run = async () => {
       setLoadingB2bLeadContext(true);
       setB2bLeadLoadError("");
       try {
-        const res = await fetch(`${backendUrl}/college/lrp/b2b-lead/${linkedB2bLeadId}`, {
-          headers: { "x-auth": token },
-        });
+        const headers = { "x-auth": token };
+        const res = await fetch(`${backendUrl}/college/lrp/b2b-lead/${linkedB2bLeadId}`, { headers });
         const json = await res.json().catch(() => ({}));
+
+        if (cancelled) return;
+
         if (!res.ok || !json?.success || !json?.data) {
           setB2bLeadLoadError(json?.message || "Could not load lead for this report.");
           setCategoryQuestions([]);
           return;
         }
-        const lead = json.data;
-        const cat = lead.leadCategory;
-        const catId = cat && typeof cat === "object" ? cat._id : cat;
-        const dept = lead.b2bDepartment;
-        const deptId = dept && typeof dept === "object" ? dept._id : dept;
-        const proj = lead.b2bProject;
-        const projId = proj && typeof proj === "object" ? proj._id : proj;
-        const typeId = lead.typeOfB2B && typeof lead.typeOfB2B === "object" ? lead.typeOfB2B._id : lead.typeOfB2B;
-        const qs = cat && typeof cat === "object" && Array.isArray(cat.questions) ? cat.questions : [];
-        setCategoryQuestions(qs.filter((q) => q && String(q.question || "").trim()));
-        setLeadSourceAnswers({});
 
-        setForm((prev) => {
-          const st = String(lead.state || prev.state || "Punjab");
-          const city = String(lead.city || "").trim();
-          const dist = city || prev.district;
-          return {
-            ...prev,
-            b2bLeadId: linkedB2bLeadId,
-            leadCategory: catId ? String(catId) : prev.leadCategory,
-            b2bDepartment: deptId ? String(deptId) : prev.b2bDepartment,
-            b2bProject: projId ? String(projId) : prev.b2bProject,
-            typeOfB2B: typeId ? String(typeId) : prev.typeOfB2B,
-            state: st,
-            district: dist,
-          };
-        });
+        applyB2bLeadContext(json.data);
       } catch (e) {
+        if (cancelled) return;
         // eslint-disable-next-line no-console
         console.error("[LRP] B2B lead load failed", e);
         setB2bLeadLoadError("Could not load B2B lead for this report.");
         setCategoryQuestions([]);
       } finally {
-        setLoadingB2bLeadContext(false);
+        if (!cancelled) setLoadingB2bLeadContext(false);
       }
     };
 
     run();
-  }, [mode, linkedB2bLeadId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, linkedB2bLeadId, location.state, applyB2bLeadContext]);
 
   useEffect(() => {
     if (mode !== "add" || linkedB2bLeadId) return;
@@ -520,14 +706,49 @@ function Lrp() {
     );
   }, [allB2bProjects, form.b2bDepartment]);
 
+  const linkedLeadSummary = useMemo(() => {
+    if (!linkedB2bLeadId) return null;
+    const deptOpts = (allB2bDepartments || []).map((d) => ({ value: d._id, label: d.name }));
+    const projOpts = (allB2bProjects || []).map((p) => ({ value: p._id, label: p.name }));
+    const typeOpts = (allTypeOfB2BRaw || []).map((t) => ({ value: t._id, label: t.name }));
+    return {
+      department: b2bLeadDisplay.department || pickOptionLabel(form.b2bDepartment, deptOpts),
+      project: b2bLeadDisplay.project || pickOptionLabel(form.b2bProject, projOpts),
+      leadSource: b2bLeadDisplay.leadSource || pickOptionLabel(form.leadCategory, leadCategoryOptions),
+      b2bType: b2bLeadDisplay.b2bType || pickOptionLabel(form.typeOfB2B, typeOpts),
+      state: form.state,
+      city: form.district,
+    };
+  }, [
+    linkedB2bLeadId,
+    b2bLeadDisplay,
+    form.b2bDepartment,
+    form.b2bProject,
+    form.leadCategory,
+    form.typeOfB2B,
+    form.state,
+    form.district,
+    allB2bDepartments,
+    allB2bProjects,
+    leadCategoryOptions,
+    allTypeOfB2BRaw,
+  ]);
+
   const getErrorsForStep = (s) => {
     const e = {};
 
     if (s === 1) {
-      if (!isNonEmpty(form.b2bDepartment)) e.b2bDepartment = "Required for B2B lead";
-      if (!isNonEmpty(form.b2bProject)) e.b2bProject = "Required for B2B lead";
-      if (!isNonEmpty(form.leadCategory)) e.leadCategory = "Required for B2B lead";
-      if (!isNonEmpty(form.typeOfB2B)) e.typeOfB2B = "Required for B2B lead";
+      const linkedMissing = (field, label) => {
+        if (!isNonEmpty(form[field])) {
+          e[field] = linkedB2bLeadId
+            ? `${label} is missing on this B2B lead. Update the lead in B2B Sales first.`
+            : "Required for B2B lead";
+        }
+      };
+      linkedMissing("b2bDepartment", "Department");
+      linkedMissing("b2bProject", "Project");
+      linkedMissing("leadCategory", "Lead source");
+      linkedMissing("typeOfB2B", "B2B type");
       if (!isNonEmpty(form.partnerType)) e.partnerType = "Required";
       if (!isNonEmpty(form.implementationPartnerName)) e.implementationPartnerName = "Required";
       if (!isNonEmpty(form.visitDate)) e.visitDate = "Required";
@@ -571,7 +792,7 @@ function Lrp() {
 
   const errors = useMemo(
     () => getErrorsForStep(step),
-    [step, form, mode, categoryQuestions, leadSourceAnswers]
+    [step, form, mode, linkedB2bLeadId, categoryQuestions, leadSourceAnswers]
   );
   const hasStepErrors = Object.keys(errors).length > 0;
 
@@ -763,109 +984,133 @@ function Lrp() {
         {step === 1 && (
           <Card number={1} title="Partner & Visit Details">
             <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "flex-end" }}>
-              <div style={{ flex: "1 1 240px", minWidth: 220 }}>
-                <label style={lblStyle}>B2B department {reqStar}</label>
-                <select
-                  value={form.b2bDepartment}
-                  onChange={(e) => {
-                    const next = e.target.value;
-                    setForm((prev) => ({
-                      ...prev,
-                      b2bDepartment: next,
-                      b2bProject: "",
-                      typeOfB2B: "",
-                    }));
-                  }}
-                  onBlur={() => markTouched("b2bDepartment")}
-                  disabled={mode === "add" && !!linkedB2bLeadId}
-                  style={{
-                    ...fldStyle,
-                    opacity: mode === "add" && linkedB2bLeadId ? 0.75 : 1,
-                    cursor: mode === "add" && linkedB2bLeadId ? "not-allowed" : "default",
-                  }}
-                >
-                  <option value="">Select department</option>
-                  {allB2bDepartments.map((d) => (
-                    <option key={d._id} value={d._id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-                <FieldError name="b2bDepartment" />
-              </div>
+              {linkedB2bLeadId ? (
+                <div style={{ flex: "1 1 100%", marginBottom: 4 }}>
+                  <div
+                    style={{
+                      padding: "14px 16px",
+                      borderRadius: 12,
+                      background: "#f8fafc",
+                      border: "1px solid #e2e8f0",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#64748b", marginBottom: 10 }}>
+                      Lead details
+                    </div>
+                    {b2bLeadLoadError ? (
+                      <div style={{ fontSize: 13, color: "#b91c1c", fontWeight: 600 }}>{b2bLeadLoadError}</div>
+                    ) : loadingB2bLeadContext ? (
+                      <div style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>Loading lead details…</div>
+                    ) : (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "12px 16px" }}>
+                        <ReadOnlyField label="B2B department" value={linkedLeadSummary?.department} />
+                        <ReadOnlyField label="B2B project" value={linkedLeadSummary?.project} />
+                        <ReadOnlyField label="B2B lead source" value={linkedLeadSummary?.leadSource} />
+                        <ReadOnlyField label="B2B type" value={linkedLeadSummary?.b2bType} />
+                        <ReadOnlyField label="State" value={linkedLeadSummary?.state} />
+                        <ReadOnlyField label="City" value={linkedLeadSummary?.city} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ flex: "1 1 240px", minWidth: 220 }}>
+                    <label style={lblStyle}>B2B department {reqStar}</label>
+                    <select
+                      value={form.b2bDepartment}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        setForm((prev) => ({
+                          ...prev,
+                          b2bDepartment: next,
+                          b2bProject: "",
+                          typeOfB2B: "",
+                        }));
+                      }}
+                      onBlur={() => markTouched("b2bDepartment")}
+                      style={fldStyle}
+                    >
+                      <option value="">Select department</option>
+                      {allB2bDepartments.map((d) => (
+                        <option key={d._id} value={d._id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                    <FieldError name="b2bDepartment" />
+                  </div>
 
-              <div style={{ flex: "1 1 240px", minWidth: 220 }}>
-                <label style={lblStyle}>B2B project {reqStar}</label>
-                <select
-                  value={form.b2bProject}
-                  onChange={(e) => setValue("b2bProject", e.target.value)}
-                  onBlur={() => markTouched("b2bProject")}
-                  disabled={!form.b2bDepartment || (mode === "add" && !!linkedB2bLeadId)}
-                  style={{
-                    ...fldStyle,
-                    opacity: !form.b2bDepartment || (mode === "add" && linkedB2bLeadId) ? 0.75 : 1,
-                    cursor: !form.b2bDepartment || (mode === "add" && linkedB2bLeadId) ? "not-allowed" : "default",
-                  }}
-                >
-                  <option value="">
-                    {form.b2bDepartment ? "Select project" : "Select department first"}
-                  </option>
-                  {departmentProjects.map((p) => (
-                    <option key={p._id} value={p._id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-                <FieldError name="b2bProject" />
-              </div>
+                  <div style={{ flex: "1 1 240px", minWidth: 220 }}>
+                    <label style={lblStyle}>B2B project {reqStar}</label>
+                    <select
+                      value={form.b2bProject}
+                      onChange={(e) => setValue("b2bProject", e.target.value)}
+                      onBlur={() => markTouched("b2bProject")}
+                      disabled={!form.b2bDepartment}
+                      style={{
+                        ...fldStyle,
+                        opacity: !form.b2bDepartment ? 0.75 : 1,
+                        cursor: !form.b2bDepartment ? "not-allowed" : "default",
+                      }}
+                    >
+                      <option value="">
+                        {form.b2bDepartment ? "Select project" : "Select department first"}
+                      </option>
+                      {departmentProjects.map((p) => (
+                        <option key={p._id} value={p._id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    <FieldError name="b2bProject" />
+                  </div>
 
-              <div style={{ flex: "1 1 240px", minWidth: 220 }}>
-                <label style={lblStyle}>B2B lead source {reqStar}</label>
-                <select
-                  value={form.leadCategory}
-                  onChange={(e) => setValue("leadCategory", e.target.value)}
-                  onBlur={() => markTouched("leadCategory")}
-                  disabled={mode === "add" && !!linkedB2bLeadId}
-                  style={{
-                    ...fldStyle,
-                    opacity: mode === "add" && linkedB2bLeadId ? 0.75 : 1,
-                    cursor: mode === "add" && linkedB2bLeadId ? "not-allowed" : "default",
-                  }}
-                >
-                  <option value="">Select lead source</option>
-                  {leadCategoryOptions.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-                <FieldError name="leadCategory" />
-              </div>
+                  <div style={{ flex: "1 1 240px", minWidth: 220 }}>
+                    <label style={lblStyle}>B2B lead source {reqStar}</label>
+                    <select
+                      value={form.leadCategory}
+                      onChange={(e) => setValue("leadCategory", e.target.value)}
+                      onBlur={() => markTouched("leadCategory")}
+                      style={fldStyle}
+                    >
+                      <option value="">Select lead source</option>
+                      {leadCategoryOptions.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                    <FieldError name="leadCategory" />
+                  </div>
 
-              <div style={{ flex: "1 1 240px", minWidth: 220 }}>
-                <label style={lblStyle}>B2B type {reqStar}</label>
-                <select
-                  value={form.typeOfB2B}
-                  onChange={(e) => setValue("typeOfB2B", e.target.value)}
-                  onBlur={() => markTouched("typeOfB2B")}
-                  disabled={!form.b2bDepartment || (mode === "add" && !!linkedB2bLeadId)}
-                  style={{
-                    ...fldStyle,
-                    opacity: !form.b2bDepartment || (mode === "add" && linkedB2bLeadId) ? 0.75 : 1,
-                    cursor: !form.b2bDepartment || (mode === "add" && linkedB2bLeadId) ? "not-allowed" : "default",
-                  }}
-                >
-                  <option value="">
-                    {form.b2bDepartment ? "Select type" : "Select department first"}
-                  </option>
-                  {typeOfB2BOptions.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-                <FieldError name="typeOfB2B" />
-              </div>
+                  <div style={{ flex: "1 1 240px", minWidth: 220 }}>
+                    <label style={lblStyle}>B2B type {reqStar}</label>
+                    <select
+                      value={form.typeOfB2B}
+                      onChange={(e) => setValue("typeOfB2B", e.target.value)}
+                      onBlur={() => markTouched("typeOfB2B")}
+                      disabled={!form.b2bDepartment}
+                      style={{
+                        ...fldStyle,
+                        opacity: !form.b2bDepartment ? 0.75 : 1,
+                        cursor: !form.b2bDepartment ? "not-allowed" : "default",
+                      }}
+                    >
+                      <option value="">
+                        {form.b2bDepartment ? "Select type" : "Select department first"}
+                      </option>
+                      {typeOfB2BOptions.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                    <FieldError name="typeOfB2B" />
+                  </div>
+                </>
+              )}
 
               <div style={{ flex: "1 1 240px", minWidth: 220 }}>
                 <label style={lblStyle}>Type of partner {reqStar}</label>
@@ -875,10 +1120,12 @@ function Lrp() {
                   onBlur={() => markTouched("partnerType")}
                   style={fldStyle}
                 >
-                  <option value="">Select partner</option>
-                  {PARTNER_TYPES.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
+                  <option value="">
+                    {partnerTypeOptions.length ? "Select partner" : "No partners available"}
+                  </option>
+                  {partnerTypeOptions.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
                     </option>
                   ))}
                 </select>

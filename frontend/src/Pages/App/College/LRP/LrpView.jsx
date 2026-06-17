@@ -1,6 +1,26 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
+const pickRefName = (ref) => {
+  if (!ref) return "";
+  if (typeof ref === "object") return String(ref.name || ref.title || "").trim();
+  return "";
+};
+
+const getLeadDisplayLabels = (lead) => {
+  if (!lead || typeof lead !== "object") return null;
+  const cat = lead.leadCategory;
+  const typ = lead.typeOfB2B || (typeof cat === "object" ? cat.typeOfB2B : null);
+  const proj = lead.b2bProject || (typeof cat === "object" ? cat.b2bProject : null);
+  const dept = lead.b2bDepartment || (typeof cat === "object" ? cat.b2bDepartment : null);
+  return {
+    leadSource: pickRefName(cat),
+    b2bType: pickRefName(typ),
+    department: pickRefName(dept) || pickRefName(proj?.department) || pickRefName(typ?.department),
+    project: pickRefName(proj),
+  };
+};
+
 const readLrpMeta = (items, metaKey) => {
   const it = (items || []).find((x) => x && x.metaKey === metaKey);
   return it ? String(it.value || "").trim() : "";
@@ -116,25 +136,28 @@ function LrpView() {
       setError("");
       setNotFound(false);
       try {
-        const [lrpRes, leadRes] = await Promise.all([
+        const [lrpRes, lrpLeadRes, b2bLeadRes] = await Promise.all([
           fetch(`${backendUrl}/college/lrp/by-b2b-lead/${b2bLeadId}`, { headers }),
           fetch(`${backendUrl}/college/lrp/b2b-lead/${b2bLeadId}`, { headers }),
+          fetch(`${backendUrl}/college/b2b/leads/${b2bLeadId}`, { headers }),
         ]);
         const lrpJson = await lrpRes.json().catch(() => ({}));
-        const leadJson = await leadRes.json().catch(() => ({}));
+        const lrpLeadJson = await lrpLeadRes.json().catch(() => ({}));
+        const b2bLeadJson = await b2bLeadRes.json().catch(() => ({}));
 
-        if (leadJson?.success && leadJson?.data) {
-          const lead = leadJson.data;
-          const cat = lead.leadCategory;
-          const typ = lead.typeOfB2B;
-          const dept = lead.b2bDepartment;
-          const proj = lead.b2bProject;
-          setCategoryLabel(
-            cat && typeof cat === "object" ? String(cat.name || cat.title || "").trim() || "—" : "—"
-          );
-          setTypeLabel(typ && typeof typ === "object" ? String(typ.name || "").trim() || "—" : "—");
-          setDeptLabel(dept && typeof dept === "object" ? String(dept.name || "").trim() || "—" : "—");
-          setProjLabel(proj && typeof proj === "object" ? String(proj.name || "").trim() || "—" : "—");
+        let lead = null;
+        if (lrpLeadRes.ok && lrpLeadJson?.success && lrpLeadJson?.data) {
+          lead = lrpLeadJson.data;
+        } else if (b2bLeadRes.ok && b2bLeadJson?.status && b2bLeadJson?.data) {
+          lead = b2bLeadJson.data;
+        }
+
+        const labels = getLeadDisplayLabels(lead);
+        if (labels) {
+          setCategoryLabel(labels.leadSource || "—");
+          setTypeLabel(labels.b2bType || "—");
+          setDeptLabel(labels.department || "—");
+          setProjLabel(labels.project || "—");
         } else {
           setCategoryLabel("—");
           setTypeLabel("—");

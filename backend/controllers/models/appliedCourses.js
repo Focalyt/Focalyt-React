@@ -103,6 +103,8 @@ const appliedCoursesSchema = new Schema(
       rejectedAt: { type: Date },
       rejectionReason: { type: String, trim: true },
     },
+    crossSaleRootId: { type: ObjectId, ref: 'AppliedCourses', index: true },
+    parentAppliedCourseId: { type: ObjectId, ref: 'AppliedCourses', index: true },
     
     admissionDone: { type: Boolean, default: false },
     admissionDate: { type: Date },

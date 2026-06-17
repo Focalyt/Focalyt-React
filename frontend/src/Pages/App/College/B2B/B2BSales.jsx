@@ -1394,17 +1394,15 @@ const B2BSales = () => {
   const validateMobileNumber = (number) => {
     // Remove all non-digit characters
     const cleanNumber = number.replace(/\D/g, '');
-    // Check if it's a valid Indian mobile number (10 digits starting with 6-9)
-    const mobileRegex = /^[6-9]\d{9}$/;
-    return mobileRegex.test(cleanNumber);
+    const phoneRegex = /^\d{10}$/;
+    return phoneRegex.test(cleanNumber);
   };
 
   // Extract mobile/WhatsApp numbers from text
   const extractMobileNumbers = (text) => {
     if (!text) return [];
 
-    // Regex to match various mobile number formats
-    const mobileRegex = /(?:\+91[\s-]?)?[6-9]\d{9}|(?:\+91[\s-]?)?[0-9]{10}/g;
+    const mobileRegex = /(?:\+91[\s-]?)?\d{10}/g;
     const matches = text.match(mobileRegex) || [];
 
     // Clean and validate numbers
@@ -1532,7 +1530,7 @@ const B2BSales = () => {
     if (!leadFormData.mobile) {
       errors.mobile = 'Mobile number is required';
     } else if (!validateMobileNumber(leadFormData.mobile)) {
-      errors.mobile = 'Please enter a valid 10-digit mobile number';
+      errors.mobile = 'Please enter a valid 10-digit phone number';
     }
 
     // WhatsApp validation (optional but validate if provided)
@@ -5838,7 +5836,7 @@ const B2BSales = () => {
                                   <button
                                     type="button"
                                     className="lead-meta-v2__pill"
-                                    onClick={() => navigate(`/institute/lrp?b2bLeadId=${lead._id}&mode=add`)}
+                                    onClick={() => navigate(`/institute/lrp?b2bLeadId=${lead._id}&mode=add`, { state: { b2bLead: lead } })}
                                     title="Add Lead Report"
                                   >
                                     <i className="fas fa-plus" aria-hidden="true"></i>
@@ -6237,7 +6235,7 @@ const B2BSales = () => {
                                   <button
                                     type="button"
                                     className="lead-meta-v2__pill"
-                                    onClick={() => navigate(`/institute/lrp?b2bLeadId=${lead._id}&mode=add`)}
+                                    onClick={() => navigate(`/institute/lrp?b2bLeadId=${lead._id}&mode=add`, { state: { b2bLead: lead } })}
                                     title="Add Lead Report"
                                   >
                                     <i className="fas fa-plus" aria-hidden="true"></i>
@@ -6497,6 +6495,14 @@ const B2BSales = () => {
                                   <div className="lead-meta-v2__label">B2B Type</div>
                                   <div className="lead-meta-v2__value text-capitalize" title={lead.typeOfB2B?.name || '—'}>{lead.typeOfB2B?.name || '—'}</div>
                                 </div>
+                                <div className="lead-meta-v2__item">
+                                  <div className="lead-meta-v2__label">State</div>
+                                  <div className="lead-meta-v2__value text-capitalize" title={lead.state || '—'}>{lead.state || '—'}</div>
+                                </div>
+                                <div className="lead-meta-v2__item">
+                                  <div className="lead-meta-v2__label">City</div>
+                                  <div className="lead-meta-v2__value text-capitalize" title={lead.city || '—'}>{lead.city || '—'}</div>
+                                </div>
                               </div>
                               <div className="d-flex justify-content-end mt-2">
                                 <button
@@ -6742,7 +6748,8 @@ const B2BSales = () => {
                     )}
 
                     <Link
-                      to="/institute/lrp"
+                      to={`/institute/lrp?b2bLeadId=${mobileMoreLead?._id || ''}&mode=add`}
+                      state={{ b2bLead: mobileMoreLead }}
                       className="lead-meta-v2__action-btn"
                       style={{ textDecoration: 'none' }}
                       onClick={() => setMobileMoreLead(null)}

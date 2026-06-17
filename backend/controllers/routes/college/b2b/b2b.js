@@ -302,7 +302,23 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 	};
 
 	const applyLeadCorePopulates = (query) => query
-		.populate('leadCategory', 'name documents questions isActive')
+		.populate({
+			path: 'leadCategory',
+			select: 'name documents questions isActive b2bDepartment b2bProject typeOfB2B',
+			populate: [
+				{ path: 'b2bDepartment', select: 'name isActive' },
+				{
+					path: 'b2bProject',
+					select: 'name department isActive',
+					populate: { path: 'department', select: 'name isActive' },
+				},
+				{
+					path: 'typeOfB2B',
+					select: 'name department isActive',
+					populate: { path: 'department', select: 'name isActive' },
+				},
+			],
+		})
 		.populate('b2bProject', 'name')
 		.populate('b2bDepartment', 'name')
 		.populate({
@@ -1080,6 +1096,9 @@ router.get('/lead-categories', isCollege, async (req, res) => {
 		}
 		const categories = await LeadCategory.find(query)
 			.populate('addedBy', 'name email')
+			.populate('b2bDepartment', 'name isActive')
+			.populate('b2bProject', 'name isActive')
+			.populate('typeOfB2B', 'name isActive')
 			.sort({ createdAt: -1 });
 
 		res.json({
@@ -1101,7 +1120,10 @@ router.get('/lead-categories', isCollege, async (req, res) => {
 router.get('/lead-categories/:id', isCollege, async (req, res) => {
 	try {
 		const category = await LeadCategory.findById(req.params.id)
-			.populate('addedBy', 'name email');
+			.populate('addedBy', 'name email')
+			.populate('b2bDepartment', 'name isActive')
+			.populate('b2bProject', 'name isActive')
+			.populate('typeOfB2B', 'name isActive');
 
 		if (!category) {
 			return res.status(404).json({
@@ -1128,7 +1150,7 @@ router.get('/lead-categories/:id', isCollege, async (req, res) => {
 // Create new Lead Category
 router.post('/lead-categories', isCollege, async (req, res) => {
 	try {
-		const { name, description, documents, questions } = req.body;
+		const { name, description, documents, questions, b2bDepartment, b2bProject, typeOfB2B } = req.body;
 
 		// Validate required fields
 		if (!name) {
@@ -1177,11 +1199,19 @@ router.post('/lead-categories', isCollege, async (req, res) => {
 			description,
 			documents: safeDocuments,
 			questions: safeQuestions,
+			...(b2bDepartment && mongoose.Types.ObjectId.isValid(b2bDepartment) ? { b2bDepartment } : {}),
+			...(b2bProject && mongoose.Types.ObjectId.isValid(b2bProject) ? { b2bProject } : {}),
+			...(typeOfB2B && mongoose.Types.ObjectId.isValid(typeOfB2B) ? { typeOfB2B } : {}),
 			addedBy: req.user._id
 		});
 
 		const savedCategory = await newCategory.save();
-		await savedCategory.populate('addedBy', 'name email');
+		await savedCategory.populate([
+			{ path: 'addedBy', select: 'name email' },
+			{ path: 'b2bDepartment', select: 'name isActive' },
+			{ path: 'b2bProject', select: 'name isActive' },
+			{ path: 'typeOfB2B', select: 'name isActive' },
+		]);
 
 		res.status(201).json({
 			status: true,
@@ -1201,7 +1231,7 @@ router.post('/lead-categories', isCollege, async (req, res) => {
 // Update Lead Category
 router.put('/lead-categories/:id', isCollege, async (req, res) => {
 	try {
-		const { name, description, isActive, documents, questions } = req.body;
+		const { name, description, isActive, documents, questions, b2bDepartment, b2bProject, typeOfB2B } = req.body;
 
 		// Check if name already exists (excluding current record)
 		if (name) {
@@ -1248,12 +1278,28 @@ router.put('/lead-categories/:id', isCollege, async (req, res) => {
 				}).filter((q) => q.question)
 				: [];
 		}
+		if (b2bDepartment !== undefined) {
+			updatePayload.b2bDepartment =
+				b2bDepartment && mongoose.Types.ObjectId.isValid(b2bDepartment) ? b2bDepartment : null;
+		}
+		if (b2bProject !== undefined) {
+			updatePayload.b2bProject =
+				b2bProject && mongoose.Types.ObjectId.isValid(b2bProject) ? b2bProject : null;
+		}
+		if (typeOfB2B !== undefined) {
+			updatePayload.typeOfB2B =
+				typeOfB2B && mongoose.Types.ObjectId.isValid(typeOfB2B) ? typeOfB2B : null;
+		}
 
 		const updatedCategory = await LeadCategory.findByIdAndUpdate(
 			req.params.id,
 			updatePayload,
 			{ new: true, runValidators: true }
-		).populate('addedBy', 'name email');
+		)
+			.populate('addedBy', 'name email')
+			.populate('b2bDepartment', 'name isActive')
+			.populate('b2bProject', 'name isActive')
+			.populate('typeOfB2B', 'name isActive');
 
 		if (!updatedCategory) {
 			return res.status(404).json({
@@ -4586,6 +4632,45 @@ router.post('/leads/import', isCollege, async (req, res) => {
 		const processedLeads = [];
 		const errors = [];
 
+		// Bulk-only duplicate restriction:
+		// - Reject duplicates inside the same upload file (mobile/email)
+		// - Reject duplicates against existing leads for the same leadAddedBy (mobile/email)
+		const normalizeEmail = (v) => String(v || '').trim().toLowerCase();
+		const normalizeMobile = (v) => String(v || '').replace(/\D/g, '');
+
+		const fileMobiles = [];
+		const fileEmails = [];
+		for (let i = 0; i < leads.length; i++) {
+			const row = leads[i];
+			if (!row || typeof row !== 'object') continue;
+			const m = normalizeMobile(row.mobile);
+			if (m) fileMobiles.push(m);
+			const e = normalizeEmail(row.email);
+			if (e) fileEmails.push(e);
+		}
+
+		const existingMobileSet = new Set();
+		const existingEmailSet = new Set();
+		if (fileMobiles.length || fileEmails.length) {
+			const existing = await Lead.find({
+				leadAddedBy: req.user._id,
+				$or: [
+					...(fileMobiles.length ? [{ mobile: { $in: fileMobiles } }] : []),
+					...(fileEmails.length ? [{ email: { $in: fileEmails } }] : []),
+				],
+			})
+				.select('mobile email')
+				.lean();
+
+			for (const doc of existing || []) {
+				if (doc?.mobile) existingMobileSet.add(String(doc.mobile));
+				if (doc?.email) existingEmailSet.add(normalizeEmail(doc.email));
+			}
+		}
+
+		const seenMobileInFile = new Set();
+		const seenEmailInFile = new Set();
+
 		for (let i = 0; i < leads.length; i++) {
 			const row = leads[i];
 			try {
@@ -4595,25 +4680,39 @@ router.post('/leads/import', isCollege, async (req, res) => {
 					continue;
 				}
 
-				// Validate mobile number format (10 digits)
-				const mobileRegex = /^[6-9]\d{9}$/;
-				const cleanMobile = row.mobile.replace(/\D/g, '');
-				if (!mobileRegex.test(cleanMobile)) {
-					errors.push(`Row ${i + 2}: Invalid mobile number format (should be 10 digits starting with 6-9)`);
+				// Validate phone number format (10 digits — mobile or landline)
+				const phoneRegex = /^\d{10}$/;
+				const cleanMobile = normalizeMobile(row.mobile);
+				if (!phoneRegex.test(cleanMobile)) {
+					errors.push(`Row ${i + 2}: Invalid phone number format (should be 10 digits)`);
 					continue;
 				}
 
-				// Check if email already exists (only if email is provided)
-				if (row.email) {
-					const existingLead = await Lead.findOne({
-						email: row.email,
-						leadAddedBy: req.user._id
-					});
+				const rowEmailNorm = normalizeEmail(row.email);
 
-					if (existingLead) {
-						errors.push(`Row ${i + 2}: Email ${row.email} already exists`);
+				// Restrict duplicates within the same uploaded file
+				if (seenMobileInFile.has(cleanMobile)) {
+					errors.push(`Row ${i + 2}: Mobile ${cleanMobile} is duplicate in the uploaded file`);
+					continue;
+				}
+				seenMobileInFile.add(cleanMobile);
+
+				if (rowEmailNorm) {
+					if (seenEmailInFile.has(rowEmailNorm)) {
+						errors.push(`Row ${i + 2}: Email ${rowEmailNorm} is duplicate in the uploaded file`);
 						continue;
 					}
+					seenEmailInFile.add(rowEmailNorm);
+				}
+
+				// Restrict duplicates against existing leads in DB (bulk only)
+				if (existingMobileSet.has(cleanMobile)) {
+					errors.push(`Row ${i + 2}: Mobile ${cleanMobile} already exists`);
+					continue;
+				}
+				if (rowEmailNorm && existingEmailSet.has(rowEmailNorm)) {
+					errors.push(`Row ${i + 2}: Email ${rowEmailNorm} already exists`);
+					continue;
 				}
 
 				// Lead Source: modal selection applies to all rows when set on upload form

@@ -2146,6 +2146,17 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					name: (doc._candidate && doc._candidate.name) ? doc._candidate.name : 'N/A',
 					email: (doc._candidate && doc._candidate.email) ? doc._candidate.email : 'N/A'
 				},
+				_course: doc._course ? {
+					_id: doc._course._id || null,
+					name: doc._course.name || null,
+					docsRequired: doc._course.docsRequired || [],
+				} : null,
+				_center: doc._center ? {
+					_id: doc._center._id || null,
+					name: doc._center.name || null,
+				} : null,
+				crossSaleRootId: doc.crossSaleRootId || null,
+				parentAppliedCourseId: doc.parentAppliedCourseId || null,
 				_leadStatus: {
 					_id: doc._leadStatus?._id || null,
 					title: doc._leadStatus?.title || 'No Status'
@@ -2158,8 +2169,22 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					hasFollowup: selectedSubstatus ? selectedSubstatus.hasFollowup : false,
 					hasFollowup: selectedSubstatus ? selectedSubstatus.hasFollowup : false,
 				},
-				docCounts,
-				followup
+				docCounts: {
+					totalRequired: docCounts.totalRequired,
+					uploadedCount: docCounts.uploaded,
+					verifiedCount: docCounts.verified,
+					pendingVerificationCount: docCounts.pending,
+					RejectedCount: docCounts.rejected,
+					notUploadedCount: docCounts.notUploaded,
+					uploadPercentage: docCounts.uploadPercentage,
+				},
+				uploadedDocs: doc.uploadedDocs || [],
+				followup,
+				createdAt: doc.createdAt,
+				updatedAt: doc.updatedAt,
+				approval: doc.approval,
+				leadAssignment: doc.leadAssignment,
+				remarks: doc.remarks,
 			};
 		});
 
@@ -2179,6 +2204,202 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		res.status(500).json({
 			success: false,
 			message: "Server Error"
+		});
+	}
+});
+
+const getB2cCrossSaleRootId = (doc) => {
+	if (!doc) return null;
+	if (doc.crossSaleRootId) return String(doc.crossSaleRootId);
+	if (doc.parentAppliedCourseId) return String(doc.parentAppliedCourseId);
+	return String(doc._id);
+};
+
+const buildB2cCrossSaleGroupQuery = (rootId) => ({
+	$or: [
+		{ _id: rootId },
+		{ crossSaleRootId: rootId },
+		{ parentAppliedCourseId: rootId },
+	],
+});
+
+
+router.get('/applied-courses/:id/cross-sales', isCollege, async (req, res) => {
+	try {
+		const source = await AppliedCourses.findById(req.params.id).select('_id parentAppliedCourseId crossSaleRootId');
+		if (!source) {
+			return res.status(404).json({ success: false, message: 'Registration not found' });
+		}
+
+		const rootId = getB2cCrossSaleRootId(source);
+		const groupLeads = await AppliedCourses.find(buildB2cCrossSaleGroupQuery(rootId))
+			.populate('_candidate', 'name mobile email')
+			.populate('_course', 'name project vertical')
+			.populate('_center', 'name')
+			.populate('_leadStatus', 'title substatuses')
+			.populate('registeredBy', 'name email')
+			.sort({ createdAt: 1 })
+			.lean();
+
+		return res.json({
+			success: true,
+			data: { rootId, leads: groupLeads },
+			message: 'Cross-sale registrations retrieved successfully',
+		});
+	} catch (error) {
+		console.error('Error getting B2C cross-sales:', error);
+		return res.status(500).json({
+			success: false,
+			message: 'Failed to retrieve cross-sale registrations',
+			error: error.message,
+		});
+	}
+});
+
+router.post('/applied-courses/:id/cross-sale', isCollege, async (req, res) => {
+	try {
+		const user = req.user;
+		const {
+			course,
+			center,
+			leadStatus,
+			leadSubStatus,
+			counsellor,
+			remark,
+		} = req.body 
+
+		const source = await AppliedCourses.findById(req.params.id)
+			.populate('_candidate', 'name mobile')
+			.populate('_course', 'name');
+		if (!source) {
+			return res.status(404).json({ success: false, message: 'Registration not found' });
+		}
+		if (!source._candidate) {
+			return res.status(400).json({ success: false, message: 'Candidate not found on source registration' });
+		}
+
+		if (!course || !mongoose.Types.ObjectId.isValid(course)) {
+			return res.status(400).json({ success: false, message: 'Valid course is required' });
+		}
+		if (!center || !mongoose.Types.ObjectId.isValid(center)) {
+			return res.status(400).json({ success: false, message: 'Valid center is required' });
+		}
+		if (!leadStatus || !mongoose.Types.ObjectId.isValid(leadStatus)) {
+			return res.status(400).json({ success: false, message: 'Valid lead status is required' });
+		}
+		if (!leadSubStatus || !mongoose.Types.ObjectId.isValid(leadSubStatus)) {
+			return res.status(400).json({ success: false, message: 'Valid sub-status is required' });
+		}
+
+		const courseDoc = await Courses.findById(course).select('name college');
+		if (!courseDoc) {
+			return res.status(400).json({ success: false, message: 'Course not found' });
+		}
+		const centerDoc = await Center.findById(center).select('name');
+		if (!centerDoc) {
+			return res.status(400).json({ success: false, message: 'Center not found' });
+		}
+
+		const rootId = getB2cCrossSaleRootId(source);
+		const existingInCourse = await AppliedCourses.findOne({
+			...buildB2cCrossSaleGroupQuery(rootId),
+			_course: course,
+		}).select('_id');
+
+		if (existingInCourse) {
+			return res.status(400).json({
+				success: false,
+				message: 'This candidate is already registered for the selected course in this group',
+			});
+		}
+
+		if (!source.crossSaleRootId) {
+			source.crossSaleRootId = source._id;
+			await source.save();
+		}
+
+		let counsellorId = null;
+		let counsellorName = '';
+		if (counsellor && mongoose.Types.ObjectId.isValid(counsellor)) {
+			const counsellorUser = await User.findById(counsellor).select('name');
+			if (counsellorUser) {
+				counsellorId = counsellorUser._id;
+				counsellorName = counsellorUser.name || '';
+			}
+		}
+		if (!counsellorId) {
+			return res.status(400).json({ success: false, message: 'Valid counsellor is required' });
+		}
+
+		const statusDoc = await Status.findById(leadStatus).select('title substatuses');
+		if (!statusDoc) {
+			return res.status(400).json({ success: false, message: 'Invalid lead status' });
+		}
+		const subMatch = (statusDoc.substatuses || []).find((s) => String(s._id) === String(leadSubStatus));
+		if (!subMatch) {
+			return res.status(400).json({ success: false, message: 'Invalid sub-status for selected status' });
+		}
+
+		const crossSaleDoc = new AppliedCourses({
+			_candidate: source._candidate._id || source._candidate,
+			_course: course,
+			_center: center,
+			_leadStatus: leadStatus,
+			_leadSubStatus: leadSubStatus,
+			registeredBy: user._id,
+			counsellor: counsellorId,
+			parentAppliedCourseId: rootId,
+			crossSaleRootId: rootId,
+			remarks: remark || '',
+			approval: { status: 'PENDING' },
+			leadAssignment: [{
+				_counsellor: counsellorId,
+				counsellorName,
+				assignDate: new Date(),
+				assignedBy: user._id,
+			}],
+			logs: [{
+				user: user._id,
+				timestamp: new Date(),
+				action: `Cross-sale added to course "${courseDoc.name}"`,
+				remarks: remark || `Linked from registration ${source._id}`,
+			}],
+		});
+
+		const saved = await crossSaleDoc.save();
+
+		await CandidateProfile.findByIdAndUpdate(
+			source._candidate._id || source._candidate,
+			{ $addToSet: { _appliedCourses: saved._id } }
+		);
+
+		source.logs = source.logs || [];
+		source.logs.push({
+			user: user._id,
+			timestamp: new Date(),
+			action: `Cross-sale created for course "${courseDoc.name}"`,
+			remarks: `New registration id ${saved._id}`,
+		});
+		await source.save();
+
+		const populated = await AppliedCourses.findById(saved._id)
+			.populate('_candidate', 'name mobile email')
+			.populate('_course', 'name')
+			.populate('_center', 'name')
+			.populate('_leadStatus', 'title substatuses')
+			.lean();
+
+		return res.status(201).json({
+			success: true,
+			data: populated,
+			message: 'Cross-sale registration added successfully',
+		});
+	} catch (error) {
+		console.error('Error creating B2C cross-sale:', error);
+		return res.status(500).json({
+			success: false,
+			message: 'Failed to create cross-sale registration',
+			error: error.message,
 		});
 	}
 });
@@ -2510,10 +2731,6 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 		};
 	}
 
-
-
-
-
 	if (filters.registeredByMe) {
 		baseMatch.registeredBy = new mongoose.Types.ObjectId(filters.registeredByMe);
 	} else if (teamMemberIds && teamMemberIds.length > 0) {
@@ -2593,6 +2810,7 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 					{ $match: { college: college._id } },
 					{
 						$project: {
+							name: 1,
 							courseFeeType: 1,
 							college: 1,
 							project: 1,
@@ -2644,7 +2862,18 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 				]
 			}
 		},
-		{ $unwind: { path: '$_leadStatus', preserveNullAndEmptyArrays: true } }
+		{ $unwind: { path: '$_leadStatus', preserveNullAndEmptyArrays: true } },
+
+		{
+			$lookup: {
+				from: 'centers',
+				localField: '_center',
+				foreignField: '_id',
+				as: '_center',
+				pipeline: [{ $project: { name: 1 } }]
+			}
+		},
+		{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } }
 	);
 
 	// Apply additional filters
@@ -2689,12 +2918,19 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 		$project: {
 			_id: 1,
 			_candidate: 1,
+			_course: 1,
+			_center: 1,
+			crossSaleRootId: 1,
+			parentAppliedCourseId: 1,
 			_leadStatus: 1,
 			_leadSubStatus: 1,
-			'_course.docsRequired': 1,
 			uploadedDocs: 1,
 			createdAt: 1,
-			updatedAt: 1
+			updatedAt: 1,
+			approval: 1,
+			leadAssignment: 1,
+			remarks: 1,
+			followup: 1,
 		}
 	});
 
