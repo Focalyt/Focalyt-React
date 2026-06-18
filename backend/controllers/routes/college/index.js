@@ -157,6 +157,8 @@ class InvalidParameterError extends Error {
 }
 
 const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
+const objectStorage = require('../../../helpers/objectStorage');
+const { normalizeStorageKey, resolvePublicUrl } = require('../../../helpers/s3Storage');
 const allowedVideoExtensions = ['mp4', 'mkv', 'mov', 'avi', 'wmv'];
 const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
 const allowedDocumentExtensions = ['pdf', 'doc', 'docx']; // ✅ PDF aur DOC types allow karein
@@ -9113,10 +9115,9 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			{ $limit: limit }
 		);
 
-		const crmFilterCounts = await calculateKycFilterCounts(teamMembers, college._id, {
+		const sharedKycFilters = {
 			name,
 			courseType,
-			kyc,
 			leadStatus,
 			sector,
 			createdFromDate,
@@ -9130,7 +9131,23 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			courseArray,
 			centerArray,
 			counselorArray
+		};
+
+		// Tab counts must ignore the active kyc tab filter so every tab shows its true total
+		const crmFilterCounts = await calculateKycFilterCounts(teamMembers, college._id, {
+			...sharedKycFilters,
+			applyKycFilter: false
 		});
+
+		let listTotalCount = crmFilterCounts.all || 0;
+		if (kyc !== undefined && kyc !== '' && String(kyc).toLowerCase() !== 'all') {
+			const filteredListCounts = await calculateKycFilterCounts(teamMembers, college._id, {
+				...sharedKycFilters,
+				kyc,
+				applyKycFilter: true
+			});
+			listTotalCount = filteredListCounts.all || 0;
+		}
 
 		const allFilteredResults = await AppliedCourses
 			.aggregate(aggregationPipeline)
@@ -9258,7 +9275,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			};
 		});
 
-		const totalCount = crmFilterCounts.all || 0;
+		const totalCount = listTotalCount;
 		const pendingKycCount = crmFilterCounts.pendingKyc || 0;
 		const doneKycCount = crmFilterCounts.doneKyc || 0;
 		const paginatedResult = results;
@@ -9280,7 +9297,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			pendingKycCount,
 			doneKycCount,
 			totalCount,
-			totalPages: Math.ceil(totalCount / limit),
+			totalPages: Math.ceil(listTotalCount / limit),
 			data: paginatedResult,
 			crmFilterCounts
 		});
@@ -9299,8 +9316,12 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 	const counts = {
 		all: 0,
 		pendingKyc: 0,
+		pendingDocumentVerification: 0,
+		rejectedDocs: 0,
 		doneKyc: 0
 	};
+
+	const applyKycFilter = appliedFilters.applyKycFilter === true;
 
 	try {
 
@@ -9365,7 +9386,12 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 			baseMatchStage._leadStatus = new mongoose.Types.ObjectId(appliedFilters.leadStatus);
 		}
 
-		if (appliedFilters.kyc !== undefined && appliedFilters.kyc !== '' && String(appliedFilters.kyc).toLowerCase() !== 'all') {
+		if (
+			applyKycFilter &&
+			appliedFilters.kyc !== undefined &&
+			appliedFilters.kyc !== '' &&
+			String(appliedFilters.kyc).toLowerCase() !== 'all'
+		) {
 			baseMatchStage.kyc = appliedFilters.kyc === 'true' || appliedFilters.kyc === true;
 		}
 
@@ -9398,8 +9424,8 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 		// Filter by college FIRST
 		basePipeline.push({ $match: { '_course.college': collegeId } });
 
-		// NEW: Add KYC filter logic based on docs required (same as main route)
-		if (appliedFilters.kyc !== undefined && appliedFilters.kyc !== '') {
+		// Add KYC tab filter only when counting the currently filtered list (pagination)
+		if (applyKycFilter && appliedFilters.kyc !== undefined && appliedFilters.kyc !== '') {
 			let kycMatchStage = {};
 
 			if (appliedFilters.kyc === 'true' || appliedFilters.kyc === true) {
@@ -9430,7 +9456,9 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 				};
 			}
 
-			basePipeline.push({ $match: kycMatchStage });
+			if (Object.keys(kycMatchStage).length > 0) {
+				basePipeline.push({ $match: kycMatchStage });
+			}
 		}
 
 		// Apply additional filters
@@ -9484,25 +9512,59 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 		const allKycCount = allKycAggregation[0]?.total || 0;
 		counts.all += allKycCount;
 
-		// UPDATED: Get KYC status counts with new logic
+		// Bucket each candidate into a single KYC tab category
 		const kycStatusAggregation = await AppliedCourses.aggregate([
 			...basePipeline,
 			{
 				$addFields: {
-					// Calculate effective KYC status based on new logic
 					effectiveKycStatus: {
 						$cond: {
 							if: {
 								$or: [
-									// If kyc is true
 									{ $eq: ["$kyc", true] },
-									// OR if course has no required docs
-									{ $not: { $ifNull: ["$_course.docsRequired", []] } },
 									{ $eq: [{ $size: { $ifNull: ["$_course.docsRequired", []] } }, 0] }
 								]
 							},
 							then: "done",
-							else: "pending"
+							else: {
+								$cond: {
+									if: {
+										$gt: [
+											{
+												$size: {
+													$filter: {
+														input: { $ifNull: ["$uploadedDocs", []] },
+														as: "doc",
+														cond: { $eq: ["$$doc.status", "Rejected"] }
+													}
+												}
+											},
+											0
+										]
+									},
+									then: "rejected",
+									else: {
+										$cond: {
+											if: {
+												$gt: [
+													{
+														$size: {
+															$filter: {
+																input: { $ifNull: ["$uploadedDocs", []] },
+																as: "doc",
+																cond: { $eq: ["$$doc.status", "Pending"] }
+															}
+														}
+													},
+													0
+												]
+											},
+											then: "pendingVerification",
+											else: "pendingDocs"
+										}
+									}
+								}
+							}
 						}
 					}
 				}
@@ -9515,28 +9577,35 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 			}
 		]).allowDiskUse(true);
 
-		// Update KYC counts based on effective status
 		kycStatusAggregation.forEach(kycGroup => {
 			if (kycGroup._id === "done") {
 				counts.doneKyc += kycGroup.count;
-			} else if (kycGroup._id === "pending") {
+			} else if (kycGroup._id === "pendingDocs") {
 				counts.pendingKyc += kycGroup.count;
+			} else if (kycGroup._id === "pendingVerification") {
+				counts.pendingDocumentVerification += kycGroup.count;
+			} else if (kycGroup._id === "rejected") {
+				counts.rejectedDocs += kycGroup.count;
 			}
 		});
 
-
-		// Return final counts
-		const finalCounts = {
+		return {
 			all: counts.all,
 			pendingKyc: counts.pendingKyc,
+			pendingDocumentVerification: counts.pendingDocumentVerification,
+			rejectedDocs: counts.rejectedDocs,
 			doneKyc: counts.doneKyc
 		};
 
-		return finalCounts;
-
 	} catch (error) {
 		console.error('Error calculating KYC filter counts:', error);
-		return { all: 0, pendingKyc: 0, doneKyc: 0 };
+		return {
+			all: 0,
+			pendingKyc: 0,
+			pendingDocumentVerification: 0,
+			rejectedDocs: 0,
+			doneKyc: 0
+		};
 	}
 }
 
@@ -11653,33 +11722,48 @@ router.get("/generate-application-form/:id", async (req, res) => {
 
 		const dobFormatted = formatDate(data._candidate.dob);
 
-		const normalizeS3Key = (imagePath) => {
-			let key = String(imagePath).trim();
-			if (/^https?:\/\//i.test(key)) {
-				try {
-					const url = new URL(key);
-					key = decodeURIComponent(url.pathname.replace(/^\//, ''));
-				} catch (_) { /* keep original */ }
-			}
-			return key.replace(/^\//, '');
-		};
-
 		const getProfileImageDataUri = async (imagePath) => {
-			const key = normalizeS3Key(imagePath);
+			const key = normalizeStorageKey(imagePath);
 			if (!key) return null;
+
+			const ext = key.split('.').pop()?.toLowerCase() || 'jpeg';
+			const mimeByExt = {
+				jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+				gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp',
+			};
+			const toDataUri = (body, contentType) => {
+				const buffer = Buffer.isBuffer(body) ? body : Buffer.from(body);
+				return `data:${contentType || mimeByExt[ext] || 'image/jpeg'};base64,${buffer.toString('base64')}`;
+			};
+
+			// Profile pics are uploaded via objectStorage (local disk in dev)
+			try {
+				const localObject = await objectStorage.getObject({ Key: key }).promise();
+				return toDataUri(localObject.Body);
+			} catch (_) {
+				// try S3 / public URL fallbacks
+			}
+
 			try {
 				const s3Object = await s3.getObject({ Bucket: bucketName, Key: key }).promise();
-				const ext = key.split('.').pop()?.toLowerCase() || 'jpeg';
-				const mimeByExt = {
-					jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-					gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp',
-				};
-				const contentType = s3Object.ContentType || mimeByExt[ext] || 'image/jpeg';
-				return `data:${contentType};base64,${s3Object.Body.toString('base64')}`;
-			} catch (err) {
-				console.error('Admission form: failed to load profile image from S3:', key, err.message);
-				return null;
+				return toDataUri(s3Object.Body, s3Object.ContentType);
+			} catch (_) {
+				// try public URL fallback
 			}
+
+			try {
+				const publicUrl = /^https?:\/\//i.test(String(imagePath).trim())
+					? String(imagePath).trim()
+					: resolvePublicUrl(key);
+				if (publicUrl && /^https?:\/\//i.test(publicUrl)) {
+					const response = await axios.get(publicUrl, { responseType: 'arraybuffer', timeout: 15000 });
+					return toDataUri(response.data, response.headers['content-type']);
+				}
+			} catch (err) {
+				console.error('Admission form: failed to load profile image:', key, err.message);
+			}
+
+			return null;
 		};
 
 		const profileImageDataUri = await getProfileImageDataUri(data._candidate.personalInfo.image);
