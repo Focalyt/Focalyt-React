@@ -1987,7 +1987,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
 			nextActionFromDate, nextActionToDate,
 			projects, verticals, course, center, counselor, subStatuses, batch, registeredByMe,
-			followupStatus
+			followupStatus, approvalStatus
 		} = req.query;
 
 		// console.log("substautes", subStatuses)
@@ -2080,6 +2080,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				projectsArray, verticalsArray, courseArray, centerArray, batchArray, subStatuses,
 				registeredByMe: registeredByMe || null,
 				followupAppliedIds,
+				approvalStatus,
 			},
 			pagination: { skip, limit }
 		});
@@ -2206,6 +2207,94 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		res.status(500).json({
 			success: false,
 			message: "Server Error"
+		});
+	}
+});
+
+router.put('/appliedCandidates/:id/approval', isCollege, async (req, res) => {
+	try {
+		if (!canApproveB2cLeads(req.user)) {
+			return res.status(403).json({
+				success: false,
+				message: 'You do not have permission to approve or reject leads',
+			});
+		}
+
+		const college = await College.findOne({ '_concernPerson._id': req.user._id });
+		if (!college) {
+			return res.status(404).json({ success: false, message: 'College not found' });
+		}
+
+		const { status, rejectionReason } = req.body || {};
+		const normalized = String(status || '').toUpperCase();
+		if (!['APPROVED', 'REJECTED'].includes(normalized)) {
+			return res.status(400).json({
+				success: false,
+				message: 'status must be APPROVED or REJECTED',
+			});
+		}
+
+		let { id } = req.params;
+		if (!mongoose.Types.ObjectId.isValid(id)) {
+			return res.status(400).json({ success: false, message: 'Invalid registration id' });
+		}
+		id = new mongoose.Types.ObjectId(id);
+
+		const appliedCourse = await AppliedCourses.findById(id).populate({
+			path: '_course',
+			select: 'college name',
+		});
+		if (!appliedCourse) {
+			return res.status(404).json({ success: false, message: 'Registration not found' });
+		}
+		if (String(appliedCourse._course?.college) !== String(college._id)) {
+			return res.status(403).json({ success: false, message: 'Unauthorized for this registration' });
+		}
+
+		const now = new Date();
+		if (normalized === 'APPROVED') {
+			appliedCourse.approval = {
+				...(appliedCourse.approval || {}),
+				status: 'APPROVED',
+				approvedBy: req.user._id,
+				approvedAt: now,
+				rejectedBy: undefined,
+				rejectedAt: undefined,
+				rejectionReason: undefined,
+			};
+		} else {
+			appliedCourse.approval = {
+				...(appliedCourse.approval || {}),
+				status: 'REJECTED',
+				rejectedBy: req.user._id,
+				rejectedAt: now,
+				rejectionReason: rejectionReason ? String(rejectionReason).trim() : '',
+				approvedBy: undefined,
+				approvedAt: undefined,
+			};
+		}
+
+		appliedCourse.logs = appliedCourse.logs || [];
+		appliedCourse.logs.push({
+			user: req.user._id,
+			timestamp: now,
+			action: `Lead approval set to ${appliedCourse.approval.status}`,
+			remarks: normalized === 'REJECTED' ? (appliedCourse.approval.rejectionReason || '') : '',
+		});
+
+		await appliedCourse.save();
+
+		return res.status(200).json({
+			success: true,
+			data: { approval: appliedCourse.approval },
+			message: 'Lead approval updated successfully',
+		});
+	} catch (error) {
+		console.error('Error updating B2C lead approval:', error);
+		return res.status(500).json({
+			success: false,
+			message: 'Failed to update lead approval',
+			error: error.message,
 		});
 	}
 });
@@ -2714,6 +2803,34 @@ router.route("/markWhatsAppMessagesAsRead").post(isCollege, async (req, res) => 
 	}
 });
 
+function buildApprovalStatusClause(approvalStatus) {
+	const normalized = String(approvalStatus || '').toUpperCase();
+	if (normalized === 'APPROVED') {
+		return { 'approval.status': 'APPROVED' };
+	}
+	if (normalized === 'REJECTED') {
+		return { 'approval.status': 'REJECTED' };
+	}
+	if (normalized === 'PENDING') {
+		return {
+			$or: [
+				{ 'approval.status': 'PENDING' },
+				{ 'approval.status': { $exists: false } },
+				{ approval: { $exists: false } },
+				{ approval: null },
+			],
+		};
+	}
+	return null;
+}
+
+function canApproveB2cLeads(user) {
+	if (!user) return false;
+	if (user.permissions?.permission_type === 'Admin') return true;
+	return user.permissions?.permission_type === 'Custom'
+		&& user.permissions?.custom_permissions?.can_approve_leads === true;
+}
+
 function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }) {
 	const pipeline = [];
 	let baseMatch = {};
@@ -2795,6 +2912,11 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 
 		baseMatch._leadSubStatus = new mongoose.Types.ObjectId(filters.subStatuses);
 
+	}
+
+	const approvalClause = buildApprovalStatusClause(filters.approvalStatus);
+	if (approvalClause) {
+		baseMatch = { $and: [baseMatch, approvalClause] };
 	}
 
 	pipeline.push({ $match: baseMatch });
@@ -4072,7 +4194,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 
 
 		// Single aggregation to get all counts
-		const [allCount, statusCounts, movedInKYCCount] = await Promise.all([
+		const [allCount, statusCounts, movedInKYCCount, approvalStatusCounts] = await Promise.all([
 			AppliedCourses.aggregate([...basePipeline, { $count: "total" }]),
 			AppliedCourses.aggregate([
 				...basePipeline,
@@ -4083,7 +4205,29 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 					}
 				}
 			]),
-			AppliedCourses.aggregate([...movedInKYCPipeline, { $count: "total" }])
+			AppliedCourses.aggregate([...movedInKYCPipeline, { $count: "total" }]),
+			AppliedCourses.aggregate([
+				...basePipeline,
+				{
+					$addFields: {
+						effectiveApprovalStatus: {
+							$switch: {
+								branches: [
+									{ case: { $eq: ['$approval.status', 'APPROVED'] }, then: 'approved' },
+									{ case: { $eq: ['$approval.status', 'REJECTED'] }, then: 'rejected' },
+								],
+								default: 'pending',
+							},
+						},
+					},
+				},
+				{
+					$group: {
+						_id: '$effectiveApprovalStatus',
+						count: { $sum: 1 },
+					},
+				},
+			]),
 		]);
 
 		// Process results
@@ -4124,8 +4268,19 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			}
 		});
 
+		const approvalCounts = {
+			total: allCount[0]?.total || 0,
+			approved: 0,
+			pending: 0,
+			rejected: 0,
+		};
+		approvalStatusCounts.forEach(({ _id, count }) => {
+			if (_id === 'approved') approvalCounts.approved += count;
+			else if (_id === 'rejected') approvalCounts.rejected += count;
+			else approvalCounts.pending += count;
+		});
 
-		res.status(200).json({ success: true, crmFilterCount: counts });
+		res.status(200).json({ success: true, crmFilterCount: counts, approvalCounts });
 
 	} catch (error) {
 		console.error('Error calculating filter counts:', error);
