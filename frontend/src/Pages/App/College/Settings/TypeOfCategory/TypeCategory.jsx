@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import B2BDeleteMoveModal from '../components/B2BDeleteMoveModal';
+import { useB2bDeleteWithMove } from '../hooks/useB2bDeleteWithMove';
 
 function TypeCategory() {
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -52,6 +54,25 @@ function TypeCategory() {
     useEffect(() => {
         fetchCategories();
     }, []);
+
+    const handleDeleted = (item, message) => {
+        setCategories((prev) => prev.filter((category) => category._id !== item._id));
+        if (editingId === item._id) resetForm();
+        showAlert(message || 'Category deleted successfully!', 'success');
+    };
+
+    const {
+        deleteModal,
+        deleteLoading,
+        openDeleteModal,
+        closeDeleteModal,
+        confirmDelete
+    } = useB2bDeleteWithMove({
+        backendUrl,
+        token,
+        entityType: 'source',
+        onDeleted: handleDeleted
+    });
 
     // Fetch categories from API
     const fetchCategories = async () => {
@@ -196,42 +217,8 @@ function TypeCategory() {
         }
     };
 
-    // Handle delete
-    const handleDelete = async (categoryId, categoryName) => {
-        const confirmed = window.confirm(`Are you sure you want to delete "${categoryName}"?`);
-
-        if (!confirmed) return;
-
-        try {
-            setLoading(true);
-
-            const response = await fetch(`${backendUrl}/college/b2b/lead-categories/${categoryId}`, {
-                method: 'DELETE',
-                headers: {
-                    'x-auth': token,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            const data = await response.json();
-
-            if (data.status) {
-                setCategories(prev => prev.filter(category => category._id !== categoryId));
-
-                if (editingId === categoryId) {
-                    resetForm();
-                }
-
-                showAlert('Category deleted successfully!', 'success');
-            } else {
-                showAlert(data.message || 'Failed to delete category', 'error');
-            }
-        } catch (error) {
-            console.error('Error deleting category:', error);
-            showAlert('Failed to delete category', 'error');
-        } finally {
-            setLoading(false);
-        }
+    const handleDelete = (category) => {
+        openDeleteModal(category);
     };
 
     // Handle edit button click
@@ -829,9 +816,9 @@ function TypeCategory() {
                                                                         </button>
                                                                         <button
                                                                             className="btn btn-sm btn-outline-danger"
-                                                                            onClick={() => handleDelete(category._id, category.name)}
+                                                                            onClick={() => handleDelete(category)}
                                                                             title="Delete Category"
-                                                                            disabled={loading}
+                                                                            disabled={loading || deleteLoading}
                                                                         >
                                                                             <i className="fas fa-trash me-1"></i>
                                                                             Delete
@@ -861,6 +848,16 @@ function TypeCategory() {
                     </div>
                 </section>
             </div>
+
+            <B2BDeleteMoveModal
+                show={deleteModal.show}
+                loading={deleteLoading}
+                impact={deleteModal.impact}
+                entityLabel="Lead Source"
+                sources={categories}
+                onCancel={closeDeleteModal}
+                onConfirm={confirmDelete}
+            />
 
             <style jsx>{`
         .asterisk {
