@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import B2BDeleteMoveModal from '../components/B2BDeleteMoveModal';
+import { useB2bDeleteWithMove } from '../hooks/useB2bDeleteWithMove';
 
 function B2BDepartment() {
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -6,6 +8,8 @@ function B2BDepartment() {
     const token = userData.token;
 
     const [b2bDepartments, setB2bDepartments] = useState([]);
+    const [allProjects, setAllProjects] = useState([]);
+    const [allTypes, setAllTypes] = useState([]);
     const [formData, setFormData] = useState({
         name: '',
         description: ''
@@ -17,7 +21,47 @@ function B2BDepartment() {
 
     useEffect(() => {
         fetchB2bDepartments();
+        fetchMoveOptions();
     }, []);
+
+    const fetchMoveOptions = async () => {
+        try {
+            const [projectsRes, typesRes] = await Promise.all([
+                fetch(`${backendUrl}/college/b2b/b2b-projects`, {
+                    headers: { 'x-auth': token, 'Content-Type': 'application/json' }
+                }),
+                fetch(`${backendUrl}/college/b2b/type-of-b2b`, {
+                    headers: { 'x-auth': token, 'Content-Type': 'application/json' }
+                })
+            ]);
+            const projectsData = await projectsRes.json();
+            const typesData = await typesRes.json();
+            if (projectsData.status) setAllProjects(projectsData.data || []);
+            if (typesData.status) setAllTypes(typesData.data || []);
+        } catch (error) {
+            console.error('Error fetching move options:', error);
+        }
+    };
+
+    const handleDeleted = (item, message) => {
+        setB2bDepartments((prev) => prev.filter((dept) => dept._id !== item._id));
+        if (editingId === item._id) resetForm();
+        showAlert(message || 'B2B department deleted successfully!', 'success');
+        fetchMoveOptions();
+    };
+
+    const {
+        deleteModal,
+        deleteLoading,
+        openDeleteModal,
+        closeDeleteModal,
+        confirmDelete
+    } = useB2bDeleteWithMove({
+        backendUrl,
+        token,
+        entityType: 'department',
+        onDeleted: handleDeleted
+    });
 
     const fetchB2bDepartments = async () => {
         try {
@@ -124,41 +168,8 @@ function B2BDepartment() {
         }
     };
 
-    const handleDelete = async (departmentId, departmentName) => {
-        const confirmed = window.confirm(`Are you sure you want to delete "${departmentName}"?`);
-
-        if (!confirmed) return;
-
-        try {
-            setLoading(true);
-
-            const response = await fetch(`${backendUrl}/college/b2b/b2b-departments/${departmentId}`, {
-                method: 'DELETE',
-                headers: {
-                    'x-auth': token,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            const data = await response.json();
-
-            if (data.status) {
-                setB2bDepartments(prev => prev.filter(dept => dept._id !== departmentId));
-
-                if (editingId === departmentId) {
-                    resetForm();
-                }
-
-                showAlert('B2B project deleted successfully!', 'success');
-            } else {
-                showAlert(data.message || 'Failed to delete B2B project', 'error');
-            }
-        } catch (error) {
-            console.error('Error deleting B2B project:', error);
-            showAlert('Failed to delete B2B project', 'error');
-        } finally {
-            setLoading(false);
-        }
+    const handleDelete = (department) => {
+        openDeleteModal(department);
     };
 
     const handleEdit = (department) => {
@@ -362,9 +373,9 @@ function B2BDepartment() {
                                                                         </button>
                                                                         <button
                                                                             className="btn btn-sm btn-outline-danger"
-                                                                            onClick={() => handleDelete(department._id, department.name)}
+                                                                            onClick={() => handleDelete(department)}
                                                                             title="Delete B2B Department"
-                                                                            disabled={loading}
+                                                                            disabled={loading || deleteLoading}
                                                                         >
                                                                             <i className="fas fa-trash me-1"></i>
                                                                             Delete
@@ -394,6 +405,18 @@ function B2BDepartment() {
                     </div>
                 </section>
             </div>
+
+            <B2BDeleteMoveModal
+                show={deleteModal.show}
+                loading={deleteLoading}
+                impact={deleteModal.impact}
+                entityLabel="Department"
+                departments={b2bDepartments}
+                projects={allProjects}
+                types={allTypes}
+                onCancel={closeDeleteModal}
+                onConfirm={confirmDelete}
+            />
 
             <style jsx>{`
         .asterisk {

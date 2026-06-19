@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import B2BDeleteMoveModal from '../components/B2BDeleteMoveModal';
+import { useB2bDeleteWithMove } from '../hooks/useB2bDeleteWithMove';
+import { formatProjectDepartments, getProjectDepartmentIds } from '../../../../../utils/b2bProjectHelpers';
 
 function B2BProject() {
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -6,12 +9,13 @@ function B2BProject() {
     const token = userData.token;
 
     const [b2bProjects, setB2bProjects] = useState([]);
+    const [allProjects, setAllProjects] = useState([]);
     const [b2bDepartments, setB2bDepartments] = useState([]);
     const [filterDepartment, setFilterDepartment] = useState('');
     const [formData, setFormData] = useState({
         name: '',
         description: '',
-        department: ''
+        departments: []
     });
     const [loading, setLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -20,7 +24,40 @@ function B2BProject() {
 
     useEffect(() => {
         fetchB2bDepartments();
+        fetchAllProjects();
     }, []);
+
+    const fetchAllProjects = async () => {
+        try {
+            const response = await fetch(`${backendUrl}/college/b2b/b2b-projects`, {
+                headers: { 'x-auth': token, 'Content-Type': 'application/json' }
+            });
+            const data = await response.json();
+            if (data.status) setAllProjects(data.data || []);
+        } catch (error) {
+            console.error('Error fetching all projects:', error);
+        }
+    };
+
+    const handleDeleted = (item, message) => {
+        setB2bProjects((prev) => prev.filter((project) => project._id !== item._id));
+        if (editingId === item._id) resetForm();
+        showAlert(message || 'B2B project deleted successfully!', 'success');
+        fetchAllProjects();
+    };
+
+    const {
+        deleteModal,
+        deleteLoading,
+        openDeleteModal,
+        closeDeleteModal,
+        confirmDelete
+    } = useB2bDeleteWithMove({
+        backendUrl,
+        token,
+        entityType: 'project',
+        onDeleted: handleDeleted
+    });
 
     useEffect(() => {
         fetchB2bProjects(filterDepartment);
@@ -76,6 +113,17 @@ function B2BProject() {
         }
     };
 
+    const toggleDepartment = (deptId) => {
+        setFormData((prev) => {
+            const selected = prev.departments.map(String);
+            const id = String(deptId);
+            const next = selected.includes(id)
+                ? selected.filter((d) => d !== id)
+                : [...selected, id];
+            return { ...prev, departments: next };
+        });
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -84,8 +132,8 @@ function B2BProject() {
             return;
         }
 
-        if (!formData.department) {
-            showAlert('Please select a B2B department', 'error');
+        if (!formData.departments.length) {
+            showAlert('Please select at least one B2B department', 'error');
             return;
         }
 
@@ -104,7 +152,11 @@ function B2BProject() {
                     'x-auth': token,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(formData)
+                body: JSON.stringify({
+                    name: formData.name,
+                    description: formData.description,
+                    departments: formData.departments
+                })
             });
 
             const data = await response.json();
@@ -116,6 +168,7 @@ function B2BProject() {
                 );
                 resetForm();
                 fetchB2bProjects(filterDepartment);
+                fetchAllProjects();
             } else {
                 showAlert(data.message || 'Operation failed', 'error');
             }
@@ -160,55 +213,22 @@ function B2BProject() {
         }
     };
 
-    const handleDelete = async (projectId, projectName) => {
-        const confirmed = window.confirm(`Are you sure you want to delete "${projectName}"?`);
-
-        if (!confirmed) return;
-
-        try {
-            setLoading(true);
-
-            const response = await fetch(`${backendUrl}/college/b2b/b2b-projects/${projectId}`, {
-                method: 'DELETE',
-                headers: {
-                    'x-auth': token,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            const data = await response.json();
-
-            if (data.status) {
-                setB2bProjects(prev => prev.filter(project => project._id !== projectId));
-
-                if (editingId === projectId) {
-                    resetForm();
-                }
-
-                showAlert('B2B department deleted successfully!', 'success');
-            } else {
-                showAlert(data.message || 'Failed to delete B2B department', 'error');
-            }
-        } catch (error) {
-            console.error('Error deleting B2B department:', error);
-            showAlert('Failed to delete B2B project', 'error');
-        } finally {
-            setLoading(false);
-        }
+    const handleDelete = (project) => {
+        openDeleteModal(project);
     };
 
     const handleEdit = (project) => {
         setFormData({
             name: project.name,
             description: project.description || '',
-            department: project.department?._id || project.department || ''
+            departments: getProjectDepartmentIds(project)
         });
         setIsEditing(true);
         setEditingId(project._id);
     };
 
     const resetForm = () => {
-        setFormData({ name: '', description: '', department: '' });
+        setFormData({ name: '', description: '', departments: [] });
         setIsEditing(false);
         setEditingId(null);
     };
@@ -271,29 +291,45 @@ function B2BProject() {
                                             <div className="row">
                                                 <div className="col-xl-8 mb-1">
                                                     <label>
-                                                        Select B2B Department
+                                                        Select B2B Department(s)
                                                         <span className="asterisk" style={{ color: 'red' }}>*</span>
                                                     </label>
-                                                    <select
-                                                        className="form-control"
-                                                        name="department"
-                                                        value={formData.department}
-                                                        onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                                                        disabled={loading}
-                                                        required
+                                                    <div
+                                                        className="border rounded p-2"
+                                                        style={{ maxHeight: '160px', overflowY: 'auto' }}
                                                     >
-                                                        <option value="">Select Department</option>
-                                                        {b2bDepartments.map((dept) => (
-                                                            <option key={dept._id} value={dept._id}>
-                                                                {dept.name}{dept.isActive === false ? ' (Inactive)' : ''}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                    {b2bDepartments.length === 0 && (
-                                                        <small className="text-danger">
-                                                            No departments found. Please add a B2B department first.
-                                                        </small>
-                                                    )}
+                                                        {b2bDepartments.length === 0 ? (
+                                                            <small className="text-danger">
+                                                                No departments found. Please add a B2B department first.
+                                                            </small>
+                                                        ) : (
+                                                            b2bDepartments.map((dept) => {
+                                                                const deptId = String(dept._id);
+                                                                const checked = formData.departments.map(String).includes(deptId);
+                                                                return (
+                                                                    <label
+                                                                        key={dept._id}
+                                                                        className="d-flex align-items-center gap-2 mb-1"
+                                                                        style={{ cursor: 'pointer' }}
+                                                                    >
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={checked}
+                                                                            disabled={loading}
+                                                                            onChange={() => toggleDepartment(dept._id)}
+                                                                        />
+                                                                        <span>
+                                                                            {dept.name}
+                                                                            {dept.isActive === false ? ' (Inactive)' : ''}
+                                                                        </span>
+                                                                    </label>
+                                                                );
+                                                            })
+                                                        )}
+                                                    </div>
+                                                    <small className="text-muted">
+                                                        Ek hi project multiple departments mein ho sakta hai.
+                                                    </small>
                                                 </div>
 
                                                 <div className="col-xl-8 mb-1">
@@ -334,7 +370,7 @@ function B2BProject() {
                                                         type="button"
                                                         className="btn btn-success font-small-3"
                                                         onClick={handleSubmit}
-                                                        disabled={loading || !formData.name.trim() || !formData.department}
+                                                        disabled={loading || !formData.name.trim() || !formData.departments.length}
                                                     >
                                                         {loading ? (
                                                             <>
@@ -404,7 +440,7 @@ function B2BProject() {
                                                 <thead>
                                                     <tr>
                                                         <th>B2B Project</th>
-                                                        <th>Department</th>
+                                                        <th>Department(s)</th>
                                                         <th>Description</th>
                                                         <th>Status</th>
                                                         <th>Action</th>
@@ -415,7 +451,11 @@ function B2BProject() {
                                                         b2bProjects.map((project) => (
                                                             <tr key={project._id}>
                                                                 <td>{project.name}</td>
-                                                                <td>{project.department?.name || '—'}</td>
+                                                                <td>
+                                                                    <span className="text-muted small">
+                                                                        {formatProjectDepartments(project)}
+                                                                    </span>
+                                                                </td>
                                                                 <td>
                                                                     <span className="text-muted">
                                                                         {project.description || 'No description'}
@@ -444,9 +484,9 @@ function B2BProject() {
                                                                         </button>
                                                                         <button
                                                                             className="btn btn-sm btn-outline-danger"
-                                                                            onClick={() => handleDelete(project._id, project.name)}
+                                                                            onClick={() => handleDelete(project)}
                                                                             title="Delete B2B Project"
-                                                                            disabled={loading}
+                                                                            disabled={loading || deleteLoading}
                                                                         >
                                                                             <i className="fas fa-trash me-1"></i>
                                                                             Delete
@@ -476,6 +516,16 @@ function B2BProject() {
                     </div>
                 </section>
             </div>
+
+            <B2BDeleteMoveModal
+                show={deleteModal.show}
+                loading={deleteLoading}
+                impact={deleteModal.impact}
+                entityLabel="Project"
+                projects={allProjects}
+                onCancel={closeDeleteModal}
+                onConfirm={confirmDelete}
+            />
 
             <style jsx>{`
         .asterisk {

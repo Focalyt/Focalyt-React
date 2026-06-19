@@ -49,6 +49,12 @@ const {
 } = require("../../../models");
 const TypeOfB2B = require("../../../models/b2b/typeOfB2B");
 const B2BProject = require("../../../models/b2b/b2bProject");
+const {
+	getProjectDepartmentIds,
+	projectBelongsToDepartment,
+	parseDepartmentsFromBody,
+	projectDepartmentQuery,
+} = require("../../../models/b2b/b2bProjectHelpers");
 const B2BDepartment = require("../../../models/b2b/b2bDepartment");
 const LeadCategory = require("../../../models/b2b/leadCategory");
 const defaultLeadModel = require("../../../models/b2b/lead");
@@ -61,6 +67,26 @@ const { generatePassword, sendMail } = require("../../../../helpers");
 function createB2BRouter(LeadModel = defaultLeadModel) {
 	const Lead = LeadModel;
 	const router = express.Router();
+
+	const isValidId = (id) => id && mongoose.Types.ObjectId.isValid(String(id));
+
+	const assertDifferentTarget = (sourceId, targetId, label) => {
+		if (sourceId && targetId && String(sourceId) === String(targetId)) {
+			const err = new Error(`Please choose a different ${label} to move records to`);
+			err.statusCode = 400;
+			throw err;
+		}
+	};
+
+	const handleDeleteError = (res, error, fallbackMessage) => {
+		const status = error.statusCode || 500;
+		if (status >= 500) console.error(fallbackMessage, error);
+		res.status(status).json({
+			status: false,
+			message: error.message || fallbackMessage,
+			error: status >= 500 ? error.message : undefined
+		});
+	};
 
 	const isAdminUser = (req) => req.user?.permissions?.permission_type === 'Admin';
 
@@ -385,9 +411,12 @@ router.get('/type-of-b2b', isCollege, async (req, res) => {
 		if (department && mongoose.Types.ObjectId.isValid(department)) {
 			query.department = department;
 		} else if (project && mongoose.Types.ObjectId.isValid(project)) {
-			const projectDoc = await B2BProject.findById(project).select('department');
-			if (projectDoc?.department) {
-				query.department = projectDoc.department;
+			const projectDoc = await B2BProject.findById(project).select('department departments');
+			const deptIds = getProjectDepartmentIds(projectDoc);
+			if (deptIds.length === 1) {
+				query.department = deptIds[0];
+			} else if (deptIds.length > 1) {
+				query.department = { $in: deptIds };
 			}
 		}
 
@@ -594,18 +623,54 @@ router.put('/type-of-b2b/:id', isCollege, async (req, res) => {
 	}
 });
 
-// Delete Type of B2B (soft delete)
+router.get('/type-of-b2b/:id/delete-impact', isCollege, async (req, res) => {
+	try {
+		const typeId = req.params.id;
+		const typeDoc = await TypeOfB2B.findById(typeId).select('name department');
+		if (!typeDoc) {
+			return res.status(404).json({ status: false, message: 'Type of B2B not found' });
+		}
+		const leads = await Lead.countDocuments({ typeOfB2B: typeId });
+		res.json({
+			status: true,
+			data: {
+				entityType: 'type',
+				entityId: typeId,
+				entityName: typeDoc.name,
+				departmentId: typeDoc.department ? String(typeDoc.department) : null,
+				leads,
+				projects: 0,
+				types: 0,
+				requiresMove: leads > 0
+			}
+		});
+	} catch (error) {
+		handleDeleteError(res, error, 'Failed to fetch delete impact');
+	}
+});
+
+// Delete Type of B2B
 router.delete('/type-of-b2b/:id', isCollege, async (req, res) => {
 	try {
 		const typeId = req.params.id;
+		const { moveLeadsTo } = req.body || {};
 
 		const linkedLeadsCount = await Lead.countDocuments({ typeOfB2B: typeId });
 
 		if (linkedLeadsCount > 0) {
-			return res.status(400).json({
-				status: false,
-				message: `This B2B type is used in ${linkedLeadsCount} lead(s), so it cannot be deleted`
-			});
+			if (!isValidId(moveLeadsTo?.typeOfB2B)) {
+				return res.status(400).json({
+					status: false,
+					message: `This B2B type is used in ${linkedLeadsCount} lead(s). Select another type to move them before deleting.`,
+					data: { leads: linkedLeadsCount, requiresMove: true }
+				});
+			}
+			assertDifferentTarget(typeId, moveLeadsTo.typeOfB2B, 'B2B type');
+			const targetType = await TypeOfB2B.findById(moveLeadsTo.typeOfB2B);
+			if (!targetType) {
+				return res.status(400).json({ status: false, message: 'Target B2B type not found' });
+			}
+			await Lead.updateMany({ typeOfB2B: typeId }, { $set: { typeOfB2B: targetType._id } });
 		}
 
 		const deletedType = await TypeOfB2B.findByIdAndDelete(typeId);
@@ -619,15 +684,12 @@ router.delete('/type-of-b2b/:id', isCollege, async (req, res) => {
 
 		res.json({
 			status: true,
-			message: 'Type of B2B deleted successfully'
+			message: linkedLeadsCount > 0
+				? `Moved ${linkedLeadsCount} lead(s) and deleted B2B type successfully`
+				: 'Type of B2B deleted successfully'
 		});
 	} catch (error) {
-		console.error('Error deleting type of B2B:', error);
-		res.status(500).json({
-			status: false,
-			message: 'Failed to delete type of B2B',
-			error: error.message
-		});
+		handleDeleteError(res, error, 'Failed to delete type of B2B');
 	}
 });
 
@@ -641,9 +703,10 @@ router.get('/b2b-projects', isCollege, async (req, res) => {
 			query.isActive = status === 'true' || status === true;
 		}
 		if (department && mongoose.Types.ObjectId.isValid(department)) {
-			query.department = department;
+			Object.assign(query, projectDepartmentQuery(department));
 		}
 		const projects = await B2BProject.find(query)
+			.populate('departments', 'name isActive')
 			.populate('department', 'name isActive')
 			.populate('addedBy', 'name email')
 			.sort({ createdAt: -1 });
@@ -666,6 +729,7 @@ router.get('/b2b-projects', isCollege, async (req, res) => {
 router.get('/b2b-projects/:id', isCollege, async (req, res) => {
 	try {
 		const project = await B2BProject.findById(req.params.id)
+			.populate('departments', 'name isActive')
 			.populate('department', 'name isActive')
 			.populate('addedBy', 'name email');
 
@@ -693,7 +757,8 @@ router.get('/b2b-projects/:id', isCollege, async (req, res) => {
 
 router.post('/b2b-projects', isCollege, async (req, res) => {
 	try {
-		const { name, description, department } = req.body;
+		const { name, description } = req.body;
+		const departmentIds = parseDepartmentsFromBody(req.body);
 
 		if (!name || !String(name).trim()) {
 			return res.status(400).json({
@@ -702,39 +767,43 @@ router.post('/b2b-projects', isCollege, async (req, res) => {
 			});
 		}
 
-		if (!department || !mongoose.Types.ObjectId.isValid(department)) {
+		if (!departmentIds.length) {
 			return res.status(400).json({
 				status: false,
-				message: 'Valid B2B department is required'
+				message: 'Select at least one B2B department'
 			});
 		}
 
-		const departmentDoc = await B2BDepartment.findById(department);
-		if (!departmentDoc) {
-			return res.status(400).json({
-				status: false,
-				message: 'B2B department not found'
-			});
+		for (const deptId of departmentIds) {
+			const departmentDoc = await B2BDepartment.findById(deptId);
+			if (!departmentDoc) {
+				return res.status(400).json({
+					status: false,
+					message: 'One or more selected B2B departments were not found'
+				});
+			}
 		}
 
 		const trimmedName = String(name).trim();
-		const existingProject = await B2BProject.findOne({ name: trimmedName, department });
+		const existingProject = await B2BProject.findOne({ name: trimmedName });
 		if (existingProject) {
 			return res.status(400).json({
 				status: false,
-				message: 'B2B project with this name already exists for the selected department'
+				message: 'B2B project with this name already exists'
 			});
 		}
 
 		const newProject = new B2BProject({
 			name: trimmedName,
 			description,
-			department,
+			departments: departmentIds,
+			department: departmentIds[0],
 			addedBy: req.user._id
 		});
 
 		const savedProject = await newProject.save();
 		await savedProject.populate([
+			{ path: 'departments', select: 'name isActive' },
 			{ path: 'department', select: 'name isActive' },
 			{ path: 'addedBy', select: 'name email' }
 		]);
@@ -756,8 +825,9 @@ router.post('/b2b-projects', isCollege, async (req, res) => {
 
 router.put('/b2b-projects/:id', isCollege, async (req, res) => {
 	try {
-		const { name, description, isActive, department } = req.body;
+		const { name, description, isActive } = req.body;
 		const projectId = req.params.id;
+		const departmentIds = parseDepartmentsFromBody(req.body);
 
 		const currentProject = await B2BProject.findById(projectId);
 		if (!currentProject) {
@@ -767,22 +837,25 @@ router.put('/b2b-projects/:id', isCollege, async (req, res) => {
 			});
 		}
 
-		const departmentId = department || currentProject.department;
+		const hasDepartmentUpdate =
+			Array.isArray(req.body.departments) ||
+			(req.body.department !== undefined && req.body.department !== null && req.body.department !== '');
 
-		if (department && !mongoose.Types.ObjectId.isValid(department)) {
-			return res.status(400).json({
-				status: false,
-				message: 'Valid B2B department is required'
-			});
-		}
-
-		if (department) {
-			const departmentDoc = await B2BDepartment.findById(department);
-			if (!departmentDoc) {
+		if (hasDepartmentUpdate) {
+			if (!departmentIds.length) {
 				return res.status(400).json({
 					status: false,
-					message: 'B2B department not found'
+					message: 'Select at least one B2B department'
 				});
+			}
+			for (const deptId of departmentIds) {
+				const departmentDoc = await B2BDepartment.findById(deptId);
+				if (!departmentDoc) {
+					return res.status(400).json({
+						status: false,
+						message: 'One or more selected B2B departments were not found'
+					});
+				}
 			}
 		}
 
@@ -790,13 +863,12 @@ router.put('/b2b-projects/:id', isCollege, async (req, res) => {
 			const trimmedName = String(name).trim();
 			const existingProject = await B2BProject.findOne({
 				name: trimmedName,
-				department: departmentId,
 				_id: { $ne: projectId }
 			});
 			if (existingProject) {
 				return res.status(400).json({
 					status: false,
-					message: 'B2B project with this name already exists for the selected department'
+					message: 'B2B project with this name already exists'
 				});
 			}
 		}
@@ -805,13 +877,17 @@ router.put('/b2b-projects/:id', isCollege, async (req, res) => {
 		if (name !== undefined) updatePayload.name = String(name).trim();
 		if (description !== undefined) updatePayload.description = description;
 		if (isActive !== undefined) updatePayload.isActive = isActive;
-		if (department !== undefined) updatePayload.department = department;
+		if (hasDepartmentUpdate) {
+			updatePayload.departments = departmentIds;
+			updatePayload.department = departmentIds[0];
+		}
 
 		const updatedProject = await B2BProject.findByIdAndUpdate(
 			projectId,
 			updatePayload,
 			{ new: true, runValidators: true }
 		).populate([
+			{ path: 'departments', select: 'name isActive' },
 			{ path: 'department', select: 'name isActive' },
 			{ path: 'addedBy', select: 'name email' }
 		]);
@@ -838,17 +914,75 @@ router.put('/b2b-projects/:id', isCollege, async (req, res) => {
 	}
 });
 
+router.get('/b2b-projects/:id/delete-impact', isCollege, async (req, res) => {
+	try {
+		const projectId = req.params.id;
+		const projectDoc = await B2BProject.findById(projectId).select('name department departments');
+		if (!projectDoc) {
+			return res.status(404).json({ status: false, message: 'B2B project not found' });
+		}
+		const leads = await Lead.countDocuments({ b2bProject: projectId });
+		const deptIds = getProjectDepartmentIds(projectDoc);
+		res.json({
+			status: true,
+			data: {
+				entityType: 'project',
+				entityId: projectId,
+				entityName: projectDoc.name,
+				departmentId: deptIds[0] || null,
+				leads,
+				projects: 0,
+				types: 0,
+				requiresMove: leads > 0
+			}
+		});
+	} catch (error) {
+		handleDeleteError(res, error, 'Failed to fetch delete impact');
+	}
+});
+
 router.delete('/b2b-projects/:id', isCollege, async (req, res) => {
 	try {
 		const projectId = req.params.id;
+		const { moveLeadsTo } = req.body || {};
 
 		const linkedLeadsCount = await Lead.countDocuments({ b2bProject: projectId });
 
 		if (linkedLeadsCount > 0) {
-			return res.status(400).json({
-				status: false,
-				message: `This project is used in ${linkedLeadsCount} lead(s), so it cannot be deleted`
+			if (!isValidId(moveLeadsTo?.b2bProject)) {
+				return res.status(400).json({
+					status: false,
+					message: `This project is used in ${linkedLeadsCount} lead(s). Select another project to move them before deleting.`,
+					data: { leads: linkedLeadsCount, requiresMove: true }
+				});
+			}
+			assertDifferentTarget(projectId, moveLeadsTo.b2bProject, 'B2B project');
+			const targetProject = await B2BProject.findById(moveLeadsTo.b2bProject);
+			if (!targetProject) {
+				return res.status(400).json({ status: false, message: 'Target B2B project not found' });
+			}
+			const targetDeptIds = getProjectDepartmentIds(targetProject);
+			const leadsToMove = await Lead.find({ b2bProject: projectId }).select('b2bDepartment').lean();
+			const bulkOps = leadsToMove.map((lead) => {
+				const leadDept = String(lead.b2bDepartment || '');
+				const newDept = targetDeptIds.includes(leadDept)
+					? leadDept
+					: (targetDeptIds[0] || null);
+				return {
+					updateOne: {
+						filter: { _id: lead._id },
+						update: {
+							$set: {
+								b2bProject: targetProject._id,
+								b2bDepartment: newDept,
+							},
+						},
+					},
+				};
 			});
+			if (bulkOps.length) {
+				await Lead.bulkWrite(bulkOps);
+			}
 		}
 
 		const deletedProject = await B2BProject.findByIdAndDelete(projectId);
@@ -862,15 +996,12 @@ router.delete('/b2b-projects/:id', isCollege, async (req, res) => {
 
 		res.json({
 			status: true,
-			message: 'B2B project deleted successfully'
+			message: linkedLeadsCount > 0
+				? `Moved ${linkedLeadsCount} lead(s) and deleted B2B project successfully`
+				: 'B2B project deleted successfully'
 		});
 	} catch (error) {
-		console.error('Error deleting B2B project:', error);
-		res.status(500).json({
-			status: false,
-			message: 'Failed to delete B2B project',
-			error: error.message
-		});
+		handleDeleteError(res, error, 'Failed to delete B2B project');
 	}
 });
 
@@ -1032,32 +1163,185 @@ router.put('/b2b-departments/:id', isCollege, async (req, res) => {
 	}
 });
 
+router.get('/b2b-departments/:id/delete-impact', isCollege, async (req, res) => {
+	try {
+		const departmentId = req.params.id;
+		const departmentDoc = await B2BDepartment.findById(departmentId).select('name');
+		if (!departmentDoc) {
+			return res.status(404).json({ status: false, message: 'B2B department not found' });
+		}
+
+		const deptObjectId = new mongoose.Types.ObjectId(departmentId);
+		const [deptProjects, deptTypes, leadGroups, typeLeadGroups, totalLeads] = await Promise.all([
+			B2BProject.find(projectDepartmentQuery(departmentId)).select('name departments department').lean(),
+			TypeOfB2B.find({ department: departmentId }).select('name').lean(),
+			Lead.aggregate([
+				{ $match: { b2bDepartment: deptObjectId } },
+				{ $group: { _id: '$b2bProject', leadsCount: { $sum: 1 } } }
+			]),
+			Lead.aggregate([
+				{ $match: { b2bDepartment: deptObjectId, typeOfB2B: { $ne: null } } },
+				{ $group: { _id: '$typeOfB2B', leadsCount: { $sum: 1 } } }
+			]),
+			Lead.countDocuments({ b2bDepartment: departmentId })
+		]);
+
+		const leadCountByProject = new Map(
+			leadGroups.map((g) => [g._id ? String(g._id) : '__none__', g.leadsCount])
+		);
+		const leadCountByType = new Map(
+			typeLeadGroups.map((g) => [String(g._id), g.leadsCount])
+		);
+
+		const projectGroups = deptProjects.map((p) => ({
+			projectId: p._id,
+			projectName: p.name,
+			leadsCount: leadCountByProject.get(String(p._id)) || 0
+		}));
+
+		const typeGroups = deptTypes.map((t) => ({
+			typeId: t._id,
+			typeName: t.name,
+			leadsCount: leadCountByType.get(String(t._id)) || 0
+		}));
+
+		const orphanLeadsCount = leadCountByProject.get('__none__') || 0;
+
+		res.json({
+			status: true,
+			data: {
+				entityType: 'department',
+				entityId: departmentId,
+				entityName: departmentDoc.name,
+				departmentId,
+				leads: totalLeads,
+				orphanLeadsCount,
+				projects: deptProjects.length,
+				types: deptTypes.length,
+				projectGroups,
+				typeGroups,
+				requiresMove: deptProjects.length > 0 || deptTypes.length > 0
+			}
+		});
+	} catch (error) {
+		handleDeleteError(res, error, 'Failed to fetch delete impact');
+	}
+});
+
 router.delete('/b2b-departments/:id', isCollege, async (req, res) => {
 	try {
 		const departmentId = req.params.id;
+		const { moveProjects = [], moveTypes = [] } = req.body || {};
 
-		const linkedProjectsCount = await B2BProject.countDocuments({ department: departmentId });
-		const linkedTypesCount = await TypeOfB2B.countDocuments({ department: departmentId });
+		const deptProjects = await B2BProject.find(projectDepartmentQuery(departmentId)).select('_id name departments department').lean();
+		const deptTypes = await TypeOfB2B.find({ department: departmentId }).select('_id name').lean();
 		const linkedLeadsCount = await Lead.countDocuments({ b2bDepartment: departmentId });
+		const moveProjectsList = Array.isArray(moveProjects) ? moveProjects : [];
+		const moveTypesList = Array.isArray(moveTypes) ? moveTypes : [];
 
-		if (linkedProjectsCount > 0) {
+		const orphanLeadsCount = await Lead.countDocuments({
+			b2bDepartment: departmentId,
+			$or: [{ b2bProject: null }, { b2bProject: { $exists: false } }]
+		});
+		if (orphanLeadsCount > 0) {
 			return res.status(400).json({
 				status: false,
-				message: `This department has ${linkedProjectsCount} project(s), so it cannot be deleted`
+				message: `${orphanLeadsCount} lead(s) are not linked to any project in this department. Assign them to a project before deleting.`
 			});
 		}
 
-		if (linkedTypesCount > 0) {
+		if (deptTypes.length > 0) {
+			for (const typeDoc of deptTypes) {
+				const mapping = moveTypesList.find(
+					(m) => m?.typeId && String(m.typeId) === String(typeDoc._id)
+				);
+				if (!isValidId(mapping?.toDepartmentId)) {
+					return res.status(400).json({
+						status: false,
+						message: `Select a department to move B2B type "${typeDoc.name}" before deleting.`,
+						data: { requiresMove: true }
+					});
+				}
+				assertDifferentTarget(departmentId, mapping.toDepartmentId, 'department');
+			}
+		}
+
+		for (const mapping of moveTypesList) {
+			if (!isValidId(mapping?.typeId) || !isValidId(mapping?.toDepartmentId)) continue;
+			const targetDept = await B2BDepartment.findById(mapping.toDepartmentId);
+			if (!targetDept) {
+				return res.status(400).json({ status: false, message: 'Target department for B2B type not found' });
+			}
+			await TypeOfB2B.updateOne(
+				{ _id: mapping.typeId, department: departmentId },
+				{ $set: { department: targetDept._id } }
+			);
+		}
+
+		if (deptProjects.length > 0) {
+			for (const proj of deptProjects) {
+				const mapping = moveProjectsList.find(
+					(m) => m?.projectId && String(m.projectId) === String(proj._id)
+				);
+				if (!isValidId(mapping?.toDepartmentId)) {
+					return res.status(400).json({
+						status: false,
+						message: `Select a department to move project "${proj.name}" before deleting.`,
+						data: { requiresMove: true }
+					});
+				}
+				assertDifferentTarget(departmentId, mapping.toDepartmentId, 'department');
+			}
+		}
+
+		for (const mapping of moveProjectsList) {
+			if (!isValidId(mapping?.projectId) || !isValidId(mapping?.toDepartmentId)) continue;
+			const targetDept = await B2BDepartment.findById(mapping.toDepartmentId);
+			if (!targetDept) {
+				return res.status(400).json({ status: false, message: 'Target department for project not found' });
+			}
+			const projectDoc = await B2BProject.findById(mapping.projectId).select('departments department');
+			if (!projectDoc) continue;
+			const deptIds = getProjectDepartmentIds(projectDoc);
+
+			if (deptIds.length > 1) {
+				await B2BProject.updateOne(
+					{ _id: mapping.projectId },
+					{
+						$pull: { departments: departmentId },
+						$addToSet: { departments: targetDept._id },
+					}
+				);
+			} else {
+				await B2BProject.updateOne(
+					{ _id: mapping.projectId },
+					{ $set: { departments: [targetDept._id], department: targetDept._id } }
+				);
+			}
+			const updatedProject = await B2BProject.findById(mapping.projectId);
+			if (updatedProject) {
+				updatedProject.department = updatedProject.departments?.[0] || null;
+				await updatedProject.save();
+			}
+			await Lead.updateMany(
+				{ b2bProject: mapping.projectId, b2bDepartment: departmentId },
+				{ $set: { b2bDepartment: targetDept._id } }
+			);
+		}
+
+		const remainingTypes = await TypeOfB2B.countDocuments({ department: departmentId });
+		if (remainingTypes > 0) {
 			return res.status(400).json({
 				status: false,
-				message: `This department is used in ${linkedTypesCount} B2B type(s), so it cannot be deleted`
+				message: `${remainingTypes} B2B type(s) are still linked to this department. Move all types first.`
 			});
 		}
 
-		if (linkedLeadsCount > 0) {
+		const remainingLeads = await Lead.countDocuments({ b2bDepartment: departmentId });
+		if (remainingLeads > 0) {
 			return res.status(400).json({
 				status: false,
-				message: `This department is used in ${linkedLeadsCount} lead(s), so it cannot be deleted`
+				message: `${remainingLeads} lead(s) are still linked to this department. Move all projects first.`
 			});
 		}
 
@@ -1070,17 +1354,19 @@ router.delete('/b2b-departments/:id', isCollege, async (req, res) => {
 			});
 		}
 
+		const movedParts = [];
+		if (deptProjects.length > 0) movedParts.push(`${deptProjects.length} project(s)`);
+		if (deptTypes.length > 0) movedParts.push(`${deptTypes.length} B2B type(s)`);
+		if (linkedLeadsCount > 0) movedParts.push(`${linkedLeadsCount} lead(s) updated with project`);
+
 		res.json({
 			status: true,
-			message: 'B2B department deleted successfully'
+			message: movedParts.length
+				? `Shifted ${movedParts.join(', ')} and deleted B2B department successfully`
+				: 'B2B department deleted successfully'
 		});
 	} catch (error) {
-		console.error('Error deleting B2B department:', error);
-		res.status(500).json({
-			status: false,
-			message: 'Failed to delete B2B department',
-			error: error.message
-		});
+		handleDeleteError(res, error, 'Failed to delete B2B department');
 	}
 });
 
@@ -1323,18 +1609,53 @@ router.put('/lead-categories/:id', isCollege, async (req, res) => {
 	}
 });
 
-// Delete Lead Category (soft delete)
+router.get('/lead-categories/:id/delete-impact', isCollege, async (req, res) => {
+	try {
+		const categoryId = req.params.id;
+		const categoryDoc = await LeadCategory.findById(categoryId).select('name');
+		if (!categoryDoc) {
+			return res.status(404).json({ status: false, message: 'Lead category not found' });
+		}
+		const leads = await Lead.countDocuments({ leadCategory: categoryId });
+		res.json({
+			status: true,
+			data: {
+				entityType: 'source',
+				entityId: categoryId,
+				entityName: categoryDoc.name,
+				leads,
+				projects: 0,
+				types: 0,
+				requiresMove: leads > 0
+			}
+		});
+	} catch (error) {
+		handleDeleteError(res, error, 'Failed to fetch delete impact');
+	}
+});
+
+// Delete Lead Category
 router.delete('/lead-categories/:id', isCollege, async (req, res) => {
 	try {
 		const categoryId = req.params.id;
+		const { moveLeadsTo } = req.body || {};
 
 		const linkedLeadsCount = await Lead.countDocuments({ leadCategory: categoryId });
 
 		if (linkedLeadsCount > 0) {
-			return res.status(400).json({
-				status: false,
-				message: `This category is used in ${linkedLeadsCount} lead(s), so it cannot be deleted`
-			});
+			if (!isValidId(moveLeadsTo?.leadCategory)) {
+				return res.status(400).json({
+					status: false,
+					message: `This source is used in ${linkedLeadsCount} lead(s). Select another source to move them before deleting.`,
+					data: { leads: linkedLeadsCount, requiresMove: true }
+				});
+			}
+			assertDifferentTarget(categoryId, moveLeadsTo.leadCategory, 'lead source');
+			const targetCategory = await LeadCategory.findById(moveLeadsTo.leadCategory);
+			if (!targetCategory) {
+				return res.status(400).json({ status: false, message: 'Target lead source not found' });
+			}
+			await Lead.updateMany({ leadCategory: categoryId }, { $set: { leadCategory: targetCategory._id } });
 		}
 
 		const deletedCategory = await LeadCategory.findByIdAndDelete(categoryId);
@@ -1348,15 +1669,12 @@ router.delete('/lead-categories/:id', isCollege, async (req, res) => {
 
 		res.json({
 			status: true,
-			message: 'Lead category deleted successfully'
+			message: linkedLeadsCount > 0
+				? `Moved ${linkedLeadsCount} lead(s) and deleted lead source successfully`
+				: 'Lead category deleted successfully'
 		});
 	} catch (error) {
-		console.error('Error deleting lead category:', error);
-		res.status(500).json({
-			status: false,
-			message: 'Failed to delete lead category',
-			error: error.message
-		});
+		handleDeleteError(res, error, 'Failed to delete lead category');
 	}
 });
 
@@ -2651,7 +2969,7 @@ router.post('/leads/:id/cross-sale', isCollege, async (req, res) => {
 		if (!departmentDoc) {
 			return res.status(400).json({ status: false, message: 'B2B department not found' });
 		}
-		if (String(projectDoc.department) !== String(b2bDepartment)) {
+		if (!projectBelongsToDepartment(projectDoc, b2bDepartment)) {
 			return res.status(400).json({
 				status: false,
 				message: 'Selected project does not belong to the selected department',
@@ -2964,7 +3282,7 @@ router.post('/add-lead', isCollege, async (req, res) => {
 		if (!departmentDoc) {
 			return res.status(400).json({ status: false, message: 'B2B department not found' });
 		}
-		if (String(projectDoc.department) !== String(b2bDepartment)) {
+		if (!projectBelongsToDepartment(projectDoc, b2bDepartment)) {
 			return res.status(400).json({
 				status: false,
 				message: 'Selected project does not belong to the selected department'
@@ -3910,7 +4228,7 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 				return res.status(400).json({ status: false, message: 'B2B project not found' });
 			}
 			const departmentId = updatePayload.b2bDepartment || existingLead.b2bDepartment;
-			if (departmentId && String(projectDoc.department) !== String(departmentId)) {
+			if (departmentId && !projectBelongsToDepartment(projectDoc, departmentId)) {
 				return res.status(400).json({
 					status: false,
 					message: 'Selected project does not belong to the selected department'
@@ -3933,7 +4251,7 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 				if (!projectDoc) {
 					return res.status(400).json({ status: false, message: 'B2B project not found' });
 				}
-				if (String(projectDoc.department) !== String(b2bDepartment)) {
+				if (!projectBelongsToDepartment(projectDoc, b2bDepartment)) {
 					return res.status(400).json({
 						status: false,
 						message: 'Selected project does not belong to the selected department'
@@ -4609,7 +4927,7 @@ router.post('/leads/import', isCollege, async (req, res) => {
 			});
 		}
 
-		if (String(defaultB2bProjectDoc.department) !== String(defaultB2bDepartmentDoc._id)) {
+		if (!projectBelongsToDepartment(defaultB2bProjectDoc, defaultB2bDepartmentDoc._id)) {
 			return res.status(400).json({
 				status: false,
 				message: 'Selected B2B project does not belong to the selected department.'

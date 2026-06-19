@@ -7,6 +7,7 @@ import axios from 'axios'
 import * as XLSX from 'xlsx';
 import { Link, useNavigate } from 'react-router-dom';
 import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/googleOAuth';
+import { getProjectDepartmentIds, projectBelongsToDepartment } from '../../../../utils/b2bProjectHelpers';
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
@@ -857,7 +858,7 @@ const B2BSales = () => {
   const addLeadProjects = useMemo(() => {
     if (!leadFormData.b2bDepartment) return [];
     return allB2bProjects.filter(
-      (proj) => String(proj.department?._id || proj.department) === String(leadFormData.b2bDepartment)
+      (proj) => projectBelongsToDepartment(proj, leadFormData.b2bDepartment)
     );
   }, [allB2bProjects, leadFormData.b2bDepartment]);
 
@@ -1627,7 +1628,7 @@ const B2BSales = () => {
   const cycleProjectOptions = useMemo(() => {
     if (!filters.b2bDepartment) return allB2bProjects;
     return allB2bProjects.filter(
-      (proj) => String(proj.department?._id || proj.department) === String(filters.b2bDepartment)
+      (proj) => projectBelongsToDepartment(proj, filters.b2bDepartment)
     );
   }, [allB2bProjects, filters.b2bDepartment]);
 
@@ -1640,9 +1641,9 @@ const B2BSales = () => {
     } else if (filters.b2bProject) {
       const project = allB2bProjects.find((p) => String(p._id) === String(filters.b2bProject));
       if (project) {
-        const deptId = String(project.department?._id || project.department);
-        types = types.filter(
-          (type) => String(type.department?._id || type.department) === deptId
+        const deptIds = getProjectDepartmentIds(project);
+        types = types.filter((type) =>
+          deptIds.includes(String(type.department?._id || type.department))
         );
       }
     }
@@ -1754,7 +1755,7 @@ const B2BSales = () => {
   const crossSaleProjectOptions = useMemo(() => {
     if (!crossSaleForm.b2bDepartment) return [];
     return allB2bProjects.filter(
-      (proj) => String(proj.department?._id || proj.department) === String(crossSaleForm.b2bDepartment)
+      (proj) => projectBelongsToDepartment(proj, crossSaleForm.b2bDepartment)
     );
   }, [allB2bProjects, crossSaleForm.b2bDepartment]);
 
@@ -2984,7 +2985,7 @@ const B2BSales = () => {
   const bulkUploadProjectOptions = useMemo(() => {
     if (!bulkUploadFormData.b2bDepartment) return [];
     return allB2bProjects.filter(
-      (proj) => String(proj.department?._id || proj.department) === String(bulkUploadFormData.b2bDepartment)
+      (proj) => projectBelongsToDepartment(proj, bulkUploadFormData.b2bDepartment)
     );
   }, [allB2bProjects, bulkUploadFormData.b2bDepartment]);
 

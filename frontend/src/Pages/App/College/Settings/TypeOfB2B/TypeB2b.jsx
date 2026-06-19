@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import B2BDeleteMoveModal from '../components/B2BDeleteMoveModal';
+import { useB2bDeleteWithMove } from '../hooks/useB2bDeleteWithMove';
 
 function TypeB2b() {
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -6,6 +8,7 @@ function TypeB2b() {
     const token = userData.token;
 
     const [b2bTypes, setB2bTypes] = useState([]);
+    const [allTypes, setAllTypes] = useState([]);
     const [b2bDepartments, setB2bDepartments] = useState([]);
     const [filterDepartment, setFilterDepartment] = useState('');
     const [formData, setFormData] = useState({
@@ -20,7 +23,40 @@ function TypeB2b() {
 
     useEffect(() => {
         fetchB2bDepartments();
+        fetchAllTypes();
     }, []);
+
+    const fetchAllTypes = async () => {
+        try {
+            const response = await fetch(`${backendUrl}/college/b2b/type-of-b2b`, {
+                headers: { 'x-auth': token, 'Content-Type': 'application/json' }
+            });
+            const data = await response.json();
+            if (data.status) setAllTypes(data.data || []);
+        } catch (error) {
+            console.error('Error fetching all B2B types:', error);
+        }
+    };
+
+    const handleDeleted = (item, message) => {
+        setB2bTypes((prev) => prev.filter((type) => type._id !== item._id));
+        if (editingId === item._id) resetForm();
+        showAlert(message || 'B2B type deleted successfully!', 'success');
+        fetchAllTypes();
+    };
+
+    const {
+        deleteModal,
+        deleteLoading,
+        openDeleteModal,
+        closeDeleteModal,
+        confirmDelete
+    } = useB2bDeleteWithMove({
+        backendUrl,
+        token,
+        entityType: 'type',
+        onDeleted: handleDeleted
+    });
 
     useEffect(() => {
         fetchB2bTypes(filterDepartment);
@@ -164,41 +200,8 @@ function TypeB2b() {
         }
     };
 
-    const handleDelete = async (typeId, typeName) => {
-        const confirmed = window.confirm(`Are you sure you want to delete "${typeName}"?`);
-
-        if (!confirmed) return;
-
-        try {
-            setLoading(true);
-
-            const response = await fetch(`${backendUrl}/college/b2b/type-of-b2b/${typeId}`, {
-                method: 'DELETE',
-                headers: {
-                    'x-auth': token,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            const data = await response.json();
-
-            if (data.status) {
-                setB2bTypes(prev => prev.filter(type => type._id !== typeId));
-
-                if (editingId === typeId) {
-                    resetForm();
-                }
-
-                showAlert('B2B type deleted successfully!', 'success');
-            } else {
-                showAlert(data.message || 'Failed to delete B2B type', 'error');
-            }
-        } catch (error) {
-            console.error('Error deleting B2B type:', error);
-            showAlert('Failed to delete B2B type', 'error');
-        } finally {
-            setLoading(false);
-        }
+    const handleDelete = (type) => {
+        openDeleteModal(type);
     };
 
     const handleEdit = (type) => {
@@ -449,9 +452,9 @@ function TypeB2b() {
                                                                         </button>
                                                                         <button
                                                                             className="btn btn-sm btn-outline-danger"
-                                                                            onClick={() => handleDelete(type._id, type.name)}
+                                                                            onClick={() => handleDelete(type)}
                                                                             title="Delete B2B Type"
-                                                                            disabled={loading}
+                                                                            disabled={loading || deleteLoading}
                                                                         >
                                                                             <i className="fas fa-trash me-1"></i>
                                                                             Delete
@@ -481,6 +484,16 @@ function TypeB2b() {
                     </div>
                 </section>
             </div>
+
+            <B2BDeleteMoveModal
+                show={deleteModal.show}
+                loading={deleteLoading}
+                impact={deleteModal.impact}
+                entityLabel="B2B Type"
+                types={allTypes}
+                onCancel={closeDeleteModal}
+                onConfirm={confirmDelete}
+            />
 
             <style jsx>{`
         .asterisk {
