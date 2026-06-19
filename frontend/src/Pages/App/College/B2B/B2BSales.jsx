@@ -781,7 +781,8 @@ const B2BSales = () => {
     b2bProject: '',
     typeOfB2B: '',
     leadStatus: '',
-    leadSubStatus: ''
+    leadSubStatus: '',
+    leadOwner: ''
   });
   const [bulkUploadFormErrors, setBulkUploadFormErrors] = useState({});
   const [bulkUploadSubStatuses, setBulkUploadSubStatuses] = useState([]);
@@ -3045,6 +3046,7 @@ const B2BSales = () => {
   );
 
   const openBulkUploadModal = () => {
+    const uid = userData?._id != null ? String(userData._id) : '';
     setBulkUploadFormData({
       leadCategory: '',
       b2bDepartment: '',
@@ -3052,6 +3054,7 @@ const B2BSales = () => {
       typeOfB2B: '',
       leadStatus: '',
       leadSubStatus: '',
+      leadOwner: uid,
     });
     setBulkUploadFormErrors({});
     setBulkUploadSubStatuses([]);
@@ -3066,8 +3069,8 @@ const B2BSales = () => {
   // Bulk Upload Functions (Excel only — same columns as backend import)
   const downloadB2bLeadsSampleExcel = () => {
     const rows = [
-      ['Business Name', 'Concern Person Name', 'Mobile', 'Email', 'Address', 'City', 'State', 'Designation', 'WhatsApp', 'Landline Number', 'Lead Owner', 'Remark'],
-      ['ABC Company', 'John Doe', '9876543210', 'john@abc.com', '123 Main Street', 'Mumbai', 'Maharashtra', 'Manager', '9876543210', '0221234567', 'Owner Name', 'Sample remark'],
+      ['Business Name', 'Concern Person Name', 'Mobile', 'Email', 'Address', 'City', 'State', 'Designation', 'WhatsApp', 'Landline Number', 'Counsellor', 'Remark'],
+      ['ABC Company', 'John Doe', '9876543210', 'john@abc.com', '123 Main Street', 'Mumbai', 'Maharashtra', 'Manager', '9876543210', '0221234567', 'Counsellor Name', 'Sample remark'],
       ['XYZ Corp', 'Jane Smith', '9876543211', 'jane@xyz.com',  '456 Park Avenue', 'Delhi', 'Delhi', 'Director', '9876543211', '0111234567', 'Owner Name', 'Another remark'],
       ['Tech Solutions', 'Raj Kumar', '9876543212', 'raj@tech.com','789 Tech Park', 'Bangalore', 'Karnataka', 'CEO', '9876543212', '0801234567', 'Owner Name', 'Technology company']
     ];
@@ -3152,6 +3155,9 @@ const B2BSales = () => {
     formData.append('leadStatus', bulkUploadFormData.leadStatus);
     if (bulkUploadFormData.leadSubStatus) {
       formData.append('leadSubStatus', bulkUploadFormData.leadSubStatus);
+    }
+    if (bulkUploadFormData.leadOwner) {
+      formData.append('leadOwner', bulkUploadFormData.leadOwner);
     }
 
     try {
@@ -7751,10 +7757,11 @@ const B2BSales = () => {
                     Instructions:
                   </h6>
                   <ul className="mb-0 small">
-                    <li>Step 1: Select Lead Source, B2B Department, B2B Project, Type of B2B, Lead Status, and Sub Status below.</li>
+                    <li>Step 1: Select Lead Source, B2B Department, B2B Project, Type of B2B, Lead Status, Sub Status, and Counsellor below.</li>
                     <li>Step 2: Upload an Excel file (.xlsx or .xls, max 10MB).</li>
                     <li><strong>Required in Excel:</strong> Business Name, Concern Person Name, Mobile.</li>
                     <li>All imported leads use your selections above. You do not need those columns in Excel.</li>
+                    <li>Counsellor is optional; if selected, all imported leads are assigned to that counsellor.</li>
                   </ul>
                 </div>
 
@@ -7918,6 +7925,33 @@ const B2BSales = () => {
                     {bulkUploadFormData.leadStatus && !bulkUploadSubStatusesLoading && bulkUploadSubStatuses.length === 0 && (
                       <div className="form-text text-muted small">No sub-statuses configured for this status.</div>
                     )}
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-user-tie text-primary me-1"></i>
+                      Counsellor
+                    </label>
+                    <select
+                      className="form-select"
+                      name="leadOwner"
+                      value={bulkUploadFormData.leadOwner}
+                      onChange={handleBulkUploadInputChange}
+                      disabled={bulkUploadLoading}
+                    >
+                      <option value="">Select Counsellor</option>
+                      {userData?._id &&
+                        !users?.some((u) => String(u?._id) === String(userData._id)) && (
+                          <option key={`bulk-me-${userData._id}`} value={String(userData._id)}>
+                            {userData.name || 'Me'}
+                          </option>
+                        )}
+                      {users?.map((user) => (
+                        <option key={user?._id} value={user?._id}>
+                          {user?.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
