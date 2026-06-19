@@ -21,6 +21,7 @@ const University = require('../../models/university');
 const Qualification = require('../../models/qualification');
 const AppliedCourses = require('../../models/appliedCourses');
 const Source = require('../../models/source');
+const Partner = require('../../models/partners');
 
 // Permission Checker Utility Function
 const hasPermission = (user, permission) => {
@@ -921,6 +922,82 @@ router.put('/updateSource/:sourceId', isCollege, async (req, res) => {
     });
   } catch (error) {
     console.log(error);
+  }
+});
+
+router.post("/addPartner", isCollege, async (req, res) => {
+  try {
+    const { name } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Partner name is required',
+      });
+    }
+
+    const partner = new Partner({ name: name.trim() });
+    await partner.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Partner added successfully',
+      data: partner,
+    });
+  } catch (error) {
+    console.error('Add Partner Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add partner',
+    });
+  }
+});
+
+router.get('/partners', isCollege, async (req, res) => {
+  try {
+    const partners = await Partner.find({}).sort({ createdAt: -1 });
+    res.status(200).json({
+      success: true,
+      data: partners,
+    });
+  } catch (error) {
+    console.error('Get Partners Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch partners',
+    });
+  }
+});
+
+router.put('/updatePartner/:partnerId', isCollege, async (req, res) => {
+  try {
+    const { partnerId } = req.params;
+    const { name, status } = req.body;
+
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (status !== undefined) updateData.status = status;
+
+    const partner = await Partner.findByIdAndUpdate(partnerId, updateData, { new: true });
+
+    if (!partner) {
+      return res.status(404).json({
+        success: false,
+        message: 'Partner not found',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Partner updated successfully',
+      data: partner,
+    });
+  } catch (error) {
+    console.error('Update Partner Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update partner',
+    });
   }
 });
 

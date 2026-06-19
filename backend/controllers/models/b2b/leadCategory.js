@@ -22,6 +22,9 @@ const questionItemSchema = new mongoose.Schema(
 const LeadCategorySchema = new mongoose.Schema({
   name: { type: String, required: true, unique: true },
   description: { type: String },
+  b2bDepartment: { type: ObjectId, ref: 'B2BDepartment' },
+  b2bProject: { type: ObjectId, ref: 'B2BProject' },
+  typeOfB2B: { type: ObjectId, ref: 'TypeOfB2B' },
   isActive: { type: Boolean, default: true },
   documents: { type: [documentItemSchema], default: [] },
   questions: { type: [questionItemSchema], default: [] },

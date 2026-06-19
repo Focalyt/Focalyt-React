@@ -2384,11 +2384,11 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
         const { crmFilterCounts } = response.data;
 
         const filter = [
-          { _id: 'pendingEkyc', name: 'Pending for Documents', count: crmFilterCounts.pendingKyc, milestone: '' },
-          { _id: 'pendingDocumentVerification', name: 'Pending for Verification', count: 0, milestone: '' },
-          { _id: 'rejectedDocs', name: 'Reject Documents', count: 0, milestone: '' },
-          { _id: 'doneEkyc', name: 'Verified', count: crmFilterCounts.doneKyc, milestone: 'kyc Done' },
-          { _id: 'All', name: 'All', count: crmFilterCounts.all, milestone: '' }
+          { _id: 'pendingEkyc', name: 'Pending for Documents', count: crmFilterCounts.pendingKyc ?? 0, milestone: '' },
+          { _id: 'pendingDocumentVerification', name: 'Pending for Verification', count: crmFilterCounts.pendingDocumentVerification ?? 0, milestone: '' },
+          { _id: 'rejectedDocs', name: 'Reject Documents', count: crmFilterCounts.rejectedDocs ?? 0, milestone: '' },
+          { _id: 'doneEkyc', name: 'Verified', count: crmFilterCounts.doneKyc ?? 0, milestone: 'kyc Done' },
+          { _id: 'All', name: 'All', count: crmFilterCounts.all ?? 0, milestone: '' }
         ];
 
         setEkycFilters(filter);
@@ -3545,7 +3545,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                               <i className={`fas ${filter._id === 'pendingEkyc' ? 'fa-clock' : filter._id === 'doneEkyc' ? 'fa-check-circle' : 'fa-list'} me-1`}></i>
                               <span className="d-none d-sm-inline">{filter.name}</span>
                               <span className="d-sm-none">{filter.name.split(' ')[0]}</span>
-                              <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>({filter.count})</span>
+                              <span className={`ms-1 fw-semibold ${activeCrmFilter === index ? 'text-white' : 'text-body'}`}>({filter.count ?? 0})</span>
                             </button>
                             {filter.milestone && (
                               <span
@@ -3621,7 +3621,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                               >
                                 <i className={`fas ${filter._id === 'pendingEkyc' ? 'fa-clock' : filter._id === 'doneEkyc' ? 'fa-check-circle' : 'fa-list'} me-1`}></i>
                                 {filter.name}
-                                <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>({filter.count})</span>
+                                <span className={`ms-1 fw-semibold ${activeCrmFilter === index ? 'text-white' : 'text-body'}`}>({filter.count ?? 0})</span>
                               </button>
                               {filter.milestone && (
                                 <span
@@ -3709,7 +3709,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
                               >
                                 <i className={`fas ${filter._id === 'pendingEkyc' ? 'fa-clock' : filter._id === 'doneEkyc' ? 'fa-check-circle' : 'fa-list'} me-1`}></i>
                                 {filter.name}
-                                <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>({filter.count})</span>
+                                <span className={`ms-1 fw-semibold ${activeCrmFilter === index ? 'text-white' : 'text-body'}`}>({filter.count ?? 0})</span>
                               </button>
                               {filter.milestone && (
                                 <span

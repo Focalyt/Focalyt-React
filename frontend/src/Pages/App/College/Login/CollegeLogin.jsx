@@ -113,7 +113,7 @@ const CollegeLogin = () => {
                         // window.location.href = decodeURIComponent(returnUrl);
                         navigate(decodeURIComponent(returnUrl));
                     } else {
-                        window.location.href = '/institute/dashboard';
+                        window.location.href = '/institute/registration';
                     }
                 } else {
                     setSuccessMessage('');

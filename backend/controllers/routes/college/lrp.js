@@ -406,8 +406,30 @@ router.get("/b2b-lead/:leadId", async (req, res) => {
     }
 
     const lead = await Lead.findById(leadId)
-      .populate("leadCategory", "name questions isActive")
-      .populate("typeOfB2B", "name")
+      .populate({
+        path: "leadCategory",
+        select: "name questions isActive b2bDepartment b2bProject typeOfB2B",
+        populate: [
+          { path: "b2bDepartment", select: "name isActive" },
+          {
+            path: "b2bProject",
+            select: "name department isActive",
+            populate: { path: "department", select: "name isActive" },
+          },
+          {
+            path: "typeOfB2B",
+            select: "name department isActive",
+            populate: { path: "department", select: "name isActive" },
+          },
+        ],
+      })
+      .populate("b2bProject", "name")
+      .populate("b2bDepartment", "name")
+      .populate({
+        path: "typeOfB2B",
+        select: "name department",
+        populate: { path: "department", select: "name" },
+      })
       .lean();
 
     if (!lead) {
