@@ -4418,6 +4418,8 @@ router.post('/leads/import', isCollege, async (req, res) => {
 			'whatsapp': 'whatsapp',
 			'landlinenumber': 'landlineNumber',
 			'leadowner': 'leadOwner',
+			'counsellor': 'leadOwner',
+			'counselor': 'leadOwner',
 			'leadstatus': 'leadStatus',
 			'performance': 'leadStatus',
 			'performancestatus': 'leadStatus',
@@ -4559,6 +4561,7 @@ router.post('/leads/import', isCollege, async (req, res) => {
 		const bodyTypeOfB2B = req.body?.typeOfB2B ? String(req.body.typeOfB2B).trim() : '';
 		const bodyLeadStatus = req.body?.leadStatus ? String(req.body.leadStatus).trim() : '';
 		const bodyLeadSubStatus = req.body?.leadSubStatus ? String(req.body.leadSubStatus).trim() : '';
+		const bodyLeadOwner = req.body?.leadOwner ? String(req.body.leadOwner).trim() : '';
 
 		if (bodyLeadCategory && mongoose.Types.ObjectId.isValid(bodyLeadCategory)) {
 			defaultLeadCategoryDoc = await LeadCategory.findById(bodyLeadCategory);
@@ -4583,6 +4586,20 @@ router.post('/leads/import', isCollege, async (req, res) => {
 			const stDoc = await StatusB2b.findById(modalStatusId).select('substatuses');
 			const matched = (stDoc?.substatuses || []).find((s) => String(s._id) === bodyLeadSubStatus);
 			if (matched) modalSubStatusId = matched._id;
+		}
+
+		let modalLeadOwnerId = null;
+		if (bodyLeadOwner) {
+			if (mongoose.Types.ObjectId.isValid(bodyLeadOwner)) {
+				const owner = await User.findById(bodyLeadOwner);
+				if (owner) modalLeadOwnerId = owner._id;
+			}
+			if (!modalLeadOwnerId) {
+				return res.status(400).json({
+					status: false,
+					message: 'Invalid Counsellor selected in the upload form. Please choose again.'
+				});
+			}
 		}
 
 		if (!defaultLeadCategoryDoc || !defaultB2bDepartmentDoc || !defaultB2bProjectDoc || !defaultTypeOfB2BDoc) {
@@ -4619,6 +4636,7 @@ router.post('/leads/import', isCollege, async (req, res) => {
 		const useModalLeadSource = Boolean(defaultLeadCategoryDoc);
 		const useModalB2bType = Boolean(defaultTypeOfB2BDoc);
 		const useModalPipeline = Boolean(modalStatusId);
+		const useModalLeadOwner = Boolean(modalLeadOwnerId);
 
 		leads = leads.filter((row) => {
 			if (!row || typeof row !== 'object') return false;
@@ -4891,7 +4909,9 @@ router.post('/leads/import', isCollege, async (req, res) => {
 					}
 				}
 
-				if (row.leadOwner && row.leadOwner.trim()) {
+				if (useModalLeadOwner) {
+					leadData.leadOwner = modalLeadOwnerId;
+				} else if (row.leadOwner && row.leadOwner.trim()) {
 					const ownerName = row.leadOwner.trim();
 
 					let owner = null;

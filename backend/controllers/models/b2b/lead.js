@@ -195,7 +195,7 @@ B2BLeadSchema.pre('save', async function(next) {
         '_concernPerson._id': this.leadAddedBy
       });
       
-      console.log('College found:', college ? college._id : 'No college found');
+      // console.log('College found:', college ? college._id : 'No college found');
       
       if (college) {
         const defaultStatus = await StatusB2b.findOne({
