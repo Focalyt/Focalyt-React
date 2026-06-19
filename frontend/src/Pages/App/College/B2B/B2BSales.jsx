@@ -112,6 +112,73 @@ function getLeadGroupRootId(lead) {
   return String(lead.crossSaleRootId || lead.parentLeadId || lead._id || '');
 }
 
+const B2B_LEAD_DOWNLOAD_COLUMNS = [
+  { key: 'concernPerson', label: 'Concern Person' },
+  { key: 'businessName', label: 'Business Name' },
+  { key: 'mobile', label: 'Mobile' },
+  { key: 'email', label: 'Email' },
+  { key: 'whatsapp', label: 'WhatsApp' },
+  { key: 'designation', label: 'Designation' },
+  { key: 'approvalStatus', label: 'Approval Status' },
+  { key: 'performanceStatus', label: 'Performance Status' },
+  { key: 'subStatus', label: 'Sub Status' },
+  { key: 'followUpCallStatus', label: 'Follow-up Call Status' },
+  { key: 'followUpCallDate', label: 'Follow-up Call Date' },
+  { key: 'followUpVisitStatus', label: 'Follow-up Visit Status' },
+  { key: 'followUpVisitDate', label: 'Follow-up Visit Date' },
+  { key: 'documentsStatus', label: 'Documents Status' },
+  { key: 'leadAgeDays', label: 'Lead Age (Days)' },
+  { key: 'leadOwner', label: 'Lead Owner' },
+  { key: 'addedBy', label: 'Added By' },
+  { key: 'b2bDepartment', label: 'B2B Department' },
+  { key: 'b2bProject', label: 'B2B Project' },
+  { key: 'leadSource', label: 'Lead Source' },
+  { key: 'b2bType', label: 'B2B Type' },
+  { key: 'state', label: 'State' },
+  { key: 'city', label: 'City' },
+  { key: 'address', label: 'Address' },
+  { key: 'remark', label: 'Remark' },
+  { key: 'createdAt', label: 'Created At' },
+  { key: 'updatedAt', label: 'Updated At' },
+];
+
+const DEFAULT_DOWNLOAD_COLUMN_KEYS = [
+  'concernPerson', 'businessName', 'mobile', 'approvalStatus',
+  'performanceStatus', 'subStatus', 'leadOwner', 'b2bProject',
+  'leadSource', 'b2bType', 'state', 'city',
+];
+
+const B2B_DOWNLOAD_COLUMN_GROUPS = [
+  {
+    title: 'Contact',
+    columnKeys: ['concernPerson', 'businessName', 'mobile', 'email', 'whatsapp', 'designation'],
+  },
+  {
+    title: 'Lead Status',
+    columnKeys: ['approvalStatus', 'performanceStatus', 'subStatus'],
+  },
+  {
+    title: 'Follow-up',
+    columnKeys: ['followUpCallStatus', 'followUpCallDate', 'followUpVisitStatus', 'followUpVisitDate'],
+  },
+  {
+    title: 'Documents',
+    columnKeys: ['documentsStatus'],
+  },
+  {
+    title: 'Lead Info',
+    columnKeys: ['leadAgeDays', 'leadOwner', 'addedBy', 'b2bDepartment', 'b2bProject', 'leadSource', 'b2bType'],
+  },
+  {
+    title: 'Location & Other',
+    columnKeys: ['state', 'city', 'address', 'remark', 'createdAt', 'updatedAt'],
+  },
+];
+
+const B2B_DOWNLOAD_COLUMN_MAP = Object.fromEntries(
+  B2B_LEAD_DOWNLOAD_COLUMNS.map((col) => [col.key, col])
+);
+
 function buildLeadRemarkSuggestion({ leadFormData, leadCategoryOptions, typeOfB2BOptions }) {
   const business = safeStr(leadFormData?.businessName);
   const city = safeStr(leadFormData?.city);
@@ -1553,6 +1620,11 @@ const B2BSales = () => {
   // Add state for leads data
   const [leads, setLeads] = useState([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
+  const [downloadingLeads, setDownloadingLeads] = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [selectedDownloadColumns, setSelectedDownloadColumns] = useState(DEFAULT_DOWNLOAD_COLUMN_KEYS);
+  const [downloadLeadCount, setDownloadLeadCount] = useState(0);
+  const [downloadCountLoading, setDownloadCountLoading] = useState(false);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState(null);
   const [leadViewTab, setLeadViewTab] = useState('all'); // 'all' | 'myRefer'
   const [myReferLeadsCount, setMyReferLeadsCount] = useState(0);
@@ -1682,6 +1754,77 @@ const B2BSales = () => {
     if (tab === 'all') {
       fetchStatusCounts();
       fetchApprovalCounts();
+    }
+  };
+  const openDownloadLeadModal = () => {
+    setDownloadLeadCount(totalLeads || 0);
+    setShowDownloadModal(true);
+  };
+
+  const closeDownloadLeadModal = () => {
+    if (downloadingLeads) return;
+    setShowDownloadModal(false);
+  };
+
+  const toggleDownloadColumn = (key) => {
+    setSelectedDownloadColumns((prev) => (
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    ));
+  };
+
+  const selectAllDownloadColumns = () => {
+    setSelectedDownloadColumns(B2B_LEAD_DOWNLOAD_COLUMNS.map((col) => col.key));
+  };
+
+  const clearAllDownloadColumns = () => {
+    setSelectedDownloadColumns([]);
+  };
+
+  const handleDownloadLeads = async () => {
+    if (!token || downloadingLeads) return;
+    if (!selectedDownloadColumns.length) {
+      alert('Please select at least one column to download.');
+      return;
+    }
+
+    try {
+      setDownloadingLeads(true);
+      const params = buildDownloadQueryParams();
+      params.columnsIn = selectedDownloadColumns.join(',');
+
+      const response = await axios.get(`${backendUrl}/college/b2b/leads/download`, {
+        headers: { 'x-auth': token },
+        params,
+        responseType: 'blob',
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }));
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `b2b-leads-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+      setShowDownloadModal(false);
+    } catch (error) {
+      console.error('Error downloading leads:', error);
+      let message = 'Failed to download leads';
+      const errorData = error?.response?.data;
+      if (errorData instanceof Blob) {
+        try {
+          const text = await errorData.text();
+          const parsed = JSON.parse(text);
+          message = parsed?.message || message;
+        } catch {
+          // keep default message
+        }
+      } else if (errorData?.message) {
+        message = errorData.message;
+      }
+      alert(message);
+    } finally {
+      setDownloadingLeads(false);
     }
   };
 
@@ -2097,6 +2240,99 @@ const B2BSales = () => {
     return params;
   };
 
+  const buildDownloadQueryParams = () => {
+    const eff = { ...filters, ...getLeadFetchOverrides() };
+    const params = {};
+    if (selectedStatusFilter) {
+      params.status = selectedStatusFilter;
+    }
+    appendLeadFilterParams(params, eff);
+    return params;
+  };
+
+  useEffect(() => {
+    if (!showDownloadModal || !token) return;
+
+    let cancelled = false;
+    const fetchDownloadCount = async () => {
+      setDownloadCountLoading(true);
+      try {
+        const params = { page: 1, limit: 1, ...buildDownloadQueryParams() };
+        const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
+          headers: { 'x-auth': token },
+          params,
+        });
+        if (!cancelled && response.data?.data?.pagination?.totalLeads != null) {
+          setDownloadLeadCount(response.data.data.pagination.totalLeads);
+        }
+      } catch (error) {
+        if (!cancelled) setDownloadLeadCount(totalLeads || 0);
+      } finally {
+        if (!cancelled) setDownloadCountLoading(false);
+      }
+    };
+
+    fetchDownloadCount();
+    return () => { cancelled = true; };
+  }, [showDownloadModal, selectedStatusFilter, selectedApprovalStatus, filters, leadViewTab, token, backendUrl, totalLeads]);
+
+  const getDownloadFilterSummary = () => {
+    const parts = [];
+    if (leadViewTab === 'myRefer') parts.push('My Referred Leads');
+    if (selectedApprovalStatus) {
+      const approvalLabel = {
+        PENDING: 'Pending',
+        APPROVED: 'Approved',
+        REJECTED: 'Rejected',
+      }[selectedApprovalStatus] || selectedApprovalStatus;
+      parts.push(`Lead Approval: ${approvalLabel}`);
+    }
+    if (selectedStatusFilter) {
+      const statusName = statusCounts?.find((s) => String(s.statusId) === String(selectedStatusFilter))?.statusName;
+      parts.push(`Performance: ${statusName || 'Selected'}`);
+    }
+    if (filters.followUpCallBucket) {
+      const callLabel = { done: 'Done', planned: 'Planned', missed: 'Missed' }[filters.followUpCallBucket] || filters.followUpCallBucket;
+      parts.push(`Follow-up Calling: ${callLabel}`);
+    }
+    if (filters.followUpVisitBucket) {
+      const visitLabel = { done: 'Done', planned: 'Planned', missed: 'Missed' }[filters.followUpVisitBucket] || filters.followUpVisitBucket;
+      parts.push(`Follow-up Visit: ${visitLabel}`);
+    }
+    if (Array.isArray(filters.documentsStatus) && filters.documentsStatus.length) {
+      const docLabels = filters.documentsStatus.map((d) => (d === 'done' ? 'Done' : d === 'pending' ? 'Pending' : d));
+      parts.push(`Documents: ${docLabels.join(', ')}`);
+    }
+    if (filters.b2bDepartment) {
+      const dept = allB2bDepartments.find((d) => String(d._id) === String(filters.b2bDepartment));
+      if (dept?.name) parts.push(`Department: ${dept.name}`);
+    }
+    if (filters.b2bProject) {
+      const proj = allB2bProjects.find((p) => String(p._id) === String(filters.b2bProject));
+      if (proj?.name) parts.push(`Project: ${proj.name}`);
+    }
+    if (filters.search) parts.push(`Search: ${filters.search}`);
+    return parts.length ? parts.join(' • ') : 'All leads (current view)';
+  };
+
+  const renderDownloadColumnCheckbox = (key) => {
+    const col = B2B_DOWNLOAD_COLUMN_MAP[key];
+    if (!col) return null;
+    return (
+      <div className="col-md-4 col-sm-6" key={key}>
+        <label className="d-flex align-items-center gap-2 border rounded px-2 py-2 h-100 mb-0" style={{ cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            className="form-check-input m-0"
+            checked={selectedDownloadColumns.includes(key)}
+            onChange={() => toggleDownloadColumn(key)}
+          />
+          <span className="small">{col.label}</span>
+        </label>
+      </div>
+    );
+  };
+
   const handleFollowupDashClick = (type, bucket) => {
     const filterKey = type === 'Visit' ? 'followUpVisitBucket' : 'followUpCallBucket';
     const otherKey = type === 'Visit' ? 'followUpCallBucket' : 'followUpVisitBucket';
@@ -2119,6 +2355,24 @@ const B2BSales = () => {
   const isFollowupDashSelected = (type, bucket) => {
     const filterKey = type === 'Visit' ? 'followUpVisitBucket' : 'followUpCallBucket';
     return filters[filterKey] === bucket;
+  };
+
+  const isDocumentsDashSelected = (bucket) => (
+    Array.isArray(filters.documentsStatus) && filters.documentsStatus.includes(bucket)
+  );
+
+  const handleDocumentsDashClick = (bucket) => {
+    const next = { ...filters };
+    const list = [...(next.documentsStatus || [])];
+    const idx = list.indexOf(bucket);
+    if (idx >= 0) list.splice(idx, 1);
+    else list.push(bucket);
+    next.documentsStatus = list;
+    setFilters(next);
+    setCurrentPage(1);
+    fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides(next));
+    fetchStatusCounts(next);
+    fetchApprovalCounts(next);
   };
 
   const handleCycleFilterChange = (key, value) => {
@@ -5186,6 +5440,21 @@ const B2BSales = () => {
                           onClick={() => handleLeadViewTabChange('myRefer')}
                         >
                           My Referred Leads ({myReferLeadsCount})
+                        </button> 
+                        <button
+                          onClick={openDownloadLeadModal}
+                          disabled={downloadingLeads}
+                          style={{
+                            padding: '6px 14px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            borderRadius: '999px',
+                            cursor: downloadingLeads ? 'not-allowed' : 'pointer',
+                            opacity: downloadingLeads ? 0.7 : 1,
+                          }}
+                        >
+                          <i className={`fas ${downloadingLeads ? 'fa-spinner fa-spin' : 'fa-download'}`}></i>
+                          {downloadingLeads ? ' Downloading...' : ' Download Lead'}
                         </button>
                       </div>
                     </div>
@@ -5375,21 +5644,27 @@ const B2BSales = () => {
                           <span className="b2b-dash-section__label">Documents</span>
                           <div className="d-flex flex-wrap gap-2 pt-1">
                             {[
-                              { key: 'doc-done', label: 'Done', value: dashboardB2BCounts.docs.done, bg: '#4b5563' },
-                              { key: 'doc-pending', label: 'Pending', value: dashboardB2BCounts.docs.pending, bg: '#4b5563' }
-                            ].map((row) => (
-                              <div
+                              { key: 'doc-done', bucket: 'done', label: 'Done', value: dashboardB2BCounts.docs.done, bg: '#4b5563' },
+                              { key: 'doc-pending', bucket: 'pending', label: 'Pending', value: dashboardB2BCounts.docs.pending, bg: '#4b5563' }
+                            ].map((row) => {
+                              const selected = isDocumentsDashSelected(row.bucket);
+                              return (
+                              <button
                                 key={row.key}
-                                className="b2b-dash-stat-card text-center text-white flex-grow-1"
+                                type="button"
+                                className={`b2b-dash-stat-card text-center text-white flex-grow-1 border-0${selected ? ' b2b-dash-stat-card--active' : ''}`}
                                 style={{ background: row.bg }}
+                                onClick={() => handleDocumentsDashClick(row.bucket)}
+                                title={`Filter leads: Documents — ${row.label}`}
                               >
                                 <div className="b2b-dash-stat-card__label">{row.label}</div>
                                 <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
                                 <div className="b2b-dash-stat-card__value text-white">
                                   {String(row.value).padStart(2, '0')}
                                 </div>
-                              </div>
-                            ))}
+                              </button>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>
@@ -6259,9 +6534,7 @@ const B2BSales = () => {
                                 </div>
 
                                 {/* Performance block — label paired with each input */}
-                                <div className="lead-header-v2__perf-block" style={{
-                                  width: '20%'
-                                }}>
+                                <div className="lead-header-v2__perf-block">
                                   <span className="lead-header-v2__perf-title">Performance</span>
                                   <button
                                     type="button"
@@ -6289,7 +6562,6 @@ const B2BSales = () => {
                                       className="form-control form-control-sm m-0 lead-header-v2__perf-input"
                                       value={getLeadSubStatusTitle(lead) || 'Untouch Lead'}
                                       readOnly
-                                      style={{ fontSize: '8px' }}
                                     />
                                   </div>
                                   {/* mobile expand/options — keep hidden on desktop */}
@@ -7740,6 +8012,87 @@ const B2BSales = () => {
         )
       }
 
+      {/* Download Leads Modal */}
+      {showDownloadModal && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
+          <div className="modal-dialog modal-lg modal-dialog-centered">
+            <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+              <div className="modal-header" style={{ background: 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)', color: 'white' }}>
+                <h5 className="modal-title d-flex align-items-center">
+                  <i className="fas fa-download me-2"></i>
+                  Select Columns to Download
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={closeDownloadLeadModal}
+                  disabled={downloadingLeads}
+                ></button>
+              </div>
+
+              <div className="modal-body p-4">
+                <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-2 border-bottom">
+                  <div className="small text-muted">
+                    {downloadCountLoading ? (
+                      <span><i className="fas fa-spinner fa-spin me-1"></i> Counting...</span>
+                    ) : (
+                      <span><strong className="text-dark">{downloadLeadCount}</strong> lead{downloadLeadCount === 1 ? '' : 's'} ready to download</span>
+                    )}
+                    {getDownloadFilterSummary() !== 'All leads (current view)' && (
+                      <div className="small text-muted mt-1">Current tab: {getDownloadFilterSummary()}</div>
+                    )}
+                  </div>
+                  <div className="d-flex gap-2">
+                    <button type="button" className="btn btn-sm btn-outline-primary" onClick={selectAllDownloadColumns}>
+                      Select All
+                    </button>
+                    <button type="button" className="btn btn-sm btn-outline-secondary" onClick={clearAllDownloadColumns}>
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+
+                {B2B_DOWNLOAD_COLUMN_GROUPS.map((group) => (
+                  <div key={group.title} className="mb-3">
+                    <div className="small fw-semibold text-secondary mb-2">{group.title}</div>
+                    <div className="row g-2">
+                      {group.columnKeys.map((key) => renderDownloadColumnCheckbox(key))}
+                    </div>
+                  </div>
+                ))}
+
+                {selectedDownloadColumns.length === 0 && (
+                  <div className="text-danger small">Select at least one column.</div>
+                )}
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={closeDownloadLeadModal}
+                  disabled={downloadingLeads}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleDownloadLeads}
+                  disabled={downloadingLeads || !selectedDownloadColumns.length || downloadCountLoading}
+                >
+                  {downloadingLeads ? (
+                    <><i className="fas fa-spinner fa-spin me-1"></i> Downloading...</>
+                  ) : (
+                    <><i className="fas fa-file-excel me-1"></i> Download Excel</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Bulk Upload Modal */}
       {showBulkUploadModal && (
         <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
@@ -8449,7 +8802,7 @@ const B2BSales = () => {
     border-radius: var(--lead-card-radius);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     border: 1px solid #f0f0f0;
-    overflow: hidden;
+    overflow: visible;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     margin-bottom: 0.5rem;
     position: relative;
@@ -8495,9 +8848,9 @@ const B2BSales = () => {
 
   .lead-header-v2{
     background: linear-gradient(90deg, #0b5ed7 0%, #1aa3ff 55%, #2dd4ff 100%);
-    padding: 8px 10px;
+    padding: 12px 10px 8px;
     position: relative;
-    --lead-header-v2-block-h: 92px;
+    --lead-header-v2-block-h: 86px;
     overflow: visible;
     z-index: 3;
   }
@@ -8588,20 +8941,25 @@ const B2BSales = () => {
     justify-content:space-between;
     gap:8px;
     flex-wrap: nowrap;
+    padding-top: 6px;
+    overflow: visible;
   }
 
   .lead-header-v2__left{
     display:flex;
     align-items:center;
     gap:8px;
-    min-width: 132px;
-    flex: 0 0 132px;
-        position: relative;
+    min-width: 230px;
+    flex: 0 0 230px;
+    width: 230px;
+    position: relative;
     border: 1px solid rgba(255, 255, 255, 0.35);
     border-radius: 10px;
-    padding: 8px 8px 6px;
+    padding: 8px 10px 6px;
     background: rgba(255, 255, 255, 0.14);
     backdrop-filter: blur(6px);
+    overflow: visible;
+    margin-top: 4px;
   }
 
   .lead-header-v2__inputs{
@@ -8628,9 +8986,8 @@ const B2BSales = () => {
     border: 1px solid rgba(255,255,255,0.35);
     border-radius: 10px;
     padding: 5px 8px;
-    // flex: 1 1 0;
-    // min-width: 150px;
-    // width: 250px;
+    width: 100%;
+    min-width: 0;
   }
 
   .lead-header-v2__input-icon{
@@ -8646,10 +9003,13 @@ const B2BSales = () => {
     background: transparent;
     color: #fff;
     font-weight: 700;
-    font-size: 13px;
-    line-height: 1.1;
+    font-size: 12px;
+    line-height: 1.15;
     padding: 0;
     min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .lead-header-v2__input::placeholder{
@@ -8660,31 +9020,36 @@ const B2BSales = () => {
   .lead-header-v2__approval{
     position: relative;
     display:flex;
-    gap:8px;
-    flex-shrink:0;
+    gap:4px;
+    flex: 0 0 auto;
+    min-width: 72px;
+    max-width: 82px;
     flex-direction: column;
-    padding: 12px 8px 8px;
-    border-radius: 12px;
+    padding: 10px 5px 6px;
+    border-radius: 10px;
     background: rgba(255, 255, 255, 0.14);
     border: 1px solid rgba(255,255,255,0.28);
     backdrop-filter: blur(6px);
     z-index: 20;
     overflow: visible;
+    margin-top: 4px;
   }
 
   .lead-header-v2__approval-label{
     position: absolute;
-    top: -10px;
-    left: 10px;
-    padding: 0 8px;
+    top: 0;
+    left: 6px;
+    transform: translateY(-50%);
+    padding: 0 5px;
     border-radius: 999px;
     background: rgba(11, 94, 215, 0.95);
     border: 1px solid rgba(255, 255, 255, 0.35);
     color: #fff;
-    font-size: 10px;
+    font-size: 8px;
     font-weight: 900;
-    line-height: 18px;
+    line-height: 16px;
     white-space: nowrap;
+    z-index: 3;
   }
 
   .lead-header-v2__approval-btn{
@@ -8703,24 +9068,27 @@ const B2BSales = () => {
   .lead-approval-v2__row{
     display:flex;
     align-items:center;
-    gap: 8px;
+    gap: 3px;
     width: 100%;
     justify-content: center;
-    flex-direction: column
+    flex-direction: row;
+    flex-wrap: nowrap;
   }
 
   .lead-approval-v2__pill{
     border: 1px solid rgba(255,255,255,0.35);
     color: #fff;
     border-radius: 999px;
-    padding: 6px 12px;
-    height: 32px;
-    font-size: 11px;
+    padding: 3px 5px;
+    height: 22px;
+    font-size: 8px;
     font-weight: 900;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.01em;
     background: rgba(255,255,255,0.18);
     text-transform: uppercase;
-    min-width: 110px;
+    min-width: 0;
+    flex: 1 1 auto;
+    line-height: 1;
   }
 
   .lead-approval-v2__pill--pending{
@@ -8737,15 +9105,17 @@ const B2BSales = () => {
   }
 
   .lead-approval-v2__iconbtn{
-    width: 32px;
-    height: 32px;
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
     display:inline-flex;
     align-items:center;
     justify-content:center;
-    border-radius: 10px;
+    border-radius: 6px;
     border: 1px solid rgba(255,255,255,0.35);
     background: rgba(255,255,255,0.16);
     color: #fff;
+    flex-shrink: 0;
     transition: transform 120ms ease, background 120ms ease, box-shadow 120ms ease;
   }
   .lead-approval-v2__iconbtn:hover{
@@ -8753,7 +9123,7 @@ const B2BSales = () => {
     background: rgba(255,255,255,0.24);
     box-shadow: 0 6px 14px rgba(0,0,0,0.18);
   }
-  .lead-approval-v2__iconbtn i{ font-size: 12px; }
+  .lead-approval-v2__iconbtn i{ font-size: 9px; }
 
   .lead-approval-v2__menu{
     display:flex;
@@ -8909,23 +9279,23 @@ const B2BSales = () => {
   .lead-header-v2__right{
     display:flex;
     align-items:stretch;
-    gap:8px;
+    gap:6px;
     flex-wrap: nowrap;
     justify-content:flex-end;
     flex: 1 1 auto;
     min-width: 0;
-    // overflow: hidden;
-    white-space: nowrap;
+    overflow: visible;
     position: relative;
+    padding-top: 4px;
   }
 
   .lead-header-v2__dash{
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
-    width: clamp(480px, 48vw, 700px);
-    min-width: 0;
+    gap: 6px;
     flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
   }
 
   .lead-header-v2__dash-col{
@@ -8940,20 +9310,37 @@ const B2BSales = () => {
     position: relative;
     border: 1px solid rgba(255,255,255,0.35);
     border-radius: 10px;
-    padding: 8px 8px 6px;
+    padding: 7px 5px 5px;
     background: rgba(255,255,255,0.14);
     backdrop-filter: blur(6px);
     width: 100%;
     min-height: var(--lead-header-v2-block-h);
     display: flex;
     flex-direction: column;
+    overflow: visible;
+    margin-top: 4px;
   }
 
   /* Make stats row use remaining height so all blocks match */
   .lead-header-v2 .b2b-dash-section > .d-flex{
     flex: 1 1 auto;
     min-height: 0;
-    align-items: center;
+    align-items: stretch;
+  }
+
+  .lead-header-v2 .b2b-dash-section > .d-flex.flex-wrap{
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: stretch;
+    gap: 3px;
+    padding-top: 4px !important;
+  }
+
+  .lead-header-v2 .b2b-dash-section > .d-flex.flex-wrap .b2b-dash-stat-card{
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 34px;
+    padding: 3px 2px 2px;
   }
 
   .lead-header-v2 .b2b-dash-section > .ActionsDates{
@@ -8967,66 +9354,70 @@ const B2BSales = () => {
 
   .lead-header-v2 .b2b-dash-section__label{
     position: absolute;
-    top: -10px;
-    left: 10px;
-    padding: 0 8px;
+    top: 0;
+    left: 8px;
+    transform: translateY(-50%);
+    padding: 0 6px;
     border-radius: 999px;
     background: rgba(11, 94, 215, 0.95);
     border: 1px solid rgba(255,255,255,0.35);
     color: #fff;
-    font-size: 11px;
+    font-size: 9px;
     font-weight: 900;
-    line-height: 18px;
+    line-height: 16px;
     white-space: nowrap;
+    z-index: 3;
   }
 
   .lead-header-v2 .b2b-dash-stat-card{
-    border-radius: 8px;
-    padding: 5px 5px 4px;
-    min-height: 48px;
+    border-radius: 6px;
+    padding: 3px 2px 2px;
+    min-height: 34px;
     display:flex;
     flex-direction:column;
     align-items:center;
     justify-content:center;
-    box-shadow: 0 6px 14px rgba(0,0,0,0.14);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.12);
     min-width: 0;
   }
 
   .lead-header-v2 .b2b-dash-stat-card__label{
-    font-size: 9px;
+    font-size: 7.5px;
     font-weight: 800;
-    line-height: 1.05;
+    line-height: 1;
     opacity: 0.98;
   }
 
   .lead-header-v2 .b2b-dash-stat-card__divider{
-    width: 72%;
-    max-width: 56px;
+    width: 70%;
+    max-width: 42px;
     height: 1px;
-    margin: 4px 0;
+    margin: 2px 0;
     background: rgba(255,255,255,0.95);
     flex-shrink: 0;
   }
 
   .lead-header-v2 .b2b-dash-stat-card__value{
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 900;
-    line-height: 1.05;
-    letter-spacing: 0.3px;
+    line-height: 1;
+    letter-spacing: 0.2px;
   }
 
   /* Keep dashboard compact on one line (desktop) */
   @media (max-width: 1360px){
-    .lead-header-v2__dash{ width: clamp(480px, 48vw, 680px); gap: 8px; }
-    .lead-header-v2 .b2b-dash-section{ padding: 7px 7px 6px; }
+    .lead-header-v2__dash{ gap: 6px; }
+    .lead-header-v2 .b2b-dash-section{ padding: 7px 6px 5px; }
+    .lead-header-v2__perf-block{ min-width: 142px; flex-basis: 142px; }
   }
 
   @media (max-width: 1200px){
-    .lead-header-v2__dash{ width: clamp(420px, 46vw, 620px); gap: 8px; }
-    .lead-header-v2 .b2b-dash-stat-card{ min-height: 44px; }
-    .lead-header-v2 .b2b-dash-stat-card__label{ font-size: 8.5px; }
-    .lead-header-v2 .b2b-dash-stat-card__value{ font-size: 12px; }
-    .lead-header-v2 .ActionsDates{ font-size: 10px; }
+    .lead-header-v2__dash{ gap: 5px; }
+    .lead-header-v2 .b2b-dash-stat-card{ min-height: 42px; padding: 4px 4px 3px; }
+    .lead-header-v2 .b2b-dash-stat-card__label{ font-size: 8px; }
+    .lead-header-v2 .b2b-dash-stat-card__value{ font-size: 11px; }
+    .lead-header-v2 .ActionsDates{ font-size: 9px; }
+    .lead-header-v2__perf-block{ min-width: 132px; flex-basis: 132px; }
   }
 
   @media (max-width: 1100px){
@@ -9043,15 +9434,17 @@ const B2BSales = () => {
 
   .lead-header-v2 .ActionsDates{
     display:flex;
-    justify-content:left;
-    gap:10px;
-    margin-top: 6px;
-    padding-top: 6px;
+    justify-content:flex-start;
+    align-items: center;
+    flex-wrap: wrap;
+    gap:4px;
+    margin-top: 4px;
+    padding-top: 4px;
     border-top: 1px solid rgba(255,255,255,0.22);
     color: rgba(255,255,255,0.95);
-    font-size: 11px;
+    font-size: 9px;
     font-weight: 800;
-    // flex-wrap: wrap;
+    line-height: 1.2;
     white-space: normal;
     min-width: 0;
   }
@@ -9079,6 +9472,7 @@ const B2BSales = () => {
     flex-direction: column;
     gap: 6px;
     flex-shrink: 0;
+    margin-top: 4px;
   }
 
   /* Performance block: title + label-input rows */
@@ -9086,35 +9480,33 @@ const B2BSales = () => {
     display: flex;
     flex-direction: column;
     gap: 5px;
-    flex-shrink: 0;
-    min-width: 148px;
-        position: relative;
+    flex: 0 0 158px;
+    min-width: 158px;
+    position: relative;
     border: 1px solid rgba(255, 255, 255, 0.35);
     border-radius: 10px;
-    padding: 10px 10px 8px;
+    padding: 10px 8px 8px;
     background: rgba(255, 255, 255, 0.14);
     backdrop-filter: blur(6px);
+    overflow: visible;
+    margin-top: 4px;
   }
-.lead-header-v2__perf-title{
-position: absolute;
-    top: -10px;
+
+  .lead-header-v2__perf-title{
+    position: absolute;
+    top: 0;
     left: 10px;
+    transform: translateY(-50%);
     padding: 0 8px;
     border-radius: 999px;
     background: rgba(11, 94, 215, 0.95);
     border: 1px solid rgba(255, 255, 255, 0.35);
     color: #fff;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 900;
     line-height: 18px;
     white-space: nowrap;
-}
-  .lead-header-v2__perf-title{
-    font-size: 11px;
-    font-weight: 900;
-    color: rgba(255,255,255,0.95);
-    text-align: center;
-    letter-spacing: 0.3px;
+    z-index: 3;
   }
 
   .lead-header-v2__perf-row{
@@ -9124,25 +9516,29 @@ position: absolute;
   }
 
   .lead-header-v2__perf-label{
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 800;
     color: rgba(255,255,255,0.9);
     white-space: nowrap;
-    min-width: 58px;
+    min-width: 54px;
+    flex-shrink: 0;
   }
 
   .lead-header-v2__perf-input{
     cursor: pointer;
     height: 22px !important;
-    font-size: 10px !important;
+    font-size: 9px !important;
     border-radius: 6px !important;
     border: 1px solid rgba(255,255,255,0.35) !important;
     background: rgba(255,255,255,0.18) !important;
     color: #fff !important;
     font-weight: 700 !important;
-    padding: 0 6px !important;
+    padding: 0 5px !important;
     min-width: 0;
     flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .lead-header-v2__perf-input::placeholder{

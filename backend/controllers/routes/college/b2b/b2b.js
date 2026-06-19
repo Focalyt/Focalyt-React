@@ -330,6 +330,258 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 			}
 		});
 
+	const convertToObjectId = (id) => {
+		if (!id) return null;
+		if (mongoose.Types.ObjectId.isValid(id)) {
+			return new mongoose.Types.ObjectId(id);
+		}
+		return id;
+	};
+
+	const parseIdList = (csv) =>
+		String(csv || '')
+			.split(',')
+			.map((s) => s.trim())
+			.filter(Boolean)
+			.map((id) => convertToObjectId(id))
+			.filter(Boolean);
+
+	const buildLeadsFilterQuery = async (req) => {
+		const {
+			status,
+			statusIn,
+			leadCategory,
+			leadCategoryIn,
+			typeOfB2B,
+			typeOfB2BIn,
+			b2bProject,
+			b2bProjectIn,
+			b2bDepartment,
+			b2bDepartmentIn,
+			search,
+			subStatus,
+			subStatusIn,
+			startDate,
+			endDate,
+			leadOwner,
+			leadOwnerIn,
+			hasFollowUpCall,
+			hasFollowUpVisit,
+			followUpCallBucket,
+			followUpVisitBucket,
+			documentsStatusIn,
+			approvalStatus,
+			referredByMe
+		} = req.query;
+
+		const referredByMeActive = isReferredByMeQuery(referredByMe);
+		let ownershipConditions = [];
+
+		const followupBucketFilters = [];
+		if (followUpCallBucket) {
+			const bucketFilter = await resolveFollowupBucketLeadFilter('call', followUpCallBucket);
+			if (bucketFilter) followupBucketFilters.push(bucketFilter);
+		}
+		if (followUpVisitBucket) {
+			const bucketFilter = await resolveFollowupBucketLeadFilter('visit', followUpVisitBucket);
+			if (bucketFilter) followupBucketFilters.push(bucketFilter);
+		}
+
+		if (!referredByMeActive && !isAdminUser(req)) {
+			const teamMembers = await getAllTeamMembers(req.user._id);
+			ownershipConditions = teamMembers.map(member => ({
+				$or: [{ leadAddedBy: member }, { leadOwner: member }]
+			}));
+		}
+
+		const searchConditions = search
+			? {
+				$or: [
+					{ concernPersonName: { $regex: search, $options: 'i' } },
+					{ businessName: { $regex: search, $options: 'i' } },
+					{ email: { $regex: search, $options: 'i' } },
+					{ mobile: { $regex: search, $options: 'i' } }
+				]
+			}
+			: {};
+
+		const finalQuery = {
+			$and: [
+				...(ownershipConditions.length > 0 ? [{ $or: ownershipConditions.flatMap(c => c.$or) }] : []),
+				...(referredByMeActive ? [getReferredByMeFilter(req.user._id)] : []),
+				...followupBucketFilters,
+				...(search ? [searchConditions] : []),
+				...(statusIn ? [{ status: { $in: parseIdList(statusIn) } }] : []),
+				...(!statusIn && status ? [{ status: convertToObjectId(status) }] : []),
+				...(leadCategoryIn ? [{ leadCategory: { $in: parseIdList(leadCategoryIn) } }] : []),
+				...(!leadCategoryIn && leadCategory ? [{ leadCategory: convertToObjectId(leadCategory) }] : []),
+				...(typeOfB2BIn ? [{ typeOfB2B: { $in: parseIdList(typeOfB2BIn) } }] : []),
+				...(!typeOfB2BIn && typeOfB2B ? [{ typeOfB2B: convertToObjectId(typeOfB2B) }] : []),
+				...(b2bProjectIn ? [{ b2bProject: { $in: parseIdList(b2bProjectIn) } }] : []),
+				...(!b2bProjectIn && b2bProject ? [{ b2bProject: convertToObjectId(b2bProject) }] : []),
+				...(b2bDepartmentIn ? [{ b2bDepartment: { $in: parseIdList(b2bDepartmentIn) } }] : []),
+				...(!b2bDepartmentIn && b2bDepartment ? [{ b2bDepartment: convertToObjectId(b2bDepartment) }] : []),
+				...(subStatusIn ? [{ subStatus: { $in: parseIdList(subStatusIn) } }] : []),
+				...(!subStatusIn && subStatus ? [{ subStatus: convertToObjectId(subStatus) }] : []),
+				...(startDate || endDate ? [{
+					createdAt: {
+						...(startDate ? { $gte: new Date(startDate) } : {}),
+						...(endDate ? { $lte: new Date(endDate) } : {})
+					}
+				}] : []),
+				...(leadOwnerIn ? [{
+					$or: [
+						{ leadOwner: { $in: parseIdList(leadOwnerIn) } },
+						{ leadAddedBy: { $in: parseIdList(leadOwnerIn) } }
+					]
+				}] : []),
+				...(!leadOwnerIn && leadOwner ? [{
+					$or: [
+						{ leadOwner: convertToObjectId(leadOwner) },
+						{ leadAddedBy: convertToObjectId(leadOwner) }
+					]
+				}] : []),
+				...(approvalStatus ? [{ 'approval.status': String(approvalStatus).toUpperCase() }] : []),
+				...(String(hasFollowUpCall).toLowerCase() === 'true'
+					? [{ followUpCall: { $exists: true, $ne: null } }]
+					: []),
+				...(String(hasFollowUpVisit).toLowerCase() === 'true'
+					? [{ followUpVisit: { $exists: true, $ne: null } }]
+					: []),
+			]
+		};
+
+		if (documentsStatusIn) {
+			const list = String(documentsStatusIn).split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+			const wantsDone = list.includes('done');
+			const wantsPending = list.includes('pending');
+			const doneCond = {
+				'documents.0': { $exists: true },
+				documents: { $not: { $elemMatch: { status: { $ne: 'APPROVED' } } } }
+			};
+			const pendingCond = {
+				$or: [
+					{ 'documents.0': { $exists: false } },
+					{ documents: { $elemMatch: { status: { $ne: 'APPROVED' } } } }
+				]
+			};
+			if (wantsDone && !wantsPending) {
+				finalQuery.$and.push(doneCond);
+			} else if (wantsPending && !wantsDone) {
+				finalQuery.$and.push(pendingCond);
+			}
+		}
+
+		if (finalQuery.$and.length === 0) {
+			delete finalQuery.$and;
+		}
+
+		return finalQuery;
+	};
+
+	const formatExcelDate = (value) => {
+		if (!value) return '';
+		const date = new Date(value);
+		return Number.isNaN(date.getTime()) ? '' : moment(date).format('DD MMM YYYY, hh:mm A');
+	};
+
+	const getFollowupBucketLabel = (followUpLike) => {
+		if (!followUpLike) return '';
+		const status = String(followUpLike?.status || '').trim().toLowerCase();
+		if (status === 'completed') return 'Done';
+
+		const dt = followUpLike?.scheduledDate ? new Date(followUpLike.scheduledDate) : null;
+		if (!dt || Number.isNaN(dt.getTime())) return '';
+
+		return dt.getTime() < Date.now() ? 'Missed' : 'Planned';
+	};
+
+	const getLeadFollowupBucketLabel = (lead, type) => {
+		const isVisit = String(type || '').toLowerCase() === 'visit';
+		const slot = isVisit ? lead?.followUpVisit : lead?.followUpCall;
+		const slotLabel = getFollowupBucketLabel(slot);
+		if (slotLabel) return slotLabel;
+
+		const legacy = lead?.followUp || null;
+		if (!legacy) return '';
+		const legacyType = String(legacy?.followUpType || legacy?.type || 'call').toLowerCase();
+		if (isVisit && legacyType !== 'visit') return '';
+		if (!isVisit && legacyType === 'visit') return '';
+		return getFollowupBucketLabel(legacy);
+	};
+
+	const getLeadSubStatusTitle = (lead) => {
+		const id = lead?.subStatus?._id || lead?.subStatus;
+		if (!id) return '';
+		const list = lead?.status?.substatuses;
+		if (!Array.isArray(list)) return '';
+		const found = list.find((ss) => String(ss?._id) === String(id));
+		return found?.title || found?.name || '';
+	};
+
+	const getLeadDocumentsStatusLabel = (lead) => {
+		const docs = Array.isArray(lead?.documents) ? lead.documents : [];
+		if (!docs.length) return 'Pending';
+		return docs.every((doc) => doc?.status === 'APPROVED') ? 'Done' : 'Pending';
+	};
+
+	const getLeadAgeDays = (createdAt) => {
+		if (!createdAt) return '';
+		const created = new Date(createdAt);
+		if (Number.isNaN(created.getTime())) return '';
+		return Math.max(0, Math.floor((Date.now() - created.getTime()) / 86400000));
+	};
+
+	const LEAD_DOWNLOAD_COLUMN_DEFS = {
+		concernPerson: { label: 'Concern Person', value: (lead) => lead.concernPersonName || '' },
+		businessName: { label: 'Business Name', value: (lead) => lead.businessName || '' },
+		mobile: { label: 'Mobile', value: (lead) => lead.mobile || '' },
+		email: { label: 'Email', value: (lead) => lead.email || '' },
+		whatsapp: { label: 'WhatsApp', value: (lead) => lead.whatsapp || '' },
+		designation: { label: 'Designation', value: (lead) => lead.designation || '' },
+		approvalStatus: { label: 'Approval Status', value: (lead) => lead.approval?.status || 'PENDING' },
+		performanceStatus: { label: 'Performance Status', value: (lead) => lead.status?.title || lead.status?.name || '' },
+		subStatus: { label: 'Sub Status', value: (lead) => getLeadSubStatusTitle(lead) },
+		followUpCallStatus: { label: 'Follow-up Call Status', value: (lead) => getLeadFollowupBucketLabel(lead, 'call') },
+		followUpCallDate: { label: 'Follow-up Call Date', value: (lead) => formatExcelDate(lead.followUpCall?.scheduledDate || lead.followUpCall?.completedDate) },
+		followUpVisitStatus: { label: 'Follow-up Visit Status', value: (lead) => getLeadFollowupBucketLabel(lead, 'visit') },
+		followUpVisitDate: { label: 'Follow-up Visit Date', value: (lead) => formatExcelDate(lead.followUpVisit?.scheduledDate || lead.followUpVisit?.completedDate) },
+		documentsStatus: { label: 'Documents Status', value: (lead) => getLeadDocumentsStatusLabel(lead) },
+		leadAgeDays: { label: 'Lead Age (Days)', value: (lead) => getLeadAgeDays(lead.createdAt) },
+		leadOwner: { label: 'Lead Owner', value: (lead) => lead.leadOwner?.name || '' },
+		addedBy: { label: 'Added By', value: (lead) => lead.leadAddedBy?.name || '' },
+		b2bDepartment: { label: 'B2B Department', value: (lead) => lead.b2bDepartment?.name || lead.typeOfB2B?.department?.name || '' },
+		b2bProject: { label: 'B2B Project', value: (lead) => lead.b2bProject?.name || '' },
+		leadSource: { label: 'Lead Source', value: (lead) => lead.leadCategory?.name || '' },
+		b2bType: { label: 'B2B Type', value: (lead) => lead.typeOfB2B?.name || '' },
+		state: { label: 'State', value: (lead) => lead.state || '' },
+		city: { label: 'City', value: (lead) => lead.city || '' },
+		address: { label: 'Address', value: (lead) => lead.address || '' },
+		remark: { label: 'Remark', value: (lead) => lead.remark || '' },
+		createdAt: { label: 'Created At', value: (lead) => formatExcelDate(lead.createdAt) },
+		updatedAt: { label: 'Updated At', value: (lead) => formatExcelDate(lead.updatedAt) },
+	};
+
+	const parseDownloadColumnKeys = (columnsIn) => {
+		const allKeys = Object.keys(LEAD_DOWNLOAD_COLUMN_DEFS);
+		if (!columnsIn) return allKeys;
+		const selected = String(columnsIn)
+			.split(',')
+			.map((key) => key.trim())
+			.filter((key) => LEAD_DOWNLOAD_COLUMN_DEFS[key]);
+		return selected;
+	};
+
+	const mapLeadToExcelRow = (lead, selectedKeys) => {
+		const keys = selectedKeys?.length ? selectedKeys : Object.keys(LEAD_DOWNLOAD_COLUMN_DEFS);
+		const row = {};
+		keys.forEach((key) => {
+			const def = LEAD_DOWNLOAD_COLUMN_DEFS[key];
+			row[def.label] = def.value(lead);
+		});
+		return row;
+	};
+
 	// AI client (optional): used for supervision report narrative
 	const getAnthropicClient = () => {
 		const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -409,6 +661,51 @@ router.get('/type-of-b2b', isCollege, async (req, res) => {
 		res.status(500).json({
 			status: false,
 			message: 'Failed to retrieve types of B2B',
+			error: error.message
+		});
+	}
+});
+
+// Download Leads according to active filters as Excel
+router.get('/leads/download', isCollege, async (req, res) => {
+	try {
+		const { columnsIn } = req.query;
+		const selectedColumnKeys = parseDownloadColumnKeys(columnsIn);
+		if (!selectedColumnKeys.length) {
+			return res.status(400).json({
+				status: false,
+				message: 'Select at least one column to download',
+			});
+		}
+
+		const finalQuery = await buildLeadsFilterQuery(req);
+		const leads = await applyLeadCorePopulates(Lead.find(finalQuery))
+			.populate('status', 'name title substatuses')
+			.populate('followUpCall', 'followUpType description status scheduledDate completedDate')
+			.populate('followUpVisit', 'followUpType description status scheduledDate completedDate')
+			.populate('followUp', 'followUpType description status scheduledDate completedDate')
+			.populate('leadAddedBy', 'name email')
+			.populate('leadOwner', 'name email')
+			.sort({ updatedAt: -1 })
+			.lean();
+
+		const rows = leads.map((lead) => mapLeadToExcelRow(lead, selectedColumnKeys));
+		const XLSX = require('xlsx');
+		const worksheet = XLSX.utils.json_to_sheet(rows);
+		const workbook = XLSX.utils.book_new();
+		XLSX.utils.book_append_sheet(workbook, worksheet, 'B2B Leads');
+		const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+		const fileName = `b2b-leads-${moment().format('YYYY-MM-DD-HHmmss')}.xlsx`;
+
+		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+		res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
+		res.setHeader('X-Lead-Count', String(leads.length));
+		return res.status(200).send(excelBuffer);
+	} catch (error) {
+		console.error('Error downloading leads:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to download leads',
 			error: error.message
 		});
 	}
