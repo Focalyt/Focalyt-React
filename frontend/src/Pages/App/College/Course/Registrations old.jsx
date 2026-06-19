@@ -829,6 +829,20 @@ const CRMDashboard = () => {
   const [kycShowRejectForm, setKycShowRejectForm] = useState(false);
   const [kycMarkingId, setKycMarkingId] = useState(null);
   const [kycCounts, setKycCounts] = useState({ all: 0, pendingDocs: 0, pendingVerification: 0, rejected: 0, verified: 0 });
+  const [setPreVerification, showSetPreVerification] = useState(false);
+  const [questionFormData, setQuestionFormData] = useState({});
+  const [isLoadingQuestionAnswers, setIsLoadingQuestionAnswers] = useState(false);
+  const [isSubmittingAnswers, setIsSubmittingAnswers] = useState(false);
+  const [questionAnswers, setQuestionAnswers] = useState([]);
+  const [isLoadingAnswers, setIsLoadingAnswers] = useState(false);
+  const [currentPreVerificationProfile, setCurrentPreVerificationProfile] = useState(null);
+  const [visitDates, setVisitDates] = useState([]);
+  const [preVerificationQuestions, setPreVerificationQuestions] = useState([]);
+  const [isLoadingPreVerificationQuestions, setIsLoadingPreVerificationQuestions] = useState(false);
+  const [showQuestionRejectionModal, setShowQuestionRejectionModal] = useState(false);
+  const [questionRejectionReason, setQuestionRejectionReason] = useState('');
+  const [pendingQuestionRejection, setPendingQuestionRejection] = useState(null);
+  const [selectedDate, setSelectedDate] = useState('');
   const [approvalEditProfileId, setApprovalEditProfileId] = useState(null);
   const [showApprovalRejectionModal, setShowApprovalRejectionModal] = useState(false);
   const [approvalLeadTarget, setApprovalLeadTarget] = useState(null);
@@ -2873,7 +2887,8 @@ const CRMDashboard = () => {
     'Profile',
     'Job History',
     'Course History',
-    'Documents'
+    'Documents',
+    'Pre Verification'
   ];
 
   // Check if device is mobile
@@ -3071,44 +3086,353 @@ const CRMDashboard = () => {
     }
   };
 
-  const handleMoveToKyc = async (profile) => {
+  const handleMoveToAdmission = async (profile) => {
     try {
+      if (!profile || !profile._id) {
+        alert('No profile selected');
+        return;
+      }
 
+      const uploadedDocs = profile.uploadedDocs;
 
-      if (profile?._course?.center || profile?._course?.center?.length > 0) {
-        if (!profile._center || !profile._center._id) {
-          alert('Please assign a branch/center first before moving to KYC!');
+      for (const doc of uploadedDocs) {
+        const docStatus = doc.status;
+        if (doc.mandatory && !docStatus) {
+          alert('All documents must be verified before moving to admission list');
           return;
         }
       }
 
+      const confirmMove = window.confirm('Do you really want to move this profile to admission list?');
+      if (!confirmMove) {
+        return;
+      }
 
-      // Prepare the request body
-      const updatedData = {
-        kycStage: true
+      if (!backendUrl) {
+        alert('Backend URL not configured');
+        return;
+      }
+
+      if (!token) {
+        alert('Authentication token missing');
+        return;
+      }
+
+      const response = await axios.put(
+        `${backendUrl}/college/update/${profile._id}`,
+        {
+          admissionDone: true,
+          remarks: 'Moved to admission'
+        },
+        {
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.data.success) {
+        alert('Profile moved to admission successfully!');
+        await fetchProfileData(filterData, currentPage);
+        if (leadDetailsVisible !== null && leadDetailsVisible !== undefined) {
+          await fetchLeadDetails();
+        }
+        fetchKycCounts();
+      } else {
+        console.error('API returned error:', response.data);
+        alert(response.data.message || 'Failed to move to admission');
+      }
+    } catch (error) {
+      console.error('Error moving to admission:', error);
+      alert('Failed to move to admission');
+    }
+  };
+
+  const openPreVerificationModal = async (profile) => {
+    setSelectedProfile(profile);
+    showSetPreVerification(true);
+    await fetchQuestionAnswers(profile._id);
+  };
+
+  const fetchPreVerificationQuestions = async () => {
+    try {
+      setIsLoadingPreVerificationQuestions(true);
+      const response = await axios.get(
+        `${backendUrl}/college/candidate/preVerification/questions`,
+        { headers: { 'x-auth': token } }
+      );
+
+      if (response.data.status && Array.isArray(response.data.data)) {
+        setPreVerificationQuestions(response.data.data);
+      } else {
+        setPreVerificationQuestions([]);
+      }
+    } catch (error) {
+      console.error('Error fetching pre-verification questions:', error);
+      setPreVerificationQuestions([]);
+    } finally {
+      setIsLoadingPreVerificationQuestions(false);
+    }
+  };
+
+  const handleQuestionRejection = (questionNumber, questionText) => {
+    setPendingQuestionRejection({ questionNumber, questionText });
+    setShowQuestionRejectionModal(true);
+  };
+
+  const confirmQuestionRejection = () => {
+    if (!questionRejectionReason.trim()) {
+      alert('Please enter a rejection reason');
+      return;
+    }
+
+    setQuestionFormData((prev) => ({
+      ...prev,
+      [`q${pendingQuestionRejection.questionNumber}`]: 'Rejected',
+      [`q${pendingQuestionRejection.questionNumber}_reason`]: questionRejectionReason
+    }));
+
+    setShowQuestionRejectionModal(false);
+    setQuestionRejectionReason('');
+    setPendingQuestionRejection(null);
+  };
+
+  const cancelQuestionRejection = () => {
+    setShowQuestionRejectionModal(false);
+    setQuestionRejectionReason('');
+    setPendingQuestionRejection(null);
+  };
+
+  const saveVisitDate = async (appliedCourseId, visitDate, visitType) => {
+    try {
+      const response = await axios.post(`${backendUrl}/college/candidate/visit-calendar`, {
+        appliedCourseId,
+        visitDate,
+        visitType
+      }, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.status) {
+        return response.data;
+      }
+      console.error('Error saving visit date:', response.data.message);
+      return null;
+    } catch (error) {
+      console.error('Error saving visit date:', error);
+      return null;
+    }
+  };
+
+  const getVisitDates = async (appliedCourseId) => {
+    try {
+      const response = await axios.get(`${backendUrl}/college/candidate/visit-calendar/${appliedCourseId}`, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.status) {
+        return response.data.data;
+      }
+      console.error('Error fetching visit dates:', response.data.message);
+      return [];
+    } catch (error) {
+      console.error('Error fetching visit dates:', error);
+      return [];
+    }
+  };
+
+  const updateVisitStatus = async (visitId, status, remarks) => {
+    try {
+      const response = await axios.put(`${backendUrl}/college/candidate/visit-calendar/${visitId}`, {
+        status,
+        remarks
+      }, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.status) {
+        return response.data;
+      }
+      console.error('Error updating visit status:', response.data.message);
+      return null;
+    } catch (error) {
+      console.error('Error updating visit status:', error);
+      return null;
+    }
+  };
+
+  const fetchQuestionAnswers = async (appliedcourseId) => {
+    try {
+      setQuestionAnswers([]);
+      setIsLoadingAnswers(true);
+
+      const response = await axios.get(`${backendUrl}/college/candidate/questionAnswer/${appliedcourseId}`, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.status && response.data.data) {
+        const existingData = response.data.data.responses;
+        const visitDatesData = response.data.data.visitDates || [];
+
+        setQuestionAnswers(existingData);
+
+        const formData = {};
+        const sortedQuestions = (preVerificationQuestions || [])
+          .filter((q) => q.isActive !== false)
+          .sort((a, b) => (a.order || 0) - (b.order || 0));
+        sortedQuestions.forEach((q, index) => {
+          const match = existingData.find((qa) => qa.question === q.questionText);
+          if (match) {
+            formData[`q${index + 1}`] = match.answer;
+            if (match.rejectionReason) {
+              formData[`q${index + 1}_reason`] = match.rejectionReason;
+            }
+          }
+        });
+
+        setQuestionFormData(formData);
+        setVisitDates(visitDatesData);
+      } else {
+        setQuestionFormData({});
+        setQuestionAnswers([]);
+        setVisitDates([]);
+      }
+    } catch (error) {
+      console.log('No existing question answers found or error:', error);
+      setQuestionFormData({});
+      setQuestionAnswers([]);
+      setVisitDates([]);
+    } finally {
+      setIsLoadingAnswers(false);
+    }
+  };
+
+  const QuestionAnswer = async () => {
+    try {
+      setIsSubmittingAnswers(true);
+
+      if (!token) {
+        alert('Authentication token not found. Please login again.');
+        return;
+      }
+
+      if (!preVerificationQuestions.length) {
+        alert('Pre-verification questions are not loaded. Please try again.');
+        return;
+      }
+
+      const sortedQuestions = preVerificationQuestions
+        .filter((q) => q.isActive !== false)
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+      const isVisitTypeQuestion = (q) => {
+        if (q.type === 'visit') return true;
+        const opts = Array.isArray(q.options) ? q.options : [];
+        return opts.length >= 2 &&
+          opts.some((o) => /visit/i.test(String(o))) &&
+          opts.some((o) => /joining/i.test(String(o))) &&
+          opts.some((o) => /both/i.test(String(o)));
       };
+      const visitQuestionIndex = sortedQuestions.findIndex(isVisitTypeQuestion);
 
-      // Send PUT request to backend API
-      const response = await axios.put(`${backendUrl}/college/update/${profile._id}`, updatedData, {
-        headers: {
-          'x-auth': token,
-          'Content-Type': 'application/json'
+      const visitAnswerKey = visitQuestionIndex >= 0 ? `q${visitQuestionIndex + 1}` : null;
+      if (visitAnswerKey && questionFormData[visitAnswerKey] && !selectedDate) {
+        alert('Please select a date');
+        setIsSubmittingAnswers(false);
+        return;
+      }
+
+      const responses = [];
+      const questions = sortedQuestions.map((q) => q.questionText);
+
+      const existingAnswersMap = {};
+      questionAnswers.forEach((qa) => {
+        existingAnswersMap[qa.question] = qa.answer;
+      });
+
+      questions.forEach((question, index) => {
+        const fieldKey = `q${index + 1}`;
+        const newAnswer = questionFormData[fieldKey];
+        const existingAnswer = existingAnswersMap[question];
+        const answer = newAnswer || existingAnswer;
+
+        if (answer) {
+          const responseObj = { question, answer };
+          if (answer === 'Rejected') {
+            const rejectionReason = questionFormData[`${fieldKey}_reason`];
+            if (rejectionReason) responseObj.rejectionReason = rejectionReason;
+          }
+          responses.push(responseObj);
         }
       });
 
-
-      if (response.data.success) {
-        alert('Lead moved to KYC Section successfully!');
-        // Optionally refresh data here
-        fetchProfileData()
-      } else {
-        alert('Failed to update status');
+      if (!selectedProfile || !selectedProfile._id) {
+        alert('No profile selected. Please try again.');
+        return;
       }
+
+      if (responses.length === 0) {
+        alert('Please answer at least one question before submitting.');
+        return;
+      }
+
+      const qaResponse = await axios.post(
+        `${backendUrl}/college/candidate/questionAnswer`,
+        {
+          appliedcourse: selectedProfile._id,
+          responses,
+          visitDate: selectedDate
+        },
+        { headers: { 'x-auth': token } }
+      );
+
+      if (!qaResponse.data.status) {
+        alert(`Error: ${qaResponse.data.message}`);
+        return;
+      }
+
+      const visitType = visitAnswerKey ? questionFormData[visitAnswerKey] : null;
+      if (visitAnswerKey && visitType && selectedDate) {
+        await axios.post(
+          `${backendUrl}/college/candidate/visit-calendar`,
+          {
+            appliedCourseId: selectedProfile._id,
+            visitDate: selectedDate,
+            visitType
+          },
+          { headers: { 'x-auth': token, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      alert('Pre-verification & visit scheduled successfully!');
+      showSetPreVerification(false);
+      setQuestionFormData({});
+      setSelectedDate('');
+      setQuestionAnswers(responses);
     } catch (error) {
-      console.error('Error updating status:', error);
-      // alert('An error occurred while updating status');
+      console.error(error);
+      alert('Error occurred while submitting data.');
+    } finally {
+      if (selectedProfile?._id) {
+        fetchQuestionAnswers(selectedProfile._id);
+      }
+      setIsSubmittingAnswers(false);
     }
   };
+
+  useEffect(() => {
+    fetchPreVerificationQuestions();
+  }, []);
+
+  useEffect(() => {
+    if (selectedProfile?._id) {
+      fetchQuestionAnswers(selectedProfile._id);
+    } else {
+      setQuestionAnswers([]);
+      setQuestionFormData({});
+      setCurrentPreVerificationProfile(null);
+    }
+  }, [selectedProfile]);
 
   const fetchSubStatus = async () => {
     try {
@@ -4222,6 +4546,7 @@ console.log('API Response:', response.data);
       ...(nextActionFromDateFormatted && { nextActionFromDate: nextActionFromDateFormatted }),
       ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
+      ...(filters.approvalStatus && { approvalStatus: filters.approvalStatus }),
       // Multi-select filters
       ...buildListFilterQueryParts(formData, cycleFilters),
     });
@@ -4375,6 +4700,11 @@ console.log('API Response:', response.data);
       ...prevTabs,
       [profileIndex]: tabIndex
     }));
+
+    if (tabIndex === 5 && profile?._id) {
+      setCurrentPreVerificationProfile(profile);
+      fetchQuestionAnswers(profile._id);
+    }
 
     // Auto-scroll tab into view on mobile
     if (isMobile) {
@@ -8583,13 +8913,23 @@ useEffect(() => {
     <div className="lead-strip-v3__actions-menu">
       {canEditLeadsPermission && (
         <>
+          {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
+            <button
+              type="button"
+              className="lead-strip-v3__actions-item"
+              onClick={() => { handleMoveToAdmission(profile); onClose(); }}
+            >
+              <i className="fas fa-arrow-right text-primary" aria-hidden="true"></i>
+              Move to Admission
+            </button>
+          )}
           <button
             type="button"
             className="lead-strip-v3__actions-item"
-            onClick={() => { handleMoveToKyc(profile); onClose(); }}
+            onClick={() => { openPreVerificationModal(profile); onClose(); }}
           >
-            <i className="fas fa-arrow-right text-primary" aria-hidden="true"></i>
-            Move To KYC List
+            <i className="fas fa-clipboard-check text-primary" aria-hidden="true"></i>
+            Add Pre Verification
           </button>
           <button
             type="button"
@@ -12432,12 +12772,12 @@ useEffect(() => {
 
   const renderCrmDashboard = () => (
     <div className="col-12 b2b-crm-dashboard px-0">
-      <div className="b2b-dash-section mt-2">
+      {/* <div className="b2b-dash-section mt-2">
         <span className="b2b-dash-section__label">View</span>
         <div className="b2b-mobile-hscroll d-flex gap-2 align-items-center pt-1">
           {[
             { id: 'registration', label: 'Registration' },
-            { id: 'ekyc', label: 'eKYC' },
+            // { id: 'ekyc', label: 'eKYC' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -12459,9 +12799,9 @@ useEffect(() => {
             </button>
           ))}
         </div>
-      </div>
+      </div> */}
 
-      {pageMainTab === 'ekyc' && (
+      {/* {pageMainTab === 'ekyc' && (
         <div className="b2b-dash-section mt-2">
           <span className="b2b-dash-section__label">eKYC Filters</span>
           <div className="b2b-mobile-hscroll d-flex flex-wrap gap-2 align-items-center pt-1">
@@ -12488,7 +12828,7 @@ useEffect(() => {
             ))}
           </div>
         </div>
-      )}
+      )} */}
 
       {pageMainTab === 'registration' && (
       <>
@@ -12755,6 +13095,181 @@ useEffect(() => {
       )}
 
       {/* KYC Document Review Modal */}
+      {setPreVerification && (
+        <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered mt-2">
+            <div className="modal-content p-0 w-100">
+              <div className="modal-header">
+                <h1 className="modal-title fs-5">Pre Verification</h1>
+                <button type="button" className="btn-close" onClick={() => {
+                  showSetPreVerification(false);
+                  setQuestionFormData({});
+                }}></button>
+              </div>
+              <div className="modal-body">
+                {isLoadingQuestionAnswers && (
+                  <div className="text-center mb-3">
+                    <div className="spinner-border text-primary" role="status">
+                      <span className="visually-hidden">Loading existing answers...</span>
+                    </div>
+                    <p className="mt-2 text-muted">Loading existing answers...</p>
+                  </div>
+                )}
+
+                <div className="table-responsive">
+                  <table className="verification-table">
+                    <thead>
+                      <tr>
+                        <th>S.NO</th>
+                        <th>Questions</th>
+                        <th>Answer</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {isLoadingPreVerificationQuestions ? (
+                        <tr>
+                          <td colSpan={3} className="text-center py-3 text-muted">
+                            Loading questions...
+                          </td>
+                        </tr>
+                      ) : (() => {
+                        const sortedQuestions = (preVerificationQuestions || [])
+                          .filter((q) => q.isActive !== false)
+                          .sort((a, b) => (a.order || 0) - (b.order || 0));
+                        if (sortedQuestions.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={3} className="text-center py-3 text-muted">
+                                No pre-verification questions configured. Add questions in Pre Verification settings.
+                              </td>
+                            </tr>
+                          );
+                        }
+                        return sortedQuestions.map((q, index) => {
+                          const fieldKey = `q${index + 1}`;
+                          const options = Array.isArray(q.options) ? q.options : [];
+                          const hasRejected = options.some((opt) => String(opt).toLowerCase() === 'rejected');
+                          const isVisitType = q.type === 'visit' || (
+                            options.length >= 2 &&
+                            options.some((o) => /visit/i.test(String(o))) &&
+                            options.some((o) => /joining/i.test(String(o))) &&
+                            options.some((o) => /both/i.test(String(o)))
+                          );
+                          return (
+                            <tr key={q._id || index}>
+                              <td className="s-no">{index + 1}</td>
+                              <td className="question">{q.questionText}</td>
+                              <td>
+                                <div className="checkbox-group">
+                                  <div className="select-option">
+                                    <select
+                                      name={`${fieldKey}_select`}
+                                      className="form-select"
+                                      value={questionFormData[fieldKey] ?? ''}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (hasRejected && val === 'Rejected') {
+                                          handleQuestionRejection(index + 1, q.questionText);
+                                        } else {
+                                          setQuestionFormData((prev) => ({ ...prev, [fieldKey]: val }));
+                                        }
+                                      }}
+                                    >
+                                      <option value="">Select Option</option>
+                                      {options.map((opt, i) => (
+                                        <option key={i} value={String(opt).trim()}>
+                                          {String(opt).trim()}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    {isVisitType && questionFormData[fieldKey] && (
+                                      <div className="date-field mt-2">
+                                        <label className="form-label">Select Date:</label>
+                                        <input
+                                          type="date"
+                                          className="form-control"
+                                          value={selectedDate}
+                                          onChange={(e) => setSelectedDate(e.target.value)}
+                                          required
+                                        />
+                                      </div>
+                                    )}
+                                    {hasRejected && questionFormData[fieldKey] === 'Rejected' && questionFormData[`${fieldKey}_reason`] && (
+                                      <div className="mt-2 p-2 bg-light border rounded">
+                                        <small className="text-danger fw-bold">Rejection Reason:</small>
+                                        <div className="mt-1 text-muted">{questionFormData[`${fieldKey}_reason`]}</div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                  <div className="modal-footer border-0 pt-2">
+                    <button
+                      type="button"
+                      onClick={QuestionAnswer}
+                      className="btn btn-primary"
+                      disabled={isLoadingQuestionAnswers || isSubmittingAnswers || isLoadingPreVerificationQuestions}
+                    >
+                      {isSubmittingAnswers ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                          Submitting...
+                        </>
+                      ) : (
+                        'Submit'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showQuestionRejectionModal && (
+        <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Enter Rejection Reason</h5>
+                <button type="button" className="btn-close" onClick={cancelQuestionRejection}></button>
+              </div>
+              <div className="modal-body">
+                <p className="mb-3">
+                  <strong>Question:</strong> {pendingQuestionRejection?.questionText}
+                </p>
+                <div className="mb-3">
+                  <label htmlFor="rejectionReason" className="form-label">Rejection Reason *</label>
+                  <textarea
+                    id="rejectionReason"
+                    className="form-control"
+                    rows="4"
+                    placeholder="Please provide a detailed reason for rejection..."
+                    value={questionRejectionReason}
+                    onChange={(e) => setQuestionRejectionReason(e.target.value)}
+                  ></textarea>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={cancelQuestionRejection}>
+                  Cancel
+                </button>
+                <button type="button" className="btn btn-danger" onClick={confirmQuestionRejection}>
+                  Confirm Rejection
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {kycDocModalOpen && kycSelectedDoc && kycSelectedProfile && (() => {
         const lastUpload = kycSelectedDoc.uploads?.slice(-1)[0];
         const bucketUrl = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
@@ -13897,25 +14412,9 @@ useEffect(() => {
                   <div className="modal-body reapply-modal__body">
                     <p className="text-muted small mb-3">ReApply history</p>
                     <div className="table-responsive">
-                      <table className="table table-hover table-bordered mb-0">
-                        <thead className="table-light">
-                          <tr>
-                            <th>S.No</th>
-                            <th>Applied Date</th>
-                            <th>Course Name</th>
-                            <th>Lead Added By</th>
-                            <th>Counsellor</th>
-                            <th>Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td colSpan={6} className="text-center text-muted py-4">
+                      
                               No reapply history available
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
+                            
                     </div>
                   </div>
                   <div className="modal-footer">
@@ -15586,6 +16085,25 @@ useEffect(() => {
 
                                           {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
                                             <>
+                                              {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
+                                                <button
+                                                  className="dropdown-item"
+                                                  style={{
+                                                    width: "100%",
+                                                    padding: "8px 16px",
+                                                    border: "none",
+                                                    background: "none",
+                                                    textAlign: "left",
+                                                    cursor: "pointer",
+                                                    fontSize: "12px",
+                                                    fontWeight: "600"
+                                                  }}
+                                                  onClick={() => handleMoveToAdmission(profile)}
+                                                >
+                                                  Move to Admission
+                                                </button>
+                                              )}
+
                                               <button
                                                 className="dropdown-item"
                                                 style={{
@@ -15598,9 +16116,9 @@ useEffect(() => {
                                                   fontSize: "12px",
                                                   fontWeight: "600"
                                                 }}
-                                                onClick={() => (handleMoveToKyc(profile))}
+                                                onClick={() => openPreVerificationModal(profile)}
                                               >
-                                                Move To KYC List
+                                                Add Pre Verification
                                               </button>
 
                                               <button
@@ -16995,6 +17513,114 @@ useEffect(() => {
                                             </div>
                                           );
                                         })()}
+                                      </div>
+                                    )}
+
+                                    {(activeTab[profileIndex] || 0) === 5 && (
+                                      <div className="tab-pane active" id="preverification">
+                                        <div className="row">
+                                          <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mb-xl-0 mb-lg-0 mb-md-sm-0 mb-0 candidate-card">
+                                            <div className="card mt-1 mb-2">
+                                              <div className="col-xl-12 p-3">
+                                                <div className="row">
+                                                  <div className="col-xl-8 col-lg-8 col-md-8 col-sm-8 col-8 my-auto">
+                                                    <h4 className="card-title mb-0" id="wrapping-bottom">Pre Verification</h4>
+                                                  </div>
+                                                  <div className="col-xl-4 col-lg-4 col-md-4 col-sm-4 col-4 text-end">
+                                                    <button
+                                                      type="button"
+                                                      className="btn btn-sm btn-primary"
+                                                      onClick={() => openPreVerificationModal(profile)}
+                                                    >
+                                                      Add Pre Verification
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              </div>
+
+                                              <div className="card-content">
+                                                {isLoadingAnswers ? (
+                                                  <div className="text-center p-4">
+                                                    <div className="spinner-border text-primary" role="status">
+                                                      <span className="visually-hidden">Loading...</span>
+                                                    </div>
+                                                    <p className="mt-2">Loading verification data...</p>
+                                                  </div>
+                                                ) : questionAnswers.length > 0 ? (
+                                                  <div className="table-responsive">
+                                                    <table className="verification-table">
+                                                      <thead>
+                                                        <tr>
+                                                          <th>S.NO</th>
+                                                          <th>Questions</th>
+                                                          <th>Answer</th>
+                                                        </tr>
+                                                      </thead>
+                                                      <tbody>
+                                                        {questionAnswers.map((item, index) => (
+                                                          <tr key={index}>
+                                                            <td className="s-no">{index + 1}</td>
+                                                            <td className="question">{item.question}</td>
+                                                            <td>
+                                                              <div className="answer-display">
+                                                                <span className={`badge ${item.answer === 'Yes' || item.answer === 'Selected' ? 'bg-success' :
+                                                                  item.answer === 'No' || item.answer === 'Rejected' ? 'bg-danger' :
+                                                                    'bg-warning'
+                                                                  }`}>
+                                                                  {item.answer}
+                                                                </span>
+                                                                {(item.answer === 'Rejected') && item.rejectionReason && (
+                                                                  <div className="mt-2 p-2 bg-light border rounded">
+                                                                    <small className="text-danger fw-bold">Rejection Reason:</small>
+                                                                    <div className="mt-1 text-muted">{item.rejectionReason}</div>
+                                                                  </div>
+                                                                )}
+                                                                {(item.answer === 'Visit' || item.answer === 'Joining' || item.answer === 'Both') && (item.visitDate || (visitDates && visitDates.length > 0)) && (
+                                                                  <div className="mt-2 p-2 bg-light border rounded">
+                                                                    <small className="text-primary fw-bold">Visit Date:</small>
+                                                                    <div className="mt-1">
+                                                                      {item.visitDate ? (
+                                                                        <div className="d-flex align-items-center gap-2">
+                                                                          <i className="fas fa-calendar-alt text-primary"></i>
+                                                                          <span>{new Date(item.visitDate).toLocaleDateString()}</span>
+                                                                          <span className={`badge bg-${item.answer === 'Visit' ? 'primary' : item.answer === 'Joining' ? 'success' : 'info'}`}>
+                                                                            {item.answer}
+                                                                          </span>
+                                                                        </div>
+                                                                      ) : (
+                                                                        visitDates.map((visit, visitIndex) => (
+                                                                          <div key={visit._id || visitIndex} className="d-flex align-items-center gap-2">
+                                                                            <i className="fas fa-calendar-alt text-primary"></i>
+                                                                            <span>{new Date(visit.visitDate).toLocaleDateString()}</span>
+                                                                            <span className={`badge bg-${visit.visitType === 'Visit' ? 'primary' : visit.visitType === 'Joining' ? 'success' : 'info'}`}>
+                                                                              {visit.visitType}
+                                                                            </span>
+                                                                          </div>
+                                                                        ))
+                                                                      )}
+                                                                    </div>
+                                                                  </div>
+                                                                )}
+                                                              </div>
+                                                            </td>
+                                                          </tr>
+                                                        ))}
+                                                      </tbody>
+                                                    </table>
+                                                  </div>
+                                                ) : (
+                                                  <div className="text-center p-4">
+                                                    <div className="text-muted">
+                                                      <i className="fas fa-info-circle fa-3x mb-3"></i>
+                                                      <h5>No Pre-Verification Data Found</h5>
+                                                      <p>Pre-verification questions have not been answered yet.</p>
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
                                       </div>
                                     )}
 
@@ -28361,6 +28987,62 @@ max-width: 600px;
             grid-auto-columns: minmax(168px, 48vw);
             padding: 0 11px 11px;
           }
+        }
+
+        .verification-table {
+          width: 100%;
+          border-collapse: separate;
+          border-spacing: 0;
+          background: white;
+          border-radius: 8px;
+          overflow: hidden;
+        }
+
+        .verification-table thead {
+          background: #f8f9fc;
+        }
+
+        .verification-table th {
+          padding: 16px 20px;
+          text-align: left;
+          font-weight: 600;
+          font-size: 14px;
+          color: #6b7280;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          border-bottom: 2px solid #e5e7eb;
+        }
+
+        .verification-table td {
+          padding: 5px;
+          border-bottom: 1px solid #f3f4f6;
+          vertical-align: middle;
+        }
+
+        .verification-table tbody tr:hover {
+          background-color: #f9fafb;
+        }
+
+        .verification-table .s-no {
+          font-weight: 600;
+          color: #374151;
+          font-size: 16px;
+          width: 60px;
+          text-align: center;
+        }
+
+        .verification-table .question {
+          color: #374151;
+          font-size: 15px;
+          font-weight: 500;
+          max-width: 500px;
+          line-height: 1.5;
+        }
+
+        .checkbox-group {
+          display: flex;
+          gap: 20px;
+          flex-wrap: wrap;
         }
       `}</style>
       </div>
