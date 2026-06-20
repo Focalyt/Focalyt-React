@@ -1,11 +1,7 @@
-/** Legacy folder prefix only — do NOT use /^upload/ (breaks keys like uploads/...) */
-const UPLOAD_DOC_FOLDER_PREFIX = /^Documents for course\/?/i;
-
 const normalizeStorageKey = (path) =>
   String(path)
     .trim()
-    .replace(/\{\s*_id:\s*new ObjectId\('([a-f0-9]{24})'\)\s*\}/gi, '$1')
-    .replace(UPLOAD_DOC_FOLDER_PREFIX, '');
+    .replace(/\{\s*_id:\s*new ObjectId\('([a-f0-9]{24})'\)\s*\}/gi, '$1');
 
 function getMediaBaseUrl(explicitBucketUrl) {
   const fromEnv = (explicitBucketUrl || process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
@@ -13,7 +9,7 @@ function getMediaBaseUrl(explicitBucketUrl) {
     return fromEnv;
   }
   const backend = (process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080').replace(/\/$/, '');
-  return `${backend}/upload`;
+  return `${backend}/api/upload`;
 }
 
 function extractStorageKey(path, bucketUrl) {
@@ -25,6 +21,7 @@ function extractStorageKey(path, bucketUrl) {
   const bases = [
     base,
     (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, ''),
+    `${(process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080').replace(/\/$/, '')}/api/upload`,
     `${(process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080').replace(/\/$/, '')}/upload`,
   ].filter(Boolean);
 
