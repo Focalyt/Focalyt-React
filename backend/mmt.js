@@ -193,6 +193,7 @@ const serveUploadMiddleware = require('./helpers/serveUpload');
 app.set("view engine", "ejs");
 app.use(blockIPMiddleware);
 app.use('/upload', serveUploadMiddleware);
+app.use('/api/upload', serveUploadMiddleware);
 app.use(express.static(path.resolve(__dirname, "public")));
 app.use(session(sess));
 app.use(bodyParser.urlencoded({ extended: true }));

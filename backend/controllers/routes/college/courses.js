@@ -24,6 +24,7 @@ const {
 
 const s3 = require("../../../helpers/objectStorage");
 const { normalizeStorageKey } = require('../../../helpers/s3Storage');
+const { buildCourseDocumentKey } = require('../../../helpers/storagePaths');
 const allowedVideoExtensions = ['mp4', 'mkv', 'mov', 'avi', 'wmv'];
 const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
 const allowedDocumentExtensions = ['pdf', 'doc', 'docx']; // ✅ PDF aur DOC types allow karein
@@ -677,11 +678,13 @@ router.route('/:courseId/candidate/upload-docs')
 			const appliedCourse = await AppliedCourses.findOne({
 				_candidate: candidate._id,
 				_course: courseId
-			});
+			}).populate({ path: '_course', select: 'name docsRequired' });
 
 			if (!candidate) {
 				return res.status(400).json({ error: "You have not applied for this course." });
 			}
+
+			const docName = appliedCourse?._course?.docsRequired?.find(d => d._id.toString() === docsId.toString())?.Name || docsName || 'Unknown Document';
 
 			let files = req.files?.file;
 			if (!files) {
@@ -711,7 +714,13 @@ router.route('/:courseId/candidate/upload-docs')
 					fileType = "video";
 				}
 
-				const key = `${courseId}/${candidateId}/${docsId}/${uuid()}.${ext}`;
+				const key = buildCourseDocumentKey({
+					candidateName: candidate.name,
+					candidateMobile: candidate.mobile,
+					courseName: appliedCourse?._course?.name,
+					docName,
+					ext,
+				});
 				const params = {
 					Bucket: bucketName,
 					Key: key,

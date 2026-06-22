@@ -159,6 +159,7 @@ class InvalidParameterError extends Error {
 const s3 = new AWS.S3({ region, signatureVersion: 'v4' });
 const objectStorage = require('../../../helpers/objectStorage');
 const { normalizeStorageKey, resolvePublicUrl } = require('../../../helpers/s3Storage');
+const { buildCourseDocumentKey } = require('../../../helpers/storagePaths');
 const allowedVideoExtensions = ['mp4', 'mkv', 'mov', 'avi', 'wmv'];
 const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
 const allowedDocumentExtensions = ['pdf', 'doc', 'docx']; // ✅ PDF aur DOC types allow karein
@@ -9845,7 +9846,10 @@ router.put("/upload_docs/:id", isCollege, async (req, res) => {
 
 		const appliedCourse = await AppliedCourses.findOne({ _id: id }).populate({
 			path: '_course',
-			select: 'docsRequired'
+			select: 'docsRequired name'
+		}).populate({
+			path: '_candidate',
+			select: 'name mobile'
 		});
 
 		if (!appliedCourse) {
@@ -9853,7 +9857,7 @@ router.put("/upload_docs/:id", isCollege, async (req, res) => {
 		}
 
 		// Find document name from course's docsRequired
-		const docName = appliedCourse._course?.docsRequired?.find(d => d._id.toString() === docsId.toString())?.name || 'Unknown Document';
+		const docName = appliedCourse._course?.docsRequired?.find(d => d._id.toString() === docsId.toString())?.Name || 'Unknown Document';
 
 		const files = req.files?.file;
 		if (!files) {
@@ -9879,7 +9883,13 @@ router.put("/upload_docs/:id", isCollege, async (req, res) => {
 				fileType = "video";
 			}
 
-			const key = `${appliedCourse._course._id}/${appliedCourse._candidate}/${docsId}/${uuid()}.${ext}`;
+			const key = buildCourseDocumentKey({
+				candidateName: appliedCourse._candidate?.name,
+				candidateMobile: appliedCourse._candidate?.mobile,
+				courseName: appliedCourse._course?.name,
+				docName,
+				ext,
+			});
 
 			const params = {
 				Bucket: bucketName,
@@ -9889,7 +9899,7 @@ router.put("/upload_docs/:id", isCollege, async (req, res) => {
 			};
 
 			uploadPromises.push(
-				s3.upload(params).promise().then(() => {
+				objectStorage.upload(params).promise().then(() => {
 					uploadedFiles.push({
 						fileURL: key,
 						fileType,
