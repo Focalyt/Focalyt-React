@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { getProjectDepartmentIds, projectBelongsToDepartment } from "../../../../utils/b2bProjectHelpers";
 
 const pickRefId = (ref) => {
   if (ref == null || ref === "") return "";
@@ -32,10 +31,10 @@ const parseB2bLeadContext = (lead) => {
   const catId = pickRefId(cat);
   const typeId = pickRefId(typ);
   const projId = pickRefId(proj);
-  const deptId = pickRefId(dept) || pickRefId(typ?.department);
+  const deptId = pickRefId(dept) || pickRefId(proj?.department) || pickRefId(typ?.department);
 
   const department =
-    pickRefName(dept) || pickRefName(typ?.department);
+    pickRefName(dept) || pickRefName(proj?.department) || pickRefName(typ?.department);
   const project = pickRefName(proj);
   const leadSource = pickRefName(cat);
   const b2bType = pickRefName(typ);
@@ -702,7 +701,9 @@ function Lrp() {
   const departmentProjects = useMemo(() => {
     const deptId = String(form.b2bDepartment || "").trim();
     if (!deptId) return [];
-    return (allB2bProjects || []).filter((p) => projectBelongsToDepartment(p, deptId));
+    return (allB2bProjects || []).filter(
+      (p) => String(p?.department?._id || p?.department || "").trim() === deptId
+    );
   }, [allB2bProjects, form.b2bDepartment]);
 
   const linkedLeadSummary = useMemo(() => {
