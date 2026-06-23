@@ -2260,6 +2260,29 @@ const B2BSales = () => {
     }
   };
 
+  const fetchAiLeadIntel = async (fetchedLeads) => {
+    if (!Array.isArray(fetchedLeads) || fetchedLeads.length === 0) {
+      setAiLeadIntelLoading(false);
+      return;
+    }
+
+    try {
+      setAiLeadIntelLoading(true);
+      const aiRes = await axios.post(
+        `${backendUrl}/api/ai/lead-intel/bulk`,
+        { leads: fetchedLeads },
+        { headers: { 'x-auth': token } }
+      );
+      if (aiRes?.data?.success && aiRes?.data?.data) {
+        setAiLeadIntelById((prev) => ({ ...prev, ...(aiRes.data.data || {}) }));
+      }
+    } catch (aiErr) {
+      setAiLeadIntelError(aiErr?.response?.data?.message || 'AI lead supervision unavailable.');
+    } finally {
+      setAiLeadIntelLoading(false);
+    }
+  };
+
   const fetchLeads = async (statusFilter = null, page = 1, filterOverrides = {}) => {
     try {
       closePanel();
@@ -2273,7 +2296,7 @@ const B2BSales = () => {
         page: page,
         sortBy: 'updatedAt',
         sortOrder: 'desc',
-        // limit: 10,           
+        limit: 20,
       };
 
       if (statusFilter) {
@@ -2332,24 +2355,7 @@ const B2BSales = () => {
         // });
 
         setLeads(fetchedLeads);
-
-        try {
-          if (Array.isArray(fetchedLeads) && fetchedLeads.length > 0) {
-            setAiLeadIntelLoading(true);
-            const aiRes = await axios.post(
-              `${backendUrl}/api/ai/lead-intel/bulk`,
-              { leads: fetchedLeads },
-              { headers: { 'x-auth': token } }
-            );
-            if (aiRes?.data?.success && aiRes?.data?.data) {
-              setAiLeadIntelById((prev) => ({ ...prev, ...(aiRes.data.data || {}) }));
-            }
-          }
-        } catch (aiErr) {
-          setAiLeadIntelError(aiErr?.response?.data?.message || 'AI lead supervision unavailable.');
-        } finally {
-          setAiLeadIntelLoading(false);
-        }
+        fetchAiLeadIntel(fetchedLeads);
         // ✅ Extract pagination data from backend response
         if (response.data.data.pagination) {
           setTotalPages(response.data.data.pagination.totalPages || 1);
@@ -5944,7 +5950,7 @@ const B2BSales = () => {
                                                       await approveLead(lead);
                                                     }}
                                                   >
-                                                    <i className="fas fa-check" aria-hidden="true"></i>
+                                                  {/*  <i className="fas fa-check" aria-hidden="true"></i> */}
                                                     Approve
                                                   </button>
                                                   <button
@@ -5957,7 +5963,7 @@ const B2BSales = () => {
                                                       setShowRejectionForm(true);
                                                     }}
                                                   >
-                                                    <i className="fas fa-times" aria-hidden="true"></i>
+                                                  {/*  <i className="fas fa-times" aria-hidden="true"></i> */}
                                                     Reject
                                                   </button>
                                                 </div>
@@ -6201,7 +6207,7 @@ const B2BSales = () => {
                                               await approveLead(lead);
                                             }}
                                           >
-                                            <i className="fas fa-check" aria-hidden="true"></i>
+                                            {/* <i className="fas fa-check" aria-hidden="true"></i> */}
                                             Approve
                                           </button>
                                           <button
@@ -6214,7 +6220,7 @@ const B2BSales = () => {
                                               setShowRejectionForm(true);
                                             }}
                                           >
-                                            <i className="fas fa-times" aria-hidden="true"></i>
+                                            {/* <i className="fas fa-times" aria-hidden="true"></i> */}
                                             Reject
                                           </button>
                                         </div>
@@ -8674,9 +8680,10 @@ const B2BSales = () => {
 
   .lead-header-v2__approval-label{
     position: absolute;
-    top: -10px;
-    left: 10px;
-    padding: 0 8px;
+    top: 0;
+    left: -9px;
+    transform: translateY(-50%);
+    padding: 0 5px;
     border-radius: 999px;
     background: rgba(11, 94, 215, 0.95);
     border: 1px solid rgba(255, 255, 255, 0.35);
@@ -8706,7 +8713,8 @@ const B2BSales = () => {
     gap: 8px;
     width: 100%;
     justify-content: center;
-    flex-direction: column
+    flex-direction: column;
+    flex-wrap: nowrap;
   }
 
   .lead-approval-v2__pill{
@@ -8759,7 +8767,7 @@ const B2BSales = () => {
     display:flex;
     flex-direction: column;
     gap: 8px;
-    padding: 10px;
+    // padding: 10px;
     border-radius: 12px;
     border: 1px solid rgba(255,255,255,0.35);
     background: rgba(255,255,255,0.85);
@@ -8782,7 +8790,7 @@ const B2BSales = () => {
     border-radius: 10px;
     border: none;
     padding: 8px 10px;
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 900;
     cursor: pointer;
   }

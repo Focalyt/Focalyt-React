@@ -1,5 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
+import DatePicker from "react-date-picker";
+import "react-date-picker/dist/DatePicker.css";
+import "react-calendar/dist/Calendar.css";
+// import { getProjectDepartmentIds, projectBelongsToDepartment } from "../../../../utils/b2bProjectHelpers";
 
 const pickRefId = (ref) => {
   if (ref == null || ref === "") return "";
@@ -102,6 +106,25 @@ const isValidMmDdYyyy = (value) => {
   return dd >= 1 && dd <= daysInMonth;
 };
 
+const formatDateToMmDdYyyy = (date) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const yyyy = date.getFullYear();
+  return `${mm}/${dd}/${yyyy}`;
+};
+
+const parseVisitDateToDate = (value) => {
+  const v = String(value || "").trim();
+  if (!v) return null;
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v);
+  if (m && isValidMmDdYyyy(v)) {
+    return new Date(Number(m[3]), Number(m[1]) - 1, Number(m[2]));
+  }
+  const parsed = new Date(v);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
 const createInitialForm = () => ({
   b2bLeadId: "",
   leadCategory: "",
@@ -155,7 +178,8 @@ const Card = ({ number, title, children }) => (
       borderRadius: "16px",
       boxShadow: "0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04)",
       marginBottom: "20px",
-      overflow: "hidden",
+      overflow: "visible",
+      position: "relative",
     }}
   >
     <div
@@ -906,6 +930,98 @@ function Lrp() {
 
   return (
     <div style={{ background: isEmbedded ? "#ffffff" : "#f1f5f9", minHeight: isEmbedded ? "auto" : "100vh", padding: isEmbedded ? "16px" : "20px" }}>
+      <style>{`
+        .lrp-visit-date-picker {
+          width: 100%;
+          display: block;
+        }
+        .lrp-visit-date-picker .react-date-picker__wrapper {
+          width: 100%;
+          min-height: 42px;
+          border: 1.5px solid #e2e8f0 !important;
+          border-radius: 10px !important;
+          background: #fff !important;
+          padding: 6px 12px !important;
+          box-sizing: border-box;
+        }
+        .lrp-visit-date-picker .react-date-picker__inputGroup {
+          width: 100%;
+          min-width: 0;
+          font-size: 14px !important;
+          font-weight: 600 !important;
+          color: #0f172a !important;
+        }
+        .lrp-visit-date-picker .react-date-picker__inputGroup__input {
+          color: #0f172a !important;
+          font-weight: 600 !important;
+          min-width: 0.54em !important;
+        }
+        .lrp-visit-date-picker .react-date-picker__inputGroup__divider {
+          color: #64748b !important;
+          font-weight: 600 !important;
+          padding: 0 2px !important;
+        }
+        .lrp-visit-date-picker .react-date-picker__inputGroup__leadingZero {
+          color: #0f172a !important;
+        }
+        .lrp-visit-date-picker .react-date-picker__calendar-button {
+          color: #FC2B5A !important;
+          font-size: 15px !important;
+          padding: 0 0 0 8px !important;
+        }
+        .lrp-visit-date-picker .react-date-picker__calendar-button:enabled:hover {
+          color: #a5003a !important;
+        }
+        .lrp-visit-date-picker .react-date-picker__calendar {
+          z-index: 9999 !important;
+          margin-top: 6px !important;
+        }
+        .lrp-visit-date-picker .react-calendar {
+          border: 1px solid #e2e8f0 !important;
+          border-radius: 12px !important;
+          box-shadow: 0 8px 24px rgba(15, 23, 42, 0.15) !important;
+          font-family: inherit !important;
+          width: 300px !important;
+          max-width: 100% !important;
+          padding: 8px !important;
+        }
+        .lrp-visit-date-picker .react-calendar__navigation {
+          margin-bottom: 8px !important;
+        }
+        .lrp-visit-date-picker .react-calendar__navigation button {
+          min-width: 36px !important;
+          font-size: 14px !important;
+          font-weight: 700 !important;
+          color: #1e293b !important;
+        }
+        .lrp-visit-date-picker .react-calendar__month-view__weekdays {
+          font-size: 11px !important;
+          font-weight: 700 !important;
+          color: #475569 !important;
+          text-transform: uppercase !important;
+        }
+        .lrp-visit-date-picker .react-calendar__tile {
+          font-size: 13px !important;
+          font-weight: 600 !important;
+          padding: 10px 6px !important;
+          border-radius: 8px !important;
+        }
+        .lrp-visit-date-picker .react-calendar__tile--now {
+          background: #fff5f7 !important;
+          color: #FC2B5A !important;
+        }
+        .lrp-visit-date-picker .react-calendar__tile--active {
+          background: #FC2B5A !important;
+          color: #fff !important;
+        }
+        .lrp-visit-date-picker .react-calendar__tile:enabled:hover {
+          background: #ffe4ea !important;
+          color: #a5003a !important;
+        }
+        .lrp-visit-date-picker .react-calendar__month-view__days__day--weekend {
+          color: #e11d48 !important;
+        }
+      `}</style>
       {!isEmbedded && (
         <div
           style={{
@@ -1146,17 +1262,19 @@ function Lrp() {
                 <FieldError name="implementationPartnerName" />
               </div>
 
-              <div style={{ flex: "1 1 220px", minWidth: 200 }}>
+              <div style={{ flex: "1 1 240px", minWidth: 220, position: "relative", zIndex: 20 }}>
                 <label style={lblStyle}>Visit date {reqStar}</label>
-                <input
-                  type="text"
-                  value={form.visitDate}
-                  onChange={(e) => setValue("visitDate", e.target.value)}
+                <DatePicker
+                  onChange={(date) => setValue("visitDate", formatDateToMmDdYyyy(date))}
                   onBlur={() => markTouched("visitDate")}
-                  placeholder="mm/dd/yyyy"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  style={fldStyle}
+                  value={parseVisitDateToDate(form.visitDate)}
+                  format="MM/dd/yyyy"
+                  dayPlaceholder="dd"
+                  monthPlaceholder="mm"
+                  yearPlaceholder="yyyy"
+                  clearIcon={null}
+                  calendarIcon={<i className="fa fa-calendar" aria-hidden="true" />}
+                  className="lrp-visit-date-picker"
                 />
                 <FieldError name="visitDate" />
               </div>
