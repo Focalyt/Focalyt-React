@@ -7202,7 +7202,6 @@ router.delete('/center_delete/:id', async (req, res) => {
 //lead status change
 router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 	try {
-		console.log('[Lead Status Change] Step 1: Request received', { method: req.method, path: req.path });
 		const { id } = req.params;
 		const {
 			_leadStatus,
@@ -7211,18 +7210,13 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 			followup,  // combined date and time
 			googleCalendarEvent = false,
 		} = req.body;
-		console.log("req", req.body)
-		console.log('[Lead Status Change] Step 2: Params & body', { appliedCourseId: id, _leadStatus, _leadSubStatus, hasRemarks: !!remarks, hasFollowup: !!followup });
 
 		const userId = req.user._id;
 		const collegeId = req.user.college._id;
-		console.log('[Lead Status Change] Step 3: User context', { userId: userId?.toString(), userName: req.user?.name, collegeId: collegeId?.toString() });
 
 		// Find the AppliedCourse document by ID
 		const doc = await AppliedCourses.findById(id);
-		console.log('[Lead Status Change] Step 4: AppliedCourse lookup', { found: !!doc, id });
 		if (!doc) {
-			console.log('[Lead Status Change] Step 5: Exiting - AppliedCourse not found');
 			return res.status(404).json({ success: false, message: 'AppliedCourse not found' });
 		}
 
@@ -7237,7 +7231,6 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 		const newStatusDoc = await Status.findById(_leadStatus).lean();
 		const newStatusTitle = newStatusDoc ? newStatusDoc.title : 'Unknown';
 		const newSubStatusTitle = newStatusDoc?.substatuses?.find(s => s._id.toString() === _leadSubStatus)?.title || 'Unknown';
-
 
 		// If lead sub-status is updated, log the change and update the sub-status
 		// Logging changes
@@ -7273,7 +7266,6 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 				createdBy: userId,
 				collegeId: collegeId
 			});
-			console.log("newFollowup", newFollowup)
 			await newFollowup.save();
 		}
 
@@ -7330,21 +7322,16 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 
 
 		doc.logs.push(newLogEntry);
-		console.log('[Lead Status Change] Step 5: Log entry added', { logEntry: newLogEntry, id, _leadStatus, _leadSubStatus });
-		console.log("newLogEntry", newLogEntry)
 		// Save the updated document
 		await doc.save();
-		console.log('[Lead Status Change] Step 5: Doc saved', { id, _leadStatus, _leadSubStatus });
 
-		const newStatusLogs = await statusLogHelper(id, {
+		await statusLogHelper(id, {
 			_statusId: _leadStatus,
 			_subStatusId: _leadSubStatus,
 		});
 
-		console.log('[Lead Status Change] Step 6: Success - sending response');
 		return res.json({ success: true, data: doc });
 	} catch (error) {
-		console.error('[Lead Status Change] Error:', error);
 		return res.status(500).json({ success: false, message: 'Internal Server Error' });
 	}
 });
@@ -8859,6 +8846,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			courseType,
 			status,
 			kyc,
+			kycBucket,
 			leadStatus,
 			sector,
 			createdFromDate,
@@ -8930,7 +8918,6 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 				typeof member === 'string' ? new mongoose.Types.ObjectId(member) : member
 			);
 		}
-
 
 		// Base match stage - Modified to handle KYC logic differently
 		let baseMatchStage = {
@@ -9182,21 +9169,8 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			let kycMatchStage = {};
 
 			if (kyc === 'true' || kyc === true) {
-				// For kyc=true: Include all candidates (with or without required docs)
-				kycMatchStage = {
-					$or: [
-						// Candidates with kyc=true
-						{ kyc: true },
-						// Candidates whose course has no required docs (regardless of kyc status)
-						{
-							$or: [
-								{ '_course.docsRequired': { $exists: false } },
-								{ '_course.docsRequired': { $size: 0 } },
-								{ '_course.docsRequired': null }
-							]
-						}
-					]
-				};
+				// Verified tab should contain KYC done leads.
+				kycMatchStage = { kyc: true };
 			} else if (kyc === 'false' || kyc === false) {
 				// For kyc=false: Only include candidates whose course has required docs and kyc=false
 				kycMatchStage = {
@@ -9213,6 +9187,51 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 		} else {
 			// Default behavior when no kyc filter is specified - show all KYC candidates
 			// No additional filter needed, will show all candidates with kycStage: true
+		}
+
+		if (kycBucket && kycBucket !== 'all') {
+			const docsRequiredExists = {
+				'_course.docsRequired': {
+					$exists: true,
+					$ne: null,
+					$not: { $size: 0 }
+				}
+			};
+			const hasRejectedUpload = {
+				uploadedDocs: {
+					$elemMatch: { status: 'Rejected' }
+				}
+			};
+
+			const bucketMatches = {
+				pendingDocs: {
+					kyc: false,
+					...docsRequiredExists,
+					'uploadedDocs.0': { $exists: false }
+				},
+				pendingVerification: {
+					kyc: false,
+					...docsRequiredExists,
+					'uploadedDocs.0': { $exists: true },
+					uploadedDocs: {
+						$not: {
+							$elemMatch: { status: 'Rejected' }
+						}
+					}
+				},
+				rejected: {
+					kyc: false,
+					...docsRequiredExists,
+					...hasRejectedUpload
+				},
+				verified: {
+					kyc: true
+				}
+			};
+
+			if (bucketMatches[kycBucket]) {
+				aggregationPipeline.push({ $match: bucketMatches[kycBucket] });
+			}
 		}
 
 		// Apply additional filters based on populated data
@@ -9274,6 +9293,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 		const sharedKycFilters = {
 			name,
 			courseType,
+			kycBucket,
 			leadStatus,
 			sector,
 			createdFromDate,
@@ -9296,7 +9316,20 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 		});
 
 		let listTotalCount = crmFilterCounts.all || 0;
-		if (kyc !== undefined && kyc !== '' && String(kyc).toLowerCase() !== 'all') {
+		if (kycBucket && kycBucket !== 'all') {
+			const filteredListCounts = await calculateKycFilterCounts(teamMembers, college._id, {
+				...sharedKycFilters,
+				kycBucket,
+				applyKycFilter: true
+			});
+			const countKeyByBucket = {
+				pendingDocs: 'pendingKyc',
+				pendingVerification: 'pendingDocumentVerification',
+				rejected: 'rejectedDocs',
+				verified: 'doneKyc'
+			};
+			listTotalCount = filteredListCounts[countKeyByBucket[kycBucket]] || 0;
+		} else if (kyc !== undefined && kyc !== '' && String(kyc).toLowerCase() !== 'all') {
 			const filteredListCounts = await calculateKycFilterCounts(teamMembers, college._id, {
 				...sharedKycFilters,
 				kyc,
@@ -9484,9 +9517,11 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 		// Build base aggregation pipeline
 		let basePipeline = [];
 
-		if (typeof member === 'string') {
-			member = new mongoose.Types.ObjectId(member);
-		}
+		const teamMemberIds = (teamMembers || [])
+			.filter(member => member)
+			.map(member =>
+				typeof member === 'string' ? new mongoose.Types.ObjectId(member) : member
+			);
 
 		// Base match stage for KYC candidates
 		let baseMatchStage = {
@@ -9494,10 +9529,10 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 
 		};
 
-		if (teamMembers && teamMembers.length > 0) {
+		if (teamMemberIds.length > 0) {
 			baseMatchStage.$or = [
-				{ registeredBy: { $in: teamMembers } },
-				{ counsellor: { $in: teamMembers } }
+				{ registeredBy: { $in: teamMemberIds } },
+				{ counsellor: { $in: teamMemberIds } }
 			];
 		}
 
@@ -9585,21 +9620,7 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 			let kycMatchStage = {};
 
 			if (appliedFilters.kyc === 'true' || appliedFilters.kyc === true) {
-				// For kyc=true: Include all candidates (with or without required docs)
-				kycMatchStage = {
-					$or: [
-						// Candidates with kyc=true
-						{ kyc: true },
-						// Candidates whose course has no required docs (regardless of kyc status)
-						{
-							$or: [
-								{ '_course.docsRequired': { $exists: false } },
-								{ '_course.docsRequired': { $size: 0 } },
-								{ '_course.docsRequired': null }
-							]
-						}
-					]
-				};
+				kycMatchStage = { kyc: true };
 			} else if (appliedFilters.kyc === 'false' || appliedFilters.kyc === false) {
 				// For kyc=false: Only include candidates whose course has required docs and kyc=false
 				kycMatchStage = {
@@ -9614,6 +9635,47 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 
 			if (Object.keys(kycMatchStage).length > 0) {
 				basePipeline.push({ $match: kycMatchStage });
+			}
+		}
+
+		if (applyKycFilter && appliedFilters.kycBucket && appliedFilters.kycBucket !== 'all') {
+			const docsRequiredExists = {
+				'_course.docsRequired': {
+					$exists: true,
+					$ne: null,
+					$not: { $size: 0 }
+				}
+			};
+			const bucketMatches = {
+				pendingDocs: {
+					kyc: false,
+					...docsRequiredExists,
+					'uploadedDocs.0': { $exists: false }
+				},
+				pendingVerification: {
+					kyc: false,
+					...docsRequiredExists,
+					'uploadedDocs.0': { $exists: true },
+					uploadedDocs: {
+						$not: {
+							$elemMatch: { status: 'Rejected' }
+						}
+					}
+				},
+				rejected: {
+					kyc: false,
+					...docsRequiredExists,
+					uploadedDocs: {
+						$elemMatch: { status: 'Rejected' }
+					}
+				},
+				verified: {
+					kyc: true
+				}
+			};
+
+			if (bucketMatches[appliedFilters.kycBucket]) {
+				basePipeline.push({ $match: bucketMatches[appliedFilters.kycBucket] });
 			}
 		}
 
@@ -9676,10 +9738,7 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 					effectiveKycStatus: {
 						$cond: {
 							if: {
-								$or: [
-									{ $eq: ["$kyc", true] },
-									{ $eq: [{ $size: { $ifNull: ["$_course.docsRequired", []] } }, 0] }
-								]
+								$eq: ["$kyc", true]
 							},
 							then: "done",
 							else: {
@@ -9703,15 +9762,7 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 										$cond: {
 											if: {
 												$gt: [
-													{
-														$size: {
-															$filter: {
-																input: { $ifNull: ["$uploadedDocs", []] },
-																as: "doc",
-																cond: { $eq: ["$$doc.status", "Pending"] }
-															}
-														}
-													},
+													{ $size: { $ifNull: ["$uploadedDocs", []] } },
 													0
 												]
 											},

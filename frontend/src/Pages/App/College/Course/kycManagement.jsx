@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import DatePicker from 'react-date-picker';
 
 import 'react-date-picker/dist/DatePicker.css';
@@ -515,7 +516,6 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
   const fetchProfile = (id) => {
     if (candidateRef.current) {
-      console.log('start fetching', id)
       candidateRef.current.fetchProfile(id);
       fetchProfileData()
     }
@@ -553,7 +553,6 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     if (candidateRef.current) {
       const result = await candidateRef.current.handleSaveCV();
 
-      console.log(result, 'result')
       if (result.isvalid === true) {
         // Find and update the candidate in allProfiles
         setAllProfiles(prevProfiles =>
@@ -596,6 +595,33 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
   // ========================================
   // 🎯 Main Tab State
   // ========================================
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const parseKycFilterIndex = (params) => {
+    const filterParam = params.get('filter');
+    const index = parseInt(filterParam, 10);
+    if (!Number.isNaN(index) && index >= 0 && index <= 4) return index;
+    return 0;
+  };
+
+  const getKycFilterDataPatch = (index) => {
+    if (index === 0) return { kyc: false, kycBucket: 'pendingDocs' };
+    if (index === 1) return { kyc: false, kycBucket: 'pendingVerification' };
+    if (index === 2) return { kyc: 'all', kycBucket: 'rejected' };
+    if (index === 3) return { kyc: true, kycBucket: 'verified' };
+    return { kyc: 'all', kycBucket: 'all' };
+  };
+
+  const initialCrmFilterIndex = parseKycFilterIndex(searchParams);
+
+  const updateFilterInUrl = useCallback((index) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('filter', String(index));
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
   const [mainTab, setMainTab] = useState('Ekyc'); // 'Ekyc' or 'AllAdmission'
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
@@ -605,7 +631,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
   const [showPopup, setShowPopup] = useState(null);
   const [openModalId, setOpenModalId] = useState(null);
 
-  const [activeCrmFilter, setActiveCrmFilter] = useState(0);
+  const [activeCrmFilter, setActiveCrmFilter] = useState(initialCrmFilterIndex);
   const [showEditPanel, setShowEditPanel] = useState(false);
   const [showFollowupPanel, setShowFollowupPanel] = useState(false);
   const [showWhatsappPanel, setShowWhatsappPanel] = useState(false);
@@ -1698,30 +1724,9 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
   const handleCrmFilterClick = (filter, index) => {
     // 0: Pending for Documents, 1: Pending for Verification, 2: Reject Documents, 3: Verified, 4: All
-    if (index === 0) {
-      setFilterData(prev => ({ ...prev, kyc: false }));
-      setActiveCrmFilter(index);
-      return;
-    }
-    if (index === 1) {
-      setFilterData(prev => ({ ...prev, kyc: false })); // Pending for Verification = not yet verified
-      setActiveCrmFilter(index);
-      return;
-    }
-    if (index === 2) {
-      setFilterData(prev => ({ ...prev, kyc: 'all' }));
-      setActiveCrmFilter(index);
-      return;
-    }
-    if (index === 3) {
-      // Verified tab - only kyc done
-      setFilterData(prev => ({ ...prev, kyc: true }));
-      setActiveCrmFilter(index);
-      return;
-    }
-    // index === 4: All
-    setFilterData(prev => ({ ...prev, kyc: 'all' }));
+    setFilterData(prev => ({ ...prev, ...getKycFilterDataPatch(index) }));
     setActiveCrmFilter(index);
+    updateFilterInUrl(index);
   };
 
   // Filter state from Registration component
@@ -1729,7 +1734,6 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     name: '',
     courseType: '',
     status: 'true',
-    kyc: false,
     leadStatus: '',
     sector: '',
     createdFromDate: null,
@@ -1737,8 +1741,8 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
     modifiedFromDate: null,
     modifiedToDate: null,
     nextActionFromDate: null,
-    nextActionToDate: null
-
+    nextActionToDate: null,
+    ...getKycFilterDataPatch(initialCrmFilterIndex),
   });
 
 
@@ -1915,6 +1919,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
       modifiedToDate: null,
       nextActionFromDate: null,
       nextActionToDate: null,
+      ...getKycFilterDataPatch(activeCrmFilter),
     };
 
     setFilterData(clearedFilters);
@@ -2071,8 +2076,6 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
   };
 
   const handleUpdateStatus = async () => {
-    console.log('Function called');
-
     try {
       if (showEditPanel) {
         // Validation checks
@@ -2135,8 +2138,6 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
             }
           }
         );
-
-        console.log('API response:', response.data);
 
         if (response.data.success) {
           alert('Status updated successfully!');
@@ -2219,8 +2220,6 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
           }
         );
 
-
-        console.log('API response:', response.data);
 
         if (response.data.success) {
           alert('Status updated successfully!');
@@ -2336,13 +2335,11 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
 
   useEffect(() => {
     fetchProfileData();
-    console.log(filterData, 'filterData')
 
   }, [currentPage, activeCrmFilter]);
 
   const fetchProfileData = async (filters = filterData, page = currentPage) => {
     try {
-      console.log('filters', filters)
       setIsLoadingProfiles(true);
       if (!token) {
         console.warn('No token found in session storage.');
@@ -2355,6 +2352,7 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
         ...(filters.name && { name: filters.name }),
         ...(filters.courseType && { courseType: filters.courseType }),
         ...(filters.kyc !== undefined && filters.kyc !== 'all' && { kyc: String(filters.kyc) }),
+        ...(filters.kycBucket && filters.kycBucket !== 'all' && { kycBucket: filters.kycBucket }),
         ...(filters.status && filters.status !== 'true' && { status: filters.status }),
         ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
         ...(filters.sector && { sector: filters.sector }),
@@ -2371,8 +2369,6 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
         ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
         ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
       });
-
-      console.log('queryParams', queryParams)
 
       const response = await axios.get(`${backendUrl}/college/kycCandidates?${queryParams}`, {
         headers: {
@@ -2392,7 +2388,6 @@ const KYCManagement = ({ openPanel = null, closePanel = null, isPanelOpen = null
         ];
 
         setEkycFilters(filter);
-        console.log('backend response', response.data)
         setAllProfiles(response.data.data);
         setTotalPages(response.data.totalPages)
 

@@ -33,11 +33,9 @@ const BASIC_DETAILS_INIT = {
   batchCode: 'BATCH-RS-2024-01',
   totalPointsTillDate: '1245',
   totalDaysTillDate: '42',
-  averageScore: '78.5',
 };
 
 const TAB_NAV = [
-  { id: 'details', label: 'Report Details' },
   { id: 'attendance', label: 'Attendance' },
   { id: 'training', label: 'Training Delivery' },
   { id: 'studentPoints', label: 'Student Metrics' },
@@ -477,329 +475,44 @@ const TrainerModule = () => {
         </button>
       </div>
 
-      {/* ── Module card row ── */}
-      <div className={`dbr-card-row-wrap${cardsExpanded ? '' : ' dbr-card-row-wrap--collapsed'}`}>
-        <div className="dbr-card-row-head">
-          <span className="dbr-section-lbl">Batch Monitoring Modules</span>
-          <button type="button" className="dbr-icon-btn" onClick={() => setCardsExpanded((e) => !e)} title={cardsExpanded ? 'Collapse' : 'Expand'}>
+      {/* ── Lead-style hero banner + detail card ── */}
+      <div className="tm-hero-wrap">
+        {/* Gradient hero banner */}
+        <div className="tm-hero">
+          {cardsExpanded && (
+          <div className="tm-hero__details">
+            {[
+              ['fa-project-diagram', 'Project Name', basicDetails.projectName],
+              ['fa-building', 'Center Name', basicDetails.centerName],
+              ['fa-chalkboard-teacher', 'Trainer Name', basicDetails.trainerName],
+              ['fa-graduation-cap', 'Course / Trade', basicDetails.courseTrade],
+              ['fa-barcode', 'Batch Code', basicDetails.batchCode],
+              ['fa-calendar-day', 'Total Days', basicDetails.totalDaysTillDate],
+            ].map(([icon, label, value]) => (
+              <div key={label} className="tm-hero__detail">
+                <div className="tm-hero__detail-label">
+                  <i className={`fas ${icon}`} /> {label}
+                </div>
+                <div className="tm-hero__detail-value" title={value}>{value || '—'}</div>
+              </div>
+            ))}
+          </div>
+          )}
+
+          <button
+            type="button"
+            className="tm-hero__float-icon"
+            onClick={() => setCardsExpanded((e) => !e)}
+            title={cardsExpanded ? 'Collapse' : 'Expand'}
+          >
             <i className={`fas fa-chevron-${cardsExpanded ? 'up' : 'down'}`} />
           </button>
         </div>
-        {cardsExpanded && (
-          <div className="dbr-card-row">
-            {/* Card 1 */}
-            <ModuleCardShell title="Trainer & Batch Info" icon="fa-chalkboard-teacher" onEdit={() => setActiveTab('details')}>
-              <div className="dbr-info-line"><i className="fas fa-user" /><span>{TRAINER_INFO.name}</span></div>
-              <div className="dbr-info-line"><i className="fab fa-whatsapp text-success" /><span>{TRAINER_INFO.mobile}</span></div>
-              <div className="dbr-info-line"><i className="fas fa-envelope" /><span>{TRAINER_INFO.email}</span></div>
-              <div className="dbr-info-line"><i className="fas fa-layer-group" /><span>{TRAINER_INFO.batchCode}</span></div>
-              <div className="dbr-info-line"><i className="fas fa-book" /><span>{TRAINER_INFO.course}</span></div>
-              <div className="dbr-info-line"><i className="fas fa-map-marker-alt" /><span>{TRAINER_INFO.center}</span></div>
-            </ModuleCardShell>
 
-            {/* Card 2 */}
-            <ModuleCardShell title="Report Approval" icon="fa-award" onEdit={() => setActiveTab('reviewers')}>
-              <div className="dbr-kv"><span>Report Status</span></div>
-              <span className={`dbr-approval-pill ${approvalPillClass}`}>{reportStatus}</span>
-              <button type="button" className="dbr-btn dbr-btn--pink dbr-btn--block mt-2" onClick={() => { setReportStatus('Submitted'); notify('Submitted for approval'); }}>
-                Submit for Approval
-              </button>
-            </ModuleCardShell>
-
-            {/* Card 3 */}
-            <ModuleCardShell title="Performance" icon="fa-chart-line" onEdit={() => setActiveTab('summary')}>
-              <div className="dbr-kv"><span>Status</span><span className="dbr-chip dbr-chip--green">Good</span></div>
-              <div className="dbr-kv"><span>Sub-Status</span><span className="dbr-chip dbr-chip--blue">On Track</span></div>
-              <div className="dbr-kv"><span>Avg Score</span><strong>{averageScore}</strong></div>
-              <div className="dbr-kv"><span>Self Score</span><strong>{totalSelfScore}</strong></div>
-              <div className="dbr-kv"><span>Reviewer</span><strong>75</strong></div>
-            </ModuleCardShell>
-
-            {/* Card 4 */}
-            <ModuleCardShell title="Candidate Attendance" icon="fa-user-check" onEdit={() => setActiveTab('attendance')}>
-              <div className="dbr-mini-row">
-                <MiniStat label="Enrolled" value="45" bg="#5b4fc9" />
-                <MiniStat label="Present" value="38" bg="#10b981" />
-                <MiniStat label="Absent" value="07" bg="#ef4444" />
-              </div>
-              <div className="dbr-att-pct">
-                <span>Attendance %</span>
-                <strong className="text-success">84.4%</strong>
-              </div>
-            </ModuleCardShell>
-
-            {/* Card 5 – Training Delivery (hidden for now)
-            <ModuleCardShell title="Training Delivery" icon="fa-book-open" onEdit={() => setActiveTab('training')}>
-              <div className="dbr-kv"><span>Topic Covered</span><span className="dbr-chip dbr-chip--green">Done</span></div>
-              <div className="dbr-kv"><span>Pending Topic</span><span className="dbr-chip dbr-chip--orange">Pending</span></div>
-              <div className="dbr-kv"><span>Training Hours</span><strong>6 hrs</strong></div>
-              <div className="dbr-kv"><span>Practical</span><span className="dbr-chip dbr-chip--green">Done</span></div>
-            </ModuleCardShell>
-            */}
-
-            {/* Card 6 – Follow-up Calling (hidden for now)
-            <ModuleCardShell title="Follow-up Calling" icon="fa-phone-alt" onEdit={() => setActiveTab('attendance')}>
-              <div className="dbr-mini-row">
-                <MiniStat label="Done" value="05" bg="#12b3ff" />
-                <MiniStat label="Planned" value="02" bg="#f59e0b" />
-                <MiniStat label="Missed" value="01" bg="#7c3d14" />
-              </div>
-              <div className="dbr-kv mt-2"><span>Next Follow-up</span><span>22/06/2026</span></div>
-            </ModuleCardShell>
-            */}
-
-            {/* Card 7 – Follow-up Visit / Student Support (hidden for now)
-            <ModuleCardShell title="Follow-up Visit / Student Support" icon="fa-hands-helping" onEdit={() => setActiveTab('students')}>
-              <div className="dbr-kv"><span>Counseling Done</span><span className="dbr-chip dbr-chip--green">03</span></div>
-              <div className="dbr-kv"><span>Career Discussion</span><span className="dbr-chip dbr-chip--blue">02</span></div>
-              <div className="dbr-kv"><span>Placement Discussion</span><span className="dbr-chip dbr-chip--blue">01</span></div>
-              <div className="dbr-kv"><span>Pending Support</span><span className="dbr-chip dbr-chip--orange">02</span></div>
-            </ModuleCardShell>
-            */}
-
-            {/* Card 8 – Documents / Evidence (hidden for now)
-            <ModuleCardShell title="Documents / Evidence" icon="fa-folder-open" onEdit={() => setActiveTab('documents')}>
-              <div className="dbr-kv"><span>Uploaded</span><strong>12</strong></div>
-              <div className="dbr-kv"><span>Pending</span><strong className="text-warning">03</strong></div>
-              <div className="dbr-kv"><span>DTR</span><span className="dbr-chip dbr-chip--green">Updated</span></div>
-              <div className="dbr-kv"><span>MIS</span><span className="dbr-chip dbr-chip--orange">Pending</span></div>
-              <div className="dbr-kv"><span>Batch File</span><span className="dbr-chip dbr-chip--green">Updated</span></div>
-              <button type="button" className="dbr-btn dbr-btn--blue dbr-btn--block mt-1" onClick={() => setActiveTab('documents')}>
-                <i className="fas fa-upload" /> Upload Evidence
-              </button>
-            </ModuleCardShell>
-            */}
-
-            {/* Card 9 – Issues / Action (hidden for now)
-            <ModuleCardShell title="Issues / Action" icon="fa-exclamation-triangle" onEdit={() => setActiveTab('issues')}>
-              <div className="dbr-kv"><span>Attendance</span><span className="dbr-chip dbr-chip--red">01</span></div>
-              <div className="dbr-kv"><span>Engagement</span><span className="dbr-chip dbr-chip--orange">01</span></div>
-              <div className="dbr-kv"><span>Documentation</span><span className="dbr-chip dbr-chip--gray">00</span></div>
-              <div className="dbr-kv"><span>Infrastructure</span><span className="dbr-chip dbr-chip--gray">00</span></div>
-              <div className="dbr-kv"><span>Tomorrow Pending</span><span className="dbr-chip dbr-chip--orange">02</span></div>
-            </ModuleCardShell>
-            */}
-
-            {/* Card 10 – Reviewer / HO (hidden for now)
-            <ModuleCardShell title="Reviewer / HO" icon="fa-user-shield" onEdit={() => setActiveTab('reviewers')}>
-              <div className="dbr-kv"><span>Centre Manager</span><span className="dbr-chip dbr-chip--orange">Pending</span></div>
-              <div className="dbr-kv"><span>Batch Coordinator</span><span className="dbr-chip dbr-chip--orange">Pending</span></div>
-              <div className="dbr-kv"><span>MIS-QA / HO</span><span className="dbr-chip dbr-chip--orange">Pending</span></div>
-              <div className="dbr-mini-row mt-2">
-                <MiniStat label="Reviewed" value="00" bg="#10b981" />
-                <MiniStat label="Pending" value="03" bg="#f59e0b" />
-                <MiniStat label="Returned" value="00" bg="#ef4444" />
-              </div>
-            </ModuleCardShell>
-            */}
-          </div>
-        )}
       </div>
 
-      {/* ── Tabs ── */}
-      <div className="dbr-tabs">
-        {TAB_NAV.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={`dbr-tab${activeTab === t.id ? ' dbr-tab--active' : ''}`}
-            onClick={() => setActiveTab(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
 
-      {/* ── Tab content ── */}
-      <div className="dbr-tab-panel">
-        {activeTab === 'details' && (
-          <div className="dbr-section-card">
-            <div className="dbr-section-card__label">Basic Details</div>
-            <div className="dbr-basic-grid">
-              {[
-                ['centerName', 'Center Name'], ['trainerName', 'Trainer Name'], ['projectName', 'Project Name'],
-                ['courseTrade', 'Course / Trade'], ['reportingPerson', 'Reporting Person'],
-                ['batchCode', 'Batch Code / Batch Name'], ['totalPointsTillDate', 'Total Points till Date'],
-                ['totalDaysTillDate', 'Total Number of Days till Date'], ['averageScore', 'Average Score'],
-              ].map(([key, lbl]) => (
-                <div key={key} className="dbr-field">
-                  <label className="dbr-lbl">{lbl}</label>
-                  <input
-                    className="dbr-input"
-                    value={basicDetails[key]}
-                    onChange={(e) => setBasicDetails((b) => ({ ...b, [key]: e.target.value }))}
-                  />
-                </div>
-              ))}
-              <div className="dbr-field">
-                <label className="dbr-lbl">Date</label>
-                <input className="dbr-input dbr-input--ro" readOnly value={reportDate?.toLocaleDateString('en-IN') || ''} />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'attendance' && (
-          <div className="dbr-points-grid">
-            {ATTENDANCE_POINTS.map((p) => (
-              <PointFieldCard
-                key={p.id}
-                point={p}
-                data={attendanceData[p.id]}
-                onChange={(f, v) => updateMap(setAttendanceData, p.id, f, v)}
-              />
-            ))}
-          </div>
-        )}
-
-        {activeTab === 'training' && (
-          <div className="dbr-points-grid">
-            {TRAINING_POINTS.map((p) => (
-              <PointFieldCard
-                key={p.id}
-                point={p}
-                data={trainingData[p.id]}
-                onChange={(f, v) => updateMap(setTrainingData, p.id, f, v)}
-              />
-            ))}
-          </div>
-        )}
-
-        {activeTab === 'studentPoints' && (
-          <div className="dbr-points-grid">
-            {STUDENT_POINTS.map((p) => (
-              <PointFieldCard
-                key={p.id}
-                point={p}
-                data={studentData[p.id]}
-                onChange={(f, v) => updateMap(setStudentData, p.id, f, v)}
-              />
-            ))}
-          </div>
-        )}
-
-        {activeTab === 'documents' && (
-          <div className="dbr-points-grid">
-            {DOCUMENT_POINTS.map((p) => (
-              <DocumentCard
-                key={p.id}
-                point={p}
-                data={documentData[p.id]}
-                onChange={(f, v) => updateMap(setDocumentData, p.id, f, v)}
-              />
-            ))}
-          </div>
-        )}
-
-        {activeTab === 'reviewers' && (
-          <div className="dbr-reviewers-grid">
-            <ReviewerPanel
-              title="Centre Manager Review"
-              reviewerKey="centreManager"
-              data={reviewers.centreManager}
-              onChange={(f, v) => setReviewers((r) => ({ ...r, centreManager: { ...r.centreManager, [f]: v } }))}
-              onApprove={() => { setReviewers((r) => ({ ...r, centreManager: { ...r.centreManager, status: 'Approved' } })); notify('Centre Manager approved'); }}
-              onReturn={() => { setReviewers((r) => ({ ...r, centreManager: { ...r.centreManager, status: 'Returned' } })); setReportStatus('Returned'); notify('Returned'); }}
-            />
-            <ReviewerPanel
-              title="Batch Coordinator Review"
-              reviewerKey="batchCoordinator"
-              data={reviewers.batchCoordinator}
-              onChange={(f, v) => setReviewers((r) => ({ ...r, batchCoordinator: { ...r.batchCoordinator, [f]: v } }))}
-              onApprove={() => { setReviewers((r) => ({ ...r, batchCoordinator: { ...r.batchCoordinator, status: 'Approved' } })); notify('Batch Coordinator approved'); }}
-              onReturn={() => { setReviewers((r) => ({ ...r, batchCoordinator: { ...r.batchCoordinator, status: 'Returned' } })); setReportStatus('Returned'); }}
-            />
-            <ReviewerPanel
-              title="MIS-QA / HO Review"
-              reviewerKey="misQa"
-              data={reviewers.misQa}
-              onChange={(f, v) => setReviewers((r) => ({ ...r, misQa: { ...r.misQa, [f]: v } }))}
-              onApprove={() => {
-                setReviewers((r) => ({ ...r, misQa: { ...r.misQa, status: 'Approved' } }));
-                setReportStatus('Approved');
-                setFinalStatus('Approved');
-                notify('HO approved');
-              }}
-              onReturn={() => {
-                setReviewers((r) => ({ ...r, misQa: { ...r.misQa, status: 'Returned' } }));
-                setReportStatus('Returned');
-                setFinalStatus('Correction Required');
-                notify('Returned for correction');
-              }}
-            />
-          </div>
-        )}
-
-        {activeTab === 'issues' && (
-          <div className="dbr-points-grid">
-            {ISSUE_POINTS.map((issue) => (
-              <IssueCard
-                key={issue.id}
-                issue={issue}
-                data={issueData[issue.id]}
-                onChange={(f, v) => updateMap(setIssueData, issue.id, f, v)}
-              />
-            ))}
-          </div>
-        )}
-
-        {activeTab === 'summary' && (
-          <div className="dbr-summary-card">
-            <div className="dbr-section-card__label">Final Report Summary</div>
-            <div className="dbr-summary-grid">
-              {[
-                ['Total Weightage', totalWeightage],
-                ['Total Self Assessment Score', totalSelfScore],
-                ['Centre Manager Score', reviewers.centreManager.score || '—'],
-                ['Batch Coordinator Score', reviewers.batchCoordinator.score || '—'],
-                ['MIS-QA / HO Score', reviewers.misQa.score || '—'],
-                ['Average Score', averageScore],
-              ].map(([lbl, val]) => (
-                <div key={lbl} className="dbr-summary-stat">
-                  <small>{lbl}</small>
-                  <strong>{val}</strong>
-                </div>
-              ))}
-              <div className="dbr-summary-stat">
-                <small>Final Status</small>
-                <span className={`dbr-approval-pill ${finalStatus === 'Approved' ? 'dbr-approval--approved' : finalStatus === 'Correction Required' ? 'dbr-approval--returned' : 'dbr-approval--submitted'}`}>
-                  {finalStatus}
-                </span>
-              </div>
-            </div>
-            <div className="dbr-field mt-3">
-              <label className="dbr-lbl">Final Remarks</label>
-              <textarea className="dbr-textarea" rows={4} value={finalRemarks} onChange={(e) => setFinalRemarks(e.target.value)} placeholder="Enter final remarks..." />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ── Bottom actions ── */}
-      <footer className="dbr-footer">
-        <button type="button" className="dbr-btn dbr-btn--outline" onClick={() => { setReportStatus('Draft'); notify('Draft saved'); }}>
-          <i className="fas fa-save" /> Save Draft
-        </button>
-        <button type="button" className="dbr-btn dbr-btn--pink" onClick={() => { setReportStatus('Submitted'); notify('Report submitted'); }}>
-          <i className="fas fa-paper-plane" /> Submit Report
-        </button>
-        <button type="button" className="dbr-btn dbr-btn--blue" onClick={() => notify('Generating PDF...')}>
-          <i className="fas fa-file-pdf" /> Generate PDF
-        </button>
-        <button type="button" className="dbr-btn dbr-btn--danger" onClick={() => {
-          setAttendanceData(buildPointMap(ATTENDANCE_POINTS));
-          setTrainingData(buildPointMap(TRAINING_POINTS));
-          setStudentData(buildPointMap(STUDENT_POINTS));
-          setDocumentData(buildPointMap(DOCUMENT_POINTS));
-          setIssueData(Object.fromEntries(ISSUE_POINTS.map((p) => [p.id, emptyIssueValue()])));
-          setBasicDetails(BASIC_DETAILS_INIT);
-          setReportStatus('Draft');
-          setFinalStatus('Pending');
-          notify('Form reset');
-        }}>
-          <i className="fas fa-redo" /> Reset Form
-        </button>
-      </footer>
+  
         </>
       )}
 
@@ -999,6 +712,209 @@ const PORTAL_CSS = `
   .dbr-footer { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 2px solid ${PINK}; padding: 10px 20px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; z-index: 100; box-shadow: 0 -4px 16px rgba(0,0,0,0.06); }
   .dbr-toast { position: fixed; bottom: 70px; right: 20px; background: #1e293b; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 600; z-index: 200; }
 
+  /* ── Lead-style hero banner ── */
+  .tm-hero-wrap { margin-bottom: 14px; }
+  .tm-hero {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: linear-gradient(90deg, #0b5ed7 0%, #1aa3ff 55%, #2dd4ff 100%);
+    border-radius: 14px;
+    padding: 12px 56px 12px 12px;
+    box-shadow: 0 6px 20px rgba(11,94,215,0.25);
+  }
+
+  .tm-hero__details {
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px 14px;
+    align-content: center;
+  }
+  .tm-hero__detail { min-width: 0; }
+  .tm-hero__detail-label {
+    font-size: 11px;
+    font-weight: 800;
+    color: rgba(255,255,255,0.9);
+    margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tm-hero__detail-label i { margin-right: 5px; opacity: 0.9; }
+  .tm-hero__detail-value {
+    font-size: 14px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tm-hero__identity {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 200px;
+    flex: 0 0 auto;
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 12px;
+    padding: 10px;
+    background: rgba(255,255,255,0.14);
+    backdrop-filter: blur(6px);
+  }
+  .tm-hero__field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.18);
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 10px;
+    padding: 6px 9px;
+  }
+  .tm-hero__field-icon { font-size: 13px; color: #fff; opacity: 0.95; width: 16px; text-align: center; flex-shrink: 0; }
+  .tm-hero__input {
+    width: 100%; border: none; outline: none; background: transparent;
+    color: #fff; font-weight: 700; font-size: 13px; line-height: 1.1; min-width: 0;
+    text-overflow: ellipsis;
+  }
+  .tm-hero__input::placeholder { color: rgba(255,255,255,0.85); font-weight: 600; }
+
+  .tm-hero__approval {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    padding: 14px 12px 10px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.14);
+    border: 1px solid rgba(255,255,255,0.28);
+    backdrop-filter: blur(6px);
+  }
+  .tm-hero__approval-label {
+    position: absolute;
+    top: -10px;
+    left: 10px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: rgba(11,94,215,0.95);
+    border: 1px solid rgba(255,255,255,0.35);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 18px;
+    white-space: nowrap;
+  }
+  .tm-approval__row { display: flex; align-items: center; gap: 8px; }
+  .tm-approval__pill {
+    border: 1px solid rgba(255,255,255,0.35);
+    color: #fff;
+    border-radius: 999px;
+    padding: 6px 14px;
+    height: 34px;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    background: rgba(255,255,255,0.18);
+    text-transform: uppercase;
+    min-width: 110px;
+    cursor: default;
+  }
+  .tm-approval__pill--draft { background: rgba(148,163,184,0.32); border-color: rgba(148,163,184,0.55); }
+  .tm-approval__pill--submitted { background: rgba(245,158,11,0.30); border-color: rgba(245,158,11,0.55); }
+  .tm-approval__pill--approved { background: rgba(16,185,129,0.30); border-color: rgba(16,185,129,0.55); }
+  .tm-approval__pill--returned { background: rgba(239,68,68,0.28); border-color: rgba(239,68,68,0.55); }
+  .tm-approval__iconbtn {
+    width: 34px; height: 34px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.16);
+    color: #fff;
+    cursor: pointer;
+    transition: 0.12s;
+  }
+  .tm-approval__iconbtn:hover { background: rgba(255,255,255,0.28); transform: translateY(-1px); }
+
+  .tm-hero__pills {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+  .tm-hero__pill {
+    width: 40px; height: 40px;
+    border: none;
+    border-radius: 999px;
+    background: #fa5579;
+    color: #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 6px 14px rgba(250,85,121,0.35);
+    transition: 0.12s;
+  }
+  .tm-hero__pill:hover { filter: brightness(0.96); transform: translateY(-1px); }
+
+  .tm-hero__float-icon {
+    position: absolute;
+    top: 12px; right: 12px;
+    width: 34px; height: 34px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.85);
+    background: rgba(255,255,255,0.92);
+    color: #0b5ed7;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+  }
+  .tm-hero__float-icon:hover { background: #fff; }
+
+  /* Detail card */
+  .tm-detail {
+    position: relative;
+    border: 1px solid #dbe1e8;
+    border-radius: 12px;
+    background: #fff;
+    padding: 22px 16px 14px;
+    margin-top: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+  .tm-detail__title {
+    position: absolute;
+    top: -12px; left: 50%;
+    transform: translateX(-50%);
+    background: #fff;
+    padding: 0 12px;
+    font-weight: 900;
+    color: #111827;
+    font-size: 15px;
+    white-space: nowrap;
+  }
+  .tm-detail__grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px 18px;
+  }
+  .tm-detail__item { min-width: 0; }
+  .tm-detail__label { font-size: 12px; color: #fa5579; font-weight: 700; margin-bottom: 3px; }
+  .tm-detail__value {
+    font-size: 14px; font-weight: 800; color: #111827; line-height: 1.2;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .tm-detail__foot { display: flex; justify-content: flex-end; margin-top: 12px; }
+  .tm-detail__history {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #fff; border: 1px solid #cbd5e1; color: #475569;
+    border-radius: 8px; padding: 6px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
+  }
+  .tm-detail__history:hover { background: #f8fafc; }
+
   .mt-1 { margin-top: 4px; }
   .mt-2 { margin-top: 8px; }
   .mt-3 { margin-top: 12px; }
@@ -1011,6 +927,14 @@ const PORTAL_CSS = `
     .dbr-filter-pill { max-width: 100%; }
     .dbr-points-grid { grid-template-columns: 1fr; }
     .dbr-basic-grid { grid-template-columns: 1fr; }
+    .tm-hero { padding: 12px 48px 12px 12px; }
+    .tm-hero__identity { min-width: 100%; flex: 1 1 100%; }
+    .tm-hero__details { grid-template-columns: 1fr 1fr; }
+    .tm-detail__grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (min-width: 769px) and (max-width: 1100px) {
+    .tm-hero__details { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .tm-detail__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
 `;
 

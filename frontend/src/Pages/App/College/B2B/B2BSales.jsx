@@ -2260,6 +2260,29 @@ const B2BSales = () => {
     }
   };
 
+  const fetchAiLeadIntel = async (fetchedLeads) => {
+    if (!Array.isArray(fetchedLeads) || fetchedLeads.length === 0) {
+      setAiLeadIntelLoading(false);
+      return;
+    }
+
+    try {
+      setAiLeadIntelLoading(true);
+      const aiRes = await axios.post(
+        `${backendUrl}/api/ai/lead-intel/bulk`,
+        { leads: fetchedLeads },
+        { headers: { 'x-auth': token } }
+      );
+      if (aiRes?.data?.success && aiRes?.data?.data) {
+        setAiLeadIntelById((prev) => ({ ...prev, ...(aiRes.data.data || {}) }));
+      }
+    } catch (aiErr) {
+      setAiLeadIntelError(aiErr?.response?.data?.message || 'AI lead supervision unavailable.');
+    } finally {
+      setAiLeadIntelLoading(false);
+    }
+  };
+
   const fetchLeads = async (statusFilter = null, page = 1, filterOverrides = {}) => {
     try {
       closePanel();
@@ -2273,7 +2296,7 @@ const B2BSales = () => {
         page: page,
         sortBy: 'updatedAt',
         sortOrder: 'desc',
-        // limit: 10,           
+        limit: 20,
       };
 
       if (statusFilter) {
@@ -2332,24 +2355,7 @@ const B2BSales = () => {
         // });
 
         setLeads(fetchedLeads);
-
-        try {
-          if (Array.isArray(fetchedLeads) && fetchedLeads.length > 0) {
-            setAiLeadIntelLoading(true);
-            const aiRes = await axios.post(
-              `${backendUrl}/api/ai/lead-intel/bulk`,
-              { leads: fetchedLeads },
-              { headers: { 'x-auth': token } }
-            );
-            if (aiRes?.data?.success && aiRes?.data?.data) {
-              setAiLeadIntelById((prev) => ({ ...prev, ...(aiRes.data.data || {}) }));
-            }
-          }
-        } catch (aiErr) {
-          setAiLeadIntelError(aiErr?.response?.data?.message || 'AI lead supervision unavailable.');
-        } finally {
-          setAiLeadIntelLoading(false);
-        }
+        fetchAiLeadIntel(fetchedLeads);
         // ✅ Extract pagination data from backend response
         if (response.data.data.pagination) {
           setTotalPages(response.data.data.pagination.totalPages || 1);

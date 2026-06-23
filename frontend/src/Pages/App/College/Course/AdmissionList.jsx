@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import DatePicker from 'react-date-picker';
 
 import 'react-date-picker/dist/DatePicker.css';
@@ -431,6 +432,27 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
   // ========================================
   // 🎯 Main Tab State
   // ========================================
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const ADMISSION_FILTER_IDS = ['alladmission', 'pendingBatchAssign', 'batchAssigned', 'zeroPeriod', 'batchFreeze', 'dropout'];
+
+  const parseAdmissionFilterIndex = (params) => {
+    const filterParam = params.get('filter');
+    const index = parseInt(filterParam, 10);
+    if (!Number.isNaN(index) && index >= 0 && index < ADMISSION_FILTER_IDS.length) return index;
+    return 0;
+  };
+
+  const initialCrmFilterIndex = parseAdmissionFilterIndex(searchParams);
+
+  const updateFilterInUrl = useCallback((index) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('filter', String(index));
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
   const [mainTab, setMainTab] = useState('AllAdmission'); // 'Ekyc' or 'AllAdmission'
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
 
@@ -438,7 +460,7 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(false);
   const [openModalId, setOpenModalId] = useState(null);
   const [showPopup, setShowPopup] = useState(null);
-  const [activeCrmFilter, setActiveCrmFilter] = useState(0);
+  const [activeCrmFilter, setActiveCrmFilter] = useState(initialCrmFilterIndex);
   const [showEditPanel, setShowEditPanel] = useState(false);
   const [showFollowupPanel, setShowFollowupPanel] = useState(false);
   const [showWhatsappPanel, setShowWhatsappPanel] = useState(false);
@@ -1079,14 +1101,14 @@ const AdmissionList = ({ openPanel = null, closePanel = null, isPanelOpen = null
     setActiveCrmFilter(index);
     console.log('_id', _id)
     setFilterData({ ...filterData, status: _id });
-
+    updateFilterInUrl(index);
   };
 
   // Filter state from Registration component
   const [filterData, setFilterData] = useState({
     name: '',
     courseType: '',
-    status: 'alladmission',
+    status: ADMISSION_FILTER_IDS[initialCrmFilterIndex] || 'alladmission',
     leadStatus: '',
     sector: '',
     createdFromDate: null,

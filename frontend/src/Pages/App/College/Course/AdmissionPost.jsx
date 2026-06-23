@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import DatePicker from 'react-date-picker';
-// import KYCManagement from './kycManagement';
+import KYCManagement from './kycManagement';
 import AdmissionList from './AdmissionList';
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
@@ -154,10 +155,6 @@ const CRMDashboard = (profile) => {
     // const permissions = userData.permissions;
     const [permissions, setPermissions] = useState();
 
-    useEffect(() => {
-      updatedPermission()
-    }, [])
-  
     const updatedPermission = async () => {
   
       const respose = await axios.get(`${backendUrl}/college/permission`, {
@@ -170,10 +167,58 @@ const CRMDashboard = (profile) => {
     }
     
     const [isPanelOpen, setIsPanelOpen] = useState(false);
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    const getMainTabFromParams = useCallback((params) => {
+        const tab = params.get('tab');
+        if (tab === 'admission' || tab === 'AllAdmission') return 'AllAdmission';
+        if (tab === 'kyc') return 'kyc';
+        return 'kyc';
+    }, []);
+
+    const mainTabToParam = useCallback((tab) => (tab === 'AllAdmission' ? 'admission' : 'kyc'), []);
+
+    const updateSearchParams = useCallback((updates) => {
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            Object.entries(updates).forEach(([key, value]) => {
+                if (value === null || value === undefined) {
+                    next.delete(key);
+                } else {
+                    next.set(key, String(value));
+                }
+            });
+            return next;
+        }, { replace: true });
+    }, [setSearchParams]);
+
     // ========================================OpenPanel
     // 🎯 Main Tab State
     // ========================================
-    const [mainTab, setMainTab] = useState('AllAdmission'); // 'kyc' or 'AllAdmission'
+    const [mainTab, setMainTab] = useState(() => getMainTabFromParams(searchParams)); // 'kyc' or 'AllAdmission'
+
+    useEffect(() => {
+      updatedPermission()
+    }, [])
+
+    useEffect(() => {
+        if (!searchParams.get('tab')) {
+            updateSearchParams({ tab: mainTabToParam(mainTab) });
+        }
+    }, []);
+
+    const canViewKyc = useMemo(
+        () => (permissions?.custom_permissions?.can_view_kyc && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin',
+        [permissions]
+    );
+
+    useEffect(() => {
+        if (permissions === undefined) return;
+        if (mainTab === 'kyc' && !canViewKyc) {
+            setMainTab('AllAdmission');
+            updateSearchParams({ tab: 'admission' });
+        }
+    }, [permissions, canViewKyc, mainTab, updateSearchParams]);
     const [isNewModalOpen, setIsNewModalOpen] = useState(false);
 
     const [activeTab, setActiveTab] = useState({});
@@ -662,9 +707,9 @@ const CRMDashboard = (profile) => {
     // 🎯 Main Tab Change Handler
     // ========================================
     const handleMainTabChange = (tabName) => {
+        if (tabName === mainTab) return;
         setMainTab(tabName);
-        setActiveCrmFilter(0);
-
+        updateSearchParams({ tab: mainTabToParam(tabName) });
     };
 
     const handleUpdateStatus = async () => {
@@ -819,12 +864,12 @@ const CRMDashboard = (profile) => {
 
     const renderMainTabContent = () => {
         switch (mainTab) {
-            // case 'kyc':
-            //     return <KYCManagement openPanel={openPanel} closePanel={closePanel} isPanelOpen={isPanelOpen} />;
+            case 'kyc':
+                return <KYCManagement openPanel={openPanel} closePanel={closePanel} isPanelOpen={isPanelOpen} />;
             case 'AllAdmission':
                 return <AdmissionList openPanel={openPanel} closePanel={closePanel} isPanelOpen={isPanelOpen} />;
             default:
-                return <AdmissionList openPanel={openPanel} closePanel={closePanel} isPanelOpen={isPanelOpen} />;
+                return <KYCManagement openPanel={openPanel} closePanel={closePanel} isPanelOpen={isPanelOpen} />;
         }
     };
 
@@ -1684,7 +1729,7 @@ const CRMDashboard = (profile) => {
                                         <div className="main-tabs-container">
                                             <ul className="nav nav-tabs nav-tabs-main border-0">
                                                 {/* kyc Management Tab */}
-                                          {/* {((permissions?.custom_permissions?.can_view_kyc && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                                          {((permissions?.custom_permissions?.can_view_kyc && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
                                                
                                                 <li className="nav-item">
                                                     <button
@@ -1697,7 +1742,7 @@ const CRMDashboard = (profile) => {
                                                         </span>
                                                     </button>
                                                 </li>
-                                          )} */}
+                                          )}
                                                 {/* All Admission Tab */}
                                                 <li className="nav-item">
                                                     <button
