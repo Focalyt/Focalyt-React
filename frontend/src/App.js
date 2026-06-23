@@ -106,6 +106,7 @@ import TypeCategory from './Pages/App/College/Settings/TypeOfCategory/TypeCatego
 import Target from './Pages/App/College/Target/Target';
 import Lrp from './Pages/App/College/LRP/Lrp';
 import LrpView from './Pages/App/College/LRP/LrpView';
+import VideoTimestamp from './Pages/App/College/VideoTimestamp/VideoTimestamp';
 
 
 import CompanyLayout from './Component/Layouts/App/Company';
@@ -329,6 +330,7 @@ const Layout = () => {
           <Route path='target' element={<Target/>}/>
           <Route path='lrp' element={<Lrp/>}/>
           <Route path='lrp-view' element={<LrpView/>}/>
+          <Route path='video-timestamp' element={<VideoTimestamp/>}/>
         </Route>
 
         {/* company  */}
