@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import DatePicker from 'react-date-picker';
-import KYCManagement from './kycManagement';
+// import KYCManagement from './kycManagement';
 import AdmissionList from './AdmissionList';
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
 
@@ -173,7 +173,7 @@ const CRMDashboard = (profile) => {
     // ========================================OpenPanel
     // 🎯 Main Tab State
     // ========================================
-    const [mainTab, setMainTab] = useState('kyc'); // 'kyc' or 'AllAdmission'
+    const [mainTab, setMainTab] = useState('AllAdmission'); // 'kyc' or 'AllAdmission'
     const [isNewModalOpen, setIsNewModalOpen] = useState(false);
 
     const [activeTab, setActiveTab] = useState({});
@@ -819,12 +819,12 @@ const CRMDashboard = (profile) => {
 
     const renderMainTabContent = () => {
         switch (mainTab) {
-            case 'kyc':
-                return <KYCManagement openPanel={openPanel} closePanel={closePanel} isPanelOpen={isPanelOpen} />;
+            // case 'kyc':
+            //     return <KYCManagement openPanel={openPanel} closePanel={closePanel} isPanelOpen={isPanelOpen} />;
             case 'AllAdmission':
                 return <AdmissionList openPanel={openPanel} closePanel={closePanel} isPanelOpen={isPanelOpen} />;
             default:
-                return null;
+                return <AdmissionList openPanel={openPanel} closePanel={closePanel} isPanelOpen={isPanelOpen} />;
         }
     };
 
@@ -1684,7 +1684,7 @@ const CRMDashboard = (profile) => {
                                         <div className="main-tabs-container">
                                             <ul className="nav nav-tabs nav-tabs-main border-0">
                                                 {/* kyc Management Tab */}
-                                          {((permissions?.custom_permissions?.can_view_kyc && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                                          {/* {((permissions?.custom_permissions?.can_view_kyc && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
                                                
                                                 <li className="nav-item">
                                                     <button
@@ -1697,7 +1697,7 @@ const CRMDashboard = (profile) => {
                                                         </span>
                                                     </button>
                                                 </li>
-                                          )}
+                                          )} */}
                                                 {/* All Admission Tab */}
                                                 <li className="nav-item">
                                                     <button

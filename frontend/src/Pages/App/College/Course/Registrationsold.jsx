@@ -27239,7 +27239,7 @@ max-width: 600px;
         }
 
         .lead-card-kyc-dash__stat-label{
-          font-size: 10px;
+          font-size: 9px;
           font-weight: 600;
           margin: 0;
           line-height: 1.2;
@@ -27249,7 +27249,7 @@ max-width: 600px;
 
         .lead-card-kyc-dash__stat-divider{
           width: 72%;
-          max-width: 52px;
+          max-width: 40px;
           height: 1px;
           margin: 6px 0;
           background: rgba(255, 255, 255, 0.95);
@@ -27796,7 +27796,7 @@ max-width: 600px;
         }
 
         .lead-strip-v3__stat-label{
-          font-size: 10px;
+          font-size: 9px;
           font-weight: 800;
           line-height: 1.1;
         }
