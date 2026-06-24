@@ -371,8 +371,8 @@ const TrainerModule = () => {
       {/* ── Header ── */}
       <header className="dbr-header">
         <div>
-          <h1 className="dbr-title">Daily Batch Monitoring Report Card</h1>
-          <nav className="dbr-breadcrumb">
+          <h1 className="dbr-title">Trainer Report Card</h1>
+          <nav className="dbr-breadcrumb">  
             <a href="/">Home</a>
             <span>/</span>
             <span>Training Module</span>
