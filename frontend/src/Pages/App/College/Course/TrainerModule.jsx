@@ -477,31 +477,70 @@ const TrainerModule = () => {
 
       {/* ── Lead-style hero banner + detail card ── */}
       <div className="tm-hero-wrap">
-        {/* Gradient hero banner */}
-        <div className="tm-hero">
-          {cardsExpanded && (
-          <div className="tm-hero__details">
-            {[
-              ['fa-project-diagram', 'Project Name', basicDetails.projectName],
-              ['fa-building', 'Center Name', basicDetails.centerName],
-              ['fa-chalkboard-teacher', 'Trainer Name', basicDetails.trainerName],
-              ['fa-graduation-cap', 'Course / Trade', basicDetails.courseTrade],
-              ['fa-barcode', 'Batch Code', basicDetails.batchCode],
-              ['fa-calendar-day', 'Total Days', basicDetails.totalDaysTillDate],
-            ].map(([icon, label, value]) => (
-              <div key={label} className="tm-hero__detail">
-                <div className="tm-hero__detail-label">
-                  <i className={`fas ${icon}`} /> {label}
+        <div className="tm-session-card">
+              <div className="tm-session-card__identity">
+                <div className="tm-person-line">
+                  <span className="tm-person-line__icon"><i className="far fa-user-circle" /></span>
+                  <span>
+                    <strong>{basicDetails.trainerName}</strong>
+                    <small>Trainer</small>
+                  </span>
                 </div>
-                <div className="tm-hero__detail-value" title={value}>{value || '—'}</div>
+                <div className="tm-person-line">
+                  <span className="tm-person-line__icon"><i className="far fa-building" /></span>
+                  <span>
+                    <strong>{basicDetails.centerName}</strong>
+                    <small>Training Centre</small>
+                  </span>
+                </div>
+                <div className="tm-person-line">
+                  <span className="tm-person-line__icon"><i className="fas fa-phone-alt" /></span>
+                  <span>
+                    <strong>{TRAINER_INFO.mobile}</strong>
+                    <small>Contact Number</small>
+                  </span>
+                </div>
               </div>
-            ))}
-          </div>
-          )}
 
+              <div className="tm-session-card__meta">
+                <div>
+                  <span className="tm-overline">Session Status</span>
+                  <span className="tm-status-pill">Completed</span>
+                </div>
+                <div>
+                  <span className="tm-overline">Session ID</span>
+                  <strong className="tm-session-id">
+                    S-20240622-01
+                    <button type="button" className="tm-copy-btn" title="Copy session id" onClick={() => notify('Session ID copied')}>
+                      <i className="far fa-copy" />
+                    </button>
+                  </strong>
+                </div>
+              </div>
+
+              <div className="tm-session-card__stats">
+                {[
+                  ['fa-user-friends', 'Total Candidates', '30', 'blue'],
+                  ['fa-check', 'Present', '26', 'green'],
+                  ['fa-times', 'Absent', '4', 'red'],
+                  ['fa-percent', 'Attendance %', '86.7%', 'orange'],
+                ].map(([icon, label, value, tone]) => (
+                  <div key={label} className={`tm-stat-card tm-stat-card--${tone}`}>
+                    <span className="tm-stat-card__icon"><i className={`fas ${icon}`} /></span>
+                    <strong>{value}</strong>
+                    <span>{label}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="tm-session-card__schedule">
+                <div><i className="far fa-calendar" /> <span>22 Jun 2026</span></div>
+                <div><i className="far fa-clock" /> <span>10:00 AM - 12:00 PM</span></div>
+                <div><i className="fas fa-hourglass-half" /> <span>2 hrs</span></div>
+              </div>
           <button
             type="button"
-            className="tm-hero__float-icon"
+            className="tm-session-card__toggle"
             onClick={() => setCardsExpanded((e) => !e)}
             title={cardsExpanded ? 'Collapse' : 'Expand'}
           >
@@ -510,6 +549,92 @@ const TrainerModule = () => {
         </div>
 
       </div>
+
+      {cardsExpanded && (
+      <section className="tm-session-body">
+        <div className="tm-session-body__tabs">
+          <button
+            type="button"
+            className={`tm-body-tab${activeTab === 'details' ? ' tm-body-tab--active' : ''}`}
+            onClick={() => setActiveTab('details')}
+          >
+            <i className="far fa-list-alt" /> Session Details
+          </button>
+          <button
+            type="button"
+            className={`tm-body-tab${activeTab === 'evidence' ? ' tm-body-tab--active' : ''}`}
+            onClick={() => setActiveTab('evidence')}
+          >
+            <i className="far fa-image" /> Evidence
+          </button>
+        </div>
+
+        {activeTab === 'details' ? (
+          <div className="tm-session-body__content">
+            <div className="tm-detail-grid">
+              {[
+                ['fa-book-open', 'Topic', 'Basics of Retail & Customer Service', 'blue'],
+                ['fa-graduation-cap', 'Course / Trade', basicDetails.courseTrade, 'blue'],
+                ['fa-hashtag', 'Batch Code', basicDetails.batchCode, 'pink'],
+                ['fa-chalkboard', 'Training Method', 'Interactive Learning', 'blue'],
+                ['fa-clock', 'Duration', '2 hrs', 'blue'],
+                ['fa-user-friends', 'Trainer', basicDetails.trainerName, 'pink'],
+              ].map(([icon, label, value, tone]) => (
+                <div key={label} className="tm-detail-item">
+                  <span className={`tm-detail-item__icon tm-detail-item__icon--${tone}`}>
+                    <i className={`fas ${icon}`} />
+                  </span>
+                  <span>
+                    <small>{label}</small>
+                    <strong>{value}</strong>
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="tm-notes-row">
+              <span className="tm-detail-item__icon tm-detail-item__icon--blue">
+                <i className="far fa-edit" />
+              </span>
+              <span>
+                <small>Additional Notes</small>
+                <strong>Covered basics of customer service and communication skills.</strong>
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="tm-session-body__content">
+            <div className="tm-evidence-grid">
+              {[
+                ['fa-image', 'Class Photo', 'Uploaded'],
+                ['fa-file-alt', 'Attendance Sheet', 'Pending'],
+                ['fa-video', 'Training Clip', 'Uploaded'],
+              ].map(([icon, title, status]) => (
+                <div key={title} className="tm-evidence-card">
+                  <span><i className={`fas ${icon}`} /></span>
+                  <strong>{title}</strong>
+                  <small className={status === 'Uploaded' ? 'text-success' : 'text-warning'}>{status}</small>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="tm-session-body__actions">
+          <button type="button" className="tm-action-btn tm-action-btn--outline" onClick={() => notify('Edit session')}>
+            <i className="far fa-edit" /> Edit Session
+          </button>
+          <div className="tm-session-body__action-group">
+            <button type="button" className="tm-action-btn tm-action-btn--outline" onClick={() => notify('Mark attendance')}>
+              <i className="fas fa-user-check" /> Mark Attendance
+            </button>
+            <button type="button" className="tm-action-btn tm-action-btn--solid" onClick={() => notify('View attendance')}>
+              <i className="far fa-chart-bar" /> View Attendance
+            </button>
+          </div>
+        </div>
+      </section>
+      )}
 
 
   
@@ -711,6 +836,348 @@ const PORTAL_CSS = `
 
   .dbr-footer { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 2px solid ${PINK}; padding: 10px 20px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; z-index: 100; box-shadow: 0 -4px 16px rgba(0,0,0,0.06); }
   .dbr-toast { position: fixed; bottom: 70px; right: 20px; background: #1e293b; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 600; z-index: 200; }
+
+  /* Session overview card */
+  .tm-session-card {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(220px, 1.2fr) minmax(130px, 0.7fr) minmax(300px, 1.45fr) minmax(170px, 0.85fr);
+    gap: 14px;
+    align-items: stretch;
+    min-height: 148px;
+    margin-bottom: 14px;
+    padding: 20px 64px 20px 20px;
+    border: 1px solid #dbe4ef;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 12px 30px rgba(15,23,42,0.06);
+  }
+  .tm-session-card--collapsed { min-height: 54px; padding: 12px 70px 12px 18px; }
+  .tm-session-card__identity {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
+    padding: 16px;
+    border-radius: 12px;
+    background: #f5f8ff;
+    border: 1px solid #e4ebf7;
+  }
+  .tm-person-line { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .tm-person-line__icon {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex: 0 0 36px;
+    border-radius: 10px;
+    background: #e5edff;
+    color: #1d4ed8;
+    font-size: 15px;
+    box-shadow: inset 0 0 0 1px rgba(37,99,235,0.08);
+  }
+  .tm-person-line span:last-child { min-width: 0; }
+  .tm-person-line strong {
+    display: block;
+    color: #0f172a;
+    font-size: 13px;
+    line-height: 1.25;
+    font-weight: 800;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tm-person-line small {
+    display: block;
+    margin-top: 2px;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .tm-session-card__meta {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 24px;
+    min-width: 0;
+  }
+  .tm-overline {
+    display: block;
+    margin-bottom: 7px;
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+  .tm-status-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 5px 14px;
+    border-radius: 999px;
+    background: #d8f7e6;
+    color: #059669;
+    font-size: 13px;
+    font-weight: 800;
+  }
+  .tm-session-id {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    color: #111827;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1.2;
+  }
+  .tm-copy-btn {
+    width: 22px; height: 22px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+  }
+  .tm-copy-btn:hover { color: ${BLUE}; }
+  .tm-session-card__stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(68px, 1fr));
+    gap: 10px;
+    align-content: stretch;
+  }
+  .tm-stat-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 120px;
+    padding: 12px 8px;
+    border: 1px solid #dce5f0;
+    border-radius: 12px;
+    text-align: center;
+  }
+  .tm-stat-card--blue { background: linear-gradient(180deg, #f3f6ff 0%, #eef4ff 100%); }
+  .tm-stat-card--green { background: linear-gradient(180deg, #f1fbf6 0%, #ecfdf5 100%); }
+  .tm-stat-card--red { background: linear-gradient(180deg, #fff5f4 0%, #feeef0 100%); }
+  .tm-stat-card--orange { background: linear-gradient(180deg, #fff8ed 0%, #fff3df 100%); }
+  .tm-stat-card__icon {
+    width: 46px; height: 46px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 13px;
+    font-size: 18px;
+  }
+  .tm-stat-card--blue .tm-stat-card__icon { background: #dbe7ff; color: #2563eb; }
+  .tm-stat-card--green .tm-stat-card__icon { background: #cff7df; color: #059669; }
+  .tm-stat-card--red .tm-stat-card__icon { background: #ffe0e3; color: #dc2626; }
+  .tm-stat-card--orange .tm-stat-card__icon { background: #ffead1; color: #d97706; }
+  .tm-stat-card strong {
+    color: #0f172a;
+    font-size: 24px;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .tm-stat-card span:last-child {
+    color: #111827;
+    font-size: 11px;
+    font-weight: 750;
+    line-height: 1.2;
+  }
+  .tm-session-card__schedule {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 15px;
+    min-width: 0;
+    padding-left: 6px;
+  }
+  .tm-session-card__schedule div {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 750;
+    min-width: 0;
+  }
+  .tm-session-card__schedule i {
+    width: 22px;
+    color: #475569;
+    font-size: 16px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .tm-session-card__schedule span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tm-session-card__toggle {
+    position: absolute;
+    top: 20px; right: 20px;
+    width: 40px; height: 40px;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    background: #fff;
+    color: ${BLUE};
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 8px 18px rgba(15,23,42,0.08);
+    transition: 0.15s;
+  }
+  .tm-session-card__toggle:hover { transform: translateY(-1px); box-shadow: 0 14px 28px rgba(15,23,42,0.12); }
+
+  /* Session body card */
+  .tm-session-body {
+    overflow: hidden;
+    margin-bottom: 18px;
+    border: 1px solid #dbe4ef;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 12px 30px rgba(15,23,42,0.055);
+  }
+  .tm-session-body__tabs {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    min-height: 58px;
+    padding: 0 24px;
+    border-bottom: 1px solid #e5ebf3;
+  }
+  .tm-body-tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    height: 58px;
+    border: none;
+    background: transparent;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .tm-body-tab i { color: #64748b; }
+  .tm-body-tab--active { color: ${BLUE}; }
+  .tm-body-tab--active i { color: ${BLUE}; }
+  .tm-body-tab--active::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; bottom: -1px;
+    height: 2px;
+    border-radius: 999px 999px 0 0;
+    background: ${BLUE};
+  }
+  .tm-session-body__content { padding: 30px 36px 26px; }
+  .tm-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(190px, 1fr));
+    gap: 30px 48px;
+  }
+  .tm-detail-item,
+  .tm-notes-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-width: 0;
+  }
+  .tm-detail-item__icon {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex: 0 0 36px;
+    border-radius: 9px;
+    font-size: 15px;
+  }
+  .tm-detail-item__icon--blue { background: #eef4ff; color: #1d4ed8; }
+  .tm-detail-item__icon--pink { background: #fff1f3; color: #8a3c3c; }
+  .tm-detail-item span:last-child,
+  .tm-notes-row span:last-child { min-width: 0; }
+  .tm-detail-item small,
+  .tm-notes-row small {
+    display: block;
+    margin-bottom: 4px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 750;
+  }
+  .tm-detail-item strong,
+  .tm-notes-row strong {
+    display: block;
+    color: #111827;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1.35;
+  }
+  .tm-detail-item strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tm-notes-row {
+    margin-top: 28px;
+    padding-top: 22px;
+    border-top: 1px dashed #d7dee8;
+  }
+  .tm-evidence-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(160px, 1fr));
+    gap: 14px;
+  }
+  .tm-evidence-card {
+    min-height: 112px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 7px;
+    padding: 18px;
+    border: 1px solid #dbe4ef;
+    border-radius: 12px;
+    background: #fbfcfe;
+  }
+  .tm-evidence-card span {
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 10px;
+    background: #eef4ff;
+    color: ${BLUE};
+  }
+  .tm-evidence-card strong { color: #111827; font-size: 13px; font-weight: 800; }
+  .tm-evidence-card small { font-size: 12px; font-weight: 800; }
+  .tm-session-body__actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 20px 36px;
+    border-top: 1px solid #e5ebf3;
+  }
+  .tm-session-body__action-group { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 14px; }
+  .tm-action-btn {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border-radius: 8px;
+    padding: 0 24px;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: 0.15s;
+    white-space: nowrap;
+  }
+  .tm-action-btn--outline {
+    border: 1.5px solid #2563eb;
+    background: #fff;
+    color: ${BLUE};
+  }
+  .tm-action-btn--outline:hover { background: #eff6ff; }
+  .tm-action-btn--solid {
+    border: 1.5px solid ${BLUE};
+    background: ${BLUE};
+    color: #fff;
+    box-shadow: 0 10px 18px rgba(37,99,235,0.22);
+  }
+  .tm-action-btn--solid:hover { filter: brightness(0.96); transform: translateY(-1px); }
 
   /* ── Lead-style hero banner ── */
   .tm-hero-wrap { margin-bottom: 14px; }
@@ -927,12 +1394,36 @@ const PORTAL_CSS = `
     .dbr-filter-pill { max-width: 100%; }
     .dbr-points-grid { grid-template-columns: 1fr; }
     .dbr-basic-grid { grid-template-columns: 1fr; }
+    .tm-session-card {
+      grid-template-columns: 1fr;
+      gap: 14px;
+      padding: 16px 16px 76px;
+    }
+    .tm-session-card--collapsed { padding: 12px 68px 12px 16px; }
+    .tm-session-card__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .tm-stat-card { min-height: 116px; }
+    .tm-session-card__schedule { padding-left: 0; gap: 12px; }
+    .tm-session-card__toggle { top: auto; right: 16px; bottom: 16px; }
+    .tm-session-body__tabs { gap: 18px; padding: 0 18px; overflow-x: auto; }
+    .tm-body-tab { height: 58px; font-size: 13px; flex: 0 0 auto; }
+    .tm-session-body__content { padding: 24px 18px; }
+    .tm-detail-grid,
+    .tm-evidence-grid { grid-template-columns: 1fr; gap: 20px; }
+    .tm-detail-item strong { white-space: normal; }
+    .tm-notes-row { margin-top: 24px; padding-top: 20px; }
+    .tm-session-body__actions { align-items: stretch; flex-direction: column; padding: 18px; }
+    .tm-session-body__action-group { flex-direction: column; }
+    .tm-action-btn { width: 100%; min-height: 46px; padding: 0 16px; }
     .tm-hero { padding: 12px 48px 12px 12px; }
     .tm-hero__identity { min-width: 100%; flex: 1 1 100%; }
     .tm-hero__details { grid-template-columns: 1fr 1fr; }
     .tm-detail__grid { grid-template-columns: 1fr 1fr; }
   }
   @media (min-width: 769px) and (max-width: 1100px) {
+    .tm-session-card { grid-template-columns: 1fr 1fr; padding-right: 70px; }
+    .tm-session-card__stats { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+    .tm-detail-grid { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
+    .tm-evidence-grid { grid-template-columns: repeat(2, minmax(160px, 1fr)); }
     .tm-hero__details { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .tm-detail__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
