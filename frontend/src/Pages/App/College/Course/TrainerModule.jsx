@@ -191,53 +191,40 @@ const SessionCard = ({ basicDetails, notify }) => {
               {basicDetails.centerName}&nbsp;·&nbsp;{TRAINER_INFO.mobile}
             </div>
           </div>
-        </div>
-        <div className="sc-head-right">
-          <span className="sc-badge sc-badge--green">
-            <i className="fas fa-check-circle" /> Completed
-          </span>
-          <span className="sc-badge sc-badge--blue">
-            <i className="fas fa-fingerprint" />&nbsp;
-            <code>S-20240622-01</code>
-          </span>
-          <button
-            type="button"
-            className="sc-copy-btn"
-            title="Copy session ID"
-            onClick={() => notify('Session ID copied')}
-          >
-            <i className="far fa-copy" />
-          </button>
-          <button
-            type="button"
-            className="sc-toggle-btn"
-            onClick={() => setCollapsed((c) => !c)}
-            aria-label={collapsed ? 'Expand card' : 'Collapse card'}
-          >
-            <i className={`fas fa-chevron-${collapsed ? 'down' : 'up'}`} />
-          </button>
-        </div>
-      </div>
-
-      {!collapsed && (
-        <>
-          {/* ── Meta row ── */}
-          <div className="sc-meta">
+           {/* <div className="sc-meta">
             {[
               ['fa-calendar-alt', '22 Jun 2026'],
               ['fa-clock', '10:00 AM – 12:00 PM'],
               ['fa-hourglass-half', '2 hrs'],
-              ['fa-graduation-cap', basicDetails.courseTrade],
-              ['fa-tag', basicDetails.batchCode],
             ].map(([icon, val]) => (
               <div key={val} className="sc-meta-item">
                 <i className={`fas ${icon}`} />
                 <span>{val}</span>
               </div>
             ))}
-          </div>
+          </div> */}
+        </div>
+        <div className="sc-head-right">
+          <span className="sc-badge sc-badge--green">
+            <i className="fas fa-check-circle" /> Completed
+          </span>
+          {/* <span className="sc-badge sc-badge--blue">
+            <i className="fas fa-fingerprint" />&nbsp;
+            <code>S-20240622-01</code>
+          </span> */}
+          {/* <button
+            type="button"
+            className="sc-copy-btn"
+            title="Copy session ID"
+            onClick={() => notify('Session ID copied')}
+          >
+            <i className="far fa-copy" />
+          </button> */}
+        
+        </div>
 
-          {/* ── Stat strip ── */}
+       
+
           <div className="sc-stats">
             {[
               { icon: 'fa-users', val: '30', lbl: 'Total Candidates', cls: 'blue' },
@@ -255,7 +242,20 @@ const SessionCard = ({ basicDetails, notify }) => {
             ))}
           </div>
 
-          {/* ── Tab bar ── */}
+            <button
+            type="button"
+            className="sc-toggle-btn"
+            onClick={() => setCollapsed((c) => !c)}
+            aria-label={collapsed ? 'Expand card' : 'Collapse card'}
+          >
+            <i className={`fas fa-chevron-${collapsed ? 'down' : 'up'}`} />
+          </button>
+      </div>
+
+      {!collapsed && (
+        <>
+          
+
           <div className="sc-tabs">
             <button
               type="button"
@@ -273,7 +273,6 @@ const SessionCard = ({ basicDetails, notify }) => {
             </button>
           </div>
 
-          {/* ── Tab body ── */}
           {activeTab === 'details' ? (
             <div className="sc-body">
               <div className="sc-detail-grid">
@@ -329,7 +328,6 @@ const SessionCard = ({ basicDetails, notify }) => {
             </div>
           )}
 
-          {/* ── Footer actions ── */}
           <div className="sc-foot">
             <button type="button" className="sc-btn" onClick={() => notify('Edit session')}>
               <i className="far fa-edit" /> Edit Session
@@ -584,36 +582,41 @@ const PORTAL_CSS = `
   ════════════════════════════════════════ */
   .sc-wrap {
     background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 16px;
+    border: 1px solid #bfdbfe;
+    border-radius: 14px;
     overflow: hidden;
     margin-bottom: 14px;
-    box-shadow: 0 2px 12px rgba(15,23,42,0.06);
+    box-shadow: 0 8px 22px rgba(37,99,235,0.12);
   }
 
   /* Head — always one line */
   .sc-head {
     display: flex; align-items: center; justify-content: space-between;
-    gap: 10px; padding: 11px 16px; flex-wrap: nowrap; overflow: hidden;
-    border-bottom: 1px solid #f1f5f9;
-    background: #fafbfc;
+    gap: 12px; padding: 14px 16px 8px; flex-wrap: nowrap; overflow: hidden;
+    border-bottom: 0;
+    background: linear-gradient(105deg, #1264dc 0%, #1b8def 48%, #2bd2e9 100%);
   }
   .sc-head-left {
     display: flex; align-items: center; gap: 10px;
     min-width: 0; flex: 1 1 0; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 9px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.13);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
   }
   .sc-avatar {
-    width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0;
-    background: #fce7ef; color: ${PINK};
+    width: 34px; height: 34px; border-radius: 8px; flex-shrink: 0;
+    background: rgba(255,255,255,0.22); color: #fff;
     display: flex; align-items: center; justify-content: center; font-size: 15px;
   }
   .sc-head-text { min-width: 0; overflow: hidden; }
   .sc-trainer-name {
-    font-size: 13px; font-weight: 800; color: #0f172a;
+    font-size: 13px; font-weight: 800; color: #fff;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .sc-trainer-sub {
-    font-size: 11px; color: #64748b; margin-top: 1px;
+    font-size: 11px; color: rgba(255,255,255,0.86); margin-top: 2px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .sc-head-right {
@@ -623,62 +626,81 @@ const PORTAL_CSS = `
 
   .sc-badge {
     display: inline-flex; align-items: center; gap: 4px;
-    font-size: 11px; font-weight: 700; padding: 4px 9px;
-    border-radius: 999px; white-space: nowrap; flex-shrink: 0;
+    font-size: 11px; font-weight: 800; padding: 7px 12px;
+    border-radius: 9px; white-space: nowrap; flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.35);
+    box-shadow: inset 0 -1px 0 rgba(255,255,255,0.18);
   }
-  .sc-badge--green { background: #d1fae5; color: #065f46; }
-  .sc-badge--blue { background: #dbeafe; color: #1e40af; }
+  .sc-badge--green { background: rgba(16,185,129,0.9); color: #fff; }
+  .sc-badge--blue { background: rgba(255,255,255,0.18); color: #fff; }
   .sc-badge--blue code {
-    font-family: monospace; font-size: 11px; color: #1e40af; font-weight: 700;
+    font-family: monospace; font-size: 11px; color: #fff; font-weight: 800;
   }
 
   .sc-copy-btn {
-    border: none; background: none; cursor: pointer; color: #94a3b8;
-    font-size: 13px; padding: 4px 5px; border-radius: 6px; flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.36); background: rgba(255,255,255,0.12);
+    cursor: pointer; color: #fff;
+    font-size: 13px; width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
   }
-  .sc-copy-btn:hover { background: #f1f5f9; color: ${BLUE}; }
+  .sc-copy-btn:hover { background: rgba(255,255,255,0.22); color: #fff; }
 
   .sc-toggle-btn {
-    border: 1px solid #e2e8f0; background: #fff; border-radius: 8px;
-    padding: 5px 8px; cursor: pointer; color: #64748b; font-size: 12px;
-    display: flex; align-items: center; flex-shrink: 0;
+    border: 0; background: #fff; border-radius: 50%;
+    width: 38px; height: 38px; cursor: pointer; color: ${BLUE}; font-size: 14px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    box-shadow: 0 5px 14px rgba(15,23,42,0.14);
   }
-  .sc-toggle-btn:hover { background: #f8fafc; }
+  .sc-toggle-btn:hover { background: #eff6ff; }
 
   /* Meta row */
   .sc-meta {
-    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
-    padding: 10px 18px; border-bottom: 1px solid #f1f5f9;
+    display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap;
+    padding: 0 16px 10px; border-bottom: 0;
+    background: linear-gradient(105deg, #1264dc 0%, #1b8def 48%, #2bd2e9 100%);
   }
-  .sc-meta-item { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #64748b; }
-  .sc-meta-item i { font-size: 13px; color: #94a3b8; }
-  .sc-meta-item span { font-weight: 600; color: #334155; }
+  .sc-meta-item {
+    display: flex; align-items: center; gap: 7px; font-size: 12px; color: #fff;
+    min-height: 36px; padding: 7px 10px; border-radius: 8px;
+    background: rgba(255,255,255,0.14);
+    border: 1px solid rgba(255,255,255,0.28);
+    min-width: 0;
+  }
+  .sc-meta-item i { font-size: 13px; color: rgba(255,255,255,0.92); }
+  .sc-meta-item span { font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   /* Stat strip */
   .sc-stats {
-    display: grid; grid-template-columns: repeat(4, 1fr);
-    border-bottom: 1px solid #f1f5f9;
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    padding: 0 16px 14px;
+    border-bottom: 0;
+    background: linear-gradient(105deg, #1264dc 0%, #1b8def 48%, #2bd2e9 100%);
   }
   .sc-stat {
     display: flex; flex-direction: column; align-items: center;
-    justify-content: center; padding: 16px 10px; gap: 5px; text-align: center;
+    justify-content: center; padding: 10px 8px; gap: 4px; text-align: center;
     position: relative;
+    min-height: 78px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.28);
+    background: rgba(255,255,255,0.16);
+    box-shadow: inset 0 -1px 0 rgba(255,255,255,0.16);
   }
   .sc-stat + .sc-stat::before {
-    content: ''; position: absolute; left: 0; top: 20%; height: 60%;
-    width: 1px; background: #f1f5f9;
+    content: none;
   }
   .sc-stat__icon {
-    width: 34px; height: 34px; border-radius: 9px;
+    width: 30px; height: 30px; border-radius: 8px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 15px; margin-bottom: 4px;
+    font-size: 14px; margin-bottom: 1px;
   }
-  .sc-stat__icon--blue  { background: #dbeafe; color: #1d4ed8; }
-  .sc-stat__icon--green { background: #d1fae5; color: #059669; }
-  .sc-stat__icon--red   { background: #fee2e2; color: #dc2626; }
-  .sc-stat__icon--amber { background: #fef3c7; color: #d97706; }
-  .sc-stat__val { font-size: 22px; font-weight: 800; color: #0f172a; line-height: 1; }
-  .sc-stat__lbl { font-size: 11px; color: #64748b; font-weight: 600; }
+  .sc-stat__icon--blue  { background: rgba(219,234,254,0.95); color: #1d4ed8; }
+  .sc-stat__icon--green { background: rgba(209,250,229,0.95); color: #059669; }
+  .sc-stat__icon--red   { background: rgba(254,226,226,0.95); color: #dc2626; }
+  .sc-stat__icon--amber { background: rgba(254,243,199,0.95); color: #d97706; }
+  .sc-stat__val { font-size: 20px; font-weight: 900; color: #fff; line-height: 1; }
+  .sc-stat__lbl { font-size: 11px; color: rgba(255,255,255,0.86); font-weight: 700; }
 
   /* Tab bar */
   .sc-tabs {

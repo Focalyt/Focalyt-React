@@ -14,6 +14,7 @@ const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
 	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage, UploadCandidates, Placement, PlacementStatus, BatchMonitor } = require("../../models");
+const { ReEnquire } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -2318,7 +2319,7 @@ const buildB2cCrossSaleGroupQuery = (rootId) => ({
 
 router.get('/applied-courses/:id/cross-sales', isCollege, async (req, res) => {
 	try {
-		const source = await AppliedCourses.findById(req.params.id).select('_id parentAppliedCourseId crossSaleRootId');
+		const source = await AppliedCourses.findById(req.params.id).select('_id _candidate parentAppliedCourseId crossSaleRootId');
 		if (!source) {
 			return res.status(404).json({ success: false, message: 'Registration not found' });
 		}
@@ -2333,9 +2334,31 @@ router.get('/applied-courses/:id/cross-sales', isCollege, async (req, res) => {
 			.sort({ createdAt: 1 })
 			.lean();
 
+		const groupAppliedIds = groupLeads.map((lead) => lead._id).filter(Boolean);
+		const candidateId = source._candidate || groupLeads[0]?._candidate?._id;
+		const reEnquiries = candidateId
+			? await ReEnquire.find({
+				candidate: candidateId,
+				...(groupAppliedIds.length > 0 && { appliedCourse: { $in: groupAppliedIds } }),
+			})
+				.populate('course', 'name')
+				.populate('appliedCourse', '_course _center _leadStatus createdAt')
+				.populate({
+					path: 'appliedCourse',
+					populate: [
+						{ path: '_course', select: 'name' },
+						{ path: '_center', select: 'name' },
+						{ path: '_leadStatus', select: 'title' },
+					],
+				})
+				.populate('counselorName', 'name email')
+				.sort({ reEnquireDate: -1, createdAt: -1 })
+				.lean()
+			: [];
+
 		return res.json({
 			success: true,
-			data: { rootId, leads: groupLeads },
+			data: { rootId, leads: groupLeads, reEnquiries },
 			message: 'Cross-sale registrations retrieved successfully',
 		});
 	} catch (error) {
