@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 import {
   faUser, faBookOpen, faPlusCircle, faEye, faShoppingCart, faChartLine, faUserFriends, faUserCheck, faBell,
   faHandshake, faTasks, faClipboardList, faFileUpload, faGraduationCap, faBuilding, faCalendarAlt, faCheckCircle,
-  faCogs, faUserShield, faSitemap, faProjectDiagram, faFileAlt, faWallet, faCaretDown, faIndustry, faTags, faGlobe, faBullhorn, faUserTie
+  faCogs, faUserShield, faSitemap, faProjectDiagram, faFileAlt, faWallet, faCaretDown, faIndustry, faTags, faGlobe, faBullhorn, faUserTie, faVideo
 } from "@fortawesome/free-solid-svg-icons";
 import { faWhatsapp } from "@fortawesome/free-brands-svg-icons";
 import {
@@ -1129,6 +1129,14 @@ function CollegeLayout({ children }) {
                 <Link to="/institute/uploadTemplates" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faFileUpload} />
                   <span className="menu-title">{t('upload_templates')}</span>
+                </Link>
+              </li>
+
+              {/* Video Timestamp */}
+              <li className={`nav-item ${location.pathname === '/institute/video-timestamp' ? 'active' : ''}`}>
+                <Link to="/institute/video-timestamp" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faVideo} />
+                  <span className="menu-title">Video Timestamp</span>
                 </Link>
               </li>
 

@@ -1297,9 +1297,6 @@ commonRoutes.get("/Coins", async (req, res) => {
 });
 
 
-
-
-
 commonRoutes.get("/getCreditCount", async (req, res) => {
 	try {
 		let validation = { mobile: req.body.mobile }
