@@ -118,6 +118,9 @@ module.exports.isCollege = async (req, res, next) => {
     const userAgent = req.get('User-Agent');
     const ipAddress = req.header('x-forwarded-for') || req.socket.remoteAddress;
     console.log("--- ERROR College", ipAddress, userAgent, err);
+    if (req.header('x-auth')) {
+      return res.status(401).json({ status: false, message: err.message || 'You are not authorized' });
+    }
     req.flash("error", err.message);
     return res.redirect("/college/login");
   }

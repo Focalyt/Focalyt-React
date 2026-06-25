@@ -1,6 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile } from '@ffmpeg/util';
+import React, { useState, useRef, useEffect } from 'react';
+import axios from 'axios';
 import { saveAs } from 'file-saver';
 import { toast } from 'react-toastify';
 
@@ -48,64 +47,6 @@ const formatVideoTime = (seconds) => {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m}:${pad2(s)}`;
-};
-
-const formatAssTime = (seconds) => {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  const cs = Math.floor((seconds % 1) * 100);
-  return `${h}:${pad2(m)}:${pad2(s)}.${pad2(cs)}`;
-};
-
-const escapeAssText = (text) => String(text || '').replace(/\\/g, '\\\\').replace(/\{/g, '\\{').replace(/\}/g, '\\}').replace(/\n/g, '\\N');
-
-const generateAssSubtitles = (config, width, height, duration) => {
-  const smallFs = config.fontSizeSmall ?? 13;
-  const largeFs = config.fontSizeLarge ?? 28;
-  const posX = Math.round((config.overlayLeftPercent / 100) * width);
-  const posY = Math.round((config.overlayTopPercent / 100) * height);
-  const totalSeconds = Math.max(1, Math.ceil(duration));
-
-  const header = [
-    '[Script Info]',
-    'ScriptType: v4.00+',
-    `PlayResX: ${width}`,
-    `PlayResY: ${height}`,
-    'WrapStyle: 0',
-    '',
-    '[V4+ Styles]',
-    'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
-    `Style: Small,Arial,${smallFs},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,2,0,9,10,10,10,1`,
-    `Style: Large,Arial,${largeFs},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,2,0,9,10,10,10,1`,
-    '',
-    '[Events]',
-    'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
-  ];
-
-  const events = [];
-  for (let sec = 0; sec < totalSeconds; sec += 1) {
-    const start = formatAssTime(sec);
-    const end = formatAssTime(sec + 1);
-    const timeLine = escapeAssText(getVideoTimestamp(config.startDateTime, sec));
-    const dirLine = escapeAssText(getDirectionDisplayLine(config.directionDegrees, config.compass, sec));
-    const indexLine = config.indexNumber
-      ? escapeAssText(`Index number: ${config.indexNumber}`)
-      : '';
-    const locLine = config.location ? escapeAssText(`📍 ${config.location}`) : '';
-
-    const posTag = `{\\an9\\pos(${posX},${posY})}`;
-    const lines = [
-      `${posTag}{\\rSmall}${timeLine}`,
-      `{\\rLarge}${dirLine}`,
-    ];
-    if (indexLine) lines.push(`{\\rSmall}${indexLine}`);
-    if (locLine) lines.push(`{\\rSmall}${locLine}`);
-
-    events.push(`Dialogue: 0,${start},${end},Small,,0,0,0,,${lines.join('\\N')}`);
-  }
-
-  return [...header, ...events].join('\n');
 };
 
 const overlayLineStyle = {
@@ -294,8 +235,8 @@ function VideoTimestamp() {
   const [recordedBlob, setRecordedBlob] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [ffmpegReady, setFfmpegReady] = useState(false);
-  const ffmpegRef = useRef(null);
+
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
   const [config, setConfig] = useState({
     startDateTime: toDateTimeLocalValue(new Date()),
@@ -313,24 +254,6 @@ function VideoTimestamp() {
   useEffect(() => () => {
     if (videoUrl) URL.revokeObjectURL(videoUrl);
   }, [videoUrl]);
-
-  const loadFfmpeg = useCallback(async () => {
-    if (ffmpegRef.current?.loaded) return ffmpegRef.current;
-    const ffmpeg = new FFmpeg();
-    ffmpeg.on('progress', ({ progress: p }) => {
-      setProgress(Math.min(99, Math.round(p * 100)));
-    });
-
-    const baseURL = `${window.location.origin}${process.env.PUBLIC_URL || ''}/ffmpeg`;
-    await ffmpeg.load({
-      coreURL: `${baseURL}/ffmpeg-core.js`,
-      wasmURL: `${baseURL}/ffmpeg-core.wasm`,
-    });
-
-    ffmpegRef.current = ffmpeg;
-    setFfmpegReady(true);
-    return ffmpeg;
-  }, []);
 
   const invalidateOutput = () => {
     setRecordedBlob(null);
@@ -373,41 +296,70 @@ function VideoTimestamp() {
       return;
     }
 
+    const token = sessionStorage.getItem('token');
+    if (!token) {
+      toast.error('Login required');
+      return;
+    }
+
     setProcessing(true);
     setProgress(0);
 
     try {
-      const ffmpeg = await loadFfmpeg();
-      const inputName = `input${videoFile.name.includes('.') ? videoFile.name.slice(videoFile.name.lastIndexOf('.')) : '.mp4'}`;
-      const assContent = generateAssSubtitles(
-        config,
-        videoMeta.width,
-        videoMeta.height,
-        videoMeta.duration
+      const formData = new FormData();
+      formData.append('video', videoFile);
+      formData.append('config', JSON.stringify({
+        ...config,
+        width: videoMeta.width,
+        height: videoMeta.height,
+        duration: videoMeta.duration,
+      }));
+
+      const response = await axios.post(
+        `${backendUrl}/college/video-timestamp/apply`,
+        formData,
+        {
+          headers: { 'x-auth': token },
+          responseType: 'blob',
+          onUploadProgress: (evt) => {
+            if (evt.total) {
+              setProgress(Math.min(90, Math.round((evt.loaded / evt.total) * 90)));
+            }
+          },
+        }
       );
 
-      await ffmpeg.writeFile(inputName, await fetchFile(videoFile));
-      await ffmpeg.writeFile('overlay.ass', new TextEncoder().encode(assContent));
+      const contentType = response.headers['content-type'] || '';
+      if (!contentType.includes('video/mp4')) {
+        const text = await response.data.text();
+        let message = 'Video process failed';
+        try {
+          message = JSON.parse(text).message || message;
+        } catch (_) {
+          message = text?.slice(0, 120) || message;
+        }
+        throw new Error(message);
+      }
 
-      await ffmpeg.exec([
-        '-i', inputName,
-        '-vf', 'ass=overlay.ass',
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '23',
-        '-c:a', 'copy',
-        '-movflags', '+faststart',
-        'output.mp4',
-      ]);
+      const blob = new Blob([response.data], { type: 'video/mp4' });
+      if (blob.size < 1000) {
+        throw new Error('Output video empty');
+      }
 
-      const data = await ffmpeg.readFile('output.mp4');
-      const blob = new Blob([data], { type: 'video/mp4' });
       setRecordedBlob(blob);
       setProgress(100);
-      toast.success('Video ready! Ab download turant hoga — normal speed par.');
+      toast.success('Timestamp video par lag gaya! Ab download karein.');
     } catch (err) {
       console.error(err);
-      toast.error(err.message || 'Video process failed');
+      let message = err.message || 'Video process failed';
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const parsed = JSON.parse(text);
+          message = parsed.message || message;
+        } catch (_) { /* ignore */ }
+      }
+      toast.error(message);
     } finally {
       setProcessing(false);
     }
@@ -429,7 +381,7 @@ function VideoTimestamp() {
           <div className="col-12">
             <h4 className="mb-2">Video Timestamp Editor</h4>
             <p className="text-muted mb-3">
-              Video normal speed par preview karein. Timestamp video timeline par sync hoke lagta hai (FFmpeg).
+              Video normal speed par preview karein. Timestamp server par FFmpeg se video mein burn hota hai.
             </p>
           </div>
         </div>
@@ -528,7 +480,7 @@ function VideoTimestamp() {
                     <div className="progress" style={{ height: 8 }}>
                       <div className="progress-bar progress-bar-striped progress-bar-animated" style={{ width: `${progress}%` }} />
                     </div>
-                    <small className="text-white-50">{ffmpegReady ? `Processing... ${progress}%` : 'FFmpeg load ho raha hai...'}</small>
+                    <small className="text-white-50">{processing ? `Processing... ${progress}%` : ''}</small>
                   </div>
                 )}
 

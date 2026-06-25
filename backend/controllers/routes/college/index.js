@@ -38,6 +38,7 @@ const mockInterviewRoutes = require("./mockInterview");
 const coursesRoutes = require("./courses");
 const dripmarketingRoutes = require("./dripmarketing");
 const lrpRoutes = require("./lrp");
+const videoTimestampRoutes = require("./videoTimestamp");
 
 //Trainer route 
 const trainerRoutes = require('./trainer');
@@ -125,6 +126,7 @@ router.use("/courses", isCollege, coursesRoutes);
 router.use("/status", statusRoutes);
 router.use("/dripmarketing", isCollege, dripmarketingRoutes);
 router.use("/lrp", isCollege, lrpRoutes);
+router.use("/video-timestamp", videoTimestampRoutes);
 router.use("/trainer", trainerRoutes)
 const readXlsxFile = require("read-excel-file/node");
 const appliedCourses = require("../../models/appliedCourses");

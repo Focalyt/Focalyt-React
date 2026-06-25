@@ -67,7 +67,6 @@ import CandidateReview from './Pages/Front/CandidateReview/CandidateReview';
 import Certificate from './Pages/Front/Certificate/certificate';
 import Certificates from './Pages/Front/Certificate/certificates';
 import Registration from './Pages/Front/StudentRegistration/Registration';
-import Regitrationsold from './Pages/App/College/Course/Registrationsold'
 import CollegeLayout from './Component/Layouts/App/College';
 import CollegeLogin from './Pages/App/College/Login/CollegeLogin';
 import CollegeRegister from './Pages/App/College/Register/CollegeRegister';
@@ -148,8 +147,6 @@ import TrainerManagement from './Pages/App/College/Settings/TrainerManagement/Tr
 import WhatsappChat from './Pages/App/College/Whatapp/WhatsappChat';
 import WhatsappWallet from './Pages/App/College/whatsappWallet/WhatsappWallet';
 import EmailTemplate from './Pages/App/College/Email/EmailTemplate';
-import TrainerModule from './Pages/App/College/Course/TrainerModule';
-
 // Trainer module
 import TrainerLayout from './Component/Layouts/App/Trainer'
 import TrainerLogin from './Pages/App/Trainer/TrainerLogin/TrainerLogin'
@@ -334,9 +331,6 @@ const Layout = () => {
           <Route path='lrp' element={<Lrp/>}/>
           <Route path='lrp-view' element={<LrpView/>}/>
           <Route path='video-timestamp' element={<VideoTimestamp/>}/>
-          <Route path='training' element={<TrainerModule/>}/>
-          <Route path='registrationsold' element={<Regitrationsold/>}/>
-
         </Route>
 
         {/* company  */}

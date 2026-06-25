@@ -205,13 +205,20 @@ app.use(helmet());
 app.use(cors());
 app.use(flash());
 // app.use(fileupload());
-app.use((req, res, next) => {
+	app.use((req, res, next) => {
 	if (req.path.includes('/whatsapp/send-file') || req.path.includes('/whatsapp/send-audio')) {
 		return next();
 	}
 	const isApkUpload = req.path.includes('/admin/appRelease/upload');
+	const isVideoTimestamp = req.path.includes('/college/video-timestamp/apply');
 	fileupload({
-		limits: { fileSize: isApkUpload ? 250 * 1024 * 1024 : 50 * 1024 * 1024 },
+		limits: {
+			fileSize: isApkUpload
+				? 250 * 1024 * 1024
+				: isVideoTimestamp
+					? 200 * 1024 * 1024
+					: 50 * 1024 * 1024,
+		},
 		abortOnLimit: true,
 	})(req, res, next);
 });

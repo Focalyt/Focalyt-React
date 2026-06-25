@@ -882,12 +882,6 @@ function CollegeLayout({ children }) {
                         <span className="menu-title">{t('admission_cycle_pre')}</span>
                       </Link>
                     </li>
-                    <li className={`nav-item ${location.pathname === '/institute/registrationsold' ? 'active' : ''}`}>
-                      <Link to="/institute/registrationsold" onClick={() => handleSidebarClose()}>
-                        <FontAwesomeIcon icon={faUserFriends} />
-                        <span className="menu-title">{t('Admission New')}</span>
-                      </Link>
-                    </li>
                     <li className={`nav-item ${location.pathname === '/institute/admissionpost' ? 'active' : ''}`}>
                       <Link to="/institute/admissionpost" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faUserCheck} />
