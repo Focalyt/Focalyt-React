@@ -1,5 +1,6 @@
 module.exports.AppBanner = require('./appBanner');
 module.exports.Batch = require('./batch');
+module.exports.BatchMonitor = require('./batchMonitor');
 module.exports.Event = require('./event');
 module.exports.AppliedEvent = require('./appliedEvent');
 module.exports.AppUpdate = require('./appUpdate');
