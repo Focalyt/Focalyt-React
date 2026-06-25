@@ -7774,10 +7774,11 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 		if (useAllTime) {
 			// no date filter
 		} else if (useActivityFilter) {
-			// Today's activity: followups SET today (createdAt) OR status UPDATED today (done/missed - statusUpdatedAt)
+			// Activity: followups set in range, or status changed in range.
 			baseMatch.$or = [
 				{ createdAt: { $gte: fromDate, $lte: toDate } },
-				{ statusUpdatedAt: { $gte: fromDate, $lte: toDate } }
+				{ statusUpdatedAt: { $gte: fromDate, $lte: toDate } },
+				{ updatedAt: { $gte: fromDate, $lte: toDate } }
 			];
 		} else {
 			baseMatch.followupDate = { $gte: fromDate, $lte: toDate };
@@ -10110,6 +10111,7 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 
 			existingFollowup.status = 'done';
 			existingFollowup.updatedBy = user._id;
+			existingFollowup.statusUpdatedAt = new Date();
 			existingFollowup.updatedAt = new Date();
 
 			const updatedFollowup = await existingFollowup.save({ new: true });
@@ -10274,7 +10276,8 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 	try {
 		const user = req.user;
 		let filter = {};
-		const { fromDate, toDate, page = 1, limit = 10, followupStatus, projects, verticals, course, center, counselor, name: searchName } = req.query;
+		const { fromDate, toDate, page = 1, limit = 10, followupStatus, projects, verticals, course, center, counselor, name: searchName, filterBy } = req.query;
+		const useActivityFilter = filterBy === 'activity';
 
 		// Add date validation
 		let from, to;
@@ -10284,6 +10287,7 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 			if (isNaN(from.getTime())) {
 				return res.status(400).json({ error: "Invalid fromDate format" });
 			}
+			from.setHours(0, 0, 0, 0);
 		} else {
 			from = new Date(new Date().setHours(0, 0, 0, 0));
 		}
@@ -10293,6 +10297,7 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 			if (isNaN(to.getTime())) {
 				return res.status(400).json({ error: "Invalid toDate format" });
 			}
+			to.setHours(23, 59, 59, 999);
 		} else {
 			to = new Date(new Date().setHours(23, 59, 59, 999));
 		}
@@ -10322,13 +10327,25 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 			baseMatch.createdBy = user._id;
 		}
 
+		const dateMatch = useActivityFilter
+			? {
+				$or: [
+					{ createdAt: { $gte: from, $lte: to } },
+					{ statusUpdatedAt: { $gte: from, $lte: to } },
+					{ updatedAt: { $gte: from, $lte: to } }
+				]
+			}
+			: {
+				followupDate: { $gte: from, $lte: to }
+			};
+
 
 		const aggregate = [
 			{
 				$match: {
 					...baseMatch,
 					status: followupStatus,
-					followupDate: { $gte: from, $lte: to },
+					...dateMatch,
 
 				}
 			},

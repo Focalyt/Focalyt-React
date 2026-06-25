@@ -107,6 +107,7 @@ const B2BLeadSchema = new mongoose.Schema({
   businessName: { type: String, required: true },
   address: { type: String },  
   city: { type: String },
+  block: { type: String },
   state: { type: String },
   coordinates: {
     type: { type: String, default: "Point" },

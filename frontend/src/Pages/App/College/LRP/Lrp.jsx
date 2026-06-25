@@ -64,6 +64,7 @@ const parseB2bLeadContext = (lead) => {
     questions,
     state: String(lead.state || "").trim(),
     district: String(lead.city || lead.district || "").trim(),
+    block: String(lead.block || "").trim(),
   };
 };
 
@@ -137,6 +138,7 @@ const createInitialForm = () => ({
   geoTaggedPhoto: null,
   state: "",
   district: "",
+  block: "",
 });
 
 const ReadOnlyField = ({ label, value }) => (
@@ -539,6 +541,7 @@ function Lrp() {
         typeOfB2B: parsed.ids.typeOfB2B || prev.typeOfB2B,
         state: parsed.state || prev.state || "Punjab",
         district: parsed.district || prev.district,
+        block: parsed.block || prev.block,
       }));
     },
     [linkedB2bLeadId]
@@ -680,6 +683,7 @@ function Lrp() {
           geoTaggedPhoto: null,
           state: readLrpMeta(qaItems, "lrp_state") || prev.state,
           district: readLrpMeta(qaItems, "lrp_district"),
+          block: readLrpMeta(qaItems, "lrp_block"),
         }));
         setTouched({});
         setStep(1);
@@ -742,6 +746,7 @@ function Lrp() {
       b2bType: b2bLeadDisplay.b2bType || pickOptionLabel(form.typeOfB2B, typeOpts),
       state: form.state,
       city: form.district,
+      block: form.block,
     };
   }, [
     linkedB2bLeadId,
@@ -752,6 +757,7 @@ function Lrp() {
     form.typeOfB2B,
     form.state,
     form.district,
+    form.block,
     allB2bDepartments,
     allB2bProjects,
     leadCategoryOptions,
@@ -782,6 +788,7 @@ function Lrp() {
     if (s === 2) {
       if (!isNonEmpty(form.state)) e.state = "Required";
       if (!isNonEmpty(form.district)) e.district = "Required";
+      if (!isNonEmpty(form.block)) e.block = "Required";
     }
 
     if (s === 3) {
@@ -1126,6 +1133,7 @@ function Lrp() {
                         <ReadOnlyField label="B2B type" value={linkedLeadSummary?.b2bType} />
                         <ReadOnlyField label="State" value={linkedLeadSummary?.state} />
                         <ReadOnlyField label="City" value={linkedLeadSummary?.city} />
+                        <ReadOnlyField label="Block" value={linkedLeadSummary?.block} />
                       </div>
                     )}
                   </div>
@@ -1249,7 +1257,7 @@ function Lrp() {
               </div>
 
               <div style={{ flex: "1 1 360px", minWidth: 260 }}>
-                <label style={lblStyle}>Field implementation partner name {reqStar}</label>
+                <label style={lblStyle}>Employee Name {reqStar}</label>
                 <input
                   type="text"
                   value={form.implementationPartnerName}
@@ -1303,7 +1311,7 @@ function Lrp() {
         )}
 
         {step === 2 && (
-          <Card number={2} title="State & District">
+          <Card number={2} title="State, District & Block">
             <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "flex-end" }}>
               <div style={{ flex: "1 1 240px", minWidth: 220 }}>
                 <label style={lblStyle}>State {reqStar}</label>
@@ -1331,6 +1339,18 @@ function Lrp() {
                   style={fldStyle}
                 />
                 <FieldError name="district" />
+              </div>
+              <div style={{ flex: "1 1 280px", minWidth: 240 }}>
+                <label style={lblStyle}>Block {reqStar}</label>
+                <input
+                  value={form.block}
+                  onChange={(e) => setValue("block", e.target.value)}
+                  onBlur={() => markTouched("block")}
+                  placeholder="Enter block name"
+                  autoComplete="off"
+                  style={fldStyle}
+                />
+                <FieldError name="block" />
               </div>
             </div>
 

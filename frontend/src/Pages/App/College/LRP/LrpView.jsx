@@ -111,6 +111,7 @@ function LrpView() {
     geoTaggedPhoto: "",
     state: "",
     district: "",
+    block: "",
   });
 
   useEffect(() => {
@@ -175,6 +176,7 @@ function LrpView() {
             geoTaggedPhoto: "",
             state: "",
             district: "",
+            block: "",
           });
           return;
         }
@@ -189,6 +191,7 @@ function LrpView() {
           geoTaggedPhoto: readLrpMeta(items, "lrp_geoTaggedPhoto"),
           state: readLrpMeta(items, "lrp_state"),
           district: readLrpMeta(items, "lrp_district"),
+          block: readLrpMeta(items, "lrp_block"),
         });
       } catch (e) {
         // eslint-disable-next-line no-console
@@ -334,6 +337,7 @@ function LrpView() {
             <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px" }}>
               <FieldRow label="State" value={meta.state} />
               <FieldRow label="District" value={meta.district} />
+              <FieldRow label="Block" value={meta.block} />
             </div>
           </Card>
 

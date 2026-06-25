@@ -1618,7 +1618,7 @@ const MyFollowups = () => {
 
   //
   const clearAllFilters = () => {
-    setFilterData({
+    const newFilterData = {
       name: '',
       courseType: '',
       status: 'true',
@@ -1631,7 +1631,9 @@ const MyFollowups = () => {
       nextActionFromDate: null,
       nextActionToDate: null,
 
-    });
+    };
+
+    setFilterData(newFilterData);
 
     setFormData({
       projects: { type: "includes", values: [] },
@@ -1641,7 +1643,8 @@ const MyFollowups = () => {
       counselor: { type: "includes", values: [] },
       sector: { type: "includes", values: [] }
     })
-    fetchProfileData()
+    fetchProfileData(newFilterData)
+    fetchFollowupCounts(newFilterData)
     setCurrentPage(1);
   };
 
@@ -1924,6 +1927,27 @@ const MyFollowups = () => {
 
   const [isLoadingAllProfiles, setIsLoadingAllProfiles] = useState(false);
 
+  const isSameCalendarDate = (firstDate, secondDate) => {
+    if (!firstDate || !secondDate) return false;
+    const first = new Date(firstDate);
+    const second = new Date(secondDate);
+
+    if (isNaN(first.getTime()) || isNaN(second.getTime())) return false;
+
+    return first.toDateString() === second.toDateString();
+  };
+
+  const getFollowupDateFilterBy = (filters = filterData) => {
+    const hasDateRange = filters?.fromDate || filters?.toDate;
+    const isTodayRange =
+      filters?.fromDate &&
+      filters?.toDate &&
+      isSameCalendarDate(filters.fromDate, new Date()) &&
+      isSameCalendarDate(filters.toDate, new Date());
+
+    return !hasDateRange || isTodayRange ? 'activity' : undefined;
+  };
+
   const fetchProfileData = async (filters = filterData, page = currentPage) => {
     setIsLoadingAllProfiles(true);
     try {
@@ -1936,6 +1960,7 @@ const MyFollowups = () => {
         // You can add fromDate and toDate here if needed for followup date filtering
         ...(filters?.fromDate && { fromDate: filters.fromDate }),
         ...(filters?.toDate && { toDate: filters.toDate }),
+        ...(getFollowupDateFilterBy(filters) && { filterBy: getFollowupDateFilterBy(filters) }),
         ...(filters.name && { name: filters.name }),
         ...(filters.courseType && { courseType: filters.courseType }),
         ...(filters.status && { status: filters.status }),
@@ -1990,7 +2015,8 @@ const MyFollowups = () => {
 
   const [courseHistory, setCourseHistory] = useState([]);
   const [jobHistory, setJobHistory] = useState([]);
-
+  const [leadHistory, setLeadHistory] = useState([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   useEffect(() => {
     fetchCourseHistory();
     fetchJobHistory();
@@ -2119,6 +2145,7 @@ const MyFollowups = () => {
         // You can add fromDate and toDate here if needed for followup date filtering
         ...(filters?.fromDate && { fromDate: filters.fromDate }),
         ...(filters?.toDate && { toDate: filters.toDate }),
+        ...(getFollowupDateFilterBy(filters) && { filterBy: getFollowupDateFilterBy(filters) }),
         ...(filters.name && { name: filters.name }),
         ...(filters.courseType && { courseType: filters.courseType }),
 
@@ -2281,6 +2308,9 @@ const MyFollowups = () => {
 
   const closeleadHistoryPanel = () => {
     setLeadHistoryPanel(false)
+    setShowPanel(null)
+    setLeadHistory([])
+    setIsHistoryLoading(false)
     if (!isMobile) {
       // Desktop: Keep col-8 because calendar sidebar is always visible
       setMainContentClass('col-8');
@@ -3209,6 +3239,45 @@ const MyFollowups = () => {
     ) : null;
   };
 
+  const getLeadHistoryId = (profile = selectedProfile) => profile?.appliedCourseId || profile?._id;
+
+  const fetchLeadHistory = async (profile = selectedProfile) => {
+    const leadId = getLeadHistoryId(profile);
+
+    if (!leadId) {
+      setLeadHistory([]);
+      setIsHistoryLoading(false);
+      return;
+    }
+
+    try {
+      setIsHistoryLoading(true);
+      setLeadHistory([])
+      const response = await axios.get(`${backendUrl}/college/lead-history/${leadId}`, {
+        headers: {
+          'x-auth': token,
+        }
+      });
+      if (response.data.success) {
+        setLeadHistory(response.data.data);
+      } else {
+        alert('Field to history load')
+      }
+    } catch (error) {
+      console.error('Error fetching lead history:', error);
+      alert('Field to history load')
+
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (showPanel === 'history' && selectedProfile) {
+      fetchLeadHistory(selectedProfile);
+    }
+  }, [showPanel, selectedProfile]);
+
   // Render WhatsApp Panel (Desktop Sidebar or Mobile Modal)
   const renderWhatsAppPanel = () => {
     const panelContent = (
@@ -3377,15 +3446,21 @@ const MyFollowups = () => {
               minHeight: '200px'
             }}
           >
-            {selectedProfile?.logs && Array.isArray(selectedProfile.logs) && selectedProfile.logs.length > 0 ? (
+            {isHistoryLoading ? (
+              <div className="d-flex align-items-center justify-content-center h-100 py-5">
+                <div className="spinner-border text-primary" role="status">
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+              </div>
+            ) : leadHistory && Array.isArray(leadHistory) && leadHistory.length > 0 ? (
               <div className="timeline">
-                {selectedProfile.logs.map((log, index) => (
+                {leadHistory.map((log, index) => (
                   <div key={index} className="timeline-item mb-4">
                     <div className="timeline-marker">
                       <div className="timeline-marker-icon">
                         <i className="fas fa-circle text-primary" style={{ fontSize: '8px' }}></i>
                       </div>
-                      {index !== selectedProfile.logs.length - 1 && (
+                      {index !== leadHistory.length - 1 && (
                         <div className="timeline-line"></div>
                       )}
                     </div>
@@ -8708,4 +8783,3 @@ padding: 1.8rem 1.0rem 0!important;
 };
 
 export default MyFollowups;
-

@@ -76,6 +76,14 @@ const buildLrpMetaItems = (body, geoTaggedPhotoUrl) => {
       required: true,
       value: v("district"),
     },
+    {
+      metaKey: "lrp_block",
+      question: "Block",
+      type: "text",
+      options: [],
+      required: true,
+      value: v("block"),
+    },
   ];
 };
 
@@ -338,6 +346,7 @@ async function createLinkedB2BLead(req, body) {
       address: addressFromBody(body),
       city: valueByMetaKey(qaItems, "lrp_district") || String(body.district || "").trim(),
       state: valueByMetaKey(qaItems, "lrp_state") || String(body.state || "").trim(),
+      block: valueByMetaKey(qaItems, "lrp_block") || String(body.block || "").trim(),
       concernPersonName,
       designation: "",
       email: email || undefined,

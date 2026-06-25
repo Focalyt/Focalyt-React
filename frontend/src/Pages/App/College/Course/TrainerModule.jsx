@@ -40,11 +40,82 @@ const MAIN_TABS = [
   { id: 'student', label: 'Students' },
 ];
 
+const DEFAULT_EVIDENCE_DOCS = [
+  { id: 'EV001', name: 'Class photo', type: 'Image', status: 'Uploaded', fileName: 'class-photo.jpg' },
+  { id: 'EV002', name: 'Attendance sheet', type: 'Document', status: 'Pending', fileName: '' },
+  { id: 'EV003', name: 'Training clip', type: 'Video', status: 'Uploaded', fileName: 'training-clip.mp4' },
+];
+
 const DUMMY_SESSIONS = [
   { id: 'S001', title: 'Morning Batch – Retail Sales', date: '22/06/2026', status: 'Completed' },
   { id: 'S002', title: 'Practical – Customer Handling', date: '22/06/2026', status: 'Pending' },
   { id: 'S003', title: 'Assessment Review', date: '21/06/2026', status: 'Completed' },
 ];
+
+const getTodayInputValue = () => new Date().toISOString().slice(0, 10);
+const formatSessionDate = (dateValue) => {
+  if (!dateValue) return new Date().toLocaleDateString('en-IN');
+  return new Date(dateValue).toLocaleDateString('en-IN');
+};
+const createEvidenceDocs = (status = 'Pending') =>
+  DEFAULT_EVIDENCE_DOCS.map((doc) => ({ ...doc, status, fileName: status === 'Uploaded' ? doc.fileName : '' }));
+const createSessionDraft = (sessionNumber, basicDetails) => ({
+  id: `S${String(sessionNumber).padStart(3, '0')}`,
+  title: 'New Session',
+  topicCovered: 'Basics of Retail & Customer Service',
+  trainingMethod: 'Interactive Learning',
+  sessionDate: getTodayInputValue(),
+  startTime: '10:00',
+  endTime: '12:00',
+  status: 'Pending',
+  totalCandidates: '30',
+  presentCandidates: '26',
+  absentCandidates: '4',
+  courseTrade: basicDetails.courseTrade,
+  batchCode: basicDetails.batchCode,
+  trainerName: basicDetails.trainerName,
+  notes: 'Covered basics of customer service and communication skills.',
+  evidenceDocs: createEvidenceDocs('Pending'),
+});
+const hydrateSession = (session, index, basicDetails) => ({
+  ...createSessionDraft(index + 1, basicDetails),
+  ...session,
+  topicCovered: session.topicCovered || (index === 1 ? 'Customer handling practical' : 'Basics of Retail & Customer Service'),
+  trainingMethod: session.trainingMethod || (index === 2 ? 'Assessment Discussion' : 'Interactive Learning'),
+  totalCandidates: session.totalCandidates || '30',
+  presentCandidates: session.presentCandidates || '26',
+  absentCandidates: session.absentCandidates || '4',
+  attendance: session.attendance || '86.7%',
+  notes: session.notes || 'Covered basics of customer service and communication skills.',
+  evidenceDocs: session.evidenceDocs || createEvidenceDocs(session.status === 'Completed' ? 'Uploaded' : 'Pending'),
+});
+const normalizeSessionDraft = (draft, basicDetails) => {
+  const total = Number(draft.totalCandidates) || 0;
+  const present = Number(draft.presentCandidates) || 0;
+  const attendance = total > 0 ? `${((present / total) * 100).toFixed(1)}%` : (draft.attendance || '0%');
+  const evidenceDocs = (draft.evidenceDocs || [])
+    .filter((doc) => doc.name?.trim())
+    .map((doc, index) => ({
+      id: doc.id || `EV${Date.now()}-${index}`,
+      name: doc.name.trim(),
+      type: doc.type || 'Document',
+      status: doc.status || 'Pending',
+      fileName: doc.fileName || '',
+    }));
+
+  return {
+    ...draft,
+    title: draft.title?.trim() || 'New Session',
+    topicCovered: draft.topicCovered?.trim() || draft.title?.trim() || 'Session topic',
+    trainingMethod: draft.trainingMethod?.trim() || 'Interactive Learning',
+    date: formatSessionDate(draft.sessionDate),
+    courseTrade: draft.courseTrade || basicDetails.courseTrade,
+    batchCode: draft.batchCode || basicDetails.batchCode,
+    trainerName: draft.trainerName || basicDetails.trainerName,
+    attendance,
+    evidenceDocs,
+  };
+};
 
 const DUMMY_STUDENTS = [
   { id: 'ST01', name: 'Akash Gaurav', mobile: '6280484211', attendance: '92%', status: 'Active' },
@@ -173,9 +244,156 @@ const IssueCard = ({ issue, data, onChange }) => (
 );
 
 /* ─── Redesigned Session Card ─── */
-const SessionCard = ({ basicDetails, notify }) => {
+const AddSessionModal = ({
+  draft,
+  isEdit,
+  onClose,
+  onSave,
+  onFieldChange,
+  onEvidenceChange,
+  onAddEvidence,
+  onRemoveEvidence,
+}) => {
+  if (!draft) return null;
+
+  return (
+    <div className="session-modal-backdrop">
+      <div className="session-modal" role="dialog" aria-modal="true">
+        <div className="session-modal__head">
+          <div>
+            <h5>{isEdit ? 'Edit Session' : 'Add Session'}</h5>
+            <span>{draft.id}</span>
+          </div>
+          <button type="button" className="session-modal__close" onClick={onClose} aria-label="Close">
+            <i className="fas fa-times" />
+          </button>
+        </div>
+
+        <div className="session-modal__body">
+          <div className="session-form-grid">
+            <label className="session-field">
+              <span>Session title</span>
+              <input className="dbr-input" value={draft.title} onChange={(e) => onFieldChange('title', e.target.value)} />
+            </label>
+            <label className="session-field">
+              <span>Topic covered</span>
+              <input className="dbr-input" value={draft.topicCovered} onChange={(e) => onFieldChange('topicCovered', e.target.value)} />
+            </label>
+            <label className="session-field">
+              <span>Training method</span>
+              <input className="dbr-input" value={draft.trainingMethod} onChange={(e) => onFieldChange('trainingMethod', e.target.value)} />
+            </label>
+            <label className="session-field">
+              <span>Status</span>
+              <select className="dbr-select" value={draft.status} onChange={(e) => onFieldChange('status', e.target.value)}>
+                <option>Pending</option>
+                <option>Completed</option>
+              </select>
+            </label>
+            <label className="session-field">
+              <span>Date</span>
+              <input type="date" className="dbr-input" value={draft.sessionDate} onChange={(e) => onFieldChange('sessionDate', e.target.value)} />
+            </label>
+            <label className="session-field">
+              <span>Start time</span>
+              <input type="time" className="dbr-input" value={draft.startTime} onChange={(e) => onFieldChange('startTime', e.target.value)} />
+            </label>
+            <label className="session-field">
+              <span>End time</span>
+              <input type="time" className="dbr-input" value={draft.endTime} onChange={(e) => onFieldChange('endTime', e.target.value)} />
+            </label>
+            <label className="session-field">
+              <span>Course / trade</span>
+              <input className="dbr-input" value={draft.courseTrade} onChange={(e) => onFieldChange('courseTrade', e.target.value)} />
+            </label>
+            <label className="session-field">
+              <span>Batch code</span>
+              <input className="dbr-input" value={draft.batchCode} onChange={(e) => onFieldChange('batchCode', e.target.value)} />
+            </label>
+            <label className="session-field">
+              <span>Total candidates</span>
+              <input type="number" min="0" className="dbr-input" value={draft.totalCandidates} onChange={(e) => onFieldChange('totalCandidates', e.target.value)} />
+            </label>
+            <label className="session-field">
+              <span>Present</span>
+              <input type="number" min="0" className="dbr-input" value={draft.presentCandidates} onChange={(e) => onFieldChange('presentCandidates', e.target.value)} />
+            </label>
+            <label className="session-field">
+              <span>Absent</span>
+              <input type="number" min="0" className="dbr-input" value={draft.absentCandidates} onChange={(e) => onFieldChange('absentCandidates', e.target.value)} />
+            </label>
+          </div>
+
+          <label className="session-field session-field--full">
+            <span>Additional notes</span>
+            <textarea className="dbr-textarea" rows="3" value={draft.notes} onChange={(e) => onFieldChange('notes', e.target.value)} />
+          </label>
+
+          <div className="session-evidence-builder">
+            <div className="session-evidence-builder__head">
+              <h6>Evidence documents</h6>
+              <button type="button" className="session-mini-btn" onClick={onAddEvidence}>
+                <i className="fas fa-plus" /> Add document
+              </button>
+            </div>
+
+            {(draft.evidenceDocs || []).map((doc, index) => (
+              <div key={doc.id || index} className="session-evidence-row">
+                <input
+                  className="dbr-input"
+                  placeholder="Document name"
+                  value={doc.name}
+                  onChange={(e) => onEvidenceChange(index, 'name', e.target.value)}
+                />
+                <select className="dbr-select" value={doc.type} onChange={(e) => onEvidenceChange(index, 'type', e.target.value)}>
+                  <option>Document</option>
+                  <option>Image</option>
+                  <option>Video</option>
+                  <option>PDF</option>
+                </select>
+                <button type="button" className="session-remove-btn" onClick={() => onRemoveEvidence(index)} aria-label="Remove document">
+                  <i className="fas fa-trash" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="session-modal__foot">
+          <button type="button" className="sc-btn" onClick={onClose}>Cancel</button>
+          <button type="button" className="sc-btn sc-btn--primary" onClick={onSave}>
+            <i className="fas fa-save" /> Save Session
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SessionCard = ({ basicDetails, session, notify, onStatusChange, onEvidenceUpload, onEditSession }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  const activeSession = session || hydrateSession(DUMMY_SESSIONS[0], 0, basicDetails);
+  const statusTone = activeSession.status === 'Completed' ? 'green' : 'amber';
+  const statusIcon = activeSession.status === 'Completed' ? 'fa-check-circle' : 'fa-clock';
+  const timeRange = `${activeSession.startTime || '10:00'} - ${activeSession.endTime || '12:00'}`;
+  const detailItems = useMemo(() => ([
+    ['fa-book-open', 'Topic covered', activeSession.topicCovered || activeSession.title, 'blue'],
+    ['fa-chalkboard', 'Training method', activeSession.trainingMethod || 'Interactive Learning', 'blue'],
+    ['fa-calendar-alt', 'Session date', activeSession.date || formatSessionDate(activeSession.sessionDate), 'blue'],
+    ['fa-clock', 'Time', timeRange, 'blue'],
+    ['fa-graduation-cap', 'Course / trade', activeSession.courseTrade || basicDetails.courseTrade, 'pink'],
+    ['fa-hashtag', 'Batch code', activeSession.batchCode || basicDetails.batchCode, 'pink'],
+    ['fa-user', 'Trainer', activeSession.trainerName || basicDetails.trainerName, 'pink'],
+  ]), [activeSession, basicDetails, timeRange]);
+  const statItems = useMemo(() => ([
+    { icon: 'fa-users', val: activeSession.totalCandidates || '0', lbl: 'Total Candidates', cls: 'blue' },
+    { icon: 'fa-check-circle', val: activeSession.presentCandidates || '0', lbl: 'Present', cls: 'green' },
+    { icon: 'fa-times-circle', val: activeSession.absentCandidates || '0', lbl: 'Absent', cls: 'red' },
+    { icon: 'fa-percentage', val: activeSession.attendance || '0%', lbl: 'Attendance', cls: 'amber' },
+  ]), [activeSession]);
+  const evidenceDocs = activeSession.evidenceDocs?.length ? activeSession.evidenceDocs : createEvidenceDocs('Pending');
 
   return (
     <div className="sc-wrap">
@@ -186,28 +404,45 @@ const SessionCard = ({ basicDetails, notify }) => {
             <i className="fas fa-user" />
           </div>
           <div className="sc-head-text">
-            <div className="sc-trainer-name">{basicDetails.trainerName}</div>
+            <div className="sc-trainer-name">{activeSession.title}</div>
             <div className="sc-trainer-sub">
-              {basicDetails.centerName}&nbsp;·&nbsp;{TRAINER_INFO.mobile}
+              {basicDetails.centerName}&nbsp;·&nbsp;{activeSession.id}&nbsp;·&nbsp;{TRAINER_INFO.mobile}
             </div>
           </div>
-           {/* <div className="sc-meta">
-            {[
-              ['fa-calendar-alt', '22 Jun 2026'],
-              ['fa-clock', '10:00 AM – 12:00 PM'],
-              ['fa-hourglass-half', '2 hrs'],
-            ].map(([icon, val]) => (
-              <div key={val} className="sc-meta-item">
-                <i className={`fas ${icon}`} />
-                <span>{val}</span>
-              </div>
-            ))}
-          </div> */}
+           
         </div>
         <div className="sc-head-right">
-          <span className="sc-badge sc-badge--green">
-            <i className="fas fa-check-circle" /> Completed
-          </span>
+          <div className="sc-status-control">
+            <span className={`sc-badge sc-badge--${statusTone}`}>
+              <i className={`fas ${statusIcon}`} /> {activeSession.status}
+            </span>
+            <button
+              type="button"
+              className="sc-status-edit"
+              title="Edit status"
+              onClick={() => setStatusMenuOpen((open) => !open)}
+            >
+              <i className="fas fa-pencil-alt" />
+            </button>
+            {statusMenuOpen && (
+              <div className="sc-status-menu">
+                {['Completed', 'Pending'].map((status) => (
+                  <button
+                    type="button"
+                    key={status}
+                    className={activeSession.status === status ? 'sc-status-menu__item sc-status-menu__item--active' : 'sc-status-menu__item'}
+                    onClick={() => {
+                      onStatusChange(activeSession.id, status);
+                      setStatusMenuOpen(false);
+                    }}
+                  >
+                    <i className={`fas ${status === 'Completed' ? 'fa-check-circle' : 'fa-clock'}`} />
+                    {status}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           {/* <span className="sc-badge sc-badge--blue">
             <i className="fas fa-fingerprint" />&nbsp;
             <code>S-20240622-01</code>
@@ -226,12 +461,7 @@ const SessionCard = ({ basicDetails, notify }) => {
        
 
           <div className="sc-stats">
-            {[
-              { icon: 'fa-users', val: '30', lbl: 'Total Candidates', cls: 'blue' },
-              { icon: 'fa-check-circle', val: '26', lbl: 'Present', cls: 'green' },
-              { icon: 'fa-times-circle', val: '4', lbl: 'Absent', cls: 'red' },
-              { icon: 'fa-percentage', val: '86.7%', lbl: 'Attendance', cls: 'amber' },
-            ].map(({ icon, val, lbl, cls }) => (
+            {statItems.map(({ icon, val, lbl, cls }) => (
               <div key={lbl} className="sc-stat">
                 <div className={`sc-stat__icon sc-stat__icon--${cls}`}>
                   <i className={`fas ${icon}`} />
@@ -276,14 +506,7 @@ const SessionCard = ({ basicDetails, notify }) => {
           {activeTab === 'details' ? (
             <div className="sc-body">
               <div className="sc-detail-grid">
-                {[
-                  ['fa-book-open', 'Topic covered', 'Basics of Retail & Customer Service', 'blue'],
-                  ['fa-chalkboard', 'Training method', 'Interactive Learning', 'blue'],
-                  ['fa-clock', 'Duration', '2 hrs', 'blue'],
-                  ['fa-graduation-cap', 'Course / trade', basicDetails.courseTrade, 'pink'],
-                  ['fa-hashtag', 'Batch code', basicDetails.batchCode, 'pink'],
-                  ['fa-user', 'Trainer', basicDetails.trainerName, 'pink'],
-                ].map(([icon, label, value, tone]) => (
+                {detailItems.map(([icon, label, value, tone]) => (
                   <div key={label} className="sc-detail-item">
                     <small>{label}</small>
                     <strong>
@@ -295,55 +518,111 @@ const SessionCard = ({ basicDetails, notify }) => {
                   </div>
                 ))}
               </div>
+          
               <div className="sc-notes">
                 <span className="sc-detail-icon sc-detail-icon--blue">
                   <i className="far fa-edit" />
                 </span>
                 <div>
                   <small>Additional notes</small>
-                  <p>Covered basics of customer service and communication skills.</p>
+                  <p>{activeSession.notes || 'No notes added.'}</p>
                 </div>
               </div>
             </div>
           ) : (
             <div className="sc-body">
               <div className="sc-evidence-grid">
-                {[
-                  { icon: 'fa-image', title: 'Class photo', status: 'Uploaded', tone: 'blue' },
-                  { icon: 'fa-file-alt', title: 'Attendance sheet', status: 'Pending', tone: 'amber' },
-                  { icon: 'fa-video', title: 'Training clip', status: 'Uploaded', tone: 'green' },
-                ].map(({ icon, title, status, tone }) => (
-                  <div key={title} className="sc-evidence-card">
-                    <div className={`sc-evidence-icon sc-evidence-icon--${tone}`}>
-                      <i className={`fas ${icon}`} />
+                {evidenceDocs.map((doc) => {
+                  const icon = doc.type === 'Image' ? 'fa-image' : doc.type === 'Video' ? 'fa-video' : 'fa-file-alt';
+                  const tone = doc.status === 'Uploaded' ? 'green' : 'amber';
+                  return (
+                    <div key={doc.id} className="sc-evidence-card">
+                      <div className={`sc-evidence-icon sc-evidence-icon--${tone}`}>
+                        <i className={`fas ${icon}`} />
+                      </div>
+                      <strong>{doc.name}</strong>
+                      <small className={doc.status === 'Uploaded' ? 'ev-uploaded' : 'ev-pending'}>
+                        <i className={`fas ${doc.status === 'Uploaded' ? 'fa-check-circle' : 'fa-clock'}`} />
+                        &nbsp;{doc.status}
+                      </small>
+                      {doc.fileName && <span className="sc-file-name">{doc.fileName}</span>}
+                      <input
+                        id={`${activeSession.id}-${doc.id}`}
+                        type="file"
+                        className="sc-file-input"
+                        onChange={(e) => onEvidenceUpload(activeSession.id, doc.id, e.target.files?.[0])}
+                      />
+                      <label className="sc-upload-btn" htmlFor={`${activeSession.id}-${doc.id}`}>
+                        <i className="fas fa-upload" /> Upload
+                      </label>
                     </div>
-                    <strong>{title}</strong>
-                    <small className={status === 'Uploaded' ? 'ev-uploaded' : 'ev-pending'}>
-                      <i className={`fas ${status === 'Uploaded' ? 'fa-check-circle' : 'fa-clock'}`} />
-                      &nbsp;{status}
-                    </small>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
 
           <div className="sc-foot">
-            <button type="button" className="sc-btn" onClick={() => notify('Edit session')}>
+            <button type="button" className="sc-btn" onClick={() => onEditSession(activeSession)}>
               <i className="far fa-edit" /> Edit Session
             </button>
             <div className="sc-foot-right">
-              <button type="button" className="sc-btn" onClick={() => notify('Mark attendance')}>
+              <button type="button" className="sc-btn btn btn-primary" data-bs-toggle="modal" data-bs-target="#markAttendance">
                 <i className="fas fa-user-check" /> Mark Attendance
               </button>
-              <button type="button" className="sc-btn sc-btn--primary" onClick={() => notify('View attendance')}>
+              <button type="button" className="sc-btn sc-btn--primary" data-bs-toggle="modal" data-bs-target="#viewAttendance">
                 <i className="fas fa-chart-bar" /> View Attendance
               </button>
             </div>
           </div>
         </>
       )}
+
+
+{/* modal  */}
+
+<div class="modal fade" id="markAttendance" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="staticBackdropLabel">Mark Attendance</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        ...
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary">Understood</button>
+      </div>
     </div>
+  </div>
+</div>
+
+{/* modal */}
+
+{/* view attendance */}
+<div class="modal fade" id="viewAttendance" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="staticBackdropLabel">View Attendance</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        ...
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary">Understood</button>
+      </div>
+    </div>
+  </div>
+</div>
+    </div>
+
+
+
   );
 };
 
@@ -356,9 +635,15 @@ const TrainerModule = () => {
   });
   const [quickSearch, setQuickSearch] = useState('');
   const [mainTab, setMainTab] = useState('session');
-  const [sessions, setSessions] = useState(DUMMY_SESSIONS);
-  const [toast, setToast] = useState('');
   const [basicDetails] = useState(BASIC_DETAILS_INIT);
+  const [sessions, setSessions] = useState(() =>
+    DUMMY_SESSIONS.map((session, index) => hydrateSession(session, index, BASIC_DETAILS_INIT))
+  );
+  const [selectedSessionId, setSelectedSessionId] = useState(DUMMY_SESSIONS[0]?.id || '');
+  const [sessionDraft, setSessionDraft] = useState(null);
+  const [editingSessionId, setEditingSessionId] = useState(null);
+  const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
+  const [toast, setToast] = useState('');
 
   const [attendanceData, setAttendanceData] = useState(() => buildPointMap(ATTENDANCE_POINTS));
   const [trainingData, setTrainingData] = useState(() => buildPointMap(TRAINING_POINTS));
@@ -372,6 +657,94 @@ const TrainerModule = () => {
     setter((prev) => ({ ...prev, [id]: { ...prev[id], [field]: val } }));
   }, []);
   const setFilter = (key, val) => setFilters((f) => ({ ...f, [key]: val }));
+  const selectedSession = useMemo(
+    () => sessions.find((session) => session.id === selectedSessionId) || sessions[0],
+    [sessions, selectedSessionId]
+  );
+
+  const openAddSessionModal = () => {
+    const nextSessionNumber = sessions.length + 1;
+    setEditingSessionId(null);
+    setSessionDraft(createSessionDraft(nextSessionNumber, basicDetails));
+    setIsSessionModalOpen(true);
+  };
+  const openEditSessionModal = (session) => {
+    setEditingSessionId(session.id);
+    setSessionDraft({
+      ...createSessionDraft(sessions.length + 1, basicDetails),
+      ...session,
+      evidenceDocs: session.evidenceDocs?.length ? session.evidenceDocs : createEvidenceDocs('Pending'),
+    });
+    setIsSessionModalOpen(true);
+  };
+  const closeSessionModal = () => {
+    setIsSessionModalOpen(false);
+    setSessionDraft(null);
+    setEditingSessionId(null);
+  };
+  const updateSessionDraft = (field, value) => {
+    setSessionDraft((prev) => ({ ...prev, [field]: value }));
+  };
+  const updateDraftEvidence = (index, field, value) => {
+    setSessionDraft((prev) => ({
+      ...prev,
+      evidenceDocs: prev.evidenceDocs.map((doc, docIndex) =>
+        docIndex === index ? { ...doc, [field]: value } : doc
+      ),
+    }));
+  };
+  const addDraftEvidence = () => {
+    setSessionDraft((prev) => ({
+      ...prev,
+      evidenceDocs: [
+        ...prev.evidenceDocs,
+        { id: `EV${Date.now()}`, name: '', type: 'Document', status: 'Pending', fileName: '' },
+      ],
+    }));
+  };
+  const removeDraftEvidence = (index) => {
+    setSessionDraft((prev) => ({
+      ...prev,
+      evidenceDocs: prev.evidenceDocs.filter((_, docIndex) => docIndex !== index),
+    }));
+  };
+  const saveSessionDraft = () => {
+    const normalizedSession = normalizeSessionDraft(sessionDraft, basicDetails);
+
+    if (editingSessionId) {
+      setSessions((prev) => prev.map((session) => (
+        session.id === editingSessionId ? { ...normalizedSession, id: editingSessionId } : session
+      )));
+      setSelectedSessionId(editingSessionId);
+      notify('Session updated');
+    } else {
+      setSessions((prev) => [...prev, normalizedSession]);
+      setSelectedSessionId(normalizedSession.id);
+      notify('Session added');
+    }
+
+    closeSessionModal();
+  };
+  const updateSessionStatus = (sessionId, status) => {
+    setSessions((prev) => prev.map((session) => (
+      session.id === sessionId ? { ...session, status } : session
+    )));
+    notify(`Session marked ${status}`);
+  };
+  const uploadEvidenceFile = (sessionId, docId, file) => {
+    if (!file) return;
+    setSessions((prev) => prev.map((session) => (
+      session.id === sessionId
+        ? {
+          ...session,
+          evidenceDocs: session.evidenceDocs.map((doc) => (
+            doc.id === docId ? { ...doc, status: 'Uploaded', fileName: file.name } : doc
+          )),
+        }
+        : session
+    )));
+    notify('Evidence uploaded');
+  };
 
   return (
     <div className="dbr-portal">
@@ -426,12 +799,7 @@ const TrainerModule = () => {
               </span>
             </div>
             <div className="dbr-session-actions">
-              <button type="button" className="dbr-btn dbr-btn--session-pill"
-                onClick={() => {
-                  const n = sessions.length + 1;
-                  setSessions((prev) => [...prev, { id: `S${String(n).padStart(3, '0')}`, title: 'New Session', date: new Date().toLocaleDateString('en-IN'), status: 'Pending' }]);
-                  notify('Session added');
-                }}>
+              <button type="button" className="dbr-btn dbr-btn--session-pill" onClick={openAddSessionModal}>
                 <i className="fas fa-plus" /> Add Session
               </button>
               <button type="button" className="dbr-btn dbr-btn--session-pill" onClick={() => notify('Refer Session')}>
@@ -473,7 +841,14 @@ const TrainerModule = () => {
           </div>
 
           {/* ── Redesigned Session Card ── */}
-          <SessionCard basicDetails={basicDetails} notify={notify} />
+          <SessionCard
+            basicDetails={basicDetails}
+            session={selectedSession}
+            notify={notify}
+            onStatusChange={updateSessionStatus}
+            onEvidenceUpload={uploadEvidenceFile}
+            onEditSession={openEditSessionModal}
+          />
         </>
       )}
 
@@ -513,6 +888,19 @@ const TrainerModule = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {isSessionModalOpen && (
+        <AddSessionModal
+          draft={sessionDraft}
+          isEdit={Boolean(editingSessionId)}
+          onClose={closeSessionModal}
+          onSave={saveSessionDraft}
+          onFieldChange={updateSessionDraft}
+          onEvidenceChange={updateDraftEvidence}
+          onAddEvidence={addDraftEvidence}
+          onRemoveEvidence={removeDraftEvidence}
+        />
       )}
 
       {toast && (
@@ -592,7 +980,7 @@ const PORTAL_CSS = `
   /* Head — always one line */
   .sc-head {
     display: flex; align-items: center; justify-content: space-between;
-    gap: 12px; padding: 14px 16px 8px; flex-wrap: nowrap; overflow: hidden;
+    gap: 12px; padding: 14px 16px 8px; flex-wrap: nowrap; overflow: visible;
     border-bottom: 0;
     background: linear-gradient(105deg, #1264dc 0%, #1b8def 48%, #2bd2e9 100%);
   }
@@ -632,10 +1020,55 @@ const PORTAL_CSS = `
     box-shadow: inset 0 -1px 0 rgba(255,255,255,0.18);
   }
   .sc-badge--green { background: rgba(16,185,129,0.9); color: #fff; }
+  .sc-badge--amber { background: rgba(245,158,11,0.92); color: #fff; }
   .sc-badge--blue { background: rgba(255,255,255,0.18); color: #fff; }
   .sc-badge--blue code {
     font-family: monospace; font-size: 11px; color: #fff; font-weight: 800;
   }
+  .sc-status-control { position: relative; display: inline-flex; align-items: center; gap: 6px; }
+  .sc-status-edit {
+    border: 1px solid rgba(255,255,255,0.38);
+    background: rgba(255,255,255,0.16);
+    color: #fff;
+    width: 31px;
+    height: 31px;
+    border-radius: 9px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .sc-status-edit:hover { background: rgba(255,255,255,0.26); }
+  .sc-status-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 150px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    box-shadow: 0 18px 40px rgba(15,23,42,0.18);
+    padding: 6px;
+    z-index: 30;
+  }
+  .sc-status-menu__item {
+    width: 100%;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #334155;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 9px 10px;
+    text-align: left;
+  }
+  .sc-status-menu__item:hover,
+  .sc-status-menu__item--active { background: #eff6ff; color: ${BLUE}; }
 
   .sc-copy-btn {
     border: 1px solid rgba(255,255,255,0.36); background: rgba(255,255,255,0.12);
@@ -766,6 +1199,31 @@ const PORTAL_CSS = `
   .sc-evidence-card small { font-size: 11px; font-weight: 600; }
   .ev-uploaded { color: #059669; }
   .ev-pending  { color: #d97706; }
+  .sc-file-name {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sc-file-input { display: none; }
+  .sc-upload-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 2px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    border: 1px solid #bfdbfe;
+    background: #eff6ff;
+    color: ${BLUE};
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .sc-upload-btn:hover { background: #dbeafe; }
 
   /* Footer */
   .sc-foot {
@@ -786,6 +1244,110 @@ const PORTAL_CSS = `
     box-shadow: 0 4px 12px rgba(37,99,235,0.22);
   }
   .sc-btn--primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
+
+  /* Session modal */
+  .session-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    background: rgba(15,23,42,0.52);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+  }
+  .session-modal {
+    width: min(920px, 100%);
+    max-height: 92vh;
+    overflow: hidden;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 24px 70px rgba(15,23,42,0.26);
+    display: flex;
+    flex-direction: column;
+  }
+  .session-modal__head,
+  .session-modal__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 18px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .session-modal__foot { border-top: 1px solid #e2e8f0; border-bottom: 0; justify-content: flex-end; }
+  .session-modal__head h5 { margin: 0; font-size: 18px; font-weight: 900; color: #0f172a; }
+  .session-modal__head span { color: #64748b; font-size: 12px; font-weight: 800; }
+  .session-modal__close {
+    width: 34px;
+    height: 34px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    border-radius: 8px;
+    color: #64748b;
+    cursor: pointer;
+  }
+  .session-modal__close:hover { background: #f8fafc; color: #0f172a; }
+  .session-modal__body { overflow-y: auto; padding: 18px; }
+  .session-form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .session-field { display: flex; flex-direction: column; gap: 6px; margin: 0; }
+  .session-field span {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+  .session-field--full { margin-top: 12px; }
+  .session-evidence-builder {
+    margin-top: 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px;
+    background: #fafbfc;
+  }
+  .session-evidence-builder__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .session-evidence-builder__head h6 { margin: 0; font-size: 13px; font-weight: 900; color: #1e293b; }
+  .session-mini-btn,
+  .session-remove-btn {
+    border: 1px solid #bfdbfe;
+    background: #eff6ff;
+    color: ${BLUE};
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 7px 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .session-remove-btn {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-color: #fecdd3;
+    background: #fff1f2;
+    color: #e11d48;
+  }
+  .session-evidence-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 150px 36px;
+    gap: 8px;
+    align-items: center;
+    margin-top: 8px;
+  }
 
   /* Students */
   .dbr-student-view { margin-bottom: 20px; }
@@ -839,11 +1401,15 @@ const PORTAL_CSS = `
     .sc-head { flex-wrap: wrap; }
     .sc-head-right { flex-wrap: wrap; }
     .sc-badge--blue { display: none; }
+    .session-form-grid { grid-template-columns: 1fr; }
+    .session-evidence-row { grid-template-columns: 1fr; }
+    .session-remove-btn { width: 100%; }
   }
 
   @media (min-width: 641px) and (max-width: 1100px) {
     .sc-detail-grid { grid-template-columns: repeat(2, 1fr); }
     .sc-evidence-grid { grid-template-columns: repeat(2, 1fr); }
+    .session-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 `;
 
