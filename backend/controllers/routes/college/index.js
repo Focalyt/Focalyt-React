@@ -14,6 +14,7 @@ const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
 	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage, UploadCandidates, Placement, PlacementStatus, BatchMonitor } = require("../../models");
+const { ReEnquire } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -2320,7 +2321,7 @@ const buildB2cCrossSaleGroupQuery = (rootId) => ({
 
 router.get('/applied-courses/:id/cross-sales', isCollege, async (req, res) => {
 	try {
-		const source = await AppliedCourses.findById(req.params.id).select('_id parentAppliedCourseId crossSaleRootId');
+		const source = await AppliedCourses.findById(req.params.id).select('_id _candidate parentAppliedCourseId crossSaleRootId');
 		if (!source) {
 			return res.status(404).json({ success: false, message: 'Registration not found' });
 		}
@@ -2335,9 +2336,31 @@ router.get('/applied-courses/:id/cross-sales', isCollege, async (req, res) => {
 			.sort({ createdAt: 1 })
 			.lean();
 
+		const groupAppliedIds = groupLeads.map((lead) => lead._id).filter(Boolean);
+		const candidateId = source._candidate || groupLeads[0]?._candidate?._id;
+		const reEnquiries = candidateId
+			? await ReEnquire.find({
+				candidate: candidateId,
+				...(groupAppliedIds.length > 0 && { appliedCourse: { $in: groupAppliedIds } }),
+			})
+				.populate('course', 'name')
+				.populate('appliedCourse', '_course _center _leadStatus createdAt')
+				.populate({
+					path: 'appliedCourse',
+					populate: [
+						{ path: '_course', select: 'name' },
+						{ path: '_center', select: 'name' },
+						{ path: '_leadStatus', select: 'title' },
+					],
+				})
+				.populate('counselorName', 'name email')
+				.sort({ reEnquireDate: -1, createdAt: -1 })
+				.lean()
+			: [];
+
 		return res.json({
 			success: true,
-			data: { rootId, leads: groupLeads },
+			data: { rootId, leads: groupLeads, reEnquiries },
 			message: 'Cross-sale registrations retrieved successfully',
 		});
 	} catch (error) {
@@ -7753,10 +7776,11 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 		if (useAllTime) {
 			// no date filter
 		} else if (useActivityFilter) {
-			// Today's activity: followups SET today (createdAt) OR status UPDATED today (done/missed - statusUpdatedAt)
+			// Activity: followups set in range, or status changed in range.
 			baseMatch.$or = [
 				{ createdAt: { $gte: fromDate, $lte: toDate } },
-				{ statusUpdatedAt: { $gte: fromDate, $lte: toDate } }
+				{ statusUpdatedAt: { $gte: fromDate, $lte: toDate } },
+				{ updatedAt: { $gte: fromDate, $lte: toDate } }
 			];
 		} else {
 			baseMatch.followupDate = { $gte: fromDate, $lte: toDate };
@@ -10089,6 +10113,7 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 
 			existingFollowup.status = 'done';
 			existingFollowup.updatedBy = user._id;
+			existingFollowup.statusUpdatedAt = new Date();
 			existingFollowup.updatedAt = new Date();
 
 			const updatedFollowup = await existingFollowup.save({ new: true });
@@ -10253,7 +10278,8 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 	try {
 		const user = req.user;
 		let filter = {};
-		const { fromDate, toDate, page = 1, limit = 10, followupStatus, projects, verticals, course, center, counselor, name: searchName } = req.query;
+		const { fromDate, toDate, page = 1, limit = 10, followupStatus, projects, verticals, course, center, counselor, name: searchName, filterBy } = req.query;
+		const useActivityFilter = filterBy === 'activity';
 
 		// Add date validation
 		let from, to;
@@ -10263,6 +10289,7 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 			if (isNaN(from.getTime())) {
 				return res.status(400).json({ error: "Invalid fromDate format" });
 			}
+			from.setHours(0, 0, 0, 0);
 		} else {
 			from = new Date(new Date().setHours(0, 0, 0, 0));
 		}
@@ -10272,6 +10299,7 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 			if (isNaN(to.getTime())) {
 				return res.status(400).json({ error: "Invalid toDate format" });
 			}
+			to.setHours(23, 59, 59, 999);
 		} else {
 			to = new Date(new Date().setHours(23, 59, 59, 999));
 		}
@@ -10301,13 +10329,25 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 			baseMatch.createdBy = user._id;
 		}
 
+		const dateMatch = useActivityFilter
+			? {
+				$or: [
+					{ createdAt: { $gte: from, $lte: to } },
+					{ statusUpdatedAt: { $gte: from, $lte: to } },
+					{ updatedAt: { $gte: from, $lte: to } }
+				]
+			}
+			: {
+				followupDate: { $gte: from, $lte: to }
+			};
+
 
 		const aggregate = [
 			{
 				$match: {
 					...baseMatch,
 					status: followupStatus,
-					followupDate: { $gte: from, $lte: to },
+					...dateMatch,
 
 				}
 			},

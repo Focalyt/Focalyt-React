@@ -49,31 +49,43 @@ const UserManagement = ({
   ];
 
   const currentUsers = users.length > 0 ? users : sampleUsers;
+  const getSearchValue = (value) => String(value || '').toLowerCase();
+  const getUserName = (user) => user?.name || 'Unnamed User';
+  const getUserDesignation = (user) => user?.designation || user?.role_designation || 'No designation';
+  const getUserInitial = (user) => getUserName(user).charAt(0).toUpperCase();
+  const getFormattedDate = (value) => value ? new Date(value).toLocaleDateString() : '-';
+  const isActiveUser = (user) => user?.status === 'active' || user?.status === true || user?.status === 'true';
 
   const handleStatusChange = (userId, currentStatus) => {
-    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    const newStatus = isActiveUser({ status: currentStatus }) ? 'inactive' : 'active';
     if (onStatusChange) {
       onStatusChange(userId, newStatus);
     }
   };
 
   const getFilteredUsers = () => {
-    let filtered = currentUsers;
+    let filtered = currentUsers.filter(Boolean);
+    const normalizedSearchTerm = getSearchValue(searchTerm);
 
     // Filter by tab (active/inactive status)
     filtered = filtered.filter(user => {
       if (activeTab === 'active') {
-        return user.status === 'active';
+        return isActiveUser(user);
       } else {
-        return user.status !== 'active';
+        return !isActiveUser(user);
       }
     });
 
+    if (!normalizedSearchTerm) {
+      return filtered;
+    }
+
     // Filter by search term
     return filtered.filter(user =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.designation.toLowerCase().includes(searchTerm.toLowerCase())
+      getSearchValue(user.name).includes(normalizedSearchTerm) ||
+      getSearchValue(user.email).includes(normalizedSearchTerm) ||
+      getSearchValue(user.designation).includes(normalizedSearchTerm) ||
+      getSearchValue(user.role_designation).includes(normalizedSearchTerm)
     );
   };
 
@@ -101,8 +113,8 @@ const UserManagement = ({
     setShowUserModal(true);
   };
 
-  const getActiveUsersCount = () => currentUsers.filter(user => user.status === 'active').length;
-  const getInactiveUsersCount = () => currentUsers.filter(user => user.status !== 'active').length;
+  const getActiveUsersCount = () => currentUsers.filter(isActiveUser).length;
+  const getInactiveUsersCount = () => currentUsers.filter(user => !isActiveUser(user)).length;
 
   // User Details Modal
   const UserDetailsModal = ({ user, onClose }) => {
@@ -126,12 +138,12 @@ const UserManagement = ({
                     <div className="bg-primary rounded-circle d-flex align-items-center justify-content-center me-3" 
                          style={{ width: '60px', height: '60px' }}>
                       <span className="text-white fw-bold" style={{ fontSize: '24px' }}>
-                        {user.name.charAt(0).toUpperCase()}
+                        {getUserInitial(user)}
                       </span>
                     </div>
                     <div>
-                      <h4 className="mb-1">{user.name}</h4>
-                      <p className="text-muted mb-0">{user.designation}</p>
+                      <h4 className="mb-1">{getUserName(user)}</h4>
+                      <p className="text-muted mb-0">{getUserDesignation(user)}</p>
                     </div>
                   </div>
 
@@ -159,7 +171,7 @@ const UserManagement = ({
                         <Calendar size={16} className="text-muted me-2" />
                         <div>
                           <small className="text-muted d-block">Created</small>
-                          <span>{new Date(user.created_at).toLocaleDateString()}</span>
+                          <span>{getFormattedDate(user.created_at)}</span>
                         </div>
                       </div>
                     </div>
@@ -219,8 +231,8 @@ const UserManagement = ({
                       <div className="mb-3">
                         <div className="d-flex justify-content-between align-items-center">
                           <span>Status</span>
-                          <span className={`badge ${user.status === 'active' ? 'bg-success' : 'bg-danger'}`}>
-                            {user.status === 'active' ? 'Active' : 'Inactive'}
+                          <span className={`badge ${isActiveUser(user) ? 'bg-success' : 'bg-danger'}`}>
+                            {isActiveUser(user) ? 'Active' : 'Inactive'}
                           </span>
                         </div>
                       </div>
@@ -314,12 +326,12 @@ const UserManagement = ({
                           <div className="bg-primary rounded-circle d-flex align-items-center justify-content-center me-2" 
                                style={{ width: '24px', height: '24px', fontSize: '10px' }}>
                             <span className="text-white fw-bold">
-                              {user.name.charAt(0).toUpperCase()}
+                              {getUserInitial(user)}
                             </span>
                           </div>
                           <div>
-                            <div className="small fw-bold">{user.name}</div>
-                            <div className="text-muted" style={{ fontSize: '0.7rem' }}>{user.designation}</div>
+                            <div className="small fw-bold">{getUserName(user)}</div>
+                            <div className="text-muted" style={{ fontSize: '0.7rem' }}>{getUserDesignation(user)}</div>
                           </div>
                         </div>
                       </td>
@@ -535,12 +547,12 @@ const UserManagement = ({
                           <div className="bg-primary rounded-circle d-flex align-items-center justify-content-center me-3" 
                                style={{ width: '40px', height: '40px' }}>
                             <span className="text-white fw-bold">
-                              {user.name.charAt(0).toUpperCase()}
+                              {getUserInitial(user)}
                             </span>
                           </div>
                           <div>
-                            <div className="fw-bold">{user.name}</div>
-                            <div className="text-muted small">{user.designation}</div>
+                            <div className="fw-bold">{getUserName(user)}</div>
+                            <div className="text-muted small">{getUserDesignation(user)}</div>
                           </div>
                         </div>
                       </td>
@@ -580,20 +592,20 @@ const UserManagement = ({
                               className="form-check-input"
                               type="checkbox"
                               role="switch"
-                              checked={user.status === 'active'}
+                              checked={isActiveUser(user)}
                               onChange={() => handleStatusChange(user.user_id, user.status)}
                               disabled={!onStatusChange}
                             />
                           </div>
-                          <span className={`badge ${user.status === 'active' ? 'bg-success' : 'bg-secondary'}`}>
-                            {user.status === 'active' }
+                          <span className={`badge ${isActiveUser(user) ? 'bg-success' : 'bg-secondary'}`}>
+                            {isActiveUser(user) ? 'Active' : 'Inactive'}
                           </span>
                         </div>
                       </td>
                       
                       <td>
                         <span className="small text-muted">
-                          {new Date(user.created_at).toLocaleDateString()}
+                          {getFormattedDate(user.created_at)}
                         </span>
                       </td>
                       

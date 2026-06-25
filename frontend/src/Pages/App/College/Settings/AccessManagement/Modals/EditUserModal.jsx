@@ -100,6 +100,8 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
       can_add_leads: false,
       can_edit_leads: false,
       can_assign_leads: false,
+      can_approve_leads: false,
+      can_change_lead_status: false,
       can_delete_leads: false,
 
       // KYC Verification
@@ -162,6 +164,8 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
         can_add_leads: true,
         can_edit_leads: true,
         can_assign_leads: true,
+        can_approve_leads: true,
+        can_change_lead_status: true,
         can_delete_leads: true,
         can_view_kyc: true,
         can_verify_reject_kyc: true,
@@ -194,6 +198,8 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
         can_add_leads: false,
         can_edit_leads: false,
         can_assign_leads: false,
+        can_approve_leads: false,
+        can_change_lead_status: false,
         can_delete_leads: false,
         can_view_kyc: true,
         can_verify_reject_kyc: false,
@@ -262,13 +268,15 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
     }
 
     // Lead Management Dependencies
-    if (['can_add_leads', 'can_edit_leads', 'can_assign_leads', 'can_delete_leads'].includes(permission) && value === true) {
+    if (['can_add_leads', 'can_edit_leads', 'can_assign_leads', 'can_delete_leads', 'can_approve_leads', 'can_change_lead_status'].includes(permission) && value === true) {
       updatedPermissions.can_view_leads = true;
     }
     if (permission === 'can_view_leads' && value === false) {
       updatedPermissions.can_add_leads = false;
       updatedPermissions.can_edit_leads = false;
       updatedPermissions.can_assign_leads = false;
+      updatedPermissions.can_approve_leads = false;
+      updatedPermissions.can_change_lead_status = false;
       updatedPermissions.can_delete_leads = false;
     }
 
@@ -662,6 +670,8 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
                       can_add_leads: '➕ Add New Leads',
                       can_edit_leads: '✏️ Edit Leads',
                       can_assign_leads: '🔄 Assign Leads',
+                      can_approve_leads: '🔄 Approve Leads',
+                      can_change_lead_status: '🔄 Change Lead Status',
                       can_delete_leads: '🗑️ Delete Leads'
                     }).map(([permission, label]) => (
                       <div key={permission} className="col-md-6">

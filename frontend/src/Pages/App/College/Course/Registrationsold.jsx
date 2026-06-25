@@ -861,11 +861,13 @@ const CRMDashboard = () => {
   const [crossSaleSubStatusesLoading, setCrossSaleSubStatusesLoading] = useState(false);
   const [crossSaleLoading, setCrossSaleLoading] = useState(false);
   const [crossSaleCache, setCrossSaleCache] = useState({});
+  const [reEnquiryCache, setReEnquiryCache] = useState({});
   const [activeCourseByGroup, setActiveCourseByGroup] = useState({});
   const [crossSaleCenterOptions, setCrossSaleCenterOptions] = useState([]);
   const [crossSaleCentersLoading, setCrossSaleCentersLoading] = useState(false);
   const [showReapplyModal, setShowReapplyModal] = useState(false);
   const [reapplyProfile, setReapplyProfile] = useState(null);
+  const [reapplyHistoryLoading, setReapplyHistoryLoading] = useState(false);
 
   // Google Maps initialization
 
@@ -2252,6 +2254,50 @@ const CRMDashboard = () => {
     }
   };
 
+  const handleDuplicateLeadHistoryResponse = async (payload, mobile) => {
+    const message = payload?.message || payload?.msg || payload?.error || '';
+    const isDuplicateCandidate = /already exists|already applied|course already applied/i.test(message);
+
+    if (!isDuplicateCandidate || !mobile) return false;
+
+    try {
+      const queryParams = new URLSearchParams({
+        page: '1',
+        limit: '20',
+        name: mobile,
+      });
+
+      const historyResponse = await axios.get(`${backendUrl}/college/appliedCandidates?${queryParams}`, {
+        headers: { 'x-auth': token },
+      });
+
+      const matchingProfiles = historyResponse.data?.data || [];
+      const matchedProfile = matchingProfiles.find((profile) => (
+        String(profile?._candidate?.mobile || '').trim() === String(mobile).trim()
+      )) || matchingProfiles[0];
+
+      if (!matchedProfile) {
+        toast.info(message || 'Candidate already exists, but no duplicate history was found in the current list.');
+        return true;
+      }
+
+      toast.info('Candidate already exists. Showing duplicate history.');
+      setReapplyProfile(matchedProfile);
+      setShowReapplyModal(true);
+      setReapplyHistoryLoading(true);
+      try {
+        await fetchCrossSaleGroup(matchedProfile);
+      } finally {
+        setReapplyHistoryLoading(false);
+      }
+      return true;
+    } catch (historyError) {
+      console.error('Failed to load duplicate candidate history:', historyError);
+      toast.error(message || 'Candidate already exists');
+      return true;
+    }
+  };
+
   // Form submission handler
   const handleAddLeadsB2C = async (e) => {
     e.preventDefault();
@@ -2387,11 +2433,15 @@ const CRMDashboard = () => {
         closePanel();
       }
       else {
+        const handledDuplicate = await handleDuplicateLeadHistoryResponse(response.data, mobile);
+        if (handledDuplicate) return;
         alert(response.data.message);
       }
 
     } catch (error) {
       console.error('Error submitting form:', error);
+      const handledDuplicate = await handleDuplicateLeadHistoryResponse(error?.response?.data, String(candidateFormData.mobile || '').trim());
+      if (handledDuplicate) return;
       alert(error?.response?.data?.message || error?.message || 'Failed to add lead');
     } finally {
 
@@ -5249,14 +5299,21 @@ console.log('API Response:', response.data);
     setCrossSaleCentersLoading(false);
   };
 
-  const openReapplyModal = (profile) => {
+  const openReapplyModal = async (profile) => {
     setReapplyProfile(profile);
     setShowReapplyModal(true);
+    setReapplyHistoryLoading(true);
+    try {
+      await fetchCrossSaleGroup(profile);
+    } finally {
+      setReapplyHistoryLoading(false);
+    }
   };
 
   const closeReapplyModal = () => {
     setShowReapplyModal(false);
     setReapplyProfile(null);
+    setReapplyHistoryLoading(false);
   };
 
   const fetchCrossSaleGroup = useCallback(async (profile) => {
@@ -5270,7 +5327,9 @@ console.log('API Response:', response.data);
       );
       if (response.data.success) {
         const groupLeads = response.data.data?.leads || [];
+        const reEnquiries = response.data.data?.reEnquiries || [];
         setCrossSaleCache((prev) => ({ ...prev, [rootId]: groupLeads }));
+        setReEnquiryCache((prev) => ({ ...prev, [rootId]: reEnquiries }));
       }
     } catch (error) {
       console.error('Error fetching cross-sale group:', error);
@@ -14410,14 +14469,99 @@ useEffect(() => {
                     />
                   </div>
                   <div className="modal-body reapply-modal__body">
-                    <p className="text-muted small mb-3">ReApply history</p>
+                    <p className="text-muted small mb-3">
+                      Same mobile number se jitni course applications aur duplicate enquiries aayi hain.
+                    </p>
                     <div className="table-responsive">
-                      
+                      {(() => {
+                        const rootId = getProfileGroupRootId(reapplyProfile);
+                        const applicationRows = (
+                          crossSaleCache[rootId]?.length ? crossSaleCache[rootId] : [reapplyProfile]
+                        ).filter(Boolean);
+                        const duplicateRows = reEnquiryCache[rootId] || [];
+
+                        if (reapplyHistoryLoading) {
+                          return (
+                            <div className="text-center py-4">
+                              <div className="spinner-border spinner-border-sm text-primary me-2" role="status" />
+                              Loading duplicate history...
+                            </div>
+                          );
+                        }
+
+                        if (applicationRows.length === 0 && duplicateRows.length === 0) {
+                          return (
+                            <div className="text-center text-muted py-4">
                               No reapply history available
-                            
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <table className="table table-hover table-bordered align-middle mb-0">
+                            <thead className="table-light">
+                              <tr>
+                                <th>S.No</th>
+                                <th>Date</th>
+                                <th>Course</th>
+                                <th>Center</th>
+                                <th>Status</th>
+                                <th>Type</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {applicationRows.map((lead, index) => {
+                                const isOriginal = String(lead._id) === String(rootId) || !lead.parentAppliedCourseId;
+                                return (
+                                  <tr key={`application-${lead._id || index}`}>
+                                    <td>{index + 1}</td>
+                                    <td>{lead.createdAt ? moment(lead.createdAt).format('DD MMM YYYY') : 'N/A'}</td>
+                                    <td>{lead._course?.name || 'N/A'}</td>
+                                    <td>{lead._center?.name || 'N/A'}</td>
+                                    <td>{lead._leadStatus?.title || 'No Status'}</td>
+                                    <td>
+                                      <span className={`badge ${isOriginal ? 'bg-primary' : 'bg-success'}`}>
+                                        {isOriginal ? 'Original Apply' : 'Different Course Apply'}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                              {duplicateRows.map((item, index) => {
+                                const applied = item.appliedCourse || {};
+                                return (
+                                  <tr key={`duplicate-${item._id || index}`}>
+                                    <td>{applicationRows.length + index + 1}</td>
+                                    <td>{item.reEnquireDate ? moment(item.reEnquireDate).format('DD MMM YYYY') : 'N/A'}</td>
+                                    <td>{item.course?.name || applied._course?.name || 'N/A'}</td>
+                                    <td>{applied._center?.name || 'N/A'}</td>
+                                    <td>{applied._leadStatus?.title || 'Already Applied'}</td>
+                                    <td>
+                                      <span className="badge bg-warning text-dark">
+                                        Same Course Duplicate
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        );
+                      })()}
                     </div>
                   </div>
                   <div className="modal-footer">
+                    {/* <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => {
+                        const profile = reapplyProfile;
+                        closeReapplyModal();
+                        if (profile) openCrossSaleModal(profile);
+                      }}
+                    >
+                      Apply Another Course
+                    </button> */}
                     <button
                       type="button"
                       className="btn btn-secondary"

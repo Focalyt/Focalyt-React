@@ -3273,6 +3273,7 @@ console.log('API Response:', response.data);
       const response = await axios.get(`${backendUrl}/college/appliedCandidates?${queryParams}`, {
         headers: { 'x-auth': token }
       });
+      console.log('Fetched profile data:', response.data);
 
       if (response.data.success && response.data.data) {
         const data = response.data;
