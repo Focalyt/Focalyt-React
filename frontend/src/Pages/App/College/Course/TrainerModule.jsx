@@ -232,11 +232,17 @@ const formatProfileDate = (value) => {
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('en-IN');
 };
 
+const resolveDocName = (doc, fallback = '-') => {
+  if (!doc) return fallback;
+  if (typeof doc === 'string') return fallback;
+  return doc.name || doc.title || fallback;
+};
+
 const mapAppliedCourseToStudent = (profile) => {
   const candidate = profile._candidate || {};
   const batch = profile.batch || profile._batch || {};
-  const course = profile._course || {};
-  const center = profile._center || {};
+  const courseDoc = profile._course || profile.appliedCourse || {};
+  const centerDoc = profile._center || profile.appliedCourse?.center || profile.center || {};
   const regular = profile.attendance?.regularPeriod || {};
   const zero = profile.attendance?.zeroPeriod || {};
   const att = regular.attendancePercentage ?? zero.attendancePercentage ?? 0;
@@ -263,16 +269,16 @@ const mapAppliedCourseToStudent = (profile) => {
     attendance: `${att || 0}%`,
     status: profile.dropout ? 'Dropout' : (profile.isBatchFreeze ? 'Frozen' : 'Active'),
     email: candidate.email || profile.email || '',
-    batchCode: batch.name || profile.batchName || course.batchName || '-',
+    batchCode: batch.name || profile.batchName || courseDoc.batchName || '-',
     batchId: batch._id ? String(batch._id) : (profile.batch ? String(profile.batch) : ''),
-    course: course.name || profile.courseName || '-',
-    courseId: course._id ? String(course._id) : (profile._course ? String(profile._course) : ''),
-    center: center.name || profile.centerName || '-',
-    centerId: center._id ? String(center._id) : (profile._center ? String(profile._center) : ''),
-    project: course.projectName || profile.projectName || '-',
-    projectType: course.typeOfProject || '-',
+    course: resolveDocName(courseDoc, profile.courseName || '-'),
+    courseId: courseDoc._id ? String(courseDoc._id) : (profile._course ? String(profile._course) : ''),
+    center: resolveDocName(centerDoc, profile.centerName || '-'),
+    centerId: centerDoc._id ? String(centerDoc._id) : (profile._center ? String(profile._center) : ''),
+    project: courseDoc.projectName || profile.projectName || '-',
+    projectType: courseDoc.typeOfProject || profile.projectType || '-',
     sector: profile.sector
-      || (typeof course.sectors === 'string' ? course.sectors : course.sectors?.[0]?.name)
+      || (typeof courseDoc.sectors === 'string' ? courseDoc.sectors : courseDoc.sectors?.[0]?.name)
       || '-',
     leadStatus: profile._leadStatus?.title || profile._leadStatus?.name || '-',
     state: candidate.personalInfo?.currentAddress?.state || '-',
@@ -674,26 +680,6 @@ const priorityClass = (p) => {
 
 /* ─── Small reusable pieces ─── */
 
-const FilterSelect = ({ label, icon, options = [], value, onChange }) => {
-  const normalizedOptions = options.map((option) => (
-    typeof option === 'string' ? { value: option, label: option } : option
-  ));
-
-  return (
-    <div className="dbr-filter-pill">
-      <label className="dbr-filter-label">
-        <i className={`fas ${icon}`} /> {label}
-      </label>
-      <select className="dbr-filter-select" value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">All</option>
-        {normalizedOptions.map((option) => (
-          <option key={option.value} value={option.value}>{option.label}</option>
-        ))}
-      </select>
-    </div>
-  );
-};
-
 const PointFieldCard = ({ point, data, onChange }) => (
   <div className="dbr-point-card">
     <div className="dbr-point-card__top">
@@ -804,11 +790,11 @@ const FilterPanel = ({ filters, onFilterChange, collapsed, onToggle }) => (
     </button>
     {!collapsed && (
       <div className="tm-filters__grid">
-        <FilterSelect label="Department" icon="fa-sitemap" options={FILTER_OPTIONS.department} value={filters.department} onChange={(v) => onFilterChange('department', v)} />
-        <FilterSelect label="Project" icon="fa-project-diagram" options={FILTER_OPTIONS.project} value={filters.project} onChange={(v) => onFilterChange('project', v)} />
-        <FilterSelect label="Center" icon="fa-building" options={FILTER_OPTIONS.center} value={filters.center} onChange={(v) => onFilterChange('center', v)} />
-        <FilterSelect label="Course" icon="fa-graduation-cap" options={FILTER_OPTIONS.course} value={filters.course} onChange={(v) => onFilterChange('course', v)} />
-        <FilterSelect label="Batch" icon="fa-users" options={FILTER_OPTIONS.batch} value={filters.batch} onChange={(v) => onFilterChange('batch', v)} />
+        <SessionFormSelect label="Department" value={filters.department} onChange={(v) => onFilterChange('department', v)} />
+        <SessionFormSelect label="Project" value={filters.project} onChange={(v) => onFilterChange('project', v)} />
+        <SessionFormSelect label="Center" value={filters.center} onChange={(v) => onFilterChange('center', v)} />
+        <SessionFormSelect label="Course" value={filters.course} onChange={(v) => onFilterChange('course', v)} />
+        <SessionFormSelect label="Batch" value={filters.batch} onChange={(v) => onFilterChange('batch', v)} />
       </div>
     )}
   </section>
@@ -1135,12 +1121,9 @@ const StudentCard = ({ student, batchAttendance, onView, onAttendance, onAddPerf
   const detailItems = [
     ['fa-phone', 'Mobile', student.mobile],
     ['fa-envelope', 'Email', student.email || '-'],
+    ['fa-building', 'Center', student.center],
     ['fa-graduation-cap', 'Course', student.course],
     ['fa-users', 'Batch', student.batchCode],
-    ['fa-building', 'Center', student.center],
-    ['fa-map-marker-alt', 'Location', [student.city, student.state].filter((v) => v && v !== '-').join(', ') || '-'],
-    ['fa-project-diagram', 'Project', student.project || '-'],
-    [student.enrolledDateLabel === 'Lead Since' ? 'fa-calendar' : 'fa-calendar-check', student.enrolledDateLabel, student.enrolledDate || '-'],
   ];
 
   return (
@@ -1155,21 +1138,10 @@ const StudentCard = ({ student, batchAttendance, onView, onAttendance, onAddPerf
             </span>
             <span className="st-card__id">
               {student.batchCode} · {student.center}
-              {student.leadStatus && student.leadStatus !== '-' ? ` · ${student.leadStatus}` : ''}
             </span>
           </div>
         </div>
-        <div className="st-card__badges">
-          {student.isMultiCourseCandidate && (
-            <span className="st-card__multi-badge" title="Same candidate has multiple enrollments in this batch">
-              <i className="fas fa-layer-group" /> {student.enrollmentCount} courses
-            </span>
-          )}
-          <span className={`st-card__status st-card__status--${statusTone}`}>
-            <i className={`fas ${statusTone === 'active' ? 'fa-check-circle' : 'fa-exclamation-triangle'}`} />
-            {student.status}
-          </span>
-        </div>
+        
       </div>
 
       <div className="st-card__body">
@@ -1212,15 +1184,7 @@ const StudentCard = ({ student, batchAttendance, onView, onAttendance, onAddPerf
         </div>
 
         <div className="st-card__meta">
-          <div className="st-card__meta-item">
-            <div className="st-card__meta-icon st-card__meta-icon--blue">
-              <i className="fas fa-industry" />
-            </div>
-            <div>
-              <span>Sector</span>
-              <strong>{student.sector || '-'}</strong>
-            </div>
-          </div>
+          
           <div className="st-card__meta-item">
             <div className="st-card__meta-icon st-card__meta-icon--pink">
               <i className="fas fa-chart-line" />
@@ -1264,15 +1228,9 @@ const StudentProfileModal = ({ student, sessions, attendanceRecordsBySession, ba
   const infoItems = [
     ['fa-phone', 'Mobile', profile.mobile],
     ['fa-envelope', 'Email', profile.email || '-'],
+    ['fa-building', 'Center', profile.center],
     ['fa-graduation-cap', 'Course', profile.course],
     ['fa-users', 'Batch', profile.batchCode],
-    ['fa-building', 'Center', profile.center],
-    ['fa-project-diagram', 'Project', profile.project || '-'],
-    ['fa-briefcase', 'Project Type', profile.projectType || '-'],
-    ['fa-industry', 'Sector', profile.sector || '-'],
-    ['fa-tag', 'Lead Status', profile.leadStatus || '-'],
-    [profile.enrolledDateLabel === 'Lead Since' ? 'fa-calendar' : 'fa-calendar-check', profile.enrolledDateLabel, profile.enrolledDate || '-'],
-    ['fa-clock', 'Lead Created', profile.leadCreatedDate || '-'],
   ];
 
   return (
@@ -1569,7 +1527,77 @@ const ReferSessionModal = ({
   );
 };
 
-const SessionFeedbackModal = ({ session, onClose }) => {
+const RATING_LABELS = { 5: 'Excellent', 4: 'Good', 3: 'Average', 2: 'Below average', 1: 'Poor' };
+
+const DUMMY_STUDENT_REVIEW_TEMPLATES = [
+  { studentName: 'Akash Gaurav', rating: 5, comment: 'Session bahut accha tha, practical examples helpful the.', reviewedAt: '26/06/2026' },
+  { studentName: 'Priya Verma', rating: 4, comment: 'Trainer ne clearly explain kiya, thoda fast pace tha.', reviewedAt: '26/06/2026' },
+  { studentName: 'Rohit Singh', rating: 3, comment: 'Content good hai but more practice time chahiye tha.', reviewedAt: '25/06/2026' },
+  { studentName: 'Neha Sharma', rating: 5, comment: 'Very engaging session, communication skills improve hui.', reviewedAt: '25/06/2026' },
+  { studentName: 'Vikram Patel', rating: 4, comment: 'Good interaction and doubts clear hue.', reviewedAt: '24/06/2026' },
+  { studentName: 'Sneha Kapoor', rating: 2, comment: 'Topic samajh aaya but session thoda rushed laga.', reviewedAt: '24/06/2026' },
+];
+
+const getSessionStudentReviews = (session) => {
+  if (Array.isArray(session?.studentReviews) && session.studentReviews.length) {
+    return session.studentReviews;
+  }
+
+  const sessionId = String(session?.id || '');
+  if (!sessionId) return [];
+
+  const seed = sessionId.split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+  const reviewCount = (seed % 4) + 2;
+
+  return DUMMY_STUDENT_REVIEW_TEMPLATES.slice(0, reviewCount).map((review, index) => ({
+    ...review,
+    id: `${sessionId}-review-${index}`,
+    rating: Math.max(1, Math.min(5, review.rating + ((seed + index) % 2))),
+  }));
+};
+
+const computeReviewSummary = (reviews = []) => {
+  if (!reviews.length) return { average: 0, count: 0, filledStars: 0 };
+
+  const sum = reviews.reduce((acc, review) => acc + (Number(review.rating) || 0), 0);
+  const average = Math.round((sum / reviews.length) * 10) / 10;
+
+  return {
+    average,
+    count: reviews.length,
+    filledStars: Math.round(average),
+  };
+};
+
+const StudentStarDisplay = ({ rating, reviewCount, onClick }) => {
+  const filledStars = Math.round(rating);
+
+  return (
+    <button type="button" className="tm-star-display" onClick={onClick}>
+      <div className="tm-star-display__stars" aria-label={`${rating} out of 5 from ${reviewCount} reviews`}>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <i
+            key={star}
+            className={
+              star <= filledStars
+                ? 'fas fa-star tm-star-display__star tm-star-display__star--filled'
+                : 'far fa-star tm-star-display__star'
+            }
+          />
+        ))}
+      </div>
+      {reviewCount > 0 ? (
+        <span className="tm-star-display__meta">
+          {rating} · {reviewCount} student{reviewCount !== 1 ? 's' : ''}
+        </span>
+      ) : (
+        <span className="tm-star-display__meta tm-star-display__meta--empty">No reviews yet</span>
+      )}
+    </button>
+  );
+};
+
+const SessionFeedbackModal = ({ session, reviews, averageRating, onClose }) => {
   if (!session) return null;
 
   return (
@@ -1577,15 +1605,60 @@ const SessionFeedbackModal = ({ session, onClose }) => {
       <div className="session-modal session-feedback-modal" role="dialog" aria-modal="true">
         <div className="session-modal__head">
           <div>
-            <h5>Session Feedback</h5>
+            <h5>Student Feedback</h5>
             <span>{session.title || session.id}</span>
           </div>
           <button type="button" className="session-modal__close" onClick={onClose} aria-label="Close">
             <i className="fas fa-times" />
           </button>
         </div>
+
+        <div className="session-modal__body">
+          <div className="tm-feedback">
+            {reviews.length > 0 ? (
+              <>
+                <p className="tm-feedback__rating-summary">
+                  <i className="fas fa-star" />
+                  {' '}
+                  {averageRating} / 5 · {reviews.length} student review{reviews.length !== 1 ? 's' : ''}
+                  {' '}
+                  · {RATING_LABELS[Math.round(averageRating)] || 'Rated'}
+                </p>
+                <div className="tm-review-list">
+                  {reviews.map((review) => (
+                    <article key={review.id} className="tm-review-item">
+                      <div className="tm-review-item__head">
+                        <strong>{review.studentName}</strong>
+                        <div className="tm-review-item__stars" aria-label={`${review.rating} stars`}>
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <i
+                              key={star}
+                              className={star <= review.rating ? 'fas fa-star' : 'far fa-star'}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <p className="tm-review-item__comment">{review.comment}</p>
+                      {review.reviewedAt && (
+                        <small className="tm-review-item__date">{review.reviewedAt}</small>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="tm-review-empty">
+                <i className="far fa-comment-dots" />
+                <p>No student reviews for this session yet.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="session-modal__foot">
-          <button type="button" className="sc-btn" onClick={onClose}>Close</button>
+          <button type="button" className="sc-btn sc-btn--primary" onClick={onClose}>
+            Close
+          </button>
         </div>
       </div>
     </div>
@@ -1890,6 +1963,8 @@ const SessionCard = ({ basicDetails, session, notify, onStatusChange, onEvidence
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
   const activeSession = session || hydrateSession(DUMMY_SESSIONS[0], 0, basicDetails);
+  const studentReviews = useMemo(() => getSessionStudentReviews(activeSession), [activeSession]);
+  const reviewSummary = useMemo(() => computeReviewSummary(studentReviews), [studentReviews]);
   const statusTone = activeSession.status === 'Completed' ? 'green' : 'amber';
   const statusIcon = activeSession.status === 'Completed' ? 'fa-check-circle' : 'fa-clock';
   const timeRange = `${activeSession.startTime || '10:00'} - ${activeSession.endTime || '12:00'}`;
@@ -1904,7 +1979,6 @@ const SessionCard = ({ basicDetails, session, notify, onStatusChange, onEvidence
     ['fa-graduation-cap', 'Course / trade', activeSession.courseTrade || basicDetails.courseTrade, 'pink'],
     ['fa-hashtag', 'Batch code', activeSession.batchCode || basicDetails.batchCode, 'pink'],
     ['fa-user', 'Trainer', activeSession.trainerName || basicDetails.trainerName, 'pink'],
-    ['fa-user-tie', 'Counsellor', activeSession.counsellorName || '-', 'pink'],
   ]), [activeSession, basicDetails, timeRange]);
   const statItems = useMemo(() => ([
     { icon: 'fa-users', val: activeSession.totalCandidates || '0', lbl: 'Total Candidates', cls: 'blue' },
@@ -1924,47 +1998,6 @@ const SessionCard = ({ basicDetails, session, notify, onStatusChange, onEvidence
           <div className="sc-head-text">
             <div className="sc-trainer-name">{activeSession.title}</div>
             
-          </div>
-        </div>
-
-        <div className="sc-head-right">
-          <button
-            type="button"
-            className="sc-head-tab"
-            onClick={() => setFeedbackModalOpen(true)}
-          >
-            <i className="fas fa-comment-dots" /> Feedback
-          </button>
-          <div className="sc-status-control">
-            <span className={`sc-badge sc-badge--${statusTone}`}>
-              <i className={`fas ${statusIcon}`} /> {activeSession.status}
-            </span>
-            <button
-              type="button"
-              className="sc-status-edit"
-              title="Edit status"
-              onClick={() => setStatusMenuOpen((open) => !open)}
-            >
-              <i className="fas fa-pencil-alt" />
-            </button>
-            {statusMenuOpen && (
-              <div className="sc-status-menu">
-                {['Completed', 'Pending'].map((status) => (
-                  <button
-                    type="button"
-                    key={status}
-                    className={activeSession.status === status ? 'sc-status-menu__item sc-status-menu__item--active' : 'sc-status-menu__item'}
-                    onClick={() => {
-                      onStatusChange(activeSession.id, status);
-                      setStatusMenuOpen(false);
-                    }}
-                  >
-                    <i className={`fas ${status === 'Completed' ? 'fa-check-circle' : 'fa-clock'}`} />
-                    {status}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         </div>
 
@@ -1993,6 +2026,8 @@ const SessionCard = ({ basicDetails, session, notify, onStatusChange, onEvidence
       {feedbackModalOpen && (
         <SessionFeedbackModal
           session={activeSession}
+          reviews={studentReviews}
+          averageRating={reviewSummary.average}
           onClose={() => setFeedbackModalOpen(false)}
         />
       )}
@@ -2012,7 +2047,7 @@ const SessionCard = ({ basicDetails, session, notify, onStatusChange, onEvidence
               className={`sc-tab${activeTab === 'evidence' ? ' sc-tab--active' : ''}`}
               onClick={() => setActiveTab('evidence')}
             >
-              <i className="far fa-image" /> Evidence
+              <i className="far fa-image" /> Documents
             </button>
           </nav>
 
@@ -2026,10 +2061,18 @@ const SessionCard = ({ basicDetails, session, notify, onStatusChange, onEvidence
                       <span className={`sc-detail-icon sc-detail-icon--${tone}`}>
                         <i className={`fas ${icon}`} />
                       </span>
-                      {value}
+                      <span className="sc-detail-value">{value}</span>
                     </strong>
                   </div>
                 ))}
+                <div className="sc-detail-item">
+                  <small>Student Feedback</small>
+                  <StudentStarDisplay
+                    rating={reviewSummary.average}
+                    reviewCount={reviewSummary.count}
+                    onClick={() => setFeedbackModalOpen(true)}
+                  />
+                </div>
               </div>
 
               <div className="sc-notes">
@@ -2679,8 +2722,16 @@ const TrainerModule = () => {
     [students, sessions, attendanceRecordsBySession]
   );
   const displayStudents = useMemo(
-    () => enrichStudentsWithEnrollmentMeta(students),
-    [students]
+    () => enrichStudentsWithEnrollmentMeta(students).map((student) => ({
+      ...student,
+      course: student.course && student.course !== '-'
+        ? student.course
+        : activeBasicDetails.courseTrade,
+      center: student.center && student.center !== '-'
+        ? student.center
+        : activeBasicDetails.centerName,
+    })),
+    [students, activeBasicDetails]
   );
   const referBatchLabel = useMemo(
     () => getOptionLabel(batchOptions, filters.batch),
@@ -3002,33 +3053,33 @@ const TrainerModule = () => {
         </div>
       </header>
 
-      <div className="dbr-main-tabs">
-        {MAIN_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            className={`dbr-main-tab${mainTab === tab.id ? ' dbr-main-tab--active' : ''}`}
-            onClick={() => setMainTab(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {mainTab === 'session' && (
+      {!filters.batch ? (
+        <SessionPathPicker
+          filters={filters}
+          currentStep={sessionPathStep}
+          options={sessionPathOptions}
+          loading={sessionPathLoading}
+          getLabel={getFilterLabel}
+          onSelect={handleFilterChange}
+          onBack={handleSessionPathBack}
+          onReset={handleSessionPathReset}
+        />
+      ) : (
         <>
-          {!filters.batch ? (
-            <SessionPathPicker
-              filters={filters}
-              currentStep={sessionPathStep}
-              options={sessionPathOptions}
-              loading={sessionPathLoading}
-              getLabel={getFilterLabel}
-              onSelect={handleFilterChange}
-              onBack={handleSessionPathBack}
-              onReset={handleSessionPathReset}
-            />
-          ) : (
+          <div className="dbr-main-tabs">
+            {MAIN_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                className={`dbr-main-tab${mainTab === tab.id ? ' dbr-main-tab--active' : ''}`}
+                onClick={() => setMainTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {mainTab === 'session' && (
             <>
               <div className="dbr-session-bar">
                 <div className="dbr-session-summary">
@@ -3051,20 +3102,13 @@ const TrainerModule = () => {
                   </span>
                 </div>
                 <div className="dbr-session-actions">
-                  <FilterSelect
-                    label="Counsellor"
-                    icon="fa-user-tie"
-                    options={counselorOptions}
-                    value={filters.counsellor}
-                    onChange={(v) => handleFilterChange('counsellor', v)}
-                  />
-                  <button type="button" className="dbr-btn dbr-btn--session-pill dbr-btn--ghost" onClick={handleSessionPathReset}>
-                    Change batch
+                  <button type="button" className="dbr-btn dbr-btn--session-action dbr-btn--session-action--ghost" onClick={handleSessionPathReset}>
+                    <i className="fas fa-exchange-alt" /> Change batch
                   </button>
-                  <button type="button" className="dbr-btn dbr-btn--session-pill" onClick={openAddSessionModal}>
+                  <button type="button" className="dbr-btn dbr-btn--session-action dbr-btn--session-action--primary" onClick={openAddSessionModal}>
                     <i className="fas fa-plus" /> Add Session
                   </button>
-                  <button type="button" className="dbr-btn dbr-btn--session-pill" onClick={openReferSessionModal}>
+                  <button type="button" className="dbr-btn dbr-btn--session-action dbr-btn--session-action--outline" onClick={openReferSessionModal}>
                     <i className="fas fa-share-alt" /> Refer Session
                   </button>
                 </div>
@@ -3080,43 +3124,9 @@ const TrainerModule = () => {
                 />
               </div>
 
-              {filteredSessions.length > 0 && sessionPanelView !== 'add' && (
-                <div className="dbr-session-picker">
-                  {filteredSessions.map((session) => {
-                    const tone = session.status === 'Completed' ? 'green' : 'amber';
-                    const isActive = session.id === selectedSessionId;
-                    return (
-                      <button
-                        key={session.id}
-                        type="button"
-                        className={`dbr-session-picker__item${isActive ? ' dbr-session-picker__item--active' : ''}`}
-                        onClick={() => {
-                          setSelectedSessionId(session.id);
-                          setSessionPanelView('view');
-                        }}
-                      >
-                        <span className={`dbr-session-picker__status dbr-session-picker__status--${tone}`}>{session.status}</span>
-                        <strong>{session.title}</strong>
-                        <small>{session.date || formatSessionDate(session.sessionDate)}</small>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
               <div className="tm-workspace">
-                
                 <div className="tm-main">
-                  {sessionPanelView === 'add' && sessionDraft ? (
-                    <SessionAddPanel
-                      draft={sessionDraft}
-                      batchLabel={activeBasicDetails.batchCode}
-                      studentCount={studentsLoading ? '…' : students.length}
-                      onClose={closeSessionPanel}
-                      onSave={saveSessionDraft}
-                      onFieldChange={updateSessionDraft}
-                    />
-                  ) : selectedSession && sessionPanelView === 'view' ? (
+                  {filteredSessions.length > 0 ? (
                     <>
                       {studentsLoading && (
                         <div className="tm-empty tm-empty--inline">
@@ -3130,15 +3140,18 @@ const TrainerModule = () => {
                           <p>No batch-assigned students found. You can still manage this session.</p>
                         </div>
                       )}
-                      <SessionCard
-                        basicDetails={activeBasicDetails}
-                        session={selectedSession}
-                        notify={notify}
-                        onStatusChange={updateSessionStatus}
-                        onEvidenceUpload={uploadEvidenceFile}
-                        onEditSession={openEditSessionModal}
-                        onOpenAttendance={openAttendanceModal}
-                      />
+                      {filteredSessions.map((session) => (
+                        <SessionCard
+                          key={session.id}
+                          basicDetails={activeBasicDetails}
+                          session={session}
+                          notify={notify}
+                          onStatusChange={updateSessionStatus}
+                          onEvidenceUpload={uploadEvidenceFile}
+                          onEditSession={openEditSessionModal}
+                          onOpenAttendance={openAttendanceModal}
+                        />
+                      ))}
                     </>
                   ) : (
                     <>
@@ -3155,17 +3168,10 @@ const TrainerModule = () => {
               </div>
             </>
           )}
-        </>
-      )}
 
-      {mainTab === 'student' && (
+          {mainTab === 'student' && (
         <div className="dbr-student-view">
-          {!filters.batch ? (
-            <div className="tm-empty tm-empty--banner">
-              <i className="fas fa-filter" />
-              <h4>Select a batch to view students</h4>
-            </div>
-          ) : studentsLoading ? (
+          {studentsLoading ? (
             <div className="tm-empty"><i className="fas fa-spinner fa-spin" /><p>Loading students...</p></div>
           ) : (
             <>
@@ -3179,50 +3185,7 @@ const TrainerModule = () => {
                 <p>Track attendance and performance for enrolled candidates</p>
               </div>
             </div>
-            <div className="st-summary-stats">
-              <div className="st-summary-stat">
-                <div className="st-summary-stat__icon st-summary-stat__icon--blue">
-                  <i className="fas fa-users" />
-                </div>
-                <div>
-                  <strong>{students.length}</strong>
-                  <span>Total Students</span>
-                </div>
-              </div>
-              <div className="st-summary-stat">
-                <div className="st-summary-stat__icon st-summary-stat__icon--green">
-                  <i className="fas fa-check-circle" />
-                </div>
-                <div>
-                  <strong>{students.filter((s) => s.status === 'Active').length}</strong>
-                  <span>Active</span>
-                </div>
-              </div>
-              <div className="st-summary-stat">
-                <div className="st-summary-stat__icon st-summary-stat__icon--amber">
-                  <i className="fas fa-exclamation-triangle" />
-                </div>
-                <div>
-                  <strong>{students.filter((s) => s.status !== 'Active').length}</strong>
-                  <span>At Risk</span>
-                </div>
-              </div>
-              <div className="st-summary-stat">
-                <div className="st-summary-stat__icon st-summary-stat__icon--pink">
-                  <i className="fas fa-percentage" />
-                </div>
-                <div>
-                  <strong>
-                    {batchAttendanceSummary.average}%
-                  </strong>
-                  <span>
-                    {batchAttendanceSummary.source === 'sessions'
-                      ? `Avg across ${batchAttendanceSummary.sessionsMarked} marked sessions`
-                      : 'Avg from admission record'}
-                  </span>
-                </div>
-              </div>
-            </div>
+            
           </div>
 
           <div className="st-grid">
@@ -3244,6 +3207,8 @@ const TrainerModule = () => {
             </>
           )}
         </div>
+          )}
+        </>
       )}
 
       {isSessionModalOpen && sessionDraft && (
@@ -3403,7 +3368,7 @@ const PORTAL_CSS = `
     width: 44px; height: 44px; border-radius: 12px; background: #fff5f7;
     display: flex; align-items: center; justify-content: center; color: ${PINK}; font-size: 18px;
   }
-  .tm-path-card-btn strong { font-size: 15px; font-weight: 800; color: #0f172a; line-height: 1.35; }
+  .tm-path-card-btn strong { font-size: 11px; font-weight: 800; color: #0f172a; line-height: 1.35; }
   .tm-path-card-btn span { font-size: 11px; color: #64748b; font-weight: 600; }
   .tm-path-card-btn__arrow {
     position: absolute; right: 16px; bottom: 16px; color: ${BLUE}; font-size: 12px;
@@ -3434,9 +3399,7 @@ const PORTAL_CSS = `
   .dbr-session-summary__lbl { font-size: 13px; font-weight: 800; color: #334155; }
   .dbr-session-summary__count { font-size: 12px; color: #64748b; font-weight: 600; }
   .dbr-session-summary__count strong { color: ${BLUE}; font-size: 14px; }
-  .dbr-session-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-  .dbr-btn--session-pill { background: #fff; color: ${PINK}; border: 1.5px solid ${PINK}; border-radius: 999px; padding: 7px 16px; font-size: 11px; font-weight: 700; }
-  .dbr-btn--session-pill:hover { background: #fff5f7; }
+  .dbr-session-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 
   /* Session picker (horizontal, replaces sidebar) */
   .dbr-session-picker {
@@ -4011,7 +3974,7 @@ const PORTAL_CSS = `
     align-items: start;
   }
   .tm-sidebar { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 16px; }
-  .tm-main { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .tm-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 
   /* ── Profile card ── */
   .tm-profile-card {
@@ -4294,23 +4257,23 @@ const PORTAL_CSS = `
   ════════════════════════════════════════ */
   .sc-wrap {
     background: #fff; border: 1px solid #bfdbfe;
-    border-radius: 14px; overflow: hidden;
-    margin-bottom: 14px;
-    box-shadow: 0 8px 22px rgba(37,99,235,0.12);
+    border-radius: 10px; overflow: hidden;
+    margin-bottom: 10px;
+    box-shadow: 0 4px 14px rgba(37,99,235,0.08);
   }
 
-  /* Head — single line */
+  /* Head — compact single line */
   .sc-head {
     display: flex; align-items: center; justify-content: space-between;
-    gap: 12px; padding: 14px 16px; flex-wrap: nowrap; overflow: visible;
+    gap: 8px; padding: 10px 12px; flex-wrap: nowrap; overflow: visible;
     background: linear-gradient(105deg, #1264dc 0%, #1b8def 48%, #2bd2e9 100%);
   }
   .sc-head-left {
-    display: flex; align-items: center; gap: 10px;
+    display: flex; align-items: center; gap: 8px;
     min-width: 0; flex: 1 1 0; overflow: hidden;
     border: 1px solid rgba(255,255,255,0.35);
-    border-radius: 9px;
-    padding: 8px 10px;
+    border-radius: 8px;
+    padding: 5px 8px;
     background: rgba(255,255,255,0.13);
     box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
   }
@@ -4319,13 +4282,13 @@ const PORTAL_CSS = `
     flex-shrink: 0; flex-wrap: nowrap;
   }
   .sc-avatar {
-    width: 34px; height: 34px; border-radius: 8px; flex-shrink: 0;
+    width: 28px; height: 28px; border-radius: 7px; flex-shrink: 0;
     background: rgba(255,255,255,0.22); color: #fff;
-    display: flex; align-items: center; justify-content: center; font-size: 15px;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
   }
   .sc-head-text { min-width: 0; overflow: hidden; }
   .sc-trainer-name {
-    font-size: 13px; font-weight: 800; color: #fff;
+    font-size: 12px; font-weight: 800; color: #fff;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .sc-trainer-sub {
@@ -4372,7 +4335,147 @@ const PORTAL_CSS = `
     white-space: nowrap;
   }
   .sc-head-tab:hover { background: rgba(255,255,255,0.26); }
-  .session-feedback-modal { max-width: 480px; }
+  .session-feedback-modal { max-width: 520px; }
+  .session-feedback-modal .session-modal__head h5 { color: #0f172a; }
+  .session-feedback-modal .session-modal__head span { color: #475569; }
+
+  .tm-star-display {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+  }
+  .tm-star-display:hover .tm-star-display__star--filled { color: #f59e0b; }
+  .tm-star-display__stars {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+  }
+  .tm-star-display__star {
+    font-size: 13px;
+    color: #cbd5e1;
+    line-height: 1;
+  }
+  .tm-star-display__star--filled { color: #fbbf24; }
+  .tm-star-display__meta {
+    font-size: 10px;
+    font-weight: 700;
+    color: #64748b;
+  }
+  .tm-star-display__meta--empty { color: #94a3b8; font-style: italic; }
+
+  .tm-star-rating {
+    display: flex;
+    flex-direction: row-reverse;
+    justify-content: start;
+    gap: 0;
+  }
+  .tm-star-rating--inline { margin-top: 2px; }
+  .tm-star-rating input.tm-star { display: none; }
+  .tm-star-rating label.tm-star {
+    padding: 2px 3px;
+    font-size: 22px;
+    color: #cbd5e1;
+    cursor: pointer;
+    transition: transform 0.2s, color 0.2s;
+    line-height: 1;
+  }
+  .tm-star-rating label.tm-star:before {
+    content: '\\f006';
+    font-family: FontAwesome;
+  }
+  .tm-star-rating input.tm-star:hover ~ label.tm-star:before,
+  .tm-star-rating input.tm-star:checked ~ label.tm-star:before {
+    content: '\\f005';
+    color: #fbbf24;
+    transition: color 0.2s;
+  }
+  .tm-star-rating input.tm-star-5:hover ~ label.tm-star:before,
+  .tm-star-rating input.tm-star-5:checked ~ label.tm-star:before {
+    color: #f59e0b;
+    text-shadow: 0 0 10px rgba(245, 158, 11, 0.35);
+  }
+  .tm-star-rating label.tm-star:hover {
+    transform: rotate(-10deg) scale(1.12);
+  }
+
+  .tm-feedback { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+  .tm-feedback__rating-summary {
+    margin: 0 0 12px;
+    font-size: 14px;
+    font-weight: 800;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tm-feedback__rating-summary i { color: #f59e0b; }
+  .tm-review-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 340px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .tm-review-item {
+    padding: 12px 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #f8fafc;
+  }
+  .tm-review-item__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .tm-review-item__head strong {
+    font-size: 13px;
+    font-weight: 800;
+    color: #0f172a;
+  }
+  .tm-review-item__stars {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .tm-review-item__stars i {
+    font-size: 12px;
+    color: #cbd5e1;
+  }
+  .tm-review-item__stars i.fas { color: #f59e0b; }
+  .tm-review-item__comment {
+    margin: 0 0 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #1e293b;
+    line-height: 1.55;
+  }
+  .tm-review-item__date {
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+  }
+  .tm-review-empty {
+    text-align: center;
+    padding: 28px 16px;
+    color: #475569;
+  }
+  .tm-review-empty i {
+    font-size: 28px;
+    margin-bottom: 10px;
+    display: block;
+    color: #94a3b8;
+  }
+  .tm-review-empty p { margin: 0; font-size: 13px; font-weight: 600; color: #334155; }
+
   .sc-status-menu {
     position: absolute;
     top: calc(100% + 8px);
@@ -4404,88 +4507,95 @@ const PORTAL_CSS = `
   .sc-status-menu__item--active { background: #eff6ff; color: ${BLUE}; }
   .sc-toggle-btn {
     border: 0; background: #fff; border-radius: 50%;
-    width: 38px; height: 38px; cursor: pointer; color: ${BLUE}; font-size: 14px;
+    width: 30px; height: 30px; cursor: pointer; color: ${BLUE}; font-size: 12px;
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-    box-shadow: 0 5px 14px rgba(15,23,42,0.14);
+    box-shadow: 0 3px 10px rgba(15,23,42,0.12);
   }
   .sc-toggle-btn:hover { background: #eff6ff; }
   .sc-stats {
-    display: flex; align-items: stretch; gap: 8px;
+    display: flex; align-items: stretch; gap: 5px;
     flex-shrink: 0;
   }
   .sc-stat {
     display: flex; flex-direction: column; align-items: center;
-    justify-content: center; padding: 8px 10px; gap: 3px; text-align: center;
-    min-height: 68px; min-width: 72px;
-    border-radius: 10px;
+    justify-content: center; padding: 4px 7px; gap: 2px; text-align: center;
+    min-height: 50px; min-width: 56px;
+    border-radius: 8px;
     border: 1px solid rgba(255,255,255,0.28);
     background: rgba(255,255,255,0.16);
     box-shadow: inset 0 -1px 0 rgba(255,255,255,0.16);
   }
   .sc-stat__icon {
-    width: 26px; height: 26px; border-radius: 8px;
+    width: 20px; height: 20px; border-radius: 6px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 12px; margin-bottom: 1px;
+    font-size: 10px; margin-bottom: 0;
   }
   .sc-stat__icon--blue  { background: rgba(219,234,254,0.95); color: #1d4ed8; }
   .sc-stat__icon--green { background: rgba(209,250,229,0.95); color: #059669; }
   .sc-stat__icon--red   { background: rgba(254,226,226,0.95); color: #dc2626; }
   .sc-stat__icon--amber { background: rgba(254,243,199,0.95); color: #d97706; }
-  .sc-stat__val { font-size: 18px; font-weight: 900; color: #fff; line-height: 1; }
-  .sc-stat__lbl { font-size: 9px; color: rgba(255,255,255,0.86); font-weight: 700; white-space: nowrap; }
+  .sc-stat__val { font-size: 14px; font-weight: 900; color: #fff; line-height: 1; }
+  .sc-stat__lbl { font-size: 8px; color: rgba(255,255,255,0.86); font-weight: 700; white-space: nowrap; }
   .sc-tabs {
-    display: flex; gap: 0; padding: 0 20px; border-bottom: 1px solid #e2e8f0; background: #fafbfc;
+    display: flex; gap: 0; padding: 0 12px; border-bottom: 1px solid #e2e8f0; background: #fafbfc;
   }
   .sc-tab {
-    display: inline-flex; align-items: center; gap: 7px; height: 48px;
-    border: none; background: none; font-size: 13px; font-weight: 700;
-    color: #64748b; cursor: pointer; padding: 0 4px; margin-right: 24px; position: relative;
+    display: inline-flex; align-items: center; gap: 5px; height: 36px;
+    border: none; background: none; font-size: 12px; font-weight: 700;
+    color: #64748b; cursor: pointer; padding: 0 2px; margin-right: 16px; position: relative;
   }
   .sc-tab--active { color: ${BLUE}; }
   .sc-tab--active::after {
     content: ''; position: absolute; bottom: -1px; left: 0; right: 0;
-    height: 3px; border-radius: 3px 3px 0 0; background: ${BLUE};
+    height: 2px; border-radius: 2px 2px 0 0; background: ${BLUE};
   }
-  .sc-body { padding: 22px 22px 18px; }
+  .sc-body { padding: 12px 14px 10px; }
   .sc-detail-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px 28px; margin-bottom: 18px;
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px 14px; margin-bottom: 10px;
   }
   .sc-detail-item small {
-    font-size: 10px; font-weight: 700; text-transform: uppercase; color: #94a3b8;
-    display: block; margin-bottom: 6px; letter-spacing: 0.04em;
+    font-size: 9px; font-weight: 700; text-transform: uppercase; color: #94a3b8;
+    display: block; margin-bottom: 4px; letter-spacing: 0.03em;
   }
   .sc-detail-item strong {
-    font-size: 13px; font-weight: 700; color: #1e293b;
-    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; font-weight: 700; color: #1e293b;
+    display: flex; align-items: center; gap: 6px;
+    min-width: 0;
+  }
+  .sc-detail-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
   }
   .sc-detail-icon {
-    width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
-    display: inline-flex; align-items: center; justify-content: center; font-size: 13px;
+    width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 10px;
   }
   .sc-detail-icon--blue { background: #dbeafe; color: #1d4ed8; }
   .sc-detail-icon--pink { background: #fce7ef; color: ${PINK}; }
   .sc-notes {
-    border-top: 1px dashed #e2e8f0; padding-top: 16px;
-    display: flex; align-items: flex-start; gap: 12px;
-    background: #fafbfc; margin: 0 -22px -18px; padding: 16px 22px 18px;
+    border-top: 1px dashed #e2e8f0; padding-top: 10px;
+    display: flex; align-items: flex-start; gap: 8px;
+    background: #fafbfc; margin: 0 -14px -10px; padding: 10px 14px 12px;
   }
-  .sc-notes small { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #94a3b8; display: block; margin-bottom: 4px; }
-  .sc-notes p { font-size: 13px; color: #334155; line-height: 1.6; margin: 0; }
-  .sc-evidence-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .sc-notes small { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #94a3b8; display: block; margin-bottom: 2px; }
+  .sc-notes p { font-size: 11px; color: #334155; line-height: 1.45; margin: 0; }
+  .sc-evidence-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
   .sc-evidence-card {
-    border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px;
-    display: flex; flex-direction: column; gap: 8px; background: #fafbfc;
+    border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px;
+    display: flex; flex-direction: column; gap: 5px; background: #fafbfc;
     transition: border-color 0.15s;
   }
   .sc-evidence-card:hover { border-color: #bfdbfe; }
   .sc-evidence-icon {
-    width: 38px; height: 38px; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center; font-size: 16px;
+    width: 28px; height: 28px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
   }
   .sc-evidence-icon--amber { background: #fef3c7; color: #d97706; }
   .sc-evidence-icon--green { background: #d1fae5; color: #059669; }
-  .sc-evidence-card strong { font-size: 13px; font-weight: 700; color: #1e293b; }
-  .sc-evidence-card small { font-size: 11px; font-weight: 600; }
+  .sc-evidence-card strong { font-size: 11px; font-weight: 700; color: #1e293b; }
+  .sc-evidence-card small { font-size: 10px; font-weight: 600; }
   .ev-uploaded { color: #059669; }
   .ev-pending  { color: #d97706; }
   .sc-file-name { font-size: 11px; color: #64748b; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -4548,7 +4658,7 @@ const PORTAL_CSS = `
     cursor: pointer;
   }
   .session-modal__close:hover { background: #f8fafc; color: #0f172a; }
-  .session-modal__body { overflow-y: auto; padding: 18px; }
+  .session-modal__body { padding: 18px; }
   .session-modal__context {
     margin-bottom: 16px;
     padding: 12px 14px;
@@ -5131,7 +5241,7 @@ const PORTAL_CSS = `
     .sc-stats { display: none; }
     .sc-head { flex-wrap: wrap; }
     .sc-head-right { flex-wrap: wrap; }
-    .sc-detail-grid { grid-template-columns: 1fr; gap: 14px; }
+    .sc-detail-grid { grid-template-columns: 1fr; gap: 10px; }
     .sc-evidence-grid { grid-template-columns: 1fr; }
     .sc-foot { flex-direction: column; }
     .sc-foot-right { width: 100%; flex-direction: column; }
@@ -5159,7 +5269,7 @@ const PORTAL_CSS = `
 
   @media (min-width: 641px) and (max-width: 1100px) {
     .tm-workspace { grid-template-columns: 260px minmax(0, 1fr); }
-    .sc-detail-grid { grid-template-columns: repeat(2, 1fr); }
+    .sc-detail-grid { grid-template-columns: repeat(3, 1fr); }
     .sc-evidence-grid { grid-template-columns: repeat(2, 1fr); }
     .session-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .attendance-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
