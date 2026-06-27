@@ -2072,6 +2072,10 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			}
 		}
 
+		if (nextActionFromDate || nextActionToDate) {
+			await syncAppliedCourseFollowupDates();
+		}
+
 		// Build optimized pipeline with only essential fields
 		const pipeline = buildSimplifiedPipeline({
 			teamMemberIds,
@@ -2855,6 +2859,32 @@ function canApproveB2cLeads(user) {
 	if (user.permissions?.permission_type === 'Admin') return true;
 	return user.permissions?.permission_type === 'Custom'
 		&& user.permissions?.custom_permissions?.can_approve_leads === true;
+}
+
+async function syncAppliedCourseFollowupDates() {
+	const plannedFollowups = await B2cFollowup.find({ status: 'planned' })
+		.sort({ followupDate: -1, createdAt: -1 })
+		.select('appliedCourseId followupDate')
+		.lean();
+
+	if (!plannedFollowups.length) return;
+
+	const latestByCourse = new Map();
+	for (const followup of plannedFollowups) {
+		const key = followup.appliedCourseId.toString();
+		if (!latestByCourse.has(key)) {
+			latestByCourse.set(key, followup.followupDate);
+		}
+	}
+
+	const bulkOps = [...latestByCourse.entries()].map(([appliedCourseId, followupDate]) => ({
+		updateOne: {
+			filter: { _id: new mongoose.Types.ObjectId(appliedCourseId) },
+			update: { $set: { followupDate } }
+		}
+	}));
+
+	await AppliedCourses.bulkWrite(bulkOps, { ordered: false });
 }
 
 function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }) {
@@ -4010,6 +4040,9 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			);
 		}
 
+		if (appliedFilters.nextActionFromDate || appliedFilters.nextActionToDate) {
+			await syncAppliedCourseFollowupDates();
+		}
 
 		// Get all statuses once
 		const allStatuses = await Status.find({}).select('_id title milestone').lean();
@@ -7292,6 +7325,7 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 				collegeId: collegeId
 			});
 			await newFollowup.save();
+			doc.followupDate = new Date(followup);
 		}
 
 		if (googleCalendarEvent && newFollowup && req.user.googleAuthToken?.accessToken) {
@@ -7682,6 +7716,11 @@ router.post('/mark_complete_followup/:id', isCollege, async (req, res) => {
 			return res.status(404).json({ success: false, message: 'Followup not found' });
 		}
 
+		const nextPlannedFollowup = await B2cFollowup.findOne({
+			appliedCourseId: b2cFollowup.appliedCourseId,
+			status: 'planned'
+		}).sort({ followupDate: -1, createdAt: -1 }).select('followupDate').lean();
+
 		const newLogEntry = {
 			user: user._id,
 			action: 'Followup Marked Complete',
@@ -7692,7 +7731,10 @@ router.post('/mark_complete_followup/:id', isCollege, async (req, res) => {
 		const appliedcourse = await AppliedCourses.findOneAndUpdate({
 			_id: b2cFollowup.appliedCourseId
 		},
-			{ $push: { logs: newLogEntry } }, { new: true }
+			{
+				$set: { followupDate: nextPlannedFollowup?.followupDate || null },
+				$push: { logs: newLogEntry }
+			}, { new: true }
 		);
 		// console.log("appliedcourse", appliedcourse)
 
@@ -10087,7 +10129,7 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 			};
 
 			const updateAppliedRemarks = await AppliedCourses.findOneAndUpdate({ _id: appliedCourseId }, {
-				$set: { remarks: remarks },
+				$set: { remarks: remarks, followupDate: followupDate },
 				$push: { logs: newLogEntry }
 			});
 
@@ -10158,7 +10200,7 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 			};
 
 			const updateAppliedRemarks = await AppliedCourses.findOneAndUpdate({ _id: appliedCourseId }, {
-				$set: { remarks: remarks },
+				$set: { remarks: remarks, followupDate: followupDate },
 				$push: { logs: newLogEntry }
 			});
 

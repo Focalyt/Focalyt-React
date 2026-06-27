@@ -5,7 +5,7 @@ import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
 import * as XLSX from 'xlsx';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/googleOAuth';
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
@@ -80,6 +80,21 @@ function getLeadSubStatusTitle(lead) {
   if (!Array.isArray(list) || list.length === 0) return '';
   const found = list.find((ss) => String(ss?._id) === String(id));
   return pickFirstNonEmpty(found?.title, found?.name);
+}
+
+function getLeadStatusId(lead) {
+  return lead?.status?._id || lead?.status || '';
+}
+
+function getLeadSubStatusObject(lead) {
+  const id = lead?.subStatus?._id || lead?.subStatus;
+  if (!id) return null;
+  const list = lead?.status?.substatuses;
+  if (Array.isArray(list) && list.length) {
+    const found = list.find((ss) => String(ss?._id) === String(id));
+    if (found) return found;
+  }
+  return { _id: id };
 }
 
 function getLeadB2bProjectName(lead) {
@@ -346,7 +361,7 @@ const MultiSelectCheckbox = ({
 
 const useNavHeight = (dependencies = []) => {
   const navRef = useRef(null);
-  const [navHeight, setNavHeight] = useState(140); // Default fallback
+  const [navHeight, setNavHeight] = useState(50); // Default fallback
   const widthRef = useRef(null);
   const [width, setWidth] = useState(0);
   const [leftOffset, setLeftOffset] = useState(0);
@@ -518,6 +533,8 @@ const B2BSales = () => {
 
   const candidateRef = useRef();
   const navigate = useNavigate();
+  const location = useLocation();
+  const lrpReturnTo = `${location.pathname}${location.search}`;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const [userData, setUserData] = useState(JSON.parse(sessionStorage.getItem("user") || "{}"));
   const token = userData.token;
@@ -1624,6 +1641,19 @@ const B2BSales = () => {
   });
   const [showFilters, setShowFilters] = useState(false);
 
+  const filtersRef = useRef(filters);
+  const leadViewTabRef = useRef(leadViewTab);
+  const selectedStatusFilterRef = useRef(selectedStatusFilter);
+  const currentPageRef = useRef(currentPage);
+  const selectedApprovalStatusRef = useRef(selectedApprovalStatus);
+  const fetchLeadsRequestRef = useRef(0);
+
+  filtersRef.current = filters;
+  leadViewTabRef.current = leadViewTab;
+  selectedStatusFilterRef.current = selectedStatusFilter;
+  currentPageRef.current = currentPage;
+  selectedApprovalStatusRef.current = selectedApprovalStatus;
+
   const cycleProjectOptions = useMemo(() => {
     if (!filters.b2bDepartment) return allB2bProjects;
     return allB2bProjects.filter(
@@ -1663,7 +1693,7 @@ const B2BSales = () => {
     }
   };
 
-  const getLeadFetchOverrides = (extra = {}, viewTab = leadViewTab) => {
+  const getLeadFetchOverrides = (extra = {}, viewTab = leadViewTabRef.current) => {
     const overrides = { ...extra };
     if (viewTab === 'myRefer') {
       overrides.referredByMe = true;
@@ -1904,16 +1934,19 @@ const B2BSales = () => {
   useEffect(() => {
     const handler = () => {
       setCrossSaleCache({});
-      fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
-      if (leadViewTab === 'all') {
+      fetchLeads(
+        selectedStatusFilterRef.current,
+        currentPageRef.current,
+        getLeadFetchOverrides()
+      );
+      if (leadViewTabRef.current === 'all') {
         fetchStatusCounts();
         fetchApprovalCounts();
       }
     };
     window.addEventListener('b2b-followup-updated', handler);
     return () => window.removeEventListener('b2b-followup-updated', handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedStatusFilter, currentPage]);
+  }, []);
 
   // Auto-select leads based on Input 1 value for bulk refer
   useEffect(() => {
@@ -2088,7 +2121,7 @@ const B2BSales = () => {
       params.documentsStatusIn = toCsv(eff.documentsStatus);
     }
     if (!options.skipApprovalStatus) {
-      const approval = eff.approvalStatus ?? selectedApprovalStatus;
+      const approval = eff.approvalStatus ?? selectedApprovalStatusRef.current;
       if (approval) params.approvalStatus = approval;
     }
     if (eff.referredByMe === true || eff.referredByMe === 'true') {
@@ -2284,12 +2317,14 @@ const B2BSales = () => {
   };
 
   const fetchLeads = async (statusFilter = null, page = 1, filterOverrides = {}) => {
+    const requestId = ++fetchLeadsRequestRef.current;
+
     try {
       closePanel();
       setLoadingLeads(true);
       setAiLeadIntelError('');
 
-      const eff = { ...filters, ...filterOverrides };
+      const eff = { ...filtersRef.current, ...filterOverrides };
 
       // Build query parameters
       const params = {
@@ -2305,54 +2340,15 @@ const B2BSales = () => {
 
       appendLeadFilterParams(params, eff);
 
-      // console.log('🔍 [FRONTEND] fetchLeads called:', {
-      //   statusFilter,
-      //   page,
-      //   filters: filters,
-      //   params: params,
-      //   leadOwnerInFilters: filters.leadOwner,
-      //   leadOwnerInParams: params.leadOwner
-      // });
-
       const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
         headers: { 'x-auth': token },
         params: params
       });
 
+      if (requestId !== fetchLeadsRequestRef.current) return;
+
       if (response.data.status) {
         const fetchedLeads = response.data.data.leads || [];
-
-        // console.log('📥 [FRONTEND] Response received:', {
-        //   status: response.data.status,
-        //   leadsCount: fetchedLeads.length,
-        //   pagination: response.data.data?.pagination,
-        //   message: response.data.message,
-        //   appliedFilter: filters.leadOwner ? `leadOwner: ${filters.leadOwner}` : 'No filter'
-        // });
-
-        // Debug: Log leadOwner data from response
-        // if (fetchedLeads.length > 0) {
-        //   console.log('👤 [FRONTEND] Lead Owner Data Received:');
-        //   fetchedLeads.slice(0, 3).forEach((lead, index) => {
-        //     console.log(`  Lead ${index + 1}:`, {
-        //       businessName: lead.businessName,
-        //       leadOwner: lead.leadOwner,
-        //       leadOwnerId: lead.leadOwner?._id || lead.leadOwner || 'null',
-        //       leadOwnerName: lead.leadOwner?.name || 'No Owner',
-        //       leadOwnerEmail: lead.leadOwner?.email || 'N/A',
-        //       leadAddedBy: lead.leadAddedBy,
-        //       leadAddedByName: lead.leadAddedBy?.name || 'No Added By'
-        //     });
-        //   });
-        // } else {
-        //   console.log('⚠️ [FRONTEND] No leads in response - Setting empty array');
-        // }
-
-        // console.log('🔄 [FRONTEND] Updating leads state:', {
-        //   previousLeadsCount: leads.length,
-        //   newLeadsCount: fetchedLeads.length,
-        //   willClear: fetchedLeads.length === 0
-        // });
 
         setLeads(fetchedLeads);
         fetchAiLeadIntel(fetchedLeads);
@@ -2362,15 +2358,16 @@ const B2BSales = () => {
           setCurrentPage(response.data.data.pagination.currentPage || 1);
           setPageSize(response.data.data.pagination.totalLeads || 0);
         }
-
-        // console.log('✅ [FRONTEND] Leads state updated');
       } else {
         console.error('❌ [FRONTEND] Failed to fetch leads:', response.data.message);
       }
     } catch (error) {
+      if (requestId !== fetchLeadsRequestRef.current) return;
       console.error('Error fetching leads:', error);
     } finally {
-      setLoadingLeads(false);
+      if (requestId === fetchLeadsRequestRef.current) {
+        setLoadingLeads(false);
+      }
     }
   };
 
@@ -2378,7 +2375,7 @@ const B2BSales = () => {
   const fetchStatusCounts = async (filterOverrides = {}) => {
     try {
       setLoadingStatusCounts(true);
-      const eff = { ...filters, ...filterOverrides };
+      const eff = { ...filtersRef.current, ...filterOverrides };
       const params = {};
       appendLeadFilterParams(params, eff);
 
@@ -2413,7 +2410,7 @@ const B2BSales = () => {
   const fetchApprovalCounts = async (filterOverrides = {}) => {
     try {
       setApprovalCountsLoading(true);
-      const eff = { ...filters, ...filterOverrides };
+      const eff = { ...filtersRef.current, ...filterOverrides };
       const baseParams = {};
       appendLeadFilterParams(baseParams, eff, { skipApprovalStatus: true });
 
@@ -3522,14 +3519,9 @@ const B2BSales = () => {
 
     if (panel === 'StatusChange') {
       if (profile) {
-        const newStatus = profile?._leadStatus?._id || '';
-        setSelectedStatus(newStatus);
-
-        // if (newStatus) {
-        //   await fetchSubStatus(newStatus);
-        // }
-
-        setSelectedSubStatus(profile?.selectedSubstatus || '');
+        const newStatus = getLeadStatusId(profile);
+        setSelectedStatus(String(newStatus || ''));
+        setSelectedSubStatus(getLeadSubStatusObject(profile));
       }
       setShowPanel('editPanel')
 
@@ -5848,7 +5840,7 @@ const B2BSales = () => {
                                   <button
                                     type="button"
                                     className="lead-meta-v2__pill"
-                                    onClick={() => navigate(`/institute/lrp?b2bLeadId=${lead._id}&mode=add`, { state: { b2bLead: lead } })}
+                                    onClick={() => navigate(`/institute/lrp?b2bLeadId=${lead._id}&mode=add`, { state: { b2bLead: lead, returnTo: lrpReturnTo } })}
                                     title="Add Lead Report"
                                   >
                                     <i className="fas fa-plus" aria-hidden="true"></i>
@@ -6247,7 +6239,7 @@ const B2BSales = () => {
                                   <button
                                     type="button"
                                     className="lead-meta-v2__pill"
-                                    onClick={() => navigate(`/institute/lrp?b2bLeadId=${lead._id}&mode=add`, { state: { b2bLead: lead } })}
+                                    onClick={() => navigate(`/institute/lrp?b2bLeadId=${lead._id}&mode=add`, { state: { b2bLead: lead, returnTo: lrpReturnTo } })}
                                     title="Add Lead Report"
                                   >
                                     <i className="fas fa-plus" aria-hidden="true"></i>
@@ -6761,7 +6753,7 @@ const B2BSales = () => {
 
                     <Link
                       to={`/institute/lrp?b2bLeadId=${mobileMoreLead?._id || ''}&mode=add`}
-                      state={{ b2bLead: mobileMoreLead }}
+                      state={{ b2bLead: mobileMoreLead, returnTo: lrpReturnTo }}
                       className="lead-meta-v2__action-btn"
                       style={{ textDecoration: 'none' }}
                       onClick={() => setMobileMoreLead(null)}

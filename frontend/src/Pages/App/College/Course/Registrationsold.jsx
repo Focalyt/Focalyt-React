@@ -4113,23 +4113,6 @@ console.log('API Response:', response.data);
     const isEkycTab = activeMainTab === 'ekyc';
 
     // Prepare query parameters
-    // Helper function to format date for API (set to start of day for fromDate, end of day for toDate)
-    // Only used for nextAction dates
-    const formatDateForAPI = (date, isEndDate = false) => {
-      if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
-      const d = new Date(date);
-      if (isEndDate) {
-        d.setHours(23, 59, 59, 999); // End of day
-      } else {
-        d.setHours(0, 0, 0, 0); // Start of day
-      }
-      return d.toISOString();
-    };
-
-    // Format only nextAction dates before using in query params
-    const nextActionFromDateFormatted = filters.nextActionFromDate ? formatDateForAPI(filters.nextActionFromDate, false) : null;
-    const nextActionToDateFormatted = filters.nextActionToDate ? formatDateForAPI(filters.nextActionToDate, true) : null;
-
     const fd = formDataRef.current || formData;
     const queryParams = new URLSearchParams({
       page: page.toString(),
@@ -4142,8 +4125,8 @@ console.log('API Response:', response.data);
       ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
       ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
       ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
-      ...(nextActionFromDateFormatted && { nextActionFromDate: nextActionFromDateFormatted }),
-      ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
+      ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
+      ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
       ...buildListFilterQueryParts(fd, cycleOverride || cycleFilters),
     });
 
@@ -4496,23 +4479,6 @@ console.log('API Response:', response.data);
       return;
     }
 
-    // Helper function to format date for API (set to start of day for fromDate, end of day for toDate)
-    // Only used for nextAction dates
-    const formatDateForAPI = (date, isEndDate = false) => {
-      if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
-      const d = new Date(date);
-      if (isEndDate) {
-        d.setHours(23, 59, 59, 999); // End of day
-      } else {
-        d.setHours(0, 0, 0, 0); // Start of day
-      }
-      return d.toISOString();
-    };
-
-    // Format only nextAction dates before using in query params
-    const nextActionFromDateFormatted = filters.nextActionFromDate ? formatDateForAPI(filters.nextActionFromDate, false) : null;
-    const nextActionToDateFormatted = filters.nextActionToDate ? formatDateForAPI(filters.nextActionToDate, true) : null;
-
     // Prepare query parameters
     const queryParams = new URLSearchParams({
       page: page.toString(),
@@ -4526,8 +4492,8 @@ console.log('API Response:', response.data);
       ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
       ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
       ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
-      ...(nextActionFromDateFormatted && { nextActionFromDate: nextActionFromDateFormatted }),
-      ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
+      ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
+      ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       ...buildListFilterQueryParts(formData, cycleFilters),
     });
@@ -4566,22 +4532,6 @@ console.log('API Response:', response.data);
     }
 
     // Prepare query parameters
-
-    const formatDateForAPI = (date, isEndDate = false) => {
-      if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
-      const d = new Date(date);
-      if (isEndDate) {
-        d.setHours(23, 59, 59, 999); // End of day
-      } else {
-        d.setHours(0, 0, 0, 0); // Start of day
-      }
-      return d.toISOString();
-    };
-
-    // Format only nextAction dates before using in query params
-    const nextActionFromDateFormatted = filters.nextActionFromDate ? formatDateForAPI(filters.nextActionFromDate, false) : null;
-    const nextActionToDateFormatted = filters.nextActionToDate ? formatDateForAPI(filters.nextActionToDate, true) : null;
-
     const queryParams = new URLSearchParams({
       page: page.toString(),
       ...(filters.name && { name: filters.name }),
@@ -4593,8 +4543,8 @@ console.log('API Response:', response.data);
       ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
       ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
       ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
-      ...(nextActionFromDateFormatted && { nextActionFromDate: nextActionFromDateFormatted }),
-      ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
+      ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
+      ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       ...(filters.approvalStatus && { approvalStatus: filters.approvalStatus }),
       // Multi-select filters
@@ -5448,21 +5398,6 @@ console.log('API Response:', response.data);
 
         try {
 
-          const formatDateForAPI = (date, isEndDate = false) => {
-            if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
-            const d = new Date(date);
-            if (isEndDate) {
-              d.setHours(23, 59, 59, 999);
-            } else {
-              d.setHours(0, 0, 0, 0);
-            }
-            return d.toISOString();
-          };
-
-          // Format only nextAction dates
-          const nextActionFromDateFormatted = filterData.nextActionFromDate ? formatDateForAPI(filterData.nextActionFromDate, false) : null;
-          const nextActionToDateFormatted = filterData.nextActionToDate ? formatDateForAPI(filterData.nextActionToDate, true) : null;
-
           const queryParams = new URLSearchParams({
             page: '1',
             limit: validNumValue.toString(),
@@ -5475,8 +5410,8 @@ console.log('API Response:', response.data);
             ...(filterData.createdToDate && { createdToDate: filterData.createdToDate.toISOString() }),
             ...(filterData.modifiedFromDate && { modifiedFromDate: filterData.modifiedFromDate.toISOString() }),
             ...(filterData.modifiedToDate && { modifiedToDate: filterData.modifiedToDate.toISOString() }),
-            ...(nextActionFromDateFormatted && { nextActionFromDate: nextActionFromDateFormatted }),
-            ...(nextActionToDateFormatted && { nextActionToDate: nextActionToDateFormatted }),
+            ...(filterData.nextActionFromDate && { nextActionFromDate: filterData.nextActionFromDate.toISOString() }),
+            ...(filterData.nextActionToDate && { nextActionToDate: filterData.nextActionToDate.toISOString() }),
             ...(filterData.subStatuses && { subStatuses: filterData.subStatuses }),
             ...buildListFilterQueryParts(formData, cycleFilters),
           });
@@ -8065,19 +8000,6 @@ console.log('API Response:', response.data);
     setIsSendingBulkWhatsapp(true);
 
     try {
-      // Helper function to format date for API
-      // Only used for nextAction dates
-      const formatDateForAPI = (date, isEndDate = false) => {
-        if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
-        const d = new Date(date);
-        if (isEndDate) {
-          d.setHours(23, 59, 59, 999);
-        } else {
-          d.setHours(0, 0, 0, 0);
-        }
-        return d.toISOString();
-      };
-
       // Fetch all profiles matching current filters (not just current page)
       const queryParams = new URLSearchParams({
         page: '1',
