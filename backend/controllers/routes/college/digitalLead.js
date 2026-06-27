@@ -198,10 +198,18 @@ class BatchProcessor {
             if (existingCandidate) {
                 let alreadyApplied = await AppliedCourses.findOne({ _candidate: existingCandidate._id, _course: courseId });
                 if (alreadyApplied) {
+                    const reEnquire = await ReEnquire.create({
+                        candidate: existingCandidate._id,
+                        appliedCourse: alreadyApplied._id,
+                        course: courseId,
+                        reEnquireDate: new Date(),
+                        counselorName: alreadyApplied.counsellor,
+                        source: source || 'Digital Lead',
+                    });
                     return {
                         status: "already_exists",
                         msg: "Candidate already exists and course already applied",
-                        data: { existingCandidate, alreadyApplied },
+                        data: { existingCandidate, alreadyApplied, reEnquire },
                         mobile: mobile
                     };
                 }
@@ -470,7 +478,8 @@ router.route("/addleaddandcourseapply")
                         appliedCourse: alreadyApplied._id,
                         course: courseId,
                         reEnquireDate: new Date(),
-                        counselorName:  alreadyApplied.counsellor
+                        counselorName:  alreadyApplied.counsellor,
+                        source: source || 'Digital Lead',
                     });
                     return res.json({
                         status: false,

@@ -1,29 +1,53 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useAuth } from '../auth/AuthContext';
 import { AppHeader } from '../components/AppHeader';
 import { SideMenu } from '../components/SideMenu';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useCollegeSideMenu } from '../navigation/useCollegeSideMenu';
 import { college } from '../theme/college';
+import { B2CSalesTab } from './b2c/B2CSalesTab';
 
-export function B2CScreen() {
+type Props = {
+  navigation?: { goBack?: () => void };
+};
+
+export function B2CScreen({ navigation: navProp }: Props) {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user } = useAuth();
   const { menuSections, menuOpen, setMenuOpen } = useCollegeSideMenu();
+  const canGoBack = navigation.canGoBack();
+
+  const openMenu = () => setMenuOpen(true);
 
   return (
     <View style={styles.page}>
-      <AppHeader title="B2C Sales" onMenuPress={() => setMenuOpen(true)} />
-
-      <View style={styles.body}>
-        <Text style={styles.emoji}>🚧</Text>
-        <Text style={styles.title}>Under Construction</Text>
-        <Text style={styles.subtitle}>
-          B2C module is coming soon to the mobile app.
-        </Text>
-        {user?.collegeName ? (
-          <Text style={styles.hint}>{user.collegeName}</Text>
-        ) : null}
-      </View>
+      <AppHeader
+        title="Admission New"
+        onBackPress={
+          canGoBack
+            ? () => (navProp?.goBack ? navProp.goBack() : navigation.goBack())
+            : undefined
+        }
+        onMenuPress={!canGoBack ? openMenu : undefined}
+        rightSlot={
+          canGoBack ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Open menu"
+              onPress={openMenu}
+              hitSlop={12}
+              style={styles.headerMenuBtn}
+            >
+              <View style={styles.menuBun} />
+              <View style={[styles.menuBun, styles.menuBunMid]} />
+              <View style={styles.menuBun} />
+            </Pressable>
+          ) : null
+        }
+      />
 
       <SideMenu
         visible={menuOpen}
@@ -34,6 +58,10 @@ export function B2CScreen() {
         }}
         sections={menuSections}
       />
+
+      <View style={styles.body}>
+        <B2CSalesTab />
+      </View>
     </View>
   );
 }
@@ -45,30 +73,21 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
+  },
+  headerMenuBtn: {
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 32,
+    gap: 4,
   },
-  emoji: {
-    fontSize: 48,
-    marginBottom: 16,
+  menuBun: {
+    width: 18,
+    height: 2,
+    backgroundColor: college.text,
+    borderRadius: 1,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: college.text,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 15,
-    color: college.textMuted,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  hint: {
-    marginTop: 20,
-    fontSize: 13,
-    color: college.textMuted,
+  menuBunMid: {
+    marginVertical: 1,
   },
 });

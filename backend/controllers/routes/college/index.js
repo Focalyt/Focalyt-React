@@ -2166,9 +2166,16 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				parentAppliedCourseId: doc.parentAppliedCourseId || null,
 				_leadStatus: {
 					_id: doc._leadStatus?._id || null,
-					title: doc._leadStatus?.title || 'No Status'
+					title: doc._leadStatus?.title || 'No Status',
+					substatuses: Array.isArray(doc._leadStatus?.substatuses)
+						? doc._leadStatus.substatuses.map((sub) => ({
+							_id: sub._id,
+							title: sub.title,
+							name: sub.name,
+						}))
+						: [],
 				},
-				_leadSubStatus: selectedSubstatus ? selectedSubstatus._id : null,
+				_leadSubStatus: selectedSubstatus ? selectedSubstatus._id : doc._leadSubStatus || null,
 				selectedSubstatus: {
 					_id: selectedSubstatus ? selectedSubstatus._id : null,
 					title: selectedSubstatus ? selectedSubstatus.title : 'No Sub Status',
@@ -2336,31 +2343,27 @@ router.get('/applied-courses/:id/cross-sales', isCollege, async (req, res) => {
 			.sort({ createdAt: 1 })
 			.lean();
 
-		const groupAppliedIds = groupLeads.map((lead) => lead._id).filter(Boolean);
-		const candidateId = source._candidate || groupLeads[0]?._candidate?._id;
-		const reEnquiries = candidateId
-			? await ReEnquire.find({
-				candidate: candidateId,
-				...(groupAppliedIds.length > 0 && { appliedCourse: { $in: groupAppliedIds } }),
-			})
-				.populate('course', 'name')
-				.populate('appliedCourse', '_course _center _leadStatus createdAt')
-				.populate({
-					path: 'appliedCourse',
-					populate: [
-						{ path: '_course', select: 'name' },
-						{ path: '_center', select: 'name' },
-						{ path: '_leadStatus', select: 'title' },
-					],
-				})
-				.populate('counselorName', 'name email')
-				.sort({ reEnquireDate: -1, createdAt: -1 })
-				.lean()
-			: [];
+		const processedLeads = groupLeads.map((doc) => {
+			let selectedSubstatus = null;
+			if (doc._leadStatus?.substatuses && doc._leadSubStatus) {
+				selectedSubstatus = doc._leadStatus.substatuses.find(
+					(sub) => String(sub._id) === String(doc._leadSubStatus),
+				);
+			}
+			return {
+				...doc,
+				selectedSubstatus: selectedSubstatus
+					? {
+						_id: selectedSubstatus._id,
+						title: selectedSubstatus.title || selectedSubstatus.name,
+					}
+					: null,
+			};
+		});
 
 		return res.json({
 			success: true,
-			data: { rootId, leads: groupLeads, reEnquiries },
+			data: { rootId, leads: processedLeads },
 			message: 'Cross-sale registrations retrieved successfully',
 		});
 	} catch (error) {
@@ -2368,6 +2371,67 @@ router.get('/applied-courses/:id/cross-sales', isCollege, async (req, res) => {
 		return res.status(500).json({
 			success: false,
 			message: 'Failed to retrieve cross-sale registrations',
+			error: error.message,
+		});
+	}
+});
+
+router.get('/applied-courses/:id/reapply-history', isCollege, async (req, res) => {
+	try {
+		const source = await AppliedCourses.findById(req.params.id)
+			.select('_id _candidate _course _center')
+			.populate('_course', 'name')
+			.populate('_center', 'name')
+			.lean();
+		if (!source) {
+			return res.status(404).json({ success: false, message: 'Registration not found' });
+		}
+
+		const candidateId = source._candidate;
+		const courseId = source._course?._id || source._course;
+		if (!candidateId || !courseId) {
+			return res.json({
+				success: true,
+				data: {
+					courseName: source._course?.name || '',
+					centerName: source._center?.name || '',
+					reEnquiries: [],
+				},
+			});
+		}
+
+		const reEnquiries = await ReEnquire.find({
+			candidate: candidateId,
+			course: courseId,
+		})
+			.populate('course', 'name')
+			.populate({
+				path: 'appliedCourse',
+				select: '_course _center _leadStatus createdAt',
+				populate: [
+					{ path: '_course', select: 'name' },
+					{ path: '_center', select: 'name' },
+					{ path: '_leadStatus', select: 'title' },
+				],
+			})
+			.populate('counselorName', 'name email')
+			.sort({ reEnquireDate: -1, createdAt: -1 })
+			.lean();
+
+		return res.json({
+			success: true,
+			data: {
+				courseName: source._course?.name || '',
+				centerName: source._center?.name || '',
+				reEnquiries,
+			},
+			message: 'ReApply history retrieved successfully',
+		});
+	} catch (error) {
+		console.error('Error getting B2C reapply history:', error);
+		return res.status(500).json({
+			success: false,
+			message: 'Failed to retrieve reapply history',
 			error: error.message,
 		});
 	}
