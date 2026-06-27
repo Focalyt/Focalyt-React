@@ -355,7 +355,8 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
         appliedCourse: alreadyApplied._id,
         course: courseId,
         reEnquireDate: new Date(),
-        counselorName:  alreadyApplied.counsellor
+        counselorName:  alreadyApplied.counsellor,
+        source: 'Candidate Portal',
       });
 
      

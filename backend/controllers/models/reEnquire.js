@@ -19,7 +19,11 @@ const reEnquireSchema = new Schema({
     },
     reEnquireDate: {
         type: Date,
-    }
+    },
+    source: {
+        type: String,
+        trim: true,
+    },
 }, { timestamps: true });
 
 module.exports = model('ReEnquire', reEnquireSchema);

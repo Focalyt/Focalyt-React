@@ -861,7 +861,7 @@ const CRMDashboard = () => {
   const [crossSaleSubStatusesLoading, setCrossSaleSubStatusesLoading] = useState(false);
   const [crossSaleLoading, setCrossSaleLoading] = useState(false);
   const [crossSaleCache, setCrossSaleCache] = useState({});
-  const [reEnquiryCache, setReEnquiryCache] = useState({});
+  const [reapplyHistoryCache, setReapplyHistoryCache] = useState({});
   const [activeCourseByGroup, setActiveCourseByGroup] = useState({});
   const [crossSaleCenterOptions, setCrossSaleCenterOptions] = useState([]);
   const [crossSaleCentersLoading, setCrossSaleCentersLoading] = useState(false);
@@ -2286,7 +2286,7 @@ const CRMDashboard = () => {
       setShowReapplyModal(true);
       setReapplyHistoryLoading(true);
       try {
-        await fetchCrossSaleGroup(matchedProfile);
+        await fetchReapplyHistory(matchedProfile);
       } finally {
         setReapplyHistoryLoading(false);
       }
@@ -5254,7 +5254,7 @@ console.log('API Response:', response.data);
     setShowReapplyModal(true);
     setReapplyHistoryLoading(true);
     try {
-      await fetchCrossSaleGroup(profile);
+      await fetchReapplyHistory(profile);
     } finally {
       setReapplyHistoryLoading(false);
     }
@@ -5277,12 +5277,37 @@ console.log('API Response:', response.data);
       );
       if (response.data.success) {
         const groupLeads = response.data.data?.leads || [];
-        const reEnquiries = response.data.data?.reEnquiries || [];
-        setCrossSaleCache((prev) => ({ ...prev, [rootId]: groupLeads }));
-        setReEnquiryCache((prev) => ({ ...prev, [rootId]: reEnquiries }));
+        const cacheKey = response.data.data?.rootId || rootId;
+        setCrossSaleCache((prev) => ({
+          ...prev,
+          [cacheKey]: groupLeads,
+          [rootId]: groupLeads,
+          [profile._id]: groupLeads,
+        }));
       }
     } catch (error) {
       console.error('Error fetching cross-sale group:', error);
+    }
+  }, [backendUrl, token]);
+
+  const fetchReapplyHistory = useCallback(async (profile) => {
+    if (!profile?._id || !token) return;
+    try {
+      const response = await axios.get(
+        `${backendUrl}/college/applied-courses/${profile._id}/reapply-history`,
+        { headers: { 'x-auth': token } }
+      );
+      if (response.data.success) {
+        setReapplyHistoryCache((prev) => ({
+          ...prev,
+          [profile._id]: {
+            courseName: response.data.data?.courseName || profile._course?.name || '',
+            reEnquiries: response.data.data?.reEnquiries || [],
+          },
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching reapply history:', error);
     }
   }, [backendUrl, token]);
 
@@ -14392,29 +14417,28 @@ useEffect(() => {
                   </div>
                   <div className="modal-body reapply-modal__body">
                     <p className="text-muted small mb-3">
-                      Same mobile number se jitni course applications aur duplicate enquiries aayi hain.
+                      Jab candidate isi course par dubara apply karta hai — khud se ya digital leads se — woh attempts yahan dikhte hain.
                     </p>
                     <div className="table-responsive">
                       {(() => {
-                        const rootId = getProfileGroupRootId(reapplyProfile);
-                        const applicationRows = (
-                          crossSaleCache[rootId]?.length ? crossSaleCache[rootId] : [reapplyProfile]
-                        ).filter(Boolean);
-                        const duplicateRows = reEnquiryCache[rootId] || [];
+                        const profileId = reapplyProfile._id;
+                        const history = reapplyHistoryCache[profileId] || {};
+                        const duplicateRows = history.reEnquiries || [];
+                        const displayCourse = history.courseName || reapplyProfile._course?.name || 'This course';
 
                         if (reapplyHistoryLoading) {
                           return (
                             <div className="text-center py-4">
                               <div className="spinner-border spinner-border-sm text-primary me-2" role="status" />
-                              Loading duplicate history...
+                              Loading reapply history...
                             </div>
                           );
                         }
 
-                        if (applicationRows.length === 0 && duplicateRows.length === 0) {
+                        if (duplicateRows.length === 0) {
                           return (
                             <div className="text-center text-muted py-4">
-                              No reapply history available
+                              {displayCourse} par abhi koi reapply record nahi hai.
                             </div>
                           );
                         }
@@ -14424,43 +14448,24 @@ useEffect(() => {
                             <thead className="table-light">
                               <tr>
                                 <th>S.No</th>
-                                <th>Date</th>
+                                <th>Date & Time</th>
                                 <th>Course</th>
                                 <th>Center</th>
-                                <th>Status</th>
-                                <th>Type</th>
+                                <th>Source</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {applicationRows.map((lead, index) => {
-                                const isOriginal = String(lead._id) === String(rootId) || !lead.parentAppliedCourseId;
-                                return (
-                                  <tr key={`application-${lead._id || index}`}>
-                                    <td>{index + 1}</td>
-                                    <td>{lead.createdAt ? moment(lead.createdAt).format('DD MMM YYYY') : 'N/A'}</td>
-                                    <td>{lead._course?.name || 'N/A'}</td>
-                                    <td>{lead._center?.name || 'N/A'}</td>
-                                    <td>{lead._leadStatus?.title || 'No Status'}</td>
-                                    <td>
-                                      <span className={`badge ${isOriginal ? 'bg-primary' : 'bg-success'}`}>
-                                        {isOriginal ? 'Original Apply' : 'Different Course Apply'}
-                                      </span>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
                               {duplicateRows.map((item, index) => {
                                 const applied = item.appliedCourse || {};
                                 return (
                                   <tr key={`duplicate-${item._id || index}`}>
-                                    <td>{applicationRows.length + index + 1}</td>
-                                    <td>{item.reEnquireDate ? moment(item.reEnquireDate).format('DD MMM YYYY') : 'N/A'}</td>
-                                    <td>{item.course?.name || applied._course?.name || 'N/A'}</td>
-                                    <td>{applied._center?.name || 'N/A'}</td>
-                                    <td>{applied._leadStatus?.title || 'Already Applied'}</td>
+                                    <td>{index + 1}</td>
+                                    <td>{item.reEnquireDate ? moment(item.reEnquireDate).format('DD MMM YYYY, hh:mm A') : (item.createdAt ? moment(item.createdAt).format('DD MMM YYYY, hh:mm A') : 'N/A')}</td>
+                                    <td>{item.course?.name || applied._course?.name || displayCourse}</td>
+                                    <td>{applied._center?.name || reapplyProfile._center?.name || 'N/A'}</td>
                                     <td>
                                       <span className="badge bg-warning text-dark">
-                                        Same Course Duplicate
+                                        {item.source || 'ReApply'}
                                       </span>
                                     </td>
                                   </tr>
