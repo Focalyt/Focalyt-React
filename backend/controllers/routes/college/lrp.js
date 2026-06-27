@@ -1,12 +1,15 @@
 const express = require("express");
 const mongoose = require("mongoose");
 
-const { LRP, Lead, LeadCategory, TypeOfB2B, College, StatusB2b, User } = require("../../models");
+const { LRP, Lead, LeadCategory, TypeOfB2B, College, StatusB2b, User, Partner } = require("../../models");
 const { uploadSinglefile } = require("../functions/images");
 
 const router = express.Router();
 
-const LRP_PARTNER_TYPES = ["LRP", "Channel Partner"];
+const getPartnerTypeOptions = async () => {
+  const partners = await Partner.find({ status: { $ne: false } }).sort({ createdAt: -1 }).lean();
+  return partners.map((p) => String(p.name || "").trim()).filter(Boolean);
+};
 
 const parseLeadSourceQA = (raw) => {
   if (!raw) return null;
@@ -25,14 +28,14 @@ const valueByMetaKey = (items, key) => {
   return it ? String(it.value || "").trim() : "";
 };
 
-const buildLrpMetaItems = (body, geoTaggedPhotoUrl) => {
+const buildLrpMetaItems = (body, geoTaggedPhotoUrl, partnerTypeOptions = []) => {
   const v = (k) => String(body[k] ?? "").trim();
   return [
     {
       metaKey: "lrp_partnerType",
       question: "Type of partner",
       type: "radio",
-      options: [...LRP_PARTNER_TYPES],
+      options: [...partnerTypeOptions],
       required: true,
       value: v("partnerType"),
     },
@@ -57,7 +60,7 @@ const buildLrpMetaItems = (body, geoTaggedPhotoUrl) => {
       question: "Geo-tagged photograph",
       type: "text",
       options: [],
-      required: true,
+      required: false,
       value: String(geoTaggedPhotoUrl || "").trim(),
     },
     {
@@ -497,19 +500,13 @@ router.post("/", async (req, res) => {
       }
     }
 
-    if (!geoTaggedPhoto) {
-      return res.status(400).json({
-        success: false,
-        message: "geoTaggedPhoto is required",
-      });
-    }
-
     const categoryQA = parseLeadSourceQA(body.leadSourceQA) || {
       items: [],
       categoryId: body.leadCategory,
     };
 
-    const metaItems = buildLrpMetaItems(body, geoTaggedPhoto);
+    const partnerTypeOptions = await getPartnerTypeOptions();
+    const metaItems = buildLrpMetaItems(body, geoTaggedPhoto, partnerTypeOptions);
     const categoryItems = (categoryQA.items || []).map(normalizeQaItem);
     const cidRaw = categoryQA.categoryId || body.leadCategory;
     const cid = cidRaw && mongoose.Types.ObjectId.isValid(String(cidRaw)) ? cidRaw : undefined;

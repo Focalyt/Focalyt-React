@@ -14,6 +14,7 @@ const FILTER_OPTIONS = {
   center: [],
   course: [],
   batch: [],
+  counsellor: [],
 };
 
 const TRAINER_INFO = {
@@ -86,6 +87,8 @@ const createSessionDraft = (sessionNumber, basicDetails) => ({
   courseTrade: basicDetails.courseTrade,
   batchCode: basicDetails.batchCode,
   trainerName: basicDetails.trainerName,
+  counsellor: '',
+  counsellorName: '',
   notes: 'Covered basics of customer service and communication skills.',
   evidenceDocs: createEvidenceDocs('Pending'),
 });
@@ -101,11 +104,240 @@ const createEmptySessionDraft = (sessionNumber) => ({
   totalCandidates: '',
   presentCandidates: '',
   absentCandidates: '',
+  department: '',
+  project: '',
+  center: '',
+  course: '',
+  batch: '',
   courseTrade: '',
   batchCode: '',
   trainerName: '',
+  counsellor: '',
+  counsellorName: '',
   notes: '',
   evidenceDocs: [],
+});
+const getOptionLabel = (options = [], value) =>
+  options.find((option) => String(option.value) === String(value))?.label || '';
+
+const SESSIONS_STORAGE_PREFIX = 'trainerModuleSessions:';
+
+const loadStoredSessions = (batchId) => {
+  if (!batchId) return [];
+  try {
+    const raw = localStorage.getItem(`${SESSIONS_STORAGE_PREFIX}${batchId}`);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const persistStoredSessions = (batchId, list) => {
+  if (!batchId) return;
+  localStorage.setItem(`${SESSIONS_STORAGE_PREFIX}${batchId}`, JSON.stringify(list));
+};
+
+const ATTENDANCE_STORAGE_PREFIX = 'trainerModuleAttendance:';
+
+const loadStoredAttendance = (batchId) => {
+  if (!batchId) return {};
+  try {
+    const raw = localStorage.getItem(`${ATTENDANCE_STORAGE_PREFIX}${batchId}`);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+const persistStoredAttendance = (batchId, records) => {
+  if (!batchId) return;
+  localStorage.setItem(`${ATTENDANCE_STORAGE_PREFIX}${batchId}`, JSON.stringify(records || {}));
+};
+
+const computeStudentBatchAttendance = (studentId, sessions = [], attendanceRecordsBySession = {}) => {
+  let markedSessions = 0;
+  let presentSessions = 0;
+  let absentSessions = 0;
+
+  sessions.forEach((session) => {
+    const rows = attendanceRecordsBySession[session.id];
+    if (!rows?.length) return;
+
+    const row = rows.find((entry) => String(entry.id) === String(studentId));
+    if (!row || row.status === 'Not Marked') return;
+
+    markedSessions += 1;
+    if (row.status === 'Present') presentSessions += 1;
+    if (row.status === 'Absent') absentSessions += 1;
+  });
+
+  const percentage = markedSessions > 0
+    ? ((presentSessions / markedSessions) * 100).toFixed(1)
+    : null;
+
+  return { markedSessions, presentSessions, absentSessions, percentage };
+};
+
+const computeBatchAttendanceSummary = (students = [], sessions = [], attendanceRecordsBySession = {}) => {
+  const studentStats = students.map((student) =>
+    computeStudentBatchAttendance(student.id, sessions, attendanceRecordsBySession)
+  );
+  const tracked = studentStats.filter((stat) => stat.markedSessions > 0);
+  const sessionsWithAttendance = sessions.filter(
+    (session) => (attendanceRecordsBySession[session.id] || []).some(
+      (row) => row.status === 'Present' || row.status === 'Absent'
+    )
+  ).length;
+
+  if (!tracked.length) {
+    const admissionAvg = students.length
+      ? students.reduce((sum, student) => sum + (parseFloat(student.attendance) || 0), 0) / students.length
+      : 0;
+    return {
+      source: 'admission',
+      average: admissionAvg.toFixed(1),
+      sessionsMarked: sessionsWithAttendance,
+      totalSessions: sessions.length,
+    };
+  }
+
+  const average = tracked.reduce((sum, stat) => sum + Number(stat.percentage), 0) / tracked.length;
+  return {
+    source: 'sessions',
+    average: average.toFixed(1),
+    sessionsMarked: sessionsWithAttendance,
+    totalSessions: sessions.length,
+    trackedStudents: tracked.length,
+  };
+};
+
+const resolveSessionBatchId = (session, fallbackBatchId = '') =>
+  session?.batch || fallbackBatchId || '';
+
+const mergeBatchSessions = (batchId, currentSessions = []) => {
+  if (!batchId) return [];
+  const stored = loadStoredSessions(batchId);
+  const byId = new Map(stored.map((session) => [session.id, session]));
+  currentSessions.forEach((session) => {
+    if (!session?.id) return;
+    if (session.batch && String(session.batch) !== String(batchId)) return;
+    byId.set(session.id, session);
+  });
+  return Array.from(byId.values());
+};
+
+const formatProfileDate = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('en-IN');
+};
+
+const mapAppliedCourseToStudent = (profile) => {
+  const candidate = profile._candidate || {};
+  const batch = profile.batch || profile._batch || {};
+  const course = profile._course || {};
+  const center = profile._center || {};
+  const regular = profile.attendance?.regularPeriod || {};
+  const zero = profile.attendance?.zeroPeriod || {};
+  const att = regular.attendancePercentage ?? zero.attendancePercentage ?? 0;
+  const candidateId = candidate._id ? String(candidate._id) : '';
+  const mobile = candidate.mobile || profile.mobile || '-';
+  const name = candidate.name || 'Unknown';
+  const admissionDate = formatProfileDate(profile.admissionDate);
+  const batchAssignedDate = formatProfileDate(profile.batchAssignedAt);
+  const leadCreatedDate = formatProfileDate(profile.createdAt);
+  const enrolledDate = admissionDate || batchAssignedDate || leadCreatedDate || '-';
+  const enrolledDateLabel = admissionDate
+    ? 'Admission Date'
+    : batchAssignedDate
+      ? 'Batch Assigned'
+      : 'Lead Since';
+
+  return {
+    id: profile._id,
+    appliedCourseId: profile._id ? String(profile._id) : '',
+    candidateId,
+    candidateKey: candidateId || `${mobile}-${name}`.trim().toLowerCase(),
+    name,
+    mobile,
+    attendance: `${att || 0}%`,
+    status: profile.dropout ? 'Dropout' : (profile.isBatchFreeze ? 'Frozen' : 'Active'),
+    email: candidate.email || profile.email || '',
+    batchCode: batch.name || profile.batchName || course.batchName || '-',
+    batchId: batch._id ? String(batch._id) : (profile.batch ? String(profile.batch) : ''),
+    course: course.name || profile.courseName || '-',
+    courseId: course._id ? String(course._id) : (profile._course ? String(profile._course) : ''),
+    center: center.name || profile.centerName || '-',
+    centerId: center._id ? String(center._id) : (profile._center ? String(profile._center) : ''),
+    project: course.projectName || profile.projectName || '-',
+    projectType: course.typeOfProject || '-',
+    sector: profile.sector
+      || (typeof course.sectors === 'string' ? course.sectors : course.sectors?.[0]?.name)
+      || '-',
+    leadStatus: profile._leadStatus?.title || profile._leadStatus?.name || '-',
+    state: candidate.personalInfo?.currentAddress?.state || '-',
+    city: candidate.personalInfo?.currentAddress?.city || '-',
+    leadCreatedDate: leadCreatedDate || '-',
+    enrolledDate,
+    enrolledDateLabel,
+    totalSessions: regular.totalSessions || 0,
+    presentSessions: regular.attendedSessions || 0,
+    absentSessions: Math.max(0, (regular.totalSessions || 0) - (regular.attendedSessions || 0)),
+    assessmentScore: 0,
+    participationScore: 0,
+    engagementScore: 0,
+    practicalScore: 0,
+    trainerRemark: '',
+    sessionHistory: [],
+  };
+};
+
+const enrichStudentsWithEnrollmentMeta = (students = []) => {
+  const groups = new Map();
+  students.forEach((student) => {
+    const key = student.candidateKey || student.id;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(student);
+  });
+
+  return students.map((student) => {
+    const group = groups.get(student.candidateKey || student.id) || [student];
+    const otherEnrollments = group.filter((item) => item.id !== student.id);
+
+    return {
+      ...student,
+      enrollmentCount: group.length,
+      isMultiCourseCandidate: group.length > 1,
+      otherEnrollments: otherEnrollments.map((item) => ({
+        course: item.course,
+        batchCode: item.batchCode,
+        center: item.center,
+        appliedCourseId: item.appliedCourseId,
+      })),
+    };
+  });
+};
+
+const buildSessionContextFromFilters = (filters, {
+  verticalOptions,
+  projectOptions,
+  centerOptions,
+  courseOptions,
+  batchOptions,
+  trainerName,
+}) => ({
+  department: filters.department || '',
+  project: filters.project || '',
+  center: filters.center || '',
+  course: filters.course || '',
+  batch: filters.batch || '',
+  counsellor: filters.counsellor || '',
+  courseTrade: getOptionLabel(courseOptions, filters.course),
+  batchCode: getOptionLabel(batchOptions, filters.batch),
+  centerName: getOptionLabel(centerOptions, filters.center),
+  projectName: getOptionLabel(projectOptions, filters.project),
+  departmentName: getOptionLabel(verticalOptions, filters.department),
+  trainerName: trainerName || '',
 });
 const hydrateSession = (session, index, basicDetails) => ({
   ...createSessionDraft(index + 1, basicDetails),
@@ -148,16 +380,170 @@ const normalizeSessionDraft = (draft, basicDetails) => {
     courseTrade: draft.courseTrade || basicDetails.courseTrade,
     batchCode: draft.batchCode || basicDetails.batchCode,
     trainerName: draft.trainerName || basicDetails.trainerName,
+    departmentName: draft.departmentName || basicDetails.departmentName,
+    projectName: draft.projectName || basicDetails.projectName,
+    centerName: draft.centerName || basicDetails.centerName,
     attendance,
     evidenceDocs,
   };
 };
 
 const DUMMY_STUDENTS = [
-  { id: 'ST01', name: 'Akash Gaurav', mobile: '6280484211', attendance: '92%', status: 'Active' },
-  { id: 'ST02', name: 'Priya Verma', mobile: '9876512340', attendance: '88%', status: 'Active' },
-  { id: 'ST03', name: 'Rohit Singh', mobile: '9123456780', attendance: '76%', status: 'At Risk' },
+  {
+    id: 'ST01',
+    name: 'Akash Gaurav',
+    mobile: '6280484211',
+    attendance: '92%',
+    status: 'Active',
+    email: 'akash.gaurav@email.com',
+    batchCode: 'BATCH-RS-2024-01',
+    course: 'Retail Sales Associate',
+    center: 'Delhi Centre – Rohini',
+    enrolledDate: '01/04/2026',
+    totalSessions: 24,
+    presentSessions: 22,
+    absentSessions: 2,
+    assessmentScore: 78,
+    participationScore: 90,
+    engagementScore: 88,
+    practicalScore: 82,
+    trainerRemark: 'Strong in customer handling and group activities.',
+    sessionHistory: [
+      { date: '22/06/2026', title: 'Morning Batch – Retail Sales', status: 'Present', topic: 'Customer handling' },
+      { date: '21/06/2026', title: 'Assessment Review', status: 'Present', topic: 'Assessment discussion' },
+      { date: '20/06/2026', title: 'Practical – Customer Handling', status: 'Absent', topic: 'Role play' },
+    ],
+  },
+  {
+    id: 'ST02',
+    name: 'Priya Verma',
+    mobile: '9876512340',
+    attendance: '88%',
+    status: 'Active',
+    email: 'priya.verma@email.com',
+    batchCode: 'BATCH-RS-2024-01',
+    course: 'Retail Sales Associate',
+    center: 'Delhi Centre – Rohini',
+    enrolledDate: '05/04/2026',
+    totalSessions: 24,
+    presentSessions: 21,
+    absentSessions: 3,
+    assessmentScore: 84,
+    participationScore: 86,
+    engagementScore: 82,
+    practicalScore: 80,
+    trainerRemark: 'Consistent performer with good communication skills.',
+    sessionHistory: [
+      { date: '22/06/2026', title: 'Morning Batch – Retail Sales', status: 'Present', topic: 'Customer handling' },
+      { date: '21/06/2026', title: 'Assessment Review', status: 'Present', topic: 'Assessment discussion' },
+      { date: '20/06/2026', title: 'Practical – Customer Handling', status: 'Present', topic: 'Role play' },
+    ],
+  },
+  {
+    id: 'ST03',
+    name: 'Rohit Singh',
+    mobile: '9123456780',
+    attendance: '76%',
+    status: 'At Risk',
+    email: 'rohit.singh@email.com',
+    batchCode: 'BATCH-RS-2024-01',
+    course: 'Retail Sales Associate',
+    center: 'Delhi Centre – Rohini',
+    enrolledDate: '10/04/2026',
+    totalSessions: 24,
+    presentSessions: 18,
+    absentSessions: 6,
+    assessmentScore: 62,
+    participationScore: 68,
+    engagementScore: 60,
+    practicalScore: 58,
+    trainerRemark: 'Needs follow-up on attendance and practical participation.',
+    sessionHistory: [
+      { date: '22/06/2026', title: 'Morning Batch – Retail Sales', status: 'Absent', topic: 'Customer handling' },
+      { date: '21/06/2026', title: 'Assessment Review', status: 'Present', topic: 'Assessment discussion' },
+      { date: '20/06/2026', title: 'Practical – Customer Handling', status: 'Not Marked', topic: 'Role play' },
+    ],
+  },
 ];
+const buildStudentSessionHistory = (student, sessions = [], attendanceRecordsBySession = {}) => {
+  const history = [];
+
+  sessions.forEach((session) => {
+    const rows = attendanceRecordsBySession[session.id];
+    if (!rows?.length) return;
+
+    const row = rows.find((entry) => entry.id === student.id)
+      || rows.find((entry) => entry.name === student.name);
+    if (!row) return;
+
+    history.push({
+      date: session.date || formatSessionDate(session.sessionDate),
+      title: session.title,
+      status: row.status,
+      topic: session.topicCovered || session.title,
+    });
+  });
+
+  return history.length ? history : (student.sessionHistory || []);
+};
+const getStudentPerformanceProfile = (student, sessions, attendanceRecordsBySession, basicDetails) => {
+  if (!student) return null;
+
+  const batchAttendance = computeStudentBatchAttendance(student.id, sessions, attendanceRecordsBySession);
+  const sessionHistory = buildStudentSessionHistory(student, sessions, attendanceRecordsBySession);
+  const presentFromHistory = sessionHistory.filter((entry) => entry.status === 'Present').length;
+  const absentFromHistory = sessionHistory.filter((entry) => entry.status === 'Absent').length;
+  const attendanceDisplay = batchAttendance.percentage != null
+    ? `${batchAttendance.percentage}%`
+    : student.attendance;
+  const attendanceNum = parseFloat(batchAttendance.percentage ?? student.attendance) || 0;
+
+  return {
+    ...student,
+    batchCode: student.batchCode || basicDetails.batchCode,
+    course: student.course || basicDetails.courseTrade,
+    center: student.center || basicDetails.centerName,
+    attendance: attendanceDisplay,
+    attendanceNum,
+    attLevel: getAttendanceLevel(attendanceDisplay),
+    performanceLabel: getPerformanceLabel(getAttendanceLevel(attendanceDisplay)),
+    totalSessions: batchAttendance.markedSessions || student.totalSessions || sessionHistory.length || 0,
+    presentSessions: batchAttendance.presentSessions || student.presentSessions || presentFromHistory,
+    absentSessions: batchAttendance.absentSessions || student.absentSessions || absentFromHistory,
+    sessionHistory,
+    metrics: [
+      { label: 'Class Participation', value: student.participationScore, icon: 'fa-users', tone: 'blue' },
+      { label: 'Engagement', value: student.engagementScore, icon: 'fa-bolt', tone: 'pink' },
+      { label: 'Internal Assessment', value: student.assessmentScore, icon: 'fa-file-alt', tone: 'green' },
+      { label: 'Practical Performance', value: student.practicalScore, icon: 'fa-tools', tone: 'amber' },
+    ],
+  };
+};
+const PERFORMANCE_FIELDS = [
+  { key: 'participationScore', label: 'Class Participation', icon: 'fa-users', placeholder: 'Enter class participation %' },
+  { key: 'engagementScore', label: 'Engagement', icon: 'fa-bolt', placeholder: 'Enter engagement %' },
+  { key: 'assessmentScore', label: 'Internal Assessment', icon: 'fa-file-alt', placeholder: 'Enter assessment %' },
+  { key: 'practicalScore', label: 'Practical Performance', icon: 'fa-tools', placeholder: 'Enter practical score %' },
+];
+const createPerformanceDraft = (student) => ({
+  studentId: student?.id || '',
+  studentName: student?.name || '',
+  participationScore: student?.participationScore ?? '',
+  engagementScore: student?.engagementScore ?? '',
+  assessmentScore: student?.assessmentScore ?? '',
+  practicalScore: student?.practicalScore ?? '',
+  trainerRemark: student?.trainerRemark || '',
+});
+const hasPerformanceData = (student) =>
+  PERFORMANCE_FIELDS.some(({ key }) => student?.[key] !== '' && student?.[key] != null)
+  || Boolean(student?.trainerRemark?.trim());
+const clampScore = (value) => {
+  if (value === '' || value == null) return '';
+  const num = Number(value);
+  if (Number.isNaN(num)) return '';
+  return Math.min(100, Math.max(0, Math.round(num)));
+};
+const formatMetricValue = (value) => (value !== '' && value != null ? `${value}%` : 'Not added');
 
 const ATTENDANCE_STATUSES = ['Present', 'Absent', 'Not Marked'];
 const attendanceTone = (status) => {
@@ -165,13 +551,13 @@ const attendanceTone = (status) => {
   if (status === 'Absent') return 'absent';
   return 'not-marked';
 };
-const createSessionAttendanceRows = (session, students = DUMMY_STUDENTS) => {
-  const totalCandidates = Math.max(Number(session?.totalCandidates) || students.length, students.length);
-  const presentCount = Math.min(Number(session?.presentCandidates) || 0, totalCandidates);
-  const absentCount = Math.min(Number(session?.absentCandidates) || 0, totalCandidates - presentCount);
+const createSessionAttendanceRows = (session, students = []) => {
+  if (!students.length) return [];
 
-  return Array.from({ length: totalCandidates }, (_, index) => {
-    const student = students[index];
+  const presentCount = Math.min(Number(session?.presentCandidates) || 0, students.length);
+  const absentCount = Math.min(Number(session?.absentCandidates) || 0, students.length - presentCount);
+
+  return students.map((student, index) => {
     const status = index < presentCount
       ? 'Present'
       : index < presentCount + absentCount
@@ -179,12 +565,12 @@ const createSessionAttendanceRows = (session, students = DUMMY_STUDENTS) => {
         : 'Not Marked';
 
     return {
-      id: student?.id || `${session?.id || 'SESSION'}-ST${String(index + 1).padStart(2, '0')}`,
-      name: student?.name || `Candidate ${String(index + 1).padStart(2, '0')}`,
-      mobile: student?.mobile || '-',
+      id: student.id,
+      name: student.name,
+      mobile: student.mobile || '-',
       status,
       remarks: '',
-      attendancePercent: student?.attendance || '-',
+      attendancePercent: student.attendance || '-',
     };
   });
 };
@@ -197,12 +583,17 @@ const summarizeAttendanceRows = (rows = []) => {
 
   return { present, absent, notMarked, total, attendance };
 };
-const getStudentOverallAttendance = (studentId, students = DUMMY_STUDENTS) =>
-  students.find((student) => student.id === studentId)?.attendance || '-';
-const AttendancePercentCell = ({ row }) => (
+const getStudentOverallAttendance = (studentId, students = [], sessions = [], attendanceRecordsBySession = {}) => {
+  const batchAttendance = computeStudentBatchAttendance(studentId, sessions, attendanceRecordsBySession);
+  if (batchAttendance.percentage != null) {
+    return `${batchAttendance.percentage}% (${batchAttendance.presentSessions}/${batchAttendance.markedSessions})`;
+  }
+  return students.find((student) => student.id === studentId)?.attendance || '-';
+};
+const AttendancePercentCell = ({ row, students, sessions, attendanceRecordsBySession }) => (
   <td className="attendance-percent-col">
     <span className="attendance-percent-value">
-      {row.attendancePercent || getStudentOverallAttendance(row.id)}
+      {getStudentOverallAttendance(row.id, students, sessions, attendanceRecordsBySession)}
     </span>
   </td>
 );
@@ -238,17 +629,6 @@ const TRAINING_POINTS = [
   mkPoint('2.4', 'Practical / activity conducted', 'High', 8),
   mkPoint('2.5', 'Name of activity / practical', 'Medium', 5),
   mkPoint('2.6', 'Teaching method used', 'Medium', 5),
-];
-
-const STUDENT_POINTS = [
-  mkPoint('3.1', 'Student participation in class', 'High', 8),
-  mkPoint('3.2', 'Doubt-clearing done', 'Medium', 6),
-  mkPoint('3.3', 'Engagement activity completed', 'Medium', 6),
-  mkPoint('3.4', 'Counseling / motivation session conducted', 'Low', 4),
-  mkPoint('3.5', 'Placement / career discussion done', 'Low', 4),
-  mkPoint('3.6', 'Candidates guided for job role / career path', 'Medium', 5),
-  mkPoint('3.7', 'Internal assessment performance', 'High', 10),
-  mkPoint('3.8', 'Classroom participation', 'Medium', 7),
 ];
 
 const DOCUMENT_POINTS = [
@@ -355,6 +735,17 @@ const IssueCard = ({ issue, data, onChange }) => (
 
 const getInitials = (name = '') =>
   name.split(' ').filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'T';
+const getAttendanceLevel = (attendance = '') => {
+  const num = parseFloat(attendance) || 0;
+  if (num >= 85) return 'high';
+  if (num >= 70) return 'mid';
+  return 'low';
+};
+const getPerformanceLabel = (level) => {
+  if (level === 'high') return 'Excellent';
+  if (level === 'mid') return 'Good';
+  return 'Needs Focus';
+};
 
 const TrainerHero = ({ reportDate, onDateChange, basicDetails, sessionCount, studentCount }) => (
   <section className="tm-hero">
@@ -446,50 +837,240 @@ const SessionListItem = ({ session, active, onSelect }) => {
   );
 };
 
-const TrainerSidebar = ({ sessions, selectedSessionId, onSelectSession, onAddSession, basicDetails }) => (
-  <aside className="tm-sidebar">
-    <div className="tm-profile-card">
-      <div className="tm-profile-card__banner" />
-      <div className="tm-profile-card__body">
-        <div className="tm-avatar tm-avatar--md">{getInitials(TRAINER_INFO.name)}</div>
-        <h3>{TRAINER_INFO.name}</h3>
-        <p>{basicDetails.reportingPerson}</p>
-        <div className="tm-profile-card__details">
-          <div><i className="fas fa-phone" /><span>{TRAINER_INFO.mobile}</span></div>
-          <div><i className="fas fa-envelope" /><span>{TRAINER_INFO.email}</span></div>
-          <div><i className="fas fa-graduation-cap" /><span>{basicDetails.courseTrade}</span></div>
-          <div><i className="fas fa-building" /><span>{basicDetails.projectName}</span></div>
-        </div>
-      </div>
-    </div>
+const SessionFormSelect = ({ label, value, onChange, options = [], placeholder = 'All' }) => (
+  <label className="session-field">
+    <span>{label}</span>
+    <select className="dbr-select session-field__control" value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">{placeholder}</option>
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>{option.label}</option>
+      ))}
+    </select>
+  </label>
+);
 
-    <div className="tm-session-panel">
-      <div className="tm-session-panel__head">
-        <h4><i className="fas fa-list" /> Sessions</h4>
-        <button type="button" className="tm-icon-btn tm-icon-btn--primary" onClick={onAddSession} title="Add session">
-          <i className="fas fa-plus" />
-        </button>
-      </div>
-      <div className="tm-session-panel__list">
-        {sessions.length === 0 ? (
-          <div className="tm-empty">
-            <i className="fas fa-inbox" />
-            <p>No sessions match your search.</p>
+
+
+const SessionEmptyState = ({ onCreateSession }) => (
+  <div className="tm-empty tm-empty--session-create">
+    <i className="fas fa-laptop" />
+    <p>No sessions yet for this batch.</p>
+    <button type="button" className="tm-create-session-btn" onClick={onCreateSession}>
+      <i className="fas fa-plus" /> Create first session
+    </button>
+  </div>
+);
+
+const SESSION_PATH_STEPS = [
+  { key: 'department', label: 'Department', icon: 'fa-sitemap', step: 1, hint: 'Select a department to start' },
+  { key: 'project', label: 'Project', icon: 'fa-project-diagram', step: 2, hint: 'Projects under selected department' },
+  { key: 'center', label: 'Center', icon: 'fa-building', step: 3, hint: 'Centers linked to this project' },
+  { key: 'course', label: 'Course', icon: 'fa-graduation-cap', step: 4, hint: 'Courses available at this center' },
+  { key: 'batch', label: 'Batch', icon: 'fa-users', step: 5, hint: 'Select batch to manage sessions' },
+];
+
+const SessionPathPicker = ({
+  filters,
+  currentStep,
+  options,
+  loading,
+  getLabel,
+  onSelect,
+  onBack,
+  onReset,
+}) => {
+  const stepMeta = SESSION_PATH_STEPS.find((step) => step.key === currentStep) || SESSION_PATH_STEPS[0];
+  const completedSteps = SESSION_PATH_STEPS.filter(({ key }) => filters[key]);
+
+  return (
+    <section className="tm-path-picker">
+      <div className="tm-path-picker__intro">
+        <div>
+          <span className="tm-path-picker__badge">Step {stepMeta.step} of 5</span>
+          <h3>Select {stepMeta.label}</h3>
+          <p>{stepMeta.hint}</p>
+        </div>
+        {completedSteps.length > 0 && (
+          <div className="tm-path-picker__actions">
+            <button type="button" className="tm-path-picker__back" onClick={onBack}>
+              <i className="fas fa-arrow-left" /> Back
+            </button>
+            <button type="button" className="tm-path-picker__reset" onClick={onReset}>
+              Start over
+            </button>
           </div>
-        ) : (
-          sessions.map((session) => (
-            <SessionListItem
-              key={session.id}
-              session={session}
-              active={session.id === selectedSessionId}
-              onSelect={onSelectSession}
-            />
-          ))
         )}
       </div>
+
+      {completedSteps.length > 0 && (
+        <div className="tm-path-picker__trail">
+          {completedSteps.map(({ key, label, icon }, index) => (
+            <React.Fragment key={key}>
+              {index > 0 && <i className="fas fa-chevron-right" />}
+              <span className="tm-path-picker__crumb">
+                <i className={`fas ${icon}`} />
+                <em>{label}</em>
+                <strong>{getLabel(key, filters[key])}</strong>
+              </span>
+            </React.Fragment>
+          ))}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="tm-path-picker__loading">
+          <i className="fas fa-spinner fa-spin" />
+          <p>Loading {stepMeta.label.toLowerCase()}...</p>
+        </div>
+      ) : options.length === 0 ? (
+        <div className="tm-path-picker__empty">
+          <i className={`fas ${stepMeta.icon}`} />
+          <p>No {stepMeta.label.toLowerCase()} found for this selection.</p>
+          {completedSteps.length > 0 && (
+            <button type="button" className="tm-path-picker__back" onClick={onBack}>
+              <i className="fas fa-arrow-left" /> Go back
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="tm-path-picker__grid">
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className="tm-path-card-btn"
+              onClick={() => onSelect(currentStep, option.value)}
+            >
+              <div className="tm-path-card-btn__icon">
+                <i className={`fas ${stepMeta.icon}`} />
+              </div>
+              <strong>{option.label}</strong>
+              <span>Select {stepMeta.label.toLowerCase()}</span>
+              <i className="fas fa-arrow-right tm-path-card-btn__arrow" />
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+};
+
+const SessionFormFields = ({
+  draft,
+  isEdit,
+  onFieldChange,
+  onEvidenceChange,
+  onAddEvidence,
+  onRemoveEvidence,
+  readOnlyTrainer = false,
+}) => {
+  const ph = (text) => (isEdit ? undefined : text);
+
+  return (
+    <>
+      <div className="session-form-grid">
+        <label className="session-field">
+          <span>Session title</span>
+          <input className="dbr-input session-field__control" placeholder={ph('Enter session title')} value={draft.title} onChange={(e) => onFieldChange('title', e.target.value)} />
+        </label>
+        <label className="session-field">
+          <span>Topic covered</span>
+          <input className="dbr-input session-field__control" placeholder={ph('Enter topic covered')} value={draft.topicCovered} onChange={(e) => onFieldChange('topicCovered', e.target.value)} />
+        </label>
+        <label className="session-field">
+          <span>Training method</span>
+          <input className="dbr-input session-field__control" placeholder={ph('Enter training method')} value={draft.trainingMethod} onChange={(e) => onFieldChange('trainingMethod', e.target.value)} />
+        </label>
+        <label className="session-field">
+          <span>Date</span>
+          <input type="date" className="dbr-input session-field__control session-field__control--date" value={draft.sessionDate} onChange={(e) => onFieldChange('sessionDate', e.target.value)} />
+        </label>
+        <label className="session-field">
+          <span>Start time</span>
+          <input type="time" className="dbr-input session-field__control session-field__control--time" value={draft.startTime} onChange={(e) => onFieldChange('startTime', e.target.value)} />
+        </label>
+        <label className="session-field">
+          <span>End time</span>
+          <input type="time" className="dbr-input session-field__control session-field__control--time" value={draft.endTime} onChange={(e) => onFieldChange('endTime', e.target.value)} />
+        </label>
+        <label className="session-field">
+          <span>Trainer name</span>
+          <input className="dbr-input session-field__control" placeholder={ph('Enter trainer name')} value={draft.trainerName} onChange={(e) => onFieldChange('trainerName', e.target.value)} readOnly={readOnlyTrainer} />
+        </label>
+      </div>
+
+      {isEdit && (
+        <>
+          <label className="session-field session-field--full">
+            <span>Additional notes</span>
+            <textarea className="dbr-textarea session-field__control" rows="3" placeholder="Enter additional notes..." value={draft.notes} onChange={(e) => onFieldChange('notes', e.target.value)} />
+          </label>
+          <div className="session-evidence-builder">
+            <div className="session-evidence-builder__head">
+              <h6>Documents</h6>
+              <button type="button" className="session-mini-btn" onClick={onAddEvidence}>
+                <i className="fas fa-plus" /> Add document
+              </button>
+            </div>
+            {(draft.evidenceDocs || []).map((doc, index) => (
+              <div key={doc.id || index} className="session-evidence-row">
+                <input className="dbr-input session-field__control" placeholder="Document name" value={doc.name} onChange={(e) => onEvidenceChange(index, 'name', e.target.value)} />
+                <select className="dbr-select session-field__control" value={doc.type} onChange={(e) => onEvidenceChange(index, 'type', e.target.value)}>
+                  <option>Document</option>
+                  <option>Image</option>
+                  <option>Video</option>
+                  <option>PDF</option>
+                </select>
+                <button type="button" className="session-remove-btn" onClick={() => onRemoveEvidence(index)} aria-label="Remove document">
+                  <i className="fas fa-trash" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  );
+};
+
+const SessionAddPanel = ({
+  draft,
+  batchLabel,
+  studentCount,
+  onClose,
+  onSave,
+  onFieldChange,
+}) => {
+  if (!draft) return null;
+
+  return (
+    <div className="session-add-panel">
+      <div className="session-add-panel__head">
+        <div>
+          <h4>Add Session</h4>
+          <p>{batchLabel} · {studentCount} students</p>
+        </div>
+        <button type="button" className="session-modal__close" onClick={onClose} aria-label="Close">
+          <i className="fas fa-times" />
+        </button>
+      </div>
+      <div className="session-add-panel__body">
+        <SessionFormFields
+          draft={draft}
+          isEdit={false}
+          onFieldChange={onFieldChange}
+          readOnlyTrainer
+        />
+      </div>
+      <div className="session-add-panel__foot">
+        <button type="button" className="sc-btn" onClick={onClose}>Cancel</button>
+        <button type="button" className="sc-btn sc-btn--primary" onClick={onSave}>
+          <i className="fas fa-save" /> Save Session
+        </button>
+      </div>
     </div>
-  </aside>
-);
+  );
+};
 
 const ActionToolbar = ({ quickSearch, onSearchChange, onSearch, onAddSession, notify }) => {
   const [showMore, setShowMore] = useState(false);
@@ -540,36 +1121,474 @@ const ActionToolbar = ({ quickSearch, onSearchChange, onSearch, onAddSession, no
 
 
 
-const StudentCard = ({ student, onView }) => {
-  const tone = student.status === 'Active' ? 'green' : 'orange';
-  const attendanceNum = parseFloat(student.attendance) || 0;
+const StudentCard = ({ student, batchAttendance, onView, onAttendance, onAddPerformance }) => {
+  const attendanceLabel = batchAttendance?.percentage != null
+    ? `${batchAttendance.percentage}%`
+    : student.attendance;
+  const attendanceHint = batchAttendance?.markedSessions
+    ? `${batchAttendance.presentSessions}/${batchAttendance.markedSessions} sessions marked`
+    : 'From admission record';
+  const attendanceNum = parseFloat(batchAttendance?.percentage ?? student.attendance) || 0;
+  const attLevel = getAttendanceLevel(attendanceLabel);
+  const statusTone = student.status === 'Active' ? 'active' : 'risk';
+  const performanceAdded = hasPerformanceData(student);
+  const detailItems = [
+    ['fa-phone', 'Mobile', student.mobile],
+    ['fa-envelope', 'Email', student.email || '-'],
+    ['fa-graduation-cap', 'Course', student.course],
+    ['fa-users', 'Batch', student.batchCode],
+    ['fa-building', 'Center', student.center],
+    ['fa-map-marker-alt', 'Location', [student.city, student.state].filter((v) => v && v !== '-').join(', ') || '-'],
+    ['fa-project-diagram', 'Project', student.project || '-'],
+    [student.enrolledDateLabel === 'Lead Since' ? 'fa-calendar' : 'fa-calendar-check', student.enrolledDateLabel, student.enrolledDate || '-'],
+  ];
 
   return (
-    <article className="tm-student-card">
-      <div className="tm-student-card__header">
-        <div className="tm-avatar">{getInitials(student.name)}</div>
-        <div>
-          <h4>{student.name}</h4>
-          <span className="tm-student-card__id">{student.id}</span>
+    <article className={`st-card${student.isMultiCourseCandidate ? ' st-card--multi' : ''}`}>
+      <div className="st-card__head">
+        <div className="st-card__identity">
+          <div className="st-card__avatar">{getInitials(student.name)}</div>
+          <div className="st-card__title-wrap">
+            <h4 className="st-card__name">{student.name}</h4>
+            <span className="st-card__course-line">
+              <i className="fas fa-graduation-cap" /> {student.course}
+            </span>
+            <span className="st-card__id">
+              {student.batchCode} · {student.center}
+              {student.leadStatus && student.leadStatus !== '-' ? ` · ${student.leadStatus}` : ''}
+            </span>
+          </div>
         </div>
-        <span className={`dbr-chip dbr-chip--${tone}`}>{student.status}</span>
-      </div>
-      <div className="tm-student-card__progress">
-        <div className="tm-student-card__progress-head">
-          <span>Attendance</span>
-          <strong>{student.attendance}</strong>
+        <div className="st-card__badges">
+          {student.isMultiCourseCandidate && (
+            <span className="st-card__multi-badge" title="Same candidate has multiple enrollments in this batch">
+              <i className="fas fa-layer-group" /> {student.enrollmentCount} courses
+            </span>
+          )}
+          <span className={`st-card__status st-card__status--${statusTone}`}>
+            <i className={`fas ${statusTone === 'active' ? 'fa-check-circle' : 'fa-exclamation-triangle'}`} />
+            {student.status}
+          </span>
         </div>
-        <div className="tm-progress-bar">
-          <div className="tm-progress-bar__fill" style={{ width: `${Math.min(attendanceNum, 100)}%` }} />
+      </div>
+
+      <div className="st-card__body">
+        {student.isMultiCourseCandidate && (
+          <div className="st-card__multi-note">
+            <i className="fas fa-info-circle" />
+            <div>
+              <strong>Same candidate in multiple courses</strong>
+              <p>
+                This card is for <em>{student.course}</em> ({student.batchCode}).
+                {student.otherEnrollments?.length
+                  ? ` Also enrolled in: ${student.otherEnrollments.map((item) => `${item.course} (${item.batchCode})`).join(', ')}.`
+                  : ''}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="st-card__attendance">
+          <div className="st-card__attendance-top">
+            <span>Batch Session Attendance</span>
+            <strong className={`st-card__att-val st-card__att-val--${attLevel}`}>{attendanceLabel}</strong>
+          </div>
+          <small className="st-card__attendance-note">{attendanceHint}</small>
+          <div className="st-card__progress">
+            <div
+              className={`st-card__progress-fill st-card__progress-fill--${attLevel}`}
+              style={{ width: `${Math.min(attendanceNum, 100)}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="st-card__details">
+          {detailItems.map(([icon, label, value]) => (
+            <div key={label} className="st-card__detail-item">
+              <span><i className={`fas ${icon}`} /> {label}</span>
+              <strong>{value}</strong>
+            </div>
+          ))}
+        </div>
+
+        <div className="st-card__meta">
+          <div className="st-card__meta-item">
+            <div className="st-card__meta-icon st-card__meta-icon--blue">
+              <i className="fas fa-industry" />
+            </div>
+            <div>
+              <span>Sector</span>
+              <strong>{student.sector || '-'}</strong>
+            </div>
+          </div>
+          <div className="st-card__meta-item">
+            <div className="st-card__meta-icon st-card__meta-icon--pink">
+              <i className="fas fa-chart-line" />
+            </div>
+            <div>
+              <span>Performance</span>
+              <strong>{performanceAdded ? getPerformanceLabel(attLevel) : 'Not added'}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div className="st-card__actions">
+          <button type="button" className="st-card__btn st-card__btn--primary" onClick={() => onView(student)}>
+            <i className="fas fa-user" /> View Profile
+          </button>
+          <button type="button" className="st-card__btn st-card__btn--ghost" onClick={() => onAttendance(student)}>
+            <i className="fas fa-clipboard-check" /> Attendance
+          </button>
+          <button
+            type="button"
+            className="st-card__btn st-card__btn--performance"
+            onClick={() => onAddPerformance(student)}
+          >
+            <i className="fas fa-chart-bar" /> {performanceAdded ? 'Edit Performance' : 'Add Performance'}
+          </button>
         </div>
       </div>
-      <div className="tm-student-card__info">
-        <span><i className="fas fa-phone" /> {student.mobile}</span>
-      </div>
-      <button type="button" className="tm-btn tm-btn--outline tm-btn--block" onClick={() => onView(student.name)}>
-        <i className="fas fa-eye" /> View Profile
-      </button>
     </article>
+  );
+};
+
+const StudentProfileModal = ({ student, sessions, attendanceRecordsBySession, basicDetails, onClose, onEditPerformance }) => {
+  const profile = useMemo(
+    () => getStudentPerformanceProfile(student, sessions, attendanceRecordsBySession, basicDetails),
+    [student, sessions, attendanceRecordsBySession, basicDetails]
+  );
+
+  if (!profile) return null;
+
+  const statusTone = profile.status === 'Active' ? 'active' : 'risk';
+  const infoItems = [
+    ['fa-phone', 'Mobile', profile.mobile],
+    ['fa-envelope', 'Email', profile.email || '-'],
+    ['fa-graduation-cap', 'Course', profile.course],
+    ['fa-users', 'Batch', profile.batchCode],
+    ['fa-building', 'Center', profile.center],
+    ['fa-project-diagram', 'Project', profile.project || '-'],
+    ['fa-briefcase', 'Project Type', profile.projectType || '-'],
+    ['fa-industry', 'Sector', profile.sector || '-'],
+    ['fa-tag', 'Lead Status', profile.leadStatus || '-'],
+    [profile.enrolledDateLabel === 'Lead Since' ? 'fa-calendar' : 'fa-calendar-check', profile.enrolledDateLabel, profile.enrolledDate || '-'],
+    ['fa-clock', 'Lead Created', profile.leadCreatedDate || '-'],
+  ];
+
+  return (
+    <div className="st-profile-backdrop">
+      <div className="st-profile-modal" role="dialog" aria-modal="true" aria-labelledby="student-profile-title">
+        <div className="st-profile-modal__head">
+          <div className="st-profile-modal__identity">
+            <div className="st-profile-modal__avatar">{getInitials(profile.name)}</div>
+            <div>
+              <h3 id="student-profile-title">{profile.name}</h3>
+              <p>{profile.course} · {profile.batchCode}{profile.isMultiCourseCandidate ? ` · ${profile.enrollmentCount} enrollments` : ''}</p>
+            </div>
+          </div>
+          <div className="st-profile-modal__head-actions">
+            <span className={`st-card__status st-card__status--${statusTone}`}>
+              <i className={`fas ${statusTone === 'active' ? 'fa-check-circle' : 'fa-exclamation-triangle'}`} />
+              {profile.status}
+            </span>
+            <button type="button" className="st-profile-modal__close" onClick={onClose} aria-label="Close profile">
+              <i className="fas fa-times" />
+            </button>
+          </div>
+        </div>
+
+        <div className="st-profile-modal__body">
+          <div className="st-profile-stats">
+            <div className="st-profile-stat">
+              <div className="st-profile-stat__icon st-profile-stat__icon--pink"><i className="fas fa-percentage" /></div>
+              <strong className={`st-card__att-val st-card__att-val--${profile.attLevel}`}>{profile.attendance}</strong>
+              <span>Batch Session Attendance</span>
+            </div>
+            <div className="st-profile-stat">
+              <div className="st-profile-stat__icon st-profile-stat__icon--green"><i className="fas fa-check-circle" /></div>
+              <strong>{profile.presentSessions}</strong>
+              <span>Present Sessions</span>
+            </div>
+            <div className="st-profile-stat">
+              <div className="st-profile-stat__icon st-profile-stat__icon--red"><i className="fas fa-times-circle" /></div>
+              <strong>{profile.absentSessions}</strong>
+              <span>Absent Sessions</span>
+            </div>
+            <div className="st-profile-stat">
+              <div className="st-profile-stat__icon st-profile-stat__icon--blue"><i className="fas fa-star" /></div>
+              <strong>{profile.performanceLabel}</strong>
+              <span>Performance</span>
+            </div>
+          </div>
+
+          <div className="st-profile-section">
+            <h4><i className="fas fa-id-card" /> Basic Information</h4>
+            <div className="st-profile-info-grid">
+              {infoItems.map(([icon, label, value]) => (
+                <div key={label} className="st-profile-info-item">
+                  <span><i className={`fas ${icon}`} /> {label}</span>
+                  <strong>{value}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="st-profile-section">
+            <h4><i className="fas fa-chart-bar" /> Performance Breakdown</h4>
+            <div className="st-profile-metrics">
+              {profile.metrics.map(({ label, value, icon, tone }) => (
+                <div key={label} className="st-profile-metric">
+                  <div className="st-profile-metric__head">
+                    <span>
+                      <i className={`fas ${icon} st-profile-metric__icon st-profile-metric__icon--${tone}`} />
+                      {label}
+                    </span>
+                    <strong>{formatMetricValue(value)}</strong>
+                  </div>
+                  <div className="st-card__progress">
+                    <div
+                      className={`st-card__progress-fill st-card__progress-fill--${Number(value) >= 85 ? 'high' : Number(value) >= 70 ? 'mid' : 'low'}`}
+                      style={{ width: `${value !== '' && value != null ? Math.min(Number(value) || 0, 100) : 0}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="st-profile-section">
+            <h4><i className="fas fa-comment-dots" /> Trainer Remark</h4>
+            <p className="st-profile-remark">{profile.trainerRemark || 'No remark added yet.'}</p>
+          </div>
+
+          <div className="st-profile-section">
+            <h4><i className="fas fa-history" /> Session Attendance History</h4>
+            <div className="st-profile-table-wrap">
+              <table className="st-profile-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Session</th>
+                    <th>Topic</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {profile.sessionHistory.map((entry) => (
+                    <tr key={`${entry.date}-${entry.title}`}>
+                      <td>{entry.date}</td>
+                      <td>{entry.title}</td>
+                      <td>{entry.topic}</td>
+                      <td>
+                        <span className={`st-profile-pill st-profile-pill--${attendanceTone(entry.status)}`}>
+                          {entry.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div className="st-profile-modal__foot">
+          <button type="button" className="sc-btn sc-btn--primary" onClick={() => onEditPerformance(student)}>
+            <i className="fas fa-edit" /> {hasPerformanceData(student) ? 'Edit Performance' : 'Add Performance'}
+          </button>
+          <button type="button" className="sc-btn" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const StudentPerformanceModal = ({ draft, onClose, onSave, onFieldChange }) => {
+  if (!draft) return null;
+
+  const isEdit = hasPerformanceData({
+    participationScore: draft.participationScore,
+    engagementScore: draft.engagementScore,
+    assessmentScore: draft.assessmentScore,
+    practicalScore: draft.practicalScore,
+    trainerRemark: draft.trainerRemark,
+  });
+
+  return (
+    <div className="st-perf-backdrop">
+      <div className="st-perf-modal" role="dialog" aria-modal="true">
+        <div className="st-perf-modal__head">
+          <div>
+            <h5>{isEdit ? 'Edit Performance' : 'Add Performance'}</h5>
+            <span>{draft.studentName} · {draft.studentId}</span>
+          </div>
+          <button type="button" className="session-modal__close" onClick={onClose} aria-label="Close">
+            <i className="fas fa-times" />
+          </button>
+        </div>
+
+        <div className="st-perf-modal__body">
+          <p className="st-perf-modal__hint">
+            Enter performance scores for this student. Values should be between 0 and 100.
+          </p>
+          <div className="session-form-grid">
+            {PERFORMANCE_FIELDS.map(({ key, label, icon, placeholder }) => (
+              <label key={key} className="session-field">
+                <span><i className={`fas ${icon}`} /> {label}</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  className="dbr-input session-field__control"
+                  placeholder={placeholder}
+                  value={draft[key]}
+                  onChange={(e) => onFieldChange(key, e.target.value)}
+                />
+              </label>
+            ))}
+          </div>
+          <label className="session-field session-field--full">
+            <span><i className="fas fa-comment-dots" /> Trainer Remark</span>
+            <textarea
+              className="dbr-textarea session-field__control"
+              rows="4"
+              placeholder="Write trainer remark for this student..."
+              value={draft.trainerRemark}
+              onChange={(e) => onFieldChange('trainerRemark', e.target.value)}
+            />
+          </label>
+        </div>
+
+        <div className="st-perf-modal__foot">
+          <button type="button" className="sc-btn" onClick={onClose}>Cancel</button>
+          <button type="button" className="sc-btn sc-btn--primary" onClick={onSave}>
+            <i className="fas fa-save" /> Save Performance
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ReferSessionModal = ({
+  session,
+  batchLabel,
+  counselorOptions,
+  counselorId,
+  onCounselorChange,
+  candidates,
+  loading,
+  selectedIds,
+  onToggleCandidate,
+  onToggleAll,
+  submitting,
+  onClose,
+  onSubmit,
+}) => {
+  const allSelected = candidates.length > 0 && selectedIds.length === candidates.length;
+
+  return (
+    <div className="st-refer-backdrop">
+      <div className="st-refer-modal" role="dialog" aria-modal="true">
+        <div className="st-refer-modal__head">
+          <div>
+            <h5>Refer Session to Counsellor</h5>
+            <span>{session?.title || 'Selected session'} · {batchLabel || 'Batch not selected'}</span>
+          </div>
+          <button type="button" className="session-modal__close" onClick={onClose} aria-label="Close">
+            <i className="fas fa-times" />
+          </button>
+        </div>
+
+        <div className="st-refer-modal__body">
+          <p className="st-refer-modal__hint">
+            Select a counsellor and choose students from the batch to refer using the refer-leads API.
+          </p>
+
+          <SessionFormSelect
+            label="Counsellor"
+            value={counselorId}
+            onChange={onCounselorChange}
+            options={counselorOptions}
+            placeholder="Select counsellor"
+          />
+
+          <div className="st-refer-candidates">
+            <div className="st-refer-candidates__head">
+              <strong>Select Students</strong>
+              {candidates.length > 0 && (
+                <button type="button" className="st-refer-select-all" onClick={onToggleAll}>
+                  {allSelected ? 'Clear All' : 'Select All'}
+                </button>
+              )}
+            </div>
+
+            {loading ? (
+              <div className="st-refer-empty">
+                <i className="fas fa-spinner fa-spin" /> Loading students...
+              </div>
+            ) : candidates.length === 0 ? (
+              <div className="st-refer-empty">
+                No students found. Please select <strong>Center</strong>, <strong>Course</strong>, and <strong>Batch</strong> filters first.
+              </div>
+            ) : (
+              <div className="st-refer-candidate-list">
+                {candidates.map((candidate) => {
+                  const checked = selectedIds.includes(candidate.appliedCourseId);
+                  return (
+                    <label
+                      key={candidate.appliedCourseId}
+                      className={`st-refer-candidate${checked ? ' st-refer-candidate--active' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => onToggleCandidate(candidate.appliedCourseId)}
+                      />
+                      <div>
+                        <strong>{candidate.name}</strong>
+                        <span>{candidate.mobile}</span>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="st-refer-modal__foot">
+          <button type="button" className="sc-btn" onClick={onClose} disabled={submitting}>Cancel</button>
+          <button type="button" className="sc-btn sc-btn--primary" onClick={onSubmit} disabled={submitting}>
+            <i className={`fas ${submitting ? 'fa-spinner fa-spin' : 'fa-share-alt'}`} />
+            {submitting ? 'Referring...' : 'Refer Session'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SessionFeedbackModal = ({ session, onClose }) => {
+  if (!session) return null;
+
+  return (
+    <div className="session-modal-backdrop">
+      <div className="session-modal session-feedback-modal" role="dialog" aria-modal="true">
+        <div className="session-modal__head">
+          <div>
+            <h5>Session Feedback</h5>
+            <span>{session.title || session.id}</span>
+          </div>
+          <button type="button" className="session-modal__close" onClick={onClose} aria-label="Close">
+            <i className="fas fa-times" />
+          </button>
+        </div>
+        <div className="session-modal__foot">
+          <button type="button" className="sc-btn" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
   );
 };
 
@@ -577,6 +1596,7 @@ const StudentCard = ({ student, onView }) => {
 const AddSessionModal = ({
   draft,
   isEdit,
+  batchSummary,
   onClose,
   onSave,
   onFieldChange,
@@ -586,15 +1606,13 @@ const AddSessionModal = ({
 }) => {
   if (!draft) return null;
 
-  const ph = (text) => (isEdit ? undefined : text);
-
   return (
     <div className="session-modal-backdrop">
       <div className="session-modal" role="dialog" aria-modal="true">
         <div className="session-modal__head">
           <div>
             <h5>{isEdit ? 'Edit Session' : 'Add Session'}</h5>
-            <span>{draft.id}</span>
+            <span>{isEdit ? draft.id : 'Enter session details below'}</span>
           </div>
           <button type="button" className="session-modal__close" onClick={onClose} aria-label="Close">
             <i className="fas fa-times" />
@@ -602,91 +1620,18 @@ const AddSessionModal = ({
         </div>
 
         <div className="session-modal__body">
-          <div className="session-form-grid">
-            <label className="session-field">
-              <span>Session title</span>
-              <input className="dbr-input" placeholder={ph('Enter session title')} value={draft.title} onChange={(e) => onFieldChange('title', e.target.value)} />
-            </label>
-            <label className="session-field">
-              <span>Topic covered</span>
-              <input className="dbr-input" placeholder={ph('Enter topic covered')} value={draft.topicCovered} onChange={(e) => onFieldChange('topicCovered', e.target.value)} />
-            </label>
-            <label className="session-field">
-              <span>Training method</span>
-              <input className="dbr-input" placeholder={ph('Enter training method')} value={draft.trainingMethod} onChange={(e) => onFieldChange('trainingMethod', e.target.value)} />
-            </label>
-            <label className="session-field">
-              <span>Status</span>
-              <select className="dbr-select" value={draft.status} onChange={(e) => onFieldChange('status', e.target.value)}>
-                {!isEdit && <option value="">Select status</option>}
-                <option>Pending</option>
-                <option>Completed</option>
-              </select>
-            </label>
-            <label className="session-field">
-              <span>Date</span>
-              <input type="date" className="dbr-input" value={draft.sessionDate} onChange={(e) => onFieldChange('sessionDate', e.target.value)} />
-            </label>
-            <label className="session-field">
-              <span>Start time</span>
-              <input type="time" className="dbr-input" value={draft.startTime} onChange={(e) => onFieldChange('startTime', e.target.value)} />
-            </label>
-            <label className="session-field">
-              <span>End time</span>
-              <input type="time" className="dbr-input" value={draft.endTime} onChange={(e) => onFieldChange('endTime', e.target.value)} />
-            </label>
-            <label className="session-field">
-              <span>Course / trade</span>
-              <input className="dbr-input" placeholder={ph('Enter course / trade')} value={draft.courseTrade} onChange={(e) => onFieldChange('courseTrade', e.target.value)} />
-            </label>
-            <label className="session-field">
-              <span>Batch code</span>
-              <input className="dbr-input" placeholder={ph('Enter batch code')} value={draft.batchCode} onChange={(e) => onFieldChange('batchCode', e.target.value)} />
-            </label>
-            <label className="session-field">
-              <span>Trainer name</span>
-              <input className="dbr-input" placeholder={ph('Enter trainer name')} value={draft.trainerName} onChange={(e) => onFieldChange('trainerName', e.target.value)} />
-            </label>
-            <label className="session-field">
-              <span>Total candidates</span>
-              <input type="number" min="0" className="dbr-input" placeholder={ph('0')} value={draft.totalCandidates} onChange={(e) => onFieldChange('totalCandidates', e.target.value)} />
-            </label>
-            
-          </div>
-
-          <label className="session-field session-field--full">
-            <span>Additional notes</span>
-            <textarea className="dbr-textarea" rows="3" placeholder={ph('Enter additional notes...')} value={draft.notes} onChange={(e) => onFieldChange('notes', e.target.value)} />
-          </label>
-
-          <div className="session-evidence-builder">
-            <div className="session-evidence-builder__head">
-              <h6>Documents</h6>
-              <button type="button" className="session-mini-btn" onClick={onAddEvidence}>
-                <i className="fas fa-plus" /> Add document
-              </button>
-            </div>
-
-            {(draft.evidenceDocs || []).map((doc, index) => (
-              <div key={doc.id || index} className="session-evidence-row">
-                <input
-                  className="dbr-input"
-                  placeholder="Document name"
-                  value={doc.name}
-                  onChange={(e) => onEvidenceChange(index, 'name', e.target.value)}
-                />
-                <select className="dbr-select" value={doc.type} onChange={(e) => onEvidenceChange(index, 'type', e.target.value)}>
-                  <option>Document</option>
-                  <option>Image</option>
-                  <option>Video</option>
-                  <option>PDF</option>
-                </select>
-                <button type="button" className="session-remove-btn" onClick={() => onRemoveEvidence(index)} aria-label="Remove document">
-                  <i className="fas fa-trash" />
-                </button>
-              </div>
-            ))}
-          </div>
+          {!isEdit && batchSummary && (
+            <div className="session-modal__context">{batchSummary}</div>
+          )}
+          <SessionFormFields
+            draft={draft}
+            isEdit={isEdit}
+            onFieldChange={onFieldChange}
+            onEvidenceChange={onEvidenceChange}
+            onAddEvidence={onAddEvidence}
+            onRemoveEvidence={onRemoveEvidence}
+            readOnlyTrainer={!isEdit}
+          />
         </div>
 
         <div className="session-modal__foot">
@@ -703,10 +1648,12 @@ const AddSessionModal = ({
 const AttendanceManagementModal = ({
   session,
   rows,
+  students,
+  sessions,
+  attendanceRecordsBySession,
   view,
   onViewChange,
   onStatusChange,
-  onRemarksChange,
   onClose,
   onSave,
 }) => {
@@ -730,7 +1677,7 @@ const AttendanceManagementModal = ({
   const sessionDetails = [
     { label: 'Session ID', value: session.id },
     { label: 'Topic covered', value: session.topicCovered || session.title },
-    { label: 'Training method', value: session.trainingMethod || 'Interactive Learning' },
+    { label: 'Training Mode', value: session.trainingMethod || 'Interactive Learning' },
     { label: 'Session date', value: sessionDate },
     { label: 'Time', value: sessionTime },
     { label: 'Batch code', value: session.batchCode || TRAINER_INFO.batchCode },
@@ -786,44 +1733,7 @@ const AttendanceManagementModal = ({
             </div>
           </div>
 
-          <div className="attendance-selected-student">
-            <div className="attendance-selected-student__header">
-              <strong>Trace specific student</strong>
-              <select
-                className="attendance-status-select"
-                value={activeStudentId}
-                onChange={(event) => setSelectedStudentId(event.target.value)}
-              >
-                {rows.map((row) => (
-                  <option key={row.id} value={row.id}>
-                    {row.name} · {row.mobile}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="attendance-selected-student__card">
-              <div>
-                <span>Name</span>
-                <strong>{selectedStudent.name || '-'}</strong>
-              </div>
-              <div>
-                <span>Mobile</span>
-                <strong>{selectedStudent.mobile || '-'}</strong>
-              </div>
-              <div>
-                <span>Current status</span>
-                <strong>{selectedStudent.status || '-'}</strong>
-              </div>
-              <div>
-                <span>Remarks</span>
-                <strong>{selectedStudent.remarks || '-'}</strong>
-              </div>
-              <div>
-                <span>Overall attendance</span>
-                <strong>{getStudentOverallAttendance(activeStudentId)}</strong>
-              </div>
-            </div>
-          </div>
+          
 
           <div className="attendance-stat-grid">
             <div className="attendance-stat-card attendance-stat-card--blue">
@@ -857,11 +1767,8 @@ const AttendanceManagementModal = ({
                   <thead>
                     <tr>
                       <th className="attendance-student-col">Student Information</th>
-                      <th className="attendance-date-col">
-                        <span>{sessionDate}</span>
-                        <small>Session Date</small>
-                      </th>
-                      <th>Attendance (%)</th>
+                      <th className="attendance-date-col">This Session</th>
+                      <th>Batch Attendance</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -883,18 +1790,22 @@ const AttendanceManagementModal = ({
                             ))}
                           </select>
                         </td>
-                        
+                        <AttendancePercentCell
+                          row={row}
+                          students={students}
+                          sessions={sessions}
+                          attendanceRecordsBySession={attendanceRecordsBySession}
+                        />
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td>Daily Summary</td>
+                      <td>This Session Summary</td>
                       <td>
                         P: {stats.present} - A: {stats.absent} - NM: {stats.notMarked}
                       </td>
                       <td>{stats.attendance}%</td>
-                      <td>-</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -918,7 +1829,7 @@ const AttendanceManagementModal = ({
                         <small>Session Date</small>
                       </th>
                       <th>Status</th>
-                      <th>Attendance (%)</th>
+                      <th>Batch Attendance</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -937,18 +1848,22 @@ const AttendanceManagementModal = ({
                             {row.status}
                           </span>
                         </td> 
-                        <AttendancePercentCell row={row} />
+                        <AttendancePercentCell
+                          row={row}
+                          students={students}
+                          sessions={sessions}
+                          attendanceRecordsBySession={attendanceRecordsBySession}
+                        />
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td>Daily Summary</td>
+                      <td>This Session Summary</td>
                       <td>{sessionDate}</td>
                       <td>
                         P: {stats.present} - A: {stats.absent} - NM: {stats.notMarked}
                       </td>
-                      <td>-</td>
                       <td>{stats.attendance}%</td>
                     </tr>
                   </tfoot>
@@ -973,11 +1888,15 @@ const SessionCard = ({ basicDetails, session, notify, onStatusChange, onEvidence
   const [collapsed, setCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
   const activeSession = session || hydrateSession(DUMMY_SESSIONS[0], 0, basicDetails);
   const statusTone = activeSession.status === 'Completed' ? 'green' : 'amber';
   const statusIcon = activeSession.status === 'Completed' ? 'fa-check-circle' : 'fa-clock';
   const timeRange = `${activeSession.startTime || '10:00'} - ${activeSession.endTime || '12:00'}`;
   const detailItems = useMemo(() => ([
+    ['fa-sitemap', 'Department', activeSession.departmentName || basicDetails.departmentName || '-', 'blue'],
+    ['fa-project-diagram', 'Project', activeSession.projectName || basicDetails.projectName || '-', 'blue'],
+    ['fa-building', 'Center', activeSession.centerName || basicDetails.centerName || '-', 'blue'],
     ['fa-book-open', 'Topic covered', activeSession.topicCovered || activeSession.title, 'blue'],
     ['fa-chalkboard', 'Training method', activeSession.trainingMethod || 'Interactive Learning', 'blue'],
     ['fa-calendar-alt', 'Session date', activeSession.date || formatSessionDate(activeSession.sessionDate), 'blue'],
@@ -985,6 +1904,7 @@ const SessionCard = ({ basicDetails, session, notify, onStatusChange, onEvidence
     ['fa-graduation-cap', 'Course / trade', activeSession.courseTrade || basicDetails.courseTrade, 'pink'],
     ['fa-hashtag', 'Batch code', activeSession.batchCode || basicDetails.batchCode, 'pink'],
     ['fa-user', 'Trainer', activeSession.trainerName || basicDetails.trainerName, 'pink'],
+    ['fa-user-tie', 'Counsellor', activeSession.counsellorName || '-', 'pink'],
   ]), [activeSession, basicDetails, timeRange]);
   const statItems = useMemo(() => ([
     { icon: 'fa-users', val: activeSession.totalCandidates || '0', lbl: 'Total Candidates', cls: 'blue' },
@@ -1008,6 +1928,13 @@ const SessionCard = ({ basicDetails, session, notify, onStatusChange, onEvidence
         </div>
 
         <div className="sc-head-right">
+          <button
+            type="button"
+            className="sc-head-tab"
+            onClick={() => setFeedbackModalOpen(true)}
+          >
+            <i className="fas fa-comment-dots" /> Feedback
+          </button>
           <div className="sc-status-control">
             <span className={`sc-badge sc-badge--${statusTone}`}>
               <i className={`fas ${statusIcon}`} /> {activeSession.status}
@@ -1062,6 +1989,13 @@ const SessionCard = ({ basicDetails, session, notify, onStatusChange, onEvidence
           <i className={`fas fa-chevron-${collapsed ? 'down' : 'up'}`} />
         </button>
       </div>
+
+      {feedbackModalOpen && (
+        <SessionFeedbackModal
+          session={activeSession}
+          onClose={() => setFeedbackModalOpen(false)}
+        />
+      )}
 
       {!collapsed && (
         <>
@@ -1173,31 +2107,67 @@ const TrainerModule = () => {
     center: '',
     course: '',
     batch: '',
+    counsellor: '',
   });
   const [verticalOptions, setVerticalOptions] = useState([]);
   const [projectOptions, setProjectOptions] = useState([]);
   const [courseOptions, setCourseOptions] = useState([]);
   const [centerOptions, setCenterOptions] = useState([]);
   const [batchOptions, setBatchOptions] = useState([]);
+  const [counselorOptions, setCounselorOptions] = useState([]);
   const [allCoursesMeta, setAllCoursesMeta] = useState([]);
+  const [allCentersMeta, setAllCentersMeta] = useState([]);
   const [quickSearch, setQuickSearch] = useState('');
   const [mainTab, setMainTab] = useState('session');
-  const [basicDetails] = useState(BASIC_DETAILS_INIT);
-  const [sessions, setSessions] = useState(() =>
-    DUMMY_SESSIONS.map((session, index) => hydrateSession(session, index, BASIC_DETAILS_INIT))
-  );
-  const [selectedSessionId, setSelectedSessionId] = useState(DUMMY_SESSIONS[0]?.id || '');
+  const [sessions, setSessions] = useState([]);
+  const [selectedSessionId, setSelectedSessionId] = useState('');
   const [sessionDraft, setSessionDraft] = useState(null);
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [attendanceModal, setAttendanceModal] = useState({ isOpen: false, view: 'register', sessionId: '' });
   const [attendanceRecordsBySession, setAttendanceRecordsBySession] = useState({});
+  const [studentProfileModal, setStudentProfileModal] = useState({ isOpen: false, student: null });
+  const [performanceModal, setPerformanceModal] = useState({ isOpen: false, draft: null });
+  const [referSessionModal, setReferSessionModal] = useState({
+    isOpen: false,
+    counselorId: '',
+    selectedAppliedCourseIds: [],
+  });
+  const [referCandidates, setReferCandidates] = useState([]);
+  const [referCandidatesLoading, setReferCandidatesLoading] = useState(false);
+  const [referSubmitting, setReferSubmitting] = useState(false);
+  const [students, setStudents] = useState([]);
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [centerWiseCourseIds, setCenterWiseCourseIds] = useState(new Set());
+  const [centerCoursesLoading, setCenterCoursesLoading] = useState(false);
+  const [pathBatchesLoading, setPathBatchesLoading] = useState(false);
+  const [filterOptionsLoading, setFilterOptionsLoading] = useState(true);
+  const [sessionPanelView, setSessionPanelView] = useState('empty');
   const [toast, setToast] = useState('');
+
+  const trainerProfile = useMemo(() => ({
+    name: userData.name || TRAINER_INFO.name,
+    mobile: userData.mobile || TRAINER_INFO.mobile,
+    email: userData.email || TRAINER_INFO.email,
+  }), [userData]);
+
+  const activeBasicDetails = useMemo(() => buildSessionContextFromFilters(filters, {
+    verticalOptions,
+    projectOptions,
+    centerOptions,
+    courseOptions,
+    batchOptions,
+    trainerName: trainerProfile.name,
+  }), [filters, verticalOptions, projectOptions, centerOptions, courseOptions, batchOptions, trainerProfile.name]);
+
+  const persistSessions = useCallback((nextSessions, batchId = filters.batch) => {
+    if (!batchId) return;
+    persistStoredSessions(batchId, nextSessions);
+  }, [filters.batch]);
 
   const [attendanceData, setAttendanceData] = useState(() => buildPointMap(ATTENDANCE_POINTS));
   const [trainingData, setTrainingData] = useState(() => buildPointMap(TRAINING_POINTS));
   const [documentData, setDocumentData] = useState(() => buildPointMap(DOCUMENT_POINTS));
-  const [studentData, setStudentData] = useState(() => buildPointMap(STUDENT_POINTS));
   const [issueData, setIssueData] = useState(() =>
     Object.fromEntries(ISSUE_POINTS.map((p) => [p.id, emptyIssueValue()]))
   );
@@ -1208,7 +2178,7 @@ const TrainerModule = () => {
   }, []);
 
   const filterProjectOptions = useMemo(() => {
-    if (!filters.department) return projectOptions;
+    if (!filters.department) return [];
     const projectIds = new Set(
       allCoursesMeta
         .filter((course) => String(course.vertical?._id || course.vertical) === String(filters.department))
@@ -1217,84 +2187,390 @@ const TrainerModule = () => {
     return projectOptions.filter((project) => projectIds.has(String(project.value)));
   }, [filters.department, projectOptions, allCoursesMeta]);
 
+  const filterCenterOptions = useMemo(() => {
+    if (!filters.project) return [];
+    return centerOptions.filter((center) => {
+      const meta = allCentersMeta.find((centerItem) => String(centerItem._id) === String(center.value));
+      return meta?.projects?.some((project) => String(project._id || project) === String(filters.project));
+    });
+  }, [filters.project, centerOptions, allCentersMeta]);
+
   const filterCourseOptions = useMemo(() => {
-    let list = courseOptions;
-    if (filters.department) {
-      const courseIds = new Set(
-        allCoursesMeta
-          .filter((course) => String(course.vertical?._id || course.vertical) === String(filters.department))
-          .map((course) => String(course._id))
-      );
-      list = list.filter((course) => courseIds.has(String(course.value)));
+    if (!filters.center || !filters.project) return [];
+    if (!centerWiseCourseIds.size) return [];
+    return courseOptions.filter((course) => centerWiseCourseIds.has(String(course.value)));
+  }, [filters.center, filters.project, courseOptions, centerWiseCourseIds]);
+
+  const sessionPathStep = useMemo(() => {
+    if (!filters.department) return 'department';
+    if (!filters.project) return 'project';
+    if (!filters.center) return 'center';
+    if (!filters.course) return 'course';
+    if (!filters.batch) return 'batch';
+    return 'complete';
+  }, [filters]);
+
+  const sessionPathOptions = useMemo(() => {
+    switch (sessionPathStep) {
+      case 'department':
+        return verticalOptions;
+      case 'project':
+        return filterProjectOptions;
+      case 'center':
+        return filterCenterOptions;
+      case 'course':
+        return filterCourseOptions;
+      case 'batch':
+        return batchOptions;
+      default:
+        return [];
     }
-    if (filters.project) {
-      const courseIds = new Set(
-        allCoursesMeta
-          .filter((course) => String(course.project?._id || course.project) === String(filters.project))
-          .map((course) => String(course._id))
-      );
-      list = list.filter((course) => courseIds.has(String(course.value)));
-    }
-    return list;
-  }, [filters.department, filters.project, courseOptions, allCoursesMeta]);
+  }, [sessionPathStep, verticalOptions, filterProjectOptions, filterCenterOptions, filterCourseOptions, batchOptions]);
+
+  const sessionPathLoading = useMemo(() => {
+    if (filterOptionsLoading && sessionPathStep === 'department') return true;
+    if (sessionPathStep === 'course' && filters.center && filters.project && centerCoursesLoading) return true;
+    if (sessionPathStep === 'batch' && filters.center && pathBatchesLoading) return true;
+    return false;
+  }, [filterOptionsLoading, sessionPathStep, filters.center, filters.project, centerCoursesLoading, pathBatchesLoading]);
+
+  const getFilterLabel = useCallback((key, value) => {
+    if (!value) return '';
+    const optionMap = {
+      department: verticalOptions,
+      project: projectOptions,
+      center: centerOptions,
+      course: courseOptions,
+      batch: batchOptions,
+      counsellor: counselorOptions,
+    };
+    return getOptionLabel(optionMap[key] || [], value);
+  }, [verticalOptions, projectOptions, centerOptions, courseOptions, batchOptions, counselorOptions]);
 
   useEffect(() => {
-    if (!token) return undefined;
+    const authToken = token || JSON.parse(sessionStorage.getItem('user') || '{}').token;
+    if (!authToken) {
+      setFilterOptionsLoading(false);
+      console.error('TrainerModule: auth token missing, filters not loaded');
+      return undefined;
+    }
+
+    const mapOptions = (items = []) =>
+      (items || [])
+        .filter((item) => item && item._id && item.name)
+        .map((item) => ({ value: String(item._id), label: item.name }));
+
+    const requestConfig = { headers: { 'x-auth': authToken }, timeout: 12000 };
+    let cancelled = false;
 
     const fetchFilterOptions = async () => {
-      try {
-        const res = await axios.get(`${backendUrl}/college/filters-data`, {
-          headers: { 'x-auth': token },
-        });
-        if (res.data.status) {
-          setVerticalOptions(res.data.verticals.map((v) => ({ value: v._id, label: v.name })));
-          setProjectOptions(res.data.projects.map((p) => ({ value: p._id, label: p.name })));
-          setCourseOptions(res.data.courses.map((c) => ({ value: c._id, label: c.name })));
+      setFilterOptionsLoading(true);
 
+      try {
+        // Load departments first so path picker is not blocked by slower APIs.
+        try {
+          const verticalsRes = await axios.get(`${backendUrl}/college/getVerticals`, requestConfig);
+          if (!cancelled && verticalsRes.data?.status) {
+            setVerticalOptions(mapOptions(verticalsRes.data.data));
+          }
+        } catch (verticalErr) {
+          console.error('Failed to fetch verticals:', verticalErr);
           try {
-            const centersRes = await axios.get(`${backendUrl}/college/list_all_centers`, {
-              headers: { 'x-auth': token },
-            });
-            if (centersRes.data.success && centersRes.data.data) {
-              setCenterOptions(centersRes.data.data.map((c) => ({ value: c._id, label: c.name })));
-            } else {
-              setCenterOptions(res.data.centers.map((c) => ({ value: c._id, label: c.name })));
+            const filtersRes = await axios.get(`${backendUrl}/college/filters-data`, requestConfig);
+            if (!cancelled && filtersRes.data?.status) {
+              setVerticalOptions(mapOptions(filtersRes.data.verticals));
             }
-          } catch (centerErr) {
-            console.error('Failed to fetch all centers, using filters-data centers:', centerErr);
-            setCenterOptions(res.data.centers.map((c) => ({ value: c._id, label: c.name })));
+          } catch (filtersErr) {
+            console.error('Failed to fetch filter-data verticals:', filtersErr);
           }
         }
+      } finally {
+        if (!cancelled) setFilterOptionsLoading(false);
+      }
 
-        try {
-          const coursesMetaRes = await axios.get(`${backendUrl}/college/all_courses`, {
-            headers: { 'x-auth': token },
+      // Load remaining filter data in background.
+      try {
+        const [
+          projectsRes,
+          centersRes,
+          coursesRes,
+          filtersRes,
+        ] = await Promise.allSettled([
+          axios.get(`${backendUrl}/college/list_all_projects`, requestConfig),
+          axios.get(`${backendUrl}/college/list_all_centers`, requestConfig),
+          axios.get(`${backendUrl}/college/all_courses`, requestConfig),
+          axios.get(`${backendUrl}/college/filters-data`, requestConfig),
+        ]);
+
+        if (cancelled) return;
+
+        if (projectsRes.status === 'fulfilled' && projectsRes.value.data?.success) {
+          setProjectOptions(mapOptions(projectsRes.value.data.data));
+        } else if (filtersRes.status === 'fulfilled' && filtersRes.value.data?.status) {
+          setProjectOptions(mapOptions(filtersRes.value.data.projects));
+        }
+
+        if (centersRes.status === 'fulfilled' && centersRes.value.data?.success) {
+          const centers = centersRes.value.data.data || [];
+          setAllCentersMeta(centers);
+          setCenterOptions(mapOptions(centers));
+        } else if (filtersRes.status === 'fulfilled' && filtersRes.value.data?.status) {
+          const centers = filtersRes.value.data.centers || [];
+          setAllCentersMeta(centers);
+          setCenterOptions(mapOptions(centers));
+        }
+
+        if (coursesRes.status === 'fulfilled' && coursesRes.value.data?.success) {
+          const courses = coursesRes.value.data.data || [];
+          setAllCoursesMeta(courses);
+          setCourseOptions(mapOptions(courses));
+
+          const projectMap = new Map();
+          courses.forEach((course) => {
+            const id = course.project?._id || course.project;
+            const name = course.project?.name || course.projectName;
+            if (id && name) {
+              projectMap.set(String(id), { value: String(id), label: name });
+            }
           });
-          if (coursesMetaRes.data?.success) {
-            setAllCoursesMeta(coursesMetaRes.data.data || []);
+          if (projectMap.size) {
+            setProjectOptions((prev) => (prev.length ? prev : Array.from(projectMap.values())));
           }
-        } catch (metaErr) {
-          console.error('Failed to fetch courses meta:', metaErr);
+        } else if (filtersRes.status === 'fulfilled' && filtersRes.value.data?.status) {
+          setCourseOptions(mapOptions(filtersRes.value.data.courses));
+        }
+
+        if (filtersRes.status === 'fulfilled' && filtersRes.value.data?.status) {
+          const activeCounselors = (filtersRes.value.data.counselors || []).filter(
+            (c) => c?.status === true || c?.status === 'active'
+          );
+          setCounselorOptions(mapOptions(activeCounselors));
         }
       } catch (err) {
-        console.error('Failed to fetch filter options:', err);
+        console.error('Failed to fetch secondary filter options:', err);
       }
     };
 
     fetchFilterOptions();
-    return undefined;
+    return () => { cancelled = true; };
   }, [backendUrl, token]);
 
   useEffect(() => {
+    if (!token || !filters.center || !filters.project) {
+      setCenterWiseCourseIds(new Set());
+      return undefined;
+    }
+
+    const fetchCenterCourses = async () => {
+      setCenterCoursesLoading(true);
+      try {
+        const res = await axios.get(`${backendUrl}/college/all_courses_centerwise`, {
+          params: { centerId: filters.center, projectId: filters.project },
+          headers: { 'x-auth': token },
+        });
+        if (res.data?.success) {
+          setCenterWiseCourseIds(new Set((res.data.data || []).map((course) => String(course._id))));
+        } else {
+          setCenterWiseCourseIds(new Set());
+        }
+      } catch (err) {
+        console.error('Failed to fetch center-wise courses:', err);
+        setCenterWiseCourseIds(new Set());
+      } finally {
+        setCenterCoursesLoading(false);
+      }
+    };
+
+    fetchCenterCourses();
+    return undefined;
+  }, [filters.center, filters.project, token, backendUrl]);
+
+  const fetchBatchStudents = useCallback(async (batchId, signal) => {
+    const authToken = token || JSON.parse(sessionStorage.getItem('user') || '{}').token;
+    if (!authToken || !batchId) {
+      setStudents([]);
+      setStudentsLoading(false);
+      return;
+    }
+
+    setStudentsLoading(true);
+    try {
+      const res = await axios.get(
+        `${backendUrl}/college/admission-list/${batchId}?page=1&limit=500`,
+        {
+          headers: { 'x-auth': authToken },
+          timeout: 15000,
+          signal,
+        }
+      );
+      if (res.data.success && Array.isArray(res.data.data)) {
+        setStudents(res.data.data.map(mapAppliedCourseToStudent));
+      } else {
+        setStudents([]);
+      }
+    } catch (err) {
+      if (err?.code !== 'ERR_CANCELED' && err?.name !== 'CanceledError') {
+        console.error('Failed to fetch batch students:', err);
+      }
+      setStudents([]);
+    } finally {
+      setStudentsLoading(false);
+    }
+  }, [backendUrl, token]);
+
+  useEffect(() => {
+    if (!filters.batch) {
+      setSessions([]);
+      setSelectedSessionId('');
+      setStudents([]);
+      setStudentsLoading(false);
+      setAttendanceRecordsBySession({});
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const stored = loadStoredSessions(filters.batch);
+    setSessions(stored);
+    setSelectedSessionId((prev) => (
+      prev && stored.some((session) => session.id === prev) ? prev : stored[0]?.id || ''
+    ));
+    setSessionPanelView(stored.length ? 'view' : 'empty');
+    setAttendanceRecordsBySession(loadStoredAttendance(filters.batch));
+    fetchBatchStudents(filters.batch, controller.signal);
+    return () => controller.abort();
+  }, [filters.batch, fetchBatchStudents]);
+
+  const fetchReferCandidates = useCallback(async (batchId) => {
+    const authToken = token || JSON.parse(sessionStorage.getItem('user') || '{}').token;
+    if (!authToken || !batchId) {
+      setReferCandidates([]);
+      return;
+    }
+
+    setReferCandidatesLoading(true);
+    try {
+      const res = await axios.get(
+        `${backendUrl}/college/admission-list/${batchId}?page=1&limit=500`,
+        { headers: { 'x-auth': authToken }, timeout: 15000 }
+      );
+      if (res.data.success && Array.isArray(res.data.data)) {
+        setReferCandidates(res.data.data.map((profile) => ({
+          appliedCourseId: profile._id,
+          name: profile._candidate?.name || profile.counsellorName || 'Unknown',
+          mobile: profile._candidate?.mobile || '-',
+        })));
+      } else {
+        setReferCandidates([]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch refer candidates:', err);
+      setReferCandidates([]);
+    } finally {
+      setReferCandidatesLoading(false);
+    }
+  }, [backendUrl, token]);
+
+  const openReferSessionModal = () => {
+    if (!filters.batch) {
+      notify('Please select a batch first');
+    }
+    setReferSessionModal({
+      isOpen: true,
+      counselorId: filters.counsellor || '',
+      selectedAppliedCourseIds: [],
+    });
+    if (filters.batch) {
+      fetchReferCandidates(filters.batch);
+    } else {
+      setReferCandidates([]);
+    }
+  };
+
+  const closeReferSessionModal = () => {
+    setReferSessionModal({ isOpen: false, counselorId: '', selectedAppliedCourseIds: [] });
+    setReferCandidates([]);
+    setReferSubmitting(false);
+  };
+
+  const updateReferCounselor = (counselorId) => {
+    setReferSessionModal((prev) => ({ ...prev, counselorId }));
+  };
+
+  const toggleReferCandidate = (appliedCourseId) => {
+    setReferSessionModal((prev) => ({
+      ...prev,
+      selectedAppliedCourseIds: prev.selectedAppliedCourseIds.includes(appliedCourseId)
+        ? prev.selectedAppliedCourseIds.filter((id) => id !== appliedCourseId)
+        : [...prev.selectedAppliedCourseIds, appliedCourseId],
+    }));
+  };
+
+  const toggleAllReferCandidates = () => {
+    setReferSessionModal((prev) => ({
+      ...prev,
+      selectedAppliedCourseIds: prev.selectedAppliedCourseIds.length === referCandidates.length
+        ? []
+        : referCandidates.map((candidate) => candidate.appliedCourseId),
+    }));
+  };
+
+  const handleReferSession = async () => {
+    const { counselorId, selectedAppliedCourseIds } = referSessionModal;
+
+    if (!counselorId) {
+      notify('Please select counsellor');
+      return;
+    }
+    if (!selectedAppliedCourseIds.length) {
+      notify('Please select at least one student');
+      return;
+    }
+
+    const type = selectedAppliedCourseIds.length === 1 ? 'RefferSingleLead' : 'RefferBulkLead';
+    const appliedCourseId = type === 'RefferSingleLead'
+      ? selectedAppliedCourseIds[0]
+      : selectedAppliedCourseIds;
+
+    setReferSubmitting(true);
+    try {
+      const response = await axios.post(`${backendUrl}/college/refer-leads`, {
+        counselorId,
+        appliedCourseId,
+        type,
+      }, {
+        headers: { 'x-auth': token },
+      });
+
+      if (response.data.status || response.data.success) {
+        notify('Session referred successfully');
+        closeReferSessionModal();
+      } else {
+        notify(response.data.message || 'Failed to refer session');
+      }
+    } catch (error) {
+      console.error('Error referring session:', error);
+      notify(error.response?.data?.message || 'Failed to refer session');
+    } finally {
+      setReferSubmitting(false);
+    }
+  };
+
+  useEffect(() => {
     if (!token) return undefined;
+    if (!filters.center) {
+      setBatchOptions([]);
+      return undefined;
+    }
 
     const fetchBatches = async () => {
+      setPathBatchesLoading(true);
       try {
         const params = new URLSearchParams();
         if (filters.center) params.set('centerId', filters.center);
         if (filters.course) params.set('courseId', filters.course);
         const res = await axios.get(`${backendUrl}/college/get_batches?${params.toString()}`, {
           headers: { 'x-auth': token },
+          timeout: 12000,
         });
         if (res.data?.success) {
           setBatchOptions((res.data.data || []).map((b) => ({ value: b._id, label: b.name })));
@@ -1304,6 +2580,8 @@ const TrainerModule = () => {
       } catch (err) {
         console.error('Failed to fetch batches:', err);
         setBatchOptions([]);
+      } finally {
+        setPathBatchesLoading(false);
       }
     };
 
@@ -1321,7 +2599,7 @@ const TrainerModule = () => {
       return;
     }
     if (key === 'center') {
-      setFilters((prev) => ({ ...prev, center: value, batch: '' }));
+      setFilters((prev) => ({ ...prev, center: value, course: '', batch: '' }));
       return;
     }
     if (key === 'course') {
@@ -1331,20 +2609,83 @@ const TrainerModule = () => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
-  const selectedSession = useMemo(
-    () => sessions.find((session) => session.id === selectedSessionId) || sessions[0],
-    [sessions, selectedSessionId]
-  );
+  const handleSessionPathBack = () => {
+    if (filters.batch) {
+      handleFilterChange('batch', '');
+      return;
+    }
+    if (filters.course) {
+      handleFilterChange('course', '');
+      return;
+    }
+    if (filters.center) {
+      handleFilterChange('center', '');
+      return;
+    }
+    if (filters.project) {
+      handleFilterChange('project', '');
+      return;
+    }
+    if (filters.department) {
+      handleFilterChange('department', '');
+    }
+  };
+
+  const handleSessionPathReset = () => {
+    setFilters({
+      department: '',
+      project: '',
+      center: '',
+      course: '',
+      batch: '',
+      counsellor: filters.counsellor,
+    });
+  };
+
   const filteredSessions = useMemo(() => {
     const query = quickSearch.trim().toLowerCase();
-    if (!query) return sessions;
-    return sessions.filter((session) =>
-      session.title?.toLowerCase().includes(query)
-      || session.id?.toLowerCase().includes(query)
-      || session.topicCovered?.toLowerCase().includes(query)
-      || session.date?.toLowerCase().includes(query)
-    );
-  }, [sessions, quickSearch]);
+    return sessions.filter((session) => {
+      if (filters.batch && session.batch && String(session.batch) !== String(filters.batch)) return false;
+      if (filters.course && session.course && String(session.course) !== String(filters.course)) return false;
+      if (filters.center && session.center && String(session.center) !== String(filters.center)) return false;
+      if (!query) return true;
+      return (
+        session.title?.toLowerCase().includes(query)
+        || session.id?.toLowerCase().includes(query)
+        || session.topicCovered?.toLowerCase().includes(query)
+        || session.date?.toLowerCase().includes(query)
+        || session.batchCode?.toLowerCase().includes(query)
+      );
+    });
+  }, [sessions, quickSearch, filters.batch, filters.course, filters.center]);
+
+  useEffect(() => {
+    if (!filteredSessions.length) {
+      setSelectedSessionId('');
+      return;
+    }
+    if (!filteredSessions.some((session) => session.id === selectedSessionId)) {
+      setSelectedSessionId(filteredSessions[0].id);
+    }
+  }, [filteredSessions, selectedSessionId]);
+
+  const selectedSession = useMemo(
+    () => filteredSessions.find((session) => session.id === selectedSessionId) || filteredSessions[0] || null,
+    [filteredSessions, selectedSessionId]
+  );
+
+  const batchAttendanceSummary = useMemo(
+    () => computeBatchAttendanceSummary(students, sessions, attendanceRecordsBySession),
+    [students, sessions, attendanceRecordsBySession]
+  );
+  const displayStudents = useMemo(
+    () => enrichStudentsWithEnrollmentMeta(students),
+    [students]
+  );
+  const referBatchLabel = useMemo(
+    () => getOptionLabel(batchOptions, filters.batch),
+    [batchOptions, filters.batch]
+  );
   const attendanceSession = useMemo(
     () => sessions.find((session) => session.id === attendanceModal.sessionId) || selectedSession,
     [sessions, attendanceModal.sessionId, selectedSession]
@@ -1352,10 +2693,42 @@ const TrainerModule = () => {
   const attendanceRows = attendanceRecordsBySession[attendanceModal.sessionId] || [];
 
   const openAddSessionModal = () => {
+    if (!filters.batch) {
+      notify('Pehle Sessions tab mein Department se Batch tak select karein');
+      return;
+    }
+
     const nextSessionNumber = sessions.length + 1;
+    const context = buildSessionContextFromFilters(filters, {
+      verticalOptions,
+      projectOptions,
+      centerOptions,
+      courseOptions,
+      batchOptions,
+      trainerName: trainerProfile.name,
+    });
+
     setEditingSessionId(null);
-    setSessionDraft(createEmptySessionDraft(nextSessionNumber));
+    setSessionDraft({
+      ...createEmptySessionDraft(nextSessionNumber),
+      ...context,
+      status: 'Pending',
+      counsellor: filters.counsellor || '',
+      counsellorName: getOptionLabel(counselorOptions, filters.counsellor),
+      ...(trainerProfile.name ? { trainerName: trainerProfile.name } : {}),
+      ...(students.length ? {
+        totalCandidates: String(students.length),
+        presentCandidates: '0',
+        absentCandidates: '0',
+      } : {}),
+    });
     setIsSessionModalOpen(true);
+  };
+
+  const closeSessionPanel = () => {
+    setSessionDraft(null);
+    setEditingSessionId(null);
+    setSessionPanelView(filteredSessions.length ? 'view' : 'empty');
   };
   const openEditSessionModal = (session) => {
     setEditingSessionId(session.id);
@@ -1364,6 +2737,7 @@ const TrainerModule = () => {
       sessionDate: session.sessionDate || getTodayInputValue(),
       evidenceDocs: session.evidenceDocs?.length ? session.evidenceDocs : createEvidenceDocs('Pending'),
     });
+    setSessionPanelView('view');
     setIsSessionModalOpen(true);
   };
   const closeSessionModal = () => {
@@ -1397,53 +2771,178 @@ const TrainerModule = () => {
       evidenceDocs: prev.evidenceDocs.filter((_, docIndex) => docIndex !== index),
     }));
   };
-  const saveSessionDraft = () => {
-    const normalizedSession = normalizeSessionDraft(sessionDraft, basicDetails);
+  const syncFiltersFromSession = (session) => {
+    if (!session?.batch) return;
+    setFilters((prev) => ({
+      ...prev,
+      department: session.department || prev.department,
+      project: session.project || prev.project,
+      center: session.center || prev.center,
+      course: session.course || prev.course,
+      batch: session.batch,
+      counsellor: session.counsellor || prev.counsellor,
+    }));
+  };
 
-    if (editingSessionId) {
-      setSessions((prev) => prev.map((session) => (
-        session.id === editingSessionId ? { ...normalizedSession, id: editingSessionId } : session
-      )));
-      setSelectedSessionId(editingSessionId);
-      notify('Session updated');
-    } else {
-      setSessions((prev) => [...prev, normalizedSession]);
-      setSelectedSessionId(normalizedSession.id);
-      notify('Session added');
+  const finishSessionSave = (sessionId, batchId, nextSessions, savedSession) => {
+    const isActiveBatch = filters.batch && batchId && String(filters.batch) === String(batchId);
+
+    if (!isActiveBatch) {
+      syncFiltersFromSession(savedSession);
     }
 
-    closeSessionModal();
+    setSessions(nextSessions);
+    setSelectedSessionId(sessionId);
+    setSessionPanelView('view');
+  };
+
+  const saveSessionDraft = () => {
+    if (!sessionDraft?.batch) {
+      notify('Please select a batch for this session');
+      return;
+    }
+    if (!sessionDraft?.title?.trim()) {
+      notify('Please enter session title');
+      return;
+    }
+    if (!sessionDraft?.sessionDate) {
+      notify('Please select session date');
+      return;
+    }
+
+    const draftWithCounsellor = {
+      ...sessionDraft,
+      ...buildSessionContextFromFilters(filters, {
+        verticalOptions,
+        projectOptions,
+        centerOptions,
+        courseOptions,
+        batchOptions,
+        trainerName: trainerProfile.name,
+      }),
+      status: sessionDraft.status || 'Pending',
+      counsellor: filters.counsellor || sessionDraft.counsellor || '',
+      counsellorName: getOptionLabel(counselorOptions, filters.counsellor || sessionDraft.counsellor),
+      courseTrade: getOptionLabel(courseOptions, filters.course || sessionDraft.course),
+      batchCode: getOptionLabel(batchOptions, filters.batch || sessionDraft.batch),
+      departmentName: getOptionLabel(verticalOptions, filters.department || sessionDraft.department),
+      projectName: getOptionLabel(projectOptions, filters.project || sessionDraft.project),
+      centerName: getOptionLabel(centerOptions, filters.center || sessionDraft.center),
+      batch: filters.batch || sessionDraft.batch,
+      totalCandidates: String(students.length || sessionDraft.totalCandidates || 0),
+    };
+    const normalizedSession = normalizeSessionDraft(draftWithCounsellor, activeBasicDetails);
+    const batchId = resolveSessionBatchId(normalizedSession, sessionDraft.batch || filters.batch);
+
+    if (editingSessionId) {
+      const baseSessions = mergeBatchSessions(batchId, sessions);
+      const nextSessions = baseSessions.map((session) => (
+        session.id === editingSessionId ? { ...normalizedSession, id: editingSessionId } : session
+      ));
+      const updatedSession = nextSessions.find((session) => session.id === editingSessionId);
+
+      persistStoredSessions(batchId, nextSessions);
+      finishSessionSave(editingSessionId, batchId, nextSessions, updatedSession);
+      notify('Session updated');
+      closeSessionModal();
+    } else {
+      const newSession = {
+        ...normalizedSession,
+        id: `S-${Date.now()}`,
+      };
+      const baseSessions = mergeBatchSessions(batchId, sessions);
+      const nextSessions = [...baseSessions, newSession];
+
+      persistStoredSessions(batchId, nextSessions);
+      finishSessionSave(newSession.id, batchId, nextSessions, newSession);
+      notify('Session added');
+      closeSessionModal();
+    }
   };
   const updateSessionStatus = (sessionId, status) => {
-    setSessions((prev) => prev.map((session) => (
-      session.id === sessionId ? { ...session, status } : session
-    )));
+    setSessions((prev) => {
+      const next = prev.map((session) => (
+        session.id === sessionId ? { ...session, status } : session
+      ));
+      persistSessions(next, resolveSessionBatchId(next.find((session) => session.id === sessionId), filters.batch));
+      return next;
+    });
     notify(`Session marked ${status}`);
   };
   const uploadEvidenceFile = (sessionId, docId, file) => {
     if (!file) return;
-    setSessions((prev) => prev.map((session) => (
-      session.id === sessionId
-        ? {
-          ...session,
-          evidenceDocs: session.evidenceDocs.map((doc) => (
-            doc.id === docId ? { ...doc, status: 'Uploaded', fileName: file.name } : doc
-          )),
-        }
-        : session
-    )));
+    setSessions((prev) => {
+      const next = prev.map((session) => (
+        session.id === sessionId
+          ? {
+            ...session,
+            evidenceDocs: session.evidenceDocs.map((doc) => (
+              doc.id === docId ? { ...doc, status: 'Uploaded', fileName: file.name } : doc
+            )),
+          }
+          : session
+      ));
+      persistSessions(next, resolveSessionBatchId(next.find((session) => session.id === sessionId), filters.batch));
+      return next;
+    });
     notify('Evidence uploaded');
   };
   const openAttendanceModal = (session, view = 'register') => {
+    if (!students.length) {
+      notify('No students in this batch. Assign students to batch first.');
+      return;
+    }
     setAttendanceRecordsBySession((prev) => (
       prev[session.id]
         ? prev
-        : { ...prev, [session.id]: createSessionAttendanceRows(session, DUMMY_STUDENTS) }
+        : { ...prev, [session.id]: createSessionAttendanceRows(session, students) }
     ));
     setAttendanceModal({ isOpen: true, view, sessionId: session.id });
   };
   const closeAttendanceModal = () => {
     setAttendanceModal((prev) => ({ ...prev, isOpen: false }));
+  };
+  const openStudentProfile = (student) => {
+    setStudentProfileModal({ isOpen: true, student });
+  };
+  const closeStudentProfile = () => {
+    setStudentProfileModal({ isOpen: false, student: null });
+  };
+  const openPerformanceModal = (student) => {
+    setPerformanceModal({ isOpen: true, draft: createPerformanceDraft(student) });
+  };
+  const closePerformanceModal = () => {
+    setPerformanceModal({ isOpen: false, draft: null });
+  };
+  const updatePerformanceDraft = (field, value) => {
+    setPerformanceModal((prev) => (
+      prev.draft ? { ...prev, draft: { ...prev.draft, [field]: value } } : prev
+    ));
+  };
+  const savePerformanceDraft = () => {
+    const { draft } = performanceModal;
+    if (!draft?.studentId) return;
+
+    const updatedPerformance = {
+      participationScore: clampScore(draft.participationScore),
+      engagementScore: clampScore(draft.engagementScore),
+      assessmentScore: clampScore(draft.assessmentScore),
+      practicalScore: clampScore(draft.practicalScore),
+      trainerRemark: draft.trainerRemark.trim(),
+    };
+
+    setStudents((prev) => prev.map((student) => (
+      student.id === draft.studentId ? { ...student, ...updatedPerformance } : student
+    )));
+
+    setStudentProfileModal((prev) => (
+      prev.isOpen && prev.student?.id === draft.studentId
+        ? { ...prev, student: { ...prev.student, ...updatedPerformance } }
+        : prev
+    ));
+
+    notify(`Performance saved for ${draft.studentName}`);
+    closePerformanceModal();
   };
   const setAttendanceView = (view) => {
     setAttendanceModal((prev) => ({ ...prev, view }));
@@ -1458,17 +2957,28 @@ const TrainerModule = () => {
   };
   const saveAttendanceRows = () => {
     const stats = summarizeAttendanceRows(attendanceRows);
-    setSessions((prev) => prev.map((session) => (
-      session.id === attendanceModal.sessionId
-        ? {
-          ...session,
-          totalCandidates: String(stats.total),
-          presentCandidates: String(stats.present),
-          absentCandidates: String(stats.absent),
-          attendance: `${stats.attendance}%`,
-        }
-        : session
-    )));
+    setSessions((prev) => {
+      const next = prev.map((session) => (
+        session.id === attendanceModal.sessionId
+          ? {
+            ...session,
+            totalCandidates: String(stats.total),
+            presentCandidates: String(stats.present),
+            absentCandidates: String(stats.absent),
+            attendance: `${stats.attendance}%`,
+          }
+          : session
+      ));
+      persistSessions(
+        next,
+        resolveSessionBatchId(next.find((session) => session.id === attendanceModal.sessionId), filters.batch)
+      );
+      return next;
+    });
+    setAttendanceRecordsBySession((prev) => {
+      persistStoredAttendance(filters.batch, prev);
+      return prev;
+    });
     notify('Attendance saved');
     closeAttendanceModal();
   };
@@ -1492,14 +3002,6 @@ const TrainerModule = () => {
         </div>
       </header>
 
-      <div className="dbr-filters">
-        <FilterSelect label="Department" icon="fa-sitemap" options={verticalOptions} value={filters.department} onChange={(v) => handleFilterChange('department', v)} />
-        <FilterSelect label="Project" icon="fa-project-diagram" options={filterProjectOptions} value={filters.project} onChange={(v) => handleFilterChange('project', v)} />
-        <FilterSelect label="Center" icon="fa-building" options={centerOptions} value={filters.center} onChange={(v) => handleFilterChange('center', v)} />
-        <FilterSelect label="Course" icon="fa-graduation-cap" options={filterCourseOptions} value={filters.course} onChange={(v) => handleFilterChange('course', v)} />
-        <FilterSelect label="Batch" icon="fa-users" options={batchOptions} value={filters.batch} onChange={(v) => handleFilterChange('batch', v)} />
-      </div>
-
       <div className="dbr-main-tabs">
         {MAIN_TABS.map((tab) => (
           <button
@@ -1515,115 +3017,246 @@ const TrainerModule = () => {
 
       {mainTab === 'session' && (
         <>
-          <div className="dbr-session-bar">
-            <div className="dbr-session-summary">
-              <span className="dbr-session-summary__lbl">Summary</span>
-              <span className="dbr-session-summary__count">
-                No. of Session: <strong>{sessions.length}</strong>
-              </span>
-            </div>
-            <div className="dbr-session-actions">
-              <button type="button" className="dbr-btn dbr-btn--session-pill" onClick={openAddSessionModal}>
-                <i className="fas fa-plus" /> Add Session
-              </button>
-              <button type="button" className="dbr-btn dbr-btn--session-pill" onClick={() => notify('Refer Session')}>
-                <i className="fas fa-share-alt" /> Refer Session
-              </button>
-              <button type="button" className="dbr-btn dbr-btn--session-pill" onClick={() => notify('Bulk Upload Session')}>
-                <i className="fas fa-cloud-upload-alt" /> Bulk Upload Session
-              </button>
-            </div>
-          </div>
-
-          <div className="dbr-actions">
-            <button type="button" className="dbr-btn dbr-btn--outline" onClick={() => notify('Downloading report...')}>
-              <i className="fas fa-download" /> Download Report
-            </button>
-            <button type="button" className="dbr-btn dbr-btn--outline" onClick={() => notify('Bulk upload opened')}>
-              <i className="fas fa-cloud-upload-alt" /> Bulk Upload Evidence
-            </button>
-            <button type="button" className="dbr-btn dbr-btn--outline" onClick={() => notify('Add daily report')}>
-              <i className="fas fa-plus" /> Add Daily Report
-            </button>
-            <button type="button" className="dbr-btn dbr-btn--outline" onClick={() => notify('Referred to HO')}>
-              <i className="fas fa-share-alt" /> Refer to HO
-            </button>
-            <button type="button" className="dbr-btn dbr-btn--outline" onClick={() => notify('Bulk action')}>
-              <i className="fas fa-tasks" /> Bulk Action
-            </button>
-            <input
-              type="text"
-              className="dbr-search"
-              placeholder="Quick search..."
-              value={quickSearch}
-              onChange={(e) => setQuickSearch(e.target.value)}
+          {!filters.batch ? (
+            <SessionPathPicker
+              filters={filters}
+              currentStep={sessionPathStep}
+              options={sessionPathOptions}
+              loading={sessionPathLoading}
+              getLabel={getFilterLabel}
+              onSelect={handleFilterChange}
+              onBack={handleSessionPathBack}
+              onReset={handleSessionPathReset}
             />
-            <button type="button" className="dbr-btn dbr-btn--pink" onClick={() => notify(`Searching: ${quickSearch || 'all'}`)}>
-              <i className="fas fa-search" /> Search
-            </button>
-            <button type="button" className="dbr-btn dbr-btn--outline">
-              <i className="fas fa-filter" /> More
-            </button>
-          </div>
+          ) : (
+            <>
+              <div className="dbr-session-bar">
+                <div className="dbr-session-summary">
+                  <span className="dbr-session-summary__lbl">Selected path</span>
+                  <span className="dbr-session-summary__count">
+                    {[
+                      activeBasicDetails.departmentName,
+                      activeBasicDetails.projectName,
+                      activeBasicDetails.centerName,
+                      activeBasicDetails.courseTrade,
+                      activeBasicDetails.batchCode,
+                    ].filter(Boolean).join(' · ')}
+                  </span>
+                  <span className="dbr-session-summary__count">
+                    {studentsLoading ? '…' : students.length} students · <strong>{filteredSessions.length}</strong> sessions
+                  </span>
+                  <span className="dbr-session-summary__count">
+                    {batchAttendanceSummary.sessionsMarked}/{batchAttendanceSummary.totalSessions} sessions marked · Avg {batchAttendanceSummary.average}%
+                    {batchAttendanceSummary.source === 'sessions' ? ' (from marked sessions)' : ' (from admission record)'}
+                  </span>
+                </div>
+                <div className="dbr-session-actions">
+                  <FilterSelect
+                    label="Counsellor"
+                    icon="fa-user-tie"
+                    options={counselorOptions}
+                    value={filters.counsellor}
+                    onChange={(v) => handleFilterChange('counsellor', v)}
+                  />
+                  <button type="button" className="dbr-btn dbr-btn--session-pill dbr-btn--ghost" onClick={handleSessionPathReset}>
+                    Change batch
+                  </button>
+                  <button type="button" className="dbr-btn dbr-btn--session-pill" onClick={openAddSessionModal}>
+                    <i className="fas fa-plus" /> Add Session
+                  </button>
+                  <button type="button" className="dbr-btn dbr-btn--session-pill" onClick={openReferSessionModal}>
+                    <i className="fas fa-share-alt" /> Refer Session
+                  </button>
+                </div>
+              </div>
 
-          <SessionCard
-            basicDetails={basicDetails}
-            session={selectedSession}
-            notify={notify}
-            onStatusChange={updateSessionStatus}
-            onEvidenceUpload={uploadEvidenceFile}
-            onEditSession={openEditSessionModal}
-            onOpenAttendance={openAttendanceModal}
-          />
+              <div className="dbr-actions">
+                <input
+                  type="text"
+                  className="dbr-search dbr-search--full"
+                  placeholder="Search sessions by title, topic, date..."
+                  value={quickSearch}
+                  onChange={(e) => setQuickSearch(e.target.value)}
+                />
+              </div>
+
+              {filteredSessions.length > 0 && sessionPanelView !== 'add' && (
+                <div className="dbr-session-picker">
+                  {filteredSessions.map((session) => {
+                    const tone = session.status === 'Completed' ? 'green' : 'amber';
+                    const isActive = session.id === selectedSessionId;
+                    return (
+                      <button
+                        key={session.id}
+                        type="button"
+                        className={`dbr-session-picker__item${isActive ? ' dbr-session-picker__item--active' : ''}`}
+                        onClick={() => {
+                          setSelectedSessionId(session.id);
+                          setSessionPanelView('view');
+                        }}
+                      >
+                        <span className={`dbr-session-picker__status dbr-session-picker__status--${tone}`}>{session.status}</span>
+                        <strong>{session.title}</strong>
+                        <small>{session.date || formatSessionDate(session.sessionDate)}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="tm-workspace">
+                
+                <div className="tm-main">
+                  {sessionPanelView === 'add' && sessionDraft ? (
+                    <SessionAddPanel
+                      draft={sessionDraft}
+                      batchLabel={activeBasicDetails.batchCode}
+                      studentCount={studentsLoading ? '…' : students.length}
+                      onClose={closeSessionPanel}
+                      onSave={saveSessionDraft}
+                      onFieldChange={updateSessionDraft}
+                    />
+                  ) : selectedSession && sessionPanelView === 'view' ? (
+                    <>
+                      {studentsLoading && (
+                        <div className="tm-empty tm-empty--inline">
+                          <i className="fas fa-spinner fa-spin" />
+                          <p>Loading batch students...</p>
+                        </div>
+                      )}
+                      {!studentsLoading && !students.length && (
+                        <div className="tm-empty tm-empty--session-create tm-empty--inline">
+                          <i className="fas fa-user-graduate" />
+                          <p>No batch-assigned students found. You can still manage this session.</p>
+                        </div>
+                      )}
+                      <SessionCard
+                        basicDetails={activeBasicDetails}
+                        session={selectedSession}
+                        notify={notify}
+                        onStatusChange={updateSessionStatus}
+                        onEvidenceUpload={uploadEvidenceFile}
+                        onEditSession={openEditSessionModal}
+                        onOpenAttendance={openAttendanceModal}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      {studentsLoading && (
+                        <div className="tm-empty tm-empty--inline">
+                          <i className="fas fa-spinner fa-spin" />
+                          <p>Loading batch students...</p>
+                        </div>
+                      )}
+                      <SessionEmptyState onCreateSession={openAddSessionModal} />
+                    </>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </>
       )}
 
       {mainTab === 'student' && (
         <div className="dbr-student-view">
-          <div className="dbr-session-bar">
-            <div className="dbr-session-summary">
-              <span className="dbr-session-summary__lbl">Summary</span>
-              <span className="dbr-session-summary__count">
-                No. of Students: <strong>{DUMMY_STUDENTS.length}</strong>
-              </span>
+          {!filters.batch ? (
+            <div className="tm-empty tm-empty--banner">
+              <i className="fas fa-filter" />
+              <h4>Select a batch to view students</h4>
+            </div>
+          ) : studentsLoading ? (
+            <div className="tm-empty"><i className="fas fa-spinner fa-spin" /><p>Loading students...</p></div>
+          ) : (
+            <>
+          <div className="st-summary-bar">
+            <div className="st-summary-bar__left">
+              <div className="st-summary-bar__icon">
+                <i className="fas fa-user-graduate" />
+              </div>
+              <div>
+                <h3>Student Overview</h3>
+                <p>Track attendance and performance for enrolled candidates</p>
+              </div>
+            </div>
+            <div className="st-summary-stats">
+              <div className="st-summary-stat">
+                <div className="st-summary-stat__icon st-summary-stat__icon--blue">
+                  <i className="fas fa-users" />
+                </div>
+                <div>
+                  <strong>{students.length}</strong>
+                  <span>Total Students</span>
+                </div>
+              </div>
+              <div className="st-summary-stat">
+                <div className="st-summary-stat__icon st-summary-stat__icon--green">
+                  <i className="fas fa-check-circle" />
+                </div>
+                <div>
+                  <strong>{students.filter((s) => s.status === 'Active').length}</strong>
+                  <span>Active</span>
+                </div>
+              </div>
+              <div className="st-summary-stat">
+                <div className="st-summary-stat__icon st-summary-stat__icon--amber">
+                  <i className="fas fa-exclamation-triangle" />
+                </div>
+                <div>
+                  <strong>{students.filter((s) => s.status !== 'Active').length}</strong>
+                  <span>At Risk</span>
+                </div>
+              </div>
+              <div className="st-summary-stat">
+                <div className="st-summary-stat__icon st-summary-stat__icon--pink">
+                  <i className="fas fa-percentage" />
+                </div>
+                <div>
+                  <strong>
+                    {batchAttendanceSummary.average}%
+                  </strong>
+                  <span>
+                    {batchAttendanceSummary.source === 'sessions'
+                      ? `Avg across ${batchAttendanceSummary.sessionsMarked} marked sessions`
+                      : 'Avg from admission record'}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
-          <div className="dbr-student-grid">
-            {DUMMY_STUDENTS.map((st) => (
-              <div key={st.id} className="dbr-student-card">
-                <div className="dbr-student-card__head">
-                  <i className="fas fa-user-graduate" />
-                  <h6>{st.name}</h6>
-                  <span className={`dbr-chip ${st.status === 'Active' ? 'dbr-chip--green' : 'dbr-chip--orange'}`}>{st.status}</span>
-                </div>
-                <div className="dbr-info-line"><i className="fas fa-phone" /><span>{st.mobile}</span></div>
-                <div className="dbr-info-line"><i className="fas fa-percent" /><span>Attendance: {st.attendance}</span></div>
-                <button type="button" className="dbr-btn dbr-btn--outline dbr-btn--block mt-2" onClick={() => notify(`View ${st.name}`)}>
-                  <i className="fas fa-eye" /> View Details
-                </button>
+
+          <div className="st-grid">
+            {students.length === 0 ? (
+              <div className="tm-empty tm-empty--banner">
+                <p>No students in this batch yet.</p>
               </div>
+            ) : displayStudents.map((st) => (
+              <StudentCard
+                key={st.id}
+                student={st}
+                batchAttendance={computeStudentBatchAttendance(st.id, sessions, attendanceRecordsBySession)}
+                onView={openStudentProfile}
+                onAttendance={(student) => notify(`Attendance: ${student.name}`)}
+                onAddPerformance={openPerformanceModal}
+              />
             ))}
           </div>
-          <div className="dbr-section-card mt-3">
-            <div className="dbr-section-card__label">Student Metrics</div>
-            <div className="dbr-points-grid pt-2">
-              {STUDENT_POINTS.map((p) => (
-                <PointFieldCard
-                  key={p.id}
-                  point={p}
-                  data={studentData[p.id]}
-                  onChange={(field, value) => updateMap(setStudentData, p.id, field, value)}
-                />
-              ))}
-            </div>
-          </div>
+            </>
+          )}
         </div>
       )}
 
-      {isSessionModalOpen && (
+      {isSessionModalOpen && sessionDraft && (
         <AddSessionModal
           draft={sessionDraft}
-          isEdit={Boolean(editingSessionId)}
+          isEdit={!!editingSessionId}
+          batchSummary={[
+            activeBasicDetails.departmentName,
+            activeBasicDetails.projectName,
+            activeBasicDetails.centerName,
+            activeBasicDetails.courseTrade,
+            activeBasicDetails.batchCode,
+          ].filter(Boolean).join(' · ')}
           onClose={closeSessionModal}
           onSave={saveSessionDraft}
           onFieldChange={updateSessionDraft}
@@ -1637,12 +3270,52 @@ const TrainerModule = () => {
         <AttendanceManagementModal
           session={attendanceSession}
           rows={attendanceRows}
+          students={students}
+          sessions={sessions}
+          attendanceRecordsBySession={attendanceRecordsBySession}
           view={attendanceModal.view}
           onViewChange={setAttendanceView}
           onStatusChange={(studentId, status) => updateAttendanceRow(studentId, 'status', status)}
-          onRemarksChange={(studentId, remarks) => updateAttendanceRow(studentId, 'remarks', remarks)}
           onClose={closeAttendanceModal}
           onSave={saveAttendanceRows}
+        />
+      )}
+
+      {studentProfileModal.isOpen && studentProfileModal.student && (
+        <StudentProfileModal
+          student={studentProfileModal.student}
+          sessions={sessions}
+          attendanceRecordsBySession={attendanceRecordsBySession}
+          basicDetails={activeBasicDetails}
+          onClose={closeStudentProfile}
+          onEditPerformance={openPerformanceModal}
+        />
+      )}
+
+      {performanceModal.isOpen && performanceModal.draft && (
+        <StudentPerformanceModal
+          draft={performanceModal.draft}
+          onClose={closePerformanceModal}
+          onSave={savePerformanceDraft}
+          onFieldChange={updatePerformanceDraft}
+        />
+      )}
+
+      {referSessionModal.isOpen && (
+        <ReferSessionModal
+          session={selectedSession}
+          batchLabel={referBatchLabel}
+          counselorOptions={counselorOptions}
+          counselorId={referSessionModal.counselorId}
+          onCounselorChange={updateReferCounselor}
+          candidates={referCandidates}
+          loading={referCandidatesLoading}
+          selectedIds={referSessionModal.selectedAppliedCourseIds}
+          onToggleCandidate={toggleReferCandidate}
+          onToggleAll={toggleAllReferCandidates}
+          submitting={referSubmitting}
+          onClose={closeReferSessionModal}
+          onSubmit={handleReferSession}
         />
       )}
 
@@ -1675,6 +3348,72 @@ const PORTAL_CSS = `
   .dbr-header-date i { color: ${BLUE}; }
   .dbr-header-date .react-date-picker { border: none; font-size: 13px; }
   .dbr-header-date .react-date-picker__wrapper { border: none; background: transparent; }
+
+  /* Session path picker cards */
+  .tm-path-picker {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 18px;
+    padding: 20px; margin-bottom: 14px; box-shadow: 0 10px 28px rgba(15,23,42,0.05);
+  }
+  .tm-path-picker__intro {
+    display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start;
+    gap: 12px; margin-bottom: 16px;
+  }
+  .tm-path-picker__badge {
+    display: inline-block; background: #eff6ff; color: ${BLUE}; font-size: 10px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.06em; padding: 4px 10px; border-radius: 999px; margin-bottom: 8px;
+  }
+  .tm-path-picker__intro h3 { margin: 0 0 4px; font-size: 1.25rem; font-weight: 900; color: #0f172a; }
+  .tm-path-picker__intro p { margin: 0; font-size: 13px; color: #64748b; }
+  .tm-path-picker__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tm-path-picker__back, .tm-path-picker__reset {
+    border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 8px 14px;
+    font-size: 12px; font-weight: 700; cursor: pointer; color: #475569;
+  }
+  .tm-path-picker__reset { color: ${PINK}; border-color: #fecdd3; }
+  .tm-path-picker__trail {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 14px;
+    padding: 12px 14px; margin-bottom: 16px;
+  }
+  .tm-path-picker__crumb {
+    display: inline-flex; flex-direction: column; gap: 2px; background: #fff;
+    border: 1px solid #e2e8f0; border-radius: 12px; padding: 8px 12px; min-width: 120px;
+  }
+  .tm-path-picker__crumb i { color: ${PINK}; font-size: 11px; margin-bottom: 2px; }
+  .tm-path-picker__crumb em {
+    font-style: normal; font-size: 9px; font-weight: 800; text-transform: uppercase;
+    color: #94a3b8; letter-spacing: 0.05em;
+  }
+  .tm-path-picker__crumb strong { font-size: 12px; color: #0f172a; line-height: 1.3; }
+  .tm-path-picker__trail > i { color: #cbd5e1; font-size: 10px; }
+  .tm-path-picker__grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px;
+  }
+  .tm-path-card-btn {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+    text-align: left; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 16px;
+    padding: 18px; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+    position: relative; min-height: 140px;
+  }
+  .tm-path-card-btn:hover {
+    transform: translateY(-4px); border-color: ${BLUE};
+    box-shadow: 0 12px 30px rgba(37,99,235,0.12);
+  }
+  .tm-path-card-btn__icon {
+    width: 44px; height: 44px; border-radius: 12px; background: #fff5f7;
+    display: flex; align-items: center; justify-content: center; color: ${PINK}; font-size: 18px;
+  }
+  .tm-path-card-btn strong { font-size: 15px; font-weight: 800; color: #0f172a; line-height: 1.35; }
+  .tm-path-card-btn span { font-size: 11px; color: #64748b; font-weight: 600; }
+  .tm-path-card-btn__arrow {
+    position: absolute; right: 16px; bottom: 16px; color: ${BLUE}; font-size: 12px;
+  }
+  .tm-path-picker__loading, .tm-path-picker__empty {
+    text-align: center; padding: 48px 20px; color: #64748b;
+  }
+  .tm-path-picker__loading i, .tm-path-picker__empty i { font-size: 28px; color: #cbd5e1; margin-bottom: 12px; }
+  .dbr-btn--ghost { background: #fff; color: #64748b; border-color: #cbd5e1; }
+  .dbr-session-actions .dbr-filter-pill { min-width: 140px; max-width: 180px; margin: 0; }
 
   /* Filters */
   .dbr-filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 14px; box-shadow: inset 0 0 0 1px rgba(226,232,240,0.6); }
@@ -1735,12 +3474,395 @@ const PORTAL_CSS = `
 
   /* Students */
   .dbr-student-view { margin-bottom: 20px; }
-  .dbr-student-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-bottom: 14px; }
-  .dbr-student-card { background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%); border: 1px solid #e2e8f0; border-radius: 18px; padding: 18px; box-shadow: 0 10px 26px rgba(15,23,42,0.06); transition: transform 0.2s ease, box-shadow 0.2s ease; }
-  .dbr-student-card:hover { transform: translateY(-2px); box-shadow: 0 18px 32px rgba(15,23,42,0.1); }
-  .dbr-student-card__head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-  .dbr-student-card__head i { color: ${PINK}; background: rgba(250,85,121,0.12); border-radius: 12px; padding: 8px; font-size: 14px; }
-  .dbr-student-card__head h6 { margin: 0; flex: 1; font-size: 14px; font-weight: 800; color: #0f172a; }
+  .st-summary-bar {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;
+    background: #fff; border: 1px solid #fbcfe8; border-radius: 16px;
+    padding: 16px 18px; margin-bottom: 16px;
+    box-shadow: 0 10px 28px rgba(250,85,121,0.08);
+  }
+  .st-summary-bar__left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .st-summary-bar__icon {
+    width: 48px; height: 48px; border-radius: 14px; flex-shrink: 0;
+    background: linear-gradient(135deg, ${PINK}, #fb7185);
+    color: #fff; display: flex; align-items: center; justify-content: center; font-size: 20px;
+    box-shadow: 0 8px 20px rgba(250,85,121,0.25);
+  }
+  .st-summary-bar__left h3 { margin: 0 0 4px; font-size: 17px; font-weight: 900; color: #0f172a; }
+  .st-summary-bar__left p { margin: 0; font-size: 12px; color: #64748b; }
+  .st-summary-stats { display: flex; flex-wrap: wrap; gap: 10px; }
+  .st-summary-stat {
+    display: flex; align-items: center; gap: 10px;
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;
+    padding: 10px 14px; min-width: 120px;
+  }
+  .st-summary-stat__icon {
+    width: 34px; height: 34px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0;
+  }
+  .st-summary-stat__icon--blue  { background: #dbeafe; color: #1d4ed8; }
+  .st-summary-stat__icon--green { background: #d1fae5; color: #059669; }
+  .st-summary-stat__icon--amber { background: #fef3c7; color: #d97706; }
+  .st-summary-stat__icon--pink  { background: #fce7f3; color: ${PINK}; }
+  .st-summary-stat strong { display: block; font-size: 16px; font-weight: 900; color: #0f172a; line-height: 1.1; }
+  .st-summary-stat span { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; }
+  .st-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-bottom: 14px;
+  }
+  .st-card {
+    background: #fff; border: 1px solid #fbcfe8; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 10px 28px rgba(250,85,121,0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .st-card:hover { transform: translateY(-4px); box-shadow: 0 18px 40px rgba(250,85,121,0.16); }
+  .st-card__head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 14px 16px;
+    background: linear-gradient(105deg, #db2777 0%, ${PINK} 48%, #fb7185 100%);
+  }
+  .st-card__identity { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+  .st-card__avatar {
+    width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+    background: rgba(255,255,255,0.22); border: 1px solid rgba(255,255,255,0.35);
+    color: #fff; font-size: 14px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .st-card__title-wrap { min-width: 0; }
+  .st-card__name {
+    margin: 0; font-size: 14px; font-weight: 900; color: #fff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .st-card--multi { border-color: #f59e0b; box-shadow: 0 10px 28px rgba(245,158,11,0.14); }
+  .st-card__course-line {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.95);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .st-card__course-line i { margin-right: 4px; opacity: 0.9; }
+  .st-card__badges { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+  .st-card__multi-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 9px; font-weight: 800; padding: 5px 8px; border-radius: 999px;
+    background: rgba(255,255,255,0.95); color: #b45309; border: 1px solid rgba(255,255,255,0.5);
+    white-space: nowrap;
+  }
+  .st-card__multi-note {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 10px 12px; margin-bottom: 12px;
+    background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px;
+    font-size: 11px; color: #92400e;
+  }
+  .st-card__multi-note i { margin-top: 2px; color: #d97706; flex-shrink: 0; }
+  .st-card__multi-note strong { display: block; margin-bottom: 2px; font-size: 11px; }
+  .st-card__multi-note p { margin: 0; line-height: 1.45; }
+  .st-card__multi-note em { font-style: normal; font-weight: 800; color: #78350f; }
+  .st-card__details {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;
+  }
+  .st-card__detail-item {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 10px; min-width: 0;
+  }
+  .st-card__detail-item span {
+    display: block; font-size: 9px; font-weight: 700; color: #94a3b8;
+    text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px;
+  }
+  .st-card__detail-item strong {
+    display: block; font-size: 11px; font-weight: 800; color: #0f172a;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .st-card__id {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.86); margin-top: 2px;
+  }
+  .st-card__status {
+    display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+    font-size: 10px; font-weight: 800; padding: 6px 10px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.35); white-space: nowrap;
+  }
+  .st-card__status--active { background: rgba(16,185,129,0.92); color: #fff; }
+  .st-card__status--risk  { background: rgba(245,158,11,0.92); color: #fff; }
+  .st-card__body { padding: 16px; }
+  .st-card__attendance { margin-bottom: 14px; }
+  .st-card__attendance-top {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+    font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .st-card__attendance-note {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #94a3b8;
+  }
+  .st-card__att-val { font-size: 15px; font-weight: 900; }
+  .st-card__att-val--high { color: #059669; }
+  .st-card__att-val--mid  { color: #d97706; }
+  .st-card__att-val--low  { color: #dc2626; }
+  .st-card__progress { height: 7px; background: #f1f5f9; border-radius: 999px; overflow: hidden; }
+  .st-card__progress-fill { height: 100%; border-radius: 999px; transition: width 0.35s ease; }
+  .st-card__progress-fill--high { background: linear-gradient(90deg, #059669, #34d399); }
+  .st-card__progress-fill--mid  { background: linear-gradient(90deg, #d97706, #fbbf24); }
+  .st-card__progress-fill--low  { background: linear-gradient(90deg, #dc2626, #f87171); }
+  .st-card__meta {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;
+  }
+  .st-card__meta-item {
+    display: flex; align-items: center; gap: 10px;
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 12px; min-width: 0;
+  }
+  .st-card__meta-icon {
+    width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 12px;
+  }
+  .st-card__meta-icon--blue { background: #dbeafe; color: #1d4ed8; }
+  .st-card__meta-icon--pink { background: #fce7f3; color: ${PINK}; }
+  .st-card__meta-item span {
+    display: block; font-size: 9px; font-weight: 700; color: #94a3b8;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .st-card__meta-item strong {
+    display: block; font-size: 12px; font-weight: 800; color: #0f172a;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .st-card__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .st-card__actions .st-card__btn--performance { grid-column: 1 / -1; }
+  .st-card__btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    border-radius: 10px; padding: 9px 10px; font-size: 11px; font-weight: 800;
+    cursor: pointer; border: 1px solid transparent; transition: background 0.15s, transform 0.15s;
+  }
+  .st-card__btn--primary { background: ${PINK}; color: #fff; border-color: ${PINK}; }
+  .st-card__btn--primary:hover { filter: brightness(0.96); transform: translateY(-1px); }
+  .st-card__btn--ghost { background: #fff; color: ${BLUE}; border-color: rgba(37,99,235,0.2); }
+  .st-card__btn--ghost:hover { background: #eff6ff; transform: translateY(-1px); }
+  .st-card__btn--performance {
+    background: linear-gradient(90deg, #db2777, ${PINK});
+    color: #fff;
+    border-color: ${PINK};
+  }
+  .st-card__btn--performance:hover { filter: brightness(0.96); transform: translateY(-1px); }
+
+  /* Student performance form modal */
+  .st-perf-backdrop {
+    position: fixed; inset: 0; z-index: 10000;
+    background: rgba(15,23,42,0.55);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .st-perf-modal {
+    width: min(760px, 100%);
+    max-height: calc(100vh - 40px);
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 30px 80px rgba(15,23,42,0.28);
+  }
+  .st-perf-modal__head,
+  .st-perf-modal__foot {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 16px 18px; border-bottom: 1px solid #e2e8f0;
+  }
+  .st-perf-modal__foot { border-top: 1px solid #e2e8f0; border-bottom: 0; justify-content: flex-end; }
+  .st-perf-modal__head h5 { margin: 0; font-size: 18px; font-weight: 900; color: #0f172a; }
+  .st-perf-modal__head span { color: #64748b; font-size: 12px; font-weight: 800; }
+  .st-perf-modal__body { overflow-y: auto; padding: 18px; }
+  .st-perf-modal__hint {
+    margin: 0 0 14px; padding: 12px 14px; border-radius: 10px;
+    background: #fff5f7; border: 1px solid #fbcfe8;
+    color: #64748b; font-size: 12px; font-weight: 600;
+  }
+  .st-perf-modal__body .session-field span i { margin-right: 6px; color: ${PINK}; }
+
+  /* Refer session modal */
+  .st-refer-backdrop {
+    position: fixed; inset: 0; z-index: 10001;
+    background: rgba(15,23,42,0.55);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .st-refer-modal {
+    width: min(640px, 100%);
+    max-height: calc(100vh - 40px);
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 30px 80px rgba(15,23,42,0.28);
+  }
+  .st-refer-modal__head,
+  .st-refer-modal__foot {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 16px 18px; border-bottom: 1px solid #e2e8f0;
+  }
+  .st-refer-modal__foot { border-top: 1px solid #e2e8f0; border-bottom: 0; justify-content: flex-end; }
+  .st-refer-modal__head h5 { margin: 0; font-size: 18px; font-weight: 900; color: #0f172a; }
+  .st-refer-modal__head span { color: #64748b; font-size: 12px; font-weight: 800; }
+  .st-refer-modal__body { overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+  .st-refer-modal__hint {
+    margin: 0; padding: 12px 14px; border-radius: 10px;
+    background: #eff6ff; border: 1px solid #bfdbfe;
+    color: #64748b; font-size: 12px; font-weight: 600;
+  }
+  .st-refer-candidates {
+    border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background: #fafbfc;
+  }
+  .st-refer-candidates__head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 12px 14px; border-bottom: 1px solid #e2e8f0; background: #fff;
+  }
+  .st-refer-candidates__head strong { font-size: 13px; color: #0f172a; }
+  .st-refer-select-all {
+    border: 0; background: transparent; color: ${BLUE}; font-size: 12px; font-weight: 800; cursor: pointer;
+  }
+  .st-refer-select-all:hover { text-decoration: underline; }
+  .st-refer-candidate-list { max-height: 260px; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+  .st-refer-candidate {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; border-radius: 10px; border: 1px solid #e2e8f0; background: #fff; cursor: pointer;
+  }
+  .st-refer-candidate--active { border-color: ${BLUE}; background: #eff6ff; }
+  .st-refer-candidate input { width: 16px; height: 16px; accent-color: ${BLUE}; flex-shrink: 0; }
+  .st-refer-candidate strong { display: block; font-size: 13px; color: #0f172a; }
+  .st-refer-candidate span { display: block; font-size: 11px; color: #64748b; margin-top: 2px; }
+  .st-refer-empty {
+    padding: 24px 16px; text-align: center; color: #64748b; font-size: 13px; font-weight: 600;
+  }
+  .st-refer-empty i { margin-right: 8px; color: ${BLUE}; }
+
+  /* Student profile modal */
+  .st-profile-backdrop {
+    position: fixed; inset: 0; z-index: 9998;
+    background: rgba(15,23,42,0.55);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .st-profile-modal {
+    width: min(920px, 100%);
+    max-height: calc(100vh - 40px);
+    background: #fff;
+    border-radius: 18px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 30px 80px rgba(15,23,42,0.28);
+  }
+  .st-profile-modal__head {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 18px 20px;
+    background: linear-gradient(105deg, #db2777 0%, ${PINK} 48%, #fb7185 100%);
+  }
+  .st-profile-modal__identity { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .st-profile-modal__avatar {
+    width: 52px; height: 52px; border-radius: 14px; flex-shrink: 0;
+    background: rgba(255,255,255,0.22); border: 1px solid rgba(255,255,255,0.35);
+    color: #fff; font-size: 16px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .st-profile-modal__identity h3 {
+    margin: 0 0 4px; font-size: 20px; font-weight: 900; color: #fff;
+  }
+  .st-profile-modal__identity p {
+    margin: 0; font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.88);
+  }
+  .st-profile-modal__head-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .st-profile-modal__close {
+    width: 36px; height: 36px; border: 1px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.16); border-radius: 10px;
+    color: #fff; cursor: pointer;
+  }
+  .st-profile-modal__close:hover { background: rgba(255,255,255,0.28); }
+  .st-profile-modal__body { overflow-y: auto; padding: 20px; }
+  .st-profile-modal__foot {
+    display: flex; justify-content: flex-end; gap: 10px;
+    padding: 14px 20px; border-top: 1px solid #e2e8f0; background: #fafbfc;
+  }
+  .st-profile-stats {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px;
+  }
+  .st-profile-stat {
+    display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px;
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px 10px;
+  }
+  .st-profile-stat__icon {
+    width: 34px; height: 34px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; font-size: 13px; margin-bottom: 2px;
+  }
+  .st-profile-stat__icon--pink  { background: #fce7f3; color: ${PINK}; }
+  .st-profile-stat__icon--green { background: #d1fae5; color: #059669; }
+  .st-profile-stat__icon--red   { background: #fee2e2; color: #dc2626; }
+  .st-profile-stat__icon--blue  { background: #dbeafe; color: #1d4ed8; }
+  .st-profile-stat strong { font-size: 18px; font-weight: 900; color: #0f172a; line-height: 1.1; }
+  .st-profile-stat span {
+    font-size: 10px; font-weight: 700; color: #64748b;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .st-profile-section { margin-bottom: 18px; }
+  .st-profile-section h4 {
+    margin: 0 0 12px; font-size: 14px; font-weight: 900; color: #0f172a;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .st-profile-section h4 i { color: ${PINK}; }
+  .st-profile-info-grid {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;
+  }
+  .st-profile-info-item {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px;
+  }
+  .st-profile-info-item span {
+    display: block; font-size: 10px; font-weight: 700; color: #94a3b8;
+    text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;
+  }
+  .st-profile-info-item span i { margin-right: 6px; color: ${BLUE}; }
+  .st-profile-info-item strong {
+    display: block; font-size: 13px; font-weight: 800; color: #0f172a;
+    word-break: break-word;
+  }
+  .st-profile-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .st-profile-metric {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px;
+  }
+  .st-profile-metric__head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    margin-bottom: 8px; font-size: 12px; font-weight: 800; color: #334155;
+  }
+  .st-profile-metric__head span { display: inline-flex; align-items: center; gap: 8px; }
+  .st-profile-metric__icon {
+    width: 28px; height: 28px; border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 11px;
+  }
+  .st-profile-metric__icon--blue  { background: #dbeafe; color: #1d4ed8; }
+  .st-profile-metric__icon--pink  { background: #fce7f3; color: ${PINK}; }
+  .st-profile-metric__icon--green { background: #d1fae5; color: #059669; }
+  .st-profile-metric__icon--amber { background: #fef3c7; color: #d97706; }
+  .st-profile-remark {
+    margin: 0; padding: 14px 16px; border-radius: 12px;
+    background: #fff5f7; border: 1px solid #fbcfe8;
+    color: #475569; font-size: 13px; line-height: 1.55;
+  }
+  .st-profile-table-wrap {
+    border: 1px solid #e2e8f0; border-radius: 12px; overflow: auto;
+  }
+  .st-profile-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .st-profile-table th,
+  .st-profile-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #eef2f7; }
+  .st-profile-table th {
+    background: #f8fafc; font-size: 10px; font-weight: 800; color: #64748b;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .st-profile-table tbody tr:last-child td { border-bottom: 0; }
+  .st-profile-pill {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 88px; padding: 4px 10px; border-radius: 999px;
+    font-size: 10px; font-weight: 900;
+  }
+  .st-profile-pill--present { background: #dcfce7; color: #047857; }
+  .st-profile-pill--absent { background: #fee2e2; color: #b91c1c; }
+  .st-profile-pill--not-marked { background: #e2e8f0; color: #475569; }
   .dbr-info-line { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid #eff6ff; font-size: 12px; color: #475569; }
   .dbr-info-line:first-of-type { border-top: 0; }
   .dbr-info-line i { width: 18px; color: ${BLUE}; font-size: 12px; }
@@ -1884,7 +4006,7 @@ const PORTAL_CSS = `
   /* ── Workspace layout ── */
   .tm-workspace {
     display: grid;
-    grid-template-columns: 300px minmax(0, 1fr);
+    // grid-template-columns: 300px minmax(0, 1fr);
     gap: 20px;
     align-items: start;
   }
@@ -2024,6 +4146,44 @@ const PORTAL_CSS = `
     padding: 48px 24px;
   }
   .tm-empty--card h4 { margin: 0 0 8px; color: #334155; font-size: 16px; }
+  .tm-empty--banner {
+    background: #fff; border: 1px dashed #cbd5e1; border-radius: 14px;
+    padding: 32px 24px; text-align: center; margin: 16px 0;
+  }
+  .tm-empty--banner h4 { margin: 12px 0 8px; font-size: 16px; font-weight: 800; color: #334155; }
+  .tm-empty--banner p { margin: 0 0 6px; color: #64748b; font-size: 13px; }
+  .tm-empty__hint { font-size: 12px !important; color: #94a3b8 !important; }
+  .tm-empty--session-create {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
+    min-height: 320px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 48px 24px;
+  }
+  .tm-empty--session-create i { font-size: 42px; color: #cbd5e1; margin-bottom: 16px; }
+  .tm-empty--session-create p { font-size: 14px; color: #64748b; margin-bottom: 20px; }
+  .tm-create-session-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 24px; border-radius: 999px; border: 1px solid #e2e8f0;
+    background: #fff; color: ${PINK}; font-size: 14px; font-weight: 700;
+    cursor: pointer; box-shadow: 0 4px 14px rgba(15,23,42,0.06);
+  }
+  .tm-create-session-btn:hover { border-color: #fecdd3; background: #fff5f7; }
+  .tm-sidebar--profile-only { align-self: start; }
+  .dbr-search--full { width: 100%; max-width: none; }
+  .session-add-panel {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
+    overflow: hidden; box-shadow: 0 8px 24px rgba(15,23,42,0.06);
+  }
+  .session-add-panel__head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 12px; padding: 18px 20px; border-bottom: 1px solid #f1f5f9;
+  }
+  .session-add-panel__head h4 { margin: 0 0 4px; font-size: 18px; font-weight: 800; color: #0f172a; }
+  .session-add-panel__head p { margin: 0; font-size: 12px; color: #64748b; }
+  .session-add-panel__body { padding: 20px; }
+  .session-add-panel__foot {
+    display: flex; justify-content: flex-end; gap: 10px;
+    padding: 16px 20px; border-top: 1px solid #f1f5f9; background: #fafbfc;
+  }
   .tm-empty--card p { margin-bottom: 20px; }
 
   /* ── Daily report ── */
@@ -2196,6 +4356,23 @@ const PORTAL_CSS = `
     font-size: 12px;
   }
   .sc-status-edit:hover { background: rgba(255,255,255,0.26); }
+  .sc-head-tab {
+    border: 1px solid rgba(255,255,255,0.38);
+    background: rgba(255,255,255,0.16);
+    color: #fff;
+    height: 31px;
+    padding: 0 12px;
+    border-radius: 9px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+  .sc-head-tab:hover { background: rgba(255,255,255,0.26); }
+  .session-feedback-modal { max-width: 480px; }
   .sc-status-menu {
     position: absolute;
     top: calc(100% + 8px);
@@ -2372,20 +4549,59 @@ const PORTAL_CSS = `
   }
   .session-modal__close:hover { background: #f8fafc; color: #0f172a; }
   .session-modal__body { overflow-y: auto; padding: 18px; }
+  .session-modal__context {
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #f8fafc;
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+    line-height: 1.5;
+  }
   .session-form-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
+    gap: 14px 16px;
   }
   .session-field { display: flex; flex-direction: column; gap: 6px; margin: 0; }
   .session-field span {
     font-size: 10px;
     font-weight: 800;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: #64748b;
+    color: #94a3b8;
   }
-  .session-field--full { margin-top: 12px; }
+  .session-field__control {
+    min-height: 40px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 9px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+    background: #f8fafc;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .session-field__control:focus {
+    outline: none;
+    border-color: ${BLUE};
+    background: #fff;
+    box-shadow: 0 0 0 2px rgba(37,99,235,0.1);
+  }
+  .session-field__control::placeholder { color: #94a3b8; font-weight: 500; }
+  .session-field__control--date,
+  .session-field__control--time {
+    color: #0f172a;
+  }
+  .session-field__control--date:invalid,
+  .session-field__control--time:invalid {
+    color: #94a3b8;
+  }
+  .session-field--full { margin-top: 14px; grid-column: 1 / -1; }
+  .session-field--full .session-field__control { min-height: 88px; resize: vertical; }
   .session-evidence-builder {
     margin-top: 16px;
     border: 1px solid #e2e8f0;
@@ -2847,17 +5063,8 @@ const PORTAL_CSS = `
     font-weight: 900;
   }
 
-  /* Students */
+  /* Students — styles defined earlier in sheet */
   .dbr-student-view { margin-bottom: 20px; }
-  .dbr-student-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-bottom: 14px; }
-  .dbr-student-card { background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%); border: 1px solid #e2e8f0; border-radius: 18px; padding: 18px; box-shadow: 0 10px 26px rgba(15,23,42,0.06); transition: transform 0.2s ease, box-shadow 0.2s ease; }
-  .dbr-student-card:hover { transform: translateY(-2px); box-shadow: 0 18px 32px rgba(15,23,42,0.1); }
-  .dbr-student-card__head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-  .dbr-student-card__head i { color: ${PINK}; background: rgba(250,85,121,0.12); border-radius: 12px; padding: 8px; font-size: 14px; }
-  .dbr-student-card__head h6 { margin: 0; flex: 1; font-size: 14px; font-weight: 800; color: #0f172a; }
-  .dbr-info-line { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid #eff6ff; font-size: 12px; color: #475569; }
-  .dbr-info-line:first-of-type { border-top: 0; }
-  .dbr-info-line i { width: 18px; color: ${BLUE}; font-size: 12px; }
 
   /* Shared */
   .dbr-chip { font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
@@ -2897,6 +5104,7 @@ const PORTAL_CSS = `
     .tm-hero__stats { gap: 8px; }
     .tm-stat-pill { padding: 6px 12px; font-size: 12px; }
     .tm-workspace { grid-template-columns: 1fr; }
+    .tm-path-picker__grid { grid-template-columns: 1fr; }
     .tm-sidebar { position: static; }
     .tm-session-panel__list { max-height: 240px; }
     .tm-tabs { width: 100%; }
@@ -2904,6 +5112,20 @@ const PORTAL_CSS = `
     .tm-toolbar { flex-direction: column; align-items: stretch; }
     .tm-search { max-width: none; }
     .tm-student-grid { grid-template-columns: 1fr; }
+    .st-grid { grid-template-columns: 1fr; }
+    .st-summary-stats { width: 100%; }
+    .st-summary-stat { flex: 1; min-width: calc(50% - 5px); }
+    .st-card__meta { grid-template-columns: 1fr; }
+    .st-card__actions { grid-template-columns: 1fr; }
+    .st-profile-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .st-profile-info-grid { grid-template-columns: 1fr; }
+    .st-profile-metrics { grid-template-columns: 1fr; }
+    .st-profile-backdrop { padding: 10px; align-items: flex-start; }
+    .st-profile-modal { max-height: calc(100vh - 20px); }
+    .st-perf-backdrop { padding: 10px; align-items: flex-start; }
+    .st-perf-modal { max-height: calc(100vh - 20px); }
+    .st-refer-backdrop { padding: 10px; align-items: flex-start; }
+    .st-refer-modal { max-height: calc(100vh - 20px); }
     .dbr-filter-pill { max-width: 100%; }
     .dbr-points-grid { grid-template-columns: 1fr; }
     .sc-stats { display: none; }

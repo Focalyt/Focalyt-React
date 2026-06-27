@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import DatePicker from "react-date-picker";
+import { toast } from "react-toastify";
 import "react-date-picker/dist/DatePicker.css";
 import "react-calendar/dist/Calendar.css";
-// import { getProjectDepartmentIds, projectBelongsToDepartment } from "../../../../utils/b2bProjectHelpers";
-
 const pickRefId = (ref) => {
   if (ref == null || ref === "") return "";
   if (typeof ref === "object") return String(ref._id || ref.id || ref.$oid || "").trim();
@@ -124,6 +123,14 @@ const parseVisitDateToDate = (value) => {
   }
   const parsed = new Date(v);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const lrpToastOpts = {
+  position: "top-center",
+  autoClose: 2500,
+  hideProgressBar: true,
+  closeButton: false,
+  style: { fontSize: "13px", minHeight: "unset", padding: "8px 14px", maxWidth: "320px" },
 };
 
 const createInitialForm = () => ({
@@ -293,6 +300,7 @@ const WizardFooter = ({ isLast, step, submitting, onBack, onNext }) => (
 
 function Lrp() {
   const location = useLocation();
+  const navigate = useNavigate();
   const searchParams = useMemo(() => new URLSearchParams(location?.search || ""), [location?.search]);
   const isEmbedded = searchParams.get("embedded") === "1";
   const mode = (searchParams.get("mode") || "add").toLowerCase(); // add | view
@@ -300,6 +308,12 @@ function Lrp() {
     const raw = searchParams.get("b2bLeadId") || searchParams.get("leadId") || "";
     return String(raw).trim();
   }, [searchParams]);
+  const returnTo = useMemo(() => {
+    const fromState = location.state?.returnTo;
+    if (typeof fromState === "string" && fromState.startsWith("/")) return fromState;
+    if (linkedB2bLeadId) return "/institute/sales";
+    return "";
+  }, [location.state, linkedB2bLeadId]);
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(() => createInitialForm());
   const [touched, setTouched] = useState({});
@@ -859,8 +873,14 @@ function Lrp() {
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
     const token = userData.token;
 
-    if (!backendUrl) return alert("Backend URL missing in .env (REACT_APP_MIPIE_BACKEND_URL)");
-    if (!token) return alert("Login required (missing x-auth token)");
+    if (!backendUrl) {
+      toast.error("Backend URL missing in .env (REACT_APP_MIPIE_BACKEND_URL)", lrpToastOpts);
+      return;
+    }
+    if (!token) {
+      toast.error("Login required (missing x-auth token)", lrpToastOpts);
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -904,12 +924,16 @@ function Lrp() {
       }
 
       if (data.b2b?.created) {
-        alert("LRP saved and B2B lead created.");
+        toast.success("Lead Report Saved", lrpToastOpts);
       } else {
-        alert(
-          `LRP saved.${data.b2b?.message ? `\n${data.b2b.message}` : ""}`
-        );
+        toast.success("Lead Report Saved", lrpToastOpts);
       }
+
+      if (returnTo) {
+        navigate(returnTo, { replace: true });
+        return;
+      }
+
       setForm((prev) => ({
         ...createInitialForm(),
         b2bLeadId: prev.b2bLeadId || searchParams.get("b2bLeadId") || searchParams.get("leadId") || "",
@@ -920,7 +944,7 @@ function Lrp() {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error("[LRP] Save error", err);
-      alert(err?.message || "Unable to save LRP lead");
+      toast.error(err?.message || "Unable to save LRP lead", { ...lrpToastOpts, autoClose: 3500 });
     } finally {
       setSubmitting(false);
     }
