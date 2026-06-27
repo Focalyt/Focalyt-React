@@ -4,6 +4,7 @@ import DatePicker from "react-date-picker";
 import { toast } from "react-toastify";
 import "react-date-picker/dist/DatePicker.css";
 import "react-calendar/dist/Calendar.css";
+import resolveMediaUrl from "../../../../utils/resolveMediaUrl";
 const pickRefId = (ref) => {
   if (ref == null || ref === "") return "";
   if (typeof ref === "object") return String(ref._id || ref.id || ref.$oid || "").trim();
@@ -86,6 +87,15 @@ const enrichLeadLabels = (ctx, { departments = [], projects = [], categories = [
 };
 
 const MAX_STEPS = 3;
+const MAX_LRP_GEO_PHOTO_BYTES = 20 * 1024;
+
+const formatLrpPhotoSize = (bytes) => {
+  if (bytes < 1024) return `${bytes} B`;
+  return `${(bytes / 1024).toFixed(bytes >= 10240 ? 0 : 1)} KB`;
+};
+
+const isLrpGeoPhotoWithinLimit = (file) =>
+  file instanceof File && file.size > 0 && file.size <= MAX_LRP_GEO_PHOTO_BYTES;
 
 const readLrpMeta = (items, metaKey) => {
   const it = (items || []).find((x) => x && x.metaKey === metaKey);
@@ -120,6 +130,10 @@ const parseVisitDateToDate = (value) => {
   const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v);
   if (m && isValidMmDdYyyy(v)) {
     return new Date(Number(m[3]), Number(m[1]) - 1, Number(m[2]));
+  }
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  if (iso) {
+    return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
   }
   const parsed = new Date(v);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
@@ -345,6 +359,8 @@ function Lrp() {
     b2bType: "",
   });
   const [viewLeadSourceQA, setViewLeadSourceQA] = useState(null);
+  const [savedGeoPhotoKey, setSavedGeoPhotoKey] = useState("");
+  const [geoPhotoBlobUrl, setGeoPhotoBlobUrl] = useState("");
   const stateInputRef = useRef(null);
   const districtInputRef = useRef(null);
   const stateAutoRef = useRef(null);
@@ -699,6 +715,7 @@ function Lrp() {
           district: readLrpMeta(qaItems, "lrp_district"),
           block: readLrpMeta(qaItems, "lrp_block"),
         }));
+        setSavedGeoPhotoKey(readLrpMeta(qaItems, "lrp_geoTaggedPhoto"));
         setTouched({});
         setStep(1);
       } finally {
@@ -708,6 +725,25 @@ function Lrp() {
 
     loadExisting();
   }, [searchParams, mode]);
+
+  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
+
+  useEffect(() => {
+    const file = form.geoTaggedPhoto;
+    if (!file || !(file instanceof File)) {
+      setGeoPhotoBlobUrl("");
+      return undefined;
+    }
+    const url = URL.createObjectURL(file);
+    setGeoPhotoBlobUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [form.geoTaggedPhoto]);
+
+  const savedGeoPhotoUrl = useMemo(
+    () => resolveMediaUrl(bucketUrl, savedGeoPhotoKey),
+    [bucketUrl, savedGeoPhotoKey]
+  );
+  const geoPhotoDisplayUrl = geoPhotoBlobUrl || savedGeoPhotoUrl;
 
   const fldStyle = {
     width: "100%",
@@ -882,6 +918,14 @@ function Lrp() {
       return;
     }
 
+    if (form.geoTaggedPhoto && !isLrpGeoPhotoWithinLimit(form.geoTaggedPhoto)) {
+      toast.error(
+        `Geo-tagged photo must be ${formatLrpPhotoSize(MAX_LRP_GEO_PHOTO_BYTES)} or smaller.`,
+        { ...lrpToastOpts, autoClose: 3500 }
+      );
+      return;
+    }
+
     try {
       setSubmitting(true);
 
@@ -938,6 +982,7 @@ function Lrp() {
         ...createInitialForm(),
         b2bLeadId: prev.b2bLeadId || searchParams.get("b2bLeadId") || searchParams.get("leadId") || "",
       }));
+      setSavedGeoPhotoKey("");
       setLeadSourceAnswers({});
       setTouched({});
       setStep(1);
@@ -1313,20 +1358,45 @@ function Lrp() {
 
               <div style={{ flex: "1 1 320px", minWidth: 260 }}>
                 <label style={lblStyle}>Upload geo-tagged photograph (during visit)</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
-                    setValue("geoTaggedPhoto", file);
-                  }}
-                  onBlur={() => markTouched("geoTaggedPhoto")}
-                  style={{ ...fldStyle, background: "white", padding: "7px 12px" }}
-                />
+                {mode !== "view" && (
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+                      if (file && !isLrpGeoPhotoWithinLimit(file)) {
+                        toast.error(
+                          `Photo is too large (${formatLrpPhotoSize(file.size)}). Max size is ${formatLrpPhotoSize(MAX_LRP_GEO_PHOTO_BYTES)}.`,
+                          { ...lrpToastOpts, autoClose: 3500 }
+                        );
+                        e.target.value = "";
+                        setValue("geoTaggedPhoto", null);
+                        return;
+                      }
+                      setValue("geoTaggedPhoto", file);
+                    }}
+                    onBlur={() => markTouched("geoTaggedPhoto")}
+                    style={{ ...fldStyle, background: "white", padding: "7px 12px" }}
+                  />
+                )}
                 <div style={{ marginTop: 6, fontSize: 12, color: "#64748b" }}>
-                  {form.geoTaggedPhoto ? `Selected: ${form.geoTaggedPhoto.name}` : "Upload 1 supported file. Max 100 MB."}
+                  {form.geoTaggedPhoto instanceof File
+                    ? `Selected: ${form.geoTaggedPhoto.name} (${formatLrpPhotoSize(form.geoTaggedPhoto.size)})`
+                    : savedGeoPhotoKey
+                      ? "Photo uploaded"
+                      : mode === "view"
+                        ? "—"
+                        : `Upload 1 image. Max ${formatLrpPhotoSize(MAX_LRP_GEO_PHOTO_BYTES)}.`}
                 </div>
-                {/* optional */}
+                {geoPhotoDisplayUrl && (
+                  <div style={{ marginTop: 10, maxWidth: 320 }}>
+                    <img
+                      src={geoPhotoDisplayUrl}
+                      alt="Geo-tagged visit"
+                      style={{ width: "100%", borderRadius: 10, border: "1px solid #e2e8f0" }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
 

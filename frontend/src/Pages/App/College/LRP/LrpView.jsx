@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import resolveMediaUrl from "../../../../utils/resolveMediaUrl";
 
 const pickRefName = (ref) => {
   if (!ref) return "";
@@ -211,7 +212,8 @@ function LrpView() {
   );
 
   const geoUrl = meta.geoTaggedPhoto;
-  const isImageUrl = /^https?:\/\//i.test(geoUrl || "");
+  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
+  const geoImageUrl = useMemo(() => resolveMediaUrl(bucketUrl, geoUrl), [geoUrl, bucketUrl]);
 
   return (
     <div style={{ background: isEmbedded ? "#ffffff" : "#f1f5f9", minHeight: isEmbedded ? "auto" : "100vh", padding: isEmbedded ? "16px" : "20px" }}>
@@ -313,16 +315,14 @@ function LrpView() {
               <FieldRow label="Geo-tagged photograph">
                 {!geoUrl ? (
                   <div style={valStyle}>—</div>
-                ) : isImageUrl ? (
+                ) : geoImageUrl ? (
                   <div>
-                    <a href={geoUrl} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 700, color: "#be123c" }}>
-                      Open full image
-                    </a>
+                    
                     <div style={{ marginTop: 10, maxWidth: 420 }}>
                       <img
-                        src={geoUrl}
+                        src={geoImageUrl}
                         alt="Geo-tagged visit"
-                        style={{ width: "100%", borderRadius: 10, border: "1px solid #e2e8f0" }}
+                        style={{ width: "40%", borderRadius: 10, border: "1px solid #e2e8f0" }}
                       />
                     </div>
                   </div>

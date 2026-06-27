@@ -6,6 +6,8 @@ const { uploadSinglefile } = require("../functions/images");
 
 const router = express.Router();
 
+const MAX_LRP_GEO_PHOTO_BYTES = 20 * 1024;
+
 const getPartnerTypeOptions = async () => {
   const partners = await Partner.find({ status: { $ne: false } }).sort({ createdAt: -1 }).lean();
   return partners.map((p) => String(p.name || "").trim()).filter(Boolean);
@@ -26,6 +28,40 @@ const parseLeadSourceQA = (raw) => {
 const valueByMetaKey = (items, key) => {
   const it = (items || []).find((x) => x && x.metaKey === key);
   return it ? String(it.value || "").trim() : "";
+};
+
+const isValidCalendarDate = (y, m, d) => {
+  const dt = new Date(y, m - 1, d);
+  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+};
+
+const normalizeQaDateValue = (raw) => {
+  const v = String(raw ?? "").trim();
+  if (!v) return "";
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  if (iso) {
+    const y = Number(iso[1]);
+    const m = Number(iso[2]);
+    const d = Number(iso[3]);
+    return isValidCalendarDate(y, m, d) ? `${iso[1]}-${iso[2]}-${iso[3]}` : v;
+  }
+  const mdy = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v);
+  if (mdy) {
+    const m = Number(mdy[1]);
+    const d = Number(mdy[2]);
+    const y = Number(mdy[3]);
+    if (isValidCalendarDate(y, m, d)) {
+      return `${mdy[3]}-${mdy[1]}-${mdy[2]}`;
+    }
+  }
+  return v;
+};
+
+const isValidQaDateValue = (raw) => {
+  const v = String(raw ?? "").trim();
+  if (!v) return false;
+  const normalized = normalizeQaDateValue(v);
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) && normalized === normalizeQaDateValue(normalized);
 };
 
 const buildLrpMetaItems = (body, geoTaggedPhotoUrl, partnerTypeOptions = []) => {
@@ -50,10 +86,10 @@ const buildLrpMetaItems = (body, geoTaggedPhotoUrl, partnerTypeOptions = []) => 
     {
       metaKey: "lrp_visitDate",
       question: "Visit date",
-      type: "text",
+      type: "date",
       options: [],
       required: true,
-      value: v("visitDate").slice(0, 10),
+      value: normalizeQaDateValue(v("visitDate")),
     },
     {
       metaKey: "lrp_geoTaggedPhoto",
@@ -99,6 +135,9 @@ const normalizeQaItem = (it) => {
     value: String(it?.value ?? "").trim(),
   };
   if (it?.metaKey) row.metaKey = String(it.metaKey).trim();
+  if (row.type === "date" && row.value) {
+    row.value = normalizeQaDateValue(row.value);
+  }
   return row;
 };
 
@@ -126,9 +165,7 @@ const validateLeadSourceQA = (qa) => {
       return `Invalid number for: ${label}`;
     }
     if (t === "date") {
-      // Expect yyyy-mm-dd (from <input type="date">)
-      const ok = /^\\d{4}-\\d{2}-\\d{2}$/.test(val);
-      if (!ok) return `Invalid date for: ${label}`;
+      if (!isValidQaDateValue(val)) return `Invalid date for: ${label}`;
     }
     if (t === "radio" && Array.isArray(it.options) && it.options.length) {
       const ok = it.options.some((o) => String(o).trim() === val);
@@ -490,8 +527,16 @@ router.post("/", async (req, res) => {
 
     let geoTaggedPhoto = body.geoTaggedPhoto;
     if (req.files && req.files.file) {
+      const uploadFile = req.files.file;
+      const fileSize = Number(uploadFile.size ?? uploadFile.data?.length ?? 0);
+      if (fileSize > MAX_LRP_GEO_PHOTO_BYTES) {
+        return res.status(400).json({
+          success: false,
+          message: "Geo-tagged photo must be 20 KB or smaller.",
+        });
+      }
       try {
-        geoTaggedPhoto = await uploadSinglefile(req.files.file, "lrp");
+        geoTaggedPhoto = await uploadSinglefile(uploadFile, "lrp");
       } catch (e) {
         return res.status(400).json({
           success: false,
