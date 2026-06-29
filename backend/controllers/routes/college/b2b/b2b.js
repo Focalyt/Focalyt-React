@@ -199,6 +199,36 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 		};
 	};
 
+	const buildLeadDateRangeCondition = (field, fromDate, toDate) => {
+		if (!fromDate && !toDate) return null;
+		return {
+			[field]: {
+				...(fromDate ? { $gte: new Date(fromDate) } : {}),
+				...(toDate ? { $lte: new Date(toDate) } : {})
+			}
+		};
+	};
+
+	const resolveNextActionDateLeadFilter = async (fromDate, toDate) => {
+		if (!fromDate && !toDate) return null;
+
+		const scheduledDate = {};
+		if (fromDate) scheduledDate.$gte = new Date(fromDate);
+		if (toDate) scheduledDate.$lte = new Date(toDate);
+
+		const followups = await FollowUp.find({ scheduledDate }).select('_id').lean();
+		const fuIds = followups.map((row) => row._id).filter(Boolean);
+		if (!fuIds.length) return { _id: { $in: [] } };
+
+		return {
+			$or: [
+				{ followUpCall: { $in: fuIds } },
+				{ followUpVisit: { $in: fuIds } },
+				{ followUp: { $in: fuIds } }
+			]
+		};
+	};
+
 	const mergeLeadQuery = (baseQuery, extra) => {
 		if (!extra) return baseQuery || {};
 		if (!baseQuery || Object.keys(baseQuery).length === 0) return extra;
@@ -1643,6 +1673,10 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 			subStatusIn,
 			startDate,
 			endDate,
+			modifiedFromDate,
+			modifiedToDate,
+			nextActionFromDate,
+			nextActionToDate,
 			leadOwner,
 			leadOwnerIn,
 			statusIn,
@@ -1720,6 +1754,8 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 			const bucketFilter = await resolveFollowupBucketLeadFilter('visit', followUpVisitBucket);
 			if (bucketFilter) followupBucketFilters.push(bucketFilter);
 		}
+		const nextActionDateFilter = await resolveNextActionDateLeadFilter(nextActionFromDate, nextActionToDate);
+		if (nextActionDateFilter) followupBucketFilters.push(nextActionDateFilter);
 
 		// Other filters - Convert to ObjectId if valid
 		if (leadCategoryIn) {
@@ -1758,14 +1794,10 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 		}
 		
 		// Date range filters
-		if (startDate || endDate) {
-			filterConditions.push({
-				createdAt: {
-					...(startDate ? { $gte: new Date(startDate) } : {}),
-					...(endDate ? { $lte: new Date(endDate) } : {})
-				}
-			});
-		}
+		const createdAtFilter = buildLeadDateRangeCondition('createdAt', startDate, endDate);
+		if (createdAtFilter) filterConditions.push(createdAtFilter);
+		const updatedAtFilter = buildLeadDateRangeCondition('updatedAt', modifiedFromDate, modifiedToDate);
+		if (updatedAtFilter) filterConditions.push(updatedAtFilter);
 		
 		// Lead owner filter - check both leadOwner and leadAddedBy
 		if (leadOwnerIn) {
@@ -2479,6 +2511,10 @@ router.get('/leads', isCollege, async (req, res) => {
 			subStatusIn,
 			startDate,
 			endDate,
+			modifiedFromDate,
+			modifiedToDate,
+			nextActionFromDate,
+			nextActionToDate,
 			leadOwner,
 			leadOwnerIn,
 			hasFollowUpCall,
@@ -2510,6 +2546,8 @@ router.get('/leads', isCollege, async (req, res) => {
 			const bucketFilter = await resolveFollowupBucketLeadFilter('visit', followUpVisitBucket);
 			if (bucketFilter) followupBucketFilters.push(bucketFilter);
 		}
+		const nextActionDateFilter = await resolveNextActionDateLeadFilter(nextActionFromDate, nextActionToDate);
+		if (nextActionDateFilter) followupBucketFilters.push(nextActionDateFilter);
 
 		// Only apply team member filter if user is not Admin
 		// Admin can view all leads, others can only view their team members' leads
@@ -2578,12 +2616,11 @@ router.get('/leads', isCollege, async (req, res) => {
 				...(subStatusIn ? [{ subStatus: { $in: parseIdList(subStatusIn) } }] : []),
 				...(!subStatusIn && subStatus ? [{ subStatus: convertToObjectId(subStatus) }] : []),
 			// Date range filters
-			...(startDate || endDate ? [{
-				createdAt: {
-					...(startDate ? { $gte: new Date(startDate) } : {}),
-					...(endDate ? { $lte: new Date(endDate) } : {})
-				}
-			}] : []),
+			...(function () {
+				const createdAtFilter = buildLeadDateRangeCondition('createdAt', startDate, endDate);
+				const updatedAtFilter = buildLeadDateRangeCondition('updatedAt', modifiedFromDate, modifiedToDate);
+				return [createdAtFilter, updatedAtFilter].filter(Boolean);
+			})(),
 			// Lead owner filter - Convert to ObjectId
 			// If leadOwner filter is applied, check both leadOwner field AND leadAddedBy field
 			// (because many existing leads have leadOwner set to a different user but leadAddedBy is the actual owner)

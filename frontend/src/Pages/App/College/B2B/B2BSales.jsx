@@ -1636,6 +1636,14 @@ const B2BSales = () => {
       start: null,
       end: null
     },
+    modifiedDateRange: {
+      start: null,
+      end: null
+    },
+    nextActionDateRange: {
+      start: null,
+      end: null
+    },
     status: [],
     subStatus: []
   });
@@ -2039,6 +2047,10 @@ const B2BSales = () => {
       || (Array.isArray(f.documentsStatus) && f.documentsStatus.length)
       || f.dateRange?.start
       || f.dateRange?.end
+      || f.modifiedDateRange?.start
+      || f.modifiedDateRange?.end
+      || f.nextActionDateRange?.start
+      || f.nextActionDateRange?.end
       || (Array.isArray(f.status) && f.status.length)
       || (Array.isArray(f.subStatus) && f.subStatus.length)
       || selectedStatusFilter
@@ -2064,6 +2076,8 @@ const B2BSales = () => {
       followUpVisitBucket: '',
       documentsStatus: [],
       dateRange: { start: null, end: null },
+      modifiedDateRange: { start: null, end: null },
+      nextActionDateRange: { start: null, end: null },
       status: [],
       subStatus: []
     };
@@ -2111,6 +2125,10 @@ const B2BSales = () => {
     }
     if (eff.dateRange?.start) params.startDate = eff.dateRange.start;
     if (eff.dateRange?.end) params.endDate = eff.dateRange.end;
+    if (eff.modifiedDateRange?.start) params.modifiedFromDate = eff.modifiedDateRange.start;
+    if (eff.modifiedDateRange?.end) params.modifiedToDate = eff.modifiedDateRange.end;
+    if (eff.nextActionDateRange?.start) params.nextActionFromDate = eff.nextActionDateRange.start;
+    if (eff.nextActionDateRange?.end) params.nextActionToDate = eff.nextActionDateRange.end;
     if (Array.isArray(eff.status) && eff.status.length) params.statusIn = toCsv(eff.status);
     if (Array.isArray(eff.subStatus) && eff.subStatus.length) params.subStatusIn = toCsv(eff.subStatus);
     if (eff.hasFollowUpCall) params.hasFollowUpCall = true;
@@ -2246,12 +2264,12 @@ const B2BSales = () => {
     </div>
   );
 
-  const handleDateRangeChange = (type, value) => {
+  const handleDateRangeChange = (rangeKey, type, value) => {
     setFilters(prev => ({
       ...prev,
-      dateRange: {
-        ...prev.dateRange,
-        [type]: value
+      [rangeKey]: {
+        ...(prev[rangeKey] || {}),
+        [type]: value || null
       }
     }));
   };
@@ -2279,6 +2297,14 @@ const B2BSales = () => {
       followUpVisitBucket: '',
       documentsStatus: [],
       dateRange: {
+        start: null,
+        end: null
+      },
+      modifiedDateRange: {
+        start: null,
+        end: null
+      },
+      nextActionDateRange: {
         start: null,
         end: null
       },
@@ -5614,6 +5640,12 @@ const B2BSales = () => {
                   {filters.followUpVisitBucket && (
                     <span className="badge rounded-pill text-bg-light border">Visit: {filters.followUpVisitBucket}</span>
                   )}
+                  {(filters.modifiedDateRange?.start || filters.modifiedDateRange?.end) && (
+                    <span className="badge rounded-pill text-bg-light border">Modified date</span>
+                  )}
+                  {(filters.nextActionDateRange?.start || filters.nextActionDateRange?.end) && (
+                    <span className="badge rounded-pill text-bg-light border">Next action date</span>
+                  )}
                   {leadViewTab === 'myRefer' && (
                     <span className="badge rounded-pill text-bg-light border">My Refer Leads</span>
                   )}
@@ -6773,16 +6805,10 @@ const B2BSales = () => {
       {/* Filter Modal */}
       {showFilters && (
         <div
-          className="modal show d-block"
-          style={{
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            zIndex: 1060,
-            overflowY: 'auto',
-            maxHeight: '100vh'
-          }}
+          className="modal show d-block b2b-filter-backdrop"
         >
-          <div className="modal-dialog modal-dialog-centered modal-lg b2b-filter-dialog" style={{ maxHeight: '90vh' }}>
-            <div className="modal-content border-0 shadow b2b-filter-modal" style={{ maxHeight: '90vh' }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable b2b-filter-dialog">
+            <div className="modal-content border-0 shadow b2b-filter-modal">
               <div className="modal-header bg-header text-white">
                 <h5 className="modal-title">
                   <i className="fas fa-filter me-2"></i>
@@ -6863,7 +6889,7 @@ const B2BSales = () => {
                       <i className="fas fa-phone text-primary me-2"></i>
                       Followup Calling
                     </label>
-                    <div className="form-check form-switch m-0">
+                    <div className="form-check form-switch m-0 pt-1">
                       <input
                         className="form-check-input"
                         type="checkbox"
@@ -6879,7 +6905,7 @@ const B2BSales = () => {
                       <i className="fas fa-map-marker-alt text-primary me-2"></i>
                       Followup Visit
                     </label>
-                    <div className="form-check form-switch m-0">
+                    <div className="form-check form-switch m-0 pt-1">
                       <input
                         className="form-check-input"
                         type="checkbox"
@@ -6906,31 +6932,88 @@ const B2BSales = () => {
                     />
                   </div>
 
-                  <div className="col-md-6">
-                    <label className="form-label fw-medium text-dark mb-2">
-                      <i className="fas fa-calendar text-danger me-2"></i>
-                      Start Date
-                    </label>
-                    <input
-                      type="date"
-                      className="form-control border-0 bg-light"
-                      value={filters.dateRange.start || ''}
-                      onChange={(e) => handleDateRangeChange('start', e.target.value)}
-                      style={{ backgroundColor: '#f8f9fa' }}
-                    />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label fw-medium text-dark mb-2">
-                      <i className="fas fa-calendar text-danger me-2"></i>
-                      End Date
-                    </label>
-                    <input
-                      type="date"
-                      className="form-control border-0 bg-light"
-                      value={filters.dateRange.end || ''}
-                      onChange={(e) => handleDateRangeChange('end', e.target.value)}
-                      style={{ backgroundColor: '#f8f9fa' }}
-                    />
+                  <div className="col-12">
+                    <div className="b2b-filter-date-ranges">
+                      <div className="b2b-filter-date-ranges__head">
+                        <i className="fas fa-calendar-alt text-danger me-2" aria-hidden="true" />
+                        Date Filters
+                      </div>
+
+                      <div className="b2b-filter-date-row">
+                        <div className="b2b-filter-date-row__label">
+                          <i className="fas fa-calendar-plus text-danger me-1" aria-hidden="true" />
+                          Lead Creation
+                        </div>
+                        <div className="b2b-filter-date-row__field">
+                          <label className="form-label small text-muted mb-1">From</label>
+                          <input
+                            type="date"
+                            className="form-control form-control-sm border-0 bg-white"
+                            value={filters.dateRange.start || ''}
+                            onChange={(e) => handleDateRangeChange('dateRange', 'start', e.target.value)}
+                          />
+                        </div>
+                        <div className="b2b-filter-date-row__field">
+                          <label className="form-label small text-muted mb-1">To</label>
+                          <input
+                            type="date"
+                            className="form-control form-control-sm border-0 bg-white"
+                            value={filters.dateRange.end || ''}
+                            onChange={(e) => handleDateRangeChange('dateRange', 'end', e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="b2b-filter-date-row">
+                        <div className="b2b-filter-date-row__label">
+                          <i className="fas fa-calendar-check text-danger me-1" aria-hidden="true" />
+                          Lead Modification
+                        </div>
+                        <div className="b2b-filter-date-row__field">
+                          <label className="form-label small text-muted mb-1">From</label>
+                          <input
+                            type="date"
+                            className="form-control form-control-sm border-0 bg-white"
+                            value={filters.modifiedDateRange.start || ''}
+                            onChange={(e) => handleDateRangeChange('modifiedDateRange', 'start', e.target.value)}
+                          />
+                        </div>
+                        <div className="b2b-filter-date-row__field">
+                          <label className="form-label small text-muted mb-1">To</label>
+                          <input
+                            type="date"
+                            className="form-control form-control-sm border-0 bg-white"
+                            value={filters.modifiedDateRange.end || ''}
+                            onChange={(e) => handleDateRangeChange('modifiedDateRange', 'end', e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="b2b-filter-date-row">
+                        <div className="b2b-filter-date-row__label">
+                          <i className="fas fa-calendar-day text-danger me-1" aria-hidden="true" />
+                          Next Action
+                        </div>
+                        <div className="b2b-filter-date-row__field">
+                          <label className="form-label small text-muted mb-1">From</label>
+                          <input
+                            type="date"
+                            className="form-control form-control-sm border-0 bg-white"
+                            value={filters.nextActionDateRange.start || ''}
+                            onChange={(e) => handleDateRangeChange('nextActionDateRange', 'start', e.target.value)}
+                          />
+                        </div>
+                        <div className="b2b-filter-date-row__field">
+                          <label className="form-label small text-muted mb-1">To</label>
+                          <input
+                            type="date"
+                            className="form-control form-control-sm border-0 bg-white"
+                            value={filters.nextActionDateRange.end || ''}
+                            onChange={(e) => handleDateRangeChange('nextActionDateRange', 'end', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -8392,12 +8475,74 @@ const B2BSales = () => {
     }
   }
 
-  /* Filter modal spacing: keep dropdown above footer (scoped) */
+  /* Filter modal */
+  .b2b-filter-backdrop{
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1060;
+    overflow-y: auto;
+  }
+  .b2b-filter-dialog{
+    max-width: 860px;
+    margin: 1rem auto;
+  }
+  .b2b-filter-modal{
+    max-height: calc(100vh - 2rem);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 14px;
+  }
+  .b2b-filter-modal .modal-header{
+    flex: 0 0 auto;
+  }
   .b2b-filter-modal .modal-body{
-    overflow: visible !important;
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    flex: 1 1 auto;
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+  .b2b-filter-modal .modal-footer{
+    flex: 0 0 auto;
+    border-top: 1px solid #e9ecef;
+  }
+  .b2b-filter-date-ranges{
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+  .b2b-filter-date-ranges__head{
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #212529;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #dee2e6;
+  }
+  .b2b-filter-date-row{
+    display: grid;
+    grid-template-columns: minmax(150px, 1.2fr) 1fr 1fr;
+    gap: 10px 12px;
+    align-items: end;
+    padding: 10px 0;
+    border-bottom: 1px solid #e9ecef;
+  }
+  .b2b-filter-date-row:last-child{
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+  .b2b-filter-date-row__label{
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #343a40;
+    padding-bottom: 6px;
+  }
+  .b2b-filter-date-row__field .form-control{
+    min-height: 36px;
   }
 
-  /* Filter modal: mobile layout + scrolling */
+  /* Filter modal: mobile layout */
   @media (max-width: 576px){
     .b2b-filter-dialog{
       width: calc(100vw - 16px);
@@ -8405,38 +8550,45 @@ const B2BSales = () => {
       max-width: calc(100vw - 16px);
     }
     .b2b-filter-modal{
-      border-radius: 14px;
-      overflow: hidden;
-      max-height: 92vh !important;
-      display: flex;
-      flex-direction: column;
+      max-height: calc(100vh - 16px) !important;
     }
     .b2b-filter-modal .modal-header{
       padding: 10px 12px;
-      flex: 0 0 auto;
     }
     .b2b-filter-modal .modal-body{
       padding: 12px !important;
-      overflow-y: auto !important;
-      overflow-x: visible !important;
-      -webkit-overflow-scrolling: touch;
-      flex: 1 1 auto;
-      min-height: 0; /* allow flex child to scroll */
     }
     .b2b-filter-modal .modal-footer{
       gap: 8px;
       padding: 10px 12px;
-      flex: 0 0 auto;
+      flex-wrap: wrap;
     }
     .b2b-filter-modal .modal-footer .btn{
       flex: 1;
       white-space: nowrap;
+    }
+    .b2b-filter-date-row{
+      grid-template-columns: 1fr;
+      gap: 6px;
+      padding: 12px 0;
+    }
+    .b2b-filter-date-row__label{
+      padding-bottom: 0;
     }
     .options-list-new{
       max-height: 210px;
     }
     .multi-select-options-new{
       border-radius: 12px;
+    }
+  }
+  @media (max-width: 767px){
+    .b2b-filter-date-row{
+      grid-template-columns: 1fr 1fr;
+    }
+    .b2b-filter-date-row__label{
+      grid-column: 1 / -1;
+      padding-bottom: 0;
     }
   }
 

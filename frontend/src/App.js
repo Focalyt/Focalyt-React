@@ -59,6 +59,7 @@ import RequiredDocuments from './Pages/App/Candidate/RequiredDocuments/RequiredD
 import PaymentDetails from './Pages/App/Candidate/PaymentsDetails/PaymentDetails';
 import CandidatesEvents from './Pages/App/Candidate/Events/CandidatesEvents';
 import EnrolledCourses from './Pages/App/Candidate/EnrolledCourses/EnrolledCourses';
+import NewEnrolledCourses from './Pages/App/Candidate/EnrolledCourses/NewEnrolledCourses';
 import Curriculums from './Pages/App/Candidate/EnrolledCourses/Curriculums';
 import Assignments from './Pages/App/Candidate/Assignment/Assignment';
 import JobOffer from './Pages/App/Candidate/JobOffer/jobOffer';
@@ -263,6 +264,8 @@ const Layout = () => {
           <Route path='enrolledCourses/:courseId' element={<Curriculums/>}/>
           <Route path='assignments' element={<Assignments/>}/>
           <Route path='jobOffer' element={<JobOffer/>}/>
+          <Route path='newEnrolledCourses' element={<NewEnrolledCourses/>}/>
+          <Route path='newEnrolledCourses/:enrollmentId' element={<NewEnrolledCourses/>}/>
         </Route>
       
 
