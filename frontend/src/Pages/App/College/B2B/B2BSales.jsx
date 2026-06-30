@@ -2020,11 +2020,23 @@ const B2BSales = () => {
     }
   }, [input1Value, bulkMode, leads, totalLeads, filters, selectedStatusFilter, token]);
 
-  // Handle status card click
+  const getDashSubFiltersCleared = (base = filtersRef.current) => ({
+    ...base,
+    followUpCallBucket: '',
+    followUpVisitBucket: '',
+    documentsStatus: [],
+    hasFollowUpCall: false,
+    hasFollowUpVisit: false,
+  });
+
+  // Handle status card click (Performance: HOT, WARM, etc.)
   const handleStatusCardClick = (statusId) => {
     setSelectedStatusFilter(statusId);
+    setSelectedApprovalStatus(null);
+    const next = getDashSubFiltersCleared();
+    setFilters(next);
     setCurrentPage(1);
-    fetchLeads(statusId, 1, getLeadFetchOverrides());
+    fetchLeads(statusId, 1, getLeadFetchOverrides({ ...next, approvalStatus: null }));
   };
 
   const hasActiveFollowupFilter = Boolean(
@@ -2088,16 +2100,20 @@ const B2BSales = () => {
     fetchApprovalCounts(cleared);
   };
 
-  // Handle total card click (show all leads for current header filters)
-  const handleTotalCardClick = () => {
+  const clearFollowupDashFilters = () => {
     setSelectedStatusFilter(null);
     setSelectedApprovalStatus(null);
-    const next = { ...filters, followUpCallBucket: '', followUpVisitBucket: '' };
+    const next = getDashSubFiltersCleared();
     setFilters(next);
     setCurrentPage(1);
     fetchLeads(null, 1, getLeadFetchOverrides({ ...next, approvalStatus: null }));
     fetchStatusCounts(next);
-    fetchApprovalCounts();
+    fetchApprovalCounts(next);
+  };
+
+  // Handle total card click (show all leads for current header filters)
+  const handleTotalCardClick = () => {
+    clearFollowupDashFilters();
   };
 
   // Filter handlers
@@ -2109,6 +2125,15 @@ const B2BSales = () => {
   };
 
   const toCsv = (arr) => (Array.isArray(arr) ? arr.filter(Boolean).join(',') : '');
+
+  const stripDashboardSubFilters = (eff) => ({
+    ...eff,
+    followUpCallBucket: '',
+    followUpVisitBucket: '',
+    documentsStatus: [],
+    hasFollowUpCall: false,
+    hasFollowUpVisit: false,
+  });
 
   const appendLeadFilterParams = (params, eff, options = {}) => {
     if (eff.search) params.search = eff.search;
@@ -2150,21 +2175,17 @@ const B2BSales = () => {
 
   const handleFollowupDashClick = (type, bucket) => {
     const filterKey = type === 'Visit' ? 'followUpVisitBucket' : 'followUpCallBucket';
-    const otherKey = type === 'Visit' ? 'followUpCallBucket' : 'followUpVisitBucket';
-    const next = { ...filters };
-    const togglingOff = next[filterKey] === bucket;
+    const next = getDashSubFiltersCleared();
+    const togglingOff = filtersRef.current[filterKey] === bucket;
     next[filterKey] = togglingOff ? '' : bucket;
     if (!togglingOff) {
-      next[otherKey] = '';
       setSelectedStatusFilter(null);
       setSelectedApprovalStatus(null);
     }
     setFilters(next);
     setCurrentPage(1);
-    const overrides = getLeadFetchOverrides(togglingOff ? next : { ...next, approvalStatus: null });
-    fetchLeads(togglingOff ? selectedStatusFilter : null, 1, overrides);
-    fetchStatusCounts(next);
-    fetchApprovalCounts(next);
+    const overrides = getLeadFetchOverrides({ ...next, approvalStatus: null });
+    fetchLeads(null, 1, overrides);
   };
 
   const isFollowupDashSelected = (type, bucket) => {
@@ -2401,7 +2422,7 @@ const B2BSales = () => {
   const fetchStatusCounts = async (filterOverrides = {}) => {
     try {
       setLoadingStatusCounts(true);
-      const eff = { ...filtersRef.current, ...filterOverrides };
+      const eff = stripDashboardSubFilters({ ...filtersRef.current, ...filterOverrides });
       const params = {};
       appendLeadFilterParams(params, eff);
 
@@ -2432,11 +2453,10 @@ const B2BSales = () => {
     return permissionType === 'Admin';
   };
 
-  // Lead Approval counts (Total/Approved/Pending/Rejected) - respects current filters
   const fetchApprovalCounts = async (filterOverrides = {}) => {
     try {
       setApprovalCountsLoading(true);
-      const eff = { ...filtersRef.current, ...filterOverrides };
+      const eff = stripDashboardSubFilters({ ...filtersRef.current, ...filterOverrides });
       const baseParams = {};
       appendLeadFilterParams(baseParams, eff, { skipApprovalStatus: true });
 
@@ -2464,8 +2484,11 @@ const B2BSales = () => {
 
   const handleApprovalCardClick = (nextStatus) => {
     setSelectedApprovalStatus(nextStatus);
+    setSelectedStatusFilter(null);
+    const next = getDashSubFiltersCleared();
+    setFilters(next);
     setCurrentPage(1);
-    fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides({ approvalStatus: nextStatus }));
+    fetchLeads(null, 1, getLeadFetchOverrides({ ...next, approvalStatus: nextStatus }));
     if (leadViewTab === 'all') {
       fetchStatusCounts({ approvalStatus: nextStatus });
     }
@@ -5324,7 +5347,7 @@ const B2BSales = () => {
                         <button
                           type="button"
                           className="btn btn-sm btn-outline-danger"
-                          onClick={showAllLeads}
+                          onClick={clearFollowupDashFilters}
                           style={{ fontSize: '12px', fontWeight: 600, borderRadius: '999px' }}
                         >
                           <i className="fas fa-list me-1" aria-hidden="true" />

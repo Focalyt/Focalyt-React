@@ -21,7 +21,18 @@ function TypeCategory() {
     const [editingId, setEditingId] = useState(null);
     const [alert, setAlert] = useState({ show: false, message: '', type: '' });
 
-    /** Payload shape matches backend `leadCategory` schema: documents[], questions[{ question, type, required, options }] */
+    /** Payload shape matches backend `leadCategory` schema: documents[], questions[{ question, type, required, options, placeholder }] */
+    const QUESTION_PLACEHOLDER_DEFAULTS = {
+        text: 'Enter text (e.g. name, remark)',
+        number: 'Enter number (e.g. 25, 100)'
+    };
+
+    const getQuestionPlaceholder = (type, value) => {
+        const trimmed = String(value ?? '').trim();
+        if (trimmed) return trimmed;
+        return QUESTION_PLACEHOLDER_DEFAULTS[type] || '';
+    };
+
     const buildQuestionsPayload = (list) => {
         const allowedTypes = ['text', 'number', 'radio', 'date'];
         return (list || [])
@@ -34,7 +45,10 @@ function TypeCategory() {
                     question: String(q?.question ?? '').trim(),
                     type,
                     required: Boolean(q?.required),
-                    options: type === 'radio' ? options : []
+                    options: type === 'radio' ? options : [],
+                    ...(type === 'text' || type === 'number'
+                        ? { placeholder: getQuestionPlaceholder(type, q?.placeholder) }
+                        : {})
                 };
             })
             .filter((q) => q.question);
@@ -243,6 +257,7 @@ function TypeCategory() {
                         question: q?.question || '',
                         type,
                         required: q?.required !== false,
+                        placeholder: getQuestionPlaceholder(type, q?.placeholder),
                         options:
                             type === 'radio'
                                 ? (rawOpts.length > 0 ? rawOpts : ['Option 1', 'Option 2'])
@@ -297,7 +312,7 @@ function TypeCategory() {
     const addQuestion = () => {
         setQuestions((prev) => [
             ...(prev || []),
-            { question: '', type: 'text', required: true, options: ['Option 1', 'Option 2'] }
+            { question: '', type: 'text', required: true, placeholder: QUESTION_PLACEHOLDER_DEFAULTS.text, options: ['Option 1', 'Option 2'] }
         ]);
     };
 
@@ -591,15 +606,17 @@ function TypeCategory() {
                                                                 <div className="b2b-section-title">Questions</div>
                                                                 <div className="b2b-section-subtitle">Add custom fields you want to collect.</div>
                                                             </div>
-                                                        <button
-                                                            type="button"
-                                                            className="btn btn-sm btn-outline-primary b2b-btn"
-                                                            onClick={addQuestion}
-                                                            disabled={loading}
-                                                        >
-                                                            + Add Question
-                                                        </button>
-                                                    </div>
+                                                            {(questions || []).length === 0 && (
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-sm btn-outline-primary b2b-btn"
+                                                                    onClick={addQuestion}
+                                                                    disabled={loading}
+                                                                >
+                                                                    + Add Question
+                                                                </button>
+                                                            )}
+                                                        </div>
 
                                                         {(questions || []).length > 0 && (
                                                             <div className="mt-1">
@@ -627,6 +644,10 @@ function TypeCategory() {
                                                                                         const nextType = e.target.value;
                                                                                         updateQuestion(qIdx, {
                                                                                             type: nextType,
+                                                                                            placeholder:
+                                                                                                nextType === 'text' || nextType === 'number'
+                                                                                                    ? (QUESTION_PLACEHOLDER_DEFAULTS[nextType] || '')
+                                                                                                    : '',
                                                                                             options:
                                                                                                 nextType === 'radio'
                                                                                                     ? (Array.isArray(q?.options) && q.options.length > 0 ? q.options : ['Option 1', 'Option 2'])
@@ -667,6 +688,26 @@ function TypeCategory() {
                                                                                 </button>
                                                                             </div>
                                                                         </div>
+
+                                                                        {(q?.type === 'text' || q?.type === 'number') && (
+                                                                            <div className="row g-1 align-items-end mt-50">
+                                                                                <div className="col-12">
+                                                                                    <label className="b2b-label">Placeholder</label>
+                                                                                    <input
+                                                                                        className="form-control b2b-control"
+                                                                                        value={q?.placeholder || ''}
+                                                                                        onChange={(e) => updateQuestion(qIdx, { placeholder: e.target.value })}
+                                                                                        placeholder={
+                                                                                            q?.type === 'number'
+                                                                                                ? 'Hint shown in form, e.g. Enter number (25, 100)'
+                                                                                                : 'Hint shown in form, e.g. Enter text (name, remark)'
+                                                                                        }
+                                                                                        disabled={loading}
+                                                                                        maxLength={120}
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
 
                                                                         {q?.type === 'radio' && (
                                                                             <div className="mt-1">
@@ -713,6 +754,14 @@ function TypeCategory() {
                                                                         )}
                                                                     </div>
                                                                 ))}
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-sm btn-outline-primary b2b-btn mt-1"
+                                                                    onClick={addQuestion}
+                                                                    disabled={loading}
+                                                                >
+                                                                    + Add Question
+                                                                </button>
                                                             </div>
                                                         )}
                                                     </div>

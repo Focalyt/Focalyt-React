@@ -24,6 +24,17 @@ const pickOptionLabel = (id, options) => {
   return hit ? String(hit.label || hit.name || "").trim() : "";
 };
 
+const QUESTION_PLACEHOLDER_DEFAULTS = {
+  text: "Enter text (e.g. name, remark)",
+  number: "Enter number (e.g. 25, 100)",
+};
+
+const getQuestionFieldPlaceholder = (q) => {
+  const custom = String(q?.placeholder ?? "").trim();
+  if (custom) return custom;
+  return QUESTION_PLACEHOLDER_DEFAULTS[q?.type] || "";
+};
+
 const parseB2bLeadContext = (lead) => {
   if (!lead || typeof lead !== "object") return null;
 
@@ -1511,6 +1522,7 @@ function Lrp() {
                         <input
                           inputMode="decimal"
                           value={leadSourceAnswers[i] ?? ""}
+                          placeholder={getQuestionFieldPlaceholder(q)}
                           onChange={(e) =>
                             setLeadSourceAnswers((prev) => ({
                               ...prev,
@@ -1531,6 +1543,7 @@ function Lrp() {
                       ) : (
                         <input
                           value={leadSourceAnswers[i] ?? ""}
+                          placeholder={getQuestionFieldPlaceholder(q)}
                           onChange={(e) => setLeadSourceAnswers((prev) => ({ ...prev, [i]: e.target.value }))}
                           onBlur={() => markTouched(`ls_${i}`)}
                           style={fldStyle}

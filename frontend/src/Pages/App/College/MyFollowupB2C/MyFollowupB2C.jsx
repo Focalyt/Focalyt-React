@@ -1937,16 +1937,50 @@ const MyFollowups = () => {
     return first.toDateString() === second.toDateString();
   };
 
-  const getFollowupDateFilterBy = (filters = filterData) => {
-    const hasDateRange = filters?.fromDate || filters?.toDate;
-    const isTodayRange =
-      filters?.fromDate &&
-      filters?.toDate &&
-      isSameCalendarDate(filters.fromDate, new Date()) &&
-      isSameCalendarDate(filters.toDate, new Date());
-
-    return !hasDateRange || isTodayRange ? 'activity' : undefined;
+  const formatFollowupFilterDate = (date) => {
+    if (!date) return null;
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return null;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   };
+
+  const getFollowupDateFilterBy = (filters = filterData) => {
+    const from = formatFollowupFilterDate(filters?.fromDate);
+    const to = formatFollowupFilterDate(filters?.toDate || filters?.fromDate);
+    return {
+      ...(from && { fromDate: from }),
+      ...(to && { toDate: to }),
+    };
+  };
+
+  const followupCountFilterKey = useMemo(
+    () =>
+      JSON.stringify({
+        fromDate: filterData.fromDate,
+        toDate: filterData.toDate,
+        courseType: filterData.courseType,
+        name: filterData.name,
+        projects: formData?.projects?.values,
+        verticals: formData?.verticals?.values,
+        course: formData?.course?.values,
+        center: formData?.center?.values,
+        counselor: formData?.counselor?.values,
+      }),
+    [
+      filterData.fromDate,
+      filterData.toDate,
+      filterData.courseType,
+      filterData.name,
+      formData?.projects?.values,
+      formData?.verticals?.values,
+      formData?.course?.values,
+      formData?.center?.values,
+      formData?.counselor?.values,
+    ]
+  );
 
   const fetchProfileData = async (filters = filterData, page = currentPage) => {
     setIsLoadingAllProfiles(true);
@@ -1956,11 +1990,7 @@ const MyFollowups = () => {
         return;
       }
       const queryParams = new URLSearchParams({
-        // Followup specific date range (if you want to add separate followup date filters)
-        // You can add fromDate and toDate here if needed for followup date filtering
-        ...(filters?.fromDate && { fromDate: filters.fromDate }),
-        ...(filters?.toDate && { toDate: filters.toDate }),
-        ...(getFollowupDateFilterBy(filters) && { filterBy: getFollowupDateFilterBy(filters) }),
+        ...getFollowupDateFilterBy(filters),
         ...(filters.name && { name: filters.name }),
         ...(filters.courseType && { courseType: filters.courseType }),
         ...(filters.status && { status: filters.status }),
@@ -2127,25 +2157,18 @@ const MyFollowups = () => {
 
 
   useEffect(() => {
-    // console.log("activeCrmFilter", activeCrmFilter)
     fetchFollowupCounts();
-  }, [filterData, activeFollowupStatus, activeCrmFilter, messages, updates]);
+  }, [followupCountFilterKey, messages, updates]);
 
   const fetchFollowupCounts = async (filters = filterData) => {
     try {
-
-      // console.log("fromDate", filterData.fromDate, 'toDate', filterData.toDate)
 
       if (!token) {
         return;
       }
 
       const queryParams = new URLSearchParams({
-        // Followup specific date range (if you want to add separate followup date filters)
-        // You can add fromDate and toDate here if needed for followup date filtering
-        ...(filters?.fromDate && { fromDate: filters.fromDate }),
-        ...(filters?.toDate && { toDate: filters.toDate }),
-        ...(getFollowupDateFilterBy(filters) && { filterBy: getFollowupDateFilterBy(filters) }),
+        ...getFollowupDateFilterBy(filters),
         ...(filters.name && { name: filters.name }),
         ...(filters.courseType && { courseType: filters.courseType }),
 
@@ -2154,7 +2177,6 @@ const MyFollowups = () => {
         ...(formData?.course?.values?.length > 0 && { course: JSON.stringify(formData.course.values) }),
         ...(formData?.center?.values?.length > 0 && { center: JSON.stringify(formData.center.values) }),
         ...(formData?.counselor?.values?.length > 0 && { counselor: JSON.stringify(formData.counselor.values) }),
-        followupStatus: activeFollowupStatus,
       });
 
       const response = await axios.get(`${backendUrl}/college/followupcounts?${queryParams}`, {
@@ -2536,13 +2558,11 @@ const MyFollowups = () => {
           setFilterData(prev => ({
             ...prev,
             toDate: new Date(clickedDate),
-            fromDate: null
           }));
         } else {
           setFilterData(prev => ({
-            ...prev,
+            fromDate: new Date(clickedDate),
             toDate: new Date(filterData.fromDate),
-            fromDate: new Date(clickedDate)
           }));
         }
         setRangePreset('custom');

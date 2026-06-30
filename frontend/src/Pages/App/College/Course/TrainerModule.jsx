@@ -986,35 +986,37 @@ const SessionFormFields = ({
       </div>
 
       {isEdit && (
-        <>
-          <label className="session-field session-field--full">
-            <span>Additional notes</span>
-            <textarea className="dbr-textarea session-field__control" rows="3" placeholder="Enter additional notes..." value={draft.notes} onChange={(e) => onFieldChange('notes', e.target.value)} />
-          </label>
-          <div className="session-evidence-builder">
-            <div className="session-evidence-builder__head">
-              <h6>Documents</h6>
-              <button type="button" className="session-mini-btn" onClick={onAddEvidence}>
-                <i className="fas fa-plus" /> Add document
-              </button>
-            </div>
-            {(draft.evidenceDocs || []).map((doc, index) => (
-              <div key={doc.id || index} className="session-evidence-row">
-                <input className="dbr-input session-field__control" placeholder="Document name" value={doc.name} onChange={(e) => onEvidenceChange(index, 'name', e.target.value)} />
-                <select className="dbr-select session-field__control" value={doc.type} onChange={(e) => onEvidenceChange(index, 'type', e.target.value)}>
-                  <option>Document</option>
-                  <option>Image</option>
-                  <option>Video</option>
-                  <option>PDF</option>
-                </select>
-                <button type="button" className="session-remove-btn" onClick={() => onRemoveEvidence(index)} aria-label="Remove document">
-                  <i className="fas fa-trash" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </>
+        <label className="session-field session-field--full">
+          <span>Additional notes</span>
+          <textarea className="dbr-textarea session-field__control" rows="3" placeholder="Enter additional notes..." value={draft.notes} onChange={(e) => onFieldChange('notes', e.target.value)} />
+        </label>
       )}
+
+      <div className="session-evidence-builder">
+        <div className="session-evidence-builder__head">
+          <h6>Documents</h6>
+          <button type="button" className="session-mini-btn" onClick={onAddEvidence}>
+            <i className="fas fa-plus" /> Add document
+          </button>
+        </div>
+        {(draft.evidenceDocs || []).length === 0 && (
+          <p className="session-evidence-empty">Define document name and type here. Upload files from the Documents tab after saving.</p>
+        )}
+        {(draft.evidenceDocs || []).map((doc, index) => (
+          <div key={doc.id || index} className="session-evidence-row">
+            <input className="dbr-input session-field__control" placeholder="Document name" value={doc.name} onChange={(e) => onEvidenceChange(index, 'name', e.target.value)} />
+            <select className="dbr-select session-field__control" value={doc.type} onChange={(e) => onEvidenceChange(index, 'type', e.target.value)}>
+              <option>Document</option>
+              <option>Image</option>
+              <option>Video</option>
+              <option>PDF</option>
+            </select>
+            <button type="button" className="session-remove-btn" onClick={() => onRemoveEvidence(index)} aria-label="Remove document">
+              <i className="fas fa-trash" />
+            </button>
+          </div>
+        ))}
+      </div>
     </>
   );
 };
@@ -1986,7 +1988,7 @@ const SessionCard = ({ basicDetails, session, notify, onStatusChange, onEvidence
     { icon: 'fa-times-circle', val: activeSession.absentCandidates || '0', lbl: 'Absent', cls: 'red' },
     { icon: 'fa-percentage', val: activeSession.attendance || '0%', lbl: 'Attendance', cls: 'amber' },
   ]), [activeSession]);
-  const evidenceDocs = activeSession.evidenceDocs?.length ? activeSession.evidenceDocs : createEvidenceDocs('Pending');
+  const evidenceDocs = activeSession.evidenceDocs || [];
 
   return (
     <article className="sc-wrap">
@@ -2087,34 +2089,43 @@ const SessionCard = ({ basicDetails, session, notify, onStatusChange, onEvidence
             </div>
           ) : (
             <div className="sc-body">
-              <div className="sc-evidence-grid">
-                {evidenceDocs.map((doc) => {
-                  const icon = doc.type === 'Image' ? 'fa-image' : doc.type === 'Video' ? 'fa-video' : 'fa-file-alt';
-                  const tone = doc.status === 'Uploaded' ? 'green' : 'amber';
-                  return (
-                    <div key={doc.id} className="sc-evidence-card">
-                      <div className={`sc-evidence-icon sc-evidence-icon--${tone}`}>
-                        <i className={`fas ${icon}`} />
+              {evidenceDocs.length === 0 ? (
+                <div className="sc-evidence-empty">
+                  <i className="far fa-folder-open" />
+                  <p>No documents defined yet. Add document names in Add Session or Edit Session, then upload files here.</p>
+                </div>
+              ) : (
+                <div className="sc-evidence-grid">
+                  {evidenceDocs.map((doc) => {
+                    const icon = doc.type === 'Image' ? 'fa-image' : doc.type === 'Video' ? 'fa-video' : doc.type === 'PDF' ? 'fa-file-pdf' : 'fa-file-alt';
+                    const tone = doc.status === 'Uploaded' ? 'green' : 'amber';
+                    return (
+                      <div key={doc.id} className="sc-evidence-card">
+                        <div className={`sc-evidence-icon sc-evidence-icon--${tone}`}>
+                          <i className={`fas ${icon}`} />
+                        </div>
+                        <strong>{doc.name}</strong>
+                        <small className="sc-evidence-type">{doc.type}</small>
+                        <small className={doc.status === 'Uploaded' ? 'ev-uploaded' : 'ev-pending'}>
+                          <i className={`fas ${doc.status === 'Uploaded' ? 'fa-check-circle' : 'fa-clock'}`} />
+                          &nbsp;{doc.status}
+                        </small>
+                        {doc.fileName && <span className="sc-file-name">{doc.fileName}</span>}
+                        <input
+                          id={`${activeSession.id}-${doc.id}`}
+                          type="file"
+                          className="sc-file-input"
+                          accept="image/*,video/*,.pdf,application/pdf"
+                          onChange={(e) => onEvidenceUpload(activeSession.id, doc.id, e.target.files?.[0])}
+                        />
+                        <label className="sc-upload-btn" htmlFor={`${activeSession.id}-${doc.id}`}>
+                          <i className="fas fa-upload" /> {doc.status === 'Uploaded' ? 'Replace' : 'Upload'}
+                        </label>
                       </div>
-                      <strong>{doc.name}</strong>
-                      <small className={doc.status === 'Uploaded' ? 'ev-uploaded' : 'ev-pending'}>
-                        <i className={`fas ${doc.status === 'Uploaded' ? 'fa-check-circle' : 'fa-clock'}`} />
-                        &nbsp;{doc.status}
-                      </small>
-                      {doc.fileName && <span className="sc-file-name">{doc.fileName}</span>}
-                      <input
-                        id={`${activeSession.id}-${doc.id}`}
-                        type="file"
-                        className="sc-file-input"
-                        onChange={(e) => onEvidenceUpload(activeSession.id, doc.id, e.target.files?.[0])}
-                      />
-                      <label className="sc-upload-btn" htmlFor={`${activeSession.id}-${doc.id}`}>
-                        <i className="fas fa-upload" /> Upload
-                      </label>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -2786,7 +2797,7 @@ const TrainerModule = () => {
     setSessionDraft({
       ...session,
       sessionDate: session.sessionDate || getTodayInputValue(),
-      evidenceDocs: session.evidenceDocs?.length ? session.evidenceDocs : createEvidenceDocs('Pending'),
+      evidenceDocs: session.evidenceDocs || [],
     });
     setSessionPanelView('view');
     setIsSessionModalOpen(true);
@@ -2802,7 +2813,7 @@ const TrainerModule = () => {
   const updateDraftEvidence = (index, field, value) => {
     setSessionDraft((prev) => ({
       ...prev,
-      evidenceDocs: prev.evidenceDocs.map((doc, docIndex) =>
+      evidenceDocs: (prev.evidenceDocs || []).map((doc, docIndex) =>
         docIndex === index ? { ...doc, [field]: value } : doc
       ),
     }));
@@ -2811,7 +2822,7 @@ const TrainerModule = () => {
     setSessionDraft((prev) => ({
       ...prev,
       evidenceDocs: [
-        ...prev.evidenceDocs,
+        ...(prev.evidenceDocs || []),
         { id: `EV${Date.now()}`, name: '', type: 'Document', status: 'Pending', fileName: '' },
       ],
     }));
@@ -2819,7 +2830,7 @@ const TrainerModule = () => {
   const removeDraftEvidence = (index) => {
     setSessionDraft((prev) => ({
       ...prev,
-      evidenceDocs: prev.evidenceDocs.filter((_, docIndex) => docIndex !== index),
+      evidenceDocs: (prev.evidenceDocs || []).filter((_, docIndex) => docIndex !== index),
     }));
   };
   const syncFiltersFromSession = (session) => {
@@ -2927,8 +2938,16 @@ const TrainerModule = () => {
         session.id === sessionId
           ? {
             ...session,
-            evidenceDocs: session.evidenceDocs.map((doc) => (
-              doc.id === docId ? { ...doc, status: 'Uploaded', fileName: file.name } : doc
+            evidenceDocs: (session.evidenceDocs || []).map((doc) => (
+              doc.id === docId
+                ? {
+                  ...doc,
+                  status: 'Uploaded',
+                  fileName: file.name,
+                  type: getEvidenceTypeFromFile(file),
+                  name: doc.name?.trim() || getEvidenceDisplayName(file.name),
+                }
+                : doc
             )),
           }
           : session
@@ -4596,6 +4615,23 @@ const PORTAL_CSS = `
   .sc-evidence-icon--green { background: #d1fae5; color: #059669; }
   .sc-evidence-card strong { font-size: 11px; font-weight: 700; color: #1e293b; }
   .sc-evidence-card small { font-size: 10px; font-weight: 600; }
+  .sc-evidence-type { color: #64748b; }
+  .sc-evidence-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 120px;
+    padding: 24px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 12px;
+    background: #f8fafc;
+    color: #64748b;
+    text-align: center;
+  }
+  .sc-evidence-empty i { font-size: 28px; color: #94a3b8; }
+  .sc-evidence-empty p { margin: 0; font-size: 12px; font-weight: 600; }
   .ev-uploaded { color: #059669; }
   .ev-pending  { color: #d97706; }
   .sc-file-name { font-size: 11px; color: #64748b; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -4644,6 +4680,7 @@ const PORTAL_CSS = `
     gap: 12px;
     padding: 16px 18px;
     border-bottom: 1px solid #e2e8f0;
+    flex-shrink: 0;
   }
   .session-modal__foot { border-top: 1px solid #e2e8f0; border-bottom: 0; justify-content: flex-end; }
   .session-modal__head h5 { margin: 0; font-size: 18px; font-weight: 900; color: #0f172a; }
@@ -4658,7 +4695,12 @@ const PORTAL_CSS = `
     cursor: pointer;
   }
   .session-modal__close:hover { background: #f8fafc; color: #0f172a; }
-  .session-modal__body { padding: 18px; }
+  .session-modal__body {
+    padding: 18px;
+    overflow-y: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
   .session-modal__context {
     margin-bottom: 16px;
     padding: 12px 14px;
@@ -4727,6 +4769,12 @@ const PORTAL_CSS = `
     margin-bottom: 10px;
   }
   .session-evidence-builder__head h6 { margin: 0; font-size: 13px; font-weight: 900; color: #1e293b; }
+  .session-evidence-empty {
+    margin: 0 0 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
+  }
   .session-mini-btn,
   .session-remove-btn {
     border: 1px solid #bfdbfe;

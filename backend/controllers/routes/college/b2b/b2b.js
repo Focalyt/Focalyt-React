@@ -1440,7 +1440,10 @@ router.post('/lead-categories', isCollege, async (req, res) => {
 					question: String(q?.question || '').trim(),
 					type,
 					required: Boolean(q?.required),
-					options: type === 'radio' ? options : []
+					options: type === 'radio' ? options : [],
+					...(type === 'text' || type === 'number'
+						? { placeholder: String(q?.placeholder || '').trim() }
+						: {})
 				};
 			}).filter((q) => q.question)
 			: [];
@@ -1533,7 +1536,10 @@ router.put('/lead-categories/:id', isCollege, async (req, res) => {
 						question: String(q?.question || '').trim(),
 						type,
 						required: Boolean(q?.required),
-						options: type === 'radio' ? options : []
+						options: type === 'radio' ? options : [],
+						...(type === 'text' || type === 'number'
+							? { placeholder: String(q?.placeholder || '').trim() }
+							: {})
 					};
 				}).filter((q) => q.question)
 				: [];
@@ -3691,8 +3697,22 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 	try {
 		console.log('[B2B Update Status] Step 1: Request received', { method: req.method, path: req.path });
 		const { id } = req.params;
-		const { status, subStatus, remarks } = req.body;
-		console.log('[B2B Update Status] Step 2: Params & body', { leadId: id, status, subStatus, hasRemarks: !!remarks });
+		const {
+			status,
+			subStatus,
+			remarks,
+			followUpDate,
+			followUpTime,
+			followUpType = 'Call',
+			googleCalendarEvent = false
+		} = req.body;
+		// console.log('[B2B Update Status] Step 2: Params & body', {
+		// 	leadId: id,
+		// 	status,
+		// 	subStatus,
+		// 	hasRemarks: !!remarks,
+		// 	hasFollowUp: !!(followUpDate && followUpTime)
+		// });
 
 		// Validate required fields
 		if (!status) {
@@ -3803,20 +3823,110 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			lead.remark = remarks;
 		}
 
-		// Add to logs with detailed status change information
-		lead.logs.push({
-			user: req.user._id,
-			timestamp: new Date(),
-			action: `Status changed from ${oldStatusName} (${oldSubStatusName}) to ${newStatusName} (${newSubStatusName})`,
-			remarks: remarks || `Status updated from ${oldStatusName} to ${newStatusName}`
-		});
+		const statusChanged =
+			String(oldStatus || '') !== String(status || '') ||
+			String(oldSubStatus || '') !== String(subStatus || '');
+
+		if (statusChanged) {
+			lead.logs.push({
+				user: req.user._id,
+				timestamp: new Date(),
+				action: `Status changed from ${oldStatusName} (${oldSubStatusName}) to ${newStatusName} (${newSubStatusName})`,
+				remarks: remarks || `Status updated from ${oldStatusName} to ${newStatusName}`
+			});
+		} else if (remarks) {
+			lead.logs.push({
+				user: req.user._id,
+				timestamp: new Date(),
+				action: `Remarks updated for ${newStatusName} (${newSubStatusName})`,
+				remarks
+			});
+		}
+
+		let savedFollowUp = null;
+		let scheduledDateTime = null;
+		if (followUpDate && followUpTime) {
+			const [hours, minutes] = String(followUpTime).split(':');
+			scheduledDateTime = /^\d{4}-\d{2}-\d{2}$/.test(String(followUpDate))
+				? new Date(`${followUpDate}T00:00:00`)
+				: new Date(followUpDate);
+			scheduledDateTime.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+
+			const normalizedType = String(followUpType || 'Call').trim();
+			savedFollowUp = new FollowUp({
+				leadId: id,
+				followUpType: normalizedType,
+				description: `Status changed to ${newStatusName}`,
+				scheduledDate: scheduledDateTime,
+				remarks: remarks || '',
+				addedBy: req.user._id
+			});
+			await savedFollowUp.save();
+
+			lead.followUp = savedFollowUp._id;
+			if (normalizedType.toLowerCase() === 'visit') {
+				lead.followUpVisit = savedFollowUp._id;
+			} else {
+				lead.followUpCall = savedFollowUp._id;
+			}
+
+			lead.logs.push({
+				user: req.user._id,
+				timestamp: new Date(),
+				action: `${normalizedType} follow-up scheduled for ${scheduledDateTime.toLocaleDateString()} at ${followUpTime}`,
+				remarks: remarks || ''
+			});
+		}
 
 		await lead.save();
-		console.log('[B2B Update Status] Step 9: Lead saved', { leadId: id, newStatus: status, newSubStatus: subStatus || '(none)' });
+		// console.log('[B2B Update Status] Step 9: Lead saved', {
+		// 	leadId: id,
+		// 	newStatus: status,
+		// 	newSubStatus: subStatus || '(none)',
+		// 	followUpSet: !!savedFollowUp
+		// });
+
+		if (googleCalendarEvent && savedFollowUp && scheduledDateTime && req.user.googleAuthToken?.accessToken) {
+			try {
+				const { createGoogleCalendarEvent } = require('../../services/googleservice');
+				const googleEvent = await createGoogleCalendarEvent({
+					user: req.user,
+					event: {
+						summary: `B2B Follow-up: ${lead.businessName}`,
+						description: `Status Change Follow-up with ${lead.concernPersonName} (${lead.designation || 'N/A'})\n\nBusiness: ${lead.businessName}\nContact: ${lead.mobile}\nEmail: ${lead.email}\nStatus: ${newStatusName}\n\nRemarks: ${remarks || 'No remarks'}`,
+						start: {
+							dateTime: scheduledDateTime.toISOString(),
+							timeZone: 'Asia/Kolkata',
+						},
+						end: {
+							dateTime: new Date(scheduledDateTime.getTime() + 30 * 60000).toISOString(),
+							timeZone: 'Asia/Kolkata',
+						},
+						reminders: {
+							useDefault: false,
+							overrides: [
+								{ method: 'email', minutes: 24 * 60 },
+								{ method: 'popup', minutes: 15 },
+							],
+						},
+					}
+				});
+				const eventId = googleEvent?.event?.id || googleEvent?.data?.id;
+				if (eventId) {
+					savedFollowUp.googleCalendarEventId = eventId;
+					await savedFollowUp.save();
+				}
+			} catch (googleError) {
+				console.error('Google Calendar Error (status update):', googleError);
+			}
+		}
 
 		// Populate the updated lead
 		const updatedLead = await applyLeadCorePopulates(Lead.findById(id))
 			.populate('status', 'name title substatuses')
+			.populate('followUp', 'followUpType scheduledDate status')
+			.populate('followUpCall', 'followUpType description status scheduledDate completedDate')
+			.populate('followUpVisit', 'followUpType description status scheduledDate completedDate')
 			.populate('leadAddedBy', 'name email')
 			.populate('leadOwner', 'name email');
 

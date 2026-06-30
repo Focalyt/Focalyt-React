@@ -14,6 +14,7 @@ const questionItemSchema = new mongoose.Schema(
     question: { type: String, trim: true },
     type: { type: String, enum: ['text', 'number', 'radio', 'date'], default: 'text' },
     required: { type: Boolean, default: true },
+    placeholder: { type: String, trim: true, default: '' },
     options: [{ type: String, trim: true }]
   },
   { _id: false }

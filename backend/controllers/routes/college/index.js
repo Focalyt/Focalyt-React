@@ -7824,6 +7824,74 @@ router.post('/mark_complete_followup/:id', isCollege, async (req, res) => {
 	}
 });
 
+const parseFollowupLocalDate = (value) => {
+	if (!value || value === 'null') return null;
+	if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+		const [year, month, day] = value.split('-').map(Number);
+		return new Date(year, month - 1, day);
+	}
+	const parsed = new Date(value);
+	return isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const resolveFollowupDateRange = (fromDateInput, toDateInput, { useAllTime = false } = {}) => {
+	let from = null;
+	let to = null;
+	const parsedFrom = parseFollowupLocalDate(fromDateInput);
+	const parsedTo = parseFollowupLocalDate(toDateInput);
+
+	if (parsedFrom) {
+		from = new Date(parsedFrom);
+		from.setHours(0, 0, 0, 0);
+	}
+	if (parsedTo) {
+		to = new Date(parsedTo);
+		to.setHours(23, 59, 59, 999);
+	} else if (from) {
+		to = new Date(from);
+		to.setHours(23, 59, 59, 999);
+	}
+
+	if (!useAllTime && !from) {
+		from = new Date();
+		from.setHours(0, 0, 0, 0);
+	}
+	if (!useAllTime && !to) {
+		to = new Date();
+		to.setHours(23, 59, 59, 999);
+	}
+
+	return { from, to };
+};
+
+const buildFollowupCounselorMatch = (user, counselorArray) => {
+	if (counselorArray.length > 0) {
+		const ids = counselorArray.map((id) => new mongoose.Types.ObjectId(id));
+		return {
+			$or: [
+				{ counsellorId: { $in: ids } },
+				{ counsellorId: { $exists: false }, createdBy: { $in: ids } },
+				{ counsellorId: null, createdBy: { $in: ids } },
+			],
+		};
+	}
+	return { createdBy: user._id };
+};
+
+const buildFollowupDateMatch = (from, to, { useAllTime = false, useActivityFilter = false } = {}) => {
+	if (useAllTime || !from || !to) return {};
+	if (useActivityFilter) {
+		return {
+			$or: [
+				{ createdAt: { $gte: from, $lte: to } },
+				{ statusUpdatedAt: { $gte: from, $lte: to } },
+				{ updatedAt: { $gte: from, $lte: to } },
+			],
+		};
+	}
+	return { followupDate: { $gte: from, $lte: to } };
+};
+
 router.get('/followupcounts', isCollege, async (req, res) => {
 	try {
 
@@ -7833,27 +7901,9 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 		const useAllTime = allTime === 'true' || allTime === true;
 		const useActivityFilter = filterBy === 'activity';
 
-		// Parse dates (default today when filterBy=activity)
-		if (fromDate && fromDate !== 'null') {
-			fromDate = new Date(fromDate);
-			if (isNaN(fromDate.getTime())) {
-				console.log('Invalid fromDate format');
-				return res.status(400).json({ error: "Invalid fromDate format" });
-			}
-		} else {
-			fromDate = new Date();
-			fromDate.setUTCHours(0, 0, 0, 0);
-		}
-		if (toDate && toDate !== 'null') {
-			toDate = new Date(toDate);
-			if (isNaN(toDate.getTime())) {
-				console.log('Invalid toDate format');
-				return res.status(400).json({ error: "Invalid toDate format" });
-			}
-			toDate.setUTCHours(23, 59, 59, 999);
-		} else {
-			toDate = new Date();
-			toDate.setUTCHours(23, 59, 59, 999);
+		const { from: rangeFrom, to: rangeTo } = resolveFollowupDateRange(fromDate, toDate, { useAllTime });
+		if (!useAllTime && (!rangeFrom || !rangeTo)) {
+			return res.status(400).json({ error: 'Invalid fromDate or toDate format' });
 		}
 
 		let projectsArray = [];
@@ -7873,24 +7923,10 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 		}
 
 		let aggregate = [];
-		let baseMatch = {};
-		if (counselorArray.length > 0) {
-			baseMatch.createdBy = { $in: counselorArray.map(id => new mongoose.Types.ObjectId(id)) };
-		} else {
-			baseMatch.createdBy = user._id;
-		}
-		if (useAllTime) {
-			// no date filter
-		} else if (useActivityFilter) {
-			// Activity: followups set in range, or status changed in range.
-			baseMatch.$or = [
-				{ createdAt: { $gte: fromDate, $lte: toDate } },
-				{ statusUpdatedAt: { $gte: fromDate, $lte: toDate } },
-				{ updatedAt: { $gte: fromDate, $lte: toDate } }
-			];
-		} else {
-			baseMatch.followupDate = { $gte: fromDate, $lte: toDate };
-		}
+		let baseMatch = {
+			...buildFollowupCounselorMatch(user, counselorArray),
+			...buildFollowupDateMatch(rangeFrom, rangeTo, { useAllTime, useActivityFilter }),
+		};
 
 		let group = [{
 			$group: {
@@ -10387,27 +10423,9 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 		const { fromDate, toDate, page = 1, limit = 10, followupStatus, projects, verticals, course, center, counselor, name: searchName, filterBy } = req.query;
 		const useActivityFilter = filterBy === 'activity';
 
-		// Add date validation
-		let from, to;
-
-		if (fromDate) {
-			from = new Date(fromDate);
-			if (isNaN(from.getTime())) {
-				return res.status(400).json({ error: "Invalid fromDate format" });
-			}
-			from.setHours(0, 0, 0, 0);
-		} else {
-			from = new Date(new Date().setHours(0, 0, 0, 0));
-		}
-
-		if (toDate) {
-			to = new Date(toDate);
-			if (isNaN(to.getTime())) {
-				return res.status(400).json({ error: "Invalid toDate format" });
-			}
-			to.setHours(23, 59, 59, 999);
-		} else {
-			to = new Date(new Date().setHours(23, 59, 59, 999));
+		const { from, to } = resolveFollowupDateRange(fromDate, toDate);
+		if (!from || !to) {
+			return res.status(400).json({ error: "Invalid fromDate or toDate format" });
 		}
 
 
@@ -10427,25 +10445,9 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 
-		let baseMatch = {}
+		let baseMatch = buildFollowupCounselorMatch(user, counselorArray);
 
-		if (counselorArray.length > 0) {
-			baseMatch.createdBy = { $in: counselorArray.map(id => new mongoose.Types.ObjectId(id)) };
-		} else {
-			baseMatch.createdBy = user._id;
-		}
-
-		const dateMatch = useActivityFilter
-			? {
-				$or: [
-					{ createdAt: { $gte: from, $lte: to } },
-					{ statusUpdatedAt: { $gte: from, $lte: to } },
-					{ updatedAt: { $gte: from, $lte: to } }
-				]
-			}
-			: {
-				followupDate: { $gte: from, $lte: to }
-			};
+		const dateMatch = buildFollowupDateMatch(from, to, { useActivityFilter });
 
 
 		const aggregate = [
@@ -10564,6 +10566,8 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 					mobile: { $first: '$candidate.mobile' },
 					appliedCourseId: { $first: '$appliedCourseId._id' },
 					followupDate: { $first: '$followupDate' },
+					status: { $first: '$status' },
+					statusUpdatedAt: { $first: '$statusUpdatedAt' },
 					remarks: { $first: '$remarks' },
 					courseName: { $first: '$courseData.name' },
 					verticalName: { $first: '$verticalData.name' },

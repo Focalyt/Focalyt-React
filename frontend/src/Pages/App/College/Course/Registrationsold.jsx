@@ -829,6 +829,8 @@ const CRMDashboard = () => {
   const [kycShowRejectForm, setKycShowRejectForm] = useState(false);
   const [kycMarkingId, setKycMarkingId] = useState(null);
   const [kycCounts, setKycCounts] = useState({ all: 0, pendingDocs: 0, pendingVerification: 0, rejected: 0, verified: 0 });
+  const [milestoneCounts, setMilestoneCounts] = useState({ kycDone: 0, admission: 0 });
+  const [selectedMilestoneFilter, setSelectedMilestoneFilter] = useState(null);
   const [setPreVerification, showSetPreVerification] = useState(false);
   const [questionFormData, setQuestionFormData] = useState({});
   const [isLoadingQuestionAnswers, setIsLoadingQuestionAnswers] = useState(false);
@@ -2596,6 +2598,32 @@ const CRMDashboard = () => {
     }
   }, [backendUrl, token, buildListFilterQueryParts, cycleFilters, applyKycFilterCounts]);
 
+  const fetchMilestoneCounts = useCallback(async () => {
+    if (!token) return;
+    try {
+      const fd = formDataRef.current || formData;
+      const queryParams = new URLSearchParams({
+        page: '1',
+        limit: '1',
+        ...buildListFilterQueryParts(fd, cycleFilters),
+      });
+      const [kycRes, admissionRes] = await Promise.all([
+        axios.get(`${backendUrl}/college/kycCandidates?${queryParams}`, {
+          headers: { 'x-auth': token },
+        }),
+        axios.get(`${backendUrl}/college/admission-list?${queryParams}`, {
+          headers: { 'x-auth': token },
+        }),
+      ]);
+      setMilestoneCounts({
+        kycDone: kycRes.data?.crmFilterCounts?.doneKyc ?? 0,
+        admission: admissionRes.data?.crmFilterCounts?.all ?? admissionRes.data?.totalCount ?? 0,
+      });
+    } catch (e) {
+      console.error('Milestone counts fetch error', e);
+    }
+  }, [backendUrl, token, buildListFilterQueryParts, cycleFilters]);
+
   // Dropdown open state
   const [dropdownStates, setDropdownStates] = useState({
     projects: false,
@@ -4098,7 +4126,13 @@ console.log('API Response:', response.data);
     }
   };
 
-  const fetchProfileData = async (filters = filterData, page = currentPage, cycleOverride = null, tabOverride = null) => {
+  const fetchProfileData = async (
+    filters = filterData,
+    page = currentPage,
+    cycleOverride = null,
+    tabOverride = null,
+    milestoneFilterOverride = undefined
+  ) => {
     setIsLoadingProfiles(true);
     closePanel();
     setLeadDetailsVisible(null);
@@ -4111,6 +4145,9 @@ console.log('API Response:', response.data);
 
     const activeMainTab = tabOverride || pageMainTab;
     const isEkycTab = activeMainTab === 'ekyc';
+    const milestoneFilter = milestoneFilterOverride !== undefined
+      ? milestoneFilterOverride
+      : selectedMilestoneFilter;
 
     // Prepare query parameters
     const fd = formDataRef.current || formData;
@@ -4130,7 +4167,15 @@ console.log('API Response:', response.data);
       ...buildListFilterQueryParts(fd, cycleOverride || cycleFilters),
     });
 
-    if (isEkycTab) {
+    let listEndpoint = 'appliedCandidates';
+
+    if (milestoneFilter === 'kycDone') {
+      listEndpoint = 'kycCandidates';
+      queryParams.set('kyc', 'true');
+    } else if (milestoneFilter === 'admission') {
+      listEndpoint = 'admission-list';
+    } else if (isEkycTab) {
+      listEndpoint = 'kycCandidates';
       if (filters.kyc !== undefined && filters.kyc !== 'all') {
         queryParams.set('kyc', String(filters.kyc));
       }
@@ -4143,8 +4188,6 @@ console.log('API Response:', response.data);
       }
     }
 
-    const listEndpoint = isEkycTab ? 'kycCandidates' : 'appliedCandidates';
-
     try {
       const response = await axios.get(`${backendUrl}/college/${listEndpoint}?${queryParams}`, {
         headers: { 'x-auth': token }
@@ -4156,12 +4199,18 @@ console.log('API Response:', response.data);
         setTotalPages(data.totalPages);
         setPageSize(data.limit || data.pageSize || pageSize);
 
-        if (isEkycTab) {
+        if (milestoneFilter === 'kycDone' || isEkycTab) {
           applyKycFilterCounts(data.crmFilterCounts);
+        }
+        if (milestoneFilter === 'kycDone' || milestoneFilter === 'admission') {
+          await fetchMilestoneCounts();
+        } else if (isEkycTab) {
+          await fetchMilestoneCounts();
         } else {
           await fetchRegistrationCrmFilterCounts(filters, page, null);
           await fetchDashboardCounts(filters);
           await fetchKycCounts();
+          await fetchMilestoneCounts();
         }
       } else {
         console.error('Failed to fetch profile data', response.data.message);
@@ -4761,6 +4810,7 @@ console.log('API Response:', response.data);
     setSelectedKycFilter(null);
     setSelectedApprovalFilter(null);
     setSelectedFollowupBucket('');
+    setSelectedMilestoneFilter(null);
     setActiveCrmFilter(0);
 
     const newFilterData = { ...filterData };
@@ -4819,6 +4869,7 @@ console.log('API Response:', response.data);
     setSelectedFollowupBucket('');
     setSelectedApprovalFilter(null);
     setSelectedKycFilter(null);
+    setSelectedMilestoneFilter(null);
     setFilterData(newFilterData);
     fetchProfileData(newFilterData, 1);
   };
@@ -4827,7 +4878,8 @@ console.log('API Response:', response.data);
     if (pageMainTab !== 'registration') return;
     setLeadViewTab(tab);
     setCurrentPage(1);
-    fetchProfileData(filterData, 1);
+    setSelectedMilestoneFilter(null);
+    fetchProfileData(filterData, 1, null, null, null);
   };
 
   const handleApprovalCardClick = (approval) => {
@@ -4836,6 +4888,7 @@ console.log('API Response:', response.data);
     setSelectedApprovalFilter(next);
     setSelectedFollowupBucket('');
     setSelectedKycFilter(null);
+    setSelectedMilestoneFilter(null);
     setCurrentPage(1);
 
     const newFilterData = { ...filterData, followupStatus: '' };
@@ -4887,6 +4940,7 @@ console.log('API Response:', response.data);
     setSelectedFollowupBucket(togglingOff ? '' : key);
     setSelectedApprovalFilter(null);
     setSelectedKycFilter(null);
+    setSelectedMilestoneFilter(null);
     setCurrentPage(1);
 
     const newFilterData = { ...filterData };
@@ -4920,6 +4974,7 @@ console.log('API Response:', response.data);
     setSelectedKycFilter(nextFilter);
     setSelectedApprovalFilter(null);
     setSelectedFollowupBucket('');
+    setSelectedMilestoneFilter(null);
     setCurrentPage(1);
 
     const newFilterData = { ...filterData };
@@ -4948,6 +5003,54 @@ console.log('API Response:', response.data);
     if (!filter) return selectedKycFilter === null;
     return selectedKycFilter === filter;
   };
+
+  const milestoneDashOptions = [
+    {
+      key: 'milestone-kyc-done',
+      milestone: 'kycDone',
+      label: 'KYC Done',
+      title: 'Leads with KYC milestone completed',
+      valueKey: 'kycDone',
+      bg: '#8b5cf6',
+    },
+    {
+      key: 'milestone-admission',
+      milestone: 'admission',
+      label: 'Admission',
+      title: 'Leads moved to admission',
+      valueKey: 'admission',
+      bg: '#059669',
+    },
+  ];
+
+  const getMilestoneDashFilterLabel = (milestone) => {
+    const row = milestoneDashOptions.find((item) => item.milestone === milestone);
+    return row?.label || milestone;
+  };
+
+  const handleMilestoneDashClick = (milestone) => {
+    if (pageMainTab !== 'registration') return;
+
+    const togglingOff = selectedMilestoneFilter === milestone;
+    const nextMilestone = togglingOff ? null : milestone;
+
+    setSelectedMilestoneFilter(nextMilestone);
+    setSelectedKycFilter(null);
+    setSelectedApprovalFilter(null);
+    setSelectedFollowupBucket('');
+    setCurrentPage(1);
+
+    const newFilterData = { ...filterData };
+    delete newFilterData.followupStatus;
+    delete newFilterData.leadStatus;
+    delete newFilterData.approvalStatus;
+    delete newFilterData.kyc;
+    setFilterData(newFilterData);
+    setActiveCrmFilter(0);
+    fetchProfileData(newFilterData, 1, null, null, nextMilestone);
+  };
+
+  const isMilestoneDashSelected = (milestone) => selectedMilestoneFilter === milestone;
 
   const formatFollowupDate = (dateLike) => {
     if (!dateLike) return 'N/A';
@@ -12962,7 +13065,7 @@ useEffect(() => {
         </div>
       </div>
 
-      {(selectedFollowupBucket || selectedApprovalFilter || selectedKycFilter) && (
+      {(selectedFollowupBucket || selectedApprovalFilter || selectedKycFilter || selectedMilestoneFilter) && (
         <div className="d-flex flex-wrap align-items-center gap-2 mt-2 mb-1">
           {selectedApprovalFilter && (
             <span className="badge rounded-pill text-bg-light border" style={{ fontSize: '12px', fontWeight: 600 }}>
@@ -12982,6 +13085,12 @@ useEffect(() => {
               KYC: {getKycDashFilterLabel(selectedKycFilter)}
             </span>
           )}
+          {selectedMilestoneFilter && (
+            <span className="badge rounded-pill text-bg-light border" style={{ fontSize: '12px', fontWeight: 600 }}>
+              <i className="fas fa-filter me-1 text-danger" aria-hidden="true" />
+              Milestone: {getMilestoneDashFilterLabel(selectedMilestoneFilter)}
+            </span>
+          )}
           <button
             type="button"
             className="btn btn-sm btn-outline-danger"
@@ -12989,13 +13098,14 @@ useEffect(() => {
               setSelectedApprovalFilter(null);
               setSelectedFollowupBucket('');
               setSelectedKycFilter(null);
+              setSelectedMilestoneFilter(null);
               const cleared = { ...filterData, followupStatus: '' };
               delete cleared.leadStatus;
               delete cleared.kyc;
               delete cleared.approvalStatus;
               setFilterData(cleared);
               setActiveCrmFilter(0);
-              fetchProfileData(cleared, 1);
+              fetchProfileData(cleared, 1, null, null, null);
             }}
             style={{ fontSize: '12px', fontWeight: 600, borderRadius: '999px' }}
           >
@@ -13097,6 +13207,36 @@ useEffect(() => {
           </div>
         </div>
       </div>
+
+      {/* <div className="row g-2 mt-1 mb-2 align-items-stretch">
+        <div className="col-12 col-lg-6">
+          <div className="b2b-dash-section h-100">
+            <span className="b2b-dash-section__label">Milestones</span>
+            <div className="d-flex flex-wrap gap-1 pt-1">
+              {milestoneDashOptions.map((row) => {
+                const selected = isMilestoneDashSelected(row.milestone);
+                return (
+                  <button
+                    key={row.key}
+                    type="button"
+                    className={`b2b-dash-stat-card text-center text-white flex-grow-1 border-0${selected ? ' b2b-dash-stat-card--active' : ''}`}
+                    style={{ background: row.bg }}
+                    onClick={() => handleMilestoneDashClick(row.milestone)}
+                    title={row.title}
+                    aria-pressed={selected}
+                  >
+                    <div className="b2b-dash-stat-card__label">{row.label}</div>
+                    <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                    <div className="b2b-dash-stat-card__value text-white">
+                      {String(milestoneCounts[row.valueKey] ?? 0).padStart(2, '0')}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div> */}
       </>
       )}
 
@@ -15283,6 +15423,20 @@ useEffect(() => {
                               onClick={() => setSelectedKycFilter(null)}
                             >
                               Clear KYC filter
+                            </button>
+                          </div>
+                        )}
+                        {!isLoadingProfiles && selectedMilestoneFilter && displayedProfiles.length === 0 && (
+                          <div className="col-12 text-center py-4">
+                            <p className="text-muted mb-2">
+                              No leads match milestone: <strong>{getMilestoneDashFilterLabel(selectedMilestoneFilter)}</strong>
+                            </p>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-primary"
+                              onClick={() => handleMilestoneDashClick(selectedMilestoneFilter)}
+                            >
+                              Clear milestone filter
                             </button>
                           </div>
                         )}
