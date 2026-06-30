@@ -3136,7 +3136,7 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 		additionalFilters['_course._id'] = { $in: filters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
 	}
 	if (filters.centerArray && filters.centerArray.length > 0) {
-		additionalFilters['_center'] = { $in: filters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+		additionalFilters['_center._id'] = { $in: filters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
 	}
 	if (filters.batchArray && filters.batchArray.length > 0) {
 		additionalFilters['batch'] = { $in: filters.batchArray.map(id => new mongoose.Types.ObjectId(id)) };
@@ -3357,7 +3357,7 @@ function buildSimplifiedPipelineWithWhatsApp({ teamMemberIds, college, filters, 
 		additionalFilters['_course._id'] = { $in: filters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
 	}
 	if (filters.centerArray && filters.centerArray.length > 0) {
-		additionalFilters['_center'] = { $in: filters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+		additionalFilters['_center._id'] = { $in: filters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
 	}
 	if (filters.batchArray && filters.batchArray.length > 0) {
 		additionalFilters['batch'] = { $in: filters.batchArray.map(id => new mongoose.Types.ObjectId(id)) };

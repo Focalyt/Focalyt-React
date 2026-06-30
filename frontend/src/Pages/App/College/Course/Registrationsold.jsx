@@ -3512,6 +3512,45 @@ const CRMDashboard = () => {
     }
   }, [selectedProfile]);
 
+  const handleMoveToKyc = async (profile) => {
+    try {
+
+
+      if (profile?._course?.center || profile?._course?.center?.length > 0) {
+        if (!profile._center || !profile._center._id) {
+          alert('Please assign a branch/center first before moving to KYC!');
+          return;
+        }
+      }
+
+
+      // Prepare the request body
+      const updatedData = {
+        kycStage: true
+      };
+
+      // Send PUT request to backend API
+      const response = await axios.put(`${backendUrl}/college/update/${profile._id}`, updatedData, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'application/json'
+        }
+      });
+
+
+      if (response.data.success) {
+        alert('Lead moved to KYC Section successfully!');
+        // Optionally refresh data here
+        fetchProfileData()
+      } else {
+        alert('Failed to update status');
+      }
+    } catch (error) {
+      console.error('Error updating status:', error);
+      // alert('An error occurred while updating status');
+    }
+  };
+
   const fetchSubStatus = async () => {
     try {
       const status = seletectedStatus || filterData.statuses;
@@ -9022,6 +9061,20 @@ useEffect(() => {
     <div className="lead-strip-v3__actions-menu">
       {canEditLeadsPermission && (
         <>
+        {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                  <>
+                    <button
+                      className="lead-strip-v3__actions-item"
+                      onClick={() => {
+                        handleMoveToKyc(profile);
+                        setShowPopup(null);
+                      }}
+                    >
+                      <i className="fas fa-arrow-right me-3 text-primary"></i>
+                      <span className="fw-medium">Move To KYC List</span>
+                    </button>
+          </>
+        )}
           {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
             <button
               type="button"
@@ -16307,7 +16360,20 @@ useEffect(() => {
                                             display: showPopup === profileIndex ? "block" : "none"
                                           }}
                                         >
-
+                                          {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
+                                               <>
+                                                  <button
+                                                    className="lead-strip-v3__actions-item"
+                                                    onClick={() => {
+                                                      handleMoveToKyc(profile);
+                                                      setShowPopup(null);
+                                                    }}
+                                                  >
+                                                    <i className="fas fa-arrow-right me-3 text-primary"></i>
+                                                    <span className="fw-medium">Move To KYC List</span>
+                                                 </button>
+                                               </>
+                                          )}
                                           {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
                                             <>
                                               {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (

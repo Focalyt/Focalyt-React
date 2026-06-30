@@ -106,6 +106,8 @@ module.exports.ChatHistory = require("./chatHistory");
 module.exports.TrainerTimeTable = require("./trainerTimeTable");
 module.exports.Curriculum = require("./curriculum");
 module.exports.DailyDiary = require("./dailydiary");
+module.exports.TrainingSession = require("./trainingSession");
+module.exports.SessionAttendance = require("./sessionAttendance");
 module.exports.AssignmentQuestions = require("./questionBank");
 module.exports.AssignmentSubmission = require("./assignmentSubmission");
 //b2b models

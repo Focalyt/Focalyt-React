@@ -23,13 +23,15 @@ const {
 } = require("../../../config");
 
 const s3 = require("../../../helpers/objectStorage");
-const allowedVideoExtensions = ['mp4', 'mkv', 'mov', 'avi', 'wmv'];
-const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
-const allowedDocumentExtensions = ['pdf', 'doc', 'docx']; // ✅ PDF aur DOC types allow karein
+const { resolvePublicUrl } = require("../../../helpers/s3Storage");
+const allowedVideoExtensions = ['mp4', 'mkv', 'mov', 'avi', 'wmv', 'webm'];
+const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
+const allowedPdfExtensions = ['pdf'];
+const allowedDocumentExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'ppt', 'pptx'];
 
 const allowedExtensions = [...allowedVideoExtensions, ...allowedImageExtensions, ...allowedDocumentExtensions];
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable ,AssignmentQuestions  } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable ,AssignmentQuestions, TrainingSession  } = require("../../models");
 
 
 const destination = path.resolve(__dirname, '..', '..', '..', 'public', 'temp');
@@ -648,5 +650,272 @@ router.get('/list-projects', async (req, res) => {
 		res.status(500).json({ success: false, message: 'Server error' });
 	}
 });
+
+
+router.post('/addSession', isCollege, async (req, res) => {
+	try {
+		const user = req.user;
+		const college = req.college;
+
+		if (!college?._id) {
+			return res.status(403).json({
+				status: false,
+				message: 'College not found',
+			});
+		}
+
+		const {
+			batch,
+			course,
+			center,
+			title,
+			topicCovered,
+			trainingMethod,
+			sessionDate,
+			startTime,
+			endTime,
+			notes,
+			evidenceDocs,
+			totalCandidates,
+		} = req.body;
+
+		if (!batch || !title?.trim() || !sessionDate) {
+			return res.status(400).json({
+				status: false,
+				message: 'batch, title, and sessionDate are required',
+			});
+		}
+
+		const batchDoc = await Batch.findById(batch);
+		if (!batchDoc) {
+			return res.status(404).json({
+				status: false,
+				message: 'Batch not found',
+			});
+		}
+
+		if (String(batchDoc.college) !== String(college._id)) {
+			return res.status(403).json({
+				status: false,
+				message: 'You do not have permission to add sessions for this batch',
+			});
+		}
+
+		const allowedDocTypes = ['Document', 'Image', 'Video', 'PDF'];
+		const normalizedEvidenceDocs = (Array.isArray(evidenceDocs) ? evidenceDocs : [])
+			.filter((doc) => doc?.name?.trim())
+			.map((doc) => ({
+				name: doc.name.trim(),
+				type: allowedDocTypes.includes(doc.type) ? doc.type : 'Document',
+				status: 'Pending',
+				fileName: '',
+				fileUrl: '',
+			}));
+
+		const parsedSessionDate = new Date(sessionDate);
+		if (Number.isNaN(parsedSessionDate.getTime())) {
+			return res.status(400).json({
+				status: false,
+				message: 'Invalid sessionDate',
+			});
+		}
+
+		const session = await TrainingSession.create({
+			batch,
+			college: college._id,
+			course: course || batchDoc.courseId,
+			center: center || batchDoc.centerId,
+			title: title.trim(),
+			topicCovered: topicCovered?.trim() || '',
+			trainingMethod: trainingMethod?.trim() || '',
+			sessionDate: parsedSessionDate,
+			startTime: startTime || '',
+			endTime: endTime || '',
+			notes: notes?.trim() || '',
+			evidenceDocs: normalizedEvidenceDocs,
+			totalCandidates: Number(totalCandidates) || 0,
+			trainer: user._id,
+			createdBy: user._id,
+		});
+
+		const populatedSession = await TrainingSession.findById(session._id)
+			.populate('trainer', 'name email mobile')
+			.populate('batch', 'name')
+			.lean();
+
+		return res.status(201).json({
+			status: true,
+			message: 'Session added successfully',
+			data: populatedSession,
+		});
+	} catch (error) {
+		console.error('Error adding session:', error);
+		return res.status(500).json({
+			status: false,
+			message: error.message || 'Server error',
+		});
+	}
+});
+
+router.get('/sessions/:batchId', isCollege, async (req, res) => {
+	try {
+		const college = req.college;
+		const { batchId } = req.params;
+
+		if (!college?._id) {
+			return res.status(403).json({ status: false, message: 'College not found' });
+		}
+
+		const batchDoc = await Batch.findById(batchId);
+		if (!batchDoc) {
+			return res.status(404).json({ status: false, message: 'Batch not found' });
+		}
+
+		if (String(batchDoc.college) !== String(college._id)) {
+			return res.status(403).json({ status: false, message: 'You do not have permission to view sessions for this batch' });
+		}
+
+		const sessions = await TrainingSession.find({ batch: batchId, college: college._id })
+			.populate('trainer', 'name email mobile')
+			.populate('batch', 'name')
+			.sort({ sessionDate: -1 })
+			.lean();
+
+		const data = sessions.map((session) => ({
+			...session,
+			evidenceDocs: (session.evidenceDocs || []).map((doc) => ({
+				...doc,
+				fileUrl: doc.fileUrl ? resolvePublicUrl(doc.fileUrl) : '',
+			})),
+		}));
+
+		return res.status(200).json({
+			status: true,
+			message: 'Sessions fetched successfully',
+			data,
+		});
+	} catch (error) {
+		console.error('Error fetching sessions:', error);
+		return res.status(500).json({
+			status: false,
+			message: error.message || 'Server error',
+		});
+	}
+});
+
+const getFileExtension = (fileName = '') =>
+	path.extname(fileName).toLowerCase().replace('.', '');
+
+const inferEvidenceTypeFromFile = (fileName = '', mimeType = '') => {
+	const ext = getFileExtension(fileName);
+	const mime = (mimeType || '').toLowerCase();
+
+	if (mime.startsWith('image/') || allowedImageExtensions.includes(ext)) return 'Image';
+	if (mime.startsWith('video/') || allowedVideoExtensions.includes(ext)) return 'Video';
+	if (mime === 'application/pdf' || allowedPdfExtensions.includes(ext)) return 'PDF';
+	return 'Document';
+};
+
+const getAllowedExtensionsForDocType = (docType) => {
+	switch (docType) {
+		case 'Image': return allowedImageExtensions;
+		case 'Video': return allowedVideoExtensions;
+		case 'PDF': return allowedPdfExtensions;
+		default: return allowedDocumentExtensions;
+	}
+};
+
+const uploadSessionFileToStorage = async (file, sessionId, docId) => {
+	const key = `TrainingSession/${sessionId}/${docId}/${uuid()}-${file.name}`;
+
+	const params = {
+		Bucket: bucketName,
+		Key: key,
+		Body: file.data,
+		ContentType: file.mimetype,
+	};
+
+	const uploadResult = await s3.upload(params).promise();
+	return uploadResult.Key || key;
+};
+
+router.post('/uploadSessionDocument', isCollege, async (req, res) => {
+	try {
+		const college = req.college;
+		const sessionId = req.body?.sessionId || req.query?.sessionId;
+		const docId = req.body?.docId || req.query?.docId;
+		const file = req.files?.file;
+
+		if (!college?._id) {
+			return res.status(403).json({ status: false, message: 'College not found' });
+		}
+
+		if (!sessionId || !docId) {
+			return res.status(400).json({ status: false, message: 'sessionId and docId are required' });
+		}
+
+		if (!file) {
+			return res.status(400).json({ status: false, message: 'File is required' });
+		}
+
+		const sessionDoc = await TrainingSession.findOne({
+			_id: sessionId,
+			college: college._id,
+		});
+
+		if (!sessionDoc) {
+			return res.status(404).json({ status: false, message: 'Session not found' });
+		}
+
+		const evidenceDoc = sessionDoc.evidenceDocs.id(docId);
+		if (!evidenceDoc) {
+			return res.status(404).json({ status: false, message: 'Document slot not found in this session' });
+		}
+
+		const ext = getFileExtension(file.name);
+		const allowedForType = getAllowedExtensionsForDocType(evidenceDoc.type);
+		if (!allowedForType.includes(ext)) {
+			return res.status(400).json({
+				status: false,
+				message: `Invalid file for ${evidenceDoc.type}. Allowed: ${allowedForType.join(', ')}`,
+			});
+		}
+
+		const fileKey = await uploadSessionFileToStorage(file, sessionId, docId);
+		const detectedType = inferEvidenceTypeFromFile(file.name, file.mimetype);
+
+		evidenceDoc.status = 'Uploaded';
+		evidenceDoc.fileName = file.name;
+		evidenceDoc.fileUrl = fileKey;
+		evidenceDoc.type = detectedType;
+
+		await sessionDoc.save();
+
+		const populatedSession = await TrainingSession.findById(sessionDoc._id)
+			.populate('trainer', 'name email mobile')
+			.populate('batch', 'name')
+			.lean();
+
+		if (populatedSession?.evidenceDocs?.length) {
+			populatedSession.evidenceDocs = populatedSession.evidenceDocs.map((doc) => ({
+				...doc,
+				fileUrl: doc.fileUrl ? resolvePublicUrl(doc.fileUrl) : '',
+			}));
+		}
+
+		return res.status(200).json({
+			status: true,
+			message: 'Document uploaded successfully',
+			data: populatedSession,
+		});
+	} catch (error) {
+		console.error('Error uploading session document:', error);
+		return res.status(500).json({
+			status: false,
+			message: error.message || 'Server error',
+		});
+	}
+});
+
 
 module.exports = router;

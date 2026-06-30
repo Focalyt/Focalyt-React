@@ -3,10 +3,92 @@ import axios from 'axios';
 import DatePicker from 'react-date-picker';
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 /* ─── Theme tokens ─── */
 const PINK = '#fa5579';
 const BLUE = '#2563eb';
+const DOC_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
+const getDocFileUrl = (fileUrl) => resolveMediaUrl(DOC_BUCKET_URL, fileUrl);
+
+const getEvidenceFileType = (fileUrl, docType = '') => {
+  if (!fileUrl) return 'unknown';
+  const extension = fileUrl.split('?')[0].split('.').pop().toLowerCase();
+
+  if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(extension)) return 'image';
+  if (extension === 'pdf') return 'pdf';
+  if (['mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv'].includes(extension)) return 'video';
+  if (['doc', 'docx'].includes(extension)) return 'document';
+  if (['xls', 'xlsx'].includes(extension)) return 'spreadsheet';
+
+  const normalizedType = String(docType || '').toLowerCase();
+  if (normalizedType === 'image') return 'image';
+  if (normalizedType === 'pdf') return 'pdf';
+  if (normalizedType === 'video') return 'video';
+  if (normalizedType === 'document') return 'document';
+  return 'unknown';
+};
+
+const getAcceptForDocType = (docType = '') => {
+  switch (docType) {
+    case 'Image': return 'image/*';
+    case 'Video': return 'video/*';
+    case 'PDF': return '.pdf,application/pdf';
+    default: return '.pdf,.doc,.docx,.xls,.xlsx,application/pdf,application/msword';
+  }
+};
+
+const EvidenceDocPreview = ({ doc }) => {
+  if (doc.status !== 'Uploaded' || !doc.fileUrl) return null;
+
+  const fileUrl = getDocFileUrl(doc.fileUrl);
+  if (!fileUrl) return null;
+
+  const fileType = getEvidenceFileType(fileUrl, doc.type);
+
+  if (fileType === 'image') {
+    return (
+      <div className="sc-evidence-preview">
+        <img src={fileUrl} alt={doc.name || 'Uploaded image'} className="sc-evidence-preview__img" />
+      </div>
+    );
+  }
+
+  if (fileType === 'pdf') {
+    return (
+      <div className="sc-evidence-preview sc-evidence-preview--pdf">
+        <iframe
+          src={`${fileUrl}#navpanes=0&toolbar=0`}
+          title={doc.name || 'PDF preview'}
+          className="sc-evidence-preview__iframe"
+        />
+      </div>
+    );
+  }
+
+  if (fileType === 'video') {
+    return (
+      <div className="sc-evidence-preview">
+        <video controls className="sc-evidence-preview__video" src={fileUrl}>
+          <track kind="captions" />
+        </video>
+      </div>
+    );
+  }
+
+  return (
+    <div className="sc-evidence-preview sc-evidence-preview--file">
+      <i className="fas fa-file-alt" />
+      <span>{doc.fileName || doc.name || 'Document file'}</span>
+    </div>
+  );
+};
+
+const openEvidenceFile = (doc) => {
+  const fileUrl = getDocFileUrl(doc.fileUrl);
+  if (!fileUrl) return;
+  window.open(fileUrl, '_blank', 'noopener,noreferrer');
+};
 
 const FILTER_OPTIONS = {
   department: [],
@@ -17,41 +99,17 @@ const FILTER_OPTIONS = {
   counsellor: [],
 };
 
-const TRAINER_INFO = {
-  name: 'Rajesh Kumar Sharma',
-  mobile: '9876543210',
-  email: 'rajesh.trainer@focalyt.in',
-  batchCode: 'BATCH-RS-2024-01',
-  course: 'Retail Sales Associate',
-  center: 'Delhi Centre – Rohini',
-};
-
-const BASIC_DETAILS_INIT = {
-  centerName: 'Delhi Centre – Rohini',
-  trainerName: 'Rajesh Kumar Sharma',
-  projectName: 'PMKVY 4.0',
-  courseTrade: 'Retail Sales Associate',
-  reportingPerson: 'Priya Singh – Centre Manager',
-  batchCode: 'BATCH-RS-2024-01',
-  totalPointsTillDate: '1245',
-  totalDaysTillDate: '42',
-};
 
 const MAIN_TABS = [
   { id: 'session', label: 'Sessions', icon: 'fa-chalkboard-teacher' },
   { id: 'student', label: 'Students', icon: 'fa-user-graduate' },
 ];
 
-const DEFAULT_EVIDENCE_DOCS = [
-  { id: 'EV001', name: 'Class photo', type: 'Image', status: 'Uploaded', fileName: 'class-photo.jpg' },
-  { id: 'EV002', name: 'Attendance sheet', type: 'Document', status: 'Pending', fileName: '' },
-  { id: 'EV003', name: 'Training clip', type: 'Video', status: 'Uploaded', fileName: 'training-clip.mp4' },
-];
 
 const DUMMY_SESSIONS = [
-  { id: 'S001', title: 'Morning Batch – Retail Sales', date: '22/06/2026', status: 'Completed' },
-  { id: 'S002', title: 'Practical – Customer Handling', date: '22/06/2026', status: 'Pending' },
-  { id: 'S003', title: 'Assessment Review', date: '21/06/2026', status: 'Completed' },
+  { id: 'S001', title: 'Morning Batch – Retail Sales', date: '22/06/2026' },
+  { id: 'S002', title: 'Practical – Customer Handling', date: '22/06/2026' },
+  { id: 'S003', title: 'Assessment Review', date: '21/06/2026' }
 ];
 
 const getTodayInputValue = () => new Date().toISOString().slice(0, 10);
@@ -59,6 +117,46 @@ const formatSessionDate = (dateValue) => {
   if (!dateValue) return new Date().toLocaleDateString('en-IN');
   return new Date(dateValue).toLocaleDateString('en-IN');
 };
+const toDateInputValue = (dateValue) => {
+  if (!dateValue) return '';
+  const date = new Date(dateValue);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+};
+const mapApiSessionToClient = (session, context = {}) => ({
+  id: String(session._id),
+  title: session.title || '',
+  topicCovered: session.topicCovered || '',
+  trainingMethod: session.trainingMethod || '',
+  sessionDate: toDateInputValue(session.sessionDate),
+  date: formatSessionDate(session.sessionDate),
+  startTime: session.startTime || '',
+  endTime: session.endTime || '',
+  trainerName: session.trainer?.name || context.trainerName || '',
+  notes: session.notes || '',
+  evidenceDocs: (session.evidenceDocs || []).map((doc) => ({
+    id: String(doc._id || doc.id),
+    name: doc.name || '',
+    type: doc.type || 'Document',
+    status: doc.status || 'Pending',
+    fileName: doc.fileName || '',
+    fileUrl: doc.fileUrl || '',
+  })),
+  batch: String(session.batch?._id || session.batch || context.batch || ''),
+  course: context.course || '',
+  center: context.center || '',
+  department: context.department || '',
+  project: context.project || '',
+  courseTrade: context.courseTrade || '',
+  batchCode: context.batchCode || session.batch?.name || '',
+  departmentName: context.departmentName || '',
+  projectName: context.projectName || '',
+  centerName: context.centerName || '',
+  totalCandidates: String(session.totalCandidates ?? context.totalCandidates ?? 0),
+  presentCandidates: String(session.presentCandidates ?? 0),
+  absentCandidates: String(session.absentCandidates ?? 0),
+  attendance: `${session.attendancePercent ?? 0}%`,
+  status: 'Pending',
+});
 const getEvidenceTypeFromFile = (file) => {
   const mime = file?.type || '';
   const name = file?.name?.toLowerCase() || '';
@@ -70,8 +168,7 @@ const getEvidenceTypeFromFile = (file) => {
 };
 const getEvidenceDisplayName = (fileName = '') =>
   fileName.replace(/\.[^/.]+$/, '') || 'Evidence document';
-const createEvidenceDocs = (status = 'Pending') =>
-  DEFAULT_EVIDENCE_DOCS.map((doc) => ({ ...doc, status, fileName: status === 'Uploaded' ? doc.fileName : '' }));
+
 const createSessionDraft = (sessionNumber, basicDetails) => ({
   id: `S${String(sessionNumber).padStart(3, '0')}`,
   title: 'New Session',
@@ -90,7 +187,7 @@ const createSessionDraft = (sessionNumber, basicDetails) => ({
   counsellor: '',
   counsellorName: '',
   notes: 'Covered basics of customer service and communication skills.',
-  evidenceDocs: createEvidenceDocs('Pending'),
+  
 });
 const createEmptySessionDraft = (sessionNumber) => ({
   id: `S${String(sessionNumber).padStart(3, '0')}`,
@@ -355,7 +452,6 @@ const hydrateSession = (session, index, basicDetails) => ({
   absentCandidates: session.absentCandidates || '4',
   attendance: session.attendance || '86.7%',
   notes: session.notes || 'Covered basics of customer service and communication skills.',
-  evidenceDocs: session.evidenceDocs || createEvidenceDocs(session.status === 'Completed' ? 'Uploaded' : 'Pending'),
 });
 const normalizeSessionDraft = (draft, basicDetails) => {
   const total = Number(draft.totalCandidates) || 0;
@@ -745,11 +841,11 @@ const TrainerHero = ({ reportDate, onDateChange, basicDetails, sessionCount, stu
       </nav>
       <div className="tm-hero__main">
         <div className="tm-hero__identity">
-          <div className="tm-avatar tm-avatar--lg">{getInitials(TRAINER_INFO.name)}</div>
+          <div className="tm-avatar tm-avatar--lg">{getInitials(basicDetails.trainerName)}</div>
           <div>
             <h1 className="tm-hero__title">Trainer Daily Report</h1>
             <p className="tm-hero__subtitle">
-              {TRAINER_INFO.name} · {basicDetails.batchCode} · {basicDetails.centerName}
+               · {basicDetails.batchCode} · {basicDetails.centerName} 
             </p>
           </div>
         </div>
@@ -1755,9 +1851,9 @@ const AttendanceManagementModal = ({
     { label: 'Training Mode', value: session.trainingMethod || 'Interactive Learning' },
     { label: 'Session date', value: sessionDate },
     { label: 'Time', value: sessionTime },
-    { label: 'Batch code', value: session.batchCode || TRAINER_INFO.batchCode },
-    { label: 'Course / trade', value: session.courseTrade || TRAINER_INFO.course },
-    { label: 'Trainer', value: session.trainerName || TRAINER_INFO.name },
+    { label: 'Batch code', value: session.batchCode},
+    { label: 'Course / trade', value: session.courseTrade  },
+    { label: 'Trainer', value: session.trainerName  },
     { label: 'Status', value: session.status || 'Pending' },
   ];
 
@@ -1835,7 +1931,7 @@ const AttendanceManagementModal = ({
                 <h4>
                   <i className="fas fa-clipboard-list" /> Attendance Register
                 </h4>
-                <span>{stats.total} students - {session.batchCode || TRAINER_INFO.batchCode}</span>
+                <span>{stats.total} students - {session.batchCode }</span>
               </div>
               <div className="attendance-table-wrap">
                 <table className="attendance-table">
@@ -1892,7 +1988,7 @@ const AttendanceManagementModal = ({
                 <h4>
                   <i className="fas fa-calendar-day" /> Summary View
                 </h4>
-                <span>{stats.total} students - {session.batchCode || TRAINER_INFO.batchCode}</span>
+                <span>{stats.total} students - {session.batchCode }</span>
               </div>
               <div className="attendance-table-wrap">
                 <table className="attendance-table attendance-table--summary">
@@ -2097,30 +2193,54 @@ const SessionCard = ({ basicDetails, session, notify, onStatusChange, onEvidence
               ) : (
                 <div className="sc-evidence-grid">
                   {evidenceDocs.map((doc) => {
+                    const docKey = String(doc._id || doc.id);
                     const icon = doc.type === 'Image' ? 'fa-image' : doc.type === 'Video' ? 'fa-video' : doc.type === 'PDF' ? 'fa-file-pdf' : 'fa-file-alt';
                     const tone = doc.status === 'Uploaded' ? 'green' : 'amber';
+                    const isUploaded = doc.status === 'Uploaded' && doc.fileUrl;
                     return (
-                      <div key={doc.id} className="sc-evidence-card">
-                        <div className={`sc-evidence-icon sc-evidence-icon--${tone}`}>
-                          <i className={`fas ${icon}`} />
-                        </div>
-                        <strong>{doc.name}</strong>
-                        <small className="sc-evidence-type">{doc.type}</small>
-                        <small className={doc.status === 'Uploaded' ? 'ev-uploaded' : 'ev-pending'}>
-                          <i className={`fas ${doc.status === 'Uploaded' ? 'fa-check-circle' : 'fa-clock'}`} />
-                          &nbsp;{doc.status}
-                        </small>
-                        {doc.fileName && <span className="sc-file-name">{doc.fileName}</span>}
-                        <input
-                          id={`${activeSession.id}-${doc.id}`}
-                          type="file"
-                          className="sc-file-input"
-                          accept="image/*,video/*,.pdf,application/pdf"
-                          onChange={(e) => onEvidenceUpload(activeSession.id, doc.id, e.target.files?.[0])}
-                        />
-                        <label className="sc-upload-btn" htmlFor={`${activeSession.id}-${doc.id}`}>
-                          <i className="fas fa-upload" /> {doc.status === 'Uploaded' ? 'Replace' : 'Upload'}
-                        </label>
+                      <div key={docKey} className={`sc-evidence-card${isUploaded ? ' sc-evidence-card--uploaded' : ''}`}>
+                        {isUploaded ? (
+                          <>
+                            <EvidenceDocPreview doc={doc} />
+                            <strong className="sc-evidence-card__title">{doc.name}</strong>
+                            <div className="sc-evidence-actions">
+                              <button type="button" className="sc-upload-btn" onClick={() => openEvidenceFile(doc)}>
+                                <i className="fas fa-eye" /> View
+                              </button>
+                              <input
+                                id={`${activeSession.id}-${docKey}`}
+                                type="file"
+                                className="sc-file-input"
+                                accept={getAcceptForDocType(doc.type)}
+                                onChange={(e) => onEvidenceUpload(activeSession.id, docKey, e.target.files?.[0])}
+                              />
+                              <label className="sc-upload-btn" htmlFor={`${activeSession.id}-${docKey}`}>
+                                <i className="fas fa-upload" /> Replace
+                              </label>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className={`sc-evidence-icon sc-evidence-icon--${tone}`}>
+                              <i className={`fas ${icon}`} />
+                            </div>
+                            <strong className="sc-evidence-card__title">{doc.name}</strong>
+                            <small className="sc-evidence-type">{doc.type}</small>
+                            <small className="ev-pending">
+                              <i className="fas fa-clock" /> Pending
+                            </small>
+                            <input
+                              id={`${activeSession.id}-${docKey}`}
+                              type="file"
+                              className="sc-file-input"
+                              accept={getAcceptForDocType(doc.type)}
+                              onChange={(e) => onEvidenceUpload(activeSession.id, docKey, e.target.files?.[0])}
+                            />
+                            <label className="sc-upload-btn sc-upload-btn--full" htmlFor={`${activeSession.id}-${docKey}`}>
+                              <i className="fas fa-upload" /> Upload
+                            </label>
+                          </>
+                        )}
                       </div>
                     );
                   })}
@@ -2150,7 +2270,7 @@ const SessionCard = ({ basicDetails, session, notify, onStatusChange, onEvidence
 
 /* ─── Main page ─── */
 const TrainerModule = () => {
-  const userData = useMemo(() => JSON.parse(sessionStorage.getItem('user') || '{}'), []);
+  const [userData, setUserData] = useState(JSON.parse(sessionStorage.getItem('user') || '{}'));
   const token = userData.token;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
 
@@ -2175,7 +2295,7 @@ const TrainerModule = () => {
   const [mainTab, setMainTab] = useState('session');
   const [sessions, setSessions] = useState([]);
   const [selectedSessionId, setSelectedSessionId] = useState('');
-  const [sessionDraft, setSessionDraft] = useState(null);
+  const [session, setSession] = useState(null);
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [attendanceModal, setAttendanceModal] = useState({ isOpen: false, view: 'register', sessionId: '' });
@@ -2200,9 +2320,9 @@ const TrainerModule = () => {
   const [toast, setToast] = useState('');
 
   const trainerProfile = useMemo(() => ({
-    name: userData.name || TRAINER_INFO.name,
-    mobile: userData.mobile || TRAINER_INFO.mobile,
-    email: userData.email || TRAINER_INFO.email,
+    name: userData.name ,
+    mobile: userData.mobile ,
+    email: userData.email ,
   }), [userData]);
 
   const activeBasicDetails = useMemo(() => buildSessionContextFromFilters(filters, {
@@ -2472,6 +2592,34 @@ const TrainerModule = () => {
     }
   }, [backendUrl, token]);
 
+  const fetchBatchSessions = useCallback(async (batchId, signal) => {
+    const authToken = token || JSON.parse(sessionStorage.getItem('user') || '{}').token;
+    if (!authToken || !batchId) return null;
+
+    try {
+      const res = await axios.get(`${backendUrl}/college/trainer/sessions/${batchId}`, {
+        headers: { 'x-auth': authToken },
+        signal,
+      });
+      if (!res.data?.status || !Array.isArray(res.data.data)) return null;
+
+      return res.data.data.map((item) => mapApiSessionToClient(item, {
+        batch: batchId,
+        courseTrade: getOptionLabel(courseOptions, filters.course),
+        batchCode: getOptionLabel(batchOptions, batchId),
+        departmentName: getOptionLabel(verticalOptions, filters.department),
+        projectName: getOptionLabel(projectOptions, filters.project),
+        centerName: getOptionLabel(centerOptions, filters.center),
+        trainerName: trainerProfile.name,
+      }));
+    } catch (err) {
+      if (err?.code !== 'ERR_CANCELED' && err?.name !== 'CanceledError') {
+        console.error('Failed to fetch batch sessions:', err);
+      }
+      return null;
+    }
+  }, [backendUrl, token, courseOptions, batchOptions, verticalOptions, projectOptions, centerOptions, filters, trainerProfile.name]);
+
   useEffect(() => {
     if (!filters.batch) {
       setSessions([]);
@@ -2484,15 +2632,27 @@ const TrainerModule = () => {
 
     const controller = new AbortController();
     const stored = loadStoredSessions(filters.batch);
-    setSessions(stored);
-    setSelectedSessionId((prev) => (
-      prev && stored.some((session) => session.id === prev) ? prev : stored[0]?.id || ''
-    ));
-    setSessionPanelView(stored.length ? 'view' : 'empty');
+
+    const loadSessions = async () => {
+      const fromApi = await fetchBatchSessions(filters.batch, controller.signal);
+      const nextSessions = fromApi?.length ? fromApi : stored;
+
+      if (fromApi?.length) {
+        persistStoredSessions(filters.batch, fromApi);
+      }
+
+      setSessions(nextSessions);
+      setSelectedSessionId((prev) => (
+        prev && nextSessions.some((item) => item.id === prev) ? prev : nextSessions[0]?.id || ''
+      ));
+      setSessionPanelView(nextSessions.length ? 'view' : 'empty');
+    };
+
+    loadSessions();
     setAttendanceRecordsBySession(loadStoredAttendance(filters.batch));
     fetchBatchStudents(filters.batch, controller.signal);
     return () => controller.abort();
-  }, [filters.batch, fetchBatchStudents]);
+  }, [filters.batch, fetchBatchStudents, fetchBatchSessions]);
 
   const fetchReferCandidates = useCallback(async (batchId) => {
     const authToken = token || JSON.parse(sessionStorage.getItem('user') || '{}').token;
@@ -2771,7 +2931,7 @@ const TrainerModule = () => {
     });
 
     setEditingSessionId(null);
-    setSessionDraft({
+    setSession({
       ...createEmptySessionDraft(nextSessionNumber),
       ...context,
       status: 'Pending',
@@ -2788,30 +2948,30 @@ const TrainerModule = () => {
   };
 
   const closeSessionPanel = () => {
-    setSessionDraft(null);
+    setSession(null);
     setEditingSessionId(null);
     setSessionPanelView(filteredSessions.length ? 'view' : 'empty');
   };
-  const openEditSessionModal = (session) => {
-    setEditingSessionId(session.id);
-    setSessionDraft({
-      ...session,
-      sessionDate: session.sessionDate || getTodayInputValue(),
-      evidenceDocs: session.evidenceDocs || [],
+  const openEditSessionModal = (existingSession) => {
+    setEditingSessionId(existingSession.id);
+    setSession({
+      ...existingSession,
+      sessionDate: existingSession.sessionDate || getTodayInputValue(),
+      evidenceDocs: existingSession.evidenceDocs || [],
     });
     setSessionPanelView('view');
     setIsSessionModalOpen(true);
   };
   const closeSessionModal = () => {
     setIsSessionModalOpen(false);
-    setSessionDraft(null);
+    setSession(null);
     setEditingSessionId(null);
   };
   const updateSessionDraft = (field, value) => {
-    setSessionDraft((prev) => ({ ...prev, [field]: value }));
+    setSession((prev) => ({ ...prev, [field]: value }));
   };
   const updateDraftEvidence = (index, field, value) => {
-    setSessionDraft((prev) => ({
+    setSession((prev) => ({
       ...prev,
       evidenceDocs: (prev.evidenceDocs || []).map((doc, docIndex) =>
         docIndex === index ? { ...doc, [field]: value } : doc
@@ -2819,7 +2979,7 @@ const TrainerModule = () => {
     }));
   };
   const addDraftEvidence = () => {
-    setSessionDraft((prev) => ({
+    setSession((prev) => ({
       ...prev,
       evidenceDocs: [
         ...(prev.evidenceDocs || []),
@@ -2828,7 +2988,7 @@ const TrainerModule = () => {
     }));
   };
   const removeDraftEvidence = (index) => {
-    setSessionDraft((prev) => ({
+    setSession((prev) => ({
       ...prev,
       evidenceDocs: (prev.evidenceDocs || []).filter((_, docIndex) => docIndex !== index),
     }));
@@ -2858,22 +3018,22 @@ const TrainerModule = () => {
     setSessionPanelView('view');
   };
 
-  const saveSessionDraft = () => {
-    if (!sessionDraft?.batch) {
+  const saveSession = async () => {
+    if (!session?.batch) {
       notify('Please select a batch for this session');
       return;
     }
-    if (!sessionDraft?.title?.trim()) {
+    if (!session?.title?.trim()) {
       notify('Please enter session title');
       return;
     }
-    if (!sessionDraft?.sessionDate) {
+    if (!session?.sessionDate) {
       notify('Please select session date');
       return;
     }
 
     const draftWithCounsellor = {
-      ...sessionDraft,
+      ...session,
       ...buildSessionContextFromFilters(filters, {
         verticalOptions,
         projectOptions,
@@ -2882,36 +3042,59 @@ const TrainerModule = () => {
         batchOptions,
         trainerName: trainerProfile.name,
       }),
-      status: sessionDraft.status || 'Pending',
-      counsellor: filters.counsellor || sessionDraft.counsellor || '',
-      counsellorName: getOptionLabel(counselorOptions, filters.counsellor || sessionDraft.counsellor),
-      courseTrade: getOptionLabel(courseOptions, filters.course || sessionDraft.course),
-      batchCode: getOptionLabel(batchOptions, filters.batch || sessionDraft.batch),
-      departmentName: getOptionLabel(verticalOptions, filters.department || sessionDraft.department),
-      projectName: getOptionLabel(projectOptions, filters.project || sessionDraft.project),
-      centerName: getOptionLabel(centerOptions, filters.center || sessionDraft.center),
-      batch: filters.batch || sessionDraft.batch,
-      totalCandidates: String(students.length || sessionDraft.totalCandidates || 0),
+      status: session.status || 'Pending',
+      counsellorName: getOptionLabel(counselorOptions, filters.counsellor || session.counsellor),
+      courseTrade: getOptionLabel(courseOptions, filters.course || session.course),
+      batchCode: getOptionLabel(batchOptions, filters.batch || session.batch),
+      departmentName: getOptionLabel(verticalOptions, filters.department || session.department),
+      projectName: getOptionLabel(projectOptions, filters.project || session.project),
+      centerName: getOptionLabel(centerOptions, filters.center || session.center),
+      batch: filters.batch || session.batch,
+      totalCandidates: String(students.length || session.totalCandidates || 0),
     };
     const normalizedSession = normalizeSessionDraft(draftWithCounsellor, activeBasicDetails);
-    const batchId = resolveSessionBatchId(normalizedSession, sessionDraft.batch || filters.batch);
+    const batchId = resolveSessionBatchId(normalizedSession, session.batch || filters.batch);
 
     if (editingSessionId) {
       const baseSessions = mergeBatchSessions(batchId, sessions);
-      const nextSessions = baseSessions.map((session) => (
-        session.id === editingSessionId ? { ...normalizedSession, id: editingSessionId } : session
+      const nextSessions = baseSessions.map((item) => (
+        item.id === editingSessionId ? { ...normalizedSession, id: editingSessionId } : item
       ));
-      const updatedSession = nextSessions.find((session) => session.id === editingSessionId);
+      const updatedSession = nextSessions.find((item) => item.id === editingSessionId);
 
       persistStoredSessions(batchId, nextSessions);
       finishSessionSave(editingSessionId, batchId, nextSessions, updatedSession);
       notify('Session updated');
       closeSessionModal();
-    } else {
-      const newSession = {
-        ...normalizedSession,
-        id: `S-${Date.now()}`,
-      };
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `${backendUrl}/college/trainer/addSession`,
+        {
+          batch: batchId,
+          course: filters.course || session.course,
+          center: filters.center || session.center,
+          title: normalizedSession.title,
+          topicCovered: normalizedSession.topicCovered,
+          trainingMethod: normalizedSession.trainingMethod,
+          sessionDate: normalizedSession.sessionDate,
+          startTime: normalizedSession.startTime,
+          endTime: normalizedSession.endTime,
+          notes: normalizedSession.notes || '',
+          evidenceDocs: (normalizedSession.evidenceDocs || []).map(({ name, type }) => ({ name, type })),
+          totalCandidates: students.length || Number(normalizedSession.totalCandidates) || 0,
+        },
+        { headers: { 'x-auth': token } }
+      );
+
+      if (!response.data?.status) {
+        notify(response.data?.message || 'Failed to add session');
+        return;
+      }
+
+      const newSession = mapApiSessionToClient(response.data.data, draftWithCounsellor);
       const baseSessions = mergeBatchSessions(batchId, sessions);
       const nextSessions = [...baseSessions, newSession];
 
@@ -2919,6 +3102,9 @@ const TrainerModule = () => {
       finishSessionSave(newSession.id, batchId, nextSessions, newSession);
       notify('Session added');
       closeSessionModal();
+    } catch (error) {
+      console.error('Failed to add session:', error);
+      notify(error.response?.data?.message || 'Failed to add session');
     }
   };
   const updateSessionStatus = (sessionId, status) => {
@@ -2931,31 +3117,79 @@ const TrainerModule = () => {
     });
     notify(`Session marked ${status}`);
   };
-  const uploadEvidenceFile = (sessionId, docId, file) => {
+  const uploadEvidenceFile = async (sessionId, docId, file) => {
     if (!file) return;
-    setSessions((prev) => {
-      const next = prev.map((session) => (
-        session.id === sessionId
-          ? {
-            ...session,
-            evidenceDocs: (session.evidenceDocs || []).map((doc) => (
-              doc.id === docId
-                ? {
-                  ...doc,
-                  status: 'Uploaded',
-                  fileName: file.name,
-                  type: getEvidenceTypeFromFile(file),
-                  name: doc.name?.trim() || getEvidenceDisplayName(file.name),
-                }
-                : doc
-            )),
-          }
-          : session
-      ));
-      persistSessions(next, resolveSessionBatchId(next.find((session) => session.id === sessionId), filters.batch));
-      return next;
-    });
-    notify('Evidence uploaded');
+
+    const isDbSession = /^[a-f\d]{24}$/i.test(String(sessionId));
+    const applyLocalUpload = () => {
+      setSessions((prev) => {
+        const next = prev.map((item) => (
+          item.id === sessionId
+            ? {
+              ...item,
+              evidenceDocs: (item.evidenceDocs || []).map((doc) => (
+                String(doc.id) === String(docId)
+                  ? {
+                    ...doc,
+                    status: 'Uploaded',
+                    fileName: file.name,
+                    type: getEvidenceTypeFromFile(file),
+                    name: doc.name?.trim() || getEvidenceDisplayName(file.name),
+                  }
+                  : doc
+              )),
+            }
+            : item
+        ));
+        persistSessions(next, resolveSessionBatchId(next.find((item) => item.id === sessionId), filters.batch));
+        return next;
+      });
+      notify('Evidence uploaded');
+    };
+
+    if (!isDbSession) {
+      applyLocalUpload();
+      return;
+    }
+
+    if (!sessionId || !docId) {
+      notify('Session or document id missing. Please save session again.');
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('sessionId', String(sessionId));
+      formData.append('docId', String(docId));
+
+      const response = await axios.post(
+        `${backendUrl}/college/trainer/uploadSessionDocument`,
+        formData,
+        {
+          headers: { 'x-auth': token },
+        }
+      );
+
+      if (!response.data?.status) {
+        notify(response.data?.message || 'Failed to upload document');
+        return;
+      }
+
+      setSessions((prev) => {
+        const next = prev.map((item) => {
+          if (item.id !== sessionId) return item;
+          const mapped = mapApiSessionToClient(response.data.data, item);
+          return { ...item, ...mapped, evidenceDocs: mapped.evidenceDocs };
+        });
+        persistSessions(next, resolveSessionBatchId(next.find((item) => item.id === sessionId), filters.batch));
+        return next;
+      });
+      notify('Evidence uploaded');
+    } catch (error) {
+      console.error('Failed to upload session document:', error);
+      notify(error.response?.data?.message || 'Failed to upload document');
+    }
   };
   const openAttendanceModal = (session, view = 'register') => {
     if (!students.length) {
@@ -3230,9 +3464,9 @@ const TrainerModule = () => {
         </>
       )}
 
-      {isSessionModalOpen && sessionDraft && (
+      {isSessionModalOpen && session && (
         <AddSessionModal
-          draft={sessionDraft}
+          draft={session}
           isEdit={!!editingSessionId}
           batchSummary={[
             activeBasicDetails.departmentName,
@@ -3242,7 +3476,7 @@ const TrainerModule = () => {
             activeBasicDetails.batchCode,
           ].filter(Boolean).join(' · ')}
           onClose={closeSessionModal}
-          onSave={saveSessionDraft}
+          onSave={saveSession}
           onFieldChange={updateSessionDraft}
           onEvidenceChange={updateDraftEvidence}
           onAddEvidence={addDraftEvidence}
@@ -4603,9 +4837,18 @@ const PORTAL_CSS = `
   .sc-evidence-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
   .sc-evidence-card {
     border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px;
-    display: flex; flex-direction: column; gap: 5px; background: #fafbfc;
-    transition: border-color 0.15s;
+    display: flex; flex-direction: column; gap: 8px; background: #fafbfc;
+    transition: border-color 0.15s; min-height: 0;
   }
+  .sc-evidence-card--uploaded { gap: 6px; }
+  .sc-evidence-card__title {
+    font-size: 11px; font-weight: 700; color: #1e293b;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sc-evidence-actions {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: auto;
+  }
+  .sc-upload-btn--full { width: 100%; justify-content: center; margin-top: auto; }
   .sc-evidence-card:hover { border-color: #bfdbfe; }
   .sc-evidence-icon {
     width: 28px; height: 28px; border-radius: 8px;
@@ -4613,8 +4856,54 @@ const PORTAL_CSS = `
   }
   .sc-evidence-icon--amber { background: #fef3c7; color: #d97706; }
   .sc-evidence-icon--green { background: #d1fae5; color: #059669; }
-  .sc-evidence-card strong { font-size: 11px; font-weight: 700; color: #1e293b; }
   .sc-evidence-card small { font-size: 10px; font-weight: 600; }
+  .sc-evidence-preview {
+    width: 100%;
+    height: 120px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sc-evidence-preview__img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #fff;
+  }
+  .sc-evidence-preview__iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: #fff;
+  }
+  .sc-evidence-preview__video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+  }
+  .sc-evidence-preview--file {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    height: 100%;
+    padding: 10px;
+    color: #475569;
+    font-size: 10px;
+    font-weight: 600;
+    text-align: center;
+  }
+  .sc-evidence-preview--file i { font-size: 22px; color: #2563eb; }
   .sc-evidence-type { color: #64748b; }
   .sc-evidence-empty {
     display: flex;
