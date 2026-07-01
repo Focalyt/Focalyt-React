@@ -68,7 +68,11 @@ const {
   RewardStatus,
   RewardClaim,
   Placement,
-  PlacementStatus
+  PlacementStatus,
+  TrainingSession,
+  SessionFeedback,
+  SessionAttendance,
+  Batch
 } = require("../../models");
 
 const Candidate = require("../../models/candidateProfile")
@@ -6477,6 +6481,322 @@ router.put('/rewardClaim/:claimId/updateImage', [isCandidate], async (req, res) 
       success: false,
       message: 'Server Error',
       error: err.message
+    });
+  }
+});
+
+const formatSessionDateForClient = (dateValue) => {
+  if (!dateValue) return new Date().toLocaleDateString('en-IN');
+  return new Date(dateValue).toLocaleDateString('en-IN');
+};
+
+const mapCandidateSessionForClient = (session) => ({
+  id: String(session._id),
+  title: session.title || '',
+  topicCovered: session.topicCovered || '',
+  trainingMethod: session.trainingMethod || '',
+  sessionDate: session.sessionDate ? new Date(session.sessionDate).toISOString().slice(0, 10) : '',
+  date: formatSessionDateForClient(session.sessionDate),
+  startTime: session.startTime || '',
+  endTime: session.endTime || '',
+  trainerName: session.trainer?.name || '',
+  notes: session.notes || '',
+  batch: String(session.batch?._id || session.batch || ''),
+  course: String(session.course || ''),
+  batchCode: session.batch?.name || '',
+  evidenceDocs: (session.evidenceDocs || []).map((doc) => ({
+    id: String(doc._id || doc.id),
+    name: doc.name || '',
+    type: doc.type || 'Document',
+    status: doc.status || 'Pending',
+    fileName: doc.fileName || '',
+    fileUrl: doc.fileUrl || '',
+  })),
+  totalCandidates: String(session.totalCandidates ?? 0),
+  presentCandidates: String(session.presentCandidates ?? 0),
+  absentCandidates: String(session.absentCandidates ?? 0),
+  attendance: `${session.attendancePercent ?? 0}%`,
+});
+
+const resolveCandidateEnrollment = async (candidateId, { courseId, enrollmentId, batchId } = {}) => {
+  if (!candidateId || (!courseId && !enrollmentId)) return null;
+
+  const query = {
+    _candidate: candidateId,
+    isBatchAssigned: true,
+  };
+  if (enrollmentId) query._id = enrollmentId;
+  if (courseId) query._course = courseId;
+  if (batchId) query.batch = batchId;
+
+  return AppliedCourses.findOne(query).lean();
+};
+
+router.get('/batch-sessions/:batchId', [isCandidate, authenti], async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    const { courseId, enrollmentId } = req.query;
+
+    let validation = { mobile: req.user.mobile };
+    let { value, error } = await CandidateValidators.userMobile(validation);
+    if (error) {
+      return res.status(400).json({ status: false, message: 'Something went wrong!' });
+    }
+
+    const candidate = await Candidate.findOne({
+      mobile: value.mobile,
+      isDeleted: false,
+      status: true,
+    });
+
+    if (!candidate) {
+      return res.status(404).json({ status: false, message: 'Candidate not found' });
+    }
+
+    const enrollment = await resolveCandidateEnrollment(candidate._id, {
+      courseId,
+      enrollmentId,
+      batchId,
+    });
+    if (!enrollment) {
+      return res.status(403).json({ status: false, message: 'Enrollment not found for this batch' });
+    }
+
+    const sessions = await TrainingSession.find({ batch: batchId })
+      .populate('trainer', 'name email mobile')
+      .populate('batch', 'name')
+      .sort({ sessionDate: -1 })
+      .lean();
+
+    return res.status(200).json({
+      status: true,
+      message: 'Batch sessions fetched successfully',
+      data: sessions.map(mapCandidateSessionForClient),
+    });
+  } catch (err) {
+    console.error('Error in /batch-sessions route:', err);
+    return res.status(500).json({
+      status: false,
+      message: 'Internal Server Error',
+      error: err.message,
+    });
+  }
+});
+
+router.get('/batch-session-attendance/:batchId', [isCandidate, authenti], async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    const { courseId, enrollmentId } = req.query;
+
+    let validation = { mobile: req.user.mobile };
+    let { value, error } = await CandidateValidators.userMobile(validation);
+    if (error) {
+      return res.status(400).json({ status: false, message: 'Something went wrong!' });
+    }
+
+    const candidate = await Candidate.findOne({
+      mobile: value.mobile,
+      isDeleted: false,
+      status: true,
+    });
+
+    if (!candidate) {
+      return res.status(404).json({ status: false, message: 'Candidate not found' });
+    }
+
+    const enrollment = await resolveCandidateEnrollment(candidate._id, {
+      courseId,
+      enrollmentId,
+      batchId,
+    });
+    if (!enrollment) {
+      return res.status(403).json({ status: false, message: 'Enrollment not found for this batch' });
+    }
+
+    const records = await SessionAttendance.find({
+      batch: batchId,
+      appliedCourse: enrollment._id,
+    }).lean();
+
+    const bySession = {};
+    records.forEach((record) => {
+      bySession[String(record.session)] = {
+        status: record.status || 'Not Marked',
+        remarks: record.remarks || '',
+      };
+    });
+
+    return res.status(200).json({
+      status: true,
+      message: 'Session attendance fetched successfully',
+      data: bySession,
+    });
+  } catch (err) {
+    console.error('Error in /batch-session-attendance route:', err);
+    return res.status(500).json({
+      status: false,
+      message: 'Internal Server Error',
+      error: err.message,
+    });
+  }
+});
+
+router.get('/session-feedback/:sessionId', [isCandidate, authenti], async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { courseId, enrollmentId } = req.query;
+
+    if (!courseId && !enrollmentId) {
+      return res.status(400).json({
+        status: false,
+        message: 'courseId or enrollmentId is required',
+      });
+    }
+
+    let validation = { mobile: req.user.mobile };
+    let { value, error } = await CandidateValidators.userMobile(validation);
+    if (error) {
+      return res.status(400).json({ status: false, message: 'Something went wrong!' });
+    }
+
+    const candidate = await Candidate.findOne({
+      mobile: value.mobile,
+      isDeleted: false,
+      status: true,
+    });
+
+    if (!candidate) {
+      return res.status(404).json({ status: false, message: 'Candidate not found' });
+    }
+
+    const enrollment = await resolveCandidateEnrollment(candidate._id, { courseId, enrollmentId });
+    if (!enrollment) {
+      return res.status(403).json({ status: false, message: 'Enrollment not found' });
+    }
+
+    const session = await TrainingSession.findOne({
+      _id: sessionId,
+      batch: enrollment.batch,
+    }).lean();
+
+    if (!session) {
+      return res.status(404).json({ status: false, message: 'Session not found' });
+    }
+
+    const feedback = await SessionFeedback.findOne({
+      session: sessionId,
+      appliedCourse: enrollment._id,
+    }).lean();
+
+    return res.status(200).json({
+      status: true,
+      message: feedback ? 'Feedback fetched successfully' : 'No feedback submitted yet',
+      data: feedback
+        ? {
+          rating: feedback.rating,
+          comment: feedback.comment || '',
+          submittedAt: feedback.updatedAt,
+        }
+        : null,
+    });
+  } catch (err) {
+    console.error('Error in GET /session-feedback route:', err);
+    return res.status(500).json({
+      status: false,
+      message: 'Internal Server Error',
+      error: err.message,
+    });
+  }
+});
+
+router.post('/session-feedback', [isCandidate, authenti], async (req, res) => {
+  try {
+    const { sessionId, courseId, enrollmentId, rating, comment } = req.body;
+
+    if (!sessionId || (!courseId && !enrollmentId) || !rating) {
+      return res.status(400).json({
+        status: false,
+        message: 'sessionId, courseId (or enrollmentId) and rating are required',
+      });
+    }
+
+    const numericRating = Number(rating);
+    if (!Number.isInteger(numericRating) || numericRating < 1 || numericRating > 5) {
+      return res.status(400).json({
+        status: false,
+        message: 'rating must be an integer between 1 and 5',
+      });
+    }
+
+    let validation = { mobile: req.user.mobile };
+    let { value, error } = await CandidateValidators.userMobile(validation);
+    if (error) {
+      return res.status(400).json({ status: false, message: 'Something went wrong!' });
+    }
+
+    const candidate = await Candidate.findOne({
+      mobile: value.mobile,
+      isDeleted: false,
+      status: true,
+    });
+
+    if (!candidate) {
+      return res.status(404).json({ status: false, message: 'Candidate not found' });
+    }
+
+    const enrollment = await resolveCandidateEnrollment(candidate._id, { courseId, enrollmentId });
+    if (!enrollment) {
+      return res.status(403).json({ status: false, message: 'Enrollment not found' });
+    }
+
+    const populatedEnrollment = await AppliedCourses.findById(enrollment._id)
+      .populate('batch', 'college')
+      .lean();
+
+    const session = await TrainingSession.findOne({
+      _id: sessionId,
+      batch: populatedEnrollment.batch?._id || populatedEnrollment.batch,
+    }).lean();
+
+    if (!session) {
+      return res.status(404).json({ status: false, message: 'Session not found for this enrollment' });
+    }
+
+    const studentName = candidate.name || req.user?.name || 'Student';
+    const batchId = populatedEnrollment.batch?._id || populatedEnrollment.batch;
+    const collegeId = session.college || populatedEnrollment.batch?.college;
+    const appliedCourseId = populatedEnrollment._id;
+
+    const feedback = await SessionFeedback.findOneAndUpdate(
+      { session: sessionId, appliedCourse: appliedCourseId },
+      {
+        session: sessionId,
+        batch: batchId,
+        appliedCourse: appliedCourseId,
+        candidate: candidate._id,
+        college: collegeId,
+        studentName,
+        rating: numericRating,
+        comment: (comment || '').trim(),
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    ).lean();
+
+    return res.status(200).json({
+      status: true,
+      message: 'Feedback saved successfully',
+      data: {
+        rating: feedback.rating,
+        comment: feedback.comment || '',
+        submittedAt: feedback.updatedAt,
+      },
+    });
+  } catch (err) {
+    console.error('Error in POST /session-feedback route:', err);
+    return res.status(500).json({
+      status: false,
+      message: 'Internal Server Error',
+      error: err.message,
     });
   }
 });

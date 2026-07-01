@@ -234,29 +234,63 @@ const persistStoredSessions = (batchId, list) => {
   localStorage.setItem(`${SESSIONS_STORAGE_PREFIX}${batchId}`, JSON.stringify(list));
 };
 
-const ATTENDANCE_STORAGE_PREFIX = 'trainerModuleAttendance:';
+const mapApiAttendanceToClient = (groupedData = {}) => {
+  const records = {};
+  Object.entries(groupedData).forEach(([sessionId, rows]) => {
+    records[sessionId] = (rows || []).map((row) => ({
+      id: row.appliedCourseId || row.id,
+      name: row.name || 'Unknown',
+      mobile: row.mobile || '-',
+      status: row.status || 'Not Marked',
+      remarks: row.remarks || '',
+      attendancePercent: '-',
+    }));
+  });
+  return records;
+};
 
-const loadStoredAttendance = (batchId) => {
-  if (!batchId) return {};
-  try {
-    const raw = localStorage.getItem(`${ATTENDANCE_STORAGE_PREFIX}${batchId}`);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
+const toDateKey = (dateValue) => {
+  if (!dateValue) return '';
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+};
+
+const parseSessionDateValue = (session) => {
+  if (!session) return null;
+  const raw = session.sessionDate || session.date;
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(raw))) {
+    return new Date(`${raw}T12:00:00`);
   }
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-const persistStoredAttendance = (batchId, records) => {
-  if (!batchId) return;
-  localStorage.setItem(`${ATTENDANCE_STORAGE_PREFIX}${batchId}`, JSON.stringify(records || {}));
+const getSessionAttendanceMeta = (session) => {
+  const date = parseSessionDateValue(session);
+  if (!date) {
+    return { countable: true, reason: null, dateKey: '', label: '' };
+  }
+
+  const dateKey = toDateKey(date);
+  if (date.getDay() === 0) {
+    return { countable: false, reason: 'Sunday', dateKey, label: 'Sunday — excluded from overall attendance' };
+  }
+
+  return { countable: true, reason: null, dateKey, label: '' };
 };
+
+const getCountableSessions = (sessions = []) => (
+  sessions.filter((session) => getSessionAttendanceMeta(session).countable)
+);
 
 const computeStudentBatchAttendance = (studentId, sessions = [], attendanceRecordsBySession = {}) => {
+  const countableSessions = getCountableSessions(sessions);
   let markedSessions = 0;
   let presentSessions = 0;
   let absentSessions = 0;
 
-  sessions.forEach((session) => {
+  countableSessions.forEach((session) => {
     const rows = attendanceRecordsBySession[session.id];
     if (!rows?.length) return;
 
@@ -272,15 +306,23 @@ const computeStudentBatchAttendance = (studentId, sessions = [], attendanceRecor
     ? ((presentSessions / markedSessions) * 100).toFixed(1)
     : null;
 
-  return { markedSessions, presentSessions, absentSessions, percentage };
+  return {
+    markedSessions,
+    presentSessions,
+    absentSessions,
+    percentage,
+    totalCountableSessions: countableSessions.length,
+    excludedSessions: Math.max(0, sessions.length - countableSessions.length),
+  };
 };
 
 const computeBatchAttendanceSummary = (students = [], sessions = [], attendanceRecordsBySession = {}) => {
+  const countableSessions = getCountableSessions(sessions);
   const studentStats = students.map((student) =>
     computeStudentBatchAttendance(student.id, sessions, attendanceRecordsBySession)
   );
   const tracked = studentStats.filter((stat) => stat.markedSessions > 0);
-  const sessionsWithAttendance = sessions.filter(
+  const sessionsWithAttendance = countableSessions.filter(
     (session) => (attendanceRecordsBySession[session.id] || []).some(
       (row) => row.status === 'Present' || row.status === 'Absent'
     )
@@ -294,7 +336,8 @@ const computeBatchAttendanceSummary = (students = [], sessions = [], attendanceR
       source: 'admission',
       average: admissionAvg.toFixed(1),
       sessionsMarked: sessionsWithAttendance,
-      totalSessions: sessions.length,
+      totalSessions: countableSessions.length,
+      excludedSessions: Math.max(0, sessions.length - countableSessions.length),
     };
   }
 
@@ -303,7 +346,8 @@ const computeBatchAttendanceSummary = (students = [], sessions = [], attendanceR
     source: 'sessions',
     average: average.toFixed(1),
     sessionsMarked: sessionsWithAttendance,
-    totalSessions: sessions.length,
+    totalSessions: countableSessions.length,
+    excludedSessions: Math.max(0, sessions.length - countableSessions.length),
     trackedStudents: tracked.length,
   };
 };
@@ -567,6 +611,25 @@ const DUMMY_STUDENTS = [
     ],
   },
 ];
+const deriveSessionAttendanceStats = (session, attendanceRecordsBySession = {}, students = []) => {
+  const rows = attendanceRecordsBySession[session?.id];
+  if (rows?.length) {
+    const stats = summarizeAttendanceRows(rows);
+    return {
+      totalCandidates: String(stats.total),
+      presentCandidates: String(stats.present),
+      absentCandidates: String(stats.absent),
+      attendance: `${stats.attendance}%`,
+    };
+  }
+
+  return {
+    totalCandidates: session?.totalCandidates || String(students.length || 0),
+    presentCandidates: session?.presentCandidates || '0',
+    absentCandidates: session?.absentCandidates || '0',
+    attendance: session?.attendance || '0%',
+  };
+};
 const buildStudentSessionHistory = (student, sessions = [], attendanceRecordsBySession = {}) => {
   const history = [];
 
@@ -578,11 +641,15 @@ const buildStudentSessionHistory = (student, sessions = [], attendanceRecordsByS
       || rows.find((entry) => entry.name === student.name);
     if (!row) return;
 
+    const meta = getSessionAttendanceMeta(session);
+
     history.push({
       date: session.date || formatSessionDate(session.sessionDate),
       title: session.title,
       status: row.status,
       topic: session.topicCovered || session.title,
+      excluded: !meta.countable,
+      exclusionReason: meta.reason,
     });
   });
 
@@ -593,8 +660,8 @@ const getStudentPerformanceProfile = (student, sessions, attendanceRecordsBySess
 
   const batchAttendance = computeStudentBatchAttendance(student.id, sessions, attendanceRecordsBySession);
   const sessionHistory = buildStudentSessionHistory(student, sessions, attendanceRecordsBySession);
-  const presentFromHistory = sessionHistory.filter((entry) => entry.status === 'Present').length;
-  const absentFromHistory = sessionHistory.filter((entry) => entry.status === 'Absent').length;
+  const presentFromHistory = sessionHistory.filter((entry) => entry.status === 'Present' && !entry.excluded).length;
+  const absentFromHistory = sessionHistory.filter((entry) => entry.status === 'Absent' && !entry.excluded).length;
   const attendanceDisplay = batchAttendance.percentage != null
     ? `${batchAttendance.percentage}%`
     : student.attendance;
@@ -609,9 +676,11 @@ const getStudentPerformanceProfile = (student, sessions, attendanceRecordsBySess
     attendanceNum,
     attLevel: getAttendanceLevel(attendanceDisplay),
     performanceLabel: getPerformanceLabel(getAttendanceLevel(attendanceDisplay)),
-    totalSessions: batchAttendance.markedSessions || student.totalSessions || sessionHistory.length || 0,
+    totalSessions: batchAttendance.totalCountableSessions || student.totalSessions || sessionHistory.length || 0,
     presentSessions: batchAttendance.presentSessions || student.presentSessions || presentFromHistory,
     absentSessions: batchAttendance.absentSessions || student.absentSessions || absentFromHistory,
+    markedSessions: batchAttendance.markedSessions,
+    excludedSessions: batchAttendance.excludedSessions,
     sessionHistory,
     metrics: [
       { label: 'Class Participation', value: student.participationScore, icon: 'fa-users', tone: 'blue' },
@@ -653,26 +722,20 @@ const attendanceTone = (status) => {
   if (status === 'Absent') return 'absent';
   return 'not-marked';
 };
-const createSessionAttendanceRows = (session, students = []) => {
+const createSessionAttendanceRows = (session, students = [], existingRows = []) => {
   if (!students.length) return [];
 
-  const presentCount = Math.min(Number(session?.presentCandidates) || 0, students.length);
-  const absentCount = Math.min(Number(session?.absentCandidates) || 0, students.length - presentCount);
+  const existingById = new Map(existingRows.map((row) => [String(row.id), row]));
 
-  return students.map((student, index) => {
-    const status = index < presentCount
-      ? 'Present'
-      : index < presentCount + absentCount
-        ? 'Absent'
-        : 'Not Marked';
-
+  return students.map((student) => {
+    const existing = existingById.get(String(student.id));
     return {
       id: student.id,
       name: student.name,
       mobile: student.mobile || '-',
-      status,
-      remarks: '',
-      attendancePercent: student.attendance || '-',
+      status: existing?.status || 'Not Marked',
+      remarks: existing?.remarks || '',
+      attendancePercent: existing?.attendancePercent || student.attendance || '-',
     };
   });
 };
@@ -688,7 +751,7 @@ const summarizeAttendanceRows = (rows = []) => {
 const getStudentOverallAttendance = (studentId, students = [], sessions = [], attendanceRecordsBySession = {}) => {
   const batchAttendance = computeStudentBatchAttendance(studentId, sessions, attendanceRecordsBySession);
   if (batchAttendance.percentage != null) {
-    return `${batchAttendance.percentage}% (${batchAttendance.presentSessions}/${batchAttendance.markedSessions})`;
+    return `${batchAttendance.percentage}% (${batchAttendance.presentSessions}/${batchAttendance.markedSessions} present · ${batchAttendance.totalCountableSessions} working sessions)`;
   }
   return students.find((student) => student.id === studentId)?.attendance || '-';
 };
@@ -1210,8 +1273,10 @@ const StudentCard = ({ student, batchAttendance, onView, onAttendance, onAddPerf
     ? `${batchAttendance.percentage}%`
     : student.attendance;
   const attendanceHint = batchAttendance?.markedSessions
-    ? `${batchAttendance.presentSessions}/${batchAttendance.markedSessions} sessions marked`
-    : 'From admission record';
+    ? `${batchAttendance.presentSessions}/${batchAttendance.markedSessions} present · ${batchAttendance.totalCountableSessions} working sessions`
+    : batchAttendance?.totalCountableSessions
+      ? `0/${batchAttendance.totalCountableSessions} working sessions marked`
+      : 'From admission record';
   const attendanceNum = parseFloat(batchAttendance?.percentage ?? student.attendance) || 0;
   const attLevel = getAttendanceLevel(attendanceLabel);
   const statusTone = student.status === 'Active' ? 'active' : 'risk';
@@ -1627,16 +1692,7 @@ const ReferSessionModal = ({
 
 const RATING_LABELS = { 5: 'Excellent', 4: 'Good', 3: 'Average', 2: 'Below average', 1: 'Poor' };
 
-const DUMMY_STUDENT_REVIEW_TEMPLATES = [
-  { studentName: 'Akash Gaurav', rating: 5, comment: 'Session bahut accha tha, practical examples helpful the.', reviewedAt: '26/06/2026' },
-  { studentName: 'Priya Verma', rating: 4, comment: 'Trainer ne clearly explain kiya, thoda fast pace tha.', reviewedAt: '26/06/2026' },
-  { studentName: 'Rohit Singh', rating: 3, comment: 'Content good hai but more practice time chahiye tha.', reviewedAt: '25/06/2026' },
-  { studentName: 'Neha Sharma', rating: 5, comment: 'Very engaging session, communication skills improve hui.', reviewedAt: '25/06/2026' },
-  { studentName: 'Vikram Patel', rating: 4, comment: 'Good interaction and doubts clear hue.', reviewedAt: '24/06/2026' },
-  { studentName: 'Sneha Kapoor', rating: 2, comment: 'Topic samajh aaya but session thoda rushed laga.', reviewedAt: '24/06/2026' },
-];
-
-const getSessionStudentReviews = (session) => {
+const getSessionStudentReviews = (session, feedbackBySession = {}) => {
   if (Array.isArray(session?.studentReviews) && session.studentReviews.length) {
     return session.studentReviews;
   }
@@ -1644,14 +1700,7 @@ const getSessionStudentReviews = (session) => {
   const sessionId = String(session?.id || '');
   if (!sessionId) return [];
 
-  const seed = sessionId.split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-  const reviewCount = (seed % 4) + 2;
-
-  return DUMMY_STUDENT_REVIEW_TEMPLATES.slice(0, reviewCount).map((review, index) => ({
-    ...review,
-    id: `${sessionId}-review-${index}`,
-    rating: Math.max(1, Math.min(5, review.rating + ((seed + index) % 2))),
-  }));
+  return feedbackBySession[sessionId] || [];
 };
 
 const computeReviewSummary = (reviews = []) => {
@@ -1822,11 +1871,14 @@ const AttendanceManagementModal = ({
   students,
   sessions,
   attendanceRecordsBySession,
+  sessionMeta,
+  readOnly,
   view,
   onViewChange,
   onStatusChange,
   onClose,
   onSave,
+  saving = false,
 }) => {
   const [selectedStudentId, setSelectedStudentId] = useState('');
 
@@ -1845,16 +1897,17 @@ const AttendanceManagementModal = ({
   const stats = summarizeAttendanceRows(rows);
   const sessionDate = session.date || formatSessionDate(session.sessionDate);
   const sessionTime = `${session.startTime || '10:00'} - ${session.endTime || '12:00'}`;
+  const exclusionNote = sessionMeta?.label || (readOnly ? 'This session is excluded from overall attendance.' : '');
   const sessionDetails = [
     { label: 'Session ID', value: session.id },
     { label: 'Topic covered', value: session.topicCovered || session.title },
     { label: 'Training Mode', value: session.trainingMethod || 'Interactive Learning' },
     { label: 'Session date', value: sessionDate },
     { label: 'Time', value: sessionTime },
-    { label: 'Batch code', value: session.batchCode},
-    { label: 'Course / trade', value: session.courseTrade  },
-    { label: 'Trainer', value: session.trainerName  },
-    { label: 'Status', value: session.status || 'Pending' },
+    { label: 'Batch code', value: session.batchCode },
+    { label: 'Course / trade', value: session.courseTrade },
+    { label: 'Trainer', value: session.trainerName },
+    { label: 'Overall attendance', value: sessionMeta?.countable === false ? 'Excluded (Sunday)' : 'Included' },
   ];
 
   return (
@@ -1866,6 +1919,7 @@ const AttendanceManagementModal = ({
               <i className="fas fa-chart-line" /> Attendance Management Dashboard
             </h3>
             <p>{session.title} · {sessionDate} · {sessionTime}</p>
+            {exclusionNote ? <p className="attendance-exclusion-note">{exclusionNote}</p> : null}
           </div>
           <button type="button" className="attendance-close-btn" onClick={onClose} aria-label="Close attendance dashboard">
             <i className="fas fa-times" />
@@ -1954,6 +2008,7 @@ const AttendanceManagementModal = ({
                           <select
                             className={`attendance-status-select attendance-status-select--${attendanceTone(row.status)}`}
                             value={row.status}
+                            disabled={readOnly}
                             onChange={(event) => onStatusChange(row.id, event.target.value)}
                           >
                             {ATTENDANCE_STATUSES.map((status) => (
@@ -2046,22 +2101,42 @@ const AttendanceManagementModal = ({
 
         <div className="attendance-modal__foot">
           <button type="button" className="sc-btn" onClick={onClose}>Close</button>
-          <button type="button" className="sc-btn sc-btn--primary" onClick={onSave}>
-            <i className="fas fa-save" /> Save Attendance
-          </button>
+          {!readOnly && (
+            <button type="button" className="sc-btn sc-btn--primary" onClick={onSave} disabled={saving}>
+              <i className={`fas ${saving ? 'fa-spinner fa-spin' : 'fa-save'}`} /> {saving ? 'Saving...' : 'Save Attendance'}
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-const SessionCard = ({ basicDetails, session, notify, onStatusChange, onEvidenceUpload, onEditSession, onOpenAttendance }) => {
+const SessionCard = ({
+  basicDetails,
+  session,
+  studentReviews = [],
+  students = [],
+  attendanceRecordsBySession = {},
+  notify,
+  onStatusChange,
+  onEvidenceUpload,
+  onEditSession,
+  onOpenAttendance,
+}) => {
   const [collapsed, setCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
   const activeSession = session || hydrateSession(DUMMY_SESSIONS[0], 0, basicDetails);
-  const studentReviews = useMemo(() => getSessionStudentReviews(activeSession), [activeSession]);
+  const sessionMeta = useMemo(
+    () => getSessionAttendanceMeta(activeSession),
+    [activeSession]
+  );
+  const liveStats = useMemo(
+    () => deriveSessionAttendanceStats(activeSession, attendanceRecordsBySession, students),
+    [activeSession, attendanceRecordsBySession, students]
+  );
   const reviewSummary = useMemo(() => computeReviewSummary(studentReviews), [studentReviews]);
   const statusTone = activeSession.status === 'Completed' ? 'green' : 'amber';
   const statusIcon = activeSession.status === 'Completed' ? 'fa-check-circle' : 'fa-clock';
@@ -2079,11 +2154,11 @@ const SessionCard = ({ basicDetails, session, notify, onStatusChange, onEvidence
     ['fa-user', 'Trainer', activeSession.trainerName || basicDetails.trainerName, 'pink'],
   ]), [activeSession, basicDetails, timeRange]);
   const statItems = useMemo(() => ([
-    { icon: 'fa-users', val: activeSession.totalCandidates || '0', lbl: 'Total Candidates', cls: 'blue' },
-    { icon: 'fa-check-circle', val: activeSession.presentCandidates || '0', lbl: 'Present', cls: 'green' },
-    { icon: 'fa-times-circle', val: activeSession.absentCandidates || '0', lbl: 'Absent', cls: 'red' },
-    { icon: 'fa-percentage', val: activeSession.attendance || '0%', lbl: 'Attendance', cls: 'amber' },
-  ]), [activeSession]);
+    { icon: 'fa-users', val: liveStats.totalCandidates || '0', lbl: 'Total Candidates', cls: 'blue' },
+    { icon: 'fa-check-circle', val: liveStats.presentCandidates || '0', lbl: 'Present', cls: 'green' },
+    { icon: 'fa-times-circle', val: liveStats.absentCandidates || '0', lbl: 'Absent', cls: 'red' },
+    { icon: 'fa-percentage', val: liveStats.attendance || '0%', lbl: 'Attendance', cls: 'amber' },
+  ]), [liveStats]);
   const evidenceDocs = activeSession.evidenceDocs || [];
 
   return (
@@ -2095,7 +2170,9 @@ const SessionCard = ({ basicDetails, session, notify, onStatusChange, onEvidence
           </div>
           <div className="sc-head-text">
             <div className="sc-trainer-name">{activeSession.title}</div>
-            
+            {!sessionMeta.countable && (
+              <span className="sc-session-badge sc-session-badge--muted">{sessionMeta.reason} · excluded</span>
+            )}
           </div>
         </div>
 
@@ -2254,7 +2331,19 @@ const SessionCard = ({ basicDetails, session, notify, onStatusChange, onEvidence
               <i className="far fa-edit" /> Edit Session
             </button>
             <div className="sc-foot-right">
-              <button type="button" className="sc-btn sc-btn--outline" onClick={() => onOpenAttendance(activeSession, 'register')}>
+              <button
+                type="button"
+                className="sc-btn sc-btn--outline"
+                disabled={!sessionMeta.countable}
+                title={sessionMeta.countable ? 'Mark attendance for this session' : sessionMeta.label}
+                onClick={() => {
+                  if (!sessionMeta.countable) {
+                    notify(sessionMeta.label || 'Attendance cannot be marked on Sunday.');
+                    return;
+                  }
+                  onOpenAttendance(activeSession, 'register');
+                }}
+              >
                 <i className="fas fa-user-check" /> Mark Attendance
               </button>
               <button type="button" className="sc-btn sc-btn--primary" onClick={() => onOpenAttendance(activeSession, 'summary')}>
@@ -2300,6 +2389,7 @@ const TrainerModule = () => {
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [attendanceModal, setAttendanceModal] = useState({ isOpen: false, view: 'register', sessionId: '' });
   const [attendanceRecordsBySession, setAttendanceRecordsBySession] = useState({});
+  const [attendanceSaving, setAttendanceSaving] = useState(false);
   const [studentProfileModal, setStudentProfileModal] = useState({ isOpen: false, student: null });
   const [performanceModal, setPerformanceModal] = useState({ isOpen: false, draft: null });
   const [referSessionModal, setReferSessionModal] = useState({
@@ -2317,6 +2407,7 @@ const TrainerModule = () => {
   const [pathBatchesLoading, setPathBatchesLoading] = useState(false);
   const [filterOptionsLoading, setFilterOptionsLoading] = useState(true);
   const [sessionPanelView, setSessionPanelView] = useState('empty');
+  const [sessionFeedbackBySession, setSessionFeedbackBySession] = useState({});
   const [toast, setToast] = useState('');
 
   const trainerProfile = useMemo(() => ({
@@ -2347,6 +2438,7 @@ const TrainerModule = () => {
   );
 
   const notify = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+
   const updateMap = useCallback((setter, id, field, val) => {
     setter((prev) => ({ ...prev, [id]: { ...prev[id], [field]: val } }));
   }, []);
@@ -2422,8 +2514,7 @@ const TrainerModule = () => {
   }, [verticalOptions, projectOptions, centerOptions, courseOptions, batchOptions, counselorOptions]);
 
   useEffect(() => {
-    const authToken = token || JSON.parse(sessionStorage.getItem('user') || '{}').token;
-    if (!authToken) {
+    if (!token) {
       setFilterOptionsLoading(false);
       console.error('TrainerModule: auth token missing, filters not loaded');
       return undefined;
@@ -2434,7 +2525,7 @@ const TrainerModule = () => {
         .filter((item) => item && item._id && item.name)
         .map((item) => ({ value: String(item._id), label: item.name }));
 
-    const requestConfig = { headers: { 'x-auth': authToken }, timeout: 12000 };
+    const requestConfig = { headers: { 'x-auth': token } };
     let cancelled = false;
 
     const fetchFilterOptions = async () => {
@@ -2530,7 +2621,7 @@ const TrainerModule = () => {
   }, [backendUrl, token]);
 
   useEffect(() => {
-    if (!token || !filters.center || !filters.project) {
+    if (!filters.center || !filters.project) {
       setCenterWiseCourseIds(new Set());
       return undefined;
     }
@@ -2560,8 +2651,7 @@ const TrainerModule = () => {
   }, [filters.center, filters.project, token, backendUrl]);
 
   const fetchBatchStudents = useCallback(async (batchId, signal) => {
-    const authToken = token || JSON.parse(sessionStorage.getItem('user') || '{}').token;
-    if (!authToken || !batchId) {
+    if (!batchId) {
       setStudents([]);
       setStudentsLoading(false);
       return;
@@ -2570,9 +2660,9 @@ const TrainerModule = () => {
     setStudentsLoading(true);
     try {
       const res = await axios.get(
-        `${backendUrl}/college/admission-list/${batchId}?page=1&limit=500`,
+        `${backendUrl}/college/trainer/batch-students/${batchId}?page=1&limit=500`,
         {
-          headers: { 'x-auth': authToken },
+          headers: { 'x-auth': token },
           timeout: 15000,
           signal,
         }
@@ -2592,13 +2682,31 @@ const TrainerModule = () => {
     }
   }, [backendUrl, token]);
 
+  const fetchBatchAttendance = useCallback(async (batchId, signal) => {
+    if (!batchId) return {};
+
+    try {
+      const res = await axios.get(`${backendUrl}/college/trainer/session-attendance/batch/${batchId}`, {
+        headers: { 'x-auth': token },
+        signal,
+      });
+      if (res.data?.status && res.data.data) {
+        return mapApiAttendanceToClient(res.data.data);
+      }
+    } catch (err) {
+      if (err?.code !== 'ERR_CANCELED' && err?.name !== 'CanceledError') {
+        console.error('Failed to fetch batch attendance:', err);
+      }
+    }
+    return {};
+  }, [backendUrl, token]);
+
   const fetchBatchSessions = useCallback(async (batchId, signal) => {
-    const authToken = token || JSON.parse(sessionStorage.getItem('user') || '{}').token;
-    if (!authToken || !batchId) return null;
+    if (!batchId) return null;
 
     try {
       const res = await axios.get(`${backendUrl}/college/trainer/sessions/${batchId}`, {
-        headers: { 'x-auth': authToken },
+        headers: { 'x-auth': token },
         signal,
       });
       if (!res.data?.status || !Array.isArray(res.data.data)) return null;
@@ -2620,6 +2728,25 @@ const TrainerModule = () => {
     }
   }, [backendUrl, token, courseOptions, batchOptions, verticalOptions, projectOptions, centerOptions, filters, trainerProfile.name]);
 
+  const fetchBatchSessionFeedback = useCallback(async (batchId, signal) => {
+    if (!batchId) return {};
+
+    try {
+      const res = await axios.get(`${backendUrl}/college/trainer/session-feedback/batch/${batchId}`, {
+        headers: { 'x-auth': token },
+        signal,
+      });
+      if (res.data?.status && res.data.data) {
+        return res.data.data;
+      }
+    } catch (err) {
+      if (err?.code !== 'ERR_CANCELED' && err?.name !== 'CanceledError') {
+        console.error('Failed to fetch session feedback:', err);
+      }
+    }
+    return {};
+  }, [backendUrl, token]);
+
   useEffect(() => {
     if (!filters.batch) {
       setSessions([]);
@@ -2627,6 +2754,7 @@ const TrainerModule = () => {
       setStudents([]);
       setStudentsLoading(false);
       setAttendanceRecordsBySession({});
+      setSessionFeedbackBySession({});
       return undefined;
     }
 
@@ -2634,13 +2762,19 @@ const TrainerModule = () => {
     const stored = loadStoredSessions(filters.batch);
 
     const loadSessions = async () => {
-      const fromApi = await fetchBatchSessions(filters.batch, controller.signal);
+      const [fromApi, feedbackMap, attendanceMap] = await Promise.all([
+        fetchBatchSessions(filters.batch, controller.signal),
+        fetchBatchSessionFeedback(filters.batch, controller.signal),
+        fetchBatchAttendance(filters.batch, controller.signal),
+      ]);
       const nextSessions = fromApi?.length ? fromApi : stored;
 
       if (fromApi?.length) {
         persistStoredSessions(filters.batch, fromApi);
       }
 
+      setSessionFeedbackBySession(feedbackMap || {});
+      setAttendanceRecordsBySession(attendanceMap || {});
       setSessions(nextSessions);
       setSelectedSessionId((prev) => (
         prev && nextSessions.some((item) => item.id === prev) ? prev : nextSessions[0]?.id || ''
@@ -2649,14 +2783,25 @@ const TrainerModule = () => {
     };
 
     loadSessions();
-    setAttendanceRecordsBySession(loadStoredAttendance(filters.batch));
     fetchBatchStudents(filters.batch, controller.signal);
     return () => controller.abort();
-  }, [filters.batch, fetchBatchStudents, fetchBatchSessions]);
+  }, [filters.batch, fetchBatchStudents, fetchBatchSessions, fetchBatchSessionFeedback, fetchBatchAttendance]);
+
+  useEffect(() => {
+    if (!filters.batch) return undefined;
+
+    const refreshFeedback = () => {
+      fetchBatchSessionFeedback(filters.batch).then((feedbackMap) => {
+        if (feedbackMap) setSessionFeedbackBySession(feedbackMap);
+      });
+    };
+
+    window.addEventListener('focus', refreshFeedback);
+    return () => window.removeEventListener('focus', refreshFeedback);
+  }, [filters.batch, fetchBatchSessionFeedback]);
 
   const fetchReferCandidates = useCallback(async (batchId) => {
-    const authToken = token || JSON.parse(sessionStorage.getItem('user') || '{}').token;
-    if (!authToken || !batchId) {
+    if (!batchId) {
       setReferCandidates([]);
       return;
     }
@@ -2664,8 +2809,8 @@ const TrainerModule = () => {
     setReferCandidatesLoading(true);
     try {
       const res = await axios.get(
-        `${backendUrl}/college/admission-list/${batchId}?page=1&limit=500`,
-        { headers: { 'x-auth': authToken }, timeout: 15000 }
+        `${backendUrl}/college/trainer/batch-students/${batchId}?page=1&limit=500`,
+        { headers: { 'x-auth': token }}
       );
       if (res.data.success && Array.isArray(res.data.data)) {
         setReferCandidates(res.data.data.map((profile) => ({
@@ -2783,8 +2928,8 @@ const TrainerModule = () => {
         if (filters.center) params.set('centerId', filters.center);
         if (filters.course) params.set('courseId', filters.course);
         const res = await axios.get(`${backendUrl}/college/get_batches?${params.toString()}`, {
-          headers: { 'x-auth': token },
-          timeout: 12000,
+          headers: { 'x-auth': token }
+          
         });
         if (res.data?.success) {
           setBatchOptions((res.data.data || []).map((b) => ({ value: b._id, label: b.name })));
@@ -2913,6 +3058,10 @@ const TrainerModule = () => {
     [sessions, attendanceModal.sessionId, selectedSession]
   );
   const attendanceRows = attendanceRecordsBySession[attendanceModal.sessionId] || [];
+  const attendanceSessionMeta = useMemo(
+    () => getSessionAttendanceMeta(attendanceSession),
+    [attendanceSession]
+  );
 
   const openAddSessionModal = () => {
     if (!filters.batch) {
@@ -3196,11 +3345,18 @@ const TrainerModule = () => {
       notify('No students in this batch. Assign students to batch first.');
       return;
     }
-    setAttendanceRecordsBySession((prev) => (
-      prev[session.id]
-        ? prev
-        : { ...prev, [session.id]: createSessionAttendanceRows(session, students) }
-    ));
+
+    const meta = getSessionAttendanceMeta(session);
+    if (!meta.countable && view === 'register') {
+      notify(meta.label || 'Attendance cannot be marked on Sunday.');
+      return;
+    }
+
+    setAttendanceRecordsBySession((prev) => {
+      const existing = prev[session.id];
+      if (existing?.length) return prev;
+      return { ...prev, [session.id]: createSessionAttendanceRows(session, students, existing) };
+    });
     setAttendanceModal({ isOpen: true, view, sessionId: session.id });
   };
   const closeAttendanceModal = () => {
@@ -3259,32 +3415,90 @@ const TrainerModule = () => {
       )),
     }));
   };
-  const saveAttendanceRows = () => {
-    const stats = summarizeAttendanceRows(attendanceRows);
-    setSessions((prev) => {
-      const next = prev.map((session) => (
-        session.id === attendanceModal.sessionId
-          ? {
-            ...session,
-            totalCandidates: String(stats.total),
-            presentCandidates: String(stats.present),
-            absentCandidates: String(stats.absent),
-            attendance: `${stats.attendance}%`,
-          }
-          : session
-      ));
-      persistSessions(
-        next,
-        resolveSessionBatchId(next.find((session) => session.id === attendanceModal.sessionId), filters.batch)
+  const saveAttendanceRows = async () => {
+    if (!attendanceModal.sessionId) {
+      notify('Unable to save attendance');
+      return;
+    }
+
+    setAttendanceSaving(true);
+    try {
+      const response = await axios.post(
+        `${backendUrl}/college/trainer/session-attendance/save`,
+        {
+          sessionId: attendanceModal.sessionId,
+          rows: attendanceRows.map((row) => ({
+            appliedCourseId: row.id,
+            status: row.status,
+            remarks: row.remarks || '',
+          })),
+        },
+        { headers: { 'x-auth': token }}
       );
-      return next;
-    });
-    setAttendanceRecordsBySession((prev) => {
-      persistStoredAttendance(filters.batch, prev);
-      return prev;
-    });
-    notify('Attendance saved');
-    closeAttendanceModal();
+
+      if (!response.data?.status) {
+        throw new Error(response.data?.message || 'Failed to save attendance');
+      }
+
+      const savedRows = response.data.data?.rows || attendanceRows;
+      const savedSession = response.data.data?.session;
+
+      setAttendanceRecordsBySession((prev) => ({
+        ...prev,
+        [attendanceModal.sessionId]: savedRows.map((row) => ({
+          id: row.appliedCourseId || row.id,
+          name: row.name,
+          mobile: row.mobile || '-',
+          status: row.status || 'Not Marked',
+          remarks: row.remarks || '',
+          attendancePercent: '-',
+        })),
+      }));
+
+      if (savedSession) {
+        setSessions((prev) => prev.map((session) => (
+          session.id === attendanceModal.sessionId
+            ? mapApiSessionToClient(savedSession, {
+              batch: filters.batch,
+              courseTrade: activeBasicDetails.courseTrade,
+              batchCode: activeBasicDetails.batchCode,
+              departmentName: activeBasicDetails.departmentName,
+              projectName: activeBasicDetails.projectName,
+              centerName: activeBasicDetails.centerName,
+              trainerName: trainerProfile.name,
+            })
+            : session
+        )));
+      } else {
+        const stats = summarizeAttendanceRows(attendanceRows);
+        setSessions((prev) => {
+          const next = prev.map((session) => (
+            session.id === attendanceModal.sessionId
+              ? {
+                ...session,
+                totalCandidates: String(stats.total),
+                presentCandidates: String(stats.present),
+                absentCandidates: String(stats.absent),
+                attendance: `${stats.attendance}%`,
+              }
+              : session
+          ));
+          persistSessions(
+            next,
+            resolveSessionBatchId(next.find((session) => session.id === attendanceModal.sessionId), filters.batch)
+          );
+          return next;
+        });
+      }
+
+      notify('Attendance saved');
+      closeAttendanceModal();
+    } catch (error) {
+      console.error('Failed to save session attendance:', error);
+      notify(error.response?.data?.message || error.message || 'Failed to save attendance');
+    } finally {
+      setAttendanceSaving(false);
+    }
   };
 
   return (
@@ -3350,8 +3564,11 @@ const TrainerModule = () => {
                     {studentsLoading ? '…' : students.length} students · <strong>{filteredSessions.length}</strong> sessions
                   </span>
                   <span className="dbr-session-summary__count">
-                    {batchAttendanceSummary.sessionsMarked}/{batchAttendanceSummary.totalSessions} sessions marked · Avg {batchAttendanceSummary.average}%
+                    {batchAttendanceSummary.sessionsMarked}/{batchAttendanceSummary.totalSessions} working sessions marked · Avg {batchAttendanceSummary.average}%
                     {batchAttendanceSummary.source === 'sessions' ? ' (from marked sessions)' : ' (from admission record)'}
+                    {batchAttendanceSummary.excludedSessions > 0
+                      ? ` · ${batchAttendanceSummary.excludedSessions} excluded (Sunday)`
+                      : ''}
                   </span>
                 </div>
                 <div className="dbr-session-actions">
@@ -3398,6 +3615,9 @@ const TrainerModule = () => {
                           key={session.id}
                           basicDetails={activeBasicDetails}
                           session={session}
+                          students={students}
+                          attendanceRecordsBySession={attendanceRecordsBySession}
+                          studentReviews={getSessionStudentReviews(session, sessionFeedbackBySession)}
                           notify={notify}
                           onStatusChange={updateSessionStatus}
                           onEvidenceUpload={uploadEvidenceFile}
@@ -3491,11 +3711,14 @@ const TrainerModule = () => {
           students={students}
           sessions={sessions}
           attendanceRecordsBySession={attendanceRecordsBySession}
+          sessionMeta={attendanceSessionMeta}
+          readOnly={!attendanceSessionMeta.countable}
           view={attendanceModal.view}
           onViewChange={setAttendanceView}
           onStatusChange={(studentId, status) => updateAttendanceRow(studentId, 'status', status)}
           onClose={closeAttendanceModal}
           onSave={saveAttendanceRows}
+          saving={attendanceSaving}
         />
       )}
 
@@ -5611,6 +5834,27 @@ const PORTAL_CSS = `
     .session-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .attendance-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
    
+  }
+
+  .attendance-exclusion-note {
+    margin: 6px 0 0;
+    color: #b45309;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .sc-session-badge {
+    display: inline-flex;
+    margin-top: 4px;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .sc-session-badge--muted {
+    background: #fef3c7;
+    color: #92400e;
   }
 `;
 
