@@ -108,6 +108,7 @@ module.exports.Curriculum = require("./curriculum");
 module.exports.DailyDiary = require("./dailydiary");
 module.exports.TrainingSession = require("./trainingSession");
 module.exports.SessionAttendance = require("./sessionAttendance");
+module.exports.SessionFeedback = require("./sessionFeedback");
 module.exports.AssignmentQuestions = require("./questionBank");
 module.exports.AssignmentSubmission = require("./assignmentSubmission");
 //b2b models

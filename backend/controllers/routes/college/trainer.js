@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const uuid = require('uuid/v1');
+const jwt = require('jsonwebtoken');
 const { isCollege, isTrainer } = require('../../../helpers');
 const { Parser } = require("json2csv");
 const mongoose = require('mongoose');
@@ -31,11 +32,46 @@ const allowedDocumentExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', '
 
 const allowedExtensions = [...allowedVideoExtensions, ...allowedImageExtensions, ...allowedDocumentExtensions];
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable ,AssignmentQuestions, TrainingSession  } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable ,AssignmentQuestions, TrainingSession, SessionFeedback, SessionAttendance  } = require("../../models");
 
 
 const destination = path.resolve(__dirname, '..', '..', '..', 'public', 'temp');
 if (!fs.existsSync(destination)) fs.mkdirSync(destination);
+
+const authorizeTrainingAccess = async (req, res, next) => {
+	try {
+		const token = req.header('x-auth');
+		if (!token) {
+			return res.status(401).json({ success: false, message: 'You are not authorized' });
+		}
+
+		const decoded = jwt.verify(token, process.env.MIPIE_JWT_SECRET);
+		const user = await User.findById(decoded.id);
+		if (!user || ![2, 4].includes(user.role)) {
+			return res.status(401).json({ success: false, message: 'You are not authorized' });
+		}
+
+		let college = null;
+		if (user.role === 2) {
+			college = await College.findOne({ '_concernPerson._id': user._id });
+		} else {
+			college = await College.findOne({ trainers: user._id });
+		}
+
+		if (!college) {
+			return res.status(403).json({ success: false, message: 'College not found' });
+		}
+
+		req.user = user;
+		req.college = college;
+		return next();
+	} catch (error) {
+		return res.status(401).json({
+			success: false,
+			message: error.message || 'You are not authorized',
+		});
+	}
+};
 
 const storage = multer.diskStorage({
     destination,
@@ -910,6 +946,366 @@ router.post('/uploadSessionDocument', isCollege, async (req, res) => {
 		});
 	} catch (error) {
 		console.error('Error uploading session document:', error);
+		return res.status(500).json({
+			status: false,
+			message: error.message || 'Server error',
+		});
+	}
+});
+
+
+const mapFeedbackForClient = (feedback) => ({
+	id: String(feedback._id),
+	studentName: feedback.studentName || 'Student',
+	rating: feedback.rating,
+	comment: feedback.comment || '',
+	reviewedAt: feedback.updatedAt
+		? new Date(feedback.updatedAt).toLocaleDateString('en-IN')
+		: '',
+	enrollmentId: String(feedback.appliedCourse),
+});
+
+router.get('/batch-students/:batchId', authorizeTrainingAccess, async (req, res) => {
+	try {
+		const college = req.college;
+		const { batchId } = req.params;
+
+		if (!college?._id) {
+			return res.status(403).json({ success: false, message: 'College not found' });
+		}
+
+		const batchDoc = await Batch.findById(batchId);
+		if (!batchDoc) {
+			return res.status(404).json({ success: false, message: 'Batch not found' });
+		}
+
+		if (String(batchDoc.college) !== String(college._id)) {
+			return res.status(403).json({
+				success: false,
+				message: 'You do not have permission to view students for this batch',
+			});
+		}
+
+		if (req.user.role === 4) {
+			const isTrainerAssigned = (batchDoc.trainers || []).some(
+				(trainerId) => String(trainerId) === String(req.user._id)
+			);
+			if (!isTrainerAssigned) {
+				return res.status(403).json({
+					success: false,
+					message: 'You are not assigned to this batch',
+				});
+			}
+		}
+
+		const students = await AppliedCourses.find({
+			batch: batchId,
+			$or: [
+				{ isBatchAssigned: true },
+				{ admissionDone: true },
+			],
+		})
+			.populate('_candidate', 'name mobile email personalInfo')
+			.populate({
+				path: '_course',
+				select: 'name sectors projectName typeOfProject college docsRequired',
+				populate: { path: 'sectors', select: 'name' },
+			})
+			.populate('_center', 'name')
+			.populate('batch', 'name')
+			.populate('_leadStatus', 'title name')
+			.sort({ batchAssignedAt: -1, createdAt: -1 })
+			.lean();
+
+		const data = students.filter(
+			(item) => item._course && String(item._course.college) === String(college._id)
+		);
+
+		return res.status(200).json({
+			success: true,
+			message: 'Batch students fetched successfully',
+			count: data.length,
+			data,
+		});
+	} catch (error) {
+		console.error('Error fetching batch students:', error);
+		return res.status(500).json({
+			success: false,
+			message: error.message || 'Server error',
+		});
+	}
+});
+
+const normalizeAttendanceDate = (dateValue) => {
+	const date = new Date(dateValue);
+	if (Number.isNaN(date.getTime())) {
+		throw new Error('Invalid attendance date');
+	}
+	return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+};
+
+const assertBatchTrainingAccess = async (req, res, batchId) => {
+	const college = req.college;
+	if (!college?._id) {
+		res.status(403).json({ status: false, message: 'College not found' });
+		return null;
+	}
+
+	const batchDoc = await Batch.findById(batchId);
+	if (!batchDoc) {
+		res.status(404).json({ status: false, message: 'Batch not found' });
+		return null;
+	}
+
+	if (String(batchDoc.college) !== String(college._id)) {
+		res.status(403).json({
+			status: false,
+			message: 'You do not have permission to access this batch',
+		});
+		return null;
+	}
+
+	if (req.user.role === 4) {
+		const isTrainerAssigned = (batchDoc.trainers || []).some(
+			(trainerId) => String(trainerId) === String(req.user._id)
+		);
+		if (!isTrainerAssigned) {
+			res.status(403).json({
+				status: false,
+				message: 'You are not assigned to this batch',
+			});
+			return null;
+		}
+	}
+
+	return batchDoc;
+};
+
+const mapAttendanceRowForClient = (record) => {
+	const appliedCourse = record.appliedCourse || {};
+	const candidate = appliedCourse._candidate || record.candidate || {};
+
+	return {
+		id: String(appliedCourse._id || record.appliedCourse),
+		appliedCourseId: String(appliedCourse._id || record.appliedCourse),
+		candidateId: candidate._id ? String(candidate._id) : (record.candidate ? String(record.candidate) : ''),
+		name: candidate.name || 'Unknown',
+		mobile: candidate.mobile || '-',
+		status: record.status || 'Not Marked',
+		remarks: record.remarks || '',
+	};
+};
+
+router.get('/session-attendance/batch/:batchId', authorizeTrainingAccess, async (req, res) => {
+	try {
+		const { batchId } = req.params;
+		const batchDoc = await assertBatchTrainingAccess(req, res, batchId);
+		if (!batchDoc) return;
+
+		const records = await SessionAttendance.find({ batch: batchId })
+			.populate({
+				path: 'appliedCourse',
+				select: '_candidate',
+				populate: { path: '_candidate', select: 'name mobile' },
+			})
+			.populate('candidate', 'name mobile')
+			.lean();
+
+		const grouped = {};
+		records.forEach((record) => {
+			const sessionId = String(record.session);
+			if (!grouped[sessionId]) grouped[sessionId] = [];
+			grouped[sessionId].push(mapAttendanceRowForClient(record));
+		});
+
+		return res.status(200).json({
+			status: true,
+			message: 'Session attendance fetched successfully',
+			data: grouped,
+		});
+	} catch (error) {
+		console.error('Error fetching session attendance:', error);
+		return res.status(500).json({
+			status: false,
+			message: error.message || 'Server error',
+		});
+	}
+});
+
+router.post('/session-attendance/save', authorizeTrainingAccess, async (req, res) => {
+	try {
+		const user = req.user;
+		const { sessionId, rows = [] } = req.body;
+
+		if (!sessionId) {
+			return res.status(400).json({
+				status: false,
+				message: 'sessionId is required',
+			});
+		}
+
+		if (!Array.isArray(rows) || !rows.length) {
+			return res.status(400).json({
+				status: false,
+				message: 'Attendance rows are required',
+			});
+		}
+
+		const sessionDoc = await TrainingSession.findById(sessionId);
+		if (!sessionDoc) {
+			return res.status(404).json({ status: false, message: 'Session not found' });
+		}
+
+		const batchDoc = await assertBatchTrainingAccess(req, res, sessionDoc.batch);
+		if (!batchDoc) return;
+
+		if (String(sessionDoc.college) !== String(req.college._id)) {
+			return res.status(403).json({
+				status: false,
+				message: 'You do not have permission to update this session',
+			});
+		}
+
+		const attendanceDate = normalizeAttendanceDate(sessionDoc.sessionDate);
+		const allowedStatuses = ['Present', 'Absent', 'Not Marked'];
+		const appliedCourseIds = rows.map((row) => String(row.appliedCourseId || row.id)).filter(Boolean);
+
+		const enrollments = await AppliedCourses.find({
+			_id: { $in: appliedCourseIds },
+			batch: sessionDoc.batch,
+		})
+			.populate('_candidate', 'name mobile')
+			.lean();
+
+		const enrollmentById = new Map(enrollments.map((item) => [String(item._id), item]));
+		if (enrollmentById.size !== appliedCourseIds.length) {
+			return res.status(400).json({
+				status: false,
+				message: 'One or more students do not belong to this batch',
+			});
+		}
+
+		for (const row of rows) {
+			const appliedCourseId = String(row.appliedCourseId || row.id);
+			const status = allowedStatuses.includes(row.status) ? row.status : 'Not Marked';
+			const enrollment = enrollmentById.get(appliedCourseId);
+
+			if (status === 'Not Marked') {
+				await SessionAttendance.deleteOne({
+					session: sessionId,
+					appliedCourse: appliedCourseId,
+				});
+				continue;
+			}
+
+			try {
+				await SessionAttendance.findOneAndUpdate(
+					{ session: sessionId, appliedCourse: appliedCourseId },
+					{
+						$set: {
+							batch: sessionDoc.batch,
+							candidate: enrollment._candidate?._id || enrollment._candidate,
+							status,
+							remarks: (row.remarks || '').trim(),
+							attendanceDate,
+							markedBy: user._id,
+							markedByModel: 'User',
+							markedByRole: 'trainer',
+							markedAt: new Date(),
+						},
+					},
+					{ upsert: true, new: true, runValidators: true }
+				);
+			} catch (saveError) {
+				if (saveError?.code === 11000) {
+					return res.status(409).json({
+						status: false,
+						message: 'This student already has attendance marked for another session on the same date',
+					});
+				}
+				throw saveError;
+			}
+		}
+
+		const present = rows.filter((row) => row.status === 'Present').length;
+		const absent = rows.filter((row) => row.status === 'Absent').length;
+		const total = rows.length;
+		const attendancePercent = total > 0 ? Number(((present / total) * 100).toFixed(1)) : 0;
+
+		sessionDoc.totalCandidates = total;
+		sessionDoc.presentCandidates = present;
+		sessionDoc.absentCandidates = absent;
+		sessionDoc.attendancePercent = attendancePercent;
+		await sessionDoc.save();
+
+		const savedRecords = await SessionAttendance.find({ session: sessionId })
+			.populate({
+				path: 'appliedCourse',
+				select: '_candidate',
+				populate: { path: '_candidate', select: 'name mobile' },
+			})
+			.populate('candidate', 'name mobile')
+			.lean();
+
+		const mappedRows = savedRecords.map(mapAttendanceRowForClient);
+		const populatedSession = await TrainingSession.findById(sessionDoc._id)
+			.populate('trainer', 'name email mobile')
+			.populate('batch', 'name')
+			.lean();
+
+		return res.status(200).json({
+			status: true,
+			message: 'Attendance saved successfully',
+			data: {
+				session: populatedSession,
+				rows: mappedRows,
+			},
+		});
+	} catch (error) {
+		console.error('Error saving session attendance:', error);
+		return res.status(500).json({
+			status: false,
+			message: error.message || 'Server error',
+		});
+	}
+});
+
+router.get('/session-feedback/batch/:batchId', isCollege, async (req, res) => {
+	try {
+		const college = req.college;
+		const { batchId } = req.params;
+
+		if (!college?._id) {
+			return res.status(403).json({ status: false, message: 'College not found' });
+		}
+
+		const batchDoc = await Batch.findById(batchId);
+		if (!batchDoc) {
+			return res.status(404).json({ status: false, message: 'Batch not found' });
+		}
+
+		if (String(batchDoc.college) !== String(college._id)) {
+			return res.status(403).json({ status: false, message: 'You do not have permission to view feedback for this batch' });
+		}
+
+		const feedbackList = await SessionFeedback.find({ batch: batchId })
+			.sort({ updatedAt: -1 })
+			.lean();
+
+		const grouped = {};
+		feedbackList.forEach((item) => {
+			const sessionId = String(item.session);
+			if (!grouped[sessionId]) grouped[sessionId] = [];
+			grouped[sessionId].push(mapFeedbackForClient(item));
+		});
+
+		return res.status(200).json({
+			status: true,
+			message: 'Session feedback fetched successfully',
+			data: grouped,
+		});
+	} catch (error) {
+		console.error('Error fetching session feedback:', error);
 		return res.status(500).json({
 			status: false,
 			message: error.message || 'Server error',

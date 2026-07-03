@@ -7,7 +7,6 @@ const PINK = '#fa5579';
 const BLUE = '#2563eb';
 
 const SESSIONS_STORAGE_PREFIX = 'trainerModuleSessions:';
-const ATTENDANCE_STORAGE_PREFIX = 'trainerModuleAttendance:';
 const FEEDBACK_STORAGE_PREFIX = 'necSessionFeedback:';
 const SELF_ATTENDANCE_PREFIX = 'necSelfAttendance:';
 
@@ -21,33 +20,12 @@ const loadSelfAttendanceMap = (batchId) => {
   }
 };
 
-const saveSelfAttendance = (batchId, sessionId, enrollmentId, status, studentName = 'Student') => {
+const saveSelfAttendance = (batchId, sessionId, enrollmentId, status) => {
   if (!batchId || !sessionId || !enrollmentId || !status) return;
 
   const selfMap = loadSelfAttendanceMap(batchId);
   selfMap[`${sessionId}:${enrollmentId}`] = status;
   localStorage.setItem(`${SELF_ATTENDANCE_PREFIX}${batchId}`, JSON.stringify(selfMap));
-
-  const records = loadStoredAttendance(batchId);
-  const rows = [...(records[sessionId] || [])];
-  const index = rows.findIndex((entry) => String(entry.id) === String(enrollmentId));
-  const nextRow = {
-    ...(index >= 0 ? rows[index] : {}),
-    id: enrollmentId,
-    name: studentName,
-    mobile: rows[index]?.mobile || '-',
-    status,
-    remarks: rows[index]?.remarks || '',
-    attendancePercent: rows[index]?.attendancePercent || '-',
-  };
-
-  if (index >= 0) rows[index] = nextRow;
-  else rows.push(nextRow);
-
-  localStorage.setItem(
-    `${ATTENDANCE_STORAGE_PREFIX}${batchId}`,
-    JSON.stringify({ ...records, [sessionId]: rows })
-  );
 };
 
 const loadMySessionFeedback = (sessionId, enrollmentId) => {
@@ -65,6 +43,66 @@ const saveMySessionFeedback = (sessionId, enrollmentId, feedback) => {
   localStorage.setItem(`${FEEDBACK_STORAGE_PREFIX}${sessionId}:${enrollmentId}`, JSON.stringify(feedback));
 };
 
+const fetchMySessionFeedback = async (backendUrl, sessionId, courseId, enrollmentId) => {
+  if (!backendUrl || !sessionId || !courseId) return null;
+  try {
+    const response = await axios.get(
+      `${backendUrl}/candidate/session-feedback/${sessionId}`,
+      {
+        params: { courseId },
+        headers: { 'x-auth': localStorage.getItem('token') },
+      }
+    );
+    if (response.data?.status && response.data.data) {
+      return {
+        rating: response.data.data.rating,
+        comment: response.data.data.comment || '',
+        submittedAt: response.data.data.submittedAt,
+      };
+    }
+  } catch (err) {
+    console.error('Error fetching session feedback:', err);
+  }
+  return loadMySessionFeedback(sessionId, enrollmentId);
+};
+
+const submitSessionFeedback = async (backendUrl, sessionId, courseId, enrollmentId, feedback) => {
+  saveMySessionFeedback(sessionId, enrollmentId, feedback);
+
+  if (!backendUrl || !sessionId || !courseId) return { ok: false };
+
+  try {
+    const response = await axios.post(
+      `${backendUrl}/candidate/session-feedback`,
+      {
+        sessionId,
+        courseId,
+        rating: feedback.rating,
+        comment: feedback.comment || '',
+      },
+      { headers: { 'x-auth': localStorage.getItem('token') } }
+    );
+    if (response.data?.status) {
+      return { ok: true, data: response.data.data };
+    }
+  } catch (err) {
+    console.error('Error submitting session feedback:', err);
+  }
+  return { ok: false };
+};
+
+const enrichCandidateSessions = (sessions, basicDetails) => (
+  sessions.map((session) => ({
+    ...session,
+    departmentName: session.departmentName || basicDetails.departmentName,
+    projectName: session.projectName || basicDetails.projectName,
+    centerName: session.centerName || basicDetails.centerName,
+    courseTrade: session.courseTrade || basicDetails.courseTrade,
+    batchCode: session.batchCode || basicDetails.batchCode,
+    trainerName: session.trainerName || basicDetails.trainerName,
+  }))
+);
+
 const formatSessionDate = (dateValue) => {
   if (!dateValue) return new Date().toLocaleDateString('en-IN');
   return new Date(dateValue).toLocaleDateString('en-IN');
@@ -80,14 +118,19 @@ const loadStoredSessions = (batchId) => {
   }
 };
 
-const loadStoredAttendance = (batchId) => {
-  if (!batchId) return {};
-  try {
-    const raw = localStorage.getItem(`${ATTENDANCE_STORAGE_PREFIX}${batchId}`);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
+const mapApiAttendanceForEnrollment = (bySession = {}, enrollmentId, studentName = 'Student') => {
+  const records = {};
+  Object.entries(bySession).forEach(([sessionId, entry]) => {
+    records[sessionId] = [{
+      id: enrollmentId,
+      name: studentName,
+      mobile: '-',
+      status: entry?.status || 'Not Marked',
+      remarks: entry?.remarks || '',
+      attendancePercent: '-',
+    }];
+  });
+  return records;
 };
 
 const getCandidateSessionAttendance = (attendanceRecordsBySession, selfAttendanceMap, sessionId, enrollmentId) => {
@@ -519,6 +562,17 @@ const resolveBatchId = (appliedCourse) => {
   return batch._id ? String(batch._id) : String(batch);
 };
 
+const resolveCourseId = (appliedCourse) => {
+  const course = appliedCourse?._course;
+  if (!course) return '';
+  return course._id ? String(course._id) : String(course);
+};
+
+const findEnrollmentByCourseId = (courses, courseId) => {
+  if (!courseId) return null;
+  return courses.find((item) => String(resolveCourseId(item)) === String(courseId)) || null;
+};
+
 const filterSessionsForEnrollment = (sessions, appliedCourse) => {
   const batchId = resolveBatchId(appliedCourse);
   const courseId = appliedCourse?._course?._id ? String(appliedCourse._course._id) : '';
@@ -533,10 +587,12 @@ const filterSessionsForEnrollment = (sessions, appliedCourse) => {
 const CandidateSessionCard = ({
   session,
   basicDetails,
+  courseId,
   enrollmentId,
   batchId,
   studentName,
   myAttendance,
+  backendUrl,
   onViewSession,
   onAttendanceChange,
 }) => {
@@ -544,31 +600,52 @@ const CandidateSessionCard = ({
   const [activeTab, setActiveTab] = useState('details');
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [attendanceOpen, setAttendanceOpen] = useState(false);
-  const [myReview, setMyReview] = useState(() => loadMySessionFeedback(session?.id, enrollmentId));
+  const [myReview, setMyReview] = useState(null);
+  const [feedbackLoading, setFeedbackLoading] = useState(true);
+  const [feedbackSaving, setFeedbackSaving] = useState(false);
   const [toast, setToast] = useState('');
   const timeRange = `${session.startTime || '10:00'} - ${session.endTime || '12:00'}`;
   const tone = attendanceTone(myAttendance);
   const attendanceHint = myAttendance === 'Not Marked' ? 'Tap to mark' : 'Tap to update';
 
   useEffect(() => {
-    setMyReview(loadMySessionFeedback(session?.id, enrollmentId));
-  }, [session?.id, enrollmentId]);
+    let active = true;
+    const loadFeedback = async () => {
+      setFeedbackLoading(true);
+      const feedback = await fetchMySessionFeedback(backendUrl, session?.id, courseId, enrollmentId);
+      if (active) {
+        setMyReview(feedback);
+        setFeedbackLoading(false);
+      }
+    };
+    loadFeedback();
+    return () => { active = false; };
+  }, [backendUrl, session?.id, courseId, enrollmentId]);
 
-  const handleFeedbackSubmit = ({ rating, comment }) => {
+  const handleFeedbackSubmit = async ({ rating, comment }) => {
     const feedback = {
       rating,
       comment,
       submittedAt: new Date().toISOString(),
     };
-    saveMySessionFeedback(session.id, enrollmentId, feedback);
-    setMyReview(feedback);
-    setFeedbackOpen(false);
-    setToast('Feedback saved successfully');
+    setFeedbackSaving(true);
+    const result = await submitSessionFeedback(backendUrl, session.id, courseId, enrollmentId, feedback);
+    setFeedbackSaving(false);
+
+    if (result.ok || !backendUrl || String(session.id).startsWith('DEMO-')) {
+      setMyReview(feedback);
+      setFeedbackOpen(false);
+      setToast('Feedback saved successfully');
+      setTimeout(() => setToast(''), 2500);
+      return;
+    }
+
+    setToast('Could not save feedback. Please try again.');
     setTimeout(() => setToast(''), 2500);
   };
 
   const handleAttendanceSave = (status) => {
-    saveSelfAttendance(batchId, session.id, enrollmentId, status, studentName);
+    saveSelfAttendance(batchId, session.id, enrollmentId, status);
     setAttendanceOpen(false);
     onAttendanceChange();
     setToast('Attendance saved successfully');
@@ -612,17 +689,7 @@ const CandidateSessionCard = ({
           </div>
         </div>
 
-        <div className="sc-stats">
-          {statItems.map(({ icon, val, lbl, cls }) => (
-            <div key={lbl} className="sc-stat">
-              <div className={`sc-stat__icon sc-stat__icon--${cls}`}>
-                <i className={`fas ${icon}`} />
-              </div>
-              <div className="sc-stat__val">{val}</div>
-              <div className="sc-stat__lbl">{lbl}</div>
-            </div>
-          ))}
-        </div>
+       
 
         <button
           type="button"
@@ -669,10 +736,14 @@ const CandidateSessionCard = ({
                 ))}
                 <div className="sc-detail-item">
                   <small>Student Feedback</small>
-                  <StudentStarDisplay
-                    myRating={myReview?.rating}
-                    onClick={() => setFeedbackOpen(true)}
-                  />
+                  {feedbackLoading ? (
+                    <span className="tm-star-display__meta">Loading feedback...</span>
+                  ) : (
+                    <StudentStarDisplay
+                      myRating={myReview?.rating}
+                      onClick={() => setFeedbackOpen(true)}
+                    />
+                  )}
                 </div>
                 <div className="sc-detail-item">
                   <small>My Attendance</small>
@@ -754,7 +825,7 @@ const CandidateSessionCard = ({
           session={session}
           initialRating={myReview?.rating || 0}
           initialComment={myReview?.comment || ''}
-          onClose={() => setFeedbackOpen(false)}
+          onClose={() => !feedbackSaving && setFeedbackOpen(false)}
           onSubmit={handleFeedbackSubmit}
         />
       )}
@@ -779,89 +850,97 @@ const EnrolledCourseList = ({ courses, loading }) => {
   }
 
   if (!courses.length) {
-    return <h4 className="text-center">No Enrolled Courses Found</h4>;
+    return (
+      <div className="nec-empty">
+        <i className="fas fa-book-open" />
+        <p>No Enrolled Courses Found</p>
+      </div>
+    );
   }
 
-  return courses.map((appliedCourse) => {
-    const course = appliedCourse._course;
-    const batch = appliedCourse.batch;
-    const batchId = resolveBatchId(appliedCourse);
-    const storedCount = batchId ? loadStoredSessions(batchId).length : 0;
-    const sessionCount = storedCount || 1;
+  return (
+    <div className="nec-course-list">
+      {courses.map((appliedCourse) => {
+        const course = appliedCourse._course;
+        const batch = appliedCourse.batch;
+        const batchId = resolveBatchId(appliedCourse);
+        const storedCount = batchId ? loadStoredSessions(batchId).length : 0;
+        const sessionCount = storedCount || 1;
+        const sectorName = course?.sectors?.length > 0 ? course.sectors[0].name : '';
 
-    return (
-      <div className="card mb-2" key={appliedCourse._id}>
-        <div className="card-body">
-          <div className="row pointer">
-            <div className="col-lg-8 col-md-7 column">
-              <div className="job-single-sec mt-xl-0">
-                <div className="job-single-head border-0 pb-0">
-                  <div>
-                    <h6 className="text-capitalize font-weight-bolder">
-                      {course?.name || 'NA'}
-                    </h6>
-                    <span className="text-capitalize set-lineh">
-                      {course?.sectors?.length > 0 ? course.sectors[0].name : ''}
-                    </span>
-                  </div>
-                </div>
-                <Link to={`/candidate/newEnrolledCourses/${appliedCourse._id}`}>
-                  <div className="job-overview mt-4">
-                    <ul className="mb-xl-2 mb-lg-2 mb-md-2 mb-sm-0 mb-0 list-unstyled">
-                      <li style={{ display: 'inline' }}>
-                        <i className="la la-calendar" />
-                        <h3 className="jobDetails-wrap">{batch?.name || 'N/A'}</h3>
-                        <span className="jobDetails-wrap">Batch Name</span>
-                      </li>
-                      <li style={{ display: 'inline' }}>
-                        <i className="la la-user" />
-                        <h3 className="jobDetails-wrap">{batch?.instructor || 'N/A'}</h3>
-                        <span className="jobDetails-wrap">Instructor</span>
-                      </li>
-                      <li style={{ display: 'inline', float: 'right', width: '35.334%' }}>
-                        <i className="la la-chalkboard" />
-                        <h3 className="jobDetails-wrap">{sessionCount}</h3>
-                        <span className="jobDetails-wrap">Training Sessions</span>
-                      </li>
-                    </ul>
-                  </div>
-                </Link>
+        const metaItems = [
+          { icon: 'fa-calendar-alt', label: 'Batch Name', value: batch?.name || 'N/A' },
+          { icon: 'fa-user', label: 'Instructor', value: batch?.instructor || 'N/A' },
+          { icon: 'fa-chalkboard-teacher', label: 'Training Sessions', value: String(sessionCount) },
+        ];
+
+        return (
+          <article className="nec-course-card" key={appliedCourse._id}>
+            <div className="nec-course-card__top">
+              <div className="nec-course-card__info">
+                <h6 className="nec-course-card__title">{course?.name || 'NA'}</h6>
+                {sectorName && (
+                  <span className="nec-course-card__sector">{sectorName}</span>
+                )}
               </div>
-            </div>
-            <div className="col-lg-4 col-md-5 column mt-xl-1 mt-lg-1 mt-md-1 mt-sm-3 mt-0">
-              <div className="add--documents mt-1">
+              <div className="nec-course-card__actions">
                 <Link
                   to={`/candidate/reqDocs/${course?._id}`}
-                  className="btn btn-success text-white waves-effect waves-light"
+                  className="nec-course-btn nec-course-btn--success"
                 >
                   <i className="fas fa-upload" /> Upload Documents
                 </Link>
                 <Link
-                  to={`/candidate/newEnrolledCourses/${appliedCourse._id}`}
-                  className="btn btn-primary text-white waves-effect waves-light mt-2"
+                  to={`/candidate/newEnrolledCourses/${course?._id}`}
+                  className="nec-course-btn nec-course-btn--primary"
                 >
                   <i className="fas fa-chalkboard-teacher" /> View Sessions
                 </Link>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-    );
-  });
+
+            <Link
+              to={`/candidate/newEnrolledCourses/${course?._id}`}
+              className="nec-course-card__meta-link"
+            >
+              <div className="nec-course-meta-grid">
+                {metaItems.map(({ icon, label, value }) => (
+                  <div key={label} className="nec-course-meta-item">
+                    <div className="nec-course-meta-item__icon">
+                      <i className={`fas ${icon}`} />
+                    </div>
+                    <div className="nec-course-meta-item__text">
+                      <strong>{value}</strong>
+                      <span>{label}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Link>
+          </article>
+        );
+      })}
+    </div>
+  );
 };
 
-const EnrolledCourseSessions = ({ enrollmentId, courses, loading, onRefresh, refreshKey }) => {
+const EnrolledCourseSessions = ({ courseId, courses, loading, onRefresh, refreshKey }) => {
   const navigate = useNavigate();
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const [quickSearch, setQuickSearch] = useState('');
   const [viewSession, setViewSession] = useState(null);
   const [attendanceDetailsOpen, setAttendanceDetailsOpen] = useState(false);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [apiSessions, setApiSessions] = useState([]);
+  const [apiAttendanceRecords, setApiAttendanceRecords] = useState({});
   const studentName = useMemo(() => getStudentDisplayName(), []);
 
   const enrollment = useMemo(
-    () => courses.find((item) => String(item._id) === String(enrollmentId)),
-    [courses, enrollmentId]
+    () => findEnrollmentByCourseId(courses, courseId),
+    [courses, courseId]
   );
+
+  const enrollmentId = enrollment?._id ? String(enrollment._id) : '';
 
   const batchId = useMemo(() => resolveBatchId(enrollment), [enrollment]);
 
@@ -879,17 +958,85 @@ const EnrolledCourseSessions = ({ enrollmentId, courses, loading, onRefresh, ref
     return filterSessionsForEnrollment(loadStoredSessions(batchId), enrollment);
   }, [batchId, enrollment, refreshKey]);
 
-  const usingDemoSessions = storedSessions.length === 0;
+  useEffect(() => {
+    if (!batchId || !courseId || !backendUrl) {
+      setApiSessions([]);
+      setSessionsLoading(false);
+      return undefined;
+    }
 
-  const sessions = useMemo(
-    () => (storedSessions.length ? storedSessions : buildDummySessions(basicDetails)),
-    [storedSessions, basicDetails]
-  );
+    const controller = new AbortController();
+    const fetchSessions = async () => {
+      setSessionsLoading(true);
+      try {
+        const response = await axios.get(`${backendUrl}/candidate/batch-sessions/${batchId}`, {
+          params: { courseId },
+          headers: { 'x-auth': localStorage.getItem('token') },
+          signal: controller.signal,
+        });
+        if (response.data?.status && Array.isArray(response.data.data)) {
+          setApiSessions(response.data.data);
+        } else {
+          setApiSessions([]);
+        }
+      } catch (err) {
+        if (err?.code !== 'ERR_CANCELED' && err?.name !== 'CanceledError') {
+          console.error('Error fetching batch sessions:', err);
+        }
+        setApiSessions([]);
+      } finally {
+        setSessionsLoading(false);
+      }
+    };
 
-  const attendanceRecordsBySession = useMemo(
-    () => (batchId ? loadStoredAttendance(batchId) : {}),
-    [batchId, refreshKey]
-  );
+    fetchSessions();
+    return () => controller.abort();
+  }, [backendUrl, batchId, courseId, refreshKey]);
+
+  useEffect(() => {
+    if (!batchId || !courseId || !enrollmentId || !backendUrl) {
+      setApiAttendanceRecords({});
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const fetchAttendance = async () => {
+      try {
+        const response = await axios.get(`${backendUrl}/candidate/batch-session-attendance/${batchId}`, {
+          params: { courseId },
+          headers: { 'x-auth': localStorage.getItem('token') },
+          signal: controller.signal,
+        });
+        if (response.data?.status && response.data.data) {
+          setApiAttendanceRecords(
+            mapApiAttendanceForEnrollment(response.data.data, enrollmentId, studentName)
+          );
+        } else {
+          setApiAttendanceRecords({});
+        }
+      } catch (err) {
+        if (err?.code !== 'ERR_CANCELED' && err?.name !== 'CanceledError') {
+          console.error('Error fetching batch session attendance:', err);
+        }
+        setApiAttendanceRecords({});
+      }
+    };
+
+    fetchAttendance();
+    return () => controller.abort();
+  }, [backendUrl, batchId, courseId, enrollmentId, studentName, refreshKey]);
+
+  const usingDemoSessions = !apiSessions.length && !storedSessions.length;
+
+  const sessions = useMemo(() => {
+    const source = apiSessions.length ? apiSessions : storedSessions;
+    if (source.length) {
+      return enrichCandidateSessions(source, basicDetails);
+    }
+    return buildDummySessions(basicDetails);
+  }, [apiSessions, storedSessions, basicDetails]);
+
+  const attendanceRecordsBySession = apiAttendanceRecords;
 
   const selfAttendanceMap = useMemo(
     () => (batchId ? loadSelfAttendanceMap(batchId) : {}),
@@ -932,16 +1079,13 @@ const EnrolledCourseSessions = ({ enrollmentId, courses, loading, onRefresh, ref
       if (!event.key?.startsWith('trainerModule') && !event.key?.startsWith('necSelfAttendance')) return;
       onRefresh();
     };
-    const handleFocus = () => onRefresh();
     window.addEventListener('storage', handleStorage);
-    window.addEventListener('focus', handleFocus);
     return () => {
       window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('focus', handleFocus);
     };
   }, [onRefresh]);
 
-  if (loading) {
+  if (loading && !courses.length) {
     return (
       <div className="nec-empty">
         <i className="fas fa-spinner fa-spin" />
@@ -1014,14 +1158,22 @@ const EnrolledCourseSessions = ({ enrollmentId, courses, loading, onRefresh, ref
       </div>
 
       <div className="nec-session-list">
+        {sessionsLoading && !filteredSessions.length && (
+          <div className="nec-empty">
+            <i className="fas fa-spinner fa-spin" />
+            <p>Loading sessions...</p>
+          </div>
+        )}
         {filteredSessions.map((session) => (
           <CandidateSessionCard
             key={session.id}
             session={session}
             basicDetails={basicDetails}
+            courseId={courseId}
             enrollmentId={enrollmentId}
             batchId={batchId}
             studentName={studentName}
+            backendUrl={backendUrl}
             myAttendance={getMyAttendance(session.id)}
             onViewSession={setViewSession}
             onAttendanceChange={onRefresh}
@@ -1051,7 +1203,7 @@ const EnrolledCourseSessions = ({ enrollmentId, courses, loading, onRefresh, ref
 };
 
 const NewEnrolledCourses = () => {
-  const { enrollmentId } = useParams();
+  const { courseId } = useParams();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -1079,11 +1231,11 @@ const NewEnrolledCourses = () => {
 
   useEffect(() => {
     feather.replace();
-  }, [courses, enrollmentId]);
+  }, [courses, courseId]);
 
   useEffect(() => {
     fetchEnrolledCourses();
-  }, [fetchEnrolledCourses, refreshKey]);
+  }, [fetchEnrolledCourses]);
 
   const handleRefresh = useCallback(() => {
     setRefreshKey((prev) => prev + 1);
@@ -1096,7 +1248,7 @@ const NewEnrolledCourses = () => {
           <div className="row breadcrumbs-top">
             <div className="col-12 my-auto">
               <h3 className="content-header-title float-left mb-0">
-                {enrollmentId ? 'Training Sessions' : 'My Enrolled Courses'}
+                {courseId ? 'Training Sessions' : 'My Enrolled Courses'}
               </h3>
               <div className="breadcrumb-wrapper col-12">
                 <ol className="breadcrumb">
@@ -1109,7 +1261,7 @@ const NewEnrolledCourses = () => {
                   <li className="breadcrumb-item">
                     <Link to="/candidate/newEnrolledCourses">Enrolled Courses</Link>
                   </li>
-                  {enrollmentId && (
+                  {courseId && (
                     <>
                       <li className="breadcrumb-separator">
                         <i className="fas fa-angle-right mx-1 text-muted" />
@@ -1143,11 +1295,11 @@ const NewEnrolledCourses = () => {
         </div>
       </section>
 
-      <section className={`searchjobspage${enrollmentId ? ' nec-portal' : ''}`}>
+      <section className={`searchjobspage${courseId ? ' nec-portal' : ''}`}>
         <div className="pt-xl-2 pt-lg-0 pt-md-0 pt-sm-5 pt-0">
-          {enrollmentId ? (
+          {courseId ? (
             <EnrolledCourseSessions
-              enrollmentId={enrollmentId}
+              courseId={courseId}
               courses={courses}
               loading={loading}
               onRefresh={handleRefresh}
@@ -1168,28 +1320,188 @@ const NewEnrolledCourses = () => {
 
 const LIST_CSS = `
 .breadcrumb-item a { color: #FC2B5A; }
-.job-overview h3 { color: #2c2c2c; }
-.font-weight-bolder { font-weight: bolder !important; }
-.btn {
-  display: inline-block; font-weight: 400; color: #626262; text-align: center;
-  vertical-align: middle; user-select: none; border: 0 solid transparent;
-  padding: 0.9rem 2rem; font-size: 1rem; line-height: 1; border-radius: 0.4285rem;
+
+.nec-course-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 4px 24px;
 }
-.job-single-sec { float: left; width: 100%; }
-.job-single-head { float: left; width: 100%; display: block !important; width: 100% !important; overflow-wrap: break-word; }
-.job-overview { float: left; width: 100%; }
-.job-overview ul>li { position: relative; margin: 15px 0!important; float: left; width: 100%; padding-left: 67px; }
-.job-overview ul { float: left; width: 100%; border: 2px solid #e8ecec; border-radius: 8px; padding:15px !important; transition:.3s; }
-.job-single-sec .job-overview ul li { float: left; width: 32.334%; padding-left: 50px!important; }
-.job-overview ul > li h3 { float: left; width: 100%; font-size: 13px; margin: 0; }
-.job-overview ul > li span { float: left; width: 100%; font-size: 13px; color: #888888; margin-top: 7px; }
-.job-overview ul>li i { position: absolute; top: 5px; font-size: 30px; color: #FC2B5A; }
-.job-overview ul:hover { border-color: #FC2B5A; box-shadow: 4px 4px 0px 0px rgba(241, 117, 37, 0.75); cursor: pointer; }
-.set-lineh { overflow-wrap: break-word; width: 100% !important; padding: 2px !important; }
-.btn-primary { background-color: #7367f0; border-color: #7367f0; }
-@media(max-width:768px){
-  .job-overview > ul { display: flex; flex-direction: column; }
-  .job-single-sec .job-overview ul li { width: 100%!important; }
+
+.nec-course-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.nec-course-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08);
+}
+
+.nec-course-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 20px 16px;
+  flex-wrap: wrap;
+}
+
+.nec-course-card__info {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.nec-course-card__title {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0f172a;
+  text-transform: capitalize;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.nec-course-card__sector {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: capitalize;
+}
+
+.nec-course-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 180px;
+}
+
+.nec-course-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.15s ease;
+  white-space: nowrap;
+}
+
+.nec-course-btn:hover {
+  filter: brightness(0.95);
+  text-decoration: none;
+  color: #fff;
+}
+
+.nec-course-btn--success {
+  background: #28c76f;
+  color: #fff;
+}
+
+.nec-course-btn--primary {
+  background: #7367f0;
+  color: #fff;
+}
+
+.nec-course-card__meta-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-top: 1px solid #f1f5f9;
+  padding: 16px 20px 20px;
+  transition: background 0.15s ease;
+}
+
+.nec-course-card__meta-link:hover {
+  background: #fafbfc;
+  text-decoration: none;
+  color: inherit;
+}
+
+.nec-course-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.nec-course-meta-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  min-width: 0;
+}
+
+.nec-course-meta-item__icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #fce7ef;
+  color: ${PINK};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.nec-course-meta-item__text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.nec-course-meta-item__text strong {
+  font-size: 14px;
+  font-weight: 800;
+  color: #1e293b;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.nec-course-meta-item__text span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: capitalize;
+}
+
+@media (max-width: 992px) {
+  .nec-course-meta-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .nec-course-card__top {
+    flex-direction: column;
+  }
+
+  .nec-course-card__actions {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .nec-course-btn {
+    width: 100%;
+  }
 }
 `;
 

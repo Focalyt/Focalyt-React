@@ -265,7 +265,7 @@ const Layout = () => {
           <Route path='assignments' element={<Assignments/>}/>
           <Route path='jobOffer' element={<JobOffer/>}/>
           <Route path='newEnrolledCourses' element={<NewEnrolledCourses/>}/>
-          <Route path='newEnrolledCourses/:enrollmentId' element={<NewEnrolledCourses/>}/>
+          <Route path='newEnrolledCourses/:courseId' element={<NewEnrolledCourses/>}/>
         </Route>
       
 

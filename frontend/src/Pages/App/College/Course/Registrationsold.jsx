@@ -814,6 +814,7 @@ const CRMDashboard = () => {
   const [docDashCounts, setDocDashCounts] = useState({ done: 0, pending: 0 });
   const [selectedFollowupBucket, setSelectedFollowupBucket] = useState('');
   const [selectedKycFilter, setSelectedKycFilter] = useState(null);
+  const selectedKycFilterRef = useRef(null);
   const [pageMainTab, setPageMainTab] = useState('registration'); // 'registration' | 'ekyc'
   const [ekycFilters, setEkycFilters] = useState([
     { _id: 'pendingEkyc', name: 'Pending for Documents', count: 0, milestone: '' },
@@ -1152,7 +1153,6 @@ const CRMDashboard = () => {
 
 
   // open model for upload documents 
-  const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedDocumentForUpload, setSelectedDocumentForUpload] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
@@ -1568,17 +1568,23 @@ const CRMDashboard = () => {
   };
 
 
+  const cleanupOrphanBootstrapBackdrops = () => {
+    // Only remove Bootstrap-injected backdrops on <body>, not React-managed nodes
+    document.querySelectorAll('body > .modal-backdrop').forEach((el) => el.remove());
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('padding-right');
+  };
+
   const openUploadModal = (document) => {
     setSelectedDocumentForUpload(document);
-    // setShowUploadModal(true);
     setSelectedFile(null);
     setUploadPreview(null);
     setUploadProgress(0);
-    setIsUploading(false)
+    setIsUploading(false);
   };
 
   const closeUploadModal = () => {
-    setShowUploadModal(false);
     setSelectedDocumentForUpload(null);
     setSelectedFile(null);
     setUploadPreview(null);
@@ -1618,22 +1624,14 @@ const CRMDashboard = () => {
     }
   };
 
-  //  Simulate file upload with progress
+  // Upload selected document file
   const handleFileUpload = async () => {
     if (!selectedFile || !selectedDocumentForUpload) return;
-
-    console.log('selectedDocumentForUpload', selectedDocumentForUpload)
 
     setIsUploading(true);
     setUploadProgress(0);
 
     try {
-      // Simulate upload progress
-      for (let i = 0; i <= 100; i += 10) {
-        setUploadProgress(i);
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
-
       const formData = new FormData();
       formData.append('file', selectedFile);
       formData.append('doc', selectedDocumentForUpload._id);
@@ -1642,29 +1640,29 @@ const CRMDashboard = () => {
         headers: {
           'x-auth': token,
           'Content-Type': 'multipart/form-data',
-        }
+        },
+        onUploadProgress: (event) => {
+          if (!event.total) return;
+          setUploadProgress(Math.round((event.loaded * 100) / event.total));
+        },
       });
-
-      console.log('response', response)
 
       if (response.data.status) {
         alert('Document uploaded successfully! Status: Pending Review');
-
-        // Optionally refresh data here
+        if (response.data.data) {
+          mergeProfileUpdateInState(response.data.data);
+        }
         closeUploadModal();
-        // fetchProfileData()
+        await refreshProfilesAfterDocumentChange();
       } else {
         alert('Failed to upload file');
       }
-
-
-
-
     } catch (error) {
       console.error('Upload error:', error);
       alert('Upload failed. Please try again.');
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -1819,12 +1817,12 @@ const CRMDashboard = () => {
           msg += ' document_rejected WhatsApp was sent to the student.';
         }
         alert(msg);
+        patchDocumentUploadStatusInState(selectedProfile._id, uploadId, status, reason);
         closeDocumentModal();
-        await fetchProfileData(filterDataRef.current || filterData, currentPageRef.current || currentPage);
+        await refreshProfilesAfterDocumentChange();
         if (leadDetailsVisibleRef.current !== null && leadDetailsVisibleRef.current !== undefined) {
           await fetchLeadDetails();
         }
-        fetchKycCounts();
       } else {
         alert(response.data.message || 'Failed to update document status');
       }
@@ -1911,8 +1909,12 @@ const CRMDashboard = () => {
 
   const buildProfileDocumentsList = (profile) => {
     const uploadedDocs = Array.isArray(profile?.uploadedDocs) ? profile.uploadedDocs : [];
+    const requiredDocs = profile?._course?.docsRequired || [];
 
-    if (uploadedDocs.length > 0 && uploadedDocs.some((d) => d.Name || d.name)) {
+    if (
+      uploadedDocs.length > 0 &&
+      uploadedDocs.some((d) => (d.Name || d.name) && Array.isArray(d.uploads))
+    ) {
       return uploadedDocs.map((doc) => ({
         ...doc,
         Name: doc.Name || doc.name || 'Document',
@@ -1920,7 +1922,6 @@ const CRMDashboard = () => {
       }));
     }
 
-    const requiredDocs = profile?._course?.docsRequired || [];
     if (!requiredDocs.length) return uploadedDocs;
 
     const uploadsByDocId = new Map();
@@ -1943,6 +1944,134 @@ const CRMDashboard = () => {
         uploads: matchingUploads,
         ...(matchingUploads.length === 0 ? { status: 'Not Uploaded' } : {}),
       };
+    });
+  };
+
+  const computeProfileDocCounts = (profile, combinedDocs) => {
+    const requiredDocs = profile?._course?.docsRequired || [];
+    const docsList = Array.isArray(combinedDocs) ? combinedDocs : buildProfileDocumentsList(profile);
+
+    const allDocs = requiredDocs.length
+      ? requiredDocs.map((reqDoc) => {
+        const docObj = reqDoc?.toObject ? reqDoc.toObject() : reqDoc;
+        const combined = docsList.find((d) => String(d._id) === String(docObj._id));
+        const latestUpload = combined?.uploads?.[combined.uploads.length - 1];
+        if (latestUpload) return latestUpload;
+        return { status: 'Not Uploaded' };
+      })
+      : docsList.map((doc) => {
+        const latestUpload = doc.uploads?.[doc.uploads.length - 1];
+        return latestUpload || { status: doc.status || 'Not Uploaded' };
+      });
+
+    let verifiedCount = 0;
+    let RejectedCount = 0;
+    let pendingVerificationCount = 0;
+    let notUploadedCount = 0;
+
+    allDocs.forEach((doc) => {
+      const status = doc.status || 'Not Uploaded';
+      if (status === 'Verified') verifiedCount += 1;
+      else if (status === 'Rejected') RejectedCount += 1;
+      else if (status === 'Pending') pendingVerificationCount += 1;
+      else if (status === 'Not Uploaded') notUploadedCount += 1;
+    });
+
+    const totalRequired = allDocs.length;
+    const uploadedCount = allDocs.filter((doc) => doc.status && doc.status !== 'Not Uploaded').length;
+
+    return {
+      totalRequired,
+      uploadedCount,
+      verifiedCount,
+      pendingVerificationCount,
+      RejectedCount,
+      notUploadedCount,
+      uploadPercentage: totalRequired > 0 ? Math.round((uploadedCount / totalRequired) * 100) : 0,
+    };
+  };
+
+  const normalizeProfileDocuments = (profile) => {
+    if (!profile) return profile;
+    const combinedDocs = buildProfileDocumentsList(profile);
+    return {
+      ...profile,
+      uploadedDocs: combinedDocs,
+      docCounts: computeProfileDocCounts(profile, combinedDocs),
+    };
+  };
+
+  const mergeProfileUpdateInState = (updatedProfile) => {
+    if (!updatedProfile?._id) return;
+    const normalized = normalizeProfileDocuments(updatedProfile);
+    const profileId = String(normalized._id);
+    const rootId = getProfileGroupRootId(normalized);
+
+    const patchProfile = (p) => (
+      String(p._id) === profileId ? { ...p, ...normalized } : p
+    );
+
+    setAllProfiles((prev) => prev.map(patchProfile));
+    setSelectedProfile((prev) => (prev && String(prev._id) === profileId ? { ...prev, ...normalized } : prev));
+
+    if (rootId) {
+      setCrossSaleCache((prev) => {
+        const next = { ...prev };
+        Object.keys(next).forEach((key) => {
+          if (!Array.isArray(next[key])) return;
+          next[key] = next[key].map(patchProfile);
+        });
+        return next;
+      });
+    }
+  };
+
+  const patchDocumentUploadStatusInState = (profileId, uploadId, status, reason) => {
+    const patchProfile = (p) => {
+      if (!p || String(p._id) !== String(profileId)) return p;
+
+      const uploadedDocs = (p.uploadedDocs || []).map((doc) => {
+        if (Array.isArray(doc.uploads) && doc.uploads.length > 0) {
+          const uploads = doc.uploads.map((upload) => (
+            String(upload._id) === String(uploadId)
+              ? {
+                ...upload,
+                status,
+                ...(reason ? { rejectionReason: reason, reason } : {}),
+              }
+              : upload
+          ));
+          return { ...doc, uploads };
+        }
+
+        if (String(doc._id) === String(uploadId)) {
+          return {
+            ...doc,
+            status,
+            ...(reason ? { rejectionReason: reason, reason } : {}),
+          };
+        }
+
+        return doc;
+      });
+
+      const nextProfile = { ...p, uploadedDocs };
+      return {
+        ...nextProfile,
+        docCounts: computeProfileDocCounts(nextProfile, uploadedDocs),
+      };
+    };
+
+    setAllProfiles((prev) => prev.map(patchProfile));
+    setSelectedProfile((prev) => (prev && String(prev._id) === String(profileId) ? patchProfile(prev) : prev));
+
+    setCrossSaleCache((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((key) => {
+        if (!Array.isArray(next[key])) return;
+        next[key] = next[key].map(patchProfile);
+      });
+      return next;
     });
   };
 
@@ -2564,16 +2693,16 @@ const CRMDashboard = () => {
     if (!crmFilterCounts) return;
     setEkycFilters([
       { _id: 'pendingEkyc', name: 'Pending for Documents', count: crmFilterCounts.pendingKyc ?? 0, milestone: '' },
-      { _id: 'pendingDocumentVerification', name: 'Pending for Verification', count: 0, milestone: '' },
-      { _id: 'rejectedDocs', name: 'Reject Documents', count: 0, milestone: '' },
+      { _id: 'pendingDocumentVerification', name: 'Pending for Verification', count: crmFilterCounts.pendingDocumentVerification ?? 0, milestone: '' },
+      { _id: 'rejectedDocs', name: 'Reject Documents', count: crmFilterCounts.rejectedDocs ?? 0, milestone: '' },
       { _id: 'doneEkyc', name: 'Center Verified', count: crmFilterCounts.doneKyc ?? 0, milestone: 'Ekyc Done' },
       { _id: 'All', name: 'All', count: crmFilterCounts.all ?? 0, milestone: '' },
     ]);
     setKycCounts({
       all: crmFilterCounts.all ?? 0,
       pendingDocs: crmFilterCounts.pendingKyc ?? 0,
-      pendingVerification: 0,
-      rejected: 0,
+      pendingVerification: crmFilterCounts.pendingDocumentVerification ?? 0,
+      rejected: crmFilterCounts.rejectedDocs ?? 0,
       verified: crmFilterCounts.doneKyc ?? 0,
     });
   }, []);
@@ -2724,133 +2853,6 @@ const CRMDashboard = () => {
   // Calculate total selected filters
   const totalSelected = Object.values(formData).reduce((total, filter) => total + (filter.values.length || 0), 0);
 
-  // Document Modal Component
-
-  const UploadModal = () => {
-    if (!showUploadModal || !selectedDocumentForUpload) return null;
-
-    return (
-      <div className="upload-modal-overlay" onClick={closeUploadModal}>
-        <div className="upload-modal-content" onClick={(e) => e.stopPropagation()}>
-          <div className="upload-modal-header">
-            <h3>
-              <i className="fas fa-cloud-upload-alt me-2"></i>
-              Upload {selectedDocumentForUpload.Name}
-            </h3>
-            <button className="close-btn" onClick={closeUploadModal}>&times;</button>
-          </div>
-
-          <div className="upload-modal-body">
-            <div className="upload-section">
-              {!selectedFile ? (
-                <div className="file-drop-zone">
-                  <div className="drop-zone-content">
-                    <i className="fas fa-cloud-upload-alt upload-icon"></i>
-                    <h4>Choose a file to upload</h4>
-                    <p>Drag and drop a file here, or click to select</p>
-                    <div className="file-types">
-                      <span>Supported: JPG, PNG, GIF, PDF</span>
-                      <span>Max size: 10MB</span>
-                    </div>
-                    <input
-                      type="file"
-                      id="file-input"
-                      accept=".jpg,.jpeg,.png,.gif,.pdf"
-                      onChange={handleFileSelect}
-                      style={{ display: 'none' }}
-                    />
-                    <button
-                      className="btn btn-primary"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        fileInputRef.current?.click(); // Use ref instead of getElementById
-                      }}
-                    // onClick={() => document.getElementById('file-input').click()}
-                    >
-                      <i className="fas fa-folder-open me-2"></i>
-                      Choose File
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="file-preview-section">
-                  <div className="selected-file-info">
-                    <h4>Selected File:</h4>
-                    <div className="file-details">
-                      <div className="file-icon">
-                        <i className={`fas ${selectedFile.type.startsWith('image/') ? 'fa-image' : 'fa-file-pdf'}`}></i>
-                      </div>
-                      <div className="file-info">
-                        <p className="file-name">{selectedFile.name}</p>
-                        <p className="file-size">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                      </div>
-                      <button
-                        className="btn btn-sm btn-outline-secondary"
-                        onClick={() => {
-                          setSelectedFile(null);
-                          setUploadPreview(null);
-                        }}
-                      >
-                        <i className="fas fa-trash"></i>
-                      </button>
-                    </div>
-                  </div>
-
-                  {uploadPreview && (
-                    <div className="upload-preview">
-                      <h5>Preview:</h5>
-                      <img src={uploadPreview} alt="Upload Preview" className="preview-image" />
-                    </div>
-                  )}
-
-                  {isUploading && (
-                    <div className="upload-progress-section">
-                      <h5>Uploading...</h5>
-                      <div className="progress-bar-container">
-                        <div
-                          className="progress-bar"
-                          style={{ width: `${uploadProgress}%` }}
-                        ></div>
-                      </div>
-                      <p>{uploadProgress}% Complete</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="upload-modal-footer">
-            <button
-              className="btn btn-secondary"
-              onClick={closeUploadModal}
-              disabled={isUploading}
-            >
-              Cancel
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={handleFileUpload}
-              disabled={!selectedFile || isUploading}
-            >
-              {isUploading ? (
-                <>
-                  <i className="fas fa-spinner fa-spin me-2"></i>
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <i className="fas fa-upload me-2"></i>
-                  Upload Document
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
   //Pagination
 
   const getPaginationPages = () => {
@@ -2916,12 +2918,29 @@ const CRMDashboard = () => {
   }, [filterData]);
 
   useEffect(() => {
+    selectedKycFilterRef.current = selectedKycFilter;
+  }, [selectedKycFilter]);
+
+  useEffect(() => {
     currentPageRef.current = currentPage;
   }, [currentPage]);
 
   useEffect(() => {
     leadDetailsVisibleRef.current = leadDetailsVisible;
   }, [leadDetailsVisible]);
+
+  useEffect(() => {
+    cleanupOrphanBootstrapBackdrops();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedDocumentForUpload) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [selectedDocumentForUpload]);
 
   const MOVED_IN_KYC_STATUS_ID = '6894825c9fc1425f4d5e2fc5';
   // Add dropdown visibility states
@@ -3512,6 +3531,23 @@ const CRMDashboard = () => {
     }
   }, [selectedProfile]);
 
+  const getKycDashFetchParams = (filter) => {
+    switch (filter) {
+      case 'verified':
+        return { tab: 'ekyc', kyc: true, kycBucket: 'verified' };
+      case 'pendingDocs':
+        return { tab: 'ekyc', kyc: false, kycBucket: 'pendingDocs' };
+      case 'pendingVerification':
+        return { tab: 'ekyc', kyc: false, kycBucket: 'pendingVerification' };
+      case 'rejected':
+        return { tab: 'ekyc', kyc: 'all', kycBucket: 'rejected' };
+      case 'all':
+        return { tab: 'ekyc', kyc: 'all', kycBucket: 'all' };
+      default:
+        return { tab: 'registration', kyc: undefined, kycBucket: undefined };
+    }
+  };
+
   const handleMoveToKyc = async (profile) => {
     try {
 
@@ -3540,8 +3576,8 @@ const CRMDashboard = () => {
 
       if (response.data.success) {
         alert('Lead moved to KYC Section successfully!');
-        // Optionally refresh data here
-        fetchProfileData()
+        fetchKycCounts();
+        fetchProfileData(filterDataRef.current || filterData, 1);
       } else {
         alert('Failed to update status');
       }
@@ -4170,23 +4206,30 @@ console.log('API Response:', response.data);
     page = currentPage,
     cycleOverride = null,
     tabOverride = null,
-    milestoneFilterOverride = undefined
+    milestoneFilterOverride = undefined,
+    options = {}
   ) => {
-    setIsLoadingProfiles(true);
-    closePanel();
-    setLeadDetailsVisible(null);
+    const { silent = false } = options;
+
+    if (!silent) {
+      setIsLoadingProfiles(true);
+      closePanel();
+      setLeadDetailsVisible(null);
+    }
 
     if (!token) {
       console.warn('No token found in session storage.');
-      setIsLoadingProfiles(false);
+      if (!silent) setIsLoadingProfiles(false);
       return;
     }
 
+    const activeKycFilter = selectedKycFilterRef.current ?? selectedKycFilter;
     const activeMainTab = tabOverride || pageMainTab;
     const isEkycTab = activeMainTab === 'ekyc';
     const milestoneFilter = milestoneFilterOverride !== undefined
       ? milestoneFilterOverride
       : selectedMilestoneFilter;
+    const shouldFetchKycCandidates = isEkycTab || Boolean(activeKycFilter && !milestoneFilter);
 
     // Prepare query parameters
     const fd = formDataRef.current || formData;
@@ -4213,10 +4256,16 @@ console.log('API Response:', response.data);
       queryParams.set('kyc', 'true');
     } else if (milestoneFilter === 'admission') {
       listEndpoint = 'admission-list';
-    } else if (isEkycTab) {
+    } else if (shouldFetchKycCandidates) {
       listEndpoint = 'kycCandidates';
-      if (filters.kyc !== undefined && filters.kyc !== 'all') {
-        queryParams.set('kyc', String(filters.kyc));
+      const kycFetchParams = activeKycFilter ? getKycDashFetchParams(activeKycFilter) : null;
+      const kycVal = filters.kyc !== undefined ? filters.kyc : kycFetchParams?.kyc;
+      const kycBucketVal = filters.kycBucket || kycFetchParams?.kycBucket;
+      if (kycVal !== undefined && kycVal !== 'all') {
+        queryParams.set('kyc', String(kycVal));
+      }
+      if (kycBucketVal && kycBucketVal !== 'all') {
+        queryParams.set('kycBucket', kycBucketVal);
       }
     } else {
       if (filters.approvalStatus) queryParams.set('approvalStatus', filters.approvalStatus);
@@ -4238,12 +4287,12 @@ console.log('API Response:', response.data);
         setTotalPages(data.totalPages);
         setPageSize(data.limit || data.pageSize || pageSize);
 
-        if (milestoneFilter === 'kycDone' || isEkycTab) {
+        if (milestoneFilter === 'kycDone' || shouldFetchKycCandidates) {
           applyKycFilterCounts(data.crmFilterCounts);
         }
         if (milestoneFilter === 'kycDone' || milestoneFilter === 'admission') {
           await fetchMilestoneCounts();
-        } else if (isEkycTab) {
+        } else if (shouldFetchKycCandidates) {
           await fetchMilestoneCounts();
         } else {
           await fetchRegistrationCrmFilterCounts(filters, page, null);
@@ -4258,7 +4307,7 @@ console.log('API Response:', response.data);
     } catch (error) {
       console.error('Error fetching profile data:', error);
     } finally {
-      setIsLoadingProfiles(false);
+      if (!silent) setIsLoadingProfiles(false);
     }
   };
 
@@ -4858,8 +4907,10 @@ console.log('API Response:', response.data);
     delete newFilterData.followupStatus;
     if (tab === 'ekyc') {
       newFilterData.kyc = false;
+      newFilterData.kycBucket = 'pendingDocs';
     } else {
       delete newFilterData.kyc;
+      delete newFilterData.kycBucket;
     }
     setFilterData(newFilterData);
     fetchProfileData(newFilterData, 1, null, tab);
@@ -4867,16 +4918,22 @@ console.log('API Response:', response.data);
 
   const handleEkycFilterClick = (filter, index) => {
     let newFilterData = { ...filterData };
+    delete newFilterData.kycBucket;
     if (index === 0) {
       newFilterData.kyc = false;
+      newFilterData.kycBucket = 'pendingDocs';
     } else if (index === 1) {
       newFilterData.kyc = false;
+      newFilterData.kycBucket = 'pendingVerification';
     } else if (index === 2) {
       newFilterData.kyc = 'all';
+      newFilterData.kycBucket = 'rejected';
     } else if (index === 3) {
       newFilterData.kyc = true;
+      newFilterData.kycBucket = 'verified';
     } else {
       newFilterData.kyc = 'all';
+      newFilterData.kycBucket = 'all';
     }
 
     setActiveCrmFilter(index);
@@ -4956,21 +5013,6 @@ console.log('API Response:', response.data);
     }
   };
 
-  const mapKycDashFilterToFetch = (filter) => {
-    if (!filter) return { tab: 'registration', kyc: undefined };
-    switch (filter) {
-      case 'verified':
-        return { tab: 'ekyc', kyc: true };
-      case 'pendingDocs':
-      case 'pendingVerification':
-        return { tab: 'ekyc', kyc: false };
-      case 'rejected':
-        return { tab: 'ekyc', kyc: 'all' };
-      default:
-        return { tab: 'ekyc', kyc: 'all' };
-    }
-  };
-
   const handleFollowupDashClick = (type, bucket) => {
     const followupType = String(type || 'Call').toLowerCase();
     const key = `${followupType}:${bucket}`;
@@ -5004,44 +5046,65 @@ console.log('API Response:', response.data);
     return selectedFollowupBucket === `${followupType}:${bucket}`;
   };
 
+  const buildKycFilterData = (filter, baseFilterData = filterData) => {
+    const newFilterData = { ...baseFilterData };
+    delete newFilterData.followupStatus;
+    delete newFilterData.leadStatus;
+    delete newFilterData.approvalStatus;
+    delete newFilterData.kyc;
+    delete newFilterData.kycBucket;
+
+    const { tab, kyc, kycBucket } = getKycDashFetchParams(filter);
+    if (kyc !== undefined) {
+      newFilterData.kyc = kyc;
+    }
+    if (kycBucket) {
+      newFilterData.kycBucket = kycBucket;
+    }
+    return { newFilterData, tab };
+  };
+
+  const refreshProfilesAfterDocumentChange = async () => {
+    const filters = filterDataRef.current || filterData;
+    const page = currentPageRef.current || currentPage;
+    const kycFilter = selectedKycFilterRef.current ?? selectedKycFilter;
+
+    if (kycFilter) {
+      const { newFilterData, tab } = buildKycFilterData(kycFilter, filters);
+      await fetchProfileData(newFilterData, page, null, tab, undefined, { silent: true });
+    } else if (selectedMilestoneFilter) {
+      await fetchProfileData(filters, page, null, null, selectedMilestoneFilter, { silent: true });
+    } else {
+      await fetchProfileData(filters, page, null, null, undefined, { silent: true });
+    }
+    fetchKycCounts();
+  };
+
   const handleKycDashClick = (filter) => {
     if (pageMainTab !== 'registration') return;
 
-    const togglingOff = filter && selectedKycFilter === filter;
-    const nextFilter = togglingOff ? null : filter;
-
-    setSelectedKycFilter(nextFilter);
     setSelectedApprovalFilter(null);
     setSelectedFollowupBucket('');
     setSelectedMilestoneFilter(null);
     setCurrentPage(1);
 
-    const newFilterData = { ...filterData };
-    delete newFilterData.followupStatus;
-    delete newFilterData.leadStatus;
-    delete newFilterData.approvalStatus;
-
-    if (!nextFilter) {
-      delete newFilterData.kyc;
+    if (selectedKycFilter === filter) {
+      const { newFilterData, tab } = buildKycFilterData(filter);
       setFilterData(newFilterData);
-      fetchProfileData(newFilterData, 1);
+      fetchProfileData(newFilterData, 1, null, tab);
+      fetchKycCounts();
       return;
     }
 
-    const { tab, kyc } = mapKycDashFilterToFetch(nextFilter);
-    if (kyc !== undefined) {
-      newFilterData.kyc = kyc;
-    } else {
-      delete newFilterData.kyc;
-    }
+    setSelectedKycFilter(filter);
+    selectedKycFilterRef.current = filter;
+    const { newFilterData, tab } = buildKycFilterData(filter);
     setFilterData(newFilterData);
     fetchProfileData(newFilterData, 1, null, tab);
+    fetchKycCounts();
   };
 
-  const isKycDashSelected = (filter) => {
-    if (!filter) return selectedKycFilter === null;
-    return selectedKycFilter === filter;
-  };
+  const isKycDashSelected = (filter) => selectedKycFilter === filter;
 
   const milestoneDashOptions = [
     {
@@ -5075,6 +5138,7 @@ console.log('API Response:', response.data);
 
     setSelectedMilestoneFilter(nextMilestone);
     setSelectedKycFilter(null);
+    selectedKycFilterRef.current = null;
     setSelectedApprovalFilter(null);
     setSelectedFollowupBucket('');
     setCurrentPage(1);
@@ -12791,7 +12855,7 @@ useEffect(() => {
   };
 
   const kycDashFilterOptions = [
-    { key: 'kyc-all', filter: null, label: 'All', title: 'All KYC leads', valueKey: 'all', bg: '#6366f1' },
+    { key: 'kyc-all', filter: 'all', label: 'All', title: 'All KYC leads', valueKey: 'all', bg: '#6366f1' },
     { key: 'kyc-pending-docs', filter: 'pendingDocs', label: 'Pending', labelSub: 'Docs', title: 'Pending Docs', valueKey: 'pendingDocs', bg: '#f59e0b' },
     { key: 'kyc-pending-verify', filter: 'pendingVerification', label: 'Pending', labelSub: 'Verify', title: 'Pending Verification', valueKey: 'pendingVerification', bg: '#3b82f6' },
     { key: 'kyc-rejected', filter: 'rejected', label: 'Rejected', title: 'Rejected documents', valueKey: 'rejected', bg: '#ef4444' },
@@ -12812,12 +12876,8 @@ useEffect(() => {
       result = result.filter((profile) => getProfileFollowupBucket(profile, 'Visit') === bucket);
     }
 
-    if (selectedKycFilter === 'pendingVerification' || selectedKycFilter === 'rejected') {
-      result = result.filter((profile) => profileMatchesKycFilter(profile, selectedKycFilter));
-    }
-
     return result;
-  }, [allProfiles, selectedKycFilter, selectedFollowupBucket]);
+  }, [allProfiles, selectedFollowupBucket]);
 
   const leadDisplayGroups = useMemo(() => {
     const byRoot = new Map();
@@ -12838,8 +12898,8 @@ useEffect(() => {
         merged = [...allIds].map((id) => {
           const fresh = freshById.get(id);
           const fromCache = cachedById.get(id);
-          if (fresh && fromCache) return { ...fromCache, ...fresh };
-          return fresh || fromCache;
+          if (fresh) return fresh;
+          return fromCache;
         }).filter(Boolean);
       } else {
         merged = group.membersFromList;
@@ -13151,10 +13211,12 @@ useEffect(() => {
               setSelectedApprovalFilter(null);
               setSelectedFollowupBucket('');
               setSelectedKycFilter(null);
+              selectedKycFilterRef.current = null;
               setSelectedMilestoneFilter(null);
               const cleared = { ...filterData, followupStatus: '' };
               delete cleared.leadStatus;
               delete cleared.kyc;
+              delete cleared.kycBucket;
               delete cleared.approvalStatus;
               setFilterData(cleared);
               setActiveCrmFilter(0);
@@ -14610,7 +14672,7 @@ useEffect(() => {
                   </div>
                   <div className="modal-body reapply-modal__body">
                     <p className="text-muted small mb-3">
-                      Jab candidate isi course par dubara apply karta hai — khud se ya digital leads se — woh attempts yahan dikhte hain.
+                      When a candidate applies again for the same course—directly or through digital leads—their re-application attempts are listed here.
                     </p>
                     <div className="table-responsive">
                       {(() => {
@@ -14631,7 +14693,7 @@ useEffect(() => {
                         if (duplicateRows.length === 0) {
                           return (
                             <div className="text-center text-muted py-4">
-                              {displayCourse} par abhi koi reapply record nahi hai.
+                              No re-application records found for {displayCourse}.
                             </div>
                           );
                         }
@@ -17589,22 +17651,31 @@ useEffect(() => {
                                                           <div className="document-header">
                                                             <h4 className="document-title">{doc.Name || `Document ${index + 1}`}</h4>
                                                             <div className="document-actions">
-                                                              {(!latestUpload) ? (
-                                                                <button className="action-btn upload-btn" title="Upload Document" data-bs-toggle="modal" data-bs-target="#staticBackdrop" onClick={() => {
-                                                                  setSelectedProfile(profile); // Set the current profile
-                                                                  openUploadModal(doc);        // Open the upload modal
+                                                              {((!latestUpload) || (latestUpload?.status || doc.status) === 'Rejected') ? (
+                                                                <button className="action-btn upload-btn" title="Upload Document" type="button" onClick={() => {
+                                                                  setSelectedProfile(profile);
+                                                                  openUploadModal(doc);
                                                                 }}>
                                                                   <i className="fas fa-cloud-upload-alt"></i>
                                                                   Upload
+                                                                </button>
+                                                              ) : ((latestUpload?.status || doc.status) === 'Pending') ? (
+                                                                <button
+                                                                  className="action-btn verify-btn"
+                                                                  onClick={() => openDocumentModal(doc, profile)}
+                                                                  title={canVerifyRejectKycPermission ? 'Verify Document' : 'View Document'}
+                                                                >
+                                                                  <i className="fas fa-check"></i>
+                                                                  {canVerifyRejectKycPermission ? 'VERIFY' : 'PREVIEW'}
                                                                 </button>
                                                               ) : (
                                                                 <button
                                                                   className="action-btn verify-btn"
                                                                   onClick={() => openDocumentModal(doc, profile)}
-                                                                  title={canVerifyRejectKycPermission && latestUpload?.status === 'Pending' ? 'Verify Document' : 'View Document'}
+                                                                  title="View Document"
                                                                 >
                                                                   <i className="fas fa-search"></i>
-                                                                  {canVerifyRejectKycPermission && latestUpload?.status === 'Pending' ? 'VERIFY' : 'PREVIEW'}
+                                                                  PREVIEW
                                                                 </button>
                                                               )}
                                                             </div>
@@ -17680,127 +17751,6 @@ useEffect(() => {
                                                   canVerifyKyc={canVerifyRejectKycPermission}
                                                 />
                                               )}
-                                              <div className="modal fade w-100" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
-                                                <div className="modal-dialog d-flex  justify-content-center mx-auto w-100">
-                                                  <div className="modal-content p-0 w-100">
-                                                    <div className="modal-header">
-                                                      <h3>
-                                                        <i className="fas fa-cloud-upload-alt me-2"></i>
-                                                        Upload {selectedDocumentForUpload?.Name || 'Document'}
-                                                      </h3>
-                                                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onClick={closeUploadModal}></button>
-                                                    </div>
-                                                    <div className="modal-body">
-
-
-
-                                                      <div className="upload-section">
-                                                        {!selectedFile ? (
-                                                          <div className="file-drop-zone">
-                                                            <div className="drop-zone-content">
-                                                              <i className="fas fa-cloud-upload-alt upload-icon"></i>
-                                                              <h4>Choose a file to upload</h4>
-                                                              <p>Drag and drop a file here, or click to select</p>
-                                                              <div className="file-types">
-                                                                <span>Supported: JPG, PNG, GIF, PDF</span>
-                                                                <span>Max size: 10MB</span>
-                                                              </div>
-                                                              <input
-                                                                type="file"
-                                                                id="file-input"
-                                                                accept=".jpg,.jpeg,.png,.gif,.pdf"
-                                                                onChange={handleFileSelect}
-                                                                style={{ display: 'none' }}
-                                                              />
-                                                              <button
-                                                                className="btn btn-primary"
-
-                                                                onClick={() => document.getElementById('file-input').click()}
-                                                              >
-                                                                <i className="fas fa-folder-open me-2"></i>
-                                                                Choose File
-                                                              </button>
-                                                            </div>
-                                                          </div>
-                                                        ) : (
-                                                          <div className="file-preview-section">
-                                                            <div className="selected-file-info">
-                                                              <h4>Selected File:</h4>
-                                                              <div className="file-details">
-                                                                <div className="file-icon">
-                                                                  <i className={`fas ${selectedFile.type.startsWith('image/') ? 'fa-image' : 'fa-file-pdf'}`}></i>
-                                                                </div>
-                                                                <div className="file-info">
-                                                                  <p className="file-name">{selectedFile.name}</p>
-                                                                  <p className="file-size">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                                                                </div>
-                                                                <button
-                                                                  className="btn btn-sm btn-outline-secondary"
-                                                                  onClick={() => {
-                                                                    setSelectedFile(null);
-                                                                    setUploadPreview(null);
-                                                                  }}
-                                                                >
-                                                                  <i className="fas fa-trash"></i>
-                                                                </button>
-                                                              </div>
-                                                            </div>
-
-                                                            {uploadPreview && (
-                                                              <div className="upload-preview">
-                                                                <h5>Preview:</h5>
-                                                                <img src={uploadPreview} alt="Upload Preview" className="preview-image" />
-                                                              </div>
-                                                            )}
-
-                                                            {isUploading && (
-                                                              <div className="upload-progress-section">
-                                                                <h5>Uploading...</h5>
-                                                                <div className="progress-bar-container">
-                                                                  <div
-                                                                    className="progress-bar"
-                                                                    style={{ width: `${uploadProgress}%` }}
-                                                                  ></div>
-                                                                </div>
-                                                                <p>{uploadProgress}% Complete</p>
-                                                              </div>
-                                                            )}
-                                                          </div>
-                                                        )}
-                                                      </div>
-
-
-
-                                                    </div>
-                                                    <div className="modal-footer">
-                                                      <button
-                                                        className="btn btn-secondary"
-                                                        onClick={closeUploadModal}
-                                                        disabled={isUploading}
-                                                      >
-                                                        Cancel
-                                                      </button>
-                                                      <button
-                                                        className="btn btn-primary"
-                                                        onClick={handleFileUpload}
-                                                        disabled={!selectedFile || isUploading}
-                                                      >
-                                                        {isUploading ? (
-                                                          <>
-                                                            <i className="fas fa-spinner fa-spin me-2"></i>
-                                                            Uploading...
-                                                          </>
-                                                        ) : (
-                                                          <>
-                                                            <i className="fas fa-upload me-2"></i>
-                                                            Upload Document
-                                                          </>
-                                                        )}
-                                                      </button>
-                                                    </div>
-                                                  </div>
-                                                </div>
-                                              </div>
                                             </div>
                                           );
                                         })()}
@@ -18385,7 +18335,127 @@ useEffect(() => {
         {isMobile && renderChangeCenterPanel()}
         {renderActionsModal()}
       </div>
-      <UploadModal />
+
+      {selectedDocumentForUpload && (
+        <>
+          <div
+            className="upload-doc-modal-backdrop fade show"
+            style={{ zIndex: 1050, position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)' }}
+            onClick={() => { if (!isUploading) closeUploadModal(); }}
+          />
+          <div
+            className="modal fade show d-block w-100"
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            style={{ zIndex: 1055 }}
+          >
+            <div className="modal-dialog d-flex justify-content-center mx-auto w-100">
+              <div className="modal-content p-0 w-100" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3>
+                    <i className="fas fa-cloud-upload-alt me-2"></i>
+                    Upload {selectedDocumentForUpload?.Name || 'Document'}
+                  </h3>
+                  <button type="button" className="btn-close" aria-label="Close" onClick={closeUploadModal} disabled={isUploading} />
+                </div>
+                <div className="modal-body">
+                  <div className="upload-section">
+                    {!selectedFile ? (
+                      <div className="file-drop-zone">
+                        <div className="drop-zone-content">
+                          <i className="fas fa-cloud-upload-alt upload-icon"></i>
+                          <h4>Choose a file to upload</h4>
+                          <p>Drag and drop a file here, or click to select</p>
+                          <div className="file-types">
+                            <span>Supported: JPG, PNG, GIF, PDF</span>
+                            <span>Max size: 10MB</span>
+                          </div>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".jpg,.jpeg,.png,.gif,.pdf"
+                            onChange={handleFileSelect}
+                            style={{ display: 'none' }}
+                          />
+                          <button
+                            className="btn btn-primary"
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                          >
+                            <i className="fas fa-folder-open me-2"></i>
+                            Choose File
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="file-preview-section">
+                        <div className="selected-file-info">
+                          <h4>Selected File:</h4>
+                          <div className="file-details">
+                            <div className="file-icon">
+                              <i className={`fas ${selectedFile.type.startsWith('image/') ? 'fa-image' : 'fa-file-pdf'}`}></i>
+                            </div>
+                            <div className="file-info">
+                              <p className="file-name">{selectedFile.name}</p>
+                              <p className="file-size">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                            </div>
+                            <button
+                              className="btn btn-sm btn-outline-secondary"
+                              type="button"
+                              onClick={() => {
+                                setSelectedFile(null);
+                                setUploadPreview(null);
+                              }}
+                            >
+                              <i className="fas fa-trash"></i>
+                            </button>
+                          </div>
+                        </div>
+
+                        {uploadPreview && (
+                          <div className="upload-preview">
+                            <h5>Preview:</h5>
+                            <img src={uploadPreview} alt="Upload Preview" className="preview-image" />
+                          </div>
+                        )}
+
+                        {isUploading && (
+                          <div className="upload-progress-section">
+                            <h5>Uploading...</h5>
+                            <div className="progress-bar-container">
+                              <div className="progress-bar" style={{ width: `${uploadProgress}%` }} />
+                            </div>
+                            <p>{uploadProgress}% Complete</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-secondary" type="button" onClick={closeUploadModal} disabled={isUploading}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-primary" type="button" onClick={handleFileUpload} disabled={!selectedFile || isUploading}>
+                    {isUploading ? (
+                      <>
+                        <i className="fas fa-spinner fa-spin me-2"></i>
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-upload me-2"></i>
+                        Upload Document
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Unified AI Supervision Modal */}
       {showAiSupervision && (
