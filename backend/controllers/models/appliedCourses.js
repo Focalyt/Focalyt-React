@@ -258,6 +258,12 @@ appliedCoursesSchema.methods.assignCounselor = async function() {
     
     const courseId = this._course;
     const centerId = this._center;
+
+    console.log('[AssignmentRule] assignCounselor start →', {
+      appliedCourseId: this._id,
+      courseId: courseId?.toString(),
+      centerId: centerId?.toString()
+    });
     
     // Step 1: Find applicable assignment rules
     const applicableRules = await LeadAssignmentRule.find({
@@ -285,6 +291,17 @@ appliedCoursesSchema.methods.assignCounselor = async function() {
           'course.values': courseId
         }
       ]
+    });
+
+    console.log('[AssignmentRule] matching rules found ←', {
+      count: applicableRules.length,
+      rules: applicableRules.map((rule) => ({
+        id: rule._id?.toString(),
+        ruleName: rule.ruleName,
+        centerType: rule.center?.type,
+        courseType: rule.course?.type,
+        counselors: (rule.assignedCounselors || []).map((c) => c?.toString())
+      }))
     });
 
     let allCounselors = [];
@@ -411,6 +428,14 @@ appliedCoursesSchema.methods.assignCounselor = async function() {
 
       this.courseStatus = 1; // Assigned
 
+      console.log('[AssignmentRule] counselor assigned ←', {
+        appliedCourseId: this._id?.toString(),
+        courseId: courseId?.toString(),
+        centerId: centerId?.toString(),
+        counselorId: selectedCounselor,
+        counselorName
+      });
+
       return selectedCounselor;
     }
 
@@ -426,6 +451,10 @@ appliedCoursesSchema.pre('save', async function(next) {
   try {
     // Only auto-assign if this is a new document and no counselor is assigned
     if (this.isNew && (!this.leadAssignment || this.leadAssignment.length === 0)) {
+      console.log('[AssignmentRule] pre-save auto-assign triggered →', {
+        courseId: this._course?.toString(),
+        centerId: this._center?.toString()
+      });
       await this.assignCounselor();
       // assignCounselor() method will modify the document, main save will handle the actual saving
     }

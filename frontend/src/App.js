@@ -150,6 +150,8 @@ import WhatsappChat from './Pages/App/College/Whatapp/WhatsappChat';
 import WhatsappWallet from './Pages/App/College/whatsappWallet/WhatsappWallet';
 import EmailTemplate from './Pages/App/College/Email/EmailTemplate';
 import TrainerModule from './Pages/App/College/Course/TrainerModule';
+import AcademicCoordinatorModule from './Pages/App/College/Course/Training/AcademicCoordinatorModule';
+import SeniorTrainerModule from './Pages/App/College/Course/Training/SeniorTrainerModule';
 // Trainer module
 import TrainerLayout from './Component/Layouts/App/Trainer'
 import TrainerLogin from './Pages/App/Trainer/TrainerLogin/TrainerLogin'
@@ -337,6 +339,8 @@ const Layout = () => {
           <Route path='lrp-view' element={<LrpView/>}/>
           <Route path='video-timestamp' element={<VideoTimestamp/>}/>
           <Route path='training' element={<TrainerModule/>}/>
+          <Route path='training/academic-coordinator' element={<AcademicCoordinatorModule/>}/>
+          <Route path='training/senior-trainer' element={<SeniorTrainerModule/>}/>
           <Route path='registrationsold' element={<Regitrationsold/>}/>
         </Route>
 

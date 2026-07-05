@@ -136,7 +136,13 @@ class BatchProcessor {
     // AAPKA EXISTING LOGIC - processSingleLead function me
     async processSingleLead(req_body) {
         try {
-            console.log("Processing lead:", req_body.FirstName);
+            console.log('[DigitalLead] processSingleLead →', {
+                name: req_body.FirstName,
+                mobile: req_body.MobileNumber,
+                courseId: req_body.courseId,
+                center: req_body.Field4,
+                source: req_body.source || 'FB Form'
+            });
 
             let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4, source } = req_body;
             if (!source) {
@@ -214,12 +220,21 @@ class BatchProcessor {
                     };
                 }
                 if (existingCandidate && !alreadyApplied) {
+                    console.log('[DigitalLead] creating AppliedCourses (no counselor set → AssignmentRule will run) →', {
+                        mobile, courseId: courseId?.toString(), centerId: selectedCenter?.toString()
+                    });
                     let appliedCourseEntry = await AppliedCourses.create({
                         _candidate: existingCandidate._id,
                         _course: courseId,
                         _center: selectedCenter
                     });
 
+                    console.log('[DigitalLead] AppliedCourses created ←', {
+                        appliedCourseId: appliedCourseEntry._id?.toString(),
+                        mobile,
+                        counsellor: appliedCourseEntry.counsellor?.toString(),
+                        counsellorName: appliedCourseEntry.leadAssignment?.[appliedCourseEntry.leadAssignment.length - 1]?.counsellorName
+                    });
                     console.log(`   ✅ Updated existing candidate: ${name} (${mobile})`);
 
                     return {
@@ -262,11 +277,21 @@ class BatchProcessor {
 
                 console.log('selectedCenter', typeof selectedCenter)
 
+                console.log('[DigitalLead] creating AppliedCourses (no counselor set → AssignmentRule will run) →', {
+                    mobile, courseId: courseId?.toString(), centerId: selectedCenter?.toString()
+                });
                 // Insert AppliedCourses Record
                 let appliedCourseEntry = await AppliedCourses.create({
                     _candidate: candidate._id,
                     _course: courseId,
                     _center: selectedCenter
+                });
+
+                console.log('[DigitalLead] AppliedCourses created ←', {
+                    appliedCourseId: appliedCourseEntry._id?.toString(),
+                    mobile,
+                    counsellor: appliedCourseEntry.counsellor?.toString(),
+                    counsellorName: appliedCourseEntry.leadAssignment?.[appliedCourseEntry.leadAssignment.length - 1]?.counsellorName
                 });
 
 
@@ -372,6 +397,13 @@ const batchProcessor = new BatchProcessor();
 router.route("/addleaddandcourseapply")
     .post(async (req, res) => {
         try {
+            console.log('[DigitalLead] POST /addleaddandcourseapply →', {
+                name: req.body.FirstName,
+                mobile: req.body.MobileNumber,
+                courseId: req.body.courseId,
+                center: req.body.Field4,
+                source: req.body.source || 'Digital Lead'
+            });
 
             // Basic validation only
             let { FirstName, MobileNumber, Gender, DateOfBirth, Email, courseId, Field4, source, Remarks, status,subStatus } = req.body;
@@ -489,6 +521,9 @@ router.route("/addleaddandcourseapply")
                     });
                 }
                 if (existingCandidate && !alreadyApplied) {
+                    console.log('[DigitalLead] creating AppliedCourses (no counselor set → AssignmentRule will run) →', {
+                        mobile, courseId: courseId?.toString(), centerId: selectedCenter?.toString()
+                    });
                     let appliedCourseEntry = await AppliedCourses.create({
                         _candidate: existingCandidate._id,
                         _course: courseId,
@@ -497,6 +532,12 @@ router.route("/addleaddandcourseapply")
                         _leadSubStatus: subStatusId._id
                     });
 
+                    console.log('[DigitalLead] AppliedCourses created ←', {
+                        appliedCourseId: appliedCourseEntry._id?.toString(),
+                        mobile,
+                        counsellor: appliedCourseEntry.counsellor?.toString(),
+                        counsellorName: appliedCourseEntry.leadAssignment?.[appliedCourseEntry.leadAssignment.length - 1]?.counsellorName
+                    });
                     console.log(`   ✅ Updated existing candidate: ${name} (${mobile})`);
 
                     return res.json( {
@@ -538,6 +579,9 @@ router.route("/addleaddandcourseapply")
                 });
 
 
+                console.log('[DigitalLead] creating AppliedCourses (no counselor set → AssignmentRule will run) →', {
+                    mobile, courseId: courseId?.toString(), centerId: selectedCenter?.toString()
+                });
                 // Insert AppliedCourses Record
                 let appliedCourseEntry = await AppliedCourses.create({
                     _candidate: candidate._id,
@@ -548,6 +592,13 @@ router.route("/addleaddandcourseapply")
                     _leadStatus: statusId._id,
                     _leadSubStatus: subStatusId._id
 
+                });
+
+                console.log('[DigitalLead] AppliedCourses created ←', {
+                    appliedCourseId: appliedCourseEntry._id?.toString(),
+                    mobile,
+                    counsellor: appliedCourseEntry.counsellor?.toString(),
+                    counsellorName: appliedCourseEntry.leadAssignment?.[appliedCourseEntry.leadAssignment.length - 1]?.counsellorName
                 });
 
                 appliedData = appliedCourseEntry;
