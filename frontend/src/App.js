@@ -150,8 +150,8 @@ import WhatsappChat from './Pages/App/College/Whatapp/WhatsappChat';
 import WhatsappWallet from './Pages/App/College/whatsappWallet/WhatsappWallet';
 import EmailTemplate from './Pages/App/College/Email/EmailTemplate';
 import TrainerModule from './Pages/App/College/Course/TrainerModule';
-import AcademicCoordinatorModule from './Pages/App/College/Course/Training/AcademicCoordinatorModule';
-import SeniorTrainerModule from './Pages/App/College/Course/Training/SeniorTrainerModule';
+import AcademicCoordinatorModule from './Pages/App/College/Training/AcademicCoordinatorModule';
+import SeniorTrainerModule from './Pages/App/College/Training/SeniorTrainerModule';
 // Trainer module
 import TrainerLayout from './Component/Layouts/App/Trainer'
 import TrainerLogin from './Pages/App/Trainer/TrainerLogin/TrainerLogin'
