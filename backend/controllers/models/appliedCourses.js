@@ -61,7 +61,7 @@ const appliedCoursesSchema = new Schema(
     },
     _leadSubStatus: {
       type: ObjectId,
-      default: new mongoose.Types.ObjectId('6a48e671d668a76715427ec8')
+      default: new mongoose.Types.ObjectId('64ab1234abcd5678ef901235')
     },
     
     _initialStatus: {

@@ -8,7 +8,7 @@ await mongoose.connect(process.env.MIPIE_MONGODB_URI, { useNewUrlParser: true, u
 console.log("Connected to database");  
 
 const defaultStatusId = new mongoose.Types.ObjectId('64ab1234abcd5678ef901234');
-const defaultSubstatusId = new mongoose.Types.ObjectId('6a48e671d668a76715427ec8');
+const defaultSubstatusId = new mongoose.Types.ObjectId('64ab1234abcd5678ef901235');
 
 const defaultStatusData = {
   _id: defaultStatusId,

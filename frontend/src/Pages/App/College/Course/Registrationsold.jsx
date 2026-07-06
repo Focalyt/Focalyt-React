@@ -803,8 +803,9 @@ const CRMDashboard = () => {
     center: '',
     course: '',
     batch: '',
+    counsellor: '',
   });
-  const [headerDatePreset, setHeaderDatePreset] = useState('today');
+  const [headerDatePreset, setHeaderDatePreset] = useState('');
   const [headerDateFrom, setHeaderDateFrom] = useState(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -2692,13 +2693,14 @@ const CRMDashboard = () => {
     const courseValues = cycle.course ? [cycle.course] : (fd.course?.values || []);
     const centerValues = cycle.center ? [cycle.center] : (fd.center?.values || []);
     const batchValues = cycle.batch ? [cycle.batch] : [];
+    const counselorValues = cycle.counsellor ? [cycle.counsellor] : (fd.counselor?.values || []);
     return {
       ...(projectsValues.length > 0 && { projects: JSON.stringify(projectsValues) }),
       ...(verticalsValues.length > 0 && { verticals: JSON.stringify(verticalsValues) }),
       ...(courseValues.length > 0 && { course: JSON.stringify(courseValues) }),
       ...(centerValues.length > 0 && { center: JSON.stringify(centerValues) }),
       ...(batchValues.length > 0 && { batch: JSON.stringify(batchValues) }),
-      ...(fd.counselor?.values?.length > 0 && { counselor: JSON.stringify(fd.counselor.values) }),
+      ...(counselorValues.length > 0 && { counselor: JSON.stringify(counselorValues) }),
     };
   }, [formData, cycleFilters]);
 
@@ -3108,6 +3110,7 @@ const CRMDashboard = () => {
       center: '',
       course: '',
       batch: '',
+      counsellor: '',
     });
     setLeadViewTab('all');
     setSelectedApprovalFilter(null);
@@ -12681,7 +12684,7 @@ useEffect(() => {
   const handleCycleFilterChange = (key, value) => {
     let next = { ...cycleFilters, [key]: value };
     if (key === 'department') {
-      next = { department: value, project: '', center: '', course: '', batch: '' };
+      next = { ...cycleFilters, department: value, project: '', center: '', course: '', batch: '' };
     } else if (key === 'project') {
       next = { ...cycleFilters, project: value, center: '', course: '', batch: '' };
     } else if (key === 'center') {
@@ -12690,6 +12693,8 @@ useEffect(() => {
       next = { ...cycleFilters, course: value, batch: '' };
     } else if (key === 'batch') {
       next = { ...cycleFilters, batch: value };
+    } else if (key === 'counsellor') {
+      next = { ...cycleFilters, counsellor: value };
     }
 
     setCycleFilters(next);
@@ -12699,6 +12704,7 @@ useEffect(() => {
       projects: { ...fd.projects, values: next.project ? [next.project] : [] },
       course: { ...fd.course, values: next.course ? [next.course] : [] },
       center: { ...fd.center, values: next.center ? [next.center] : [] },
+      counselor: { ...fd.counselor, values: next.counsellor ? [next.counsellor] : [] },
     }));
     setCurrentPage(1);
     fetchProfileData(filterData, 1, next);
@@ -12716,6 +12722,20 @@ useEffect(() => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showHeaderDateRangePicker]);
+
+  const applyHeaderLeadCreationDateFilter = (from, to, preset) => {
+    const newFilterData = {
+      ...filterData,
+      createdFromDate: from,
+      createdToDate: to,
+    };
+    setFilterData(newFilterData);
+    setHeaderDatePreset(preset);
+    setHeaderDateFrom(from);
+    setHeaderDateTo(to);
+    setCurrentPage(1);
+    fetchProfileData(newFilterData, 1);
+  };
 
   const handleHeaderDatePreset = (preset) => {
     if (preset === 'custom') {
@@ -12738,9 +12758,13 @@ useEffect(() => {
       from = new Date(today.getFullYear(), today.getMonth(), 1);
     }
 
-    setHeaderDatePreset(preset);
-    setHeaderDateFrom(from);
-    setHeaderDateTo(to);
+    setShowHeaderDateRangePicker(false);
+    applyHeaderLeadCreationDateFilter(from, to, preset);
+  };
+
+  const handleHeaderCustomDateApply = () => {
+    if (!headerDateFrom || !headerDateTo) return;
+    applyHeaderLeadCreationDateFilter(headerDateFrom, headerDateTo, 'custom');
     setShowHeaderDateRangePicker(false);
   };
 
@@ -12837,7 +12861,8 @@ useEffect(() => {
               <button
                 type="button"
                 className="btn btn-sm w-100 mt-2 adm-header-date-range__apply-btn"
-                onClick={() => setShowHeaderDateRangePicker(false)}
+                onClick={handleHeaderCustomDateApply}
+                disabled={!headerDateFrom || !headerDateTo}
               >
                 Apply
               </button>
@@ -12926,6 +12951,22 @@ useEffect(() => {
         >
           <option value="">All</option>
           {batchOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="adm-filter-counsellor">
+          <i className="fas fa-user-tie" aria-hidden="true" /> Counsellor
+        </label>
+        <select
+          id="adm-filter-counsellor"
+          className="b2b-cycle-filters__select"
+          value={cycleFilters.counsellor || ''}
+          onChange={(e) => handleCycleFilterChange('counsellor', e.target.value)}
+        >
+          <option value="">All</option>
+          {counselorOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </select>
@@ -14634,14 +14675,14 @@ useEffect(() => {
                 <div className="row align-items-center gy-2">
                   <div className="col-md-4 col-xl-3 d-none d-md-block">
                     <h5 className="fw-bold text-dark mb-1" style={{ fontSize: '1.1rem' }}>Sales B2C</h5>
-                    {/* {renderHeaderDateRangeFilter()} */}
+                    {renderHeaderDateRangeFilter()}
                   </div>
 
                   <div className="col-12 d-md-none mb-1 adm-cycle-mobile-title">
                     <h5 className="fw-bold text-dark mb-1" style={{ fontSize: '1.1rem' }}>Sales B2C</h5>
                   </div>
                   <div className="col-12 d-md-none mb-1">
-                    {/* {renderHeaderDateRangeFilter(true)} */}
+                    {renderHeaderDateRangeFilter(true)}
                   </div>
 
                   <div className="col-md-8 col-xl-9 d-none d-md-flex justify-content-end align-items-center">
