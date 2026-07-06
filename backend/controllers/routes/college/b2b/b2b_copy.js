@@ -1586,6 +1586,7 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 				return {
 					statusId: status._id,
 					statusName: status.title,
+					statusIndex: status.index,
 					count: count
 				};
 			})

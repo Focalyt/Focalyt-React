@@ -1638,18 +1638,8 @@ const B2BSales = () => {
   });
 
   const sortedPerformanceStatuses = useMemo(() => {
-    const order = ['HOT', 'WARM', 'COLD', 'PROSPECT'];
     const list = [...(statusCounts || [])];
-    list.sort((a, b) => {
-      const na = (a.statusName || '').toUpperCase();
-      const nb = (b.statusName || '').toUpperCase();
-      const ia = order.indexOf(na);
-      const ib = order.indexOf(nb);
-      if (ia === -1 && ib === -1) return 0;
-      if (ia === -1) return 1;
-      if (ib === -1) return -1;
-      return ia - ib;
-    });
+    list.sort((a, b) => (a.statusIndex ?? 9999) - (b.statusIndex ?? 9999));
     return list;
   }, [statusCounts]);
 
