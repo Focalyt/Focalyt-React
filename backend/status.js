@@ -51,5 +51,3 @@ async function seed() {
 seed();  // seed function ko yahin call kar rahe hain
 
 // Agar aap is file ko kisi aur module se import karna chahte ho toh export bhi kar sakte ho
-
-
