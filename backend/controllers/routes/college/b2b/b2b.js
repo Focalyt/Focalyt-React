@@ -6036,11 +6036,11 @@ router.post('/add-test-followup/:leadId', isCollege, async (req, res) => {
 router.post('/refer-lead', isCollege, async (req, res) => {
 	try {
 		const { leadId, counselorId } = req.body;
-
+console.log("/refer-lead",req.body)
 		if (!counselorId) {
 			return res.status(400).json({ status: false, message: 'counselorId is required' });
 		}
-
+console.log("counselorId",counselorId)
 		const user = req.user;
 		const lead = await Lead.findById(leadId).select('leadOwner').lean();
 		if (!lead) {
@@ -6049,16 +6049,17 @@ router.post('/refer-lead', isCollege, async (req, res) => {
 				message: 'Lead not found'
 			});
 		}
+console.log("lead",lead)
 
 		const newUser = await User.findById(counselorId);
 		if (!newUser) {
 			return res.status(404).json({ status: false, message: 'Counselor not found' });
 		}
-
+console.log("newUser",newUser)
 		const oldOwnerId = lead.leadOwner;
 		const olduser = oldOwnerId ? await User.findById(oldOwnerId) : null;
 		const oldName = olduser?.name || 'Unknown';
-
+console.log("oldName",oldName)
 		const update = {
 			$set: {
 				leadOwner: counselorId,
@@ -6081,7 +6082,7 @@ router.post('/refer-lead', isCollege, async (req, res) => {
 		if (!result.matchedCount) {
 			return res.status(404).json({ status: false, message: 'Lead not found' });
 		}
-
+console.log("result",result)
 		return res.status(200).json({
 			status: true,
 			message: 'Lead referred successfully'

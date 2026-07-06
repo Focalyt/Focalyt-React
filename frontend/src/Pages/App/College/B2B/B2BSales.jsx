@@ -1014,7 +1014,7 @@ const B2BSales = () => {
       // Determine whether follow-up fields are filled
       const hasFollowup =
         (showPanel === 'followUp') ||
-        (showPanel === 'editPanel' && seletectedSubStatus && seletectedSubStatus.hasFollowup);
+        ((showPanel === 'editPanel' || showPanel === 'bulkstatuschange') && seletectedSubStatus && seletectedSubStatus.hasFollowup);
 
       const hasFollowupData =
         hasFollowup && followupFormData.followupDate && followupFormData.followupTime;
@@ -1029,7 +1029,57 @@ const B2BSales = () => {
       };
       const followupDateValue = toYmdLocal(followupFormData.followupDate);
 
-      // 1) Edit panel: change status (and optionally set follow-up + Google Calendar) via B2B status API
+      // 1) Bulk status change panel
+      if (showPanel === 'bulkstatuschange' && seletectedStatus) {
+        if (!selectedProfiles?.length) {
+          alert('Please type a number in Input 1 to select leads first.');
+          return;
+        }
+
+        if (seletectedSubStatus?.hasRemarks && !followupFormData.remarks?.trim()) {
+          alert('Remarks are mandatory for this status. Please add remarks.');
+          return;
+        }
+
+        if (seletectedSubStatus?.hasFollowup && !hasFollowupData) {
+          alert('Follow-up date and time are mandatory for this status.');
+          return;
+        }
+
+        const statusData = {
+          status: seletectedStatus,
+          subStatus: seletectedSubStatus?._id || null,
+          remarks: followupFormData.remarks || 'Bulk status updated via B2B panel'
+        };
+
+        if (hasFollowupData) {
+          statusData.followUpDate = followupDateValue;
+          statusData.followUpTime = followupFormData.followupTime;
+          statusData.googleCalendarEvent = true;
+        }
+
+        const results = await Promise.allSettled(
+          selectedProfiles.map((id) =>
+            axios.put(`${backendUrl}/college/b2b/leads/${id}/status`, statusData, {
+              headers: { 'x-auth': token }
+            })
+          )
+        );
+
+        const ok = results.filter((r) => r.status === 'fulfilled' && r.value?.data?.status).length;
+        const failed = results.length - ok;
+
+        if (ok > 0) {
+          alert(`✅ Updated status for ${ok} lead(s)${failed ? `, ${failed} failed` : ''}.`);
+          await fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
+          await fetchStatusCounts();
+        } else {
+          alert('Failed to update status for selected leads.');
+          return;
+        }
+      }
+
+      // 2) Edit panel: change status (and optionally set follow-up + Google Calendar) via B2B status API
       if (showPanel === 'editPanel' && selectedProfile && seletectedStatus) {
         const statusData = {
           status: seletectedStatus,
@@ -1958,7 +2008,7 @@ const B2BSales = () => {
 
   // Auto-select leads based on Input 1 value for bulk refer
   useEffect(() => {
-    if (bulkMode !== 'bulkrefer') {
+    if (bulkMode !== 'bulkrefer' && bulkMode !== 'bulkaction') {
       return;
     }
 
@@ -3604,8 +3654,7 @@ const B2BSales = () => {
 
 
   const closePanel = () => {
-    // Hide bulk inputs when bulk refer panel is closed
-    if (showPanel === 'RefferAllLeads') {
+    if (showPanel === 'RefferAllLeads' || showPanel === 'bulkstatuschange') {
       setShowBulkInputs(false);
       setBulkMode('');
       setInput1Value('');
@@ -3817,15 +3866,19 @@ const B2BSales = () => {
 
   // Render Status Change Panel
   const renderStatusChangePanel = () => {
+    const isBulkStatusPanel = showPanel === 'bulkstatuschange';
+
     const panelContent = (
       <div className="card border-0 shadow-sm">
         <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
           <div className="d-flex align-items-center">
             <div className="me-2">
-              <i className="fas fa-edit text-primary"></i>
+              <i className={`fas ${isBulkStatusPanel ? 'fa-tasks' : 'fa-edit'} text-primary`}></i>
             </div>
             <h6 className="mb-0 fw-medium text-primary">
-              Change Status for {selectedProfile?.businessName || 'Lead'}
+              {isBulkStatusPanel
+                ? 'Bulk Status Change'
+                : `Change Status for ${selectedProfile?.businessName || 'Lead'}`}
             </h6>
           </div>
           <div className='d-flex align-items-center'>
@@ -3845,6 +3898,14 @@ const B2BSales = () => {
         <div className="card-body">
           {userData.googleAuthToken?.accessToken && !isgoogleLoginLoading ? (
             <form onSubmit={addFollowUpToGoogleCalendar}>
+              {isBulkStatusPanel && (
+                <p className="text-muted small mb-3">
+                  Selected leads: <strong>{selectedProfiles?.length || 0}</strong>
+                  {selectedProfiles?.length === 0 && (
+                    <span className="d-block mt-1">Enter a number in Input 1 above to select leads.</span>
+                  )}
+                </p>
+              )}
               {/* Status Selection */}
               <div className="mb-3">
                 <label htmlFor="status" className="form-label small fw-medium text-dark">
@@ -3974,8 +4035,9 @@ const B2BSales = () => {
                 <button
                   type="submit"
                   className="btn updateStatus"
+                  disabled={isBulkStatusPanel && !selectedProfiles?.length}
                 >
-                  Update Status
+                  {isBulkStatusPanel ? 'Update Bulk Status' : 'Update Status'}
                 </button>
               </div>
             </form>
@@ -4001,7 +4063,7 @@ const B2BSales = () => {
     );
 
     if (isMobile) {
-      return showPanel === 'editPanel' ? (
+      return (showPanel === 'editPanel' || showPanel === 'bulkstatuschange') ? (
         <div
           className="modal show d-block"
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
@@ -4018,7 +4080,7 @@ const B2BSales = () => {
       ) : null;
     }
 
-    return showPanel === 'editPanel' ? (
+    return (showPanel === 'editPanel' || showPanel === 'bulkstatuschange') ? (
       <div className="col-12 transition-col" id="statusChangePanel">
         {panelContent}
       </div>
@@ -4692,10 +4754,10 @@ const B2BSales = () => {
                   </div>
 
                   <div className="col-md-8 col-xl-9 d-none d-md-flex justify-content-end align-items-center">
-                    {showBulkInputs && bulkMode === 'bulkrefer' ? (
+                    {showBulkInputs && (bulkMode === 'bulkrefer' || bulkMode === 'bulkaction') ? (
                       <div className="d-flex justify-content-end align-items-center gap-2">
-                      {/* Bulk Refer inputs (desktop top row when active) */}
-                      {showBulkInputs && bulkMode === 'bulkrefer' && (
+                      {/* Bulk inputs (desktop top row when active) */}
+                      {showBulkInputs && (bulkMode === 'bulkrefer' || bulkMode === 'bulkaction') && (
                         <div style={{
                           display: "flex",
                           alignItems: "stretch",
@@ -4846,6 +4908,32 @@ const B2BSales = () => {
                           Refer All
                         </button>
                       )}
+                      {canEditLeadsB2B && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-secondary"
+                          disabled={loadingLeads || leads.length === 0}
+                          style={{
+                            padding: '8px 16px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            borderRadius: '999px',
+                            opacity: loadingLeads || leads.length === 0 ? 0.55 : 1
+                          }}
+                          onClick={() => {
+                            setShowBulkInputs(true);
+                            setBulkMode('bulkaction');
+                            setInput1Value('');
+                            openEditPanel(null, 'bulkstatuschange');
+                          }}
+                        >
+                          <i className="fas fa-tasks" style={{ fontSize: '11px' }}></i>
+                          Bulk Action
+                        </button>
+                      )}
                       </div>
 
                       <div className="d-flex align-items-center gap-2 ms-md-auto">
@@ -4952,7 +5040,7 @@ const B2BSales = () => {
 
                   {/* Mobile: filters on top row */}
                   <div className="col-12 d-md-none">
-                    {!(showBulkInputs && bulkMode === 'bulkrefer') && renderCycleFilterDropdowns(true)}
+                    {!(showBulkInputs && (bulkMode === 'bulkrefer' || bulkMode === 'bulkaction')) && renderCycleFilterDropdowns(true)}
                   </div>
 
                   {/* Mobile Layout */}
@@ -5009,6 +5097,31 @@ const B2BSales = () => {
                         >
                           <i className="fas fa-share-alt" style={{ fontSize: "14px" }}></i>
                           Refer Leads
+                        </button>
+                      )}
+                      {canEditLeadsB2B && (
+                        <button
+                          className="btn btn-sm btn-outline-secondary"
+                          disabled={loadingLeads || leads.length === 0}
+                          style={{
+                            padding: '8px 14px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            borderRadius: '999px',
+                            opacity: loadingLeads || leads.length === 0 ? 0.55 : 1
+                          }}
+                          onClick={() => {
+                            setShowBulkInputs(true);
+                            setBulkMode('bulkaction');
+                            setInput1Value('');
+                            openEditPanel(null, 'bulkstatuschange');
+                          }}
+                        >
+                          <i className="fas fa-tasks" style={{ fontSize: '12px' }}></i>
+                          Bulk Action
                         </button>
                       )}
                     </div>
@@ -5105,8 +5218,8 @@ const B2BSales = () => {
                     </div>
 
                     <div className="row g-2">
-                      {/* Mobile Bulk Input Fields for Bulk Refer */}
-                      {showBulkInputs && bulkMode === 'bulkrefer' && (
+                      {/* Mobile Bulk Input Fields */}
+                      {showBulkInputs && (bulkMode === 'bulkrefer' || bulkMode === 'bulkaction') && (
                         <div className="col-12 mt-2">
                           <div style={{
                             display: "flex",
@@ -5535,8 +5648,8 @@ const B2BSales = () => {
                 </div>
               </div>
 
-              {/* Bulk refer bar (shows above lead cards) */}
-              {showBulkInputs && bulkMode === 'bulkrefer' && (
+              {/* Bulk select bar (shows above lead cards) */}
+              {showBulkInputs && (bulkMode === 'bulkrefer' || bulkMode === 'bulkaction') && (
                 <div className="card border-0 shadow-sm mb-2" style={{ borderRadius: '12px' }}>
                   <div className="card-body py-2">
                     <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
@@ -5632,12 +5745,16 @@ const B2BSales = () => {
                               alert('Please type a number in Input 1 to select leads first.');
                               return;
                             }
-                            openRefferPanel(null, 'RefferAllLeads');
+                            if (bulkMode === 'bulkaction') {
+                              openEditPanel(null, 'bulkstatuschange');
+                            } else {
+                              openRefferPanel(null, 'RefferAllLeads');
+                            }
                           }}
                           style={{ height: '36px', whiteSpace: 'nowrap' }}
                         >
-                          <i className="fas fa-share me-1"></i>
-                          Refer
+                          <i className={`fas ${bulkMode === 'bulkaction' ? 'fa-tasks' : 'fa-share'} me-1`}></i>
+                          {bulkMode === 'bulkaction' ? 'Change Status' : 'Refer'}
                         </button>
                       </div>
                     </div>
@@ -5738,7 +5855,7 @@ const B2BSales = () => {
                     const leadIndex = groupIndex;
                     return (
                     <div key={group.rootId || lead._id || groupIndex} className="col-12">
-                      <div className={`lead-card ${(bulkMode === 'bulkrefer' && (selectedProfiles || []).includes(lead._id)) ? 'bulk-selected' : ''}`}>
+                      <div className={`lead-card ${((bulkMode === 'bulkrefer' || bulkMode === 'bulkaction') && (selectedProfiles || []).includes(lead._id)) ? 'bulk-selected' : ''}`}>
                         {group.leads.length > 0 && (
                           <div className="lead-project-tabs" role="tablist" aria-label="B2B projects for this business">
                             {group.leads.map((projLead) => {

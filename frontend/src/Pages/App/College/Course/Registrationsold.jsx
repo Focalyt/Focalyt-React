@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import DatePicker from 'react-date-picker';
+import Calendar from 'react-calendar';
 import { io } from 'socket.io-client';
 
 import 'react-date-picker/dist/DatePicker.css';
@@ -803,6 +804,18 @@ const CRMDashboard = () => {
     course: '',
     batch: '',
   });
+  const [headerDatePreset, setHeaderDatePreset] = useState('today');
+  const [headerDateFrom, setHeaderDateFrom] = useState(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+  const [headerDateTo, setHeaderDateTo] = useState(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+  const [showHeaderDateRangePicker, setShowHeaderDateRangePicker] = useState(false);
   const [leadViewTab, setLeadViewTab] = useState('all');
   const [myReferLeadsCount, setMyReferLeadsCount] = useState(0);
   const [approvalCounts, setApprovalCounts] = useState({ total: 0, approved: 0, pending: 0, rejected: 0 });
@@ -12692,6 +12705,149 @@ useEffect(() => {
     fetchRegistrationCrmFilterCounts(filterData, 1, null);
   };
 
+  useEffect(() => {
+    if (!showHeaderDateRangePicker) return undefined;
+    const handleClickOutside = (e) => {
+      if (e.target.closest('.adm-header-date-range')) return;
+      if (e.target.closest('.react-calendar')) return;
+      if (e.target.closest('.react-date-picker__calendar')) return;
+      setShowHeaderDateRangePicker(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showHeaderDateRangePicker]);
+
+  const handleHeaderDatePreset = (preset) => {
+    if (preset === 'custom') {
+      setHeaderDatePreset('custom');
+      setShowHeaderDateRangePicker((prev) => !prev);
+      return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let from = new Date(today);
+    let to = new Date(today);
+
+    if (preset === 'yesterday') {
+      from.setDate(from.getDate() - 1);
+      to.setDate(to.getDate() - 1);
+    } else if (preset === 'prev3days') {
+      from.setDate(from.getDate() - 2);
+    } else if (preset === 'thisMonth') {
+      from = new Date(today.getFullYear(), today.getMonth(), 1);
+    }
+
+    setHeaderDatePreset(preset);
+    setHeaderDateFrom(from);
+    setHeaderDateTo(to);
+    setShowHeaderDateRangePicker(false);
+  };
+
+  const renderHeaderDateRangeFilter = (compact = false) => (
+    <div
+      className={`adm-header-date-range${compact ? ' adm-header-date-range--compact' : ''}`}
+    >
+      <div className="adm-header-date-range__pills">
+        {[
+          { id: 'today', label: 'Today' },
+          { id: 'yesterday', label: 'Yesterday' },
+          { id: 'prev3days', label: compact ? '3 Days' : 'Previous 3 days' },
+          { id: 'thisMonth', label: 'This Month' },
+        ].map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={`adm-header-date-range__pill${headerDatePreset === item.id ? ' adm-header-date-range__pill--active' : ''}`}
+            onClick={() => handleHeaderDatePreset(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
+        <div className="adm-header-date-range__custom-wrap">
+          <button
+            type="button"
+            className={`adm-header-date-range__pill adm-header-date-range__pill--range${headerDatePreset === 'custom' ? ' adm-header-date-range__pill--active' : ''}`}
+            onClick={() => handleHeaderDatePreset('custom')}
+          >
+            <i className="fas fa-calendar-alt me-1" aria-hidden="true" />
+            Date Range
+            <i
+              className={`fas fa-chevron-${showHeaderDateRangePicker ? 'up' : 'down'} ms-1`}
+              style={{ fontSize: '9px' }}
+              aria-hidden="true"
+            />
+          </button>
+          {showHeaderDateRangePicker && (
+            <div className="adm-header-date-range__dropdown">
+              <div className="adm-header-date-range__dropdown-title">Date Range</div>
+              <div className="adm-header-date-range__inputs row g-2">
+                <div className="col-6">
+                  <label className="form-label small mb-1">From</label>
+                  <div className="adm-header-date-range__date-display">
+                    {headerDateFrom ? moment(headerDateFrom).format('DD/MM/YYYY') : '—'}
+                  </div>
+                </div>
+                <div className="col-6">
+                  <label className="form-label small mb-1">To</label>
+                  <div className="adm-header-date-range__date-display">
+                    {headerDateTo ? moment(headerDateTo).format('DD/MM/YYYY') : '—'}
+                  </div>
+                </div>
+              </div>
+              <div className="adm-header-date-range__calendars-row">
+                <div className="adm-header-date-range__calendar-col">
+                  <Calendar
+                    onChange={(date) => {
+                      setHeaderDateFrom(date);
+                      setHeaderDatePreset('custom');
+                      if (date && headerDateTo && date > headerDateTo) {
+                        setHeaderDateTo(date);
+                      }
+                    }}
+                    value={headerDateFrom}
+                    maxDate={headerDateTo || new Date()}
+                    className="adm-header-date-range__calendar"
+                  />
+                </div>
+                <div className="adm-header-date-range__calendar-col">
+                  <Calendar
+                    onChange={(date) => {
+                      setHeaderDateTo(date);
+                      setHeaderDatePreset('custom');
+                      if (date && headerDateFrom && date < headerDateFrom) {
+                        setHeaderDateFrom(date);
+                      }
+                    }}
+                    value={headerDateTo}
+                    minDate={headerDateFrom}
+                    maxDate={new Date()}
+                    className="adm-header-date-range__calendar"
+                  />
+                </div>
+              </div>
+              {(headerDateFrom || headerDateTo) && (
+                <div className="adm-header-date-range__selected small mt-2">
+                  <i className="fas fa-info-circle me-1" aria-hidden="true" />
+                  {headerDateFrom && moment(headerDateFrom).format('DD MMM YYYY')}
+                  {headerDateFrom && headerDateTo && ' — '}
+                  {headerDateTo && moment(headerDateTo).format('DD MMM YYYY')}
+                </div>
+              )}
+              <button
+                type="button"
+                className="btn btn-sm w-100 mt-2 adm-header-date-range__apply-btn"
+                onClick={() => setShowHeaderDateRangePicker(false)}
+              >
+                Apply
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   const renderCycleFilterDropdowns = (mobile = false) => (
     <div className={`b2b-cycle-filters${mobile ? ' b2b-cycle-filters--mobile' : ''}`}>
       <div className="b2b-cycle-filters__item">
@@ -13982,6 +14138,169 @@ useEffect(() => {
           }
           .adm-cycle-header-nav{
             border-bottom: 1px solid #eee;
+            overflow: visible;
+          }
+          .adm-header-date-range{
+            position: relative;
+            margin-top: 4px;
+            overflow: visible;
+          }
+          .adm-header-date-range__pills{
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 4px;
+            overflow: visible;
+          }
+          .adm-header-date-range--compact .adm-header-date-range__pills{
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: none;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 2px;
+          }
+          .adm-header-date-range--compact .adm-header-date-range__pills::-webkit-scrollbar{
+            display: none;
+          }
+          .adm-header-date-range__pill{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1.5px solid #e5e7eb;
+            background: #fff;
+            color: #4b5563;
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 1.2;
+            padding: 5px 10px;
+            border-radius: 999px;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s ease;
+          }
+          .adm-header-date-range__pill:hover{
+            border-color: rgba(250, 85, 121, 0.45);
+            color: rgb(250, 85, 121);
+            background: rgba(250, 85, 121, 0.06);
+          }
+          .adm-header-date-range__pill--active{
+            background: linear-gradient(135deg, #fc567b 13%, #fc567b 50%);
+            border-color: rgb(250, 85, 121);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(250, 85, 121, 0.22);
+          }
+          .adm-header-date-range__pill--active:hover{
+            background: linear-gradient(135deg, #fc567b 13%, #fc567b 50%);
+            color: #fff;
+          }
+          .adm-header-date-range__custom-wrap{
+            position: relative;
+          }
+          .adm-header-date-range__dropdown{
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            z-index: 1060;
+            min-width: 560px;
+            max-width: 580px;
+            padding: 12px;
+            background: #fff;
+            border: 1px solid #e8eaed;
+            border-radius: 12px;
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+            overflow: visible;
+          }
+          .adm-header-date-range--compact .adm-header-date-range__dropdown{
+            right: 0;
+            left: auto;
+            min-width: 300px;
+            max-width: 320px;
+          }
+          .adm-header-date-range__dropdown-title{
+            font-size: 12px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 8px;
+          }
+          .adm-header-date-range__date-display{
+            display: flex;
+            align-items: center;
+            min-height: 34px;
+            padding: 6px 10px;
+            border: 1.5px solid #e8eaed;
+            border-radius: 8px;
+            background: #f9fafb;
+            font-size: 12px;
+            font-weight: 600;
+            color: #1f2937;
+          }
+          .adm-header-date-range__calendars-row{
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            align-items: flex-start;
+          }
+          .adm-header-date-range__calendar-col{
+            flex: 1;
+            min-width: 0;
+          }
+          .adm-header-date-range__calendar.react-calendar{
+            width: 100% !important;
+            max-width: 260px;
+            height: min-content !important;
+            border: 1px solid #e8eaed;
+            border-radius: 10px;
+            box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+            padding: 6px;
+            line-height: 1.2;
+            font-size: 11px;
+          }
+          .adm-header-date-range__calendar .react-calendar__navigation{
+            margin-bottom: 6px;
+          }
+          .adm-header-date-range__calendar .react-calendar__navigation button{
+            min-width: 28px;
+            font-size: 13px;
+          }
+          .adm-header-date-range__calendar .react-calendar__month-view__weekdays{
+            font-size: 10px;
+            font-weight: 700;
+          }
+          .adm-header-date-range__calendar .react-calendar__tile{
+            padding: 6px 4px;
+            font-size: 11px;
+          }
+          .adm-header-date-range__calendar .react-calendar__tile--active,
+          .adm-header-date-range__calendar .react-calendar__tile--hasActive{
+            background: rgb(250, 85, 121) !important;
+            color: #fff;
+          }
+          .adm-header-date-range__calendar .react-calendar__tile--now{
+            background: rgba(250, 85, 121, 0.12);
+          }
+          .adm-header-date-range--compact .adm-header-date-range__calendars-row{
+            flex-direction: column;
+            gap: 8px;
+          }
+          .adm-header-date-range--compact .adm-header-date-range__calendar.react-calendar{
+            max-width: 100%;
+          }
+          .adm-header-date-range__selected{
+            color: rgb(250, 85, 121);
+            background: rgba(250, 85, 121, 0.08);
+            border-radius: 8px;
+            padding: 6px 8px;
+          }
+          .adm-header-date-range__apply-btn{
+            background: linear-gradient(135deg, #fc567b 13%, #fc567b 50%);
+            border: none;
+            color: #fff;
+            font-weight: 600;
+          }
+          .adm-header-date-range__apply-btn:hover{
+            background: linear-gradient(135deg, #e84d6f 13%, #e84d6f 50%);
+            color: #fff;
           }
           .adm-cycle-main-tabs-wrap{
             margin-top: 2px;
@@ -14314,27 +14633,15 @@ useEffect(() => {
               <div className="container-fluid">
                 <div className="row align-items-center gy-2">
                   <div className="col-md-4 col-xl-3 d-none d-md-block">
-                    <h5 className="fw-bold text-dark mb-1" style={{ fontSize: '1.1rem' }}>Admission Cycle</h5>
-                    <nav aria-label="breadcrumb">
-                      <ol className="breadcrumb mb-0 small">
-                        <li className="breadcrumb-item">
-                          <a href="/institute/dashboard" className="text-decoration-none">Home</a>
-                        </li>
-                        <li className="breadcrumb-item active">Admission Cycle</li>
-                      </ol>
-                    </nav>
+                    <h5 className="fw-bold text-dark mb-1" style={{ fontSize: '1.1rem' }}>Sales B2C</h5>
+                    {/* {renderHeaderDateRangeFilter()} */}
                   </div>
 
                   <div className="col-12 d-md-none mb-1 adm-cycle-mobile-title">
-                    <h5 className="fw-bold text-dark mb-1" style={{ fontSize: '1.1rem' }}>Admission Cycle</h5>
-                    <nav aria-label="breadcrumb">
-                      <ol className="breadcrumb mb-0 small">
-                        <li className="breadcrumb-item">
-                          <a href="/institute/dashboard" className="text-decoration-none">Home</a>
-                        </li>
-                        <li className="breadcrumb-item active">Admission Cycle</li>
-                      </ol>
-                    </nav>
+                    <h5 className="fw-bold text-dark mb-1" style={{ fontSize: '1.1rem' }}>Sales B2C</h5>
+                  </div>
+                  <div className="col-12 d-md-none mb-1">
+                    {/* {renderHeaderDateRangeFilter(true)} */}
                   </div>
 
                   <div className="col-md-8 col-xl-9 d-none d-md-flex justify-content-end align-items-center">
