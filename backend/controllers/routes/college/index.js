@@ -646,7 +646,7 @@ router.route("/register")
 					}
 
 					const newSubstatus = {
-						title: "New Lead",
+						title: "Untouch Lead",
 						description: "This is the default status for all new leads",
 						hasRemarks: false,
 						hasFollowup: false,

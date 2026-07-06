@@ -19,8 +19,8 @@ const defaultStatusData = {
   substatuses: [
     {
       _id: defaultSubstatusId,
-      title: 'New Lead',
-      description: 'Default substatus for New Lead',
+      title: 'Untouch Leads',
+      description: 'Default substatus for Untouch Leads',
       hasRemarks: false,
       hasFollowup: false,
       hasAttachment: false,
@@ -51,5 +51,3 @@ async function seed() {
 seed();  // seed function ko yahin call kar rahe hain
 
 // Agar aap is file ko kisi aur module se import karna chahte ho toh export bhi kar sakte ho
-
-
