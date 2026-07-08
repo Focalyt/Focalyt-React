@@ -199,33 +199,114 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 		};
 	};
 
+	const parseLocalDateInput = (value) => {
+		if (!value || value === 'null') return null;
+		const str = String(value).trim();
+		if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+			const [year, month, day] = str.split('-').map(Number);
+			return new Date(year, month - 1, day);
+		}
+		const parsed = new Date(value);
+		return Number.isNaN(parsed.getTime()) ? null : parsed;
+	};
+
+	const getDateRangeBounds = (fromDate, toDate) => {
+		const bounds = {};
+		const parsedFrom = parseLocalDateInput(fromDate);
+		const parsedTo = parseLocalDateInput(toDate);
+
+		if (parsedFrom) {
+			const from = new Date(parsedFrom);
+			from.setHours(0, 0, 0, 0);
+			bounds.$gte = from;
+		}
+		if (parsedTo) {
+			const to = new Date(parsedTo);
+			to.setHours(23, 59, 59, 999);
+			bounds.$lte = to;
+		} else if (parsedFrom) {
+			const to = new Date(parsedFrom);
+			to.setHours(23, 59, 59, 999);
+			bounds.$lte = to;
+		}
+		return bounds;
+	};
+
 	const buildLeadDateRangeCondition = (field, fromDate, toDate) => {
 		if (!fromDate && !toDate) return null;
-		return {
-			[field]: {
-				...(fromDate ? { $gte: new Date(fromDate) } : {}),
-				...(toDate ? { $lte: new Date(toDate) } : {})
-			}
-		};
+		return { [field]: getDateRangeBounds(fromDate, toDate) };
 	};
 
 	const resolveNextActionDateLeadFilter = async (fromDate, toDate) => {
 		if (!fromDate && !toDate) return null;
 
-		const scheduledDate = {};
-		if (fromDate) scheduledDate.$gte = new Date(fromDate);
-		if (toDate) scheduledDate.$lte = new Date(toDate);
+		const bounds = getDateRangeBounds(fromDate, toDate);
+		if (!bounds.$gte && !bounds.$lte) return null;
 
-		const followups = await FollowUp.find({ scheduledDate }).select('_id').lean();
-		const fuIds = followups.map((row) => row._id).filter(Boolean);
-		if (!fuIds.length) return { _id: { $in: [] } };
+		const scheduledDateExpr = (schedField) => {
+			const parts = [
+				{ $ne: [schedField, null] },
+				{ $ne: [{ $type: schedField }, 'missing'] },
+			];
+			if (bounds.$gte) parts.push({ $gte: [schedField, bounds.$gte] });
+			if (bounds.$lte) parts.push({ $lte: [schedField, bounds.$lte] });
+			return { $and: parts };
+		};
+
+		const slotPipelineFor = (slotField) => [
+			{ $match: { [slotField]: { $exists: true, $ne: null } } },
+			{
+				$lookup: {
+					from: 'followups',
+					localField: slotField,
+					foreignField: '_id',
+					as: 'fuArr'
+				}
+			},
+			{ $unwind: '$fuArr' },
+			{ $match: { $expr: scheduledDateExpr('$fuArr.scheduledDate') } },
+			{ $project: { _id: 1 } }
+		];
+
+		const legacyPipeline = [
+			{ $match: { followUp: { $exists: true, $ne: null } } },
+			{
+				$lookup: {
+					from: 'followups',
+					localField: 'followUp',
+					foreignField: '_id',
+					as: 'fuArr'
+				}
+			},
+			{ $unwind: '$fuArr' },
+			{ $match: { $expr: scheduledDateExpr('$fuArr.scheduledDate') } },
+			{ $project: { _id: 1 } }
+		];
+
+		const [callLeads, visitLeads, legacyLeads] = await Promise.all([
+			Lead.aggregate(slotPipelineFor('followUpCall')),
+			Lead.aggregate(slotPipelineFor('followUpVisit')),
+			Lead.aggregate(legacyPipeline),
+		]);
+
+		const ids = [
+			...new Set(
+				[...(callLeads || []), ...(visitLeads || []), ...(legacyLeads || [])]
+					.map((row) => String(row._id))
+					.filter(Boolean)
+			)
+		];
+
+		if (!ids.length) {
+			return { _id: { $in: [] } };
+		}
 
 		return {
-			$or: [
-				{ followUpCall: { $in: fuIds } },
-				{ followUpVisit: { $in: fuIds } },
-				{ followUp: { $in: fuIds } }
-			]
+			_id: {
+				$in: ids
+					.filter((id) => mongoose.Types.ObjectId.isValid(id))
+					.map((id) => new mongoose.Types.ObjectId(id))
+			}
 		};
 	};
 

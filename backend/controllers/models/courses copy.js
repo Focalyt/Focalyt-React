@@ -123,6 +123,11 @@ const courseSchema = new Schema({
     ref: 'College',
     default: null
   },
+  courseStructure: {
+    unit: { type: Boolean, default: false },
+    chapter: { type: Boolean, default: false },
+    session: { type: Boolean, default: false },
+  },
 }, { timestamps: true });
 
 module.exports = model('courses', courseSchema);

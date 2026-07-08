@@ -2074,6 +2074,7 @@ const B2BSales = () => {
     setSelectedStatusFilter(statusId);
     setSelectedApprovalStatus(null);
     const next = getDashSubFiltersCleared();
+    syncFiltersRef(next);
     setFilters(next);
     setCurrentPage(1);
     fetchLeads(statusId, 1, getLeadFetchOverrides({ ...next, approvalStatus: null }));
@@ -2133,6 +2134,7 @@ const B2BSales = () => {
       status: [],
       subStatus: []
     };
+    syncFiltersRef(cleared);
     setFilters(cleared);
     setCurrentPage(1);
     fetchLeads(null, 1, { ...cleared, approvalStatus: null });
@@ -2144,6 +2146,7 @@ const B2BSales = () => {
     setSelectedStatusFilter(null);
     setSelectedApprovalStatus(null);
     const next = getDashSubFiltersCleared();
+    syncFiltersRef(next);
     setFilters(next);
     setCurrentPage(1);
     fetchLeads(null, 1, getLeadFetchOverrides({ ...next, approvalStatus: null }));
@@ -2156,9 +2159,14 @@ const B2BSales = () => {
     clearFollowupDashFilters();
   };
 
+  const syncFiltersRef = (next) => {
+    filtersRef.current = next;
+    return next;
+  };
+
   // Filter handlers
   const handleFilterChange = (key, value) => {
-    setFilters(prev => ({
+    setFilters((prev) => syncFiltersRef({
       ...prev,
       [key]: value
     }));
@@ -2222,6 +2230,7 @@ const B2BSales = () => {
       setSelectedStatusFilter(null);
       setSelectedApprovalStatus(null);
     }
+    syncFiltersRef(next);
     setFilters(next);
     setCurrentPage(1);
     const overrides = getLeadFetchOverrides({ ...next, approvalStatus: null });
@@ -2247,7 +2256,7 @@ const B2BSales = () => {
     } else if (key === 'leadOwner') {
       next.leadOwner = value ? [value] : [];
     }
-    setFilters(next);
+    setFilters(syncFiltersRef(next));
     setCurrentPage(1);
     fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides(next));
     if (leadViewTab === 'all') {
@@ -2326,7 +2335,7 @@ const B2BSales = () => {
   );
 
   const handleDateRangeChange = (rangeKey, type, value) => {
-    setFilters(prev => ({
+    setFilters((prev) => syncFiltersRef({
       ...prev,
       [rangeKey]: {
         ...(prev[rangeKey] || {}),
@@ -2336,16 +2345,17 @@ const B2BSales = () => {
   };
 
   const applyFilters = (filterOverrides = {}) => {
+    const merged = syncFiltersRef({ ...filtersRef.current, ...filterOverrides });
     setCurrentPage(1);
-    fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides(filterOverrides));
+    fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides(merged));
     if (leadViewTab === 'all') {
-      fetchStatusCounts(filterOverrides);
-      fetchApprovalCounts(filterOverrides);
+      fetchStatusCounts(merged);
+      fetchApprovalCounts(merged);
     }
   };
 
   const clearFilters = () => {
-    setFilters({
+    const cleared = {
       search: '',
       leadCategory: [],
       b2bProject: '',
@@ -2371,12 +2381,14 @@ const B2BSales = () => {
       },
       status: [],
       subStatus: []
-    });
+    };
+    syncFiltersRef(cleared);
+    setFilters(cleared);
     setCurrentPage(1);
-    fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides());
+    fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides(cleared));
     if (leadViewTab === 'all') {
-      fetchStatusCounts();
-      fetchApprovalCounts();
+      fetchStatusCounts(cleared);
+      fetchApprovalCounts(cleared);
     }
   };
 
@@ -2526,6 +2538,7 @@ const B2BSales = () => {
     setSelectedApprovalStatus(nextStatus);
     setSelectedStatusFilter(null);
     const next = getDashSubFiltersCleared();
+    syncFiltersRef(next);
     setFilters(next);
     setCurrentPage(1);
     fetchLeads(null, 1, getLeadFetchOverrides({ ...next, approvalStatus: nextStatus }));

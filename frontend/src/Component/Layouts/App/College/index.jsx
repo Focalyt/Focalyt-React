@@ -876,12 +876,12 @@ function CollegeLayout({ children }) {
                         <span className="menu-title">{t('dashboard')}</span>
                       </Link>
                     </li> */}
-                    <li className={`nav-item ${location.pathname === '/institute/registration' ? 'active' : ''}`}>
+                    {/* <li className={`nav-item ${location.pathname === '/institute/registration' ? 'active' : ''}`}>
                       <Link to="/institute/registration" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faUserFriends} />
                         <span className="menu-title">{t('admission_cycle_pre')}</span>
                       </Link>
-                    </li>
+                    </li> */}
                     <li className={`nav-item ${location.pathname === '/institute/registrationsold' ? 'active' : ''}`}>
                       <Link to="/institute/registrationsold" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faUserFriends} />
@@ -905,7 +905,7 @@ function CollegeLayout({ children }) {
                         )}
                       </Link>
                     </li>
-                    <li className={`nav-item ${location.pathname === '/institute/calenderb2c' ? 'active' : ''}`}>
+                    {/* <li className={`nav-item ${location.pathname === '/institute/calenderb2c' ? 'active' : ''}`}>
                       <Link
                         to="/institute/calenderb2c"
                         onClick={() => handleSidebarClose()}
@@ -934,7 +934,7 @@ function CollegeLayout({ children }) {
                           </span>
                         )}
                       </Link>
-                    </li>
+                    </li> */}
                     <li className={`nav-item ${location.pathname === '/institute/myfollowup' ? 'active' : ''}`}>
                       <Link to="/institute/myfollowup" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faBell} />

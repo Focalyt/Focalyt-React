@@ -622,6 +622,39 @@ router.put('/update_course_status/:courseId', async (req, res) => {
 	}
 });
 
+router.post('/:courseId/duplicate', async (req, res) => {
+	try {
+		const { courseId } = req.params;
+		const course = await Courses.findById(courseId).lean();
+
+		if (!course) {
+			return res.status(404).json({ success: false, message: 'Course not found' });
+		}
+
+		const duplicateData = { ...course };
+		delete duplicateData._id;
+		delete duplicateData.createdAt;
+		delete duplicateData.updatedAt;
+
+		if (typeof duplicateData.name === 'string') {
+			const copySuffix = ' Copy';
+			if (!duplicateData.name.endsWith(copySuffix)) {
+				duplicateData.name = `${duplicateData.name}${copySuffix}`;
+			} else {
+				duplicateData.name = `${duplicateData.name} ${Date.now()}`;
+			}
+		}
+
+		// Preserve arrays and string fields as-is
+		const newCourse = await Courses.create(duplicateData);
+
+		return res.status(201).json({ success: true, message: 'Course duplicated successfully', data: newCourse });
+	} catch (error) {
+		console.error('Error duplicating course:', error);
+		return res.status(500).json({ success: false, message: 'Failed to duplicate course' });
+	}
+});
+
 // add leads 
 router.route('/:courseId/candidate/addleads')
 	.get(async (req, res) => {

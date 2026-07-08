@@ -88,6 +88,7 @@ import AppliedEvents from './Pages/App/Candidate/Events/AppliedEvents';
 import CandidateManagementPortal from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal';
 import CandidateManagementPortal_old from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal_copy';
 import AddCourse from './Pages/App/College/Course/AddCourse';
+import AddCoursecopy from './Pages/App/College/Course/AddCoursecopy';
 import ViewCourses from './Pages/App/College/Course/ViewCourse';
 import EditCourse from './Pages/App/College/Course/EditCourse';
 import Registrations from './Pages/App/College/Course/Registrations';
@@ -109,8 +110,7 @@ import Target from './Pages/App/College/Target/Target';
 import Lrp from './Pages/App/College/LRP/Lrp';
 import LrpView from './Pages/App/College/LRP/LrpView';
 import VideoTimestamp from './Pages/App/College/VideoTimestamp/VideoTimestamp';
-
-
+import AcademicCoordinator from './Pages/App/College/Training/AcademicCoordinatorModule';
 import CompanyLayout from './Component/Layouts/App/Company';
 import CompanyLogin from './Pages/App/Company/CompanyLogin/CompanyLogin';
 import CompanyRegister from './Pages/App/Company/CompanyRegister/CompanyRegister';
@@ -152,6 +152,9 @@ import EmailTemplate from './Pages/App/College/Email/EmailTemplate';
 import TrainerModule from './Pages/App/College/Course/TrainerModule';
 import AcademicCoordinatorModule from './Pages/App/College/Training/AcademicCoordinatorModule';
 import SeniorTrainerModule from './Pages/App/College/Training/SeniorTrainerModule';
+import Editcoursecopy from './Pages/App/College/Course/EditCoursecopy';
+import Viewcoursecopy from './Pages/App/College/Course/ViewCoursecopy';
+
 // Trainer module
 import TrainerLayout from './Component/Layouts/App/Trainer'
 import TrainerLogin from './Pages/App/Trainer/TrainerLogin/TrainerLogin'
@@ -295,7 +298,10 @@ const Layout = () => {
           <Route path="availablejobs" element={<AvailableJobs/>}/>
           <Route path="candidatemanagment" element={<CandidateManagementPortal/>}/>
           <Route path='addcourse' element={<AddCourse/>}/>
-          <Route path='viewcourse' element={<ViewCourses/>}/>
+          <Route path='addcoursecopy' element={<AddCoursecopy/>}/>
+          <Route path='editcoursecopy' element={<Editcoursecopy/>}/>
+          <Route path='viewcoursecopy' element={<Viewcoursecopy/>}/>
+         <Route path='viewcourse' element={<ViewCourses/>}/>
           <Route path='registration' element={<Registrations/>}/>
           <Route path='admissionpost' element={<AdmissionPost/>}/>
           {/* <Route path='editcourse' element={<EditCourse/>}/> */}
@@ -342,6 +348,8 @@ const Layout = () => {
           <Route path='training/academic-coordinator' element={<AcademicCoordinatorModule/>}/>
           <Route path='training/senior-trainer' element={<SeniorTrainerModule/>}/>
           <Route path='registrationsold' element={<Regitrationsold/>}/>
+          <Route path='academicCoordinator' element={<AcademicCoordinator/>}/>
+          <Route path='seniorTrainer' element={<SeniorTrainerModule/>}/>
         </Route>
 
         {/* company  */}

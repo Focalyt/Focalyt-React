@@ -161,6 +161,28 @@ const SESSION_TYPE = {
   TOT: 'tot',
 };
 
+const DEFAULT_COURSE_STRUCTURE = { unit: true, chapter: true, session: true };
+
+const normalizeCourseStructure = (structure) => ({
+  unit: structure?.unit ?? DEFAULT_COURSE_STRUCTURE.unit,
+  chapter: structure?.chapter ?? DEFAULT_COURSE_STRUCTURE.chapter,
+  session: true,
+});
+
+const getCourseStructureFromMeta = (courses = [], courseId) => {
+  if (!courseId) return { ...DEFAULT_COURSE_STRUCTURE };
+  const course = courses.find((item) => String(item._id) === String(courseId));
+  return normalizeCourseStructure(course?.courseStructure);
+};
+
+const buildStructurePathLabel = (structure = DEFAULT_COURSE_STRUCTURE) => {
+  const parts = [];
+  if (structure.unit) parts.push('Unit');
+  if (structure.chapter) parts.push('Chapter');
+  parts.push('Session');
+  return parts.join(' → ');
+};
+
 const hasLinkedTot = (session = {}) => (
   session.includeTot === true || session.sessionType === SESSION_TYPE.TOT
 );
@@ -1464,6 +1486,7 @@ const SessionPlanModal = ({
   draft,
   isEdit,
   batchSummary,
+  courseStructure = DEFAULT_COURSE_STRUCTURE,
   onClose,
   onSave,
   onFieldChange,
@@ -1484,6 +1507,10 @@ const SessionPlanModal = ({
   onClearActivityTypes,
 }) => {
   if (!draft) return null;
+
+  const showUnit = courseStructure.unit === true;
+  const showChapter = courseStructure.chapter === true;
+  const structurePathLabel = buildStructurePathLabel(courseStructure);
 
   return (
     <div className="ac-modal-backdrop">
@@ -1516,6 +1543,10 @@ const SessionPlanModal = ({
                 <strong>{draft.batchCode}</strong>
               </div>
             )}
+            <div>
+              <span>Planning path</span>
+              <strong>{structurePathLabel}</strong>
+            </div>
           </div>
 
           <ActivityTypeSelector
@@ -1528,69 +1559,77 @@ const SessionPlanModal = ({
             onClearAll={onClearActivityTypes}
           />
 
-          <div className="ac-section-label">
-            <i className="fas fa-layer-group" /> Unit <small>(optional)</small>
-          </div>
+          {showUnit && (
+            <>
+              <div className="ac-section-label">
+                <i className="fas fa-layer-group" /> Unit
+              </div>
 
-          <div className="ac-form-grid">
-            <label className="ac-field">
-              <span>Unit number</span>
-              <input
-                className="ac-input"
-                type="text"
-                inputMode="numeric"
-                placeholder="e.g. 1"
-                value={draft.unitNumber || ''}
-                onChange={(e) => onFieldChange('unitNumber', e.target.value)}
-              />
-            </label>
-            <label className="ac-field ac-field--span-2">
-              <span>Unit name</span>
-              <input
-                className="ac-input"
-                placeholder="e.g. Foundation Skills"
-                value={draft.unitName || ''}
-                onChange={(e) => onFieldChange('unitName', e.target.value)}
-              />
-            </label>
-          </div>
+              <div className="ac-form-grid">
+                <label className="ac-field">
+                  <span>Unit number</span>
+                  <input
+                    className="ac-input"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="e.g. 1"
+                    value={draft.unitNumber || ''}
+                    onChange={(e) => onFieldChange('unitNumber', e.target.value)}
+                  />
+                </label>
+                <label className="ac-field ac-field--span-2">
+                  <span>Unit name</span>
+                  <input
+                    className="ac-input"
+                    placeholder="e.g. Foundation Skills"
+                    value={draft.unitName || ''}
+                    onChange={(e) => onFieldChange('unitName', e.target.value)}
+                  />
+                </label>
+              </div>
+            </>
+          )}
 
-          <div className="ac-section-label">
-            <i className="fas fa-book" /> Chapter details <small>(optional)</small>
-          </div>
+          {showChapter && (
+            <>
+              <div className="ac-section-label">
+                <i className="fas fa-book" /> Chapter details
+              </div>
 
-          <div className="ac-form-grid">
-            <label className="ac-field">
-              <span>Chapter number</span>
-              <input
-                className="ac-input"
-                type="text"
-                inputMode="numeric"
-                placeholder="e.g. 1"
-                value={draft.chapterNumber || ''}
-                onChange={(e) => onFieldChange('chapterNumber', e.target.value)}
-              />
-            </label>
-            <label className="ac-field ac-field--span-2">
-              <span>Chapter name</span>
-              <input
-                className="ac-input"
-                placeholder="e.g. Introduction to Retail Sales"
-                value={draft.chapterName || ''}
-                onChange={(e) => onFieldChange('chapterName', e.target.value)}
-              />
-            </label>
-            <label className="ac-field ac-field--full">
-              <span>Sub topics</span>
-              <textarea
-                className="ac-input ac-input--textarea"
-                rows="3"
-                placeholder="List sub topics — one per line or comma separated"
-                value={draft.subTopics || ''}
-                onChange={(e) => onFieldChange('subTopics', e.target.value)}
-              />
-            </label>
-          </div>
+              <div className="ac-form-grid">
+                <label className="ac-field">
+                  <span>Chapter number</span>
+                  <input
+                    className="ac-input"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="e.g. 1"
+                    value={draft.chapterNumber || ''}
+                    onChange={(e) => onFieldChange('chapterNumber', e.target.value)}
+                  />
+                </label>
+                <label className="ac-field ac-field--span-2">
+                  <span>Chapter name</span>
+                  <input
+                    className="ac-input"
+                    placeholder="e.g. Introduction to Retail Sales"
+                    value={draft.chapterName || ''}
+                    onChange={(e) => onFieldChange('chapterName', e.target.value)}
+                  />
+                </label>
+                <label className="ac-field ac-field--full">
+                  <span>Sub topics</span>
+                  <textarea
+                    className="ac-input ac-input--textarea"
+                    rows="3"
+                    placeholder="List sub topics — one per line or comma separated"
+                    value={draft.subTopics || ''}
+                    onChange={(e) => onFieldChange('subTopics', e.target.value)}
+                  />
+                </label>
+              </div>
+            </>
+          )}
 
           <div className="ac-section-label">
             <i className="fas fa-user-graduate" /> Session details
@@ -1653,7 +1692,7 @@ const SessionPlanModal = ({
                 onChange={(e) => onFieldChange('endTime', e.target.value)}
               />
             </label>
-         
+
           </div>
 
           <MaterialDefinitionSection
@@ -1665,6 +1704,17 @@ const SessionPlanModal = ({
             onAdd={onAddLearningMaterial}
             onChange={onLearningMaterialChange}
             onRemove={onRemoveLearningMaterial}
+          />
+
+<MaterialDefinitionSection
+            title="Required documents"
+            addLabel="Add document"
+            emptyText="No documents defined yet."
+            items={draft.evidenceDocs || []}
+            typeOptions={EVIDENCE_TYPE_OPTIONS}
+            onAdd={onAddEvidence}
+            onChange={onEvidenceChange}
+            onRemove={onRemoveEvidence}
           />
 
           <label className="ac-tot-check ac-tot-check--include">
@@ -1698,16 +1748,7 @@ const SessionPlanModal = ({
             />
           </label>
 
-          <MaterialDefinitionSection
-            title="Required documents"
-            addLabel="Add document"
-            emptyText="No documents defined yet."
-            items={draft.evidenceDocs || []}
-            typeOptions={EVIDENCE_TYPE_OPTIONS}
-            onAdd={onAddEvidence}
-            onChange={onEvidenceChange}
-            onRemove={onRemoveEvidence}
-          />
+          
 
           
         </div>
@@ -1773,6 +1814,11 @@ const AcademicCoordinatorModule = () => {
     batchCode: getOptionLabel(batchOptions, filters.batch),
     studentCount: 0,
   }), [filters, verticalOptions, projectOptions, centerOptions, courseOptions, batchOptions]);
+
+  const selectedCourseStructure = useMemo(
+    () => getCourseStructureFromMeta(allCoursesMeta, filters.course),
+    [allCoursesMeta, filters.course]
+  );
 
   const filterProjectOptions = useMemo(() => {
     if (!filters.department) return [];
@@ -2325,11 +2371,11 @@ const AcademicCoordinatorModule = () => {
       seniorTrainerName: existing?.seniorTrainerName || '',
       title: draft.title.trim(),
       sessionNumber: draft.sessionNumber?.toString().trim() || '',
-      unitNumber: draft.unitNumber?.toString().trim() || '',
-      unitName: draft.unitName?.trim() || '',
-      chapterNumber: draft.chapterNumber?.toString().trim() || '',
-      chapterName: draft.chapterName?.trim() || '',
-      subTopics: draft.subTopics?.trim() || '',
+      unitNumber: selectedCourseStructure.unit ? draft.unitNumber?.toString().trim() || '' : '',
+      unitName: selectedCourseStructure.unit ? draft.unitName?.trim() || '' : '',
+      chapterNumber: selectedCourseStructure.chapter ? draft.chapterNumber?.toString().trim() || '' : '',
+      chapterName: selectedCourseStructure.chapter ? draft.chapterName?.trim() || '' : '',
+      subTopics: selectedCourseStructure.chapter ? draft.subTopics?.trim() || '' : '',
       topicCovered: buildTopicSummary(draft),
       trainingMethod: draft.trainingMethod?.trim() || '',
       notes: draft.notes?.trim() || '',
@@ -2551,6 +2597,7 @@ const AcademicCoordinatorModule = () => {
           draft={modal.draft}
           isEdit={!!modal.editingId}
           batchSummary={batchSummary}
+          courseStructure={selectedCourseStructure}
           onClose={closeModal}
           onSave={saveSession}
           onFieldChange={updateDraft}

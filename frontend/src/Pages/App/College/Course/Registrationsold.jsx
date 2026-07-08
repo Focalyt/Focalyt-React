@@ -3055,6 +3055,15 @@ const CRMDashboard = () => {
 
 
 
+  const resetHeaderDateFilterState = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    setHeaderDatePreset('');
+    setHeaderDateFrom(today);
+    setHeaderDateTo(today);
+    setShowHeaderDateRangePicker(false);
+  };
+
   // 5. Clear functions
   const clearDateFilter = (filterType) => {
     let newFilterData = { ...filterData };
@@ -3062,6 +3071,7 @@ const CRMDashboard = () => {
     if (filterType === 'created') {
       newFilterData.createdFromDate = null;
       newFilterData.createdToDate = null;
+      resetHeaderDateFilterState();
     } else if (filterType === 'modified') {
       newFilterData.modifiedFromDate = null;
       newFilterData.modifiedToDate = null;
@@ -3112,6 +3122,7 @@ const CRMDashboard = () => {
       batch: '',
       counsellor: '',
     });
+    resetHeaderDateFilterState();
     setLeadViewTab('all');
     setSelectedApprovalFilter(null);
     setSelectedFollowupBucket('');
@@ -12737,7 +12748,24 @@ useEffect(() => {
     fetchProfileData(newFilterData, 1);
   };
 
+  const handleHeaderDateReset = () => {
+    const newFilterData = {
+      ...filterData,
+      createdFromDate: null,
+      createdToDate: null,
+    };
+    setFilterData(newFilterData);
+    resetHeaderDateFilterState();
+    setCurrentPage(1);
+    fetchProfileData(newFilterData, 1);
+  };
+
   const handleHeaderDatePreset = (preset) => {
+    if (preset !== 'custom' && headerDatePreset === preset) {
+      handleHeaderDateReset();
+      return;
+    }
+
     if (preset === 'custom') {
       setHeaderDatePreset('custom');
       setShowHeaderDateRangePicker((prev) => !prev);
@@ -12869,6 +12897,17 @@ useEffect(() => {
             </div>
           )}
         </div>
+        {(headerDatePreset || filterData.createdFromDate || filterData.createdToDate) && (
+          <button
+            type="button"
+            className="adm-header-date-range__pill adm-header-date-range__pill--clear"
+            onClick={handleHeaderDateReset}
+            title="Clear date filter"
+          >
+            <i className="fas fa-times me-1" aria-hidden="true" />
+            Clear
+          </button>
+        )}
       </div>
     </div>
   );
@@ -14190,7 +14229,7 @@ useEffect(() => {
             display: flex;
             flex-wrap: wrap;
             align-items: center;
-            gap: 4px;
+            gap: 6px 8px;
             overflow: visible;
           }
           .adm-header-date-range--compact .adm-header-date-range__pills{
@@ -14213,11 +14252,14 @@ useEffect(() => {
             color: #4b5563;
             font-size: 11px;
             font-weight: 600;
-            line-height: 1.2;
-            padding: 5px 10px;
+            line-height: 1;
+            height: 28px;
+            padding: 0 10px;
             border-radius: 999px;
             white-space: nowrap;
             cursor: pointer;
+            box-sizing: border-box;
+            box-shadow: 0 2px 8px transparent;
             transition: all 0.2s ease;
           }
           .adm-header-date-range__pill:hover{
@@ -14237,6 +14279,18 @@ useEffect(() => {
           }
           .adm-header-date-range__custom-wrap{
             position: relative;
+            display: inline-flex;
+            align-items: center;
+          }
+          .adm-header-date-range__pill--clear{
+            border-color: #fca5a5;
+            color: #dc2626;
+            background: #fff;
+          }
+          .adm-header-date-range__pill--clear:hover{
+            border-color: #f87171;
+            color: #b91c1c;
+            background: #fef2f2;
           }
           .adm-header-date-range__dropdown{
             position: absolute;
@@ -14673,7 +14727,7 @@ useEffect(() => {
             >
               <div className="container-fluid">
                 <div className="row align-items-center gy-2">
-                  <div className="col-md-4 col-xl-3 d-none d-md-block">
+                  <div className="col-md-4 col-xl-4 d-none d-md-block">
                     <h5 className="fw-bold text-dark mb-1" style={{ fontSize: '1.1rem' }}>Sales B2C</h5>
                     {renderHeaderDateRangeFilter()}
                   </div>
@@ -14685,7 +14739,7 @@ useEffect(() => {
                     {renderHeaderDateRangeFilter(true)}
                   </div>
 
-                  <div className="col-md-8 col-xl-9 d-none d-md-flex justify-content-end align-items-center">
+                  <div className="col-md-8 col-xl-8 d-none d-md-flex justify-content-end align-items-center">
                     {renderCycleFilterDropdowns()}
                   </div>
 
