@@ -91,6 +91,15 @@ const loadCoordinatorSessions = (batchId) => {
   }
 };
 
+const persistCoordinatorSessions = (batchId, list) => {
+  if (!batchId) return;
+  try {
+    localStorage.setItem(`${AC_SESSIONS_STORAGE_PREFIX}${batchId}`, JSON.stringify(list));
+  } catch (err) {
+    console.error('Failed to save coordinator sessions', err);
+  }
+};
+
 const parseSessionDateKey = (session) => {
   if (session?.sessionDate) {
     const raw = String(session.sessionDate);
@@ -145,18 +154,6 @@ const getSessionDateValue = (session) => {
   if (!key) return null;
   const date = new Date(`${key}T12:00:00`);
   return Number.isNaN(date.getTime()) ? null : date;
-};
-
-const getSessionAssignDate = (session) => {
-  if (session?.date) return session.date;
-  if (session?.sessionDate) return formatSessionDate(session.sessionDate);
-  return '—';
-};
-
-const getSessionDayName = (session) => {
-  const date = getSessionDateValue(session);
-  if (!date) return '—';
-  return date.toLocaleDateString('en-IN', { weekday: 'long' });
 };
 
 const getSessionTypeLabel = (session) => {
@@ -321,6 +318,15 @@ const TrainingCalendar = ({
   );
 };
 
+const getDayNameFromDate = (dateValue) => {
+  if (!dateValue) return '—';
+  const date = typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)
+    ? new Date(`${dateValue}T12:00:00`)
+    : new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('en-IN', { weekday: 'long' });
+};
+
 const SessionTable = ({
   sessions,
   selectedSessionId,
@@ -334,6 +340,10 @@ const SessionTable = ({
   loadingBatches,
   onFilterChange,
   onFilterReset,
+  assignmentDrafts = {},
+  trainerOptions = [],
+  loadingTrainers = false,
+  onAssignmentChange,
 }) => (
   <section className="st-sessions-table-wrap">
     <div className="st-sessions-table__head">
@@ -428,6 +438,9 @@ const SessionTable = ({
             {sessions.map((session, index) => {
               const isSelected = resolveSessionSelectionId(selectedSessionId) === resolveSessionSelectionId(session.id);
               const typeBadge = getSessionTypeBadgeKind(session);
+              const draft = assignmentDrafts[session.id] || { assignDate: '', trainerId: '' };
+              const assignDate = draft.assignDate || parseSessionDateKey(session);
+
               return (
                 <tr
                   key={session.id}
@@ -445,9 +458,30 @@ const SessionTable = ({
                     </span>
                     <small>{getSessionActivityLabel(session)}</small>
                   </td>
-                  <td>{getSessionAssignDate(session)}</td>
-                  <td>{getSessionDayName(session)}</td>
-                  <td>{session.fieldTrainerName || session.seniorTrainerName || '—'}</td>
+                  <td className="st-table-cell--control" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="date"
+                      className="st-table-input"
+                      value={assignDate}
+                      onChange={(e) => onAssignmentChange?.(session.id, 'assignDate', e.target.value)}
+                    />
+                  </td>
+                  <td>{getDayNameFromDate(assignDate)}</td>
+                  <td className="st-table-cell--control" onClick={(e) => e.stopPropagation()}>
+                    <select
+                      className="st-table-select"
+                      value={draft.trainerId || ''}
+                      disabled={loadingTrainers}
+                      onChange={(e) => onAssignmentChange?.(session.id, 'trainerId', e.target.value)}
+                    >
+                      <option value="">{loadingTrainers ? 'Loading...' : 'Select trainer'}</option>
+                      {trainerOptions.map((trainer) => (
+                        <option key={trainer.value} value={trainer.value}>
+                          {trainer.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
                 </tr>
               );
             })}
@@ -579,6 +613,9 @@ const SeniorTrainerModule = () => {
   const [sessions, setSessions] = useState([]);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [selectedSessionId, setSelectedSessionId] = useState('');
+  const [assignmentDrafts, setAssignmentDrafts] = useState({});
+  const [trainerOptions, setTrainerOptions] = useState([]);
+  const [loadingTrainers, setLoadingTrainers] = useState(false);
 
   const pathLabels = useMemo(() => ({
     centerName: getOptionLabel(centerOptions, filters.center),
@@ -619,6 +656,93 @@ const SeniorTrainerModule = () => {
     reloadSessions();
     setSelectedSessionId('');
   }, [reloadSessions]);
+
+  useEffect(() => {
+    setAssignmentDrafts((prev) => {
+      const next = {};
+      sessions.forEach((session) => {
+        const existing = prev[session.id];
+        next[session.id] = {
+          assignDate: existing?.assignDate ?? parseSessionDateKey(session),
+          trainerId: existing?.trainerId ?? session.fieldTrainerId ?? '',
+        };
+      });
+      return next;
+    });
+  }, [sessions]);
+
+  useEffect(() => {
+    if (!token) return undefined;
+    let cancelled = false;
+
+    const fetchTrainers = async () => {
+      setLoadingTrainers(true);
+      try {
+        const res = await axios.get(`${backendUrl}/college/trainer/trainers`, {
+          headers: { 'x-auth': token },
+        });
+        if (cancelled) return;
+        const trainers = (res.data?.data || [])
+          .filter((trainer) => trainer.status !== false)
+          .map((trainer) => ({
+            value: String(trainer._id),
+            label: trainer.name || trainer.email || 'Trainer',
+          }));
+        setTrainerOptions(trainers);
+      } catch (err) {
+        console.error('Failed to fetch trainers:', err);
+        if (!cancelled) setTrainerOptions([]);
+      } finally {
+        if (!cancelled) setLoadingTrainers(false);
+      }
+    };
+
+    fetchTrainers();
+    return () => { cancelled = true; };
+  }, [backendUrl, token]);
+
+  const handleAssignmentChange = useCallback((sessionId, field, value) => {
+    setAssignmentDrafts((prev) => {
+      const nextDrafts = {
+        ...prev,
+        [sessionId]: {
+          ...prev[sessionId],
+          [field]: value,
+        },
+      };
+
+      setSessions((prevSessions) => {
+        const nextSessions = prevSessions.map((session) => {
+          if (session.id !== sessionId) return session;
+
+          const draft = nextDrafts[sessionId];
+          const trainerId = draft.trainerId || '';
+          const trainerName = trainerId
+            ? (trainerOptions.find((trainer) => String(trainer.value) === String(trainerId))?.label || session.fieldTrainerName || '')
+            : '';
+          const sessionDate = draft.assignDate || session.sessionDate || session.date;
+          const formattedDate = formatSessionDate(sessionDate);
+
+          return {
+            ...session,
+            fieldTrainerId: trainerId,
+            fieldTrainerName: trainerName,
+            sessionDate,
+            date: formattedDate,
+            workflowStatus: trainerId
+              ? WORKFLOW_STATUS.ASSIGNED
+              : (session.workflowStatus === WORKFLOW_STATUS.ASSIGNED
+                ? WORKFLOW_STATUS.SENT_TO_SENIOR
+                : session.workflowStatus),
+          };
+        });
+        persistCoordinatorSessions(filters.batch, nextSessions);
+        return nextSessions;
+      });
+
+      return nextDrafts;
+    });
+  }, [filters.batch, trainerOptions]);
 
   useEffect(() => {
     const onFocus = () => reloadSessions();
@@ -860,6 +984,10 @@ const SeniorTrainerModule = () => {
           loadingBatches={loadingBatches}
           onFilterChange={handleFilterChange}
           onFilterReset={handleFilterReset}
+          assignmentDrafts={assignmentDrafts}
+          trainerOptions={trainerOptions}
+          loadingTrainers={loadingTrainers}
+          onAssignmentChange={handleAssignmentChange}
         />
 
         <div className="st-detail-panel">
@@ -1070,6 +1198,15 @@ const ST_CSS = `
   .st-table-type--tot { background: #dbeafe; color: #1d4ed8; }
   .st-table-type--linked { background: #ede9fe; color: #6d28d9; }
   .st-table-type--student { background: #d1fae5; color: #065f46; }
+  .st-table-cell--control { min-width: 150px; }
+  .st-table-input, .st-table-select {
+    width: 100%; min-width: 130px; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 8px 10px; font-size: 12px; font-weight: 600; color: #0f172a; background: #fff;
+  }
+  .st-table-input:focus, .st-table-select:focus {
+    outline: none; border-color: ${GREEN}; box-shadow: 0 0 0 3px rgba(5,150,105,0.12);
+  }
+  .st-table-select:disabled { background: #f8fafc; color: #94a3b8; cursor: not-allowed; }
 
   .st-session-card { overflow: hidden; border-left: 4px solid ${GREEN}; }
   .st-session-card--no-activity { border-left-color: #cbd5e1; }

@@ -1011,6 +1011,17 @@ const B2BSales = () => {
         return;
       }
 
+      if (showPanel === 'editPanel' || showPanel === 'bulkstatuschange') {
+        if (!seletectedStatus) {
+          alert('Please select a status');
+          return;
+        }
+        if (!seletectedSubStatus?._id) {
+          alert('Please select a sub-status');
+          return;
+        }
+      }
+
       // Determine whether follow-up fields are filled
       const hasFollowup =
         (showPanel === 'followUp') ||
@@ -1048,7 +1059,7 @@ const B2BSales = () => {
 
         const statusData = {
           status: seletectedStatus,
-          subStatus: seletectedSubStatus?._id || null,
+          subStatus: seletectedSubStatus._id,
           remarks: followupFormData.remarks || 'Bulk status updated via B2B panel'
         };
 
@@ -1080,10 +1091,20 @@ const B2BSales = () => {
       }
 
       // 2) Edit panel: change status (and optionally set follow-up + Google Calendar) via B2B status API
-      if (showPanel === 'editPanel' && selectedProfile && seletectedStatus) {
+      if (showPanel === 'editPanel' && selectedProfile && seletectedStatus && seletectedSubStatus?._id) {
+        if (seletectedSubStatus?.hasRemarks && !followupFormData.remarks?.trim()) {
+          alert('Remarks are mandatory for this status. Please add remarks.');
+          return;
+        }
+
+        if (seletectedSubStatus?.hasFollowup && !hasFollowupData) {
+          alert('Follow-up date and time are mandatory for this status.');
+          return;
+        }
+
         const statusData = {
           status: seletectedStatus,
-          subStatus: seletectedSubStatus?._id || null,
+          subStatus: seletectedSubStatus._id,
           remarks: followupFormData.remarks || 'Status updated via B2B panel'
         };
 
@@ -1185,6 +1206,13 @@ const B2BSales = () => {
     if (t === 'visit' && legacyType !== 'visit') return null;
     if (t === 'call' && legacyType === 'visit') return null;
     return getFollowupBucket(legacy);
+  };
+
+  const getLeadFollowupDoneCount = (lead, type) => {
+    const t = String(type || '').toLowerCase() === 'visit' ? 'visit' : 'call';
+    const apiCount = Number(lead?.followupStats?.[t]?.done);
+    if (Number.isFinite(apiCount) && apiCount > 0) return apiCount;
+    return getLeadFollowupBucket(lead, type) === 'done' ? 1 : 0;
   };
 
   const getLeadDocumentsBucket = (lead) => {
@@ -3926,6 +3954,7 @@ const B2BSales = () => {
                     backgroundColor: '#f1f2f6'
                   }}
                   onChange={handleStatusChange}
+                  required
                 >
                   <option value="">Select Status</option>
                   {[...(statuses || [])]
@@ -3944,7 +3973,7 @@ const B2BSales = () => {
               {/* Sub-Status Selection */}
               <div className="mb-3">
                 <label htmlFor="subStatus" className="form-label small fw-medium text-dark">
-                  Sub-Status
+                  Sub-Status<span className="text-danger">*</span>
                 </label>
                 <select
                   className="form-select border-0 bgcolor"
@@ -3958,6 +3987,7 @@ const B2BSales = () => {
                     width: '100%'
                   }}
                   onChange={handleSubStatusChange}
+                  required
                 >
                   <option value="">Select Sub-Status</option>
                   {[...(subStatuses || [])]
@@ -4038,7 +4068,11 @@ const B2BSales = () => {
                 <button
                   type="submit"
                   className="btn updateStatus"
-                  disabled={isBulkStatusPanel && !selectedProfiles?.length}
+                  disabled={
+                    (isBulkStatusPanel && !selectedProfiles?.length) ||
+                    !seletectedStatus ||
+                    !seletectedSubStatus?._id
+                  }
                 >
                   {isBulkStatusPanel ? 'Update Bulk Status' : 'Update Status'}
                 </button>
@@ -6168,7 +6202,7 @@ const B2BSales = () => {
                                     {(() => {
                                       const b = getLeadFollowupBucket(lead, 'Call');
                                       return [
-                                        { label: 'Done', value: b === 'done' ? 1 : 0, bg: '#12b3ff' },
+                                        { label: 'Done', value: getLeadFollowupDoneCount(lead, 'Call'), bg: '#12b3ff' },
                                         { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#f59e0b' },
                                         { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#7c3d14' },
                                       ];
@@ -6201,7 +6235,7 @@ const B2BSales = () => {
                                     {(() => {
                                       const b = getLeadFollowupBucket(lead, 'Visit');
                                       return [
-                                        { label: 'Done', value: b === 'done' ? 1 : 0, bg: '#4b5563' },
+                                        { label: 'Done', value: getLeadFollowupDoneCount(lead, 'Visit'), bg: '#4b5563' },
                                         { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#4b5563' },
                                         { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#7c3d14' },
                                       ];
@@ -6510,7 +6544,7 @@ const B2BSales = () => {
                                         {(() => {
                                           const b = getLeadFollowupBucket(lead, 'Call');
                                           return [
-                                            { key: 'fc-done', label: 'Done', value: b === 'done' ? 1 : 0, bg: '#12b3ff' },
+                                            { key: 'fc-done', label: 'Done', value: getLeadFollowupDoneCount(lead, 'Call'), bg: '#12b3ff' },
                                             { key: 'fc-planned', label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#f59e0b' },
                                             { key: 'fc-missed', label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#7c3d14' },
                                           ];
@@ -6549,7 +6583,7 @@ const B2BSales = () => {
                                         {(() => {
                                           const b = getLeadFollowupBucket(lead, 'Visit');
                                           return [
-                                            { key: 'fv-done', label: 'Done', value: b === 'done' ? 1 : 0, bg: '#4b5563' },
+                                            { key: 'fv-done', label: 'Done', value: getLeadFollowupDoneCount(lead, 'Visit'), bg: '#4b5563' },
                                             { key: 'fv-planned', label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#4b5563' },
                                             { key: 'fv-missed', label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#7c3d14' },
                                           ];

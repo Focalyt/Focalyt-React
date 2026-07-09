@@ -232,6 +232,84 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 		return bounds;
 	};
 
+	const completeCurrentFollowupForType = async (lead, followUpType) => {
+		if (!lead) return;
+		const normalizedType = String(followUpType || 'Call').trim().toLowerCase();
+		const currentFollowUpId = normalizedType === 'visit' ? lead.followUpVisit : lead.followUpCall;
+		if (!currentFollowUpId) return;
+
+		await FollowUp.findOneAndUpdate(
+			{
+				_id: currentFollowUpId,
+				status: { $ne: 'Completed' }
+			},
+			{
+				status: 'Completed',
+				completedDate: new Date()
+			}
+		);
+	};
+
+	const attachFollowupStats = async (leads) => {
+		const list = Array.isArray(leads) ? leads : [];
+		const leadIds = list
+			.map((lead) => lead?._id)
+			.filter(Boolean);
+
+		if (!leadIds.length) return list.map((lead) => lead?.toObject ? lead.toObject() : lead);
+
+		const stats = await FollowUp.aggregate([
+			{
+				$match: {
+					leadId: { $in: leadIds },
+					$expr: {
+						$eq: [{ $toLower: '$status' }, 'completed']
+					}
+				}
+			},
+			{
+				$group: {
+					_id: {
+						leadId: '$leadId',
+						type: {
+							$cond: [
+								{ $eq: [{ $toLower: '$followUpType' }, 'visit'] },
+								'visit',
+								'call'
+							]
+						}
+					},
+					done: { $sum: 1 }
+				}
+			}
+		]);
+
+		const statsByLead = {};
+		stats.forEach((row) => {
+			const leadId = String(row?._id?.leadId || '');
+			const type = row?._id?.type === 'visit' ? 'visit' : 'call';
+			if (!leadId) return;
+			if (!statsByLead[leadId]) {
+				statsByLead[leadId] = {
+					call: { done: 0 },
+					visit: { done: 0 }
+				};
+			}
+			statsByLead[leadId][type].done = row.done || 0;
+		});
+
+		return list.map((lead) => {
+			const obj = lead?.toObject ? lead.toObject() : lead;
+			return {
+				...obj,
+				followupStats: statsByLead[String(obj?._id || '')] || {
+					call: { done: 0 },
+					visit: { done: 0 }
+				}
+			};
+		});
+	};
+
 	const buildLeadDateRangeCondition = (field, fromDate, toDate) => {
 		if (!fromDate && !toDate) return null;
 		return { [field]: getDateRangeBounds(fromDate, toDate) };
@@ -2914,6 +2992,8 @@ router.get('/leads', isCollege, async (req, res) => {
 			.skip(skip)
 			.limit(Number(limit));
 
+		const leadsWithFollowupStats = await attachFollowupStats(leads);
+
 		// Debug: Log leadOwner data for first few leads
 		// if (leads.length > 0) {
 		// 	console.log('👤 [BACKEND] Lead Owner Data in Response:');
@@ -2945,7 +3025,7 @@ router.get('/leads', isCollege, async (req, res) => {
 		res.json({
 			status: true,
 			data: {
-				leads,
+				leads: leadsWithFollowupStats,
 				pagination: {
 					currentPage: parseInt(page),
 					totalPages,
@@ -3934,7 +4014,8 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 				: new Date(followUpDate);
 			scheduledDateTime.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
 
-			const normalizedType = String(followUpType || 'Call').trim();
+			const normalizedType = String(followUpType || 'Call').trim() || 'Call';
+
 			savedFollowUp = new FollowUp({
 				leadId: id,
 				followUpType: normalizedType,
@@ -3944,6 +4025,7 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 				addedBy: req.user._id
 			});
 			await savedFollowUp.save();
+			await completeCurrentFollowupForType(lead, normalizedType);
 
 			lead.followUp = savedFollowUp._id;
 			if (normalizedType.toLowerCase() === 'visit') {
@@ -4610,19 +4692,21 @@ router.post('/leads/:id/followup', isCollege, async (req, res) => {
 		scheduledDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
 
 		// Create new follow-up
+		const normalizedType = String(followUpType || 'Call').trim() || 'Call';
+
 		const newFollowUp = new FollowUp({
 			leadId: req.params.id,
-			followUpType: followUpType || 'Call',
-			description: description || (String(followUpType || 'Call').toLowerCase() === 'visit' ? 'Followup Visit' : 'Followup Calling'),
+			followUpType: normalizedType,
+			description: description || (normalizedType.toLowerCase() === 'visit' ? 'Followup Visit' : 'Followup Calling'),
 			scheduledDate: scheduledDateTime,
 			remarks: remarks,
 			addedBy: req.user._id
 		});
 
 		const savedFollowUp = await newFollowUp.save();
+		await completeCurrentFollowupForType(lead, normalizedType);
 
 		// Update lead with follow-up reference and add to logs
-		const normalizedType = String(followUpType || 'Call').trim();
 		lead.followUp = savedFollowUp._id; // keep legacy "last follow-up"
 		if (normalizedType.toLowerCase() === 'visit') {
 			lead.followUpVisit = savedFollowUp._id;

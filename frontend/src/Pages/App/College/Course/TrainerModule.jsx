@@ -218,6 +218,7 @@ const getOptionLabel = (options = [], value) =>
   options.find((option) => String(option.value) === String(value))?.label || '';
 
 const SESSIONS_STORAGE_PREFIX = 'trainerModuleSessions:';
+const AC_SESSIONS_STORAGE_PREFIX = 'acCoordinatorSessions:';
 
 const loadStoredSessions = (batchId) => {
   if (!batchId) return [];
@@ -232,6 +233,36 @@ const loadStoredSessions = (batchId) => {
 const persistStoredSessions = (batchId, list) => {
   if (!batchId) return;
   localStorage.setItem(`${SESSIONS_STORAGE_PREFIX}${batchId}`, JSON.stringify(list));
+};
+
+const loadAssignedCoordinatorSessions = (batchId, trainerId) => {
+  if (!batchId || !trainerId) return [];
+  try {
+    const raw = localStorage.getItem(`${AC_SESSIONS_STORAGE_PREFIX}${batchId}`);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((session) => String(session.fieldTrainerId || '') === String(trainerId));
+  } catch {
+    return [];
+  }
+};
+
+const mergeSessionsById = (base = [], additions = []) => {
+  const sessionMap = new Map();
+  base.forEach((session) => {
+    if (!session || session.id == null) return;
+    sessionMap.set(String(session.id), session);
+  });
+  (additions || []).forEach((session) => {
+    if (!session || session.id == null) return;
+    const id = String(session.id);
+    const existing = sessionMap.get(id);
+    sessionMap.set(id, existing ? { ...existing, ...session } : session);
+  });
+  return base.map((session) => sessionMap.get(String(session.id))).concat(
+    [...sessionMap.values()].filter((session) => !base.some((item) => String(item.id) === String(session.id)))
+  );
 };
 
 const mapApiAttendanceToClient = (groupedData = {}) => {
@@ -2760,6 +2791,7 @@ const TrainerModule = () => {
 
     const controller = new AbortController();
     const stored = loadStoredSessions(filters.batch);
+    const coordinatorSessions = loadAssignedCoordinatorSessions(filters.batch, userData._id || userData.id);
 
     const loadSessions = async () => {
       const [fromApi, feedbackMap, attendanceMap] = await Promise.all([
@@ -2767,10 +2799,11 @@ const TrainerModule = () => {
         fetchBatchSessionFeedback(filters.batch, controller.signal),
         fetchBatchAttendance(filters.batch, controller.signal),
       ]);
-      const nextSessions = fromApi?.length ? fromApi : stored;
+      const baseSessions = Array.isArray(fromApi) && fromApi.length ? fromApi : stored;
+      const nextSessions = mergeSessionsById(baseSessions || [], coordinatorSessions);
 
-      if (fromApi?.length) {
-        persistStoredSessions(filters.batch, fromApi);
+      if (nextSessions.length) {
+        persistStoredSessions(filters.batch, nextSessions);
       }
 
       setSessionFeedbackBySession(feedbackMap || {});

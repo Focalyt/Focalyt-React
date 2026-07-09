@@ -888,12 +888,12 @@ function CollegeLayout({ children }) {
                         <span className="menu-title">{t('Admission New')}</span>
                       </Link>
                     </li>
-                    <li className={`nav-item ${location.pathname === '/institute/admissionpost' ? 'active' : ''}`}>
+                    {/* <li className={`nav-item ${location.pathname === '/institute/admissionpost' ? 'active' : ''}`}>
                       <Link to="/institute/admissionpost" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faUserCheck} />
                         <span className="menu-title">{t('admission_cycle_post')}</span>
                       </Link>
-                    </li>
+                    </li> */}
                     <li className={`nav-item ${location.pathname === '/institute/whatsappchat' ? 'active' : ''}`}>
                       <Link to="/institute/whatsappchat" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faWhatsapp} />

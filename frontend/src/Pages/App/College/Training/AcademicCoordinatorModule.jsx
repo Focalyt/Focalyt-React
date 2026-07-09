@@ -1251,7 +1251,7 @@ const SessionDetailSidePanel = ({
   onClose,
   onEdit,
   onDelete,
-  onSendToSenior,
+  onOpenReferModal,
 }) => {
   if (!session) {
     return (
@@ -1387,8 +1387,8 @@ const SessionDetailSidePanel = ({
           <i className="fas fa-trash" /> Delete
         </button>
         {session.workflowStatus === WORKFLOW_STATUS.SCHEDULED && (
-          <button type="button" className="ac-btn ac-btn--outline ac-btn--sm" onClick={() => onSendToSenior(session)}>
-            <i className="fas fa-paper-plane" /> Send to Senior
+          <button type="button" className="ac-btn ac-btn--outline ac-btn--sm" onClick={() => onOpenReferModal(session)}>
+            <i className="fas fa-paper-plane" /> Refer Session
           </button>
         )}
       </footer>
@@ -1764,6 +1764,90 @@ const SessionPlanModal = ({
   );
 };
 
+const ReferSessionModal = ({
+  session,
+  trainerOptions = [],
+  loadingTrainers = false,
+  onClose,
+  onConfirm,
+  onNotify,
+}) => {
+  const [selectedTrainerId, setSelectedTrainerId] = useState('');
+
+  useEffect(() => {
+    setSelectedTrainerId('');
+  }, [session?.id]);
+
+  if (!session) return null;
+
+  const sessionLabel = session.sessionNumber
+    ? `Session ${session.sessionNumber}: ${session.title}`
+    : session.title;
+
+  const handleConfirm = () => {
+    if (!selectedTrainerId) {
+      onNotify?.('Please select a Senior Trainer');
+      return;
+    }
+    const selected = trainerOptions.find((trainer) => trainer.value === selectedTrainerId);
+    onConfirm(session, {
+      id: selectedTrainerId,
+      name: selected?.label || '',
+    });
+  };
+
+  return (
+    <div className="ac-modal-backdrop">
+      <div className="ac-modal ac-modal--confirm" role="dialog" aria-modal="true">
+        <div className="ac-modal__head">
+          <div>
+            <h5>Refer Session</h5>
+            <span>Send to Senior Trainer</span>
+          </div>
+          <button type="button" className="ac-modal__close" onClick={onClose} aria-label="Close">
+            <i className="fas fa-times" />
+          </button>
+        </div>
+
+        <div className="ac-modal__body">
+          <p className="ac-refer-modal__text">
+            Refer <strong>{sessionLabel}</strong> to Senior Trainer.
+          </p>
+
+          <label className="ac-field ac-field--full">
+            <span>Senior Trainer</span>
+            <select
+              className="ac-select ac-select--full"
+              value={selectedTrainerId}
+              onChange={(e) => setSelectedTrainerId(e.target.value)}
+              disabled={loadingTrainers}
+            >
+              <option value="">Select Senior Trainer</option>
+              {trainerOptions.map((trainer) => (
+                <option key={trainer.value} value={trainer.value}>
+                  {trainer.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="ac-modal__foot">
+          <button type="button" className="ac-btn ac-btn--ghost" onClick={onClose}>Cancel</button>
+          <button
+            type="button"
+            className="ac-btn ac-btn--primary"
+            onClick={handleConfirm}
+            disabled={loadingTrainers}
+          >
+            <i className="fas fa-paper-plane" /> Refer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const AcademicCoordinatorModule = () => {
   const userData = useMemo(
     () => JSON.parse(sessionStorage.getItem('user') || '{}'),
@@ -1798,6 +1882,9 @@ const AcademicCoordinatorModule = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [activityFilter, setActivityFilter] = useState('all');
   const [modal, setModal] = useState({ open: false, draft: null, editingId: null });
+  const [referModal, setReferModal] = useState({ open: false, session: null });
+  const [seniorTrainerOptions, setSeniorTrainerOptions] = useState([]);
+  const [seniorTrainersLoading, setSeniorTrainersLoading] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState('');
   const [toast, setToast] = useState('');
 
@@ -2425,13 +2512,52 @@ const AcademicCoordinatorModule = () => {
     notify('Session plan deleted');
   };
 
-  const sendToSenior = (session) => {
+  const fetchSeniorTrainers = useCallback(async () => {
+    if (!token) return;
+    setSeniorTrainersLoading(true);
+    try {
+      const res = await axios.get(`${backendUrl}/college/trainer/trainers`, {
+        headers: { 'x-auth': token },
+      });
+      const trainers = (res.data?.data || [])
+        .filter((trainer) => trainer.status !== false)
+        .map((trainer) => ({
+          value: String(trainer._id),
+          label: trainer.name || trainer.email || 'Trainer',
+        }));
+      setSeniorTrainerOptions(trainers);
+    } catch (err) {
+      console.error('Failed to fetch senior trainers:', err);
+      setSeniorTrainerOptions([]);
+      notify('Failed to load senior trainers');
+    } finally {
+      setSeniorTrainersLoading(false);
+    }
+  }, [backendUrl, token]);
+
+  const openReferModal = (session) => {
+    setReferModal({ open: true, session });
+    fetchSeniorTrainers();
+  };
+  const closeReferModal = () => setReferModal({ open: false, session: null });
+
+  const sendToSenior = (session, seniorTrainer) => {
+    if (!seniorTrainer?.id) {
+      notify('Please select a Senior Trainer');
+      return;
+    }
     persistSessions(sessions.map((s) => (
       s.id === session.id
-        ? { ...s, workflowStatus: WORKFLOW_STATUS.SENT_TO_SENIOR }
+        ? {
+          ...s,
+          workflowStatus: WORKFLOW_STATUS.SENT_TO_SENIOR,
+          seniorTrainerId: seniorTrainer.id,
+          seniorTrainerName: seniorTrainer.name,
+        }
         : s
     )));
-    notify('Sent to Senior Trainer for review & assignment');
+    closeReferModal();
+    notify(`Referred to ${seniorTrainer.name}`);
   };
 
   const canEditSession = (session) => (
@@ -2586,7 +2712,7 @@ const AcademicCoordinatorModule = () => {
               onClose={() => setSelectedSessionId('')}
               onEdit={openEditModal}
               onDelete={deleteSession}
-              onSendToSenior={sendToSenior}
+              onOpenReferModal={openReferModal}
             />
           </div>
         </>
@@ -2616,6 +2742,17 @@ const AcademicCoordinatorModule = () => {
           activityTypes={activityTypes}
           onActivityTypeToggle={handleActivityTypeToggle}
           onClearActivityTypes={handleClearActivityTypes}
+        />
+      )}
+
+      {referModal.open && referModal.session && (
+        <ReferSessionModal
+          session={referModal.session}
+          trainerOptions={seniorTrainerOptions}
+          loadingTrainers={seniorTrainersLoading}
+          onClose={closeReferModal}
+          onConfirm={sendToSenior}
+          onNotify={notify}
         />
       )}
 
@@ -2760,6 +2897,7 @@ const AC_CSS = `
     min-width: 180px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 14px;
     font-size: 13px; background: #fff; font-weight: 600;
   }
+  .ac-select--full { width: 100%; min-width: 0; }
 
   .ac-btn {
     display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 12px;
@@ -3115,6 +3253,9 @@ const AC_CSS = `
   .ac-section-label small { font-size: 10px; font-weight: 600; text-transform: none; color: #94a3b8; margin-left: 4px; }
   .ac-side-panel__grid--single { grid-template-columns: 1fr; }
   .ac-toc-group { margin: 4px 0 8px; }
+  .ac-modal--confirm { width: min(420px, 100%); }
+  .ac-refer-modal__text { margin: 0; font-size: 14px; line-height: 1.55; color: #475569; }
+
   .ac-tot-info-box {
     display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; margin-bottom: 12px;
     background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; font-size: 12px; color: #1e40af;

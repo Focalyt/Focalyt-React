@@ -844,7 +844,7 @@ const CRMDashboard = () => {
   const [kycShowRejectForm, setKycShowRejectForm] = useState(false);
   const [kycMarkingId, setKycMarkingId] = useState(null);
   const [kycCounts, setKycCounts] = useState({ all: 0, pendingDocs: 0, pendingVerification: 0, rejected: 0, verified: 0 });
-  const [milestoneCounts, setMilestoneCounts] = useState({ kycDone: 0, admission: 0 });
+  const [milestoneCounts, setMilestoneCounts] = useState({ admission: 0 });
   const [selectedMilestoneFilter, setSelectedMilestoneFilter] = useState(null);
   const [setPreVerification, showSetPreVerification] = useState(false);
   const [questionFormData, setQuestionFormData] = useState({});
@@ -2742,27 +2742,39 @@ const CRMDashboard = () => {
     }
   }, [backendUrl, token, buildListFilterQueryParts, cycleFilters, applyKycFilterCounts]);
 
-  const fetchMilestoneCounts = useCallback(async () => {
+  const fetchMilestoneCounts = useCallback(async (filters = filterDataRef.current || {}) => {
     if (!token) return;
     try {
       const fd = formDataRef.current || formData;
       const queryParams = new URLSearchParams({
         page: '1',
         limit: '1',
+        ...(filters.name && { name: filters.name }),
+        ...(filters.courseType && { courseType: filters.courseType }),
+        ...(filters.status && filters.status !== 'true' && { status: filters.status }),
+        ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
+        ...(filters.sector && { sector: filters.sector }),
+        ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
+        ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
+        ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
+        ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
+        ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
+        ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+        ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
+        ...(filters.approvalStatus && { approvalStatus: filters.approvalStatus }),
         ...buildListFilterQueryParts(fd, cycleFilters),
       });
-      const [kycRes, admissionRes] = await Promise.all([
-        axios.get(`${backendUrl}/college/kycCandidates?${queryParams}`, {
-          headers: { 'x-auth': token },
-        }),
-        axios.get(`${backendUrl}/college/admission-list?${queryParams}`, {
-          headers: { 'x-auth': token },
-        }),
-      ]);
-      setMilestoneCounts({
-        kycDone: kycRes.data?.crmFilterCounts?.doneKyc ?? 0,
-        admission: admissionRes.data?.crmFilterCounts?.all ?? admissionRes.data?.totalCount ?? 0,
+
+      const dashboardRes = await axios.get(`${backendUrl}/college/dashbord-data?${queryParams}`, {
+        headers: { 'x-auth': token },
       });
+
+      const leads = dashboardRes.data?.success && Array.isArray(dashboardRes.data?.data)
+        ? dashboardRes.data.data
+        : [];
+      const admissionCount = leads.filter((lead) => lead?.admissionDone).length;
+
+      setMilestoneCounts({ admission: admissionCount });
     } catch (e) {
       console.error('Milestone counts fetch error', e);
     }
@@ -4283,6 +4295,22 @@ console.log('API Response:', response.data);
       queryParams.set('kyc', 'true');
     } else if (milestoneFilter === 'admission') {
       listEndpoint = 'admission-list';
+      const hasDateFilter = Boolean(
+        filters.createdFromDate
+        || filters.createdToDate
+        || filters.modifiedFromDate
+        || filters.modifiedToDate
+        || filters.nextActionFromDate
+        || filters.nextActionToDate
+      );
+      if (!hasDateFilter) {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date();
+        todayEnd.setHours(23, 59, 59, 999);
+        queryParams.set('createdFromDate', todayStart.toISOString());
+        queryParams.set('createdToDate', todayEnd.toISOString());
+      }
     } else if (shouldFetchKycCandidates) {
       listEndpoint = 'kycCandidates';
       const kycFetchParams = activeKycFilter ? getKycDashFetchParams(activeKycFilter) : null;
@@ -4318,14 +4346,14 @@ console.log('API Response:', response.data);
           applyKycFilterCounts(data.crmFilterCounts);
         }
         if (milestoneFilter === 'kycDone' || milestoneFilter === 'admission') {
-          await fetchMilestoneCounts();
+          await fetchMilestoneCounts(filters);
         } else if (shouldFetchKycCandidates) {
-          await fetchMilestoneCounts();
+          await fetchMilestoneCounts(filters);
         } else {
           await fetchRegistrationCrmFilterCounts(filters, page, null);
           await fetchDashboardCounts(filters);
           await fetchKycCounts();
-          await fetchMilestoneCounts();
+          await fetchMilestoneCounts(filters);
         }
       } else {
         console.error('Failed to fetch profile data', response.data.message);
@@ -5135,18 +5163,10 @@ console.log('API Response:', response.data);
 
   const milestoneDashOptions = [
     {
-      key: 'milestone-kyc-done',
-      milestone: 'kycDone',
-      label: 'KYC Done',
-      title: 'Leads with KYC milestone completed',
-      valueKey: 'kycDone',
-      bg: '#8b5cf6',
-    },
-    {
       key: 'milestone-admission',
       milestone: 'admission',
       label: 'Admission',
-      title: 'Leads moved to admission',
+      title: 'Admissions matching current filters (same as Dashboard)',
       valueKey: 'admission',
       bg: '#059669',
     },
@@ -13467,7 +13487,7 @@ useEffect(() => {
       )}
 
       <div className="row g-2 mt-1 mb-2 align-items-stretch b2b-followup-scroll-row">
-        <div className="col-12 col-lg-3 b2b-followup-scroll-col">
+        <div className="col-12 col-lg-2 b2b-followup-scroll-col">
           <div className="b2b-dash-section h-100">
             <span className="b2b-dash-section__label">Followup Calling</span>
             <div className="d-flex flex-wrap gap-1 pt-1">
@@ -13497,7 +13517,7 @@ useEffect(() => {
             </div>
           </div>
         </div>
-        <div className="col-12 col-lg-3 b2b-followup-scroll-col">
+        <div className="col-12 col-lg-2 b2b-followup-scroll-col">
           <div className="b2b-dash-section h-100">
             <span className="b2b-dash-section__label">Followup Visit</span>
             <div className="d-flex flex-wrap gap-1 pt-1">
@@ -13557,10 +13577,7 @@ useEffect(() => {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* <div className="row g-2 mt-1 mb-2 align-items-stretch">
-        <div className="col-12 col-lg-6">
+        <div className="col-12 col-lg-2">
           <div className="b2b-dash-section h-100">
             <span className="b2b-dash-section__label">Milestones</span>
             <div className="d-flex flex-wrap gap-1 pt-1">
@@ -13570,7 +13587,7 @@ useEffect(() => {
                   <button
                     key={row.key}
                     type="button"
-                    className={`b2b-dash-stat-card text-center text-white flex-grow-1 border-0${selected ? ' b2b-dash-stat-card--active' : ''}`}
+                    className={`b2b-dash-stat-card text-center text-white w-100 border-0${selected ? ' b2b-dash-stat-card--active' : ''}`}
                     style={{ background: row.bg }}
                     onClick={() => handleMilestoneDashClick(row.milestone)}
                     title={row.title}
@@ -13587,7 +13604,7 @@ useEffect(() => {
             </div>
           </div>
         </div>
-      </div> */}
+      </div>
       </>
       )}
 
