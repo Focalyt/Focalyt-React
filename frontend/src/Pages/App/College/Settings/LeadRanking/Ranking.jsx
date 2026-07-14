@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-function LeadRanking() {
+function Ranking() {
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
     const token = userData.token;
@@ -550,4 +550,4 @@ function LeadRanking() {
     );
 }
 
-export default LeadRanking;
+export default Ranking;
