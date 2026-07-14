@@ -329,7 +329,7 @@ const Layout = () => {
           <Route path='typeOfB2b' element={<TypeB2b/>}/>
           <Route path='b2bProject' element={<B2BProject/>}/>
           <Route path='b2bDepartment' element={<B2BDepartment/>}/>
-          <Route path='leadRanking' element={<LeadRanking/>}/>
+          <Route path='ranking' element={<LeadRanking/>}/>
           <Route path='typeOfCategory' element={<TypeCategory/>}/>
           <Route path='calenderb2c' element={<CalenderFolowupB2C/>}/>
           <Route path='source' element={<Source/>}/>
