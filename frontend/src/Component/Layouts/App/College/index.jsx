@@ -1123,12 +1123,12 @@ function CollegeLayout({ children }) {
                   <span className="menu-title">{t('upload_candidates')}</span>
                 </Link>
               </li>
-              <li className={`nav-item ${location.pathname === '/institute/leadRanking' ? 'active' : ''}`}>
-                <Link to="/institute/leadRanking" onClick={() => handleSidebarClose()}>
+              {/* <li className={`nav-item ${location.pathname === '/institute/ranking' ? 'active' : ''}`}>
+                <Link to="/institute/ranking" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faClipboardList} />
                   <span className="menu-title">{t('Lead Ranking')}</span>
                 </Link>
-              </li>
+              </li> */}
               {/* Upload Templates */}
               <li className={`nav-item ${location.pathname === '/institute/uploadTemplates' ? 'active' : ''}`}>
                 <Link to="/institute/uploadTemplates" onClick={() => handleSidebarClose()}>
