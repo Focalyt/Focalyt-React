@@ -122,6 +122,8 @@ import OngoingHiring from './Pages/App/Company/Hirings/OnGoingHiring';
 import ShortListedCandidate from './Pages/App/Company/Candidate/ShortListedCandidate';
 import AddJd from './Pages/App/Company/Jobs/AddJd';
 import Coins from './Pages/App/Company/Coins/MyPieCoins';
+import Ranking from './Pages/App/College/Settings/LeadRanking/Ranking';
+
 // import EditJob from './Pages/App/Company/Jobs/editJob';
 import ViewJd from './Pages/App/Company/Jobs/ViewJd';
 import IntCandiate from './Pages/App/Company/Candidate/IntrestedCandidates';
@@ -330,6 +332,7 @@ const Layout = () => {
           <Route path='b2bProject' element={<B2BProject/>}/>
           <Route path='b2bDepartment' element={<B2BDepartment/>}/>
           <Route path='ranking' element={<LeadRanking/>}/>
+          <Route path='rank' element={<Ranking/>}/>
           <Route path='typeOfCategory' element={<TypeCategory/>}/>
           <Route path='calenderb2c' element={<CalenderFolowupB2C/>}/>
           <Route path='source' element={<Source/>}/>
