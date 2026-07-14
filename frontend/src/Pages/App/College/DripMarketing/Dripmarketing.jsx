@@ -530,13 +530,18 @@ const DripMarketing = () => {
                 headers: { 'x-auth': token }
             });
 
-
-
             if (response.data.success) {
-                setWhatsappTemplates(response.data.data);
+                const list = Array.isArray(response.data.data) ? response.data.data : [];
+                // Prefer APPROVED templates for drip sends; fall back to all if none approved
+                const approved = list.filter((t) => String(t?.status || '').toUpperCase() === 'APPROVED');
+                setWhatsappTemplates(approved.length > 0 ? approved : list);
+            } else {
+                console.error('Failed to fetch WhatsApp templates:', response.data.message);
+                setWhatsappTemplates([]);
             }
         } catch (error) {
             console.error('Error fetching WhatsApp templates:', error);
+            setWhatsappTemplates([]);
         }
     };
 
@@ -679,7 +684,7 @@ const DripMarketing = () => {
                 });
 
                 // Close the modal
-                // closeModal();
+                closeModal();
             }
 
             // console.log('responseData', responseData)
@@ -2468,7 +2473,7 @@ const DripMarketing = () => {
 
 
                                                                         <div className="col-4">
-                                                                            <select className='form-select' value={ruleData.activityType} onChange={(e) => {
+                                                                            <select className='form-select' value={ruleData.primaryAction.activityType || ''} onChange={(e) => {
                                                                                 setRuleData(prev => ({
                                                                                     ...prev,
                                                                                     primaryAction: {
@@ -2757,11 +2762,16 @@ const DripMarketing = () => {
                                                                                                                     onChange={(e) => updateCommunication(index, 'templateId', e.target.value)}
                                                                                                                 >
                                                                                                                     <option value="">Select Template</option>
-                                                                                                                    {whatsappTemplates.length > 0 && whatsappTemplates?.map((template) => (
-                                                                                                                        <option key={template?._id} value={template?._id}>
-                                                                                                                            {template?.template?.name || ''}
-                                                                                                                        </option>
-                                                                                                                    ))}
+                                                                                                                    {whatsappTemplates.length > 0 && whatsappTemplates.map((template, tIndex) => {
+                                                                                                                        const templateName = template?.template?.name || template?.name || '';
+                                                                                                                        const templateValue = templateName || template?.id || template?._id || '';
+                                                                                                                        if (!templateValue) return null;
+                                                                                                                        return (
+                                                                                                                            <option key={template?.id || template?._id || tIndex} value={templateValue}>
+                                                                                                                                {templateName || templateValue}
+                                                                                                                            </option>
+                                                                                                                        );
+                                                                                                                    })}
                                                                                                                 </select>
                                                                                                             </div>
                                                                                                             <div className="col-4">

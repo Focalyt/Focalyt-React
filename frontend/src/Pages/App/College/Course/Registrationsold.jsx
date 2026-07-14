@@ -1133,6 +1133,7 @@ const CRMDashboard = () => {
   const [showPopup, setShowPopup] = useState(null);
   const [activeCrmFilter, setActiveCrmFilter] = useState(0);
   const [input1Value, setInput1Value] = useState('');
+  const skipBulkAutoSelectRef = useRef(false); // when true, Input 1 change came from checkbox sync — don't re-select first N
   const [showBulkInputs, setShowBulkInputs] = useState(false);
   const [bulkMode, setBulkMode] = useState(null); // 'whatsapp' or 'bulkaction'
 
@@ -1574,10 +1575,18 @@ const CRMDashboard = () => {
 
 
   const handleCheckboxChange = (profile, checked) => {
-    if (checked) {
-      setSelectedProfiles(prev => [...(Array.isArray(prev) ? prev : []), profile._id]);
-    } else {
-      setSelectedProfiles(prev => (Array.isArray(prev) ? prev : []).filter(id => id !== profile._id));
+    const profileId = String(profile?._id ?? '');
+    const list = Array.isArray(selectedProfiles) ? selectedProfiles : [];
+    const next = checked
+      ? (list.some((id) => String(id) === profileId) ? list : [...list, profile._id])
+      : list.filter((id) => String(id) !== profileId);
+
+    setSelectedProfiles(next);
+
+    // Keep Input 1 count in sync when user manually checks/unchecks leads
+    if (bulkMode === 'whatsapp' || bulkMode === 'bulkrefer' || bulkMode === 'bulkaction') {
+      skipBulkAutoSelectRef.current = true;
+      setInput1Value(next.length > 0 ? String(next.length) : '');
     }
   };
 
@@ -5653,6 +5662,12 @@ console.log('API Response:', response.data);
       return;
     }
 
+    // Checkbox uncheck/check already updated selectedProfiles — only sync the count display
+    if (skipBulkAutoSelectRef.current) {
+      skipBulkAutoSelectRef.current = false;
+      return;
+    }
+
     if (!allProfiles || allProfiles.length === 0) {
       return;
     }
@@ -9187,6 +9202,8 @@ useEffect(() => {
           </>
         )}
           {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
+            
+            <>
             <button
               type="button"
               className="lead-strip-v3__actions-item"
@@ -9195,7 +9212,26 @@ useEffect(() => {
               <i className="fas fa-arrow-right text-primary" aria-hidden="true"></i>
               Move to Admission
             </button>
+            <button
+            className="lead-strip-v3__actions-item"
+            style={{
+              width: "100%",
+              padding: "8px 16px",
+              border: "none",
+              background: "none",
+              textAlign: "left",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontWeight: "600"
+            }}
+            onClick={() => handleDownloadAdmissionForm(profile)}
+          >
+            Download Admission Form
+</button>
+</>
           )}
+
+                                       
           <button
             type="button"
             className="lead-strip-v3__actions-item"
@@ -13069,6 +13105,78 @@ useEffect(() => {
     }
   };
 
+  const handleDownloadAdmissionForm = async (profile) => {
+    try {
+      if (!profile || !profile._id) {
+        alert('No profile selected');
+        return;
+      }
+
+      // Check if backend URL and token exist
+      if (!backendUrl) {
+        alert('Backend URL not configured');
+        return;
+      }
+
+      if (!token) {
+        alert('Authentication token missing');
+        return;
+      }
+
+      // Send GET request to backend API to generate PDF
+      const response = await axios.get(
+        `${backendUrl}/college/generate-application-form/${profile._id}`,
+        {
+          headers: {
+            'x-auth': token,
+          },
+          responseType: 'blob' // Important: Set response type to blob for PDF
+        }
+      );
+
+      if (response.data.status === false) {
+        alert(response.data.message || 'Failed to download admission form');
+        return;
+      }
+
+      // Create a blob from the PDF data
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+
+      // Create a download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `application_form_${profile._id}.pdf`;
+
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+
+      // Clean up
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      alert('Admission form downloaded successfully!');
+
+    } catch (error) {
+      console.error('Error downloading admission form:', error);
+
+      // Check if it's an error response with a message
+      if (error.response && error.response.data) {
+        try {
+          // Try to parse error response as JSON to get error message
+          const errorText = await error.response.data.text();
+          const errorData = JSON.parse(errorText);
+          alert(errorData.message || 'Failed to download admission form');
+        } catch (parseError) {
+          alert('Failed to download admission form');
+        }
+      } else {
+        alert('Failed to download admission form');
+      }
+    }
+  };
+
   const openProfileKycReview = (profile, doc) => {
     setKycSelectedProfile(profile);
     setSelectedProfile(profile);
@@ -16875,6 +16983,23 @@ useEffect(() => {
                                                   Move to Admission
                                                 </button>
                                               )}
+
+<button
+                                                    className="lead-strip-v3__actions-item"
+                                                    style={{
+                                                      width: "100%",
+                                                      padding: "8px 16px",
+                                                      border: "none",
+                                                      background: "none",
+                                                      textAlign: "left",
+                                                      cursor: "pointer",
+                                                      fontSize: "12px",
+                                                      fontWeight: "600"
+                                                    }}
+                                                    onClick={() => handleDownloadAdmissionForm(profile)}
+                                                  >
+                                                    Download Admission Form
+                                                  </button>
 
                                               <button
                                                 className="dropdown-item"

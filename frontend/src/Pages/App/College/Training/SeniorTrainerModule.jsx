@@ -28,12 +28,6 @@ const STATUS_TONE = {
   [WORKFLOW_STATUS.COMPLETED]: 'green',
 };
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-
 const getOptionLabel = (options = [], value) =>
   options.find((option) => String(option.value) === String(value))?.label || '';
 
@@ -89,6 +83,14 @@ const loadCoordinatorSessions = (batchId) => {
   } catch {
     return [];
   }
+};
+
+const filterSessionsForSeniorTrainer = (sessions = [], userId = '') => {
+  // For demo on same browser, we show any session that has been sent for review.
+  // In production, you might want to strictly check:
+  // session.seniorTrainerId === userId || session.workflowStatus !== WORKFLOW_STATUS.SCHEDULED
+  // The current logic allows any senior trainer to see any referred session.
+  return sessions.filter((session) => session.workflowStatus !== WORKFLOW_STATUS.SCHEDULED);
 };
 
 const persistCoordinatorSessions = (batchId, list) => {
@@ -184,47 +186,23 @@ const sortSessionsByDate = (list = []) => [...list].sort((a, b) => {
   return (a.startTime || '').localeCompare(b.startTime || '');
 });
 
-const buildMonthGrid = (year, month) => {
-  const firstDay = new Date(year, month, 1);
-  const startOffset = firstDay.getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const daysInPrevMonth = new Date(year, month, 0).getDate();
-  const cells = [];
+const TOTAL_SESSION_SLOTS = 30;
 
-  for (let i = startOffset - 1; i >= 0; i -= 1) {
-    const day = daysInPrevMonth - i;
-    const date = new Date(year, month - 1, day);
-    cells.push({
-      date,
-      dateKey: date.toISOString().slice(0, 10),
-      day,
-      isCurrentMonth: false,
-    });
-  }
-
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    const date = new Date(year, month, day);
-    cells.push({
-      date,
-      dateKey: date.toISOString().slice(0, 10),
-      day,
-      isCurrentMonth: true,
-    });
-  }
-
-  let nextMonthDay = 1;
-  while (cells.length % 7 !== 0) {
-    const date = new Date(year, month + 1, nextMonthDay);
-    cells.push({
-      date,
-      dateKey: date.toISOString().slice(0, 10),
-      day: nextMonthDay,
-      isCurrentMonth: false,
-    });
-    nextMonthDay += 1;
-  }
-
-  return cells;
+const buildFixedSessionSlots = (sessions = [], total = TOTAL_SESSION_SLOTS) => {
+  const byNumber = {};
+  sessions.forEach((session) => {
+    const num = parseInt(String(session.sessionNumber ?? ''), 10);
+    if (!Number.isFinite(num) || num < 1 || num > total) return;
+    if (!byNumber[num]) byNumber[num] = session;
+  });
+  return Array.from({ length: total }, (_, index) => {
+    const sessionNumber = index + 1;
+    return {
+      key: `slot-${sessionNumber}`,
+      sessionNumber: String(sessionNumber),
+      session: byNumber[sessionNumber] || null,
+    };
+  });
 };
 
 const TrainingCalendar = ({
@@ -232,26 +210,10 @@ const TrainingCalendar = ({
   icon,
   accent = GREEN,
   sessions,
-  calendarMonth,
-  onMonthChange,
   selectedSessionId,
   onSelectSession,
 }) => {
-  const year = calendarMonth.getFullYear();
-  const month = calendarMonth.getMonth();
-  const todayKey = new Date().toISOString().slice(0, 10);
-  const grid = useMemo(() => buildMonthGrid(year, month), [year, month]);
-
-  const sessionsByDate = useMemo(() => {
-    const map = {};
-    sessions.forEach((session) => {
-      const key = parseSessionDateKey(session);
-      if (!key) return;
-      if (!map[key]) map[key] = [];
-      map[key].push(session);
-    });
-    return map;
-  }, [sessions]);
+  const cells = useMemo(() => buildFixedSessionSlots(sessions), [sessions]);
 
   return (
     <div className="st-calendar" style={{ '--calendar-accent': accent }}>
@@ -260,57 +222,52 @@ const TrainingCalendar = ({
           <i className={`fas ${icon}`} />
           <span>{title}</span>
         </div>
-        <span className="st-calendar__count">{sessions.length} plan(s)</span>
+        <span className="st-calendar__count">{sessions.length} / {TOTAL_SESSION_SLOTS} plan(s)</span>
       </div>
       <div className="st-calendar__head">
-        <button type="button" className="st-calendar__nav" onClick={() => onMonthChange(-1)}>
-          <i className="fas fa-chevron-left" />
-        </button>
-        <h3>{MONTH_NAMES[month]} {year}</h3>
-        <button type="button" className="st-calendar__nav" onClick={() => onMonthChange(1)}>
-          <i className="fas fa-chevron-right" />
-        </button>
+        <h3>Session plans</h3>
+        <span className="st-calendar__head-hint">Session 1–{TOTAL_SESSION_SLOTS} · dates assigned later</span>
       </div>
 
-      <div className="st-calendar__weekdays">
-        {WEEKDAYS.map((day) => (
+      <div className="st-calendar__weekdays" aria-hidden="true">
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
           <span key={day}>{day}</span>
         ))}
       </div>
 
       <div className="st-calendar__grid">
-        {grid.map((cell) => {
-          const daySessions = sessionsByDate[cell.dateKey] || [];
-          const isToday = cell.dateKey === todayKey;
-          return (
-            <div
-              key={cell.dateKey}
-              className={`st-calendar__day${cell.isCurrentMonth ? '' : ' st-calendar__day--muted'}${isToday ? ' st-calendar__day--today' : ''}`}
-            >
-              <span className="st-calendar__day-num">{cell.day}</span>
-              <div className="st-calendar__events">
-                {daySessions.slice(0, 3).map((session) => {
-                  const color = getSessionChipColor(session);
-                  const isSelected = resolveSessionSelectionId(selectedSessionId) === resolveSessionSelectionId(session.id);
-                  return (
-                    <button
-                      key={session.id}
-                      type="button"
-                      className={`st-calendar__event${isSelected ? ' st-calendar__event--selected' : ''}`}
-                      style={{ '--event-color': color }}
-                      onClick={() => onSelectSession(session.id)}
-                      title={`${session.title} · ${session.startTime || ''}`}
-                    >
-                      <span className="st-calendar__event-dot" />
-                      <span className="st-calendar__event-text">{session.title}</span>
-                    </button>
-                  );
-                })}
-                {daySessions.length > 3 && (
-                  <span className="st-calendar__more">+{daySessions.length - 3} more</span>
-                )}
+        {cells.map((cell) => {
+          const { session, sessionNumber } = cell;
+          if (!session) {
+            return (
+              <div
+                key={cell.key}
+                className="st-calendar__day st-calendar__day--slot"
+              >
+                <span className="st-calendar__day-num">{sessionNumber}</span>
+                <span className="st-calendar__session-title st-calendar__session-title--muted">Not planned</span>
               </div>
-            </div>
+            );
+          }
+
+          const color = getSessionChipColor(session);
+          const isSelected = resolveSessionSelectionId(selectedSessionId) === resolveSessionSelectionId(session.id);
+
+          return (
+            <button
+              key={cell.key}
+              type="button"
+              className={`st-calendar__day st-calendar__day--session${isSelected ? ' st-calendar__day--selected' : ''}`}
+              style={{ '--event-color': color }}
+              onClick={() => onSelectSession(session.id)}
+              title={`Session ${sessionNumber}: ${session.title || 'Untitled'}`}
+            >
+              <span className="st-calendar__day-num">{sessionNumber}</span>
+              <span className="st-calendar__session-title">{session.title || 'Untitled session'}</span>
+              {session.topicCovered ? (
+                <span className="st-calendar__session-topic">{session.topicCovered}</span>
+              ) : null}
+            </button>
           );
         })}
       </div>
@@ -418,7 +375,7 @@ const SessionTable = ({
     {sessions.length === 0 ? (
       <p className="st-sessions-table__empty">
         {filters.batch
-          ? 'No sessions to show for this batch.'
+          ? 'No referred sessions for you in this batch. Ask Academic Coordinator to refer plans first.'
           : 'Select center, course and batch to load sessions.'}
       </p>
     ) : (
@@ -593,6 +550,7 @@ const SeniorSessionCard = ({ session }) => {
 const SeniorTrainerModule = () => {
   const userData = useMemo(() => JSON.parse(sessionStorage.getItem('user') || '{}'), []);
   const token = userData.token;
+  const seniorTrainerId = userData._id || userData.id;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
 
   const [reportDate, setReportDate] = useState(new Date());
@@ -611,7 +569,6 @@ const SeniorTrainerModule = () => {
   const [loadingBatches, setLoadingBatches] = useState(false);
 
   const [sessions, setSessions] = useState([]);
-  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [selectedSessionId, setSelectedSessionId] = useState('');
   const [assignmentDrafts, setAssignmentDrafts] = useState({});
   const [trainerOptions, setTrainerOptions] = useState([]);
@@ -649,8 +606,9 @@ const SeniorTrainerModule = () => {
       setSessions([]);
       return;
     }
-    setSessions(loadCoordinatorSessions(filters.batch));
-  }, [filters.batch]);
+    const allSessions = loadCoordinatorSessions(filters.batch);
+    setSessions(filterSessionsForSeniorTrainer(allSessions, seniorTrainerId));
+  }, [filters.batch, seniorTrainerId]);
 
   useEffect(() => {
     reloadSessions();
@@ -736,7 +694,11 @@ const SeniorTrainerModule = () => {
                 : session.workflowStatus),
           };
         });
-        persistCoordinatorSessions(filters.batch, nextSessions);
+        persistCoordinatorSessions(filters.batch, (() => {
+          const allSessions = loadCoordinatorSessions(filters.batch);
+          const updatedById = new Map(nextSessions.map((item) => [item.id, item]));
+          return allSessions.map((item) => updatedById.get(item.id) || item);
+        })());
         return nextSessions;
       });
 
@@ -886,20 +848,9 @@ const SeniorTrainerModule = () => {
     return sessions.find((session) => session.id === resolvedId) || null;
   }, [sessions, selectedSessionId]);
 
-  const handleMonthChange = (delta) => {
-    setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
-  };
-
   const handleSelectSession = (sessionId) => {
     const resolvedId = resolveSessionSelectionId(sessionId);
     setSelectedSessionId((prev) => (resolveSessionSelectionId(prev) === resolvedId ? '' : resolvedId));
-    const session = sessions.find((item) => item.id === resolvedId);
-    if (session?.sessionDate) {
-      const date = new Date(session.sessionDate);
-      if (!Number.isNaN(date.getTime())) {
-        setCalendarMonth(new Date(date.getFullYear(), date.getMonth(), 1));
-      }
-    }
   };
 
   return (
@@ -916,6 +867,9 @@ const SeniorTrainerModule = () => {
             <span>Training Module</span><span>/</span>
             <span className="st-breadcrumb--active">Senior Trainer</span>
           </nav>
+          <p className="st-subtitle">
+            View plans referred by Academic Coordinator and assign field trainers.
+          </p>
 
         </div>
         <div className="st-header-meta">
@@ -950,22 +904,18 @@ const SeniorTrainerModule = () => {
       <div className="st-workspace">
         <div className="st-dual-calendars">
           <TrainingCalendar
-            title="Session Calendar"
-            icon="fa-user-graduate"
-            accent={GREEN}
-            sessions={studentSessions}
-            calendarMonth={calendarMonth}
-            onMonthChange={handleMonthChange}
-            selectedSessionId={selectedSessionId}
-            onSelectSession={handleSelectSession}
-          />
-          <TrainingCalendar
             title="TOT Calendar"
             icon="fa-chalkboard-teacher"
             accent={BLUE}
             sessions={totSessions}
-            calendarMonth={calendarMonth}
-            onMonthChange={handleMonthChange}
+            selectedSessionId={selectedSessionId}
+            onSelectSession={handleSelectSession}
+          />
+          <TrainingCalendar
+            title="Session Calendar"
+            icon="fa-user-graduate"
+            accent={GREEN}
+            sessions={studentSessions}
             selectedSessionId={selectedSessionId}
             onSelectSession={handleSelectSession}
           />
@@ -997,7 +947,7 @@ const SeniorTrainerModule = () => {
             <div className="st-detail-empty">
               <i className="fas fa-hand-pointer" />
               <h4>Select a session</h4>
-              <p>Click any event on the Session or TOT calendar, or a row in the table, to view its full plan card.</p>
+              <p>Click any session cell on the Session or TOT grid, or a row in the table, to view its full plan card.</p>
               {!filters.batch && (
                 <p className="st-detail-empty__hint">
                   Select Center → Course → Batch in the session list filters to load plans.
@@ -1104,8 +1054,14 @@ const ST_CSS = `
   .st-stat--amber strong { color: ${AMBER}; }
 
   .st-workspace { display: flex; flex-direction: column; gap: 16px; }
-  .st-dual-calendars { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
-  .st-calendar { padding: 0; overflow: hidden; }
+  .st-dual-calendars {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start;
+  }
+  .st-calendar {
+    padding: 0; overflow: hidden; min-width: 0; background: #fff;
+    border: 1px solid #e2e8f0; border-radius: 16px;
+    box-shadow: 0 10px 28px rgba(15,23,42,0.06);
+  }
   .st-calendar__title-bar {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
     padding: 12px 14px; border-bottom: 1px solid #eef2f7; background: color-mix(in srgb, var(--calendar-accent, ${GREEN}) 8%, white);
@@ -1117,42 +1073,67 @@ const ST_CSS = `
     background: color-mix(in srgb, var(--calendar-accent, ${GREEN}) 14%, white);
     padding: 4px 10px; border-radius: 999px;
   }
-  .st-calendar__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding: 14px 14px 0; }
-  .st-calendar__head h3 { margin: 0; font-size: 1.1rem; font-weight: 900; }
-  .st-calendar__nav {
-    width: 36px; height: 36px; border-radius: 10px; border: 1px solid #e2e8f0; background: #fff; cursor: pointer; color: #475569;
+  .st-calendar__head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 8px; padding: 14px 14px 0;
   }
+  .st-calendar__head h3 { margin: 0; font-size: 1.05rem; font-weight: 900; }
+  .st-calendar__head-hint { font-size: 11px; font-weight: 700; color: #94a3b8; }
   .st-calendar__weekdays {
-    display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 6px; padding: 0 14px;
+    display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px;
+    padding: 0 14px 6px;
   }
   .st-calendar__weekdays span {
-    text-align: center; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; padding: 6px 0;
+    text-align: center; font-size: 10px; font-weight: 800; color: #94a3b8;
+    text-transform: uppercase; letter-spacing: 0.04em; padding: 4px 0;
   }
-  .st-calendar__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding: 0 14px 14px; }
+  .st-calendar__grid {
+    display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px; padding: 0 14px 14px; width: 100%; box-sizing: border-box;
+  }
   .st-calendar__day {
-    min-height: 96px; border: 1px solid #eef2f7; border-radius: 10px; padding: 6px; background: #fafbfc;
-    display: flex; flex-direction: column; gap: 4px;
+    box-sizing: border-box; min-width: 0; width: 100%; max-width: 100%;
+    min-height: 88px; height: 100%;
+    border: 1px solid #eef2f7; border-radius: 10px; padding: 6px;
+    background: #fafbfc; display: flex; flex-direction: column; gap: 3px;
+    text-align: left; overflow: hidden;
   }
-  .st-calendar__day--muted { opacity: 0.45; }
-  .st-calendar__day--today { border-color: ${GREEN}; box-shadow: inset 0 0 0 1px ${GREEN}; }
-  .st-calendar__day-num { font-size: 12px; font-weight: 800; color: #334155; }
-  .st-calendar__events { display: flex; flex-direction: column; gap: 3px; }
-  .st-calendar__event {
-    display: flex; align-items: center; gap: 5px; width: 100%; border: none; border-radius: 6px;
-    padding: 3px 6px; background: color-mix(in srgb, var(--event-color, ${BLUE}) 14%, white);
-    cursor: pointer; text-align: left;
+  .st-calendar__day--muted { opacity: 0.35; }
+  .st-calendar__day--slot {
+    background: #f8fafc; border-style: dashed; border-color: #e2e8f0;
   }
-  .st-calendar__event--selected {
-    background: color-mix(in srgb, var(--event-color, ${BLUE}) 28%, white);
-    box-shadow: inset 0 0 0 1.5px var(--event-color, ${BLUE});
+  .st-calendar__day--slot .st-calendar__day-num { color: #94a3b8; }
+  .st-calendar__day--session {
+    margin: 0; font: inherit; color: inherit; appearance: none; -webkit-appearance: none;
+    cursor: pointer; border: 1px solid #eef2f7;
+    background: color-mix(in srgb, var(--event-color, ${BLUE}) 8%, white);
+    transition: border-color 0.15s, box-shadow 0.15s;
   }
-  .st-calendar__event-dot {
-    width: 7px; height: 7px; border-radius: 999px; background: var(--event-color, ${BLUE}); flex-shrink: 0;
+  .st-calendar__day--session:hover {
+    border-color: color-mix(in srgb, var(--event-color, ${BLUE}) 45%, #e2e8f0);
   }
-  .st-calendar__event-text {
-    font-size: 10px; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  .st-calendar__day--selected {
+    border-color: var(--event-color, ${GREEN});
+    box-shadow: inset 0 0 0 1.5px var(--event-color, ${GREEN});
+    background: color-mix(in srgb, var(--event-color, ${GREEN}) 16%, white);
   }
-  .st-calendar__more { font-size: 10px; color: #94a3b8; font-weight: 700; padding-left: 4px; }
+  .st-calendar__day-num {
+    flex-shrink: 0; font-size: 12px; font-weight: 900; line-height: 1;
+    color: var(--event-color, #334155);
+  }
+  .st-calendar__session-title {
+    font-size: 10px; font-weight: 700; color: #0f172a; line-height: 1.3;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden; word-break: break-word; overflow-wrap: anywhere;
+  }
+  .st-calendar__session-title--muted { color: #94a3b8; font-weight: 600; }
+  .st-calendar__session-topic {
+    margin-top: auto; font-size: 9px; font-weight: 600; color: #64748b;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+  }
+  .st-calendar__empty {
+    margin: 0; padding: 24px 14px 28px; text-align: center; font-size: 13px; font-weight: 700; color: #94a3b8;
+  }
 
   .st-detail-panel { padding: 16px; min-height: auto; }
   .st-detail-empty { text-align: center; padding: 48px 20px; color: #64748b; }

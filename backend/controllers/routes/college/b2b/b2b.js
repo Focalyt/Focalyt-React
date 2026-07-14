@@ -51,6 +51,7 @@ const TypeOfB2B = require("../../../models/b2b/typeOfB2B");
 const B2BProject = require("../../../models/b2b/b2bProject");
 const B2BDepartment = require("../../../models/b2b/b2bDepartment");
 const LeadCategory = require("../../../models/b2b/leadCategory");
+const LeadRanking = require("../../../models/b2b/leadRanking");
 const defaultLeadModel = require("../../../models/b2b/lead");
 const FollowUp = require("../../../models/b2b/followUp");
 const StatusB2b = require("../../../models/statusB2b");
@@ -1817,6 +1818,231 @@ router.delete('/lead-categories/:id', isCollege, async (req, res) => {
 	}
 });
 
+// ==================== Lead Ranking ====================
+
+router.get('/lead-rankings', isCollege, async (req, res) => {
+	try {
+		const { status } = req.query;
+		const query = {};
+
+		if (status !== undefined && status !== '') {
+			query.isActive = status === 'true' || status === true;
+		}
+
+		const rankings = await LeadRanking.find(query)
+			.populate('addedBy', 'name email')
+			.sort({ createdAt: 1 });
+
+		res.json({
+			status: true,
+			data: rankings,
+			message: 'Lead rankings retrieved successfully'
+		});
+	} catch (error) {
+		console.error('Error getting lead rankings:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to retrieve lead rankings',
+			error: error.message
+		});
+	}
+});
+
+router.get('/lead-rankings/:id', isCollege, async (req, res) => {
+	try {
+		if (!isValidId(req.params.id)) {
+			return res.status(400).json({
+				status: false,
+				message: 'Invalid lead ranking id'
+			});
+		}
+
+		const ranking = await LeadRanking.findById(req.params.id)
+			.populate('addedBy', 'name email');
+
+		if (!ranking) {
+			return res.status(404).json({
+				status: false,
+				message: 'Lead ranking not found'
+			});
+		}
+
+		res.json({
+			status: true,
+			data: ranking,
+			message: 'Lead ranking retrieved successfully'
+		});
+	} catch (error) {
+		console.error('Error getting lead ranking:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to retrieve lead ranking',
+			error: error.message
+		});
+	}
+});
+
+router.post('/lead-rankings', isCollege, async (req, res) => {
+	try {
+		const { name, description } = req.body;
+
+		if (!name || !String(name).trim()) {
+			return res.status(400).json({
+				status: false,
+				message: 'Lead ranking name is required'
+			});
+		}
+
+		const trimmedName = String(name).trim();
+		const existingRanking = await LeadRanking.findOne({ name: trimmedName });
+		if (existingRanking) {
+			return res.status(400).json({
+				status: false,
+				message: 'Lead ranking with this name already exists'
+			});
+		}
+
+		const newRanking = new LeadRanking({
+			name: trimmedName,
+			description,
+			addedBy: req.user._id
+		});
+
+		const savedRanking = await newRanking.save();
+		await savedRanking.populate([
+			{ path: 'addedBy', select: 'name email' }
+		]);
+
+		res.status(201).json({
+			status: true,
+			data: savedRanking,
+			message: 'Lead ranking created successfully'
+		});
+	} catch (error) {
+		console.error('Error creating lead ranking:', error);
+		if (error.code === 11000) {
+			return res.status(400).json({
+				status: false,
+				message: 'Lead ranking with this name already exists'
+			});
+		}
+		res.status(500).json({
+			status: false,
+			message: 'Failed to create lead ranking',
+			error: error.message
+		});
+	}
+});
+
+router.put('/lead-rankings/:id', isCollege, async (req, res) => {
+	try {
+		const { name, description, isActive } = req.body;
+		const rankingId = req.params.id;
+
+		if (!isValidId(rankingId)) {
+			return res.status(400).json({
+				status: false,
+				message: 'Invalid lead ranking id'
+			});
+		}
+
+		const currentRanking = await LeadRanking.findById(rankingId);
+		if (!currentRanking) {
+			return res.status(404).json({
+				status: false,
+				message: 'Lead ranking not found'
+			});
+		}
+
+		if (name !== undefined) {
+			const trimmedName = String(name).trim();
+			if (!trimmedName) {
+				return res.status(400).json({
+					status: false,
+					message: 'Lead ranking name is required'
+				});
+			}
+
+			const existingRanking = await LeadRanking.findOne({
+				name: trimmedName,
+				_id: { $ne: rankingId }
+			});
+			if (existingRanking) {
+				return res.status(400).json({
+					status: false,
+					message: 'Lead ranking with this name already exists'
+				});
+			}
+		}
+
+		const updatePayload = {};
+		if (name !== undefined) updatePayload.name = String(name).trim();
+		if (description !== undefined) updatePayload.description = description;
+		if (isActive !== undefined) updatePayload.isActive = isActive;
+
+		const updatedRanking = await LeadRanking.findByIdAndUpdate(
+			rankingId,
+			updatePayload,
+			{ new: true, runValidators: true }
+		).populate([
+			{ path: 'addedBy', select: 'name email' }
+		]);
+
+		res.json({
+			status: true,
+			data: updatedRanking,
+			message: 'Lead ranking updated successfully'
+		});
+	} catch (error) {
+		console.error('Error updating lead ranking:', error);
+		if (error.code === 11000) {
+			return res.status(400).json({
+				status: false,
+				message: 'Lead ranking with this name already exists'
+			});
+		}
+		res.status(500).json({
+			status: false,
+			message: 'Failed to update lead ranking',
+			error: error.message
+		});
+	}
+});
+
+router.delete('/lead-rankings/:id', isCollege, async (req, res) => {
+	try {
+		const rankingId = req.params.id;
+
+		if (!isValidId(rankingId)) {
+			return res.status(400).json({
+				status: false,
+				message: 'Invalid lead ranking id'
+			});
+		}
+
+		const deletedRanking = await LeadRanking.findByIdAndDelete(rankingId);
+
+		if (!deletedRanking) {
+			return res.status(404).json({
+				status: false,
+				message: 'Lead ranking not found'
+			});
+		}
+
+		res.json({
+			status: true,
+			message: 'Lead ranking deleted successfully'
+		});
+	} catch (error) {
+		console.error('Error deleting lead ranking:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to delete lead ranking',
+			error: error.message
+		});
+	}
+});
+
 // ==================== B2B LEAD MANAGEMENT ROUTES ====================
 
 // Get all leads with filtering and pagination
@@ -3178,6 +3404,7 @@ router.post('/leads/:id/cross-sale', isCollege, async (req, res) => {
 
 		const crossSaleLead = new Lead({
 			leadCategory: leadCategory || source.leadCategory,
+			leadRanking: source.leadRanking || undefined,
 			b2bProject,
 			b2bDepartment,
 			typeOfB2B,
@@ -3376,6 +3603,7 @@ router.post('/add-lead', isCollege, async (req, res) => {
 	try {
 		const {
 			leadCategory,
+			leadRanking,
 			b2bProject,
 			b2bDepartment,
 			typeOfB2B,
@@ -3497,6 +3725,22 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			// If owner not found, leadOwnerId remains null (optional field)
 		}
 
+		let leadRankingId = null;
+		const rankingRaw = leadRanking != null ? String(leadRanking).trim() : '';
+		if (rankingRaw) {
+			if (!mongoose.Types.ObjectId.isValid(rankingRaw)) {
+				return res.status(400).json({ status: false, message: 'Invalid lead ranking' });
+			}
+			const rankingDoc = await LeadRanking.findById(rankingRaw);
+			if (!rankingDoc) {
+				return res.status(400).json({ status: false, message: 'Lead ranking not found' });
+			}
+			if (rankingDoc.isActive === false) {
+				return res.status(400).json({ status: false, message: 'Selected lead ranking is inactive' });
+			}
+			leadRankingId = rankingDoc._id;
+		}
+
 		const collegeIdForPipeline = req.user?.college?._id;
 		const pipelineStatusScope = collegeIdForPipeline
 			? {
@@ -3616,6 +3860,10 @@ router.post('/add-lead', isCollege, async (req, res) => {
 		// Only add leadOwner if we have a valid ObjectId
 		if (leadOwnerId) {
 			leadData.leadOwner = leadOwnerId;
+		}
+
+		if (leadRankingId) {
+			leadData.leadRanking = leadRankingId;
 		}
 
 		const newLead = new Lead(leadData);
@@ -4355,6 +4603,7 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 	try {
 		const {
 			leadCategory,
+			leadRanking,
 			b2bProject,
 			b2bDepartment,
 			typeOfB2B,
@@ -4474,6 +4723,25 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 			}
 		}
 
+		if (leadRanking !== undefined) {
+			const rankingRaw = leadRanking != null ? String(leadRanking).trim() : '';
+			if (!rankingRaw) {
+				updatePayload.leadRanking = null;
+			} else {
+				if (!mongoose.Types.ObjectId.isValid(rankingRaw)) {
+					return res.status(400).json({ status: false, message: 'Invalid lead ranking' });
+				}
+				const rankingDoc = await LeadRanking.findById(rankingRaw);
+				if (!rankingDoc) {
+					return res.status(400).json({ status: false, message: 'Lead ranking not found' });
+				}
+				if (rankingDoc.isActive === false) {
+					return res.status(400).json({ status: false, message: 'Selected lead ranking is inactive' });
+				}
+				updatePayload.leadRanking = rankingDoc._id;
+			}
+		}
+
 		if (b2bProject !== undefined) {
 			if (!b2bProject || !mongoose.Types.ObjectId.isValid(b2bProject)) {
 				return res.status(400).json({ status: false, message: 'Invalid B2B project' });
@@ -4538,6 +4806,7 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 			{ new: true, runValidators: true }
 		).populate([
 			{ path: 'leadCategory', select: 'name' },
+			{ path: 'leadRanking', select: 'name isActive' },
 			{ path: 'b2bProject', select: 'name' },
 			{ path: 'b2bDepartment', select: 'name' },
 			{ path: 'typeOfB2B', select: 'name' },
@@ -5009,6 +5278,10 @@ router.post('/leads/import', isCollege, async (req, res) => {
 			'remark': 'remark',
 			'latitude': 'latitude',
 			'longitude': 'longitude',
+			'leadranking': 'leadRanking',
+			'ranking': 'leadRanking',
+			'leadrank': 'leadRanking',
+			'rank': 'leadRanking',
 			
 			'business': 'businessName',
 			'companyname': 'businessName',
@@ -5137,6 +5410,9 @@ router.post('/leads/import', isCollege, async (req, res) => {
 		const bodyLeadStatus = req.body?.leadStatus ? String(req.body.leadStatus).trim() : '';
 		const bodyLeadSubStatus = req.body?.leadSubStatus ? String(req.body.leadSubStatus).trim() : '';
 		const bodyLeadOwner = req.body?.leadOwner ? String(req.body.leadOwner).trim() : '';
+		const bodyLeadRanking = req.body?.leadRanking ? String(req.body.leadRanking).trim() : '';
+
+		let defaultLeadRankingDoc = null;
 
 		if (bodyLeadCategory && mongoose.Types.ObjectId.isValid(bodyLeadCategory)) {
 			defaultLeadCategoryDoc = await LeadCategory.findById(bodyLeadCategory);
@@ -5149,6 +5425,27 @@ router.post('/leads/import', isCollege, async (req, res) => {
 		}
 		if (bodyTypeOfB2B && mongoose.Types.ObjectId.isValid(bodyTypeOfB2B)) {
 			defaultTypeOfB2BDoc = await TypeOfB2B.findById(bodyTypeOfB2B);
+		}
+		if (bodyLeadRanking) {
+			if (!mongoose.Types.ObjectId.isValid(bodyLeadRanking)) {
+				return res.status(400).json({
+					status: false,
+					message: 'Invalid Lead Ranking selected in the upload form. Please choose again.'
+				});
+			}
+			defaultLeadRankingDoc = await LeadRanking.findById(bodyLeadRanking);
+			if (!defaultLeadRankingDoc) {
+				return res.status(400).json({
+					status: false,
+					message: 'Lead Ranking not found. Please choose again.'
+				});
+			}
+			if (defaultLeadRankingDoc.isActive === false) {
+				return res.status(400).json({
+					status: false,
+					message: 'Selected Lead Ranking is inactive. Please choose an active ranking.'
+				});
+			}
 		}
 		if (bodyLeadStatus) {
 			const resolvedModal = await resolveBulkPipelineStatus(bodyLeadStatus);
@@ -5212,6 +5509,7 @@ router.post('/leads/import', isCollege, async (req, res) => {
 		const useModalB2bType = Boolean(defaultTypeOfB2BDoc);
 		const useModalPipeline = Boolean(modalStatusId);
 		const useModalLeadOwner = Boolean(modalLeadOwnerId);
+		const useModalLeadRanking = Boolean(defaultLeadRankingDoc);
 
 		leads = leads.filter((row) => {
 			if (!row || typeof row !== 'object') return false;
@@ -5450,6 +5748,53 @@ router.post('/leads/import', isCollege, async (req, res) => {
 					rowPipelineSubStatusId = modalSubStatusId;
 				}
 
+				let leadRankingId = null;
+				if (useModalLeadRanking) {
+					leadRankingId = defaultLeadRankingDoc._id;
+				} else if (row.leadRanking != null && String(row.leadRanking).trim() !== '') {
+					const rowRanking = String(row.leadRanking).trim();
+					let rankingDoc = null;
+					if (mongoose.Types.ObjectId.isValid(rowRanking)) {
+						rankingDoc = await LeadRanking.findById(rowRanking);
+					}
+					if (!rankingDoc) {
+						const rankingNorm = rowRanking.toLowerCase();
+						rankingDoc = await LeadRanking.findOne({
+							$expr: {
+								$eq: [
+									{ $toLower: { $trim: { input: '$name' } } },
+									rankingNorm
+								]
+							},
+							isActive: true
+						});
+					}
+					if (!rankingDoc) {
+						const rankingNorm = rowRanking.toLowerCase();
+						rankingDoc = await LeadRanking.findOne({
+							$expr: {
+								$eq: [
+									{ $toLower: { $trim: { input: '$name' } } },
+									rankingNorm
+								]
+							}
+						});
+					}
+					if (!rankingDoc) {
+						const available = await LeadRanking.find({ isActive: true }).select('name').limit(10);
+						const names = available.map((r) => r.name).join(', ');
+						errors.push(
+							`Row ${i + 2}: Lead Ranking "${rowRanking}" not found. Available: ${names || 'None'}`
+						);
+						continue;
+					}
+					if (rankingDoc.isActive === false) {
+						errors.push(`Row ${i + 2}: Lead Ranking "${rowRanking}" is inactive`);
+						continue;
+					}
+					leadRankingId = rankingDoc._id;
+				}
+
 				// Create lead object
 				const leadData = {
 					leadCategory: leadCategory._id,
@@ -5469,6 +5814,10 @@ router.post('/leads/import', isCollege, async (req, res) => {
 					remark: row.remark || row.remarks || '',
 					leadAddedBy: req.user._id
 				};
+
+				if (leadRankingId) {
+					leadData.leadRanking = leadRankingId;
+				}
 
 				if (rowPipelineStatusId) {
 					leadData.status = rowPipelineStatusId;

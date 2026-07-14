@@ -154,7 +154,7 @@ import AcademicCoordinatorModule from './Pages/App/College/Training/AcademicCoor
 import SeniorTrainerModule from './Pages/App/College/Training/SeniorTrainerModule';
 import Editcoursecopy from './Pages/App/College/Course/EditCoursecopy';
 import Viewcoursecopy from './Pages/App/College/Course/ViewCoursecopy';
-
+import LeadRanking from './Pages/App/College/Settings/LeadRanking/LeadRanking';
 // Trainer module
 import TrainerLayout from './Component/Layouts/App/Trainer'
 import TrainerLogin from './Pages/App/Trainer/TrainerLogin/TrainerLogin'
@@ -302,7 +302,7 @@ const Layout = () => {
           <Route path='editcoursecopy' element={<Editcoursecopy/>}/>
           <Route path='viewcoursecopy' element={<Viewcoursecopy/>}/>
          <Route path='viewcourse' element={<ViewCourses/>}/>
-          <Route path='registration' element={<Registrations/>}/>
+          <Route path='registrationold' element={<Registrations/>}/>
           <Route path='admissionpost' element={<AdmissionPost/>}/>
           {/* <Route path='editcourse' element={<EditCourse/>}/> */}
           <Route path="institute/courses/edit/:id" element={<EditCourse />} />
@@ -329,6 +329,7 @@ const Layout = () => {
           <Route path='typeOfB2b' element={<TypeB2b/>}/>
           <Route path='b2bProject' element={<B2BProject/>}/>
           <Route path='b2bDepartment' element={<B2BDepartment/>}/>
+          <Route path='leadRanking' element={<LeadRanking/>}/>
           <Route path='typeOfCategory' element={<TypeCategory/>}/>
           <Route path='calenderb2c' element={<CalenderFolowupB2C/>}/>
           <Route path='source' element={<Source/>}/>
@@ -347,7 +348,7 @@ const Layout = () => {
           <Route path='training' element={<TrainerModule/>}/>
           <Route path='training/academic-coordinator' element={<AcademicCoordinatorModule/>}/>
           <Route path='training/senior-trainer' element={<SeniorTrainerModule/>}/>
-          <Route path='registrationsold' element={<Regitrationsold/>}/>
+          <Route path='registration' element={<Regitrationsold/>}/>
           <Route path='academicCoordinator' element={<AcademicCoordinator/>}/>
           <Route path='seniorTrainer' element={<SeniorTrainerModule/>}/>
         </Route>

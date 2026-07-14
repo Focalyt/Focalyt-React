@@ -883,17 +883,17 @@ function CollegeLayout({ children }) {
                       </Link>
                     </li> */}
                     <li className={`nav-item ${location.pathname === '/institute/registrationsold' ? 'active' : ''}`}>
-                      <Link to="/institute/registrationsold" onClick={() => handleSidebarClose()}>
+                      <Link to="/institute/registration" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faUserFriends} />
-                        <span className="menu-title">{t('Admission New')}</span>
+                        <span className="menu-title">{t('Sales B2C')}</span>
                       </Link>
                     </li>
-                    {/* <li className={`nav-item ${location.pathname === '/institute/admissionpost' ? 'active' : ''}`}>
+                    <li className={`nav-item ${location.pathname === '/institute/admissionpost' ? 'active' : ''}`}>
                       <Link to="/institute/admissionpost" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faUserCheck} />
                         <span className="menu-title">{t('admission_cycle_post')}</span>
                       </Link>
-                    </li> */}
+                    </li>
                     <li className={`nav-item ${location.pathname === '/institute/whatsappchat' ? 'active' : ''}`}>
                       <Link to="/institute/whatsappchat" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faWhatsapp} />

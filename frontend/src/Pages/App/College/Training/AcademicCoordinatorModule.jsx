@@ -6,6 +6,7 @@ import 'react-calendar/dist/Calendar.css';
 
 const PINK = '#fa5579';
 const BLUE = '#2563eb';
+const GREEN = '#059669';
 
 const getOptionLabel = (options = [], value) =>
   options.find((option) => String(option.value) === String(value))?.label || '';
@@ -71,6 +72,25 @@ const normalizeMaterialItems = (items = []) =>
       name: item.name.trim(),
       requirement: item.requirement || DOC_REQUIREMENT.MANDATORY,
       requirementLabel: getDocRequirementLabel(item.requirement),
+    }));
+
+const createTotQuestionDraft = () => ({
+  id: `TQ${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+  question: '',
+  options: ['', '', '', ''],
+  correctIndex: 0,
+  marks: 1,
+});
+
+const normalizeTotQuestions = (questions = []) =>
+  (questions || [])
+    .filter((item) => item && item.question?.trim() && Array.isArray(item.options) && item.options.length >= 2)
+    .map((item) => ({
+      id: String(item.id || `TQ-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`),
+      question: String(item.question || '').trim(),
+      options: item.options.map((option) => String(option || '').trim()),
+      correctIndex: Number.isFinite(item.correctIndex) ? item.correctIndex : 0,
+      marks: Number(item.marks) || 1,
     }));
 
 const countMaterialsByRequirement = (items = []) => {
@@ -156,6 +176,81 @@ const MaterialDefinitionSection = ({
   </div>
 );
 
+const TotQuestionBankSection = ({
+  questions = [],
+  onQuestionChange,
+  onQuestionOptionChange,
+  onAddQuestion,
+  onRemoveQuestion,
+}) => (
+  <div className="ac-question-bank">
+    <div className="ac-question-bank__head">
+      <h6>TOT MCQ question bank</h6>
+      <button type="button" className="ac-mini-btn" onClick={onAddQuestion}>
+        <i className="fas fa-plus" /> Add question
+      </button>
+    </div>
+    <p className="ac-question-bank__hint">
+      Add MCQ questions for the TOT session. The assigned trainer will see these questions.
+    </p>
+    {questions.length === 0 ? (
+      <p className="ac-question-bank__empty">No TOT questions added yet. Add one to begin.</p>
+    ) : (
+      questions.map((question, index) => (
+        <div key={question.id || index} className="ac-question-card">
+          <div className="ac-question-card__top">
+            <label className="ac-field ac-field--full">
+              <span>Question {index + 1}</span>
+              <input
+                className="ac-input"
+                placeholder="Enter question text"
+                value={question.question}
+                onChange={(e) => onQuestionChange(index, 'question', e.target.value)}
+              />
+            </label>
+            <label className="ac-field ac-field--full">
+              <span>Marks</span>
+              <input
+                className="ac-input"
+                type="number"
+                min="1"
+                value={question.marks || 1}
+                onChange={(e) => onQuestionChange(index, 'marks', e.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              className="ac-remove-btn ac-remove-btn--question"
+              onClick={() => onRemoveQuestion(index)}
+              aria-label="Remove question"
+            >
+              <i className="fas fa-trash" />
+            </button>
+          </div>
+          <div className="ac-option-grid">
+            {question.options.map((option, optionIndex) => (
+              <label key={optionIndex} className="ac-option-row">
+                <input
+                  type="radio"
+                  name={`tot-question-${question.id}-correct`}
+                  checked={question.correctIndex === optionIndex}
+                  onChange={() => onQuestionChange(index, 'correctIndex', optionIndex)}
+                />
+                <input
+                  className="ac-input ac-input--small"
+                  placeholder={`Option ${String.fromCharCode(65 + optionIndex)}`}
+                  value={option}
+                  onChange={(e) => onQuestionOptionChange(index, optionIndex, e.target.value)}
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+      ))
+    )}
+  </div>
+);
+
 const SESSION_TYPE = {
   STUDENT: 'student',
   TOT: 'tot',
@@ -214,6 +309,99 @@ const mapSessionForTotCalendar = (session = {}) => ({
     : (session.totTrainingMethod || session.trainingMethod || ''),
 });
 
+const resolveSessionSelectionId = (sessionId) => (
+  String(sessionId).endsWith('-tot') ? String(sessionId).replace(/-tot$/, '') : sessionId
+);
+
+const TOTAL_SESSION_SLOTS = 30;
+
+const buildFixedSessionSlots = (sessions = [], total = TOTAL_SESSION_SLOTS) => {
+  const byNumber = {};
+  sessions.forEach((session) => {
+    const num = parseInt(String(session.sessionNumber ?? ''), 10);
+    if (!Number.isFinite(num) || num < 1 || num > total) return;
+    if (!byNumber[num]) byNumber[num] = session;
+  });
+  return Array.from({ length: total }, (_, index) => {
+    const sessionNumber = index + 1;
+    return {
+      key: `slot-${sessionNumber}`,
+      sessionNumber: String(sessionNumber),
+      session: byNumber[sessionNumber] || null,
+    };
+  });
+};
+
+const SessionPlanCalendar = ({
+  title,
+  icon,
+  accent = GREEN,
+  sessions,
+  selectedSessionId,
+  onSelectSession,
+}) => {
+  const cells = useMemo(() => buildFixedSessionSlots(sessions), [sessions]);
+
+  return (
+    <div className="ac-calendar" style={{ '--calendar-accent': accent }}>
+      <div className="ac-calendar__title-bar">
+        <div className="ac-calendar__title">
+          <i className={`fas ${icon}`} />
+          <span>{title}</span>
+        </div>
+        <span className="ac-calendar__count">{sessions.length} / {TOTAL_SESSION_SLOTS} plan(s)</span>
+      </div>
+      <div className="ac-calendar__head">
+        <h3>Session plans</h3>
+        <span className="ac-calendar__head-hint">Session 1–{TOTAL_SESSION_SLOTS} · dates assigned later by Senior Trainer</span>
+      </div>
+      <div className="ac-calendar__weekdays" aria-hidden="true">
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+          <span key={day}>{day}</span>
+        ))}
+      </div>
+      <div className="ac-calendar__grid">
+        {cells.map((cell) => {
+          const { session, sessionNumber } = cell;
+          if (!session) {
+            return (
+              <div
+                key={cell.key}
+                className="ac-calendar__day ac-calendar__day--slot"
+              >
+                <span className="ac-calendar__day-num">{sessionNumber}</span>
+                <span className="ac-calendar__session-title ac-calendar__session-title--muted">Not planned</span>
+              </div>
+            );
+          }
+
+          const color = session.sessionActivities?.[0]?.color
+            || session.activityColor
+            || (session.sessionType === SESSION_TYPE.TOT ? BLUE : GREEN);
+          const isSelected = resolveSessionSelectionId(selectedSessionId) === resolveSessionSelectionId(session.id);
+
+          return (
+            <button
+              key={cell.key}
+              type="button"
+              className={`ac-calendar__day ac-calendar__day--session${isSelected ? ' ac-calendar__day--selected' : ''}`}
+              style={{ '--event-color': color }}
+              onClick={() => onSelectSession(session.id)}
+              title={`Session ${sessionNumber}: ${session.title || 'Untitled'}`}
+            >
+              <span className="ac-calendar__day-num">{sessionNumber}</span>
+              <span className="ac-calendar__session-title">{session.title || 'Untitled session'}</span>
+              {session.topicCovered ? (
+                <span className="ac-calendar__session-topic">{session.topicCovered}</span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const PROOF_TYPE_OPTIONS = ['Document', 'Image', 'Video', 'PDF'];
 
 const validateTotBeforeSave = (draft) => {
@@ -232,6 +420,10 @@ const TotSection = ({
   onTotMaterialChange,
   onAddTotMaterial,
   onRemoveTotMaterial,
+  onTotQuestionChange,
+  onTotQuestionOptionChange,
+  onAddTotQuestion,
+  onRemoveTotQuestion,
   onTotCompletionProofChange,
   onAddTotCompletionProof,
   onRemoveTotCompletionProof,
@@ -336,6 +528,14 @@ const TotSection = ({
       onAdd={onAddTotMaterial}
       onChange={onTotMaterialChange}
       onRemove={onRemoveTotMaterial}
+    />
+
+    <TotQuestionBankSection
+      questions={draft.totQuestionBank || []}
+      onQuestionChange={onTotQuestionChange}
+      onQuestionOptionChange={onTotQuestionOptionChange}
+      onAddQuestion={onAddTotQuestion}
+      onRemoveQuestion={onRemoveTotQuestion}
     />
   </div>
   );
@@ -849,6 +1049,8 @@ const createEmptySessionDraft = () => ({
   totTrainerName: '',
   totStatus: 'pending',
   totCompletionProofs: [],
+  totQuestionBank: [],
+  totQuestionBankLastUpdated: '',
   sessionActivities: [],
   notes: '',
   evidenceDocs: [],
@@ -1502,6 +1704,10 @@ const SessionPlanModal = ({
   onTotCompletionProofChange,
   onAddTotCompletionProof,
   onRemoveTotCompletionProof,
+  onTotQuestionChange,
+  onTotQuestionOptionChange,
+  onAddTotQuestion,
+  onRemoveTotQuestion,
   activityTypes,
   onActivityTypeToggle,
   onClearActivityTypes,
@@ -1732,6 +1938,10 @@ const SessionPlanModal = ({
             onTotMaterialChange={onTotMaterialChange}
             onAddTotMaterial={onAddTotMaterial}
             onRemoveTotMaterial={onRemoveTotMaterial}
+            onTotQuestionChange={onTotQuestionChange}
+            onTotQuestionOptionChange={onTotQuestionOptionChange}
+            onAddTotQuestion={onAddTotQuestion}
+            onRemoveTotQuestion={onRemoveTotQuestion}
             onTotCompletionProofChange={onTotCompletionProofChange}
             onAddTotCompletionProof={onAddTotCompletionProof}
             onRemoveTotCompletionProof={onRemoveTotCompletionProof}
@@ -1787,6 +1997,10 @@ const ReferSessionModal = ({
   const handleConfirm = () => {
     if (!selectedTrainerId) {
       onNotify?.('Please select a Senior Trainer');
+      return;
+    }
+    if (!session) {
+      onNotify?.('No session selected to refer.');
       return;
     }
     const selected = trainerOptions.find((trainer) => trainer.value === selectedTrainerId);
@@ -2168,7 +2382,8 @@ const AcademicCoordinatorModule = () => {
   );
 
   const handleSelectSession = (sessionId) => {
-    setSelectedSessionId((prev) => (prev === sessionId ? '' : sessionId));
+    const resolvedId = resolveSessionSelectionId(sessionId);
+    setSelectedSessionId((prev) => (resolveSessionSelectionId(prev) === resolvedId ? '' : resolvedId));
   };
 
   const loadDummySessions = () => {
@@ -2220,6 +2435,16 @@ const AcademicCoordinatorModule = () => {
   );
 
   const tocTree = useMemo(() => buildCourseToc(filteredSessions), [filteredSessions]);
+
+  const totSessions = useMemo(
+    () => filteredSessions.filter((session) => appearsOnTotCalendar(session)).map(mapSessionForTotCalendar),
+    [filteredSessions]
+  );
+
+  const studentSessions = useMemo(
+    () => filteredSessions.filter((session) => appearsOnStudentCalendar(session)),
+    [filteredSessions]
+  );
 
   const stats = useMemo(() => ({
     total: sessions.length,
@@ -2379,6 +2604,46 @@ const AcademicCoordinatorModule = () => {
   const addDraftTotCompletionProof = () => addDraftListItem('totCompletionProofs', 'PDF');
   const removeDraftTotCompletionProof = (index) => removeDraftListItem('totCompletionProofs', index);
 
+  const updateDraftTotQuestion = (index, field, value) => setModal((prev) => ({
+    ...prev,
+    draft: {
+      ...prev.draft,
+      totQuestionBank: (prev.draft.totQuestionBank || []).map((question, i) => (
+        i === index ? { ...question, [field]: value } : question
+      )),
+    },
+  }));
+
+  const updateDraftTotQuestionOption = (questionIndex, optionIndex, value) => setModal((prev) => ({
+    ...prev,
+    draft: {
+      ...prev.draft,
+      totQuestionBank: (prev.draft.totQuestionBank || []).map((question, i) => (
+        i === questionIndex
+          ? { ...question, options: question.options.map((option, optIdx) => (
+            optIdx === optionIndex ? value : option
+          )) }
+          : question
+      )),
+    },
+  }));
+
+  const addDraftTotQuestion = () => setModal((prev) => ({
+    ...prev,
+    draft: {
+      ...prev.draft,
+      totQuestionBank: [...(prev.draft.totQuestionBank || []), createTotQuestionDraft()],
+    },
+  }));
+
+  const removeDraftTotQuestion = (index) => setModal((prev) => ({
+    ...prev,
+    draft: {
+      ...prev.draft,
+      totQuestionBank: (prev.draft.totQuestionBank || []).filter((_, i) => i !== index),
+    },
+  }));
+
   const handleActivityTypeToggle = (activityType) => {
     setModal((prev) => {
       const current = prev.draft.sessionActivities?.length
@@ -2425,6 +2690,7 @@ const AcademicCoordinatorModule = () => {
     }
 
     const existing = editingId ? sessions.find((s) => s.id === editingId) : null;
+    const normalizedTotQuestionBank = normalizeTotQuestions(draft.totQuestionBank);
 
     const {
       activityTypeId: _legacyActivityTypeId,
@@ -2436,6 +2702,10 @@ const AcademicCoordinatorModule = () => {
     const normalized = {
       ...draftWithoutLegacyActivity,
       sessionType: SESSION_TYPE.STUDENT,
+      totQuestionBank: normalizedTotQuestionBank,
+      totQuestionBankLastUpdated: normalizedTotQuestionBank.length
+        ? new Date().toISOString()
+        : existing?.totQuestionBankLastUpdated || '',
       includeTot: draft.includeTot !== false,
       totUseSameTopics: draft.includeTot !== false ? draft.totUseSameTopics !== false : false,
       totTopicCovered: draft.includeTot !== false
@@ -2667,6 +2937,25 @@ const AcademicCoordinatorModule = () => {
             totalSessions={sessions.length}
           />
 
+          <div className="ac-dual-calendars">
+            <SessionPlanCalendar
+              title="TOT Calendar"
+              icon="fa-chalkboard-teacher"
+              accent={BLUE}
+              sessions={totSessions}
+              selectedSessionId={selectedSessionId}
+              onSelectSession={handleSelectSession}
+            />
+            <SessionPlanCalendar
+              title="Session Calendar"
+              icon="fa-user-graduate"
+              accent={GREEN}
+              sessions={studentSessions}
+              selectedSessionId={selectedSessionId}
+              onSelectSession={handleSelectSession}
+            />
+          </div>
+
           <div className="ac-filters">
             <input
               type="text"
@@ -2739,6 +3028,10 @@ const AcademicCoordinatorModule = () => {
           onTotCompletionProofChange={updateDraftTotCompletionProof}
           onAddTotCompletionProof={addDraftTotCompletionProof}
           onRemoveTotCompletionProof={removeDraftTotCompletionProof}
+          onTotQuestionChange={updateDraftTotQuestion}
+          onTotQuestionOptionChange={updateDraftTotQuestionOption}
+          onAddTotQuestion={addDraftTotQuestion}
+          onRemoveTotQuestion={removeDraftTotQuestion}
           activityTypes={activityTypes}
           onActivityTypeToggle={handleActivityTypeToggle}
           onClearActivityTypes={handleClearActivityTypes}
@@ -3375,9 +3668,91 @@ const AC_CSS = `
     border-radius: 10px; font-size: 13px; font-weight: 600; z-index: 500; display: flex; align-items: center; gap: 8px;
   }
 
+  .ac-dual-calendars {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; margin-bottom: 16px;
+  }
+  .ac-calendar {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; min-width: 0;
+    box-shadow: 0 10px 28px rgba(15,23,42,0.06);
+  }
+  .ac-calendar__title-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 12px 14px; border-bottom: 1px solid #eef2f7;
+    background: color-mix(in srgb, var(--calendar-accent, ${GREEN}) 8%, white);
+  }
+  .ac-calendar__title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 900; color: #0f172a; }
+  .ac-calendar__title i { color: var(--calendar-accent, ${GREEN}); }
+  .ac-calendar__count {
+    font-size: 11px; font-weight: 800; color: var(--calendar-accent, ${GREEN});
+    background: color-mix(in srgb, var(--calendar-accent, ${GREEN}) 14%, white);
+    padding: 4px 10px; border-radius: 999px;
+  }
+  .ac-calendar__head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 8px; padding: 14px 14px 0;
+  }
+  .ac-calendar__head h3 { margin: 0; font-size: 1.05rem; font-weight: 900; }
+  .ac-calendar__head-hint { font-size: 11px; font-weight: 700; color: #94a3b8; }
+  .ac-calendar__weekdays {
+    display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px;
+    padding: 0 14px 6px;
+  }
+  .ac-calendar__weekdays span {
+    text-align: center; font-size: 10px; font-weight: 800; color: #94a3b8;
+    text-transform: uppercase; letter-spacing: 0.04em; padding: 4px 0;
+  }
+  .ac-calendar__grid {
+    display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px; padding: 0 14px 14px; width: 100%; box-sizing: border-box;
+  }
+  .ac-calendar__day {
+    box-sizing: border-box; min-width: 0; width: 100%; max-width: 100%;
+    min-height: 88px; height: 100%;
+    border: 1px solid #eef2f7; border-radius: 10px; padding: 6px;
+    background: #fafbfc; display: flex; flex-direction: column; gap: 3px;
+    text-align: left; overflow: hidden;
+  }
+  .ac-calendar__day--muted { opacity: 0.35; }
+  .ac-calendar__day--slot {
+    background: #f8fafc; border-style: dashed; border-color: #e2e8f0;
+  }
+  .ac-calendar__day--slot .ac-calendar__day-num { color: #94a3b8; }
+  .ac-calendar__day--session {
+    margin: 0; font: inherit; color: inherit; appearance: none; -webkit-appearance: none;
+    cursor: pointer; border: 1px solid #eef2f7;
+    background: color-mix(in srgb, var(--event-color, ${BLUE}) 8%, white);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .ac-calendar__day--session:hover {
+    border-color: color-mix(in srgb, var(--event-color, ${BLUE}) 45%, #e2e8f0);
+  }
+  .ac-calendar__day--selected {
+    border-color: var(--event-color, ${GREEN});
+    box-shadow: inset 0 0 0 1.5px var(--event-color, ${GREEN});
+    background: color-mix(in srgb, var(--event-color, ${GREEN}) 16%, white);
+  }
+  .ac-calendar__day-num {
+    flex-shrink: 0; font-size: 12px; font-weight: 900; line-height: 1;
+    color: var(--event-color, #334155);
+  }
+  .ac-calendar__session-title {
+    font-size: 10px; font-weight: 700; color: #0f172a; line-height: 1.3;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden; word-break: break-word; overflow-wrap: anywhere;
+  }
+  .ac-calendar__session-title--muted { color: #94a3b8; font-weight: 600; }
+  .ac-calendar__session-topic {
+    margin-top: auto; font-size: 9px; font-weight: 600; color: #64748b;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+  }
+  .ac-calendar__empty {
+    margin: 0; padding: 24px 14px 28px; text-align: center; font-size: 13px; font-weight: 700; color: #94a3b8;
+  }
+
   @media (max-width: 1100px) {
     .ac-workspace, .ac-workspace--toc { grid-template-columns: 1fr; }
     .ac-toc-panel, .ac-side-panel { position: static; max-height: none; }
+    .ac-dual-calendars { grid-template-columns: 1fr; }
   }
   @media (max-width: 768px) {
     .ac-stats-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -3386,6 +3761,7 @@ const AC_CSS = `
     .ac-form-grid { grid-template-columns: 1fr; }
     .ac-field--span-2 { grid-column: span 1; }
     .ac-evidence-row { grid-template-columns: 1fr; }
+    .ac-calendar__day { min-height: 72px; }
     .ac-session-card__foot-right { margin-left: 0; width: 100%; }
     .ac-toolbar { flex-direction: column; align-items: stretch; }
     .ac-toolbar__actions { width: 100%; }

@@ -109,7 +109,10 @@ const MAIN_TABS = [
 const DUMMY_SESSIONS = [
   { id: 'S001', title: 'Morning Batch – Retail Sales', date: '22/06/2026' },
   { id: 'S002', title: 'Practical – Customer Handling', date: '22/06/2026' },
-  { id: 'S003', title: 'Assessment Review', date: '21/06/2026' }
+  { id: 'S003', title: 'Assessment Review', date: '21/06/2026' },
+  { id: 'S004', title: 'Soft Skills – Communication', date: '23/06/2026' },
+  { id: 'S005', title: 'Industry Connect Session', date: '24/06/2026' },
+  { id: 'S006', title: 'Final Evaluation & Feedback', date: '25/06/2026' }
 ];
 
 const getTodayInputValue = () => new Date().toISOString().slice(0, 10);
@@ -247,6 +250,11 @@ const loadAssignedCoordinatorSessions = (batchId, trainerId) => {
     return [];
   }
 };
+
+const isCoordinatorPlanSession = (session) => (
+  String(session?.id || '').startsWith('AC-')
+  || Boolean(session?.workflowStatus)
+);
 
 const mergeSessionsById = (base = [], additions = []) => {
   const sessionMap = new Map();
@@ -440,6 +448,8 @@ const mapAppliedCourseToStudent = (profile) => {
     mobile,
     attendance: `${att || 0}%`,
     status: profile.dropout ? 'Dropout' : (profile.isBatchFreeze ? 'Frozen' : 'Active'),
+    isBatchFreeze: !!profile.isBatchFreeze,
+    isZeroPeriodAssigned: !!profile.isZeroPeriodAssigned,
     email: candidate.email || profile.email || '',
     batchCode: batch.name || profile.batchName || courseDoc.batchName || '-',
     batchId: batch._id ? String(batch._id) : (profile.batch ? String(profile.batch) : ''),
@@ -641,7 +651,321 @@ const DUMMY_STUDENTS = [
       { date: '20/06/2026', title: 'Practical – Customer Handling', status: 'Not Marked', topic: 'Role play' },
     ],
   },
+  {
+    id: 'ST04',
+    name: 'Sameer Ranjan Deep',
+    mobile: '9668161717',
+    attendance: '84%',
+    status: 'Active',
+    email: 'sameer.deep@email.com',
+    batchCode: 'BATCH-RS-2024-01',
+    course: 'Retail Sales Associate',
+    center: 'Delhi Centre – Rohini',
+    enrolledDate: '12/04/2026',
+    totalSessions: 24,
+    presentSessions: 20,
+    absentSessions: 4,
+    assessmentScore: 75,
+    participationScore: 80,
+    engagementScore: 78,
+    practicalScore: 74,
+    trainerRemark: 'Good progress in product knowledge sessions.',
+    sessionHistory: [],
+  },
 ];
+
+const DUMMY_ATTENDANCE_PATTERN = ['Present', 'Present', 'Absent', 'Present', 'Not Marked', 'Present', 'Absent'];
+
+const getDummyStatusForDate = (studentId, dateKey, studentIndex = 0) => {
+  const day = Number(String(dateKey).slice(8, 10)) || 1;
+  const seed = (String(studentId).length * 7) + day + studentIndex;
+  return DUMMY_ATTENDANCE_PATTERN[seed % DUMMY_ATTENDANCE_PATTERN.length];
+};
+
+const ViewAttendanceRegisterModal = ({
+  students = [],
+  focusStudentId = '',
+  onClose,
+}) => {
+  const [registerDateRange, setRegisterDateRange] = useState(() => getCurrentMonthDateRange());
+
+  const sourceStudents = useMemo(() => {
+    const list = students.length ? students : DUMMY_STUDENTS;
+    if (!focusStudentId) return list;
+    const focused = list.filter((student) => String(student.id) === String(focusStudentId));
+    if (focused.length) return focused;
+    const dummyFocused = DUMMY_STUDENTS.filter((student) => String(student.id) === String(focusStudentId));
+    return dummyFocused.length ? dummyFocused : list.slice(0, 1);
+  }, [students, focusStudentId]);
+
+  const dateColumns = useMemo(
+    () => buildRegisterDateColumns(registerDateRange.startDate, registerDateRange.endDate),
+    [registerDateRange.startDate, registerDateRange.endDate]
+  );
+
+  const focusedStudent = focusStudentId
+    ? sourceStudents.find((student) => String(student.id) === String(focusStudentId)) || sourceStudents[0]
+    : null;
+
+  const getRowSummary = (studentId, studentIndex) => {
+    let present = 0;
+    let absent = 0;
+    dateColumns.forEach((column) => {
+      if (column.dayName === 'Sun') return;
+      const status = getDummyStatusForDate(studentId, column.dateKey, studentIndex);
+      if (status === 'Present') present += 1;
+      if (status === 'Absent') absent += 1;
+    });
+    const total = present + absent;
+    return {
+      present,
+      absent,
+      percentage: total > 0 ? Number(((present / total) * 100).toFixed(1)) : 0,
+    };
+  };
+
+  const getDateColumnStats = (dateKey) => {
+    const dayStats = sourceStudents.reduce((acc, student, index) => {
+      const status = getDummyStatusForDate(student.id, dateKey, index);
+      const info = getAttendanceSymbolInfo(status);
+      acc[info.className] = (acc[info.className] || 0) + 1;
+      return acc;
+    }, {});
+    const total = sourceStudents.length;
+    const presentCount = dayStats.present || 0;
+    return {
+      dayStats,
+      percentage: total > 0 ? ((presentCount / total) * 100).toFixed(1) : '0.0',
+    };
+  };
+
+  const overallAverage = sourceStudents.length
+    ? (
+      sourceStudents.reduce((sum, student, index) => sum + getRowSummary(student.id, index).percentage, 0)
+      / sourceStudents.length
+    ).toFixed(1)
+    : '0.0';
+
+  const periodLabel = dateColumns.length
+    ? `${dateColumns[0].day}/${registerDateRange.startDate?.slice(5, 7) || ''}/${registerDateRange.startDate?.slice(0, 4) || ''} to ${dateColumns[dateColumns.length - 1].day}/${registerDateRange.endDate?.slice(5, 7) || ''}/${registerDateRange.endDate?.slice(0, 4) || ''}`
+    : '-';
+
+  const batchLabel = focusedStudent?.batchCode || sourceStudents[0]?.batchCode || 'Demo Batch';
+
+  return (
+    <div className="attendance-modal-backdrop">
+      <div className="attendance-modal attendance-modal--register" role="dialog" aria-modal="true" aria-labelledby="view-attendance-title">
+        <div className="attendance-modal__head">
+          <div>
+            <h3 id="view-attendance-title">
+              <i className="fas fa-clipboard-list" /> View Attendance
+              {focusedStudent ? ` - ${focusedStudent.name}` : ''}
+            </h3>
+            <p>{batchLabel} | Dummy register data | Date filters only</p>
+          </div>
+          <button type="button" className="attendance-close-btn" onClick={onClose} aria-label="Close view attendance">
+            <i className="fas fa-times" />
+          </button>
+        </div>
+
+        <div className="attendance-modal__body">
+          <div className="attendance-register-container">
+            <div className="register-title">
+              <h4>
+                <i className="fas fa-clipboard-list" /> Attendance Register
+              </h4>
+              <p>
+                Total Students: {sourceStudents.length} | Period: {periodLabel}
+              </p>
+            </div>
+
+            <div className="register-controls register-controls--dates-only">
+              <div className="date-controls date-controls--wide">
+                <div className="date-controls__row">
+                  <label>
+                    <span>From Date</span>
+                    <input
+                      type="date"
+                      value={registerDateRange.startDate}
+                      onChange={(event) => setRegisterDateRange((prev) => ({ ...prev, startDate: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    <span>To Date</span>
+                    <input
+                      type="date"
+                      value={registerDateRange.endDate}
+                      onChange={(event) => setRegisterDateRange((prev) => ({ ...prev, endDate: event.target.value }))}
+                    />
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  className="register-month-btn"
+                  onClick={() => setRegisterDateRange(getCurrentMonthDateRange())}
+                >
+                  <i className="fas fa-calendar-day" /> Current Month
+                </button>
+              </div>
+            </div>
+
+            <div className="register-table-container">
+              <div className="table-responsive register-table-scroll">
+                <table className="attendance-register-table">
+                  <thead>
+                    <tr>
+                      <th rowSpan="2" className="student-info-header">
+                        <div className="student-header-content">
+                          <i className="fas fa-users" /> Student Information
+                        </div>
+                      </th>
+                      <th colSpan={Math.max(dateColumns.length, 1)} className="dates-header">
+                        <i className="fas fa-calendar-alt" /> Attendance Dates ({dateColumns.length} days)
+                      </th>
+                      <th rowSpan="2" className="summary-header">
+                        <div className="summary-header-content">
+                          <i className="fas fa-chart-pie" /> Summary
+                        </div>
+                      </th>
+                    </tr>
+                    <tr>
+                      {dateColumns.map((column) => (
+                        <th
+                          key={column.dateKey}
+                          className={`date-header${column.isWeekend ? ' weekend-header' : ''}`}
+                          title={column.dateLabel}
+                        >
+                          <div className="date-header-content">
+                            <div className="date-number">{column.day}</div>
+                            <div className="day-name">{column.dayName}</div>
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sourceStudents.map((student, studentIndex) => {
+                      const summary = getRowSummary(student.id, studentIndex);
+                      return (
+                        <tr key={student.id} className="student-row">
+                          <td className="student-info-cell">
+                            <div className="student-info-content">
+                              <div className="student-avatar">
+                                <i className="fas fa-user" />
+                              </div>
+                              <div className="student-details">
+                                <strong className="student-name">{student.name}</strong>
+                                <small>
+                                  <i className="fas fa-phone" /> {student.mobile || '-'}
+                                </small>
+                              </div>
+                            </div>
+                          </td>
+                          {dateColumns.map((column) => {
+                            const status = getDummyStatusForDate(student.id, column.dateKey, studentIndex);
+                            const info = getAttendanceSymbolInfo(status);
+                            return (
+                              <td
+                                key={`${student.id}-${column.dateKey}`}
+                                className={`attendance-cell ${info.className}${column.isWeekend ? ' weekend-cell' : ''}`}
+                                title={`${student.name} - ${column.dateLabel}: ${info.title}`}
+                              >
+                                <div className="attendance-symbol">{info.symbol}</div>
+                              </td>
+                            );
+                          })}
+                          <td className="summary-cell">
+                            <div className="summary-content">
+                              <div className="summary-stats">
+                                <div className="stat-item present">
+                                  <span className="stat-label">P:</span>
+                                  <span className="stat-value">{summary.present}</span>
+                                </div>
+                                <div className="stat-item absent">
+                                  <span className="stat-label">A:</span>
+                                  <span className="stat-value">{summary.absent}</span>
+                                </div>
+                              </div>
+                              <div className="attendance-percentage">
+                                <div className="percentage-bar">
+                                  <div
+                                    className="percentage-fill"
+                                    style={{ width: `${Math.min(summary.percentage, 100)}%` }}
+                                  />
+                                </div>
+                                <small>{summary.percentage}%</small>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  {!focusedStudent && (
+                    <tfoot>
+                      <tr className="summary-row">
+                        <td className="summary-row-header">
+                          <strong><i className="fas fa-calculator" /> Daily Summary</strong>
+                        </td>
+                        {dateColumns.map((column) => {
+                          const { dayStats, percentage } = getDateColumnStats(column.dateKey);
+                          return (
+                            <td
+                              key={`summary-${column.dateKey}`}
+                              className={`summary-cell${column.isWeekend ? ' weekend-summary' : ''}`}
+                            >
+                              <div className="day-summary">
+                                <div className="summary-percentage">{percentage}%</div>
+                                <div className="summary-counts">
+                                  <small>
+                                    P:{dayStats.present || 0} | A:{dayStats.absent || 0} | -:{dayStats['not-marked'] || 0}
+                                  </small>
+                                </div>
+                              </div>
+                            </td>
+                          );
+                        })}
+                        <td className="overall-summary">
+                          <div className="overall-stats">
+                            <strong>Overall Average</strong>
+                            <div className="overall-percentage">{overallAverage}%</div>
+                          </div>
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            </div>
+
+            <div className="register-legend">
+              <h6><i className="fas fa-info-circle" /> Attendance Symbols Legend</h6>
+              <div className="legend-grid">
+                <div className="legend-item">
+                  <span className="legend-symbol present">P</span>
+                  <span className="legend-text">Present</span>
+                </div>
+                <div className="legend-item">
+                  <span className="legend-symbol absent">A</span>
+                  <span className="legend-text">Absent</span>
+                </div>
+                <div className="legend-item">
+                  <span className="legend-symbol not-marked">-</span>
+                  <span className="legend-text">Not Marked</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="attendance-modal__foot">
+          <button type="button" className="sc-btn" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const deriveSessionAttendanceStats = (session, attendanceRecordsBySession = {}, students = []) => {
   const rows = attendanceRecordsBySession[session?.id];
   if (rows?.length) {
@@ -668,14 +992,16 @@ const buildStudentSessionHistory = (student, sessions = [], attendanceRecordsByS
     const rows = attendanceRecordsBySession[session.id];
     if (!rows?.length) return;
 
-    const row = rows.find((entry) => entry.id === student.id)
+    const row = rows.find((entry) => String(entry.id) === String(student.id))
       || rows.find((entry) => entry.name === student.name);
     if (!row) return;
 
     const meta = getSessionAttendanceMeta(session);
+    const dateValue = parseSessionDateValue(session);
 
     history.push({
       date: session.date || formatSessionDate(session.sessionDate),
+      dateValue,
       title: session.title,
       status: row.status,
       topic: session.topicCovered || session.title,
@@ -684,7 +1010,94 @@ const buildStudentSessionHistory = (student, sessions = [], attendanceRecordsByS
     });
   });
 
-  return history.length ? history : (student.sessionHistory || []);
+  const sortedHistory = history.sort((a, b) => {
+    if (!a.dateValue || !b.dateValue) return 0;
+    return a.dateValue.getTime() - b.dateValue.getTime();
+  });
+
+  return sortedHistory.length ? sortedHistory : (student.sessionHistory || []);
+};
+
+const getMonthKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+const getMonthLabel = (date) => date.toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+const buildAttendanceSummaries = (sessionHistory = []) => {
+  const now = new Date();
+  const currentWeekStart = new Date(now);
+  currentWeekStart.setHours(0, 0, 0, 0);
+  currentWeekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  const currentWeekEnd = new Date(currentWeekStart);
+  currentWeekEnd.setDate(currentWeekStart.getDate() + 6);
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+  const overall = { present: 0, absent: 0, total: 0 };
+  const currentWeek = { present: 0, absent: 0, total: 0 };
+  const currentMonth = { present: 0, absent: 0, total: 0 };
+  const monthMap = new Map();
+  const dayStatuses = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(currentWeekStart);
+    date.setDate(currentWeekStart.getDate() + index);
+    return {
+      key: toDateKey(date),
+      label: date.toLocaleDateString('en-IN', { weekday: 'short' }),
+      dateLabel: date.toLocaleDateString('en-IN'),
+      status: 'No Data',
+      sessions: [],
+    };
+  });
+
+  sessionHistory.forEach((entry) => {
+    if (entry.excluded || !entry.dateValue) return;
+    const status = entry.status;
+    overall.total += 1;
+    if (status === 'Present') overall.present += 1;
+    if (status === 'Absent') overall.absent += 1;
+
+    if (entry.dateValue >= currentWeekStart && entry.dateValue <= currentWeekEnd) {
+      currentWeek.total += 1;
+      if (status === 'Present') currentWeek.present += 1;
+      if (status === 'Absent') currentWeek.absent += 1;
+      const day = dayStatuses.find((dayItem) => dayItem.key === toDateKey(entry.dateValue));
+      if (day) {
+        day.status = status;
+        day.sessions.push(entry.title);
+      }
+    }
+
+    if (entry.dateValue >= currentMonthStart && entry.dateValue <= currentMonthEnd) {
+      currentMonth.total += 1;
+      if (status === 'Present') currentMonth.present += 1;
+      if (status === 'Absent') currentMonth.absent += 1;
+    }
+
+    const monthKey = getMonthKey(entry.dateValue);
+    const monthLabel = getMonthLabel(entry.dateValue);
+    const monthData = monthMap.get(monthKey) || { label: monthLabel, present: 0, absent: 0, total: 0 };
+    monthData.total += 1;
+    if (status === 'Present') monthData.present += 1;
+    if (status === 'Absent') monthData.absent += 1;
+    monthMap.set(monthKey, monthData);
+  });
+
+  const monthSummary = Array.from(monthMap.values())
+    .sort((a, b) => b.label.localeCompare(a.label))
+    .slice(0, 4)
+    .map((entry) => ({
+      ...entry,
+      percentage: entry.total > 0 ? ((entry.present / entry.total) * 100).toFixed(1) : '0.0',
+    }));
+
+  const summaryPercentage = overall.total > 0 ? ((overall.present / overall.total) * 100).toFixed(1) : '0.0';
+  const weekPercentage = currentWeek.total > 0 ? ((currentWeek.present / currentWeek.total) * 100).toFixed(1) : '0.0';
+  const monthPercentage = currentMonth.total > 0 ? ((currentMonth.present / currentMonth.total) * 100).toFixed(1) : '0.0';
+
+  return {
+    overall: { ...overall, percentage: summaryPercentage },
+    currentWeek: { ...currentWeek, percentage: weekPercentage, startDate: currentWeekStart, endDate: currentWeekEnd },
+    currentMonth: { ...currentMonth, percentage: monthPercentage, label: getMonthLabel(now) },
+    currentWeekDays: dayStatuses,
+    monthSummary,
+  };
 };
 const getStudentPerformanceProfile = (student, sessions, attendanceRecordsBySession, basicDetails) => {
   if (!student) return null;
@@ -697,6 +1110,7 @@ const getStudentPerformanceProfile = (student, sessions, attendanceRecordsBySess
     ? `${batchAttendance.percentage}%`
     : student.attendance;
   const attendanceNum = parseFloat(batchAttendance.percentage ?? student.attendance) || 0;
+  const attendanceBreakdown = buildAttendanceSummaries(sessionHistory);
 
   return {
     ...student,
@@ -713,6 +1127,7 @@ const getStudentPerformanceProfile = (student, sessions, attendanceRecordsBySess
     markedSessions: batchAttendance.markedSessions,
     excludedSessions: batchAttendance.excludedSessions,
     sessionHistory,
+    attendanceBreakdown,
     metrics: [
       { label: 'Class Participation', value: student.participationScore, icon: 'fa-users', tone: 'blue' },
       { label: 'Engagement', value: student.engagementScore, icon: 'fa-bolt', tone: 'pink' },
@@ -748,25 +1163,132 @@ const clampScore = (value) => {
 const formatMetricValue = (value) => (value !== '' && value != null ? `${value}%` : 'Not added');
 
 const ATTENDANCE_STATUSES = ['Present', 'Absent', 'Not Marked'];
+
+const getAttendanceSymbolInfo = (status = 'Not Marked') => {
+  if (status === 'Present') return { symbol: 'P', className: 'present', title: 'Present' };
+  if (status === 'Absent') return { symbol: 'A', className: 'absent', title: 'Absent' };
+  return { symbol: '-', className: 'not-marked', title: 'Not Marked' };
+};
+
+const getStudentStatusForSession = (studentId, sessionId, attendanceRecordsBySession = {}) => {
+  const rows = attendanceRecordsBySession[sessionId] || [];
+  const row = rows.find((entry) => String(entry.id) === String(studentId));
+  return row?.status || 'Not Marked';
+};
+
+const getCurrentMonthDateRange = () => {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return {
+    startDate: startOfMonth.toISOString().slice(0, 10),
+    endDate: endOfMonth.toISOString().slice(0, 10),
+  };
+};
+
+const buildRegisterDateColumns = (startDate, endDate) => {
+  let start = startDate ? new Date(`${startDate}T12:00:00`) : null;
+  let end = endDate ? new Date(`${endDate}T12:00:00`) : null;
+  if (!start || Number.isNaN(start.getTime()) || !end || Number.isNaN(end.getTime())) {
+    const fallback = getCurrentMonthDateRange();
+    start = new Date(`${fallback.startDate}T12:00:00`);
+    end = new Date(`${fallback.endDate}T12:00:00`);
+  }
+  if (start > end) {
+    const swap = start;
+    start = end;
+    end = swap;
+  }
+
+  const dates = [];
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    const dateKey = cursor.toISOString().slice(0, 10);
+    dates.push({
+      dateKey,
+      day: cursor.getDate(),
+      dayName: cursor.toLocaleDateString('en-US', { weekday: 'short' }),
+      isWeekend: cursor.getDay() === 0 || cursor.getDay() === 6,
+      dateLabel: cursor.toLocaleDateString('en-IN'),
+    });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dates;
+};
+
+const getSessionsOnDate = (sessions = [], dateKey = '') => (
+  sessions.filter((session) => {
+    const meta = getSessionAttendanceMeta(session);
+    const key = meta.dateKey || toDateKey(parseSessionDateValue(session));
+    return key && key === dateKey;
+  })
+);
+
+const getStudentStatusForDate = (studentId, dateKey, sessions = [], attendanceRecordsBySession = {}) => {
+  const sessionsOnDate = getSessionsOnDate(sessions, dateKey);
+  if (!sessionsOnDate.length) return 'Not Marked';
+  let fallback = 'Not Marked';
+  for (let i = 0; i < sessionsOnDate.length; i += 1) {
+    const status = getStudentStatusForSession(studentId, sessionsOnDate[i].id, attendanceRecordsBySession);
+    if (status === 'Present') return 'Present';
+    if (status === 'Absent') fallback = 'Absent';
+    else if (fallback === 'Not Marked') fallback = status;
+  }
+  return fallback;
+};
+
+const filterRegisterStudents = (students = [], registerTab = 'all', focusStudentId = '') => {
+  let list = students;
+  if (focusStudentId) {
+    list = list.filter((student) => String(student.id) === String(focusStudentId));
+  }
+  if (registerTab === 'zeroPeriod') {
+    return list.filter((student) => student.isZeroPeriodAssigned);
+  }
+  if (registerTab === 'batchFreeze') {
+    return list.filter((student) => student.isBatchFreeze || student.status === 'Frozen');
+  }
+  return list;
+};
+
+const getStudentStatusBadge = (student = {}) => {
+  if (student.isBatchFreeze || student.status === 'Frozen') {
+    return { label: 'BATCH FREEZE', tone: 'freeze' };
+  }
+  if (student.isZeroPeriodAssigned) {
+    return { label: 'ZERO PERIOD', tone: 'zero' };
+  }
+  if (student.status && student.status !== 'Active') {
+    return { label: String(student.status).toUpperCase(), tone: 'risk' };
+  }
+  return { label: 'ACTIVE', tone: 'active' };
+};
+
 const attendanceTone = (status) => {
   if (status === 'Present') return 'present';
   if (status === 'Absent') return 'absent';
   return 'not-marked';
 };
-const createSessionAttendanceRows = (session, students = [], existingRows = []) => {
+const createSessionAttendanceRows = (session, students = [], existingRows = [], options = {}) => {
   if (!students.length) return [];
 
+  const { useDummyStatuses = false } = options;
   const existingById = new Map(existingRows.map((row) => [String(row.id), row]));
+  const dateKey = getSessionAttendanceMeta(session).dateKey
+    || toDateKey(parseSessionDateValue(session))
+    || getTodayInputValue();
 
-  return students.map((student) => {
+  return students.map((student, index) => {
     const existing = existingById.get(String(student.id));
+    const dummyStatus = getDummyStatusForDate(student.id, dateKey, index);
     return {
       id: student.id,
       name: student.name,
       mobile: student.mobile || '-',
-      status: existing?.status || 'Not Marked',
+      status: existing?.status || (useDummyStatuses ? dummyStatus : 'Not Marked'),
       remarks: existing?.remarks || '',
       attendancePercent: existing?.attendancePercent || student.attendance || '-',
+      isDummy: !!student.isDummy || String(student.id).startsWith('ST'),
     };
   });
 };
@@ -1027,13 +1549,13 @@ const SessionFormSelect = ({ label, value, onChange, options = [], placeholder =
 
 
 
-const SessionEmptyState = ({ onCreateSession }) => (
+const SessionEmptyState = () => (
   <div className="tm-empty tm-empty--session-create">
     <i className="fas fa-laptop" />
-    <p>No sessions yet for this batch.</p>
-    <button type="button" className="tm-create-session-btn" onClick={onCreateSession}>
-      <i className="fas fa-plus" /> Create first session
-    </button>
+    <p>No sessions assigned to you for this batch yet.</p>
+    <p className="tm-empty__hint">
+      Session plans are created by Academic Coordinator and assigned to you via Senior Trainer.
+    </p>
   </div>
 );
 
@@ -1395,7 +1917,7 @@ const StudentCard = ({ student, batchAttendance, onView, onAttendance, onAddPerf
             <i className="fas fa-user" /> View Profile
           </button>
           <button type="button" className="st-card__btn st-card__btn--ghost" onClick={() => onAttendance(student)}>
-            <i className="fas fa-clipboard-check" /> Attendance
+            <i className="fas fa-clipboard-list" /> View Attendance
           </button>
           <button
             type="button"
@@ -1410,7 +1932,93 @@ const StudentCard = ({ student, batchAttendance, onView, onAttendance, onAddPerf
   );
 };
 
-const StudentProfileModal = ({ student, sessions, attendanceRecordsBySession, basicDetails, onClose, onEditPerformance }) => {
+const StudentTable = ({ students, sessions, attendanceRecordsBySession, onView, onAttendance, onAddPerformance }) => {
+  if (!students.length) return null;
+
+  return (
+    <div className="st-student-table-wrap">
+      <table className="st-student-table">
+        <thead>
+          <tr>
+            <th>Candidate</th>
+            <th>Attendance</th>
+            <th>Course / Batch</th>
+            <th>Contact</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {students.map((student) => {
+            const batchAttendance = computeStudentBatchAttendance(student.id, sessions, attendanceRecordsBySession);
+            const attendanceLabel = batchAttendance?.percentage != null
+              ? `${batchAttendance.percentage}%`
+              : student.attendance || '—';
+            const attendanceHint = batchAttendance?.markedSessions
+              ? `${batchAttendance.presentSessions}/${batchAttendance.markedSessions} present · ${batchAttendance.totalCountableSessions} working sessions`
+              : batchAttendance?.totalCountableSessions
+                ? `0/${batchAttendance.totalCountableSessions} working sessions marked`
+                : 'From admission record';
+            const attendanceLevel = getAttendanceLevel(attendanceLabel);
+            const statusTone = student.status === 'Active' ? 'active' : 'risk';
+            const performanceAdded = hasPerformanceData(student);
+
+            return (
+              <tr key={student.id}>
+                <td>
+                  <div className="st-student-cell">
+                    <span className="st-student-avatar">{getInitials(student.name)}</span>
+                    <div>
+                      <strong>{student.name}</strong>
+                      <div className="st-student-meta">
+                        <small>{student.course || 'No course selected'}</small>
+                        <small>{student.batchCode || 'No batch selected'}</small>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <strong className={`st-card__att-val st-card__att-val--${attendanceLevel}`}>{attendanceLabel}</strong>
+                  <small>{attendanceHint}</small>
+                </td>
+                <td>
+                  <div className="st-student-meta">
+                    <strong>{student.course || '-'}</strong>
+                    <small>{student.batchCode || '-'} · {student.center || '-'}</small>
+                  </div>
+                </td>
+                <td>
+                  <div className="st-student-meta">
+                    <strong>{student.mobile || '-'}</strong>
+                    <small>{student.email || '-'}</small>
+                  </div>
+                </td>
+                <td>
+                  <span className={`st-student-status st-student-status--${statusTone}`}>
+                    {student.status || 'Unknown'}
+                  </span>
+                </td>
+                <td className="st-student-actions">
+                  <button type="button" className="st-table-btn st-table-btn--primary" onClick={() => onView(student)}>
+                    View
+                  </button>
+                  <button type="button" className="st-table-btn st-table-btn--ghost" onClick={() => onAttendance(student)}>
+                    View Attendance
+                  </button>
+                  <button type="button" className="st-table-btn st-table-btn--performance" onClick={() => onAddPerformance(student)}>
+                    {performanceAdded ? 'Edit Perf' : 'Add Perf'}
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+const StudentProfileModal = ({ student, sessions, attendanceRecordsBySession, basicDetails, onClose, onEditPerformance, onOpenAttendance }) => {
   const profile = useMemo(
     () => getStudentPerformanceProfile(student, sessions, attendanceRecordsBySession, basicDetails),
     [student, sessions, attendanceRecordsBySession, basicDetails]
@@ -1508,39 +2116,26 @@ const StudentProfileModal = ({ student, sessions, attendanceRecordsBySession, ba
             </div>
           </div>
 
-          <div className="st-profile-section">
-            <h4><i className="fas fa-comment-dots" /> Trainer Remark</h4>
-            <p className="st-profile-remark">{profile.trainerRemark || 'No remark added yet.'}</p>
+          <div className="st-profile-section st-profile-section--register-cta">
+            <h4><i className="fas fa-clipboard-list" /> Attendance Register</h4>
+            <p className="st-profile-register-hint">
+              View this student in the attendance register with date columns and Zero Period / Batch Freeze filters.
+            </p>
+            <button
+              type="button"
+              className="sc-btn sc-btn--primary"
+              onClick={() => {
+                onClose();
+                onOpenAttendance?.(student);
+              }}
+            >
+              <i className="fas fa-clipboard-list" /> View Attendance
+            </button>
           </div>
 
           <div className="st-profile-section">
-            <h4><i className="fas fa-history" /> Session Attendance History</h4>
-            <div className="st-profile-table-wrap">
-              <table className="st-profile-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Session</th>
-                    <th>Topic</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {profile.sessionHistory.map((entry) => (
-                    <tr key={`${entry.date}-${entry.title}`}>
-                      <td>{entry.date}</td>
-                      <td>{entry.title}</td>
-                      <td>{entry.topic}</td>
-                      <td>
-                        <span className={`st-profile-pill st-profile-pill--${attendanceTone(entry.status)}`}>
-                          {entry.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <h4><i className="fas fa-comment-dots" /> Trainer Remark</h4>
+            <p className="st-profile-remark">{profile.trainerRemark || 'No remark added yet.'}</p>
           </div>
         </div>
 
@@ -1910,66 +2505,118 @@ const AttendanceManagementModal = ({
   onClose,
   onSave,
   saving = false,
+  focusStudentId = '',
 }) => {
   const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [registerTab, setRegisterTab] = useState('all');
+  const [registerDateRange, setRegisterDateRange] = useState(() => getCurrentMonthDateRange());
+
+  const dateColumns = useMemo(
+    () => buildRegisterDateColumns(registerDateRange.startDate, registerDateRange.endDate),
+    [registerDateRange.startDate, registerDateRange.endDate]
+  );
+
+  const zeroPeriodCount = useMemo(
+    () => students.filter((student) => student.isZeroPeriodAssigned).length,
+    [students]
+  );
+  const batchFreezeCount = useMemo(
+    () => students.filter((student) => student.isBatchFreeze || student.status === 'Frozen').length,
+    [students]
+  );
+
+  const registerStudents = useMemo(
+    () => filterRegisterStudents(students, registerTab, focusStudentId),
+    [students, registerTab, focusStudentId]
+  );
+
+  const activeSession = session || null;
+  const activeSessionDateKey = activeSession
+    ? (getSessionAttendanceMeta(activeSession).dateKey || toDateKey(parseSessionDateValue(activeSession)))
+    : '';
+  const sessionDate = activeSession
+    ? (activeSession.date || formatSessionDate(activeSession.sessionDate))
+    : '-';
+  const batchLabel = activeSession?.batchCode || students[0]?.batchCode || 'Batch';
+  const focusedStudent = focusStudentId
+    ? students.find((student) => String(student.id) === String(focusStudentId))
+    : null;
+  const stats = summarizeAttendanceRows(rows);
 
   useEffect(() => {
-    if (!rows?.length) return;
-    if (!selectedStudentId || !rows.find((row) => row.id === selectedStudentId)) {
-      setSelectedStudentId(rows[0].id);
+    if (!registerStudents?.length) return;
+    if (!selectedStudentId || !registerStudents.find((student) => student.id === selectedStudentId)) {
+      setSelectedStudentId(registerStudents[0].id);
     }
-  }, [rows, selectedStudentId]);
+  }, [registerStudents, selectedStudentId]);
 
-  if (!session) return null;
+  if (!session && !focusStudentId) return null;
 
-  const activeStudentId = selectedStudentId || rows[0]?.id || '';
-  const selectedStudent = rows.find((row) => row.id === activeStudentId) || rows[0] || {};
+  const getStudentRowSummary = (studentId) => {
+    let present = 0;
+    let absent = 0;
+    dateColumns.forEach((column) => {
+      if (column.isWeekend && column.dayName === 'Sun') return;
+      const status = getStudentStatusForDate(
+        studentId,
+        column.dateKey,
+        sessions,
+        attendanceRecordsBySession
+      );
+      if (status === 'Present') present += 1;
+      if (status === 'Absent') absent += 1;
+    });
+    const total = present + absent;
+    const percentage = total > 0 ? Number(((present / total) * 100).toFixed(1)) : 0;
+    return { present, absent, percentage };
+  };
 
-  const stats = summarizeAttendanceRows(rows);
-  const sessionDate = session.date || formatSessionDate(session.sessionDate);
-  const sessionTime = `${session.startTime || '10:00'} - ${session.endTime || '12:00'}`;
-  const exclusionNote = sessionMeta?.label || (readOnly ? 'This session is excluded from overall attendance.' : '');
-  const sessionDetails = [
-    { label: 'Session ID', value: session.id },
-    { label: 'Topic covered', value: session.topicCovered || session.title },
-    { label: 'Training Mode', value: session.trainingMethod || 'Interactive Learning' },
-    { label: 'Session date', value: sessionDate },
-    { label: 'Time', value: sessionTime },
-    { label: 'Batch code', value: session.batchCode },
-    { label: 'Course / trade', value: session.courseTrade },
-    { label: 'Trainer', value: session.trainerName },
-    { label: 'Overall attendance', value: sessionMeta?.countable === false ? 'Excluded (Sunday)' : 'Included' },
-  ];
+  const getDateColumnStats = (dateKey) => {
+    const dayStats = registerStudents.reduce((acc, student) => {
+      const status = getStudentStatusForDate(student.id, dateKey, sessions, attendanceRecordsBySession);
+      const info = getAttendanceSymbolInfo(status);
+      acc[info.className] = (acc[info.className] || 0) + 1;
+      return acc;
+    }, {});
+    const total = registerStudents.length;
+    const presentCount = dayStats.present || 0;
+    const percentage = total > 0 ? ((presentCount / total) * 100).toFixed(1) : '0.0';
+    return { dayStats, percentage };
+  };
+
+  const overallAverage = registerStudents.length
+    ? (
+      registerStudents.reduce((sum, student) => sum + Number(getStudentRowSummary(student.id).percentage || 0), 0)
+      / registerStudents.length
+    ).toFixed(1)
+    : '0.0';
+
+  const periodLabel = dateColumns.length
+    ? `${dateColumns[0].day}/${registerDateRange.startDate?.slice(5, 7) || ''}/${registerDateRange.startDate?.slice(0, 4) || ''} to ${dateColumns[dateColumns.length - 1].day}/${registerDateRange.endDate?.slice(5, 7) || ''}/${registerDateRange.endDate?.slice(0, 4) || ''}`
+    : '-';
+
+  const setCurrentMonthRange = () => setRegisterDateRange(getCurrentMonthDateRange());
 
   return (
     <div className="attendance-modal-backdrop">
-      <div className="attendance-modal" role="dialog" aria-modal="true" aria-labelledby="attendance-dashboard-title">
+      <div className="attendance-modal attendance-modal--register" role="dialog" aria-modal="true" aria-labelledby="attendance-dashboard-title">
         <div className="attendance-modal__head">
           <div>
             <h3 id="attendance-dashboard-title">
-              <i className="fas fa-chart-line" /> Attendance Management Dashboard
+              <i className="fas fa-clipboard-list" /> Attendance Register
+              {focusedStudent ? ` - ${focusedStudent.name}` : ''}
             </h3>
-            <p>{session.title} · {sessionDate} · {sessionTime}</p>
-            {exclusionNote ? <p className="attendance-exclusion-note">{exclusionNote}</p> : null}
+            <p>
+              {batchLabel}
+              {activeSession ? ` | Focus session: ${activeSession.title} (${sessionDate})` : ''}
+            </p>
           </div>
-          <button type="button" className="attendance-close-btn" onClick={onClose} aria-label="Close attendance dashboard">
+          <button type="button" className="attendance-close-btn" onClick={onClose} aria-label="Close attendance register">
             <i className="fas fa-times" />
           </button>
         </div>
 
         <div className="attendance-modal__body">
-          <div className="attendance-session-details">
-            <h4><i className="fas fa-info-circle" /> Session Details</h4>
-            <div className="attendance-session-details__grid">
-              {sessionDetails.map(({ label, value }) => (
-                <div key={label} className="attendance-session-details__item">
-                  <span>{label}</span>
-                  <strong>{value || '-'}</strong>
-                </div>
-              ))}
-            </div>
-          </div>
-
           <div className="attendance-control-panel">
             <div className="attendance-view-toggle" role="group" aria-label="Attendance view type">
               <button
@@ -1984,127 +2631,333 @@ const AttendanceManagementModal = ({
                 className={view === 'summary' ? 'attendance-toggle attendance-toggle--active' : 'attendance-toggle'}
                 onClick={() => onViewChange('summary')}
               >
-                <i className="fas fa-calendar-day" /> Summary View
+                <i className="fas fa-edit" /> Mark Attendance
               </button>
             </div>
           </div>
 
-          
-
-          <div className="attendance-stat-grid">
-            <div className="attendance-stat-card attendance-stat-card--blue">
-              <strong>{stats.total}</strong>
-              <span>Total Students</span>
-            </div>
-            <div className="attendance-stat-card attendance-stat-card--green">
-              <strong>{stats.present}</strong>
-              <span>Present</span>
-            </div>
-            <div className="attendance-stat-card attendance-stat-card--red">
-              <strong>{stats.absent}</strong>
-              <span>Absent</span>
-            </div>
-            <div className="attendance-stat-card attendance-stat-card--amber">
-              <strong>{stats.attendance}%</strong>
-              <span>Attendance</span>
-            </div>
-          </div>
-
           {view === 'register' ? (
-            <div className="attendance-register">
-              <div className="attendance-register__title">
+            <div className="attendance-register-container">
+              <div className="register-title">
                 <h4>
                   <i className="fas fa-clipboard-list" /> Attendance Register
+                  {registerTab === 'zeroPeriod' ? ' - Zero Period' : registerTab === 'batchFreeze' ? ' - Batch Freeze' : ' - All Students'}
                 </h4>
-                <span>{stats.total} students - {session.batchCode }</span>
+                <p>
+                  Total Students: {registerStudents.length} | Period: {periodLabel}
+                </p>
+                {registerTab !== 'all' && (
+                  <div className="period-badge">
+                    <span className={`register-period-badge register-period-badge--${registerTab}`}>
+                      <i className={`fas ${registerTab === 'zeroPeriod' ? 'fa-clock' : 'fa-snowflake'}`} />
+                      {registerTab === 'zeroPeriod' ? 'Zero Period Students' : 'Batch Freeze Students'}
+                    </span>
+                  </div>
+                )}
               </div>
-              <div className="attendance-table-wrap">
-                <table className="attendance-table">
-                  <thead>
-                    <tr>
-                      <th className="attendance-student-col">Student Information</th>
-                      <th className="attendance-date-col">This Session</th>
-                      <th>Batch Attendance</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((row, index) => (
-                      <tr
-                      key={row.id}
-                      className={selectedStudentId === row.id ? 'attendance-row attendance-row--active' : 'attendance-row'}
-                      onClick={() => setSelectedStudentId(row.id)}
+
+              <div className="register-controls">
+                <div className="register-tabs">
+                  <div className="register-tab-group" role="group">
+                    <button
+                      type="button"
+                      className={`register-tab-btn${registerTab === 'all' ? ' register-tab-btn--active' : ''}`}
+                      onClick={() => setRegisterTab('all')}
                     >
-                        <AttendanceStudentCell row={row} index={index} />
-                        <td>
-                          <select
-                            className={`attendance-status-select attendance-status-select--${attendanceTone(row.status)}`}
-                            value={row.status}
-                            disabled={readOnly}
-                            onChange={(event) => onStatusChange(row.id, event.target.value)}
-                          >
-                            {ATTENDANCE_STATUSES.map((status) => (
-                              <option key={status}>{status}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <AttendancePercentCell
-                          row={row}
-                          students={students}
-                          sessions={sessions}
-                          attendanceRecordsBySession={attendanceRecordsBySession}
-                        />
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td>This Session Summary</td>
-                      <td>
-                        P: {stats.present} - A: {stats.absent} - NM: {stats.notMarked}
-                      </td>
-                      <td>{stats.attendance}%</td>
-                    </tr>
-                  </tfoot>
-                </table>
+                      <i className="fas fa-users" /> All ({students.length})
+                    </button>
+                    <button
+                      type="button"
+                      className={`register-tab-btn${registerTab === 'zeroPeriod' ? ' register-tab-btn--active' : ''}`}
+                      onClick={() => setRegisterTab('zeroPeriod')}
+                    >
+                      <i className="fas fa-clock" /> Zero Period ({zeroPeriodCount})
+                    </button>
+                    <button
+                      type="button"
+                      className={`register-tab-btn${registerTab === 'batchFreeze' ? ' register-tab-btn--active' : ''}`}
+                      onClick={() => setRegisterTab('batchFreeze')}
+                    >
+                      <i className="fas fa-snowflake" /> Batch Freeze ({batchFreezeCount})
+                    </button>
+                  </div>
+                </div>
+                <div className="date-controls">
+                  <div className="date-controls__row">
+                    <label>
+                      <span>From Date</span>
+                      <input
+                        type="date"
+                        value={registerDateRange.startDate}
+                        onChange={(event) => setRegisterDateRange((prev) => ({ ...prev, startDate: event.target.value }))}
+                      />
+                    </label>
+                    <label>
+                      <span>To Date</span>
+                      <input
+                        type="date"
+                        value={registerDateRange.endDate}
+                        onChange={(event) => setRegisterDateRange((prev) => ({ ...prev, endDate: event.target.value }))}
+                      />
+                    </label>
+                  </div>
+                  <button type="button" className="register-month-btn" onClick={setCurrentMonthRange}>
+                    <i className="fas fa-calendar-day" /> Current Month
+                  </button>
+                </div>
+              </div>
+
+              <div className="register-table-container">
+                {registerStudents.length === 0 ? (
+                  <div className="register-empty">
+                    <i className="fas fa-users-slash" />
+                    <h5>No Students Found</h5>
+                    <p>
+                      {registerTab === 'zeroPeriod'
+                        ? 'No students are currently in Zero Period.'
+                        : registerTab === 'batchFreeze'
+                          ? 'No students are currently in Batch Freeze.'
+                          : 'No students available for this batch.'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="table-responsive register-table-scroll">
+                    <table className="attendance-register-table">
+                      <thead>
+                        <tr>
+                          <th rowSpan="2" className="student-info-header">
+                            <div className="student-header-content">
+                              <i className="fas fa-users" /> Student Information
+                            </div>
+                          </th>
+                          <th colSpan={Math.max(dateColumns.length, 1)} className="dates-header">
+                            <i className="fas fa-calendar-alt" /> Attendance Dates ({dateColumns.length} days)
+                          </th>
+                          <th rowSpan="2" className="summary-header">
+                            <div className="summary-header-content">
+                              <i className="fas fa-chart-pie" /> Summary
+                            </div>
+                          </th>
+                        </tr>
+                        <tr>
+                          {dateColumns.map((column) => (
+                            <th
+                              key={column.dateKey}
+                              className={`date-header${column.isWeekend ? ' weekend-header' : ''}${column.dateKey === activeSessionDateKey ? ' date-header--active' : ''}`}
+                              title={column.dateLabel}
+                            >
+                              <div className="date-header-content">
+                                <div className="date-number">{column.day}</div>
+                                <div className="day-name">{column.dayName}</div>
+                              </div>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {registerStudents.map((student) => {
+                          const summary = getStudentRowSummary(student.id);
+                          const badge = getStudentStatusBadge(student);
+                          const isActive = selectedStudentId === student.id;
+                          return (
+                            <tr
+                              key={student.id}
+                              className={`student-row${isActive ? ' student-row--active' : ''}`}
+                              onClick={() => setSelectedStudentId(student.id)}
+                            >
+                              <td className="student-info-cell">
+                                <div className="student-info-content">
+                                  <div className="student-avatar">
+                                    <i className="fas fa-user" />
+                                  </div>
+                                  <div className="student-details">
+                                    <strong className="student-name">{student.name}</strong>
+                                    <span className={`register-status-pill register-status-pill--${badge.tone}`}>
+                                      {badge.label}
+                                    </span>
+                                    <small>
+                                      <i className="fas fa-phone" /> {student.mobile || '-'}
+                                    </small>
+                                  </div>
+                                </div>
+                              </td>
+                              {dateColumns.map((column) => {
+                                const status = getStudentStatusForDate(
+                                  student.id,
+                                  column.dateKey,
+                                  sessions,
+                                  attendanceRecordsBySession
+                                );
+                                const info = getAttendanceSymbolInfo(status);
+                                const sessionsOnDate = getSessionsOnDate(sessions, column.dateKey);
+                                const isEditableColumn = !readOnly
+                                  && activeSession
+                                  && column.dateKey === activeSessionDateKey
+                                  && sessionsOnDate.some((item) => String(item.id) === String(activeSession.id));
+
+                                return (
+                                  <td
+                                    key={`${student.id}-${column.dateKey}`}
+                                    className={`attendance-cell ${info.className}${column.isWeekend ? ' weekend-cell' : ''}${isEditableColumn ? ' attendance-cell--editable' : ''}`}
+                                    title={`${student.name} - ${column.dateLabel}: ${info.title}`}
+                                  >
+                                    {isEditableColumn ? (
+                                      <select
+                                        className={`attendance-status-select attendance-status-select--${attendanceTone(status)}`}
+                                        value={status}
+                                        onClick={(event) => event.stopPropagation()}
+                                        onChange={(event) => onStatusChange(student.id, event.target.value)}
+                                      >
+                                        {ATTENDANCE_STATUSES.map((option) => (
+                                          <option key={option} value={option}>{option}</option>
+                                        ))}
+                                      </select>
+                                    ) : (
+                                      <div className="attendance-symbol">{info.symbol}</div>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                              <td className="summary-cell">
+                                <div className="summary-content">
+                                  <div className="summary-stats">
+                                    <div className="stat-item present">
+                                      <span className="stat-label">P:</span>
+                                      <span className="stat-value">{summary.present}</span>
+                                    </div>
+                                    <div className="stat-item absent">
+                                      <span className="stat-label">A:</span>
+                                      <span className="stat-value">{summary.absent}</span>
+                                    </div>
+                                  </div>
+                                  <div className="attendance-percentage">
+                                    <div className="percentage-bar">
+                                      <div
+                                        className="percentage-fill"
+                                        style={{ width: `${Math.min(Number(summary.percentage) || 0, 100)}%` }}
+                                      />
+                                    </div>
+                                    <small>{summary.percentage}%</small>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      {!focusedStudent && (
+                        <tfoot>
+                          <tr className="summary-row">
+                            <td className="summary-row-header">
+                              <strong><i className="fas fa-calculator" /> Daily Summary</strong>
+                            </td>
+                            {dateColumns.map((column) => {
+                              const { dayStats, percentage } = getDateColumnStats(column.dateKey);
+                              return (
+                                <td
+                                  key={`summary-${column.dateKey}`}
+                                  className={`summary-cell${column.isWeekend ? ' weekend-summary' : ''}`}
+                                >
+                                  <div className="day-summary">
+                                    <div className="summary-percentage">{percentage}%</div>
+                                    <div className="summary-counts">
+                                      <small>
+                                        P:{dayStats.present || 0} | A:{dayStats.absent || 0} | -:{dayStats['not-marked'] || 0}
+                                      </small>
+                                    </div>
+                                  </div>
+                                </td>
+                              );
+                            })}
+                            <td className="overall-summary">
+                              <div className="overall-stats">
+                                <strong>Overall Average</strong>
+                                <div className="overall-percentage">{overallAverage}%</div>
+                              </div>
+                            </td>
+                          </tr>
+                        </tfoot>
+                      )}
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              <div className="register-legend">
+                <h6><i className="fas fa-info-circle" /> Attendance Symbols Legend</h6>
+                <div className="legend-grid">
+                  <div className="legend-item">
+                    <span className="legend-symbol present">P</span>
+                    <span className="legend-text">Present</span>
+                  </div>
+                  <div className="legend-item">
+                    <span className="legend-symbol absent">A</span>
+                    <span className="legend-text">Absent</span>
+                  </div>
+                  <div className="legend-item">
+                    <span className="legend-symbol not-marked">-</span>
+                    <span className="legend-text">Not Marked</span>
+                  </div>
+                </div>
               </div>
             </div>
           ) : (
             <div className="attendance-summary-view">
               <div className="attendance-summary-head">
                 <h4>
-                  <i className="fas fa-calendar-day" /> Summary View
+                  <i className="fas fa-edit" /> Mark Attendance
                 </h4>
-                <span>{stats.total} students - {session.batchCode }</span>
+                <span>{(rows || []).length} students | {batchLabel} | {sessionDate}</span>
+              </div>
+              {sessionMeta?.label ? <p className="attendance-exclusion-note">{sessionMeta.label}</p> : null}
+              <div className="attendance-stat-grid">
+                <div className="attendance-stat-card attendance-stat-card--blue">
+                  <strong>{stats.total}</strong>
+                  <span>Total Students</span>
+                </div>
+                <div className="attendance-stat-card attendance-stat-card--green">
+                  <strong>{stats.present}</strong>
+                  <span>Present</span>
+                </div>
+                <div className="attendance-stat-card attendance-stat-card--red">
+                  <strong>{stats.absent}</strong>
+                  <span>Absent</span>
+                </div>
+                <div className="attendance-stat-card attendance-stat-card--amber">
+                  <strong>{stats.attendance}%</strong>
+                  <span>Attendance</span>
+                </div>
               </div>
               <div className="attendance-table-wrap">
                 <table className="attendance-table attendance-table--summary">
                   <thead>
                     <tr>
                       <th className="attendance-student-col">Student Information</th>
-                      <th className="attendance-date-col">
-                        <span>{sessionDate}</span>
-                        <small>Session Date</small>
-                      </th>
                       <th>Status</th>
                       <th>Batch Attendance</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((row, index) => (
-                      <tr
-                        key={row.id}
-                        className={selectedStudentId === row.id ? 'attendance-row attendance-row--active' : 'attendance-row'}
-                        onClick={() => setSelectedStudentId(row.id)}
-                      >
+                    {(rows || []).map((row, index) => (
+                      <tr key={row.id} className="attendance-row">
                         <AttendanceStudentCell row={row} index={index} />
                         <td>
-                          <span className="attendance-day-label">{sessionDate}</span>
+                          {readOnly ? (
+                            <span className={`attendance-pill attendance-pill--${attendanceTone(row.status)}`}>
+                              {row.status}
+                            </span>
+                          ) : (
+                            <select
+                              className={`attendance-status-select attendance-status-select--${attendanceTone(row.status)}`}
+                              value={row.status}
+                              onChange={(event) => onStatusChange(row.id, event.target.value)}
+                            >
+                              {ATTENDANCE_STATUSES.map((status) => (
+                                <option key={status} value={status}>{status}</option>
+                              ))}
+                            </select>
+                          )}
                         </td>
-                        <td>
-                          <span className={`attendance-pill attendance-pill--${attendanceTone(row.status)}`}>
-                            {row.status}
-                          </span>
-                        </td> 
                         <AttendancePercentCell
                           row={row}
                           students={students}
@@ -2114,16 +2967,6 @@ const AttendanceManagementModal = ({
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot>
-                    <tr>
-                      <td>This Session Summary</td>
-                      <td>{sessionDate}</td>
-                      <td>
-                        P: {stats.present} - A: {stats.absent} - NM: {stats.notMarked}
-                      </td>
-                      <td>{stats.attendance}%</td>
-                    </tr>
-                  </tfoot>
                 </table>
               </div>
             </div>
@@ -2132,7 +2975,12 @@ const AttendanceManagementModal = ({
 
         <div className="attendance-modal__foot">
           <button type="button" className="sc-btn" onClick={onClose}>Close</button>
-          {!readOnly && (
+          {!readOnly && activeSession && view === 'summary' && (
+            <button type="button" className="sc-btn sc-btn--primary" onClick={onSave} disabled={saving}>
+              <i className={`fas ${saving ? 'fa-spinner fa-spin' : 'fa-save'}`} /> {saving ? 'Saving...' : 'Save Attendance'}
+            </button>
+          )}
+          {!readOnly && activeSession && view === 'register' && (
             <button type="button" className="sc-btn sc-btn--primary" onClick={onSave} disabled={saving}>
               <i className={`fas ${saving ? 'fa-spinner fa-spin' : 'fa-save'}`} /> {saving ? 'Saving...' : 'Save Attendance'}
             </button>
@@ -2154,6 +3002,7 @@ const SessionCard = ({
   onEvidenceUpload,
   onEditSession,
   onOpenAttendance,
+  isCoordinatorPlan = false,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
@@ -2203,6 +3052,9 @@ const SessionCard = ({
             <div className="sc-trainer-name">{activeSession.title}</div>
             {!sessionMeta.countable && (
               <span className="sc-session-badge sc-session-badge--muted">{sessionMeta.reason} · excluded</span>
+            )}
+            {isCoordinatorPlan && (
+              <span className="sc-session-badge sc-session-badge--plan">Academic Coordinator plan</span>
             )}
           </div>
         </div>
@@ -2290,13 +3142,46 @@ const SessionCard = ({
                   <p>{activeSession.notes || 'No notes added.'}</p>
                 </div>
               </div>
+
+              {activeSession.totQuestionBank?.length > 0 && (
+                <div className="sc-tot-question-bank">
+                  <div className="sc-tot-question-bank__head">
+                    <h4><i className="fas fa-question-circle" /> TOT MCQ question bank</h4>
+                    <span className="sc-tot-question-bank__meta">
+                      {activeSession.totQuestionBank.length} question{activeSession.totQuestionBank.length === 1 ? '' : 's'}
+                      {activeSession.totQuestionBankLastUpdated ? ` · Updated ${new Date(activeSession.totQuestionBankLastUpdated).toLocaleDateString('en-IN')}` : ''}
+                    </span>
+                  </div>
+                  <div className="sc-tot-question-list">
+                    {activeSession.totQuestionBank.map((question, qIndex) => (
+                      <div key={question.id || qIndex} className="sc-tot-question-card">
+                        <div className="sc-tot-question-card__header">
+                          <strong>{qIndex + 1}. {question.question || 'Untitled question'}</strong>
+                          <span>{question.marks || 0} mark{question.marks === 1 ? '' : 's'}</span>
+                        </div>
+                        <div className="sc-tot-question-options">
+                          {(question.options || []).map((option, optionIndex) => (
+                            <div
+                              key={optionIndex}
+                              className={`sc-tot-question-option${question.correctIndex === optionIndex ? ' sc-tot-question-option--correct' : ''}`}
+                            >
+                              <span className="sc-tot-question-option__label">{String.fromCharCode(65 + optionIndex)}</span>
+                              <span>{option || 'Option not set'}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="sc-body">
               {evidenceDocs.length === 0 ? (
                 <div className="sc-evidence-empty">
                   <i className="far fa-folder-open" />
-                  <p>No documents defined yet. Add document names in Add Session or Edit Session, then upload files here.</p>
+                  <p>No documents defined for this session plan yet. Upload files here once documents are listed.</p>
                 </div>
               ) : (
                 <div className="sc-evidence-grid">
@@ -2358,9 +3243,16 @@ const SessionCard = ({
           )}
 
           <footer className="sc-foot">
-            <button type="button" className="sc-btn" onClick={() => onEditSession(activeSession)}>
-              <i className="far fa-edit" /> Edit Session
-            </button>
+            {!isCoordinatorPlan && (
+              <button type="button" className="sc-btn" onClick={() => onEditSession(activeSession)}>
+                <i className="far fa-edit" /> Edit Session
+              </button>
+            )}
+            {isCoordinatorPlan && (
+              <span className="sc-foot-note">
+                <i className="fas fa-info-circle" /> Session plan is read-only — manage attendance and documents only.
+              </span>
+            )}
             <div className="sc-foot-right">
               <button
                 type="button"
@@ -2418,7 +3310,16 @@ const TrainerModule = () => {
   const [session, setSession] = useState(null);
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
-  const [attendanceModal, setAttendanceModal] = useState({ isOpen: false, view: 'register', sessionId: '' });
+  const [attendanceModal, setAttendanceModal] = useState({
+    isOpen: false,
+    view: 'register',
+    sessionId: '',
+    focusStudentId: '',
+  });
+  const [viewAttendanceModal, setViewAttendanceModal] = useState({
+    isOpen: false,
+    focusStudentId: '',
+  });
   const [attendanceRecordsBySession, setAttendanceRecordsBySession] = useState({});
   const [attendanceSaving, setAttendanceSaving] = useState(false);
   const [studentProfileModal, setStudentProfileModal] = useState({ isOpen: false, student: null });
@@ -2778,6 +3679,33 @@ const TrainerModule = () => {
     return {};
   }, [backendUrl, token]);
 
+  const trainerId = userData._id || userData.id;
+
+  const reloadAssignedSessions = useCallback(async (batchId, signal) => {
+    if (!batchId) {
+      setSessions([]);
+      return;
+    }
+
+    let coordinatorSessions = loadAssignedCoordinatorSessions(batchId, trainerId);
+    const [feedbackMap, attendanceMap] = await Promise.all([
+      fetchBatchSessionFeedback(batchId, signal),
+      fetchBatchAttendance(batchId, signal),
+    ]);
+
+    if (!coordinatorSessions.length) {
+      coordinatorSessions = DUMMY_SESSIONS.map((session, index) => hydrateSession(session, index, activeBasicDetails));
+    }
+
+    setSessionFeedbackBySession(feedbackMap || {});
+    setAttendanceRecordsBySession(attendanceMap || {});
+    setSessions(coordinatorSessions);
+    setSelectedSessionId((prev) => (
+      prev && coordinatorSessions.some((item) => item.id === prev) ? prev : coordinatorSessions[0]?.id || ''
+    ));
+    setSessionPanelView(coordinatorSessions.length ? 'view' : 'empty');
+  }, [trainerId, fetchBatchSessionFeedback, fetchBatchAttendance]);
+
   useEffect(() => {
     if (!filters.batch) {
       setSessions([]);
@@ -2790,35 +3718,31 @@ const TrainerModule = () => {
     }
 
     const controller = new AbortController();
-    const stored = loadStoredSessions(filters.batch);
-    const coordinatorSessions = loadAssignedCoordinatorSessions(filters.batch, userData._id || userData.id);
-
-    const loadSessions = async () => {
-      const [fromApi, feedbackMap, attendanceMap] = await Promise.all([
-        fetchBatchSessions(filters.batch, controller.signal),
-        fetchBatchSessionFeedback(filters.batch, controller.signal),
-        fetchBatchAttendance(filters.batch, controller.signal),
-      ]);
-      const baseSessions = Array.isArray(fromApi) && fromApi.length ? fromApi : stored;
-      const nextSessions = mergeSessionsById(baseSessions || [], coordinatorSessions);
-
-      if (nextSessions.length) {
-        persistStoredSessions(filters.batch, nextSessions);
-      }
-
-      setSessionFeedbackBySession(feedbackMap || {});
-      setAttendanceRecordsBySession(attendanceMap || {});
-      setSessions(nextSessions);
-      setSelectedSessionId((prev) => (
-        prev && nextSessions.some((item) => item.id === prev) ? prev : nextSessions[0]?.id || ''
-      ));
-      setSessionPanelView(nextSessions.length ? 'view' : 'empty');
-    };
-
-    loadSessions();
+    reloadAssignedSessions(filters.batch, controller.signal);
     fetchBatchStudents(filters.batch, controller.signal);
     return () => controller.abort();
-  }, [filters.batch, fetchBatchStudents, fetchBatchSessions, fetchBatchSessionFeedback, fetchBatchAttendance]);
+  }, [filters.batch, fetchBatchStudents, reloadAssignedSessions]);
+
+  useEffect(() => {
+    if (!filters.batch) return undefined;
+
+    const refreshAssigned = () => {
+      reloadAssignedSessions(filters.batch);
+    };
+
+    const onStorage = (event) => {
+      if (event.key === `${AC_SESSIONS_STORAGE_PREFIX}${filters.batch}`) {
+        refreshAssigned();
+      }
+    };
+
+    window.addEventListener('focus', refreshAssigned);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('focus', refreshAssigned);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [filters.batch, reloadAssignedSessions]);
 
   useEffect(() => {
     if (!filters.batch) return undefined;
@@ -3034,9 +3958,15 @@ const TrainerModule = () => {
     });
   };
 
+  const displaySessions = useMemo(() => {
+    if (sessions.length) return sessions;
+    if (!filters.batch) return [];
+    return DUMMY_SESSIONS.map((session, index) => hydrateSession(session, index, activeBasicDetails));
+  }, [sessions, filters.batch, activeBasicDetails]);
+
   const filteredSessions = useMemo(() => {
     const query = quickSearch.trim().toLowerCase();
-    return sessions.filter((session) => {
+    return displaySessions.filter((session) => {
       if (filters.batch && session.batch && String(session.batch) !== String(filters.batch)) return false;
       if (filters.course && session.course && String(session.course) !== String(filters.course)) return false;
       if (filters.center && session.center && String(session.center) !== String(filters.center)) return false;
@@ -3049,7 +3979,7 @@ const TrainerModule = () => {
         || session.batchCode?.toLowerCase().includes(query)
       );
     });
-  }, [sessions, quickSearch, filters.batch, filters.course, filters.center]);
+  }, [displaySessions, quickSearch, filters.batch, filters.course, filters.center]);
 
   useEffect(() => {
     if (!filteredSessions.length) {
@@ -3067,8 +3997,8 @@ const TrainerModule = () => {
   );
 
   const batchAttendanceSummary = useMemo(
-    () => computeBatchAttendanceSummary(students, sessions, attendanceRecordsBySession),
-    [students, sessions, attendanceRecordsBySession]
+    () => computeBatchAttendanceSummary(students, displaySessions, attendanceRecordsBySession),
+    [students, displaySessions, attendanceRecordsBySession]
   );
   const displayStudents = useMemo(
     () => enrichStudentsWithEnrollmentMeta(students).map((student) => ({
@@ -3096,45 +4026,16 @@ const TrainerModule = () => {
     [attendanceSession]
   );
 
-  const openAddSessionModal = () => {
-    if (!filters.batch) {
-      notify('Pehle Sessions tab mein Department se Batch tak select karein');
-      return;
-    }
-
-    const nextSessionNumber = sessions.length + 1;
-    const context = buildSessionContextFromFilters(filters, {
-      verticalOptions,
-      projectOptions,
-      centerOptions,
-      courseOptions,
-      batchOptions,
-      trainerName: trainerProfile.name,
-    });
-
-    setEditingSessionId(null);
-    setSession({
-      ...createEmptySessionDraft(nextSessionNumber),
-      ...context,
-      status: 'Pending',
-      counsellor: filters.counsellor || '',
-      counsellorName: getOptionLabel(counselorOptions, filters.counsellor),
-      ...(trainerProfile.name ? { trainerName: trainerProfile.name } : {}),
-      ...(students.length ? {
-        totalCandidates: String(students.length),
-        presentCandidates: '0',
-        absentCandidates: '0',
-      } : {}),
-    });
-    setIsSessionModalOpen(true);
-  };
-
   const closeSessionPanel = () => {
     setSession(null);
     setEditingSessionId(null);
     setSessionPanelView(filteredSessions.length ? 'view' : 'empty');
   };
   const openEditSessionModal = (existingSession) => {
+    if (isCoordinatorPlanSession(existingSession)) {
+      notify('Session plan is read-only. Contact Academic Coordinator to update the plan.');
+      return;
+    }
     setEditingSessionId(existingSession.id);
     setSession({
       ...existingSession,
@@ -3201,6 +4102,10 @@ const TrainerModule = () => {
   };
 
   const saveSession = async () => {
+    if (isCoordinatorPlanSession(session) || (editingSessionId && isCoordinatorPlanSession(sessions.find((item) => item.id === editingSessionId)))) {
+      notify('Session plan is read-only. Contact Academic Coordinator to update the plan.');
+      return;
+    }
     if (!session?.batch) {
       notify('Please select a batch for this session');
       return;
@@ -3373,27 +4278,53 @@ const TrainerModule = () => {
       notify(error.response?.data?.message || 'Failed to upload document');
     }
   };
-  const openAttendanceModal = (session, view = 'register') => {
-    if (!students.length) {
-      notify('No students in this batch. Assign students to batch first.');
+  const openAttendanceModal = (session, view = 'summary') => {
+    const attendanceStudents = students.length
+      ? students
+      : DUMMY_STUDENTS.map((student) => ({ ...student, isDummy: true }));
+
+    if (!attendanceStudents.length) {
+      notify('No students available for attendance.');
       return;
     }
 
     const meta = getSessionAttendanceMeta(session);
-    if (!meta.countable && view === 'register') {
+    if (!meta.countable && view === 'summary') {
       notify(meta.label || 'Attendance cannot be marked on Sunday.');
       return;
     }
 
+    const useDummyStatuses = !students.length;
     setAttendanceRecordsBySession((prev) => {
       const existing = prev[session.id];
       if (existing?.length) return prev;
-      return { ...prev, [session.id]: createSessionAttendanceRows(session, students, existing) };
+      return {
+        ...prev,
+        [session.id]: createSessionAttendanceRows(session, attendanceStudents, existing, { useDummyStatuses }),
+      };
     });
-    setAttendanceModal({ isOpen: true, view, sessionId: session.id });
+    setAttendanceModal({
+      isOpen: true,
+      view: view === 'register' ? 'register' : 'summary',
+      sessionId: session.id,
+      focusStudentId: '',
+      usingDummyStudents: useDummyStatuses,
+    });
   };
+
+  const openStudentAttendanceRegister = (student) => {
+    setViewAttendanceModal({
+      isOpen: true,
+      focusStudentId: student?.id || '',
+    });
+  };
+
+  const closeViewAttendanceRegister = () => {
+    setViewAttendanceModal({ isOpen: false, focusStudentId: '' });
+  };
+
   const closeAttendanceModal = () => {
-    setAttendanceModal((prev) => ({ ...prev, isOpen: false }));
+    setAttendanceModal((prev) => ({ ...prev, isOpen: false, focusStudentId: '' }));
   };
   const openStudentProfile = (student) => {
     setStudentProfileModal({ isOpen: true, student });
@@ -3608,9 +4539,6 @@ const TrainerModule = () => {
                   <button type="button" className="dbr-btn dbr-btn--session-action dbr-btn--session-action--ghost" onClick={handleSessionPathReset}>
                     <i className="fas fa-exchange-alt" /> Change batch
                   </button>
-                  <button type="button" className="dbr-btn dbr-btn--session-action dbr-btn--session-action--primary" onClick={openAddSessionModal}>
-                    <i className="fas fa-plus" /> Add Session
-                  </button>
                   <button type="button" className="dbr-btn dbr-btn--session-action dbr-btn--session-action--outline" onClick={openReferSessionModal}>
                     <i className="fas fa-share-alt" /> Refer Session
                   </button>
@@ -3656,6 +4584,7 @@ const TrainerModule = () => {
                           onEvidenceUpload={uploadEvidenceFile}
                           onEditSession={openEditSessionModal}
                           onOpenAttendance={openAttendanceModal}
+                          isCoordinatorPlan={isCoordinatorPlanSession(session)}
                         />
                       ))}
                     </>
@@ -3667,7 +4596,7 @@ const TrainerModule = () => {
                           <p>Loading batch students...</p>
                         </div>
                       )}
-                      <SessionEmptyState onCreateSession={openAddSessionModal} />
+                      <SessionEmptyState />
                     </>
                   )}
                 </div>
@@ -3694,22 +4623,20 @@ const TrainerModule = () => {
             
           </div>
 
-          <div className="st-grid">
-            {students.length === 0 ? (
-              <div className="tm-empty tm-empty--banner">
-                <p>No students in this batch yet.</p>
-              </div>
-            ) : displayStudents.map((st) => (
-              <StudentCard
-                key={st.id}
-                student={st}
-                batchAttendance={computeStudentBatchAttendance(st.id, sessions, attendanceRecordsBySession)}
-                onView={openStudentProfile}
-                onAttendance={(student) => notify(`Attendance: ${student.name}`)}
-                onAddPerformance={openPerformanceModal}
-              />
-            ))}
-          </div>
+          {displayStudents.length === 0 ? (
+            <div className="tm-empty tm-empty--banner">
+              <p>No students in this batch yet.</p>
+            </div>
+          ) : (
+            <StudentTable
+              students={displayStudents}
+              sessions={sessions}
+              attendanceRecordsBySession={attendanceRecordsBySession}
+              onView={openStudentProfile}
+              onAttendance={openStudentAttendanceRegister}
+              onAddPerformance={openPerformanceModal}
+            />
+          )}
             </>
           )}
         </div>
@@ -3737,6 +4664,14 @@ const TrainerModule = () => {
         />
       )}
 
+      {viewAttendanceModal.isOpen && (
+        <ViewAttendanceRegisterModal
+          students={students.length ? students : DUMMY_STUDENTS}
+          focusStudentId={viewAttendanceModal.focusStudentId}
+          onClose={closeViewAttendanceRegister}
+        />
+      )}
+
       {attendanceModal.isOpen && (
         <AttendanceManagementModal
           session={attendanceSession}
@@ -3752,6 +4687,7 @@ const TrainerModule = () => {
           onClose={closeAttendanceModal}
           onSave={saveAttendanceRows}
           saving={attendanceSaving}
+          focusStudentId={attendanceModal.focusStudentId}
         />
       )}
 
@@ -3763,6 +4699,7 @@ const TrainerModule = () => {
           basicDetails={activeBasicDetails}
           onClose={closeStudentProfile}
           onEditPerformance={openPerformanceModal}
+          onOpenAttendance={openStudentAttendanceRegister}
         />
       )}
 
@@ -4116,6 +5053,51 @@ const PORTAL_CSS = `
   }
   .st-card__btn--performance:hover { filter: brightness(0.96); transform: translateY(-1px); }
 
+  .st-student-table-wrap {
+    overflow-x: auto; margin-bottom: 14px;
+  }
+  .st-student-table {
+    width: 100%; min-width: 920px; border-collapse: collapse; background: #fff;
+  }
+  .st-student-table th,
+  .st-student-table td {
+    padding: 14px 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top;
+  }
+  .st-student-table th {
+    background: #f8fafc; color: #334155; font-size: 12px; font-weight: 800; letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+  .st-student-table tbody tr:hover { background: #f8fafc; }
+  .st-student-cell {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .st-student-avatar {
+    width: 40px; height: 40px; border-radius: 12px; display: inline-flex;
+    align-items: center; justify-content: center; background: #fbcfe8; color: #9d174d;
+    font-size: 13px; font-weight: 900;
+  }
+  .st-student-meta { display: flex; flex-direction: column; gap: 4px; }
+  .st-student-meta small { color: #64748b; font-size: 11px; }
+  .st-student-status {
+    display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 999px;
+    font-size: 11px; font-weight: 700;
+  }
+  .st-student-status--active { background: #d1fae5; color: #057a55; }
+  .st-student-status--risk { background: #fde68a; color: #92400e; }
+  .st-student-actions {
+    display: flex; gap: 8px; align-items: center;
+  }
+  .st-table-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    border-radius: 10px; padding: 8px 10px; font-size: 11px; font-weight: 800; border: 1px solid transparent;
+    cursor: pointer; transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .st-table-btn:hover { transform: translateY(-1px); }
+  .st-table-btn--primary { background: ${PINK}; color: #fff; border-color: ${PINK}; }
+  .st-table-btn--ghost { background: #fff; color: ${BLUE}; border-color: rgba(37,99,235,0.2); }
+  .st-table-btn--ghost:hover { background: #eff6ff; }
+  .st-table-btn--performance { background: linear-gradient(90deg, #db2777, ${PINK}); color: #fff; border-color: ${PINK}; }
+
   /* Student performance form modal */
   .st-perf-backdrop {
     position: fixed; inset: 0; z-index: 10000;
@@ -4335,6 +5317,38 @@ const PORTAL_CSS = `
   .st-profile-pill--present { background: #dcfce7; color: #047857; }
   .st-profile-pill--absent { background: #fee2e2; color: #b91c1c; }
   .st-profile-pill--not-marked { background: #e2e8f0; color: #475569; }
+  .st-attendance-breakdown-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px;
+  }
+  .st-attendance-breakdown-card {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px;
+    box-shadow: 0 10px 30px rgba(15,23,42,0.04);
+  }
+  .st-attendance-breakdown-card span { display: block; color: #64748b; font-size: 11px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .st-attendance-breakdown-card strong { display: block; font-size: 24px; font-weight: 900; color: #0f172a; }
+  .st-attendance-breakdown-card--week { background: #eff6ff; }
+  .st-attendance-breakdown-card--month { background: #fef3c7; }
+  .st-attendance-weekdays {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px;
+  }
+  .st-attendance-weekday-card {
+    border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px;
+    background: #fff; min-height: 90px;
+  }
+  .st-attendance-weekday-card span { display: block; font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 8px; }
+  .st-attendance-weekday-card strong { display: block; font-size: 13px; font-weight: 900; margin-bottom: 6px; }
+  .st-attendance-weekday-card small { display: block; font-size: 11px; color: #64748b; }
+  .st-attendance-month-summary { margin-top: 10px; }
+  .st-attendance-month-summary h5 { margin: 0 0 10px; font-size: 14px; font-weight: 900; color: #0f172a; }
+  .st-attendance-month-list {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px;
+  }
+  .st-attendance-month-item {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 12px;
+  }
+  .st-attendance-month-item span { display: block; font-size: 11px; color: #64748b; margin-bottom: 6px; }
+  .st-attendance-month-item strong { display: block; font-size: 13px; font-weight: 900; color: #0f172a; }
+  .st-attendance-month-item small { display: block; font-size: 11px; color: #475569; margin-top: 6px; }
   .dbr-info-line { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid #eff6ff; font-size: 12px; color: #475569; }
   .dbr-info-line:first-of-type { border-top: 0; }
   .dbr-info-line i { width: 18px; color: ${BLUE}; font-size: 12px; }
@@ -4624,7 +5638,7 @@ const PORTAL_CSS = `
   }
   .tm-empty--banner h4 { margin: 12px 0 8px; font-size: 16px; font-weight: 800; color: #334155; }
   .tm-empty--banner p { margin: 0 0 6px; color: #64748b; font-size: 13px; }
-  .tm-empty__hint { font-size: 12px !important; color: #94a3b8 !important; }
+  .tm-empty__hint { font-size: 12px !important; color: #d97706 !important; font-weight: 600; margin-top: 8px !important; max-width: 420px; text-align: center; line-height: 1.5; }
   .tm-empty--session-create {
     background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
     min-height: 320px; display: flex; flex-direction: column;
@@ -5402,6 +6416,9 @@ const PORTAL_CSS = `
     background: #fff;
     box-shadow: 0 28px 80px rgba(15,23,42,0.18);
   }
+  .attendance-modal--register {
+    width: min(1400px, 100%);
+  }
   .attendance-session-details {
     margin-bottom: 16px;
     padding: 14px 16px;
@@ -5689,6 +6706,406 @@ const PORTAL_CSS = `
     font-size: 12px;
     font-weight: 900;
   }
+
+  /* Student.jsx-style attendance register matrix */
+  .attendance-register-container {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #fff;
+    overflow: hidden;
+  }
+  .register-title {
+    padding: 16px 18px;
+    border-bottom: 1px solid #e2e8f0;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    text-align: center;
+  }
+  .register-title h4 {
+    margin: 0 0 6px;
+    font-size: 16px;
+    font-weight: 900;
+    color: ${BLUE};
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .register-title p {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+  }
+  .period-badge { margin-top: 10px; }
+  .register-period-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+  }
+  .register-period-badge--zeroPeriod { background: #fef3c7; color: #92400e; }
+  .register-period-badge--batchFreeze { background: #dbeafe; color: #1d4ed8; }
+  .register-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(240px, 0.8fr);
+    gap: 16px;
+    align-items: start;
+    padding: 14px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    background: #fff;
+  }
+  .register-controls--dates-only {
+    grid-template-columns: 1fr;
+  }
+  .date-controls--wide {
+    max-width: 420px;
+    margin-left: auto;
+  }
+  .register-tab-group {
+    display: flex;
+    width: 100%;
+    border: 1px solid #bfdbfe;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .register-tab-btn {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: none;
+    border-right: 1px solid #bfdbfe;
+    background: #fff;
+    color: ${BLUE};
+    padding: 12px 10px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .register-tab-btn:last-child { border-right: none; }
+  .register-tab-btn--active {
+    background: ${BLUE};
+    color: #fff;
+  }
+  .date-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .date-controls__row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .date-controls label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #334155;
+  }
+  .date-controls input {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #0f172a;
+    background: #fff;
+  }
+  .register-month-btn {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #f8fafc;
+    color: #334155;
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .register-month-btn:hover { background: #eff6ff; color: ${BLUE}; border-color: #bfdbfe; }
+  .register-status-pill {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.03em;
+  }
+  .register-status-pill--freeze { background: #dbeafe; color: #1d4ed8; }
+  .register-status-pill--zero { background: #fef3c7; color: #92400e; }
+  .register-status-pill--active { background: #dcfce7; color: #166534; }
+  .register-status-pill--risk { background: #fee2e2; color: #b91c1c; }
+  .st-profile-register-hint {
+    margin: 0 0 12px;
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.5;
+  }
+  .st-profile-section--register-cta {
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 12px;
+    padding: 14px;
+  }
+  .register-table-container { overflow: hidden; }
+  .register-table-scroll {
+    max-height: 520px;
+    overflow: auto;
+  }
+  .register-empty {
+    text-align: center;
+    padding: 48px 20px;
+    color: #64748b;
+  }
+  .register-empty i { font-size: 36px; color: #cbd5e1; margin-bottom: 12px; display: block; }
+  .register-empty h5 { margin: 0 0 6px; color: #0f172a; font-weight: 800; }
+  .register-empty p { margin: 0; font-size: 13px; }
+  .attendance-register-table {
+    width: 100%;
+    min-width: 900px;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 0;
+  }
+  .attendance-register-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 10px 8px;
+    border: none;
+    text-align: center;
+  }
+  .student-info-header {
+    min-width: 220px;
+    max-width: 240px;
+    position: sticky;
+    left: 0;
+    z-index: 8 !important;
+    text-align: left !important;
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%) !important;
+  }
+  .student-header-content,
+  .summary-header-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .student-header-content { justify-content: flex-start; }
+  .dates-header {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+  }
+  .summary-header {
+    min-width: 120px;
+    background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+  }
+  .date-header {
+    min-width: 58px;
+    width: 58px;
+    border-right: 1px solid rgba(255,255,255,0.15);
+  }
+  .date-header--active { box-shadow: inset 0 -3px 0 #fbbf24; }
+  .date-header.weekend-header {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
+  }
+  .date-header-content { display: flex; flex-direction: column; gap: 2px; align-items: center; }
+  .date-number { font-size: 14px; font-weight: 900; line-height: 1; }
+  .day-name { font-size: 9px; font-weight: 700; opacity: 0.85; text-transform: uppercase; }
+  .attendance-register-table tbody td {
+    border-bottom: 1px solid #eef2f7;
+    border-right: 1px solid #f1f5f9;
+    padding: 8px;
+    vertical-align: middle;
+    background: #fff;
+  }
+  .student-row:hover td { background: #f8fafc; }
+  .student-row--active td { background: #eff6ff; }
+  .student-info-cell {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    min-width: 220px;
+    background: #fff !important;
+    box-shadow: 2px 0 8px rgba(15,23,42,0.04);
+  }
+  .student-row--active .student-info-cell { background: #eff6ff !important; }
+  .student-info-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-align: left;
+  }
+  .student-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: ${BLUE};
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 900;
+    flex-shrink: 0;
+  }
+  .student-details { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .student-name {
+    font-size: 13px;
+    font-weight: 800;
+    color: #0f172a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .student-details small {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 600;
+  }
+  .attendance-cell {
+    text-align: center;
+    min-width: 58px;
+    width: 58px;
+  }
+  .attendance-cell.present { background: #ecfdf5; }
+  .attendance-cell.absent { background: #fef2f2; }
+  .attendance-cell.not-marked { background: #f8fafc; }
+  .attendance-cell.weekend-cell { background: #fff1f2; }
+  .attendance-cell--editable { padding: 4px; background: #fffbeb !important; }
+  .attendance-symbol { font-size: 14px; font-weight: 900; line-height: 1; }
+  .attendance-cell.present .attendance-symbol { color: #059669; }
+  .attendance-cell.absent .attendance-symbol { color: #dc2626; }
+  .attendance-cell.not-marked .attendance-symbol { color: #94a3b8; }
+  .summary-cell { min-width: 120px; }
+  .summary-content { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+  .summary-stats { display: flex; gap: 8px; }
+  .stat-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    font-weight: 800;
+  }
+  .stat-item.present { color: #059669; }
+  .stat-item.absent { color: #dc2626; }
+  .attendance-percentage {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+  .percentage-bar {
+    width: 100%;
+    height: 6px;
+    border-radius: 999px;
+    background: #e2e8f0;
+    overflow: hidden;
+  }
+  .percentage-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #059669, #34d399);
+  }
+  .attendance-percentage small {
+    font-size: 10px;
+    font-weight: 800;
+    color: #334155;
+  }
+  .attendance-register-table tfoot td {
+    position: sticky;
+    bottom: 0;
+    background: #f1f5f9;
+    border-top: 1px solid #e2e8f0;
+    padding: 8px;
+    vertical-align: middle;
+  }
+  .summary-row-header {
+    position: sticky;
+    left: 0;
+    z-index: 4;
+    background: #f1f5f9 !important;
+    text-align: left;
+    font-size: 12px;
+  }
+  .day-summary { text-align: center; }
+  .summary-percentage { font-size: 12px; font-weight: 900; color: #0f172a; }
+  .summary-counts small { font-size: 9px; color: #64748b; font-weight: 700; }
+  .overall-summary { text-align: center; }
+  .overall-stats strong {
+    display: block;
+    font-size: 10px;
+    color: #64748b;
+    text-transform: uppercase;
+  }
+  .overall-percentage { font-size: 16px; font-weight: 900; color: #059669; }
+  .register-legend {
+    padding: 14px 18px 18px;
+    border-top: 1px solid #e2e8f0;
+    background: #fafbfc;
+  }
+  .register-legend h6 {
+    margin: 0 0 10px;
+    font-size: 13px;
+    font-weight: 800;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .legend-grid { display: flex; flex-wrap: wrap; gap: 14px; }
+  .legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+  }
+  .legend-symbol {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+  }
+  .legend-symbol.present { background: #ecfdf5; color: #059669; }
+  .legend-symbol.absent { background: #fef2f2; color: #dc2626; }
+  .legend-symbol.not-marked { background: #f1f5f9; color: #94a3b8; }
+  .register-legend-hint {
+    margin: 10px 0 0;
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 600;
+  }
+  .attendance-cell--editable .attendance-status-select {
+    width: 100%;
+    min-width: 0;
+    font-size: 10px;
+    padding: 4px 2px;
+  }
+
   .attendance-student {
     display: flex;
     align-items: center;
@@ -5844,6 +7261,7 @@ const PORTAL_CSS = `
     .session-remove-btn { width: 100%; }
     .attendance-modal-backdrop { padding: 10px; align-items: flex-start; }
     .attendance-modal { max-height: calc(100vh - 20px); }
+    .register-controls { grid-template-columns: 1fr; }
     .attendance-modal__head,
     .attendance-register__title,
     .attendance-summary-head {
@@ -5889,6 +7307,19 @@ const PORTAL_CSS = `
     background: #fef3c7;
     color: #92400e;
   }
+  .sc-session-badge--plan {
+    background: #dbeafe;
+    color: #1d4ed8;
+  }
+  .sc-foot-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+  }
+  .sc-foot-note i { color: #2563eb; }
 `;
 
 export default TrainerModule;

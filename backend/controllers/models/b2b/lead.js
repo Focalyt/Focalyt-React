@@ -97,6 +97,7 @@ function normalizeB2BApproval(approval) {
 
 const B2BLeadSchema = new mongoose.Schema({
   leadCategory: { type: ObjectId, ref: 'LeadCategory', required: true },
+  leadRanking: { type: ObjectId, ref: 'LeadRanking' },
   b2bProject: { type: ObjectId, ref: 'B2BProject' },
   b2bDepartment: { type: ObjectId, ref: 'B2BDepartment' },
   /** Root lead id for cross-sale group (same business, multiple projects) */
