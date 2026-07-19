@@ -27,6 +27,8 @@ const missedFollowupSchedular = require("./schedular/missedFollowupSchedular");
 missedFollowupSchedular();
 const dataBaseBackup = require("./schedular/dataBaseBackup");
 dataBaseBackup();
+const dripMarketingScheduler = require("./schedular/dripMarketingScheduler");
+dripMarketingScheduler();
 // const counselorPerformanceEmailScheduler = require("./schedular/counselorPerformanceEmailScheduler");
 // counselorPerformanceEmailScheduler();
 //upload('

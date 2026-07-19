@@ -111,6 +111,36 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 		const legacyTypePattern = isVisit ? '^visit$' : '^call$';
 		const now = new Date();
 
+		// Done = leads with ≥1 completed followup of this type (same as card followupStats),
+		// not only when the *current* slot is still Completed.
+		if (b === 'done') {
+			const completedRows = await FollowUp.aggregate([
+				{
+					$match: {
+						$expr: {
+							$and: [
+								{ $eq: [{ $toLower: { $ifNull: ['$status', ''] } }, 'completed'] },
+								isVisit
+									? { $eq: [{ $toLower: { $ifNull: ['$followUpType', ''] } }, 'visit'] }
+									: { $ne: [{ $toLower: { $ifNull: ['$followUpType', ''] } }, 'visit'] }
+							]
+						}
+					}
+				},
+				{ $group: { _id: '$leadId' } }
+			]);
+
+			const doneIds = [
+				...new Set(
+					(completedRows || [])
+						.map((row) => String(row._id || ''))
+						.filter((id) => id && mongoose.Types.ObjectId.isValid(id))
+				)
+			].map((id) => new mongoose.Types.ObjectId(id));
+
+			return { _id: { $in: doneIds } };
+		}
+
 		const bucketExpr = (prefix) => {
 			const statusLower = { $toLower: { $ifNull: [`${prefix}.status`, ''] } };
 			const sched = `${prefix}.scheduledDate`;
@@ -120,9 +150,6 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 					{ $ne: [{ $type: sched }, 'missing'] }
 				]
 			};
-			if (b === 'done') {
-				return { $eq: [statusLower, 'completed'] };
-			}
 			const notDone = { $ne: [statusLower, 'completed'] };
 			if (b === 'planned') {
 				return { $and: [notDone, hasSched, { $gte: [sched, now] }] };
@@ -2001,9 +2028,23 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 		// Follow-up existence filters
 		if (String(hasFollowUpCall).toLowerCase() === 'true') {
 			filterConditions.push({ followUpCall: { $exists: true, $ne: null } });
+		} else if (String(hasFollowUpCall).toLowerCase() === 'false') {
+			filterConditions.push({
+				$or: [
+					{ followUpCall: { $exists: false } },
+					{ followUpCall: null }
+				]
+			});
 		}
 		if (String(hasFollowUpVisit).toLowerCase() === 'true') {
 			filterConditions.push({ followUpVisit: { $exists: true, $ne: null } });
+		} else if (String(hasFollowUpVisit).toLowerCase() === 'false') {
+			filterConditions.push({
+				$or: [
+					{ followUpVisit: { $exists: false } },
+					{ followUpVisit: null }
+				]
+			});
 		}
 
 		// Documents status filter (done/pending)
@@ -2811,10 +2852,14 @@ router.get('/leads', isCollege, async (req, res) => {
 			// Follow-up existence filters
 			...(String(hasFollowUpCall).toLowerCase() === 'true'
 				? [{ followUpCall: { $exists: true, $ne: null } }]
-				: []),
+				: String(hasFollowUpCall).toLowerCase() === 'false'
+					? [{ $or: [{ followUpCall: { $exists: false } }, { followUpCall: null }] }]
+					: []),
 			...(String(hasFollowUpVisit).toLowerCase() === 'true'
 				? [{ followUpVisit: { $exists: true, $ne: null } }]
-				: []),
+				: String(hasFollowUpVisit).toLowerCase() === 'false'
+					? [{ $or: [{ followUpVisit: { $exists: false } }, { followUpVisit: null }] }]
+					: []),
 		]
 	};
 
@@ -4065,6 +4110,20 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 				action: `${normalizedType} follow-up scheduled for ${scheduledDateTime.toLocaleDateString()} at ${followUpTime}`,
 				remarks: remarks || ''
 			});
+		} else if (statusChanged) {
+			// No new follow-up date → mark previous Call/Visit follow-ups as Done
+			const hadCall = Boolean(lead.followUpCall);
+			const hadVisit = Boolean(lead.followUpVisit);
+			await completeCurrentFollowupForType(lead, 'Call');
+			await completeCurrentFollowupForType(lead, 'Visit');
+			if (hadCall || hadVisit) {
+				lead.logs.push({
+					user: req.user._id,
+					timestamp: new Date(),
+					action: 'Previous follow-up marked as Done (status changed without new follow-up date)',
+					remarks: remarks || ''
+				});
+			}
 		}
 
 		await lead.save();

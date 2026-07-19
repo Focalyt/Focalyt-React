@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require("path");
 const { auth1, isAdmin, isCollege } = require("../../../helpers");
 const moment = require("moment");
-const { Courses, College, Country, User, Qualification, CourseSectors, AppliedCourses, Center } = require("../../models");
+const { Courses, CoursesCopy, College, Country, User, Qualification, CourseSectors, AppliedCourses, Center } = require("../../models");
 const Candidate = require("../../models/candidateProfile");
 const CandidateVisitCalender = require("../../models/candidateVisitCalender");
 const candidateServices = require('../services/candidate')
@@ -309,6 +309,453 @@ router
 			res.status(400).json({ status: false, message: err.message || "Something went wrong!" });
 		}
 
+	});
+	router
+	.route("/addcoursecopy")
+	.get(async (req, res) => {
+		try {
+			const sectors = await CourseSectors.find({ status: true })
+			const center = await Center.find({ status: true })
+
+			return res.render(`${req.vPath}/College/Course`, {
+				menu: 'addCourse',
+				sectors,
+				center
+			});
+		} catch (err) {
+			req.flash("error", err.message || "Something went wrong!");
+			return res.redirect("back");
+		}
+	})
+	.post(async (req, res) => {
+		try {
+			const { files } = req;
+			let body = req.body;
+
+			const courseName = body.name || 'unnamed';
+			const bucketName = process.env.AWS_BUCKET_NAME;
+
+			if (body.trainingCenter?.length > 0) {
+				body.center = JSON.parse(body.trainingCenter);
+			}
+
+			// Parse JSON fields for CoursesCopy
+			body.docsRequired = JSON.parse(body.docsRequired || '[]');
+			body.classResourcesRequired = JSON.parse(body.classResourcesRequired || '[]');
+			body.labResourcesRequired = JSON.parse(body.labResourcesRequired || '[]');
+			body.questionAnswers = JSON.parse(body.questionAnswers || '[]');
+			if (body.courseStructure) {
+				try {
+					body.courseStructure = typeof body.courseStructure === 'string'
+						? JSON.parse(body.courseStructure)
+						: body.courseStructure;
+				} catch (_) {
+					delete body.courseStructure;
+				}
+			}
+			body.createdBy = JSON.parse(body.createdBy || '{}');
+
+			if (files?.photos) {
+				const photoUrls = await uploadFilesToS3({
+					files: files.photos,
+					folder: 'Courses',
+					courseName,
+					s3,
+					bucketName,
+					allowedExtensions: allowedImageExtensions
+				});
+				body.photos = photoUrls;
+			}
+
+			if (files?.videos) {
+				const videoUrls = await uploadFilesToS3({
+					files: files.videos,
+					folder: 'Courses',
+					courseName,
+					s3,
+					bucketName,
+					allowedExtensions: allowedVideoExtensions
+				});
+				body.videos = videoUrls;
+			}
+
+			if (files?.testimonialvideos) {
+				const testimonialVideoUrls = await uploadFilesToS3({
+					files: files.testimonialvideos,
+					folder: 'Courses',
+					courseName,
+					s3,
+					bucketName,
+					allowedExtensions: allowedVideoExtensions
+				});
+				body.testimonialvideos = testimonialVideoUrls;
+			}
+
+			if (files?.thumbnail) {
+				const [thumbnailUrl] = await uploadFilesToS3({
+					files: files.thumbnail,
+					folder: 'Courses',
+					courseName,
+					s3,
+					bucketName,
+					allowedExtensions: allowedImageExtensions
+				});
+				body.thumbnail = thumbnailUrl;
+			}
+
+			if (files?.brochure) {
+				const [brochureUrl] = await uploadFilesToS3({
+					files: files.brochure,
+					folder: 'Courses',
+					courseName,
+					s3,
+					bucketName,
+					allowedExtensions: allowedDocumentExtensions
+				});
+				body.brochure = brochureUrl;
+			}
+
+			if (typeof body.createdBy.id === 'string') {
+				body.createdBy = new mongoose.Types.ObjectId(body.createdBy.id);
+			}
+
+			body.createdByType = 'college';
+
+			if (body.sectors) {
+				if (typeof body.sectors === 'string') {
+					try {
+						body.sectors = JSON.parse(body.sectors);
+					} catch (e) {
+						body.sectors = body.sectors.replace(/[\[\]'"\s]/g, '').split(',').filter(id => id);
+					}
+				}
+				if (Array.isArray(body.sectors)) {
+					body.sectors = body.sectors.map(id => new mongoose.Types.ObjectId(id));
+				}
+			}
+
+			if (body.center) {
+				if (typeof body.center === 'string') {
+					try {
+						body.center = JSON.parse(body.center);
+					} catch (e) {
+						body.center = body.center.replace(/[\[\]'"\s]/g, '').split(',').filter(id => id);
+					}
+				}
+				if (Array.isArray(body.center)) {
+					body.center = body.center.map(id => new mongoose.Types.ObjectId(id));
+				}
+			}
+
+			normalizeCourseMedia(body);
+
+			// Save ONLY into coursescopy collection
+			const newCourse = await CoursesCopy.create(body);
+			res.json({ status: true, message: "Record added!", data: newCourse });
+
+		} catch (err) {
+			console.error("Error in course upload:", err);
+			res.status(400).json({ status: false, message: err.message || "Something went wrong!" });
+		}
+
+	});
+
+	router
+	.route("/listcoursecopy")
+	.get(async (req, res) => {
+		try {
+			const view = true;
+			const canEdit = true;
+			const user = req.user;
+			if (!user) {
+				return res.json({
+					status: false,
+					message: "You are not authorized to access this page"
+				});
+			}
+
+			const college = await College.findOne({
+				'_concernPerson._id': user._id
+			});
+			if (!college) {
+				return res.json({
+					status: false,
+					message: "College not found"
+				});
+			}
+
+			const data = req.query;
+			const fields = {
+				isDeleted: false
+			};
+			if (data['name'] != '' && data.hasOwnProperty('name')) {
+				fields["name"] = { "$regex": data['name'], "$options": "i" };
+			}
+			if (data.FromDate && data.ToDate) {
+				let fdate = moment(data.FromDate).utcOffset("+05:30").startOf('day').toDate();
+				let tdate = moment(data.ToDate).utcOffset("+05:30").endOf('day').toDate();
+				fields["createdAt"] = {
+					$gte: fdate,
+					$lte: tdate
+				};
+			}
+
+			let status = true;
+			let isChecked = "false";
+			if (req.query.status !== undefined && req.query.status.toString() === "false") {
+				status = false;
+				isChecked = "true";
+			}
+			fields["status"] = status;
+
+			const courses = await CoursesCopy.find({
+				...fields,
+				college: college._id
+			}).populate("sectors");
+
+			return res.json({
+				view,
+				courses,
+				isChecked,
+				data,
+				canEdit,
+				status
+			});
+		} catch (err) {
+			console.error("Error listing coursecopy:", err);
+			return res.status(400).json({ status: false, message: err.message || "Something went wrong!" });
+		}
+	});
+
+	router.put('/update_coursecopy_status/:courseId', async (req, res) => {
+		try {
+			const { courseId } = req.params;
+			const course = await CoursesCopy.findOne({ _id: courseId });
+			if (!course) {
+				return res.status(404).json({ status: false, message: "Course not found" });
+			}
+			course.status = req.body.status;
+			await course.save();
+			return res.json({ status: true, message: "Course status updated!", data: course });
+		} catch (err) {
+			console.error("Error updating coursecopy status:", err);
+			return res.status(400).json({ status: false, message: err.message || "Something went wrong!" });
+		}
+	});
+
+	router.post('/:courseId/duplicatecoursecopy', async (req, res) => {
+		try {
+			const { courseId } = req.params;
+			const course = await CoursesCopy.findById(courseId).lean();
+			if (!course) {
+				return res.status(404).json({ success: false, message: 'Course not found' });
+			}
+
+			const duplicateData = { ...course };
+			delete duplicateData._id;
+			delete duplicateData.createdAt;
+			delete duplicateData.updatedAt;
+
+			if (typeof duplicateData.name === 'string') {
+				const copySuffix = ' (Copy)';
+				if (!duplicateData.name.endsWith(copySuffix)) {
+					duplicateData.name = `${duplicateData.name}${copySuffix}`;
+				} else {
+					duplicateData.name = `${duplicateData.name} ${Date.now()}`;
+				}
+			}
+
+			const newCourse = await CoursesCopy.create(duplicateData);
+			return res.status(201).json({ success: true, message: 'Course duplicated successfully', data: newCourse });
+		} catch (err) {
+			console.error('Failed to duplicate coursecopy:', err);
+			return res.status(500).json({ success: false, message: 'Failed to duplicate course' });
+		}
+	});
+
+	router
+	.route("/editcoursecopy/:id")
+	.get(async (req, res) => {
+		try {
+			const { id } = req.params;
+			let course = await CoursesCopy.findById(id);
+			if (!course) throw req.ykError("course not found!");
+			const sectors = await CourseSectors.find({
+				status: true, _id: {
+					$nin: course.sectors
+				}
+			})
+			const center = await Center.find({
+				status: true, _id: {
+					$nin: course.center
+				}
+			})
+			course = await CoursesCopy.findById(id).populate('sectors').populate('center');
+			course.docsRequired = (course.docsRequired || []).filter(doc => doc.status === true);
+			course.classResourcesRequired = (course.classResourcesRequired || []).filter(doc => doc.status !== false);
+			course.labResourcesRequired = (course.labResourcesRequired || []).filter(doc => doc.status !== false);
+
+			return res.json({
+				course,
+				sectors,
+				id,
+				center,
+				menu: 'course'
+			})
+
+		} catch (err) {
+			req.flash("error", err.message || "Something went wrong!");
+			return res.redirect("back");
+		}
+	})
+	.put(async (req, res) => {
+		try {
+		const courseId = req.params.id;
+		const { files } = req;
+		let body = req.body;
+		if (Array.isArray(body.sectors)) {
+			body.sectors = body.sectors.map(id => new mongoose.Types.ObjectId(id));
+		}
+		
+		if (body.center) {
+			if (typeof body.center === 'string') {
+				try {
+					body.center = JSON.parse(body.center);
+				} catch (e) {
+					body.center = body.center.replace(/[\[\]'"\s]/g, '').split(',').filter(id => id);
+				}
+			}
+			if (Array.isArray(body.center)) {
+				body.center = body.center.map(id => new mongoose.Types.ObjectId(id));
+			}
+		}
+
+			const bucketName = process.env.AWS_BUCKET_NAME;
+
+			const existingCourse = await CoursesCopy.findById(courseId);
+			if (!existingCourse) {
+				return res.status(404).json({ status: false, message: "Course not found" });
+			}
+
+			if (Object.keys(body).length === 1 && body.status !== undefined) {
+				existingCourse.status = body.status;
+				await existingCourse.save();
+				return res.json({ status: true, message: "Course status updated!", data: existingCourse });
+			}
+
+			const courseName = body.name || existingCourse.name || 'unnamed';
+
+			if (body.docsRequired) {
+				body.docsRequired = typeof body.docsRequired === 'string'
+					? JSON.parse(body.docsRequired)
+					: body.docsRequired;
+			}
+			if (body.classResourcesRequired) {
+				body.classResourcesRequired = typeof body.classResourcesRequired === 'string'
+					? JSON.parse(body.classResourcesRequired)
+					: body.classResourcesRequired;
+			}
+			if (body.labResourcesRequired) {
+				body.labResourcesRequired = typeof body.labResourcesRequired === 'string'
+					? JSON.parse(body.labResourcesRequired)
+					: body.labResourcesRequired;
+			}
+			if (body.questionAnswers) {
+				body.questionAnswers = typeof body.questionAnswers === 'string'
+					? JSON.parse(body.questionAnswers)
+					: body.questionAnswers;
+			}
+			if (body.courseStructure) {
+				body.courseStructure = typeof body.courseStructure === 'string'
+					? JSON.parse(body.courseStructure)
+					: body.courseStructure;
+			}
+			if (body.createdBy) {
+				body.createdBy = typeof body.createdBy === 'string'
+					? JSON.parse(body.createdBy)
+					: body.createdBy;
+			}
+
+			if (files?.photos) {
+				const photoUrls = await uploadFilesToS3({
+					files: files.photos,
+					folder: 'Courses',
+					courseName,
+					s3,
+					bucketName,
+					allowedExtensions: allowedImageExtensions
+				});
+				body.photos = [...(existingCourse.photos || []), ...photoUrls];
+			} else {
+				body.photos = existingCourse.photos;
+			}
+
+			if (files?.videos) {
+				const videoUrls = await uploadFilesToS3({
+					files: files.videos,
+					folder: 'Courses',
+					courseName,
+					s3,
+					bucketName,
+					allowedExtensions: allowedVideoExtensions
+				});
+				body.videos = [...(existingCourse.videos || []), ...videoUrls];
+			} else {
+				body.videos = existingCourse.videos;
+			}
+
+			if (files?.testimonialvideos) {
+				const testimonialVideoUrls = await uploadFilesToS3({
+					files: files.testimonialvideos,
+					folder: 'Courses',
+					courseName,
+					s3,
+					bucketName,
+					allowedExtensions: allowedVideoExtensions
+				});
+				body.testimonialvideos = [...(existingCourse.testimonialvideos || []), ...testimonialVideoUrls];
+			} else {
+				body.testimonialvideos = existingCourse.testimonialvideos;
+			}
+
+			if (files?.thumbnail) {
+				const [thumbnailUrl] = await uploadFilesToS3({
+					files: files.thumbnail,
+					folder: 'Courses',
+					courseName,
+					s3,
+					bucketName,
+					allowedExtensions: allowedImageExtensions
+				});
+				body.thumbnail = thumbnailUrl;
+			} else {
+				body.thumbnail = existingCourse.thumbnail;
+			}
+
+			if (files?.brochure) {
+				const [brochureUrl] = await uploadFilesToS3({
+					files: files.brochure,
+					folder: 'Courses',
+					courseName,
+					s3,
+					bucketName,
+					allowedExtensions: allowedDocumentExtensions
+				});
+				body.brochure = brochureUrl;
+			} else {
+				body.brochure = existingCourse.brochure;
+			}
+
+			normalizeCourseMedia(body);
+
+			// Update ONLY in coursescopy collection
+			const updatedCourse = await CoursesCopy.findByIdAndUpdate(courseId, body, { new: true });
+
+			res.json({ status: true, message: "Record updated!", data: updatedCourse });
+		} catch (err) {
+			console.error("Error in course update:", err);
+			res.status(400).json({ status: false, message: err.message || "Something went wrong!" });
+		}
 	});
 router.route("/changeStatus").patch(async (req, res) => {
 	try {

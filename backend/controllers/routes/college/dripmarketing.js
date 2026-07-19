@@ -3,7 +3,8 @@ const router = express.Router();
 const moment = require('moment');
 const { isCollege } = require('../../../helpers');
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, DripMarketingRule } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, DripMarketingRule, DripMarketingJob } = require("../../models");
+const { runDripMarketingTick } = require("../../../schedular/dripMarketingScheduler");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
@@ -496,6 +497,41 @@ router.get('/get-dripmarketing-rule', [isCollege], async (req, res) => {
 	}
 });
 
+/** Manually trigger drip evaluation + due WhatsApp sends (for testing) */
+router.post('/run-now', [isCollege], async (req, res) => {
+	try {
+		const result = await runDripMarketingTick();
+		return res.status(200).json({
+			success: true,
+			message: 'Drip marketing tick completed',
+			result
+		});
+	} catch (error) {
+		console.error('Error running drip marketing:', error);
+		return res.status(500).json({ success: false, message: error.message || 'Server error' });
+	}
+});
 
+/** List queued / sent drip jobs for this college */
+router.get('/jobs', [isCollege], async (req, res) => {
+	try {
+		const collegeId = req.user.college._id;
+		const { status, ruleId } = req.query;
+		const filter = { collegeId };
+		if (status) filter.status = status;
+		if (ruleId && mongoose.Types.ObjectId.isValid(ruleId)) filter.ruleId = ruleId;
+
+		const jobs = await DripMarketingJob.find(filter)
+			.sort({ createdAt: -1 })
+			.limit(200)
+			.populate('leadId', '_candidate _course _leadStatus')
+			.lean();
+
+		return res.status(200).json({ success: true, data: jobs });
+	} catch (error) {
+		console.error('Error fetching drip jobs:', error);
+		return res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
 
 module.exports = router; 

@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import axios from 'axios';
+import { useLocation, useNavigate } from 'react-router-dom';
 import DatePicker from 'react-date-picker';
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
@@ -60,6 +61,7 @@ const LEARNING_MATERIAL_TYPE_OPTIONS = ['PDF', 'Video', 'Document', 'Presentatio
 const createMaterialItem = (defaultType = 'Document') => ({
   id: `MAT${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
   name: '',
+  description: '',
   type: defaultType,
   requirement: DOC_REQUIREMENT.MANDATORY,
 });
@@ -70,9 +72,24 @@ const normalizeMaterialItems = (items = []) =>
     .map((item) => ({
       ...item,
       name: item.name.trim(),
+      description: item.description?.trim() || '',
+      type: item.type || 'Document',
       requirement: item.requirement || DOC_REQUIREMENT.MANDATORY,
       requirementLabel: getDocRequirementLabel(item.requirement),
     }));
+
+/** Migrate old string TLM fields into document list shape */
+const normalizeTlmList = (value) => {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    return [{
+      ...createMaterialItem('Document'),
+      name: value.trim(),
+      description: '',
+    }];
+  }
+  return [];
+};
 
 const createTotQuestionDraft = () => ({
   id: `TQ${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -112,8 +129,11 @@ const MaterialDefinitionSection = ({
   items = [],
   typeOptions = EVIDENCE_TYPE_OPTIONS,
   nameColumnLabel = 'Name',
+  descriptionColumnLabel = 'Description',
   typeColumnLabel = 'Type',
   namePlaceholder = 'Enter name',
+  descriptionPlaceholder = 'Enter description',
+  showDescription = false,
   onAdd,
   onChange,
   onRemove,
@@ -125,29 +145,41 @@ const MaterialDefinitionSection = ({
         <i className="fas fa-plus" /> {addLabel}
       </button>
     </div>
-    <p className="ac-evidence-hint">{hint}</p>
+    {hint ? <p className="ac-evidence-hint">{hint}</p> : null}
     {items.length === 0 && (
       <p className="ac-evidence-empty">{emptyText}</p>
     )}
     {items.length > 0 && (
-      <div className="ac-evidence-row ac-evidence-row--head">
+      <div className={`ac-evidence-row ac-evidence-row--head${showDescription ? ' ac-evidence-row--with-desc' : ''}`}>
         <span>{nameColumnLabel}</span>
+        {showDescription && <span>{descriptionColumnLabel}</span>}
         <span>{typeColumnLabel}</span>
         <span>Requirement</span>
         <span />
       </div>
     )}
     {items.map((item, index) => (
-      <div key={item.id || index} className="ac-evidence-row">
+      <div
+        key={item.id || index}
+        className={`ac-evidence-row${showDescription ? ' ac-evidence-row--with-desc' : ''}`}
+      >
         <input
           className="ac-input"
           placeholder={namePlaceholder}
-          value={item.name}
+          value={item.name || ''}
           onChange={(e) => onChange(index, 'name', e.target.value)}
         />
+        {showDescription && (
+          <input
+            className="ac-input"
+            placeholder={descriptionPlaceholder}
+            value={item.description || ''}
+            onChange={(e) => onChange(index, 'description', e.target.value)}
+          />
+        )}
         <select
           className="ac-input"
-          value={item.type}
+          value={item.type || typeOptions[0]}
           onChange={(e) => onChange(index, 'type', e.target.value)}
         >
           {typeOptions.map((type) => (
@@ -1025,6 +1057,10 @@ const createEmptySessionDraft = () => ({
   id: '',
   title: '',
   sessionNumber: '',
+  hours: '',
+  subSessions: '',
+  subSessionName: '',
+  duration: '',
   unitNumber: '',
   unitName: '',
   chapterNumber: '',
@@ -1032,6 +1068,9 @@ const createEmptySessionDraft = () => ({
   subTopics: '',
   topicCovered: '',
   trainingMethod: '',
+  classroomLabResources: '',
+  standardTlm: [],
+  trainerBasedTlm: [],
   sessionDate: getTodayInputValue(),
   startTime: '10:00',
   endTime: '12:00',
@@ -1532,11 +1571,53 @@ const SessionDetailSidePanel = ({
         </div>
 
         <div className="ac-side-panel__section">
+          <h5>Session details</h5>
+          <div className="ac-side-panel__grid">
+            <div><em>Session Number</em><strong>{session.sessionNumber || '—'}</strong></div>
+            <div><em>Session Name</em><strong>{session.title || '—'}</strong></div>
+            <div><em>Hrs.</em><strong>{session.hours || '—'}</strong></div>
+            <div><em>Sub Sessions</em><strong>{session.subSessions || '—'}</strong></div>
+            <div><em>Sub Session Name</em><strong>{session.subSessionName || '—'}</strong></div>
+            <div><em>Duration</em><strong>{session.duration || '—'}</strong></div>
+            <div><em>Teaching Method</em><strong>{session.trainingMethod || '—'}</strong></div>
+          </div>
+          {session.topicCovered && (
+            <div className="ac-side-panel__grid ac-side-panel__grid--single" style={{ marginTop: 10 }}>
+              <div><em>Topics Covered</em><strong style={{ whiteSpace: 'pre-wrap' }}>{session.topicCovered}</strong></div>
+            </div>
+          )}
+          {session.classroomLabResources && (
+            <div className="ac-side-panel__grid ac-side-panel__grid--single" style={{ marginTop: 10 }}>
+              <div><em>Class Room &amp; Lab Resources</em><strong style={{ whiteSpace: 'pre-wrap' }}>{session.classroomLabResources}</strong></div>
+            </div>
+          )}
+          {normalizeTlmList(session.standardTlm).length > 0 && (
+            <div className="ac-side-panel__grid ac-side-panel__grid--single" style={{ marginTop: 10 }}>
+              <div>
+                <em>Standard TLM</em>
+                <strong>
+                  {normalizeTlmList(session.standardTlm).map((item) => item.name).filter(Boolean).join(', ')}
+                </strong>
+              </div>
+            </div>
+          )}
+          {normalizeTlmList(session.trainerBasedTlm).length > 0 && (
+            <div className="ac-side-panel__grid ac-side-panel__grid--single" style={{ marginTop: 10 }}>
+              <div>
+                <em>Trainer based TLM</em>
+                <strong>
+                  {normalizeTlmList(session.trainerBasedTlm).map((item) => item.name).filter(Boolean).join(', ')}
+                </strong>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="ac-side-panel__section">
           <h5>Schedule</h5>
           <div className="ac-side-panel__grid">
             <div><em>Date</em><strong>{session.date || formatSessionDate(session.sessionDate)}</strong></div>
             <div><em>Time</em><strong>{timeRange}</strong></div>
-            <div><em>Method</em><strong>{session.trainingMethod || '—'}</strong></div>
           </div>
         </div>
 
@@ -1698,6 +1779,12 @@ const SessionPlanModal = ({
   onLearningMaterialChange,
   onAddLearningMaterial,
   onRemoveLearningMaterial,
+  onStandardTlmChange,
+  onAddStandardTlm,
+  onRemoveStandardTlm,
+  onTrainerBasedTlmChange,
+  onAddTrainerBasedTlm,
+  onRemoveTrainerBasedTlm,
   onTotMaterialChange,
   onAddTotMaterial,
   onRemoveTotMaterial,
@@ -1843,7 +1930,7 @@ const SessionPlanModal = ({
 
           <div className="ac-form-grid">
             <label className="ac-field">
-              <span>Session number</span>
+              <span>Session Number</span>
               <input
                 className="ac-input"
                 type="text"
@@ -1854,7 +1941,7 @@ const SessionPlanModal = ({
               />
             </label>
             <label className="ac-field ac-field--span-2">
-              <span>Session title *</span>
+              <span>Session Name *</span>
               <input
                 className="ac-input"
                 placeholder="e.g. Product categories and selling points"
@@ -1863,7 +1950,57 @@ const SessionPlanModal = ({
               />
             </label>
             <label className="ac-field">
-              <span>Training method</span>
+              <span>Hrs.</span>
+              <input
+                className="ac-input"
+                type="text"
+                inputMode="decimal"
+                placeholder="e.g. 2"
+                value={draft.hours || ''}
+                onChange={(e) => onFieldChange('hours', e.target.value)}
+              />
+            </label>
+            <label className="ac-field">
+              <span>Sub Sessions</span>
+              <input
+                className="ac-input"
+                type="text"
+                inputMode="numeric"
+                placeholder="e.g. 2"
+                value={draft.subSessions || ''}
+                onChange={(e) => onFieldChange('subSessions', e.target.value)}
+              />
+            </label>
+            <label className="ac-field">
+              <span>Sub Session Name</span>
+              <input
+                className="ac-input"
+                placeholder="e.g. Greeting practice"
+                value={draft.subSessionName || ''}
+                onChange={(e) => onFieldChange('subSessionName', e.target.value)}
+              />
+            </label>
+            <label className="ac-field">
+              <span>Duration</span>
+              <input
+                className="ac-input"
+                placeholder="e.g. 45 min"
+                value={draft.duration || ''}
+                onChange={(e) => onFieldChange('duration', e.target.value)}
+              />
+            </label>
+            <label className="ac-field ac-field--full">
+              <span>Topics Covered</span>
+              <textarea
+                className="ac-input ac-input--textarea"
+                rows="3"
+                placeholder="List topics covered in this session"
+                value={draft.topicCovered || ''}
+                onChange={(e) => onFieldChange('topicCovered', e.target.value)}
+              />
+            </label>
+            <label className="ac-field ac-field--span-2">
+              <span>Teaching Method</span>
               <input
                 className="ac-input"
                 placeholder="Classroom, practical, role-play..."
@@ -1871,36 +2008,19 @@ const SessionPlanModal = ({
                 onChange={(e) => onFieldChange('trainingMethod', e.target.value)}
               />
             </label>
-            <label className="ac-field">
-              <span>Session date *</span>
-              <input
-                type="date"
-                className="ac-input"
-                value={draft.sessionDate}
-                onChange={(e) => onFieldChange('sessionDate', e.target.value)}
+            <label className="ac-field ac-field--full">
+              <span>Class Room &amp; Lab Resources</span>
+              <textarea
+                className="ac-input ac-input--textarea"
+                rows="2"
+                placeholder="Projector, whiteboard, lab kits, tools..."
+                value={draft.classroomLabResources || ''}
+                onChange={(e) => onFieldChange('classroomLabResources', e.target.value)}
               />
             </label>
-            <label className="ac-field">
-              <span>Start time</span>
-              <input
-                type="time"
-                className="ac-input"
-                value={draft.startTime}
-                onChange={(e) => onFieldChange('startTime', e.target.value)}
-              />
-            </label>
-            <label className="ac-field">
-              <span>End time</span>
-              <input
-                type="time"
-                className="ac-input"
-                value={draft.endTime}
-                onChange={(e) => onFieldChange('endTime', e.target.value)}
-              />
-            </label>
-
           </div>
 
+         
           <MaterialDefinitionSection
             title="Student learning material"
             addLabel="Add material"
@@ -1913,7 +2033,7 @@ const SessionPlanModal = ({
           />
 
 <MaterialDefinitionSection
-            title="Required documents"
+            title="Student Required documents"
             addLabel="Add document"
             emptyText="No documents defined yet."
             items={draft.evidenceDocs || []}
@@ -1921,6 +2041,33 @@ const SessionPlanModal = ({
             onAdd={onAddEvidence}
             onChange={onEvidenceChange}
             onRemove={onRemoveEvidence}
+          />
+ <MaterialDefinitionSection
+            title="Standard TLM"
+            addLabel="Add document"
+            emptyText="No standard TLM documents defined yet."
+            showDescription
+            items={normalizeTlmList(draft.standardTlm)}
+            typeOptions={LEARNING_MATERIAL_TYPE_OPTIONS}
+            namePlaceholder="e.g. Handbook PDF"
+            descriptionPlaceholder="Short description"
+            onAdd={onAddStandardTlm}
+            onChange={onStandardTlmChange}
+            onRemove={onRemoveStandardTlm}
+          />
+
+          <MaterialDefinitionSection
+            title="Trainer based TLM"
+            addLabel="Add document"
+            emptyText="No trainer based TLM documents defined yet."
+            showDescription
+            items={normalizeTlmList(draft.trainerBasedTlm)}
+            typeOptions={LEARNING_MATERIAL_TYPE_OPTIONS}
+            namePlaceholder="e.g. Trainer notes"
+            descriptionPlaceholder="Short description"
+            onAdd={onAddTrainerBasedTlm}
+            onChange={onTrainerBasedTlmChange}
+            onRemove={onRemoveTrainerBasedTlm}
           />
 
           <label className="ac-tot-check ac-tot-check--include">
@@ -2062,7 +2209,98 @@ const ReferSessionModal = ({
   );
 };
 
+let pendingAcDeepLink = null;
+
+const readSessionDeepLink = (locationState) => {
+  if (pendingAcDeepLink) return pendingAcDeepLink;
+
+  let fromStorage = null;
+  try {
+    const raw = sessionStorage.getItem('acSessionDeepLink');
+    if (raw) fromStorage = JSON.parse(raw);
+  } catch (_) {
+    fromStorage = null;
+  }
+
+  const incoming = locationState || fromStorage;
+  const params = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search)
+    : null;
+
+  if (!incoming) {
+    const courseIdFromQuery = params?.get('courseId');
+    if (!courseIdFromQuery || params?.get('skipWizard') !== '1') return null;
+    pendingAcDeepLink = {
+      skipPathPicker: true,
+      courseName: '',
+      departmentName: '',
+      projectName: '',
+      centerName: '',
+      filters: {
+        department: '',
+        project: '',
+        center: '',
+        course: String(courseIdFromQuery),
+        batch: `course:${courseIdFromQuery}`,
+      },
+    };
+    return pendingAcDeepLink;
+  }
+
+  const courseId = String(
+    incoming.filters?.course
+    || incoming.courseId
+    || params?.get('courseId')
+    || ''
+  );
+  if (!courseId) return null;
+
+  const skipPathPicker = incoming.skipPathPicker !== false
+    || params?.get('skipWizard') === '1';
+
+  pendingAcDeepLink = {
+    skipPathPicker,
+    courseName: incoming.courseName || '',
+    departmentName: incoming.departmentName || '',
+    projectName: incoming.projectName || '',
+    centerName: incoming.centerName || '',
+    filters: {
+      department: String(incoming.filters?.department || ''),
+      project: String(incoming.filters?.project || ''),
+      center: String(incoming.filters?.center || ''),
+      course: courseId,
+      batch: String(incoming.filters?.batch || `course:${courseId}`),
+    },
+  };
+  return pendingAcDeepLink;
+};
+
+const clearPendingAcDeepLink = () => {
+  pendingAcDeepLink = null;
+  try {
+    sessionStorage.removeItem('acSessionDeepLink');
+  } catch (_) {
+    // ignore
+  }
+};
+
 const AcademicCoordinatorModule = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const bootstrapRef = useRef(null);
+  const deepLinkBoot = useRef(null);
+
+  if (!deepLinkBoot.current) {
+    deepLinkBoot.current = readSessionDeepLink(location.state);
+    if (deepLinkBoot.current?.skipPathPicker) {
+      bootstrapRef.current = {
+        ...deepLinkBoot.current,
+        pathApplied: false,
+        batchApplied: !!deepLinkBoot.current.filters.batch,
+      };
+    }
+  }
+
   const userData = useMemo(
     () => JSON.parse(sessionStorage.getItem('user') || '{}'),
     []
@@ -2071,18 +2309,38 @@ const AcademicCoordinatorModule = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
 
   const [reportDate, setReportDate] = useState(new Date());
-  const [filters, setFilters] = useState({
-    department: '',
-    project: '',
-    center: '',
-    course: '',
-    batch: '',
+  const [filters, setFilters] = useState(() => {
+    const boot = deepLinkBoot.current;
+    if (boot?.skipPathPicker && boot.filters?.course) {
+      return {
+        department: boot.filters.department || '',
+        project: boot.filters.project || '',
+        center: boot.filters.center || '',
+        course: boot.filters.course,
+        // Set immediately so Department/Project/Center wizard never shows
+        batch: boot.filters.batch || `course:${boot.filters.course}`,
+      };
+    }
+    return {
+      department: '',
+      project: '',
+      center: '',
+      course: '',
+      batch: '',
+    };
   });
   const [verticalOptions, setVerticalOptions] = useState([]);
   const [projectOptions, setProjectOptions] = useState([]);
   const [centerOptions, setCenterOptions] = useState([]);
   const [courseOptions, setCourseOptions] = useState([]);
-  const [batchOptions, setBatchOptions] = useState([]);
+  const [batchOptions, setBatchOptions] = useState(() => {
+    const boot = deepLinkBoot.current;
+    if (boot?.skipPathPicker && boot.filters?.course) {
+      const batchId = boot.filters.batch || `course:${boot.filters.course}`;
+      return [{ value: batchId, label: boot.courseName || 'Course plan' }];
+    }
+    return [];
+  });
   const [allCoursesMeta, setAllCoursesMeta] = useState([]);
   const [allCentersMeta, setAllCentersMeta] = useState([]);
   const [centerWiseCourseIds, setCenterWiseCourseIds] = useState(new Set());
@@ -2107,14 +2365,33 @@ const AcademicCoordinatorModule = () => {
     setTimeout(() => setToast(''), 2500);
   };
 
-  const pathLabels = useMemo(() => ({
-    departmentName: getOptionLabel(verticalOptions, filters.department),
-    projectName: getOptionLabel(projectOptions, filters.project),
-    centerName: getOptionLabel(centerOptions, filters.center),
-    courseTrade: getOptionLabel(courseOptions, filters.course),
-    batchCode: getOptionLabel(batchOptions, filters.batch),
-    studentCount: 0,
-  }), [filters, verticalOptions, projectOptions, centerOptions, courseOptions, batchOptions]);
+  // Clear router query/state after deep-link is consumed (keep module cache for Strict Mode remount)
+  useEffect(() => {
+    if (!deepLinkBoot.current?.skipPathPicker) return;
+    try {
+      sessionStorage.removeItem('acSessionDeepLink');
+    } catch (_) {
+      // ignore
+    }
+    if (location.state || new URLSearchParams(location.search).get('skipWizard')) {
+      navigate('/institute/academicCoordinator', { replace: true, state: null });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const pathLabels = useMemo(() => {
+    const boot = bootstrapRef.current;
+    return {
+      departmentName: getOptionLabel(verticalOptions, filters.department) || boot?.departmentName || '',
+      projectName: getOptionLabel(projectOptions, filters.project) || boot?.projectName || '',
+      centerName: getOptionLabel(centerOptions, filters.center) || boot?.centerName || '',
+      courseTrade: getOptionLabel(courseOptions, filters.course) || boot?.courseName || '',
+      batchCode: getOptionLabel(batchOptions, filters.batch)
+        || (String(filters.batch || '').startsWith('course:')
+          ? (boot?.courseName || 'Course plan')
+          : ''),
+      studentCount: 0,
+    };
+  }, [filters, verticalOptions, projectOptions, centerOptions, courseOptions, batchOptions]);
 
   const selectedCourseStructure = useMemo(
     () => getCourseStructureFromMeta(allCoursesMeta, filters.course),
@@ -2323,7 +2600,10 @@ const AcademicCoordinatorModule = () => {
   useEffect(() => {
     if (!token) return undefined;
     if (!filters.center) {
-      setBatchOptions([]);
+      // Keep synthetic course-plan option when deep-linking without a center yet
+      if (!bootstrapRef.current?.skipPathPicker) {
+        setBatchOptions([]);
+      }
       return undefined;
     }
 
@@ -2337,16 +2617,39 @@ const AcademicCoordinatorModule = () => {
           headers: { 'x-auth': token },
         });
         if (res.data?.success) {
-          setBatchOptions((res.data.data || []).map((batch) => ({
+          const nextBatches = (res.data.data || []).map((batch) => ({
             value: String(batch._id),
             label: batch.name,
-          })));
+          }));
+          if (nextBatches.length) {
+            setBatchOptions(nextBatches);
+          } else if (bootstrapRef.current?.skipPathPicker && filters.course) {
+            const syntheticId = `course:${filters.course}`;
+            setBatchOptions([{
+              value: syntheticId,
+              label: bootstrapRef.current.courseName || 'Course plan',
+            }]);
+          } else {
+            setBatchOptions([]);
+          }
+        } else if (bootstrapRef.current?.skipPathPicker && filters.course) {
+          setBatchOptions([{
+            value: `course:${filters.course}`,
+            label: bootstrapRef.current.courseName || 'Course plan',
+          }]);
         } else {
           setBatchOptions([]);
         }
       } catch (err) {
         console.error('Failed to fetch batches:', err);
-        setBatchOptions([]);
+        if (bootstrapRef.current?.skipPathPicker && filters.course) {
+          setBatchOptions([{
+            value: `course:${filters.course}`,
+            label: bootstrapRef.current.courseName || 'Course plan',
+          }]);
+        } else {
+          setBatchOptions([]);
+        }
       } finally {
         setPathBatchesLoading(false);
       }
@@ -2365,6 +2668,82 @@ const AcademicCoordinatorModule = () => {
     setSessions(loadStoredSessions(filters.batch));
     setSelectedSessionId('');
   }, [filters.batch]);
+
+  // Deep-link: fill department/project/center from course meta (wizard already skipped)
+  useEffect(() => {
+    const boot = bootstrapRef.current;
+    if (!boot?.skipPathPicker || boot.pathApplied) return;
+    if (!filters.course) return;
+
+    const courseMeta = allCoursesMeta.find(
+      (item) => String(item._id) === String(filters.course)
+    );
+
+    if (!courseMeta && allCoursesMeta.length === 0) return;
+
+    const department = String(
+      filters.department
+      || boot.filters?.department
+      || courseMeta?.vertical?._id
+      || courseMeta?.vertical
+      || ''
+    );
+    const project = String(
+      filters.project
+      || boot.filters?.project
+      || courseMeta?.project?._id
+      || courseMeta?.project
+      || ''
+    );
+
+    let center = String(filters.center || boot.filters?.center || '');
+    if (!center && courseMeta) {
+      const centers = Array.isArray(courseMeta.center) ? courseMeta.center : [];
+      const firstCenter = centers[0];
+      center = String(firstCenter?._id || firstCenter || courseMeta.centerId || '');
+    }
+    if (!center && project && allCentersMeta.length) {
+      const projectCenter = allCentersMeta.find((centerItem) =>
+        centerItem?.projects?.some((p) => String(p._id || p) === String(project))
+      );
+      if (projectCenter) center = String(projectCenter._id);
+    }
+
+    if (courseMeta?.name && !boot.courseName) {
+      boot.courseName = courseMeta.name;
+    }
+
+    setFilters((prev) => ({
+      ...prev,
+      department: department || prev.department,
+      project: project || prev.project,
+      center: center || prev.center,
+      course: prev.course || String(boot.filters.course),
+      batch: prev.batch || `course:${boot.filters.course}`,
+    }));
+    boot.pathApplied = true;
+  }, [filters.course, filters.department, filters.project, filters.center, allCoursesMeta, allCentersMeta]);
+
+  // Deep-link: when real batches load, prefer first batch over synthetic course plan
+  useEffect(() => {
+    const boot = bootstrapRef.current;
+    if (!boot?.skipPathPicker) return;
+    if (!filters.course || !filters.center) return;
+    if (pathBatchesLoading) return;
+    if (!batchOptions.length) return;
+
+    const hasRealBatch = batchOptions.some((opt) => !String(opt.value).startsWith('course:'));
+    if (!hasRealBatch) return;
+
+    const currentIsSynthetic = String(filters.batch || '').startsWith('course:');
+    if (!currentIsSynthetic && filters.batch) return;
+
+    const firstReal = batchOptions.find((opt) => !String(opt.value).startsWith('course:'));
+    if (firstReal) {
+      setFilters((prev) => ({ ...prev, batch: firstReal.value }));
+      boot.batchApplied = true;
+    }
+  }, [filters.course, filters.center, filters.batch, batchOptions, pathBatchesLoading]);
 
   const sortedSessions = useMemo(
     () => [...sessions].sort((a, b) => {
@@ -2490,6 +2869,9 @@ const AcademicCoordinatorModule = () => {
   };
 
   const handleSessionPathReset = () => {
+    clearPendingAcDeepLink();
+    bootstrapRef.current = null;
+    deepLinkBoot.current = null;
     setFilters({ department: '', project: '', center: '', course: '', batch: '' });
   };
 
@@ -2524,6 +2906,8 @@ const AcademicCoordinatorModule = () => {
         totTrainingProofs: session.totTrainingProofs || [],
         preSessionRequirements: session.preSessionRequirements || [],
         totCompletionProofs: session.totCompletionProofs || [],
+        standardTlm: normalizeTlmList(session.standardTlm),
+        trainerBasedTlm: normalizeTlmList(session.trainerBasedTlm),
       },
     });
   };
@@ -2533,15 +2917,17 @@ const AcademicCoordinatorModule = () => {
   const updateDraft = (field, value) => {
     setModal((prev) => {
       const next = { ...prev.draft, [field]: value };
-      const topicSyncFields = ['chapterNumber', 'chapterName', 'subTopics'];
+      const topicSyncFields = ['chapterNumber', 'chapterName', 'subTopics', 'topicCovered'];
       if (next.includeTot !== false && next.totUseSameTopics !== false) {
         if (topicSyncFields.includes(field)) {
-          next.totTopicCovered = buildTopicSummary(next);
+          next.totTopicCovered = field === 'topicCovered'
+            ? (value || '')
+            : (next.topicCovered?.trim() || buildTopicSummary(next));
         }
         if (field === 'trainingMethod') next.totTrainingMethod = value;
       }
       if (field === 'totUseSameTopics' && value === true) {
-        next.totTopicCovered = buildTopicSummary(next);
+        next.totTopicCovered = next.topicCovered?.trim() || buildTopicSummary(next);
         next.totTrainingMethod = next.trainingMethod || '';
       }
       return { ...prev, draft: next };
@@ -2587,6 +2973,68 @@ const AcademicCoordinatorModule = () => {
   const updateDraftLearningMaterial = (index, field, value) => updateDraftListItem('learningMaterials', index, field, value);
   const addDraftLearningMaterial = () => addDraftListItem('learningMaterials', 'PDF');
   const removeDraftLearningMaterial = (index) => removeDraftListItem('learningMaterials', index);
+
+  const updateDraftStandardTlm = (index, field, value) => {
+    setModal((prev) => {
+      const list = normalizeTlmList(prev.draft.standardTlm);
+      return {
+        ...prev,
+        draft: {
+          ...prev.draft,
+          standardTlm: list.map((item, i) => (i === index ? { ...item, [field]: value } : item)),
+        },
+      };
+    });
+  };
+  const addDraftStandardTlm = () => {
+    setModal((prev) => ({
+      ...prev,
+      draft: {
+        ...prev.draft,
+        standardTlm: [...normalizeTlmList(prev.draft.standardTlm), createMaterialItem('PDF')],
+      },
+    }));
+  };
+  const removeDraftStandardTlm = (index) => {
+    setModal((prev) => ({
+      ...prev,
+      draft: {
+        ...prev.draft,
+        standardTlm: normalizeTlmList(prev.draft.standardTlm).filter((_, i) => i !== index),
+      },
+    }));
+  };
+
+  const updateDraftTrainerBasedTlm = (index, field, value) => {
+    setModal((prev) => {
+      const list = normalizeTlmList(prev.draft.trainerBasedTlm);
+      return {
+        ...prev,
+        draft: {
+          ...prev.draft,
+          trainerBasedTlm: list.map((item, i) => (i === index ? { ...item, [field]: value } : item)),
+        },
+      };
+    });
+  };
+  const addDraftTrainerBasedTlm = () => {
+    setModal((prev) => ({
+      ...prev,
+      draft: {
+        ...prev.draft,
+        trainerBasedTlm: [...normalizeTlmList(prev.draft.trainerBasedTlm), createMaterialItem('PDF')],
+      },
+    }));
+  };
+  const removeDraftTrainerBasedTlm = (index) => {
+    setModal((prev) => ({
+      ...prev,
+      draft: {
+        ...prev.draft,
+        trainerBasedTlm: normalizeTlmList(prev.draft.trainerBasedTlm).filter((_, i) => i !== index),
+      },
+    }));
+  };
 
   const updateDraftTotMaterial = (index, field, value) => updateDraftListItem('totMaterials', index, field, value);
   const addDraftTotMaterial = () => addDraftListItem('totMaterials', 'PDF');
@@ -2675,7 +3123,7 @@ const AcademicCoordinatorModule = () => {
   const saveSession = () => {
     const { draft, editingId } = modal;
     if (!draft?.title?.trim()) {
-      notify('Please enter session title');
+      notify('Please enter session name');
       return;
     }
     if (!draft?.sessionDate) {
@@ -2710,7 +3158,7 @@ const AcademicCoordinatorModule = () => {
       totUseSameTopics: draft.includeTot !== false ? draft.totUseSameTopics !== false : false,
       totTopicCovered: draft.includeTot !== false
         ? (draft.totUseSameTopics !== false
-          ? buildTopicSummary(draft)
+          ? (draft.topicCovered?.trim() || buildTopicSummary(draft))
           : (draft.totTopicCovered?.trim() || ''))
         : '',
       totTrainingMethod: draft.includeTot !== false
@@ -2728,13 +3176,20 @@ const AcademicCoordinatorModule = () => {
       seniorTrainerName: existing?.seniorTrainerName || '',
       title: draft.title.trim(),
       sessionNumber: draft.sessionNumber?.toString().trim() || '',
+      hours: draft.hours?.toString().trim() || '',
+      subSessions: draft.subSessions?.toString().trim() || '',
+      subSessionName: draft.subSessionName?.trim() || '',
+      duration: draft.duration?.trim() || '',
       unitNumber: selectedCourseStructure.unit ? draft.unitNumber?.toString().trim() || '' : '',
       unitName: selectedCourseStructure.unit ? draft.unitName?.trim() || '' : '',
       chapterNumber: selectedCourseStructure.chapter ? draft.chapterNumber?.toString().trim() || '' : '',
       chapterName: selectedCourseStructure.chapter ? draft.chapterName?.trim() || '' : '',
       subTopics: selectedCourseStructure.chapter ? draft.subTopics?.trim() || '' : '',
-      topicCovered: buildTopicSummary(draft),
+      topicCovered: draft.topicCovered?.trim() || buildTopicSummary(draft),
       trainingMethod: draft.trainingMethod?.trim() || '',
+      classroomLabResources: draft.classroomLabResources?.trim() || '',
+      standardTlm: normalizeMaterialItems(normalizeTlmList(draft.standardTlm)),
+      trainerBasedTlm: normalizeMaterialItems(normalizeTlmList(draft.trainerBasedTlm)),
       notes: draft.notes?.trim() || '',
       date: formatSessionDate(draft.sessionDate),
       workflowStatus: draft.workflowStatus || WORKFLOW_STATUS.SCHEDULED,
@@ -2937,24 +3392,7 @@ const AcademicCoordinatorModule = () => {
             totalSessions={sessions.length}
           />
 
-          <div className="ac-dual-calendars">
-            <SessionPlanCalendar
-              title="TOT Calendar"
-              icon="fa-chalkboard-teacher"
-              accent={BLUE}
-              sessions={totSessions}
-              selectedSessionId={selectedSessionId}
-              onSelectSession={handleSelectSession}
-            />
-            <SessionPlanCalendar
-              title="Session Calendar"
-              icon="fa-user-graduate"
-              accent={GREEN}
-              sessions={studentSessions}
-              selectedSessionId={selectedSessionId}
-              onSelectSession={handleSelectSession}
-            />
-          </div>
+          
 
           <div className="ac-filters">
             <input
@@ -3022,6 +3460,12 @@ const AcademicCoordinatorModule = () => {
           onLearningMaterialChange={updateDraftLearningMaterial}
           onAddLearningMaterial={addDraftLearningMaterial}
           onRemoveLearningMaterial={removeDraftLearningMaterial}
+          onStandardTlmChange={updateDraftStandardTlm}
+          onAddStandardTlm={addDraftStandardTlm}
+          onRemoveStandardTlm={removeDraftStandardTlm}
+          onTrainerBasedTlmChange={updateDraftTrainerBasedTlm}
+          onAddTrainerBasedTlm={addDraftTrainerBasedTlm}
+          onRemoveTrainerBasedTlm={removeDraftTrainerBasedTlm}
           onTotMaterialChange={updateDraftTotMaterial}
           onAddTotMaterial={addDraftTotMaterial}
           onRemoveTotMaterial={removeDraftTotMaterial}
@@ -3651,6 +4095,7 @@ const AC_CSS = `
   .ac-evidence-hint { margin: 0 0 12px; font-size: 12px; color: #64748b; }
   .ac-evidence-empty { margin: 0; font-size: 12px; color: #94a3b8; font-style: italic; }
   .ac-evidence-row { display: grid; grid-template-columns: 1fr 130px 150px 40px; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .ac-evidence-row--with-desc { grid-template-columns: 1.1fr 1.3fr 120px 140px 40px; }
   .ac-evidence-row--head { margin-bottom: 6px; }
   .ac-evidence-row--head span {
     font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8;

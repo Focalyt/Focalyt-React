@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Form } from 'react-bootstrap';
-import { Edit , Copy} from 'react-feather';
+import { Edit, Copy, Layers } from 'react-feather';
 import qs from 'query-string';
 
 const labelStyle = {
@@ -105,7 +105,7 @@ const ViewCourses = () => {
       };
       const queryString = qs.stringify(params);
 
-      const response = await axios.get(`${backendUrl}/college/courses?${queryString}`, { headers });
+      const response = await axios.get(`${backendUrl}/college/courses/listcoursecopy?${queryString}`, { headers });
 
       console.log("Fetched courses:", response.data.course);
       console.log(" Response :", response);
@@ -123,7 +123,7 @@ const ViewCourses = () => {
   const handleArchivedChange = () => {
     const newArchived = !isArchived;
     setIsArchived(newArchived);
-    navigate(`/institute/viewcourse?status=${!newArchived}`);
+    navigate(`/institute/viewcoursecopy?status=${!newArchived}`);
   };
 
   // Handle toggle status - FIXED VERSION
@@ -136,7 +136,7 @@ const ViewCourses = () => {
       // Toggle the status
       const newStatus = !currentStatus;
       
-      await axios.put(`${backendUrl}/college/courses/update_course_status/${courseId}`, 
+      await axios.put(`${backendUrl}/college/courses/update_coursecopy_status/${courseId}`, 
         { status: newStatus },
         {
           headers: {
@@ -184,6 +184,59 @@ const ViewCourses = () => {
     }
   };
 
+  const resolveId = (value) => {
+    if (!value) return '';
+    if (typeof value === 'object') return String(value._id || value.id || '');
+    return String(value);
+  };
+
+  const handleAddSection = (course) => {
+    const centerList = Array.isArray(course.center) ? course.center : [];
+    const firstCenter = centerList[0];
+    const courseId = resolveId(course._id);
+
+    const deepLink = {
+      skipPathPicker: true,
+      courseName: course.name || '',
+      departmentName: course.vertical?.name || '',
+      projectName: course.project?.name || course.projectName || '',
+      centerName: firstCenter?.name || '',
+      filters: {
+        department: resolveId(course.vertical),
+        project: resolveId(course.project),
+        center: resolveId(firstCenter) || resolveId(course.centerId),
+        course: courseId,
+        batch: '',
+      },
+    };
+
+    try {
+      sessionStorage.setItem('acSessionDeepLink', JSON.stringify(deepLink));
+    } catch (_) {
+      // ignore storage errors
+    }
+
+    navigate(`/institute/academicCoordinator?courseId=${encodeURIComponent(courseId)}&skipWizard=1`, {
+      state: deepLink,
+    });
+  };
+
+  const actionIconBtnStyle = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '34px',
+    height: '34px',
+    background: '#fef2f5',
+    borderRadius: '8px',
+    color: '#FC2B5A',
+    transition: 'all 0.2s',
+    border: '1px solid #fecdd3',
+    cursor: 'pointer',
+    marginLeft: '8px',
+    textDecoration: 'none',
+  };
+
   // Handle input change for filter
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -215,12 +268,12 @@ const ViewCourses = () => {
       }
     });
 
-    navigate(`/institute/viewcourse?${qs.stringify(queryParams)}`);
+    navigate(`/institute/viewcoursecopy?${qs.stringify(queryParams)}`);
   };
 
   // Handle reset filters
   const handleResetFilters = () => {
-    navigate('/institute/viewcourse');
+    navigate('/institute/viewcoursecopy');
   };
 
   return (
@@ -488,37 +541,53 @@ const ViewCourses = () => {
                       </div>
                     </td>
                     {/* Action */}
-                    <td style={{ ...tdStyle, textAlign: 'center' }}>
-                      <Link to={`/institute/courses/edit/${course._id}`} style={{
-                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                        width: '34px', height: '34px',
-                        background: '#fef2f5',
-                        borderRadius: '8px',
-                        color: '#FC2B5A',
-                        transition: 'all 0.2s',
-                        border: '1px solid #fecdd3',
-                      }}
+                    <td style={{ ...tdStyle, textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      <Link
+                        to={`/institute/editcoursecopy/${course._id}`}
+                        title="Edit"
+                        style={{ ...actionIconBtnStyle, marginLeft: 0 }}
                         onMouseEnter={e => { e.currentTarget.style.background = '#FC2B5A'; e.currentTarget.style.color = 'white'; }}
                         onMouseLeave={e => { e.currentTarget.style.background = '#fef2f5'; e.currentTarget.style.color = '#FC2B5A'; }}
                       >
                         <Edit size={15} />
                       </Link>
 
-                      <button type="button" onClick={() => handleDuplicateCourse(course._id)} style={{
-                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                        width: '34px', height: '34px',
-                        background: '#fef2f5',
-                        borderRadius: '8px',
-                        color: '#FC2B5A',
-                        transition: 'all 0.2s',
-                        border: '1px solid #fecdd3',
-                        cursor: 'pointer',
-                        marginLeft: '8px'
-                      }}
+                      <button
+                        type="button"
+                        title="Duplicate"
+                        onClick={() => handleDuplicateCourse(course._id)}
+                        style={actionIconBtnStyle}
                         onMouseEnter={e => { e.currentTarget.style.background = '#FC2B5A'; e.currentTarget.style.color = 'white'; }}
                         onMouseLeave={e => { e.currentTarget.style.background = '#fef2f5'; e.currentTarget.style.color = '#FC2B5A'; }}
                       >
                         <Copy size={15} />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleAddSection(course)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '5px',
+                          height: '34px',
+                          padding: '0 10px',
+                          background: '#fef2f5',
+                          borderRadius: '8px',
+                          color: '#FC2B5A',
+                          transition: 'all 0.2s',
+                          border: '1px solid #fecdd3',
+                          cursor: 'pointer',
+                          marginLeft: '8px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          whiteSpace: 'nowrap',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#FC2B5A'; e.currentTarget.style.color = 'white'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = '#fef2f5'; e.currentTarget.style.color = '#FC2B5A'; }}
+                      >
+                        <Layers size={14} />
                       </button>
                     </td>
                   </tr>

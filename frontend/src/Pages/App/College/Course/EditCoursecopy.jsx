@@ -51,6 +51,16 @@ const EditCourse = () => {
   const [selectedBrochurePreview, setSelectedBrochurePreview] = useState(null);
   // Document requirements
   const [docsRequired, setDocsRequired] = useState([ ]);
+  const [classResourcesRequired, setClassResourcesRequired] = useState([]);
+  const [labResourcesRequired, setLabResourcesRequired] = useState([]);
+
+  const RESOURCE_UPLOAD_TYPES = ['Image', 'PDF', 'Video', 'Document', 'Presentation'];
+  const createEmptyResource = () => ({
+    name: '',
+    description: '',
+    uploadType: 'PDF',
+    mandatory: false,
+  });
 
   // FAQ questions and answers
   const [questionAnswers, setQuestionAnswers] = useState([
@@ -292,7 +302,7 @@ const EditCourse = () => {
           'x-auth': user.token,
         };
         // Fetch course data
-        const courseRes = await axios.get(`${backendUrl}/college/courses/edit/${id}`, { headers });
+        const courseRes = await axios.get(`${backendUrl}/college/courses/editcoursecopy/${id}`, { headers });
         console.log('courseRes', courseRes)
         // Fetch sectors and centers data
         const sectorsRes = await axios.get(`${backendUrl}/api/sectorList`);
@@ -372,6 +382,26 @@ const EditCourse = () => {
             _id: doc._id,
             name: doc.Name,
             mandatory: doc.mandatory ? true : false
+          })));
+        }
+
+        if (course.classResourcesRequired?.length) {
+          setClassResourcesRequired(course.classResourcesRequired.map((doc) => ({
+            _id: doc._id,
+            name: doc.Name || '',
+            description: doc.description || '',
+            uploadType: RESOURCE_UPLOAD_TYPES.includes(doc.uploadType) ? doc.uploadType : 'PDF',
+            mandatory: !!doc.mandatory,
+          })));
+        }
+
+        if (course.labResourcesRequired?.length) {
+          setLabResourcesRequired(course.labResourcesRequired.map((doc) => ({
+            _id: doc._id,
+            name: doc.Name || '',
+            description: doc.description || '',
+            uploadType: RESOURCE_UPLOAD_TYPES.includes(doc.uploadType) ? doc.uploadType : 'PDF',
+            mandatory: !!doc.mandatory,
           })));
         }
 
@@ -1073,6 +1103,54 @@ const EditCourse = () => {
     setDocsRequired(updatedDocs);
   };
 
+  const addClassResourceField = () => {
+    setClassResourcesRequired([...classResourcesRequired, createEmptyResource()]);
+  };
+
+  const removeClassResourceField = (index) => {
+    setClassResourcesRequired(classResourcesRequired.filter((_, i) => i !== index));
+  };
+
+  const updateClassResourceField = (index, value, field) => {
+    const updated = [...classResourcesRequired];
+    if (field === 'mandatory') {
+      updated[index].mandatory = value === 'true' || value === true;
+    } else {
+      updated[index][field] = value;
+    }
+    setClassResourcesRequired(updated);
+  };
+
+  const addLabResourceField = () => {
+    setLabResourcesRequired([...labResourcesRequired, createEmptyResource()]);
+  };
+
+  const removeLabResourceField = (index) => {
+    setLabResourcesRequired(labResourcesRequired.filter((_, i) => i !== index));
+  };
+
+  const updateLabResourceField = (index, value, field) => {
+    const updated = [...labResourcesRequired];
+    if (field === 'mandatory') {
+      updated[index].mandatory = value === 'true' || value === true;
+    } else {
+      updated[index][field] = value;
+    }
+    setLabResourcesRequired(updated);
+  };
+
+  const mapResourceForSubmit = (items = []) =>
+    items
+      .filter((item) => item.name?.trim())
+      .map((item) => ({
+        ...(item._id ? { _id: item._id } : {}),
+        Name: item.name.trim(),
+        description: item.description?.trim() || '',
+        uploadType: RESOURCE_UPLOAD_TYPES.includes(item.uploadType) ? item.uploadType : 'PDF',
+        mandatory: !!item.mandatory,
+        status: true,
+      }));
+
   // Handle document disabling (server call)
   const disableDocument = async (docId) => {
     if (window.confirm('Are you sure you want to remove this document?')) {
@@ -1200,6 +1278,9 @@ const EditCourse = () => {
         mandatory: doc.mandatory
       }))));
 
+      form.append('classResourcesRequired', JSON.stringify(mapResourceForSubmit(classResourcesRequired)));
+      form.append('labResourcesRequired', JSON.stringify(mapResourceForSubmit(labResourcesRequired)));
+
       // Append question answers
       form.append('questionAnswers', JSON.stringify(questionAnswers.map(qa => ({
         Question: qa.question,
@@ -1209,7 +1290,7 @@ const EditCourse = () => {
       // Append course structure
       form.append('courseStructure', JSON.stringify({ ...structureLevels, session: true }));
 
-      const response = await axios.put(`${backendUrl}/college/courses/edit/${id}`, form, {
+      const response = await axios.put(`${backendUrl}/college/courses/editcoursecopy/${id}`, form, {
         headers: {
           'Content-Type': 'multipart/form-data',
           'x-auth': user?.token || sessionStorage.getItem('token')
@@ -1219,7 +1300,7 @@ const EditCourse = () => {
       if (response.data.status) {
         setSubmitSuccess(true);
         alert('Course updated successfully');
-        navigate('/institute/viewcourse');
+        navigate('/institute/viewcoursecopy');
       } else {
         alert(response.data.message || 'Failed to update course');
       }
@@ -1792,6 +1873,174 @@ const EditCourse = () => {
                           onChange={handleChange}
                         />
                       </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Class Resource Required Section */}
+        <section id="classResourceRequired">
+          <div className="row">
+            <div className="col-xl-12 col-lg-12">
+              <div className="card">
+                <div className="card-header border border-top-0 border-left-0 border-right-0">
+                  <h4 className="card-title pb-1">Class Resource Required</h4>
+                </div>
+                <div className="card-content">
+                  <div className="card-body">
+                    <div id="classResourceContainer">
+                      {classResourcesRequired.map((doc, index) => (
+                        <div className="row requiredDocsRow" key={doc._id || `class-res-${index}`}>
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                            <label>Document Name</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="e.g. Projector, Whiteboard"
+                              value={doc.name || ''}
+                              onChange={(e) => updateClassResourceField(index, e.target.value, 'name')}
+                            />
+                          </div>
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                            <label>Description</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="Short description"
+                              value={doc.description || ''}
+                              onChange={(e) => updateClassResourceField(index, e.target.value, 'description')}
+                            />
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1">
+                            <label>Upload Type</label>
+                            <select
+                              className="form-control"
+                              value={doc.uploadType || 'PDF'}
+                              onChange={(e) => updateClassResourceField(index, e.target.value, 'uploadType')}
+                            >
+                              {RESOURCE_UPLOAD_TYPES.map((type) => (
+                                <option key={type} value={type}>{type}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1">
+                            <label>Mandatory</label>
+                            <select
+                              className="form-control"
+                              value={String(!!doc.mandatory)}
+                              onChange={(e) => updateClassResourceField(index, e.target.value, 'mandatory')}
+                            >
+                              <option value="true">Yes</option>
+                              <option value="false">No</option>
+                            </select>
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1 d-flex align-items-end">
+                            <button
+                              type="button"
+                              className="btn btn-danger"
+                              onClick={() => removeClassResourceField(index)}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="col-xl-12 mb-1 px-0 text-right">
+                      <button
+                        type="button"
+                        className="btn btn-success text-white add-another-button"
+                        onClick={addClassResourceField}
+                      >
+                        {classResourcesRequired.length > 0 ? 'Add Another' : 'Add Document'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Lab Resource Required Section */}
+        <section id="labResourceRequired">
+          <div className="row">
+            <div className="col-xl-12 col-lg-12">
+              <div className="card">
+                <div className="card-header border border-top-0 border-left-0 border-right-0">
+                  <h4 className="card-title pb-1">Lab Resource Required</h4>
+                </div>
+                <div className="card-content">
+                  <div className="card-body">
+                    <div id="labResourceContainer">
+                      {labResourcesRequired.map((doc, index) => (
+                        <div className="row requiredDocsRow" key={doc._id || `lab-res-${index}`}>
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                            <label>Document Name</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="e.g. Lab kit, Tools"
+                              value={doc.name || ''}
+                              onChange={(e) => updateLabResourceField(index, e.target.value, 'name')}
+                            />
+                          </div>
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                            <label>Description</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="Short description"
+                              value={doc.description || ''}
+                              onChange={(e) => updateLabResourceField(index, e.target.value, 'description')}
+                            />
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1">
+                            <label>Upload Type</label>
+                            <select
+                              className="form-control"
+                              value={doc.uploadType || 'PDF'}
+                              onChange={(e) => updateLabResourceField(index, e.target.value, 'uploadType')}
+                            >
+                              {RESOURCE_UPLOAD_TYPES.map((type) => (
+                                <option key={type} value={type}>{type}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1">
+                            <label>Mandatory</label>
+                            <select
+                              className="form-control"
+                              value={String(!!doc.mandatory)}
+                              onChange={(e) => updateLabResourceField(index, e.target.value, 'mandatory')}
+                            >
+                              <option value="true">Yes</option>
+                              <option value="false">No</option>
+                            </select>
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1 d-flex align-items-end">
+                            <button
+                              type="button"
+                              className="btn btn-danger"
+                              onClick={() => removeLabResourceField(index)}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="col-xl-12 mb-1 px-0 text-right">
+                      <button
+                        type="button"
+                        className="btn btn-success text-white add-another-button"
+                        onClick={addLabResourceField}
+                      >
+                        {labResourcesRequired.length > 0 ? 'Add Another' : 'Add Document'}
+                      </button>
                     </div>
                   </div>
                 </div>

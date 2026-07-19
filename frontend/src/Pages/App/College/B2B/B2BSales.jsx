@@ -1156,6 +1156,9 @@ const B2BSales = () => {
         alert(`✅ ${followupFormData.followUpType === 'Visit' ? 'Visit' : 'Call'} follow-up saved and scheduled successfully!`);
         // ensure UI updates immediately (even if custom event listener misses)
         await fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
+        if (leadViewTab === 'all') {
+          await fetchStatusCounts();
+        }
       }
 
       window.dispatchEvent(new CustomEvent('b2b-followup-updated'));
@@ -1175,6 +1178,10 @@ const B2BSales = () => {
   };
 
   const getLeadFollowupDateLabel = (lead, type) => {
+    // Missed / done followups have no upcoming date
+    const bucket = getLeadFollowupBucket(lead, type);
+    if (bucket === 'missed' || bucket === 'done') return 'NA';
+
     const t = String(type || '').toLowerCase();
     const bySlot = t === 'visit'
       ? (lead?.followUpVisit || null)
@@ -1189,7 +1196,7 @@ const B2BSales = () => {
       }
     }
     if (legacy?.followupDate) return formatFollowupDate(legacy.followupDate);
-    return '—';
+    return 'NA';
   };
 
   const getFollowupBucket = (followUpLike) => {
@@ -1225,6 +1232,15 @@ const B2BSales = () => {
     if (Number.isFinite(apiCount) && apiCount > 0) return apiCount;
     return getLeadFollowupBucket(lead, type) === 'done' ? 1 : 0;
   };
+
+  const leadHasFollowup = (lead, type) => (
+    Boolean(getLeadFollowupBucket(lead, type)) || getLeadFollowupDoneCount(lead, type) > 0
+  );
+
+  // Light-red empty style only when neither Call nor Visit followup exists
+  const leadHasAnyFollowup = (lead) => (
+    leadHasFollowup(lead, 'Call') || leadHasFollowup(lead, 'Visit')
+  );
 
   const getLeadDocumentsBucket = (lead) => {
     const required = Array.isArray(lead?.leadCategory?.documents) ? lead.leadCategory.documents : [];
@@ -1720,8 +1736,8 @@ const B2BSales = () => {
     b2bDepartment: '',
     typeOfB2B: [],
     leadOwner: [],
-    hasFollowUpCall: false,
-    hasFollowUpVisit: false,
+    hasFollowUpCall: '', // '' | true | false
+    hasFollowUpVisit: '', // '' | true | false
     followUpCallBucket: '', // '' | 'done' | 'planned' | 'missed'
     followUpVisitBucket: '',
     documentsStatus: [], // ['done','pending']
@@ -2125,13 +2141,13 @@ const B2BSales = () => {
     }
   }, [input1Value, bulkMode, leads, totalLeads, filters, selectedStatusFilter, token]);
 
+  // Only clear dashboard drill-down chips (Done/Planned/Missed).
+  // Keep modal filters like hasFollowUpCall / hasFollowUpVisit intact.
   const getDashSubFiltersCleared = (base = filtersRef.current) => ({
     ...base,
     followUpCallBucket: '',
     followUpVisitBucket: '',
     documentsStatus: [],
-    hasFollowUpCall: false,
-    hasFollowUpVisit: false,
   });
 
   // Handle status card click (Performance: HOT, WARM, etc.)
@@ -2160,8 +2176,10 @@ const B2BSales = () => {
       || (Array.isArray(f.leadOwner) && f.leadOwner.length)
       || f.followUpCallBucket
       || f.followUpVisitBucket
-      || f.hasFollowUpCall
-      || f.hasFollowUpVisit
+      || f.hasFollowUpCall === true
+      || f.hasFollowUpCall === false
+      || f.hasFollowUpVisit === true
+      || f.hasFollowUpVisit === false
       || (Array.isArray(f.documentsStatus) && f.documentsStatus.length)
       || f.dateRange?.start
       || f.dateRange?.end
@@ -2227,8 +2245,8 @@ const B2BSales = () => {
       b2bDepartment: '',
       typeOfB2B: [],
       leadOwner: [],
-      hasFollowUpCall: false,
-      hasFollowUpVisit: false,
+      hasFollowUpCall: '',
+      hasFollowUpVisit: '',
       followUpCallBucket: '',
       followUpVisitBucket: '',
       documentsStatus: [],
@@ -2278,13 +2296,13 @@ const B2BSales = () => {
 
   const toCsv = (arr) => (Array.isArray(arr) ? arr.filter(Boolean).join(',') : '');
 
+  // Strip only dash drill-downs when computing status/approval totals.
+  // Modal Yes/No followup filters should still apply to those counts.
   const stripDashboardSubFilters = (eff) => ({
     ...eff,
     followUpCallBucket: '',
     followUpVisitBucket: '',
     documentsStatus: [],
-    hasFollowUpCall: false,
-    hasFollowUpVisit: false,
   });
 
   const appendLeadFilterParams = (params, eff, options = {}) => {
@@ -2308,8 +2326,10 @@ const B2BSales = () => {
     if (eff.nextActionDateRange?.end) params.nextActionToDate = eff.nextActionDateRange.end;
     if (Array.isArray(eff.status) && eff.status.length) params.statusIn = toCsv(eff.status);
     if (Array.isArray(eff.subStatus) && eff.subStatus.length) params.subStatusIn = toCsv(eff.subStatus);
-    if (eff.hasFollowUpCall) params.hasFollowUpCall = true;
-    if (eff.hasFollowUpVisit) params.hasFollowUpVisit = true;
+    if (eff.hasFollowUpCall === true || eff.hasFollowUpCall === 'yes') params.hasFollowUpCall = true;
+    else if (eff.hasFollowUpCall === false || eff.hasFollowUpCall === 'no') params.hasFollowUpCall = false;
+    if (eff.hasFollowUpVisit === true || eff.hasFollowUpVisit === 'yes') params.hasFollowUpVisit = true;
+    else if (eff.hasFollowUpVisit === false || eff.hasFollowUpVisit === 'no') params.hasFollowUpVisit = false;
     if (eff.followUpCallBucket) params.followUpCallBucket = eff.followUpCallBucket;
     if (eff.followUpVisitBucket) params.followUpVisitBucket = eff.followUpVisitBucket;
     if (Array.isArray(eff.documentsStatus) && eff.documentsStatus.length) {
@@ -2683,8 +2703,8 @@ const B2BSales = () => {
       b2bDepartment: '',
       typeOfB2B: [],
       leadOwner: [],
-      hasFollowUpCall: false,
-      hasFollowUpVisit: false,
+      hasFollowUpCall: '',
+      hasFollowUpVisit: '',
       followUpCallBucket: '',
       followUpVisitBucket: '',
       documentsStatus: [],
@@ -8329,9 +8349,9 @@ const renderWhatsAppPanel = () => {
                           <span className="b2b-dash-section__label">Followup Calling</span>
                           <div className="d-flex flex-wrap gap-2 pt-1">
                             {[
-                              { key: 'fc-done', bucket: 'done', label: 'Done', value: dashboardB2BCounts.call.done, bg: '#12b3ff' },
-                              { key: 'fc-planned', bucket: 'planned', label: 'Planned', value: dashboardB2BCounts.call.planned, bg: '#f59e0b' },
-                              { key: 'fc-missed', bucket: 'missed', label: 'Missed', value: dashboardB2BCounts.call.missed, bg: '#7c3d14' }
+                              { key: 'fc-done', bucket: 'done', label: 'Done', value: dashboardB2BCounts.call.done, bg: 'rgb(18, 179, 255)' },
+                              { key: 'fc-planned', bucket: 'planned', label: 'Planned', value: dashboardB2BCounts.call.planned, bg: 'rgb(12, 125, 180)' },
+                              { key: 'fc-missed', bucket: 'missed', label: 'Missed', value: dashboardB2BCounts.call.missed, bg: 'rgb(8, 80, 120)' }
                             ].map((row) => {
                               const selected = isFollowupDashSelected('Call', row.bucket);
                               return (
@@ -8359,9 +8379,9 @@ const renderWhatsAppPanel = () => {
                           <span className="b2b-dash-section__label">Followup Visit</span>
                           <div className="d-flex flex-wrap gap-2 pt-1">
                             {[
-                              { key: 'fv-done', bucket: 'done', label: 'Done', value: dashboardB2BCounts.visit.done, bg: '#4b5563' },
-                              { key: 'fv-planned', bucket: 'planned', label: 'Planned', value: dashboardB2BCounts.visit.planned, bg: '#4b5563' },
-                              { key: 'fv-missed', bucket: 'missed', label: 'Missed', value: dashboardB2BCounts.visit.missed, bg: '#7c3d14' }
+                              { key: 'fv-done', bucket: 'done', label: 'Done', value: dashboardB2BCounts.visit.done, bg: 'rgb(75, 85, 99)' },
+                              { key: 'fv-planned', bucket: 'planned', label: 'Planned', value: dashboardB2BCounts.visit.planned, bg: 'rgb(55, 65, 81)' },
+                              { key: 'fv-missed', bucket: 'missed', label: 'Missed', value: dashboardB2BCounts.visit.missed, bg: 'rgb(35, 42, 52)' }
                             ].map((row) => {
                               const selected = isFollowupDashSelected('Visit', row.bucket);
                               return (
@@ -8621,6 +8641,18 @@ const renderWhatsAppPanel = () => {
                   )}
                   {filters.followUpVisitBucket && (
                     <span className="badge rounded-pill text-bg-light border">Visit: {filters.followUpVisitBucket}</span>
+                  )}
+                  {(filters.hasFollowUpCall === true || filters.hasFollowUpCall === 'yes') && (
+                    <span className="badge rounded-pill text-bg-light border">Followup Calling: Yes</span>
+                  )}
+                  {(filters.hasFollowUpCall === false || filters.hasFollowUpCall === 'no') && (
+                    <span className="badge rounded-pill text-bg-light border">Followup Calling: No</span>
+                  )}
+                  {(filters.hasFollowUpVisit === true || filters.hasFollowUpVisit === 'yes') && (
+                    <span className="badge rounded-pill text-bg-light border">Followup Visit: Yes</span>
+                  )}
+                  {(filters.hasFollowUpVisit === false || filters.hasFollowUpVisit === 'no') && (
+                    <span className="badge rounded-pill text-bg-light border">Followup Visit: No</span>
                   )}
                   {(filters.modifiedDateRange?.start || filters.modifiedDateRange?.end) && (
                     <span className="badge rounded-pill text-bg-light border">Modified date</span>
@@ -9004,7 +9036,7 @@ const renderWhatsAppPanel = () => {
                               </div>
                               <div className="lhm__row3">
                                 {/* Followup Calling */}
-                                <div className="lhm__followup-box">
+                                <div className={`lhm__followup-box${!leadHasAnyFollowup(lead) ? ' lhm__followup-box--empty' : ''}`}>
                                   <span className="lhm__followup-title">Followup Calling</span>
                                   <button
                                     type="button"
@@ -9019,9 +9051,9 @@ const renderWhatsAppPanel = () => {
                                     {(() => {
                                       const b = getLeadFollowupBucket(lead, 'Call');
                                       return [
-                                        { label: 'Done', value: getLeadFollowupDoneCount(lead, 'Call'), bg: '#12b3ff' },
-                                        { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#f59e0b' },
-                                        { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#7c3d14' },
+                                        { label: 'Done', value: getLeadFollowupDoneCount(lead, 'Call'), bg: 'rgb(18, 179, 255)' },
+                                        { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: 'rgb(12, 125, 180)' },
+                                        { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: 'rgb(8, 80, 120)' },
                                       ];
                                     })().map((s) => (
                                       <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
@@ -9037,7 +9069,7 @@ const renderWhatsAppPanel = () => {
                                 </div>
 
                                 {/* Followup Visit */}
-                                <div className="lhm__followup-box">
+                                <div className={`lhm__followup-box${!leadHasAnyFollowup(lead) ? ' lhm__followup-box--empty' : ''}`}>
                                   <span className="lhm__followup-title">Followup Visit</span>
                                   <button
                                     type="button"
@@ -9052,9 +9084,9 @@ const renderWhatsAppPanel = () => {
                                     {(() => {
                                       const b = getLeadFollowupBucket(lead, 'Visit');
                                       return [
-                                        { label: 'Done', value: getLeadFollowupDoneCount(lead, 'Visit'), bg: '#4b5563' },
-                                        { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#4b5563' },
-                                        { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#7c3d14' },
+                                        { label: 'Done', value: getLeadFollowupDoneCount(lead, 'Visit'), bg: 'rgb(75, 85, 99)' },
+                                        { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: 'rgb(55, 65, 81)' },
+                                        { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: 'rgb(35, 42, 52)' },
                                       ];
                                     })().map((s) => (
                                       <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
@@ -9363,7 +9395,7 @@ const renderWhatsAppPanel = () => {
                                 {/* Followup Calling & Visit — Done/Planned/Missed with distinct colours */}
                                 <div className="lead-header-v2__dash">
                                   <div className="lead-header-v2__dash-col">
-                                    <div className="b2b-dash-section h-100">
+                                    <div className={`b2b-dash-section h-100${!leadHasAnyFollowup(lead) ? ' b2b-dash-section--no-followup' : ''}`}>
                                       <span className="b2b-dash-section__label">Followup Calling</span>
                                       <button
                                         type="button"
@@ -9378,9 +9410,9 @@ const renderWhatsAppPanel = () => {
                                         {(() => {
                                           const b = getLeadFollowupBucket(lead, 'Call');
                                           return [
-                                            { key: 'fc-done', label: 'Done', value: getLeadFollowupDoneCount(lead, 'Call'), bg: '#12b3ff' },
-                                            { key: 'fc-planned', label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#f59e0b' },
-                                            { key: 'fc-missed', label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#7c3d14' },
+                                            { key: 'fc-done', label: 'Done', value: getLeadFollowupDoneCount(lead, 'Call'), bg: 'rgb(18, 179, 255)' },
+                                            { key: 'fc-planned', label: 'Planned', value: b === 'planned' ? 1 : 0, bg: 'rgb(12, 125, 180)' },
+                                            { key: 'fc-missed', label: 'Missed', value: b === 'missed' ? 1 : 0, bg: 'rgb(8, 80, 120)' },
                                           ];
                                         })().map((row) => (
                                           <div
@@ -9402,7 +9434,7 @@ const renderWhatsAppPanel = () => {
                                     </div>
                                   </div>
                                   <div className="lead-header-v2__dash-col">
-                                    <div className="b2b-dash-section h-100">
+                                    <div className={`b2b-dash-section h-100${!leadHasAnyFollowup(lead) ? ' b2b-dash-section--no-followup' : ''}`}>
                                       <span className="b2b-dash-section__label">Followup Visit</span>
                                       <button
                                         type="button"
@@ -9417,9 +9449,9 @@ const renderWhatsAppPanel = () => {
                                         {(() => {
                                           const b = getLeadFollowupBucket(lead, 'Visit');
                                           return [
-                                            { key: 'fv-done', label: 'Done', value: getLeadFollowupDoneCount(lead, 'Visit'), bg: '#4b5563' },
-                                            { key: 'fv-planned', label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#4b5563' },
-                                            { key: 'fv-missed', label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#7c3d14' },
+                                            { key: 'fv-done', label: 'Done', value: getLeadFollowupDoneCount(lead, 'Visit'), bg: 'rgb(75, 85, 99)' },
+                                            { key: 'fv-planned', label: 'Planned', value: b === 'planned' ? 1 : 0, bg: 'rgb(55, 65, 81)' },
+                                            { key: 'fv-missed', label: 'Missed', value: b === 'missed' ? 1 : 0, bg: 'rgb(35, 42, 52)' },
                                           ];
                                         })().map((row) => (
                                           <div
@@ -9925,15 +9957,18 @@ const renderWhatsAppPanel = () => {
                       <i className="fas fa-phone text-primary me-2"></i>
                       Followup Calling
                     </label>
-                    <div className="form-check form-switch m-0 pt-1">
-                      <input
-                        className="form-check-input"
-                        type="checkbox"
-                        role="switch"
-                        checked={Boolean(filters.hasFollowUpCall)}
-                        onChange={(e) => handleFilterChange('hasFollowUpCall', e.target.checked)}
-                      />
-                    </div>
+                    <select
+                      className="form-select"
+                      value={filters.hasFollowUpCall === true || filters.hasFollowUpCall === 'yes' ? 'yes' : filters.hasFollowUpCall === false || filters.hasFollowUpCall === 'no' ? 'no' : ''}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        handleFilterChange('hasFollowUpCall', v === 'yes' ? true : v === 'no' ? false : '');
+                      }}
+                    >
+                      <option value="">Select</option>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                    </select>
                   </div>
 
                   <div className="col-md-3">
@@ -9941,15 +9976,18 @@ const renderWhatsAppPanel = () => {
                       <i className="fas fa-map-marker-alt text-primary me-2"></i>
                       Followup Visit
                     </label>
-                    <div className="form-check form-switch m-0 pt-1">
-                      <input
-                        className="form-check-input"
-                        type="checkbox"
-                        role="switch"
-                        checked={Boolean(filters.hasFollowUpVisit)}
-                        onChange={(e) => handleFilterChange('hasFollowUpVisit', e.target.checked)}
-                      />
-                    </div>
+                    <select
+                      className="form-select"
+                      value={filters.hasFollowUpVisit === true || filters.hasFollowUpVisit === 'yes' ? 'yes' : filters.hasFollowUpVisit === false || filters.hasFollowUpVisit === 'no' ? 'no' : ''}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        handleFilterChange('hasFollowUpVisit', v === 'yes' ? true : v === 'no' ? false : '');
+                      }}
+                    >
+                      <option value="">Select</option>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                    </select>
                   </div>
 
                   <div className="col-md-6">
@@ -12427,6 +12465,23 @@ const renderWhatsAppPanel = () => {
     flex-direction: column;
   }
 
+  .lead-header-v2 .b2b-dash-section--no-followup{
+    background: #fecaca;
+    border-color: #fca5a5;
+  }
+
+  .lead-header-v2 .b2b-dash-section--no-followup .ActionsDates,
+  .lead-header-v2 .b2b-dash-section--no-followup .ActionsDates span:last-child{
+    color: #7f1d1d;
+    border-top-color: rgba(127, 29, 29, 0.25);
+  }
+
+  .lead-header-v2 .b2b-dash-section--no-followup .lead-header-v2__editbtn{
+    background: #ef4444;
+    border-color: #dc2626;
+    color: #fff;
+  }
+
   /* Make stats row use remaining height so all blocks match */
   .lead-header-v2 .b2b-dash-section > .d-flex{
     flex: 1 1 auto;
@@ -12988,6 +13043,22 @@ position: absolute;
     position: relative;
     overflow: visible;
     scroll-snap-align: start;
+  }
+
+  .lhm__followup-box--empty{
+    background: #fecaca;
+    border-color: #fca5a5;
+  }
+
+  .lhm__followup-box--empty .lhm__followup-date{
+    color: #7f1d1d;
+    border-top-color: rgba(127, 29, 29, 0.25);
+  }
+
+  .lhm__followup-box--empty .lhm__editbtn{
+    background: #ef4444;
+    border-color: #dc2626;
+    color: #fff;
   }
 
   /* Bottom-right edit button (mobile header boxes) */

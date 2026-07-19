@@ -81,6 +81,7 @@ const AddCourse = () => {
   // Basic form state
   const [formData, setFormData] = useState(
     {
+      sectors: '',
       sector: [],
       courseLevel: '',
       courseFeeType: '',
@@ -152,6 +153,16 @@ const AddCourse = () => {
 
   // Document requirements
   const [docsRequired, setDocsRequired] = useState([]);
+  const [classResourcesRequired, setClassResourcesRequired] = useState([]);
+  const [labResourcesRequired, setLabResourcesRequired] = useState([]);
+
+  const RESOURCE_UPLOAD_TYPES = ['Image', 'PDF', 'Video', 'Document', 'Presentation'];
+  const createEmptyResource = () => ({
+    name: '',
+    description: '',
+    uploadType: 'PDF',
+    mandatory: false,
+  });
 
   // FAQ questions and answers
   const [questionAnswers, setQuestionAnswers] = useState([
@@ -581,6 +592,54 @@ const AddCourse = () => {
     setDocsRequired(updatedDocs);
   };
 
+  const addClassResourceField = () => {
+    setClassResourcesRequired([...classResourcesRequired, createEmptyResource()]);
+  };
+
+  const removeClassResourceField = (index) => {
+    setClassResourcesRequired(classResourcesRequired.filter((_, i) => i !== index));
+  };
+
+  const updateClassResourceField = (index, value, field) => {
+    const updated = [...classResourcesRequired];
+    if (field === 'mandatory') {
+      updated[index].mandatory = value === 'true' || value === true;
+    } else {
+      updated[index][field] = value;
+    }
+    setClassResourcesRequired(updated);
+  };
+
+  const addLabResourceField = () => {
+    setLabResourcesRequired([...labResourcesRequired, createEmptyResource()]);
+  };
+
+  const removeLabResourceField = (index) => {
+    setLabResourcesRequired(labResourcesRequired.filter((_, i) => i !== index));
+  };
+
+  const updateLabResourceField = (index, value, field) => {
+    const updated = [...labResourcesRequired];
+    if (field === 'mandatory') {
+      updated[index].mandatory = value === 'true' || value === true;
+    } else {
+      updated[index][field] = value;
+    }
+    setLabResourcesRequired(updated);
+  };
+
+  const mapResourceForSubmit = (items = []) =>
+    items
+      .filter((item) => item.name?.trim())
+      .map((item) => ({
+        Name: item.name.trim(),
+        description: item.description?.trim() || '',
+        uploadType: RESOURCE_UPLOAD_TYPES.includes(item.uploadType) ? item.uploadType : 'PDF',
+        mandatory: !!item.mandatory,
+        status: true,
+        ...(item._id ? { _id: item._id } : {}),
+      }));
+
   // Add a new question-answer pair
   const addQuestionAnswer = () => {
     setQuestionAnswers([...questionAnswers, { question: '', answer: '' }]);
@@ -593,21 +652,39 @@ const AddCourse = () => {
     setQuestionAnswers(updatedQA);
   };
 
-  // Validate form
+  // Validate form — only fields marked * in Course Information (plus conditional fields)
   const validateForm = () => {
     const errors = {};
     const requiredFields = [
-      'sectors', 'courseLevel', 'name', 'duration', 'qualification',
-      'trainingMode', 'address', 'ojt', 'emiOptionAvailable','vertical','project'
+      'courseLevel',
+      'courseFeeType',
+      'vertical',
+      'project',
+      'name',
+      'duration',
+      'qualification',
     ];
 
-    requiredFields.forEach(field => {
-      if (!formData[field] || formData[field].trim() === '') {
-        errors[field] = `This field is required`;
+    // Optional but recommended when shown
+    if (formData.courseType === 'coursejob') {
+      requiredFields.push('ojt');
+    }
+    if (formData.courseFeeType === 'Paid') {
+      requiredFields.push('emiOptionAvailable');
+    }
+
+    const isEmpty = (value) => {
+      if (value === undefined || value === null) return true;
+      if (Array.isArray(value)) return value.length === 0;
+      return String(value).trim() === '';
+    };
+
+    requiredFields.forEach((field) => {
+      if (isEmpty(formData[field])) {
+        errors[field] = 'This field is required';
       }
     });
 
-    // Set all errors at once
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) {
       showToast('Please fill in all required fields marked with *');
@@ -620,6 +697,7 @@ const AddCourse = () => {
     // Reset all form fields
     setFormData(
       {
+      sectors: '',
       sector: [],
       courseLevel: '',
       courseFeeType: '',
@@ -673,6 +751,8 @@ const AddCourse = () => {
 
     // Reset docs required
     setDocsRequired([{ name: '' }]);
+    setClassResourcesRequired([]);
+    setLabResourcesRequired([]);
 
     // Reset questions and answers
     setQuestionAnswers([
@@ -1101,15 +1181,13 @@ const AddCourse = () => {
     if (Object.keys(errors).length > 0) {
       // Field id map — same order as requiredFields
       const fieldIdMap = {
-        sectors: 'sectors',
         courseLevel: 'courseLevel',
+        courseFeeType: 'courseFeeType',
         vertical: 'vertical',
         project: 'project',
         name: 'name',
         duration: 'duration',
         qualification: 'qualification',
-        trainingMode: 'trainingMode',
-        address: 'address',
         ojt: 'ojt',
         emiOptionAvailable: 'emiOptionAvailable',
       };
@@ -1135,9 +1213,9 @@ const AddCourse = () => {
         key !== 'brochure' && key !== 'thumbnail') {
 
         // Special handling for sectors
-        if (key === 'sectors' && Array.isArray(value)) {
-          // Send multiple values with same field name
-          value.forEach(v => form.append('sectors', v));
+        if (key === 'sectors') {
+          const sectorValues = Array.isArray(value) ? value : (value ? [value] : []);
+          sectorValues.forEach((v) => form.append('sectors', v));
         }
         // Keep center as array format
         else if (key === 'center' && Array.isArray(value)) {
@@ -1148,7 +1226,7 @@ const AddCourse = () => {
           value.forEach(v => form.append(`${key}[]`, v));
         }
         // Handle single values
-        else {
+        else if (value !== undefined && value !== null) {
           form.append(key, value);
         }
       }
@@ -1187,6 +1265,9 @@ const AddCourse = () => {
         mandatory: doc.mandatory
       }))));
     }
+
+    form.append('classResourcesRequired', JSON.stringify(mapResourceForSubmit(classResourcesRequired)));
+    form.append('labResourcesRequired', JSON.stringify(mapResourceForSubmit(labResourcesRequired)));
     
     form.append('questionAnswers', JSON.stringify(questionAnswers));
     form.append('courseStructure', JSON.stringify({ ...structureLevels, session: true }));
@@ -1200,7 +1281,7 @@ const AddCourse = () => {
 
     try {
       setIsSubmitting(true);
-      const response = await axios.post(`${backendUrl}/college/courses/add`, form, {
+      const response = await axios.post(`${backendUrl}/college/courses/addcoursecopy`, form, {
         headers: {
           'Content-Type': 'multipart/form-data',
           'x-auth': user.token
@@ -1332,9 +1413,9 @@ const AddCourse = () => {
 
                       {/* Course Fee Type */}
                       <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="courseFeeTypeblock">
-                        <label htmlFor="courseFeeType">Course Fee Type</label>
+                        <label htmlFor="courseFeeType" style={{ color: formErrors.courseFeeType ? '#ef4444' : '' }}>Course Fee Type <span style={{ color: '#ef4444' }}>*</span></label>
                         <select
-                          className="form-control"
+                          className={`form-control ${formErrors.courseFeeType ? 'is-invalid' : ''}`}
                           name="courseFeeType"
                           id="courseFeeType"
                           value={formData.courseFeeType}
@@ -1344,6 +1425,7 @@ const AddCourse = () => {
                           <option value="Paid">Paid</option>
                           <option value="Free">Free</option>
                         </select>
+                        {formErrors.courseFeeType && <div className="invalid-feedback">{formErrors.courseFeeType}</div>}
                       </div>
 
                       
@@ -1880,13 +1962,205 @@ const AddCourse = () => {
           </div>
         </section>
 
+        {/* Class Resource Required Section */}
+        <section id="classResourceRequired">
+          <div className="row">
+            <div className="col-xl-12 col-lg-12">
+              <div className="card">
+                <div className="card-header border border-top-0 border-left-0 border-right-0">
+                  <h4 className="card-title pb-1">Class Resource Required</h4>
+                </div>
+                <div className="card-content">
+                  <div className="card-body">
+                    <div id="classResourceContainer">
+                      {classResourcesRequired.map((doc, index) => (
+                        <div className="row requiredDocsRow" key={`class-res-${index}`}>
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                            <label>Document Name</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="e.g. Projector, Whiteboard"
+                              value={doc.name}
+                              onChange={(e) => updateClassResourceField(index, e.target.value, 'name')}
+                            />
+                          </div>
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                            <label>Description</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="Short description"
+                              value={doc.description}
+                              onChange={(e) => updateClassResourceField(index, e.target.value, 'description')}
+                            />
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1">
+                            <label>Upload Type</label>
+                            <select
+                              className="form-control"
+                              value={doc.uploadType || 'PDF'}
+                              onChange={(e) => updateClassResourceField(index, e.target.value, 'uploadType')}
+                            >
+                              {RESOURCE_UPLOAD_TYPES.map((type) => (
+                                <option key={type} value={type}>{type}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1">
+                            <label>Mandatory</label>
+                            <select
+                              className="form-control"
+                              value={String(!!doc.mandatory)}
+                              onChange={(e) => updateClassResourceField(index, e.target.value, 'mandatory')}
+                            >
+                              <option value="true">Yes</option>
+                              <option value="false">No</option>
+                            </select>
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1 d-flex align-items-end">
+                            <button
+                              type="button"
+                              onClick={() => removeClassResourceField(index)}
+                              style={{
+                                background: 'white',
+                                color: '#ef4444',
+                                border: '1.5px solid #ef4444',
+                                borderRadius: '8px',
+                                padding: '8px 14px',
+                                fontWeight: 600,
+                                fontSize: '13px',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              <i className="fa fa-trash" style={{ marginRight: '5px' }}></i>
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="col-xl-12 mb-1 px-0 text-right">
+                      <button
+                        type="button"
+                        className="btn btn-success text-white add-another-button"
+                        onClick={addClassResourceField}
+                      >
+                        {classResourcesRequired.length > 0 ? 'Add Another' : 'Add Document'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Lab Resource Required Section */}
+        <section id="labResourceRequired">
+          <div className="row">
+            <div className="col-xl-12 col-lg-12">
+              <div className="card">
+                <div className="card-header border border-top-0 border-left-0 border-right-0">
+                  <h4 className="card-title pb-1">Lab Resource Required</h4>
+                </div>
+                <div className="card-content">
+                  <div className="card-body">
+                    <div id="labResourceContainer">
+                      {labResourcesRequired.map((doc, index) => (
+                        <div className="row requiredDocsRow" key={`lab-res-${index}`}>
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                            <label>Document Name</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="e.g. Lab kit, Tools"
+                              value={doc.name}
+                              onChange={(e) => updateLabResourceField(index, e.target.value, 'name')}
+                            />
+                          </div>
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                            <label>Description</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="Short description"
+                              value={doc.description}
+                              onChange={(e) => updateLabResourceField(index, e.target.value, 'description')}
+                            />
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1">
+                            <label>Upload Type</label>
+                            <select
+                              className="form-control"
+                              value={doc.uploadType || 'PDF'}
+                              onChange={(e) => updateLabResourceField(index, e.target.value, 'uploadType')}
+                            >
+                              {RESOURCE_UPLOAD_TYPES.map((type) => (
+                                <option key={type} value={type}>{type}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1">
+                            <label>Mandatory</label>
+                            <select
+                              className="form-control"
+                              value={String(!!doc.mandatory)}
+                              onChange={(e) => updateLabResourceField(index, e.target.value, 'mandatory')}
+                            >
+                              <option value="true">Yes</option>
+                              <option value="false">No</option>
+                            </select>
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1 d-flex align-items-end">
+                            <button
+                              type="button"
+                              onClick={() => removeLabResourceField(index)}
+                              style={{
+                                background: 'white',
+                                color: '#ef4444',
+                                border: '1.5px solid #ef4444',
+                                borderRadius: '8px',
+                                padding: '8px 14px',
+                                fontWeight: 600,
+                                fontSize: '13px',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              <i className="fa fa-trash" style={{ marginRight: '5px' }}></i>
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="col-xl-12 mb-1 px-0 text-right">
+                      <button
+                        type="button"
+                        className="btn btn-success text-white add-another-button"
+                        onClick={addLabResourceField}
+                      >
+                        {labResourcesRequired.length > 0 ? 'Add Another' : 'Add Document'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Documents Required Section */}
         <section id="docsRequired">
           <div className="row">
             <div className="col-xl-12 col-lg-12">
               <div className="card">
                 <div className="card-header border border-top-0 border-left-0 border-right-0">
-                  <h4 className="card-title pb-1">Documents Required</h4>
+                  <h4 className="card-title pb-1">Student Documents Required</h4>
                 </div>
                 <div className="card-content">
                   <div className="card-body">

@@ -301,7 +301,7 @@ const Layout = () => {
           <Route path="candidatemanagment" element={<CandidateManagementPortal/>}/>
           <Route path='addcourse' element={<AddCourse/>}/>
           <Route path='addcoursecopy' element={<AddCoursecopy/>}/>
-          <Route path='editcoursecopy' element={<Editcoursecopy/>}/>
+          <Route path='editcoursecopy/:id' element={<Editcoursecopy/>}/>
           <Route path='viewcoursecopy' element={<Viewcoursecopy/>}/>
          <Route path='viewcourse' element={<ViewCourses/>}/>
           <Route path='registrationold' element={<Registrations/>}/>
