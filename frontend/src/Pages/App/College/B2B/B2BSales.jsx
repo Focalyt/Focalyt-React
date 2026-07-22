@@ -1700,6 +1700,7 @@ const B2BSales = () => {
   // Add state for leads data
   const [leads, setLeads] = useState([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
+  const [downloadingPerformanceLeads, setDownloadingPerformanceLeads] = useState(false);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState(null);
   const [leadViewTab, setLeadViewTab] = useState('all'); // 'all' | 'myRefer'
   const [myReferLeadsCount, setMyReferLeadsCount] = useState(0);
@@ -2849,6 +2850,113 @@ const B2BSales = () => {
       console.error('Error fetching status counts:', error);
     } finally {
       setLoadingStatusCounts(false);
+    }
+  };
+
+  const getPerformanceExportMeta = () => {
+    if (selectedStatusFilter) {
+      const status = (statusCounts || []).find(
+        (s) => String(s.statusId) === String(selectedStatusFilter)
+      );
+      const label = String(status?.statusName || 'Status').toUpperCase().replace(/\s+/g, '_');
+      const count = pageSize > 0 ? pageSize : (status?.count ?? leads.length);
+      return { label, count, statusId: selectedStatusFilter };
+    }
+    const count = pageSize > 0 ? pageSize : (totalLeads || leads.length);
+    return { label: 'ALL', count, statusId: null };
+  };
+
+  const downloadPerformanceLeads = async () => {
+    if (!token || downloadingPerformanceLeads) return;
+
+    const { label, count, statusId } = getPerformanceExportMeta();
+    if (!count || count < 1) {
+      alert('No leads available to download for this Performance tab.');
+      return;
+    }
+
+    setDownloadingPerformanceLeads(true);
+    try {
+      const eff = { ...filtersRef.current };
+      const batchSize = 500;
+      const allLeads = [];
+      let page = 1;
+      let totalFromApi = count;
+
+      while (allLeads.length < totalFromApi) {
+        const remaining = totalFromApi - allLeads.length;
+        const params = {
+          page,
+          limit: Math.min(batchSize, remaining),
+          sortBy: 'updatedAt',
+          sortOrder: 'desc',
+        };
+        if (statusId) params.status = statusId;
+        appendLeadFilterParams(params, eff);
+
+        const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
+          headers: { 'x-auth': token },
+          params,
+        });
+
+        if (!response.data?.status) {
+          throw new Error(response.data?.message || 'Failed to fetch leads for download');
+        }
+
+        const batch = response.data.data?.leads || [];
+        const paginationTotal = response.data.data?.pagination?.totalLeads;
+        if (typeof paginationTotal === 'number' && paginationTotal >= 0) {
+          totalFromApi = paginationTotal;
+        }
+
+        if (!batch.length) break;
+        allLeads.push(...batch);
+        if (batch.length < params.limit) break;
+        page += 1;
+        if (page > 200) break;
+      }
+
+      if (!allLeads.length) {
+        alert('No leads available to download for this Performance tab.');
+        return;
+      }
+
+      const rows = allLeads.map((lead) => ({
+        'Business Name': lead.businessName || '',
+        'Concern Person Name': lead.concernPersonName || '',
+        Mobile: lead.mobile || '',
+        Email: lead.email || '',
+        WhatsApp: lead.whatsapp || '',
+        'Landline Number': lead.landlineNumber || '',
+        Designation: lead.designation || '',
+        Address: lead.address || '',
+        City: lead.city || '',
+        State: lead.state || '',
+        'B2B Department': getLeadB2bDepartmentName(lead),
+        'B2B Project': getLeadB2bProjectName(lead),
+        'Type of B2B': lead.typeOfB2B?.name || '',
+        'Lead Source': lead.leadCategory?.name || '',
+        Performance: lead.status?.title || lead.status?.name || '',
+        'Sub Status': getLeadSubStatusTitle(lead) || '',
+        'Lead Ranking': lead.leadRanking?.name || '',
+        Counsellor: lead.leadOwner?.name || '',
+        'Co-owner': lead.leadCoOwner?.name || '',
+        'Added By': lead.leadAddedBy?.name || '',
+        Remark: lead.remark || '',
+        'Created At': lead.createdAt ? moment(lead.createdAt).format('YYYY-MM-DD HH:mm') : '',
+        'Updated At': lead.updatedAt ? moment(lead.updatedAt).format('YYYY-MM-DD HH:mm') : '',
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Leads');
+      const dateStamp = moment().format('YYYY-MM-DD');
+      XLSX.writeFile(wb, `b2b_leads_${label}_${dateStamp}.xlsx`);
+    } catch (error) {
+      console.error('Error downloading performance leads:', error);
+      alert(error.response?.data?.message || error.message || 'Failed to download leads. Please try again.');
+    } finally {
+      setDownloadingPerformanceLeads(false);
     }
   };
 
@@ -7851,6 +7959,37 @@ const renderWhatsAppPanel = () => {
                           <i className="fab fa-whatsapp" style={{ fontSize: '11px' }}></i>
                           Bulk Messages
                       </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm border-0"
+                        onClick={downloadPerformanceLeads}
+                        disabled={downloadingPerformanceLeads || loadingStatusCounts || (!pageSize && !totalLeads && !leads.length)}
+                        title="Download all leads for the selected Performance tab"
+                        style={{
+                          padding: '8px 16px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          color: '#fff',
+                          backgroundColor: 'rgb(250, 85, 121)',
+                          borderRadius: '999px',
+                          opacity: downloadingPerformanceLeads || loadingStatusCounts || (!pageSize && !totalLeads && !leads.length) ? 0.55 : 1
+                        }}
+                      >
+                        {downloadingPerformanceLeads ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
+                            Downloading...
+                          </>
+                        ) : (
+                          <>
+                            <i className="fas fa-download" style={{ fontSize: '11px' }}></i>
+                            Download Leads
+                          </>
+                        )}
+                      </button>
                       </div>
 
                       <div className="d-flex align-items-center gap-2 ms-md-auto">
@@ -8061,6 +8200,29 @@ const renderWhatsAppPanel = () => {
                       >
                         <i className="fab fa-whatsapp" style={{ fontSize: '14px' }}></i>
                         Bulk Messages
+                      </button>
+                      <button
+                        type="button"
+                        className="btn b2b-mobile-action-btn"
+                        onClick={downloadPerformanceLeads}
+                        disabled={downloadingPerformanceLeads || loadingStatusCounts || (!pageSize && !totalLeads && !leads.length)}
+                        title="Download all leads for the selected Performance tab"
+                        style={{
+                          opacity: downloadingPerformanceLeads || loadingStatusCounts || (!pageSize && !totalLeads && !leads.length) ? 0.55 : 1,
+                          cursor: downloadingPerformanceLeads || loadingStatusCounts || (!pageSize && !totalLeads && !leads.length) ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        {downloadingPerformanceLeads ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
+                            Downloading...
+                          </>
+                        ) : (
+                          <>
+                            <i className="fas fa-download" style={{ fontSize: '14px' }}></i>
+                            Download Leads
+                          </>
+                        )}
                       </button>
                     </div>
 
