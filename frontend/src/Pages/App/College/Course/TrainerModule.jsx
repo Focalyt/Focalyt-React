@@ -251,6 +251,18 @@ const loadAssignedCoordinatorSessions = (batchId, trainerId) => {
   }
 };
 
+const fetchAssignedCoordinatorSessionsApi = async (backendUrl, token, trainerId, batchId = '') => {
+  if (!trainerId || !token) return [];
+  const params = new URLSearchParams({
+    fieldTrainerId: trainerId,
+  });
+  if (batchId) params.set('batch', batchId);
+  const res = await axios.get(`${backendUrl}/college/session-plans?${params.toString()}`, {
+    headers: { 'x-auth': token },
+  });
+  return Array.isArray(res.data?.data) ? res.data.data : [];
+};
+
 const isCoordinatorPlanSession = (session) => (
   String(session?.id || '').startsWith('AC-')
   || Boolean(session?.workflowStatus)
@@ -1552,9 +1564,9 @@ const SessionFormSelect = ({ label, value, onChange, options = [], placeholder =
 const SessionEmptyState = () => (
   <div className="tm-empty tm-empty--session-create">
     <i className="fas fa-laptop" />
-    <p>No sessions assigned to you for this batch yet.</p>
+    <p>No sessions assigned to you yet.</p>
     <p className="tm-empty__hint">
-      Session plans are created by Academic Coordinator and assigned to you via Senior Trainer.
+      Session plans are created by Academic Coordinator, referred to Senior Trainer, then assigned to you.
     </p>
   </div>
 );
@@ -3348,14 +3360,31 @@ const TrainerModule = () => {
     email: userData.email ,
   }), [userData]);
 
-  const activeBasicDetails = useMemo(() => buildSessionContextFromFilters(filters, {
-    verticalOptions,
-    projectOptions,
-    centerOptions,
-    courseOptions,
-    batchOptions,
-    trainerName: trainerProfile.name,
-  }), [filters, verticalOptions, projectOptions, centerOptions, courseOptions, batchOptions, trainerProfile.name]);
+  const activeBasicDetails = useMemo(() => {
+    const fromFilters = buildSessionContextFromFilters(filters, {
+      verticalOptions,
+      projectOptions,
+      centerOptions,
+      courseOptions,
+      batchOptions,
+      trainerName: trainerProfile.name,
+    });
+    const seed = sessions[0];
+    if (!seed) return fromFilters;
+    return {
+      ...fromFilters,
+      departmentName: fromFilters.departmentName || seed.departmentName || seed.verticalName || '',
+      projectName: fromFilters.projectName || seed.projectName || '',
+      centerName: fromFilters.centerName || seed.centerName || '',
+      courseTrade: fromFilters.courseTrade || seed.courseName || seed.courseTrade || '',
+      batchCode: fromFilters.batchCode || seed.batchCode || '',
+      batch: fromFilters.batch || seed.batch || '',
+      course: fromFilters.course || seed.course || '',
+      center: fromFilters.center || seed.center || '',
+      department: fromFilters.department || seed.department || seed.vertical || '',
+      project: fromFilters.project || seed.project || '',
+    };
+  }, [filters, sessions, verticalOptions, projectOptions, centerOptions, courseOptions, batchOptions, trainerProfile.name]);
 
   const persistSessions = useCallback((nextSessions, batchId = filters.batch) => {
     if (!batchId) return;
@@ -3681,81 +3710,86 @@ const TrainerModule = () => {
 
   const trainerId = userData._id || userData.id;
 
-  const reloadAssignedSessions = useCallback(async (batchId, signal) => {
-    if (!batchId) {
+  const reloadAssignedSessions = useCallback(async (signal) => {
+    if (!trainerId || !token) {
       setSessions([]);
       return;
     }
 
-    let coordinatorSessions = loadAssignedCoordinatorSessions(batchId, trainerId);
-    const [feedbackMap, attendanceMap] = await Promise.all([
-      fetchBatchSessionFeedback(batchId, signal),
-      fetchBatchAttendance(batchId, signal),
-    ]);
-
-    if (!coordinatorSessions.length) {
-      coordinatorSessions = DUMMY_SESSIONS.map((session, index) => hydrateSession(session, index, activeBasicDetails));
+    let coordinatorSessions = [];
+    try {
+      coordinatorSessions = await fetchAssignedCoordinatorSessionsApi(backendUrl, token, trainerId);
+    } catch (err) {
+      if (err?.code !== 'ERR_CANCELED' && err?.name !== 'CanceledError') {
+        console.error('Failed to load assigned session plans', err);
+      }
+      coordinatorSessions = [];
     }
 
-    setSessionFeedbackBySession(feedbackMap || {});
-    setAttendanceRecordsBySession(attendanceMap || {});
+    if (signal?.aborted) return;
+
+    const batchIds = [...new Set(
+      coordinatorSessions.map((session) => session.batch).filter(Boolean)
+    )];
+
+    let feedbackMap = {};
+    let attendanceMap = {};
+    if (batchIds.length) {
+      const feedbackAndAttendance = await Promise.all(
+        batchIds.map(async (batchId) => {
+          const [feedback, attendance] = await Promise.all([
+            fetchBatchSessionFeedback(batchId, signal),
+            fetchBatchAttendance(batchId, signal),
+          ]);
+          return { feedback, attendance };
+        })
+      );
+      feedbackAndAttendance.forEach(({ feedback, attendance }) => {
+        feedbackMap = { ...feedbackMap, ...(feedback || {}) };
+        attendanceMap = { ...attendanceMap, ...(attendance || {}) };
+      });
+    }
+
+    if (signal?.aborted) return;
+
+    setSessionFeedbackBySession(feedbackMap);
+    setAttendanceRecordsBySession(attendanceMap);
     setSessions(coordinatorSessions);
     setSelectedSessionId((prev) => (
       prev && coordinatorSessions.some((item) => item.id === prev) ? prev : coordinatorSessions[0]?.id || ''
     ));
     setSessionPanelView(coordinatorSessions.length ? 'view' : 'empty');
-  }, [trainerId, fetchBatchSessionFeedback, fetchBatchAttendance]);
+  }, [trainerId, backendUrl, token, fetchBatchSessionFeedback, fetchBatchAttendance]);
 
   useEffect(() => {
-    if (!filters.batch) {
-      setSessions([]);
-      setSelectedSessionId('');
+    const controller = new AbortController();
+    reloadAssignedSessions(controller.signal);
+    return () => controller.abort();
+  }, [reloadAssignedSessions]);
+
+  useEffect(() => {
+    const onFocus = () => reloadAssignedSessions();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [reloadAssignedSessions]);
+
+  // Load students for the active session's batch (or optional filter batch)
+  useEffect(() => {
+    const batchId = filters.batch
+      || sessions.find((session) => session.id === selectedSessionId)?.batch
+      || sessions[0]?.batch
+      || '';
+
+    if (!batchId) {
       setStudents([]);
       setStudentsLoading(false);
-      setAttendanceRecordsBySession({});
-      setSessionFeedbackBySession({});
       return undefined;
     }
 
     const controller = new AbortController();
-    reloadAssignedSessions(filters.batch, controller.signal);
-    fetchBatchStudents(filters.batch, controller.signal);
+    fetchBatchStudents(batchId, controller.signal);
     return () => controller.abort();
-  }, [filters.batch, fetchBatchStudents, reloadAssignedSessions]);
-
-  useEffect(() => {
-    if (!filters.batch) return undefined;
-
-    const refreshAssigned = () => {
-      reloadAssignedSessions(filters.batch);
-    };
-
-    const onStorage = (event) => {
-      if (event.key === `${AC_SESSIONS_STORAGE_PREFIX}${filters.batch}`) {
-        refreshAssigned();
-      }
-    };
-
-    window.addEventListener('focus', refreshAssigned);
-    window.addEventListener('storage', onStorage);
-    return () => {
-      window.removeEventListener('focus', refreshAssigned);
-      window.removeEventListener('storage', onStorage);
-    };
-  }, [filters.batch, reloadAssignedSessions]);
-
-  useEffect(() => {
-    if (!filters.batch) return undefined;
-
-    const refreshFeedback = () => {
-      fetchBatchSessionFeedback(filters.batch).then((feedbackMap) => {
-        if (feedbackMap) setSessionFeedbackBySession(feedbackMap);
-      });
-    };
-
-    window.addEventListener('focus', refreshFeedback);
-    return () => window.removeEventListener('focus', refreshFeedback);
-  }, [filters.batch, fetchBatchSessionFeedback]);
+  }, [filters.batch, selectedSessionId, sessions, fetchBatchStudents]);
 
   const fetchReferCandidates = useCallback(async (batchId) => {
     if (!batchId) {
@@ -3787,16 +3821,20 @@ const TrainerModule = () => {
   }, [backendUrl, token]);
 
   const openReferSessionModal = () => {
-    if (!filters.batch) {
-      notify('Please select a batch first');
+    const batchId = filters.batch
+      || selectedSession?.batch
+      || sessions[0]?.batch
+      || '';
+    if (!batchId) {
+      notify('No batch found on assigned sessions');
     }
     setReferSessionModal({
       isOpen: true,
       counselorId: filters.counsellor || '',
       selectedAppliedCourseIds: [],
     });
-    if (filters.batch) {
-      fetchReferCandidates(filters.batch);
+    if (batchId) {
+      fetchReferCandidates(batchId);
     } else {
       setReferCandidates([]);
     }
@@ -3958,11 +3996,7 @@ const TrainerModule = () => {
     });
   };
 
-  const displaySessions = useMemo(() => {
-    if (sessions.length) return sessions;
-    if (!filters.batch) return [];
-    return DUMMY_SESSIONS.map((session, index) => hydrateSession(session, index, activeBasicDetails));
-  }, [sessions, filters.batch, activeBasicDetails]);
+  const displaySessions = useMemo(() => sessions, [sessions]);
 
   const filteredSessions = useMemo(() => {
     const query = quickSearch.trim().toLowerCase();
@@ -4484,20 +4518,7 @@ const TrainerModule = () => {
         </div>
       </header>
 
-      {!filters.batch ? (
-        <SessionPathPicker
-          filters={filters}
-          currentStep={sessionPathStep}
-          options={sessionPathOptions}
-          loading={sessionPathLoading}
-          getLabel={getFilterLabel}
-          onSelect={handleFilterChange}
-          onBack={handleSessionPathBack}
-          onReset={handleSessionPathReset}
-        />
-      ) : (
-        <>
-          <div className="dbr-main-tabs">
+      <div className="dbr-main-tabs">
             {MAIN_TABS.map((tab) => (
               <button
                 key={tab.id}
@@ -4522,7 +4543,7 @@ const TrainerModule = () => {
                       activeBasicDetails.centerName,
                       activeBasicDetails.courseTrade,
                       activeBasicDetails.batchCode,
-                    ].filter(Boolean).join(' · ')}
+                    ].filter(Boolean).join(' · ') || 'Assigned sessions'}
                   </span>
                   <span className="dbr-session-summary__count">
                     {studentsLoading ? '…' : students.length} students · <strong>{filteredSessions.length}</strong> sessions
@@ -4536,9 +4557,6 @@ const TrainerModule = () => {
                   </span>
                 </div>
                 <div className="dbr-session-actions">
-                  <button type="button" className="dbr-btn dbr-btn--session-action dbr-btn--session-action--ghost" onClick={handleSessionPathReset}>
-                    <i className="fas fa-exchange-alt" /> Change batch
-                  </button>
                   <button type="button" className="dbr-btn dbr-btn--session-action dbr-btn--session-action--outline" onClick={openReferSessionModal}>
                     <i className="fas fa-share-alt" /> Refer Session
                   </button>
@@ -4641,8 +4659,6 @@ const TrainerModule = () => {
           )}
         </div>
           )}
-        </>
-      )}
 
       {isSessionModalOpen && session && (
         <AddSessionModal

@@ -674,6 +674,24 @@ router
 				body.createdBy = typeof body.createdBy === 'string'
 					? JSON.parse(body.createdBy)
 					: body.createdBy;
+				if (body.createdBy?.id && typeof body.createdBy.id === 'string') {
+					body.createdBy = new mongoose.Types.ObjectId(body.createdBy.id);
+				} else if (typeof body.createdBy === 'object' && !body.createdBy._bsontype) {
+					delete body.createdBy;
+				}
+			}
+
+			// Avoid CastError on Number fields when empty strings are sent from FormData
+			['counslerphonenumber', 'counslerwhatsappnumber'].forEach((field) => {
+				if (body[field] === '' || body[field] === null || body[field] === undefined) {
+					delete body[field];
+				}
+			});
+			if (body.addressInput !== undefined) {
+				delete body.addressInput;
+			}
+			if (body.isContact !== undefined) {
+				delete body.isContact;
 			}
 
 			if (files?.photos) {
@@ -749,7 +767,7 @@ router
 			normalizeCourseMedia(body);
 
 			// Update ONLY in coursescopy collection
-			const updatedCourse = await CoursesCopy.findByIdAndUpdate(courseId, body, { new: true });
+			const updatedCourse = await CoursesCopy.findByIdAndUpdate(courseId, body, { new: true, runValidators: true });
 
 			res.json({ status: true, message: "Record updated!", data: updatedCourse });
 		} catch (err) {

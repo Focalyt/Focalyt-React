@@ -1900,7 +1900,7 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 			let teamMembers = await getAllTeamMembers(req.user._id);
 			// Ownership Conditions for team members
 			ownershipConditions = teamMembers.map(member => ({
-				$or: [{ leadAddedBy: member }, { leadOwner: member }]
+				$or: [{ leadAddedBy: member }, { leadOwner: member }, { leadCoOwner: member }]
 			}));
 		}
 
@@ -2268,7 +2268,8 @@ const generateSupervisionReportData = async (req) => {
 		filterAnd.push({
 			$or: [
 				{ leadAddedBy: { $in: team } },
-				{ leadOwner: { $in: team } }
+				{ leadOwner: { $in: team } },
+				{ leadCoOwner: { $in: team } }
 			]
 		});
 	}
@@ -2765,7 +2766,7 @@ router.get('/leads', isCollege, async (req, res) => {
 			let teamMembers = await getAllTeamMembers(req.user._id);
 			// Ownership Conditions for team members
 			ownershipConditions = teamMembers.map(member => ({
-				$or: [{ leadAddedBy: member }, { leadOwner: member }]
+				$or: [{ leadAddedBy: member }, { leadOwner: member }, { leadCoOwner: member }]
 			}));
 		}
 
@@ -3036,6 +3037,7 @@ router.get('/leads', isCollege, async (req, res) => {
 			.populate('followUpVisit', 'followUpType description status scheduledDate completedDate')
 			.populate('leadAddedBy', 'name email')
 			.populate('leadOwner', 'name email')
+			.populate('leadCoOwner', 'name email')
 			.sort(sortOptions)
 			.skip(skip)
 			.limit(Number(limit));
@@ -3111,6 +3113,7 @@ router.get('/leads/:id/cross-sales', isCollege, async (req, res) => {
 			.populate('followUpCall', 'followUpType description status scheduledDate completedDate')
 			.populate('followUpVisit', 'followUpType description status scheduledDate completedDate')
 			.populate('leadOwner', 'name email')
+			.populate('leadCoOwner', 'name email')
 			.populate('leadAddedBy', 'name email')
 			.sort({ createdAt: 1 })
 			.lean();
@@ -3293,6 +3296,7 @@ router.post('/leads/:id/cross-sale', isCollege, async (req, res) => {
 		const populated = await applyLeadCorePopulates(Lead.findById(savedLead._id))
 			.populate('status', 'name title substatuses')
 			.populate('leadOwner', 'name email')
+			.populate('leadCoOwner', 'name email')
 			.populate('leadAddedBy', 'name email');
 
 		res.status(201).json({
@@ -3320,6 +3324,8 @@ router.get('/leads/:id', isCollege, async (req, res) => {
 			.populate('followUpCall', 'followUpType description status scheduledDate completedDate')
 			.populate('followUpVisit', 'followUpType description status scheduledDate completedDate')
 			.populate('leadAddedBy', 'name email')
+			.populate('leadOwner', 'name email')
+			.populate('leadCoOwner', 'name email')
 			.populate('remark.addedBy', 'name email');
 
 		if (!lead) {
@@ -3329,11 +3335,12 @@ router.get('/leads/:id', isCollege, async (req, res) => {
 			});
 		}
 
-		// Permission: Admin OR leadAddedBy OR leadOwner can view
+		// Permission: Admin OR leadAddedBy OR leadOwner OR leadCoOwner can view
 		const userId = String(req.user?._id || '');
 		const leadAddedById = lead.leadAddedBy ? String(lead.leadAddedBy?._id || lead.leadAddedBy) : '';
 		const leadOwnerId = lead.leadOwner ? String(lead.leadOwner?._id || lead.leadOwner) : '';
-		const canView = isAdminUser(req) || leadAddedById === userId || leadOwnerId === userId;
+		const leadCoOwnerId = lead.leadCoOwner ? String(lead.leadCoOwner?._id || lead.leadCoOwner) : '';
+		const canView = isAdminUser(req) || leadAddedById === userId || leadOwnerId === userId || leadCoOwnerId === userId;
 
 		if (!canView) {
 			return res.status(403).json({
@@ -3421,6 +3428,43 @@ router.get('/leads/:id/logs', isCollege, async (req, res) => {
 });
 
 // Create new lead
+// Check if mobile already exists (college concern-person scope)
+router.get('/check-mobile-duplicate', isCollege, async (req, res) => {
+	try {
+		const normalizeMobile = (v) => String(v || '').replace(/\D/g, '');
+		const mobileLast10 = normalizeMobile(req.query.mobile).slice(-10);
+		if (mobileLast10.length !== 10) {
+			return res.json({ status: true, isDuplicate: false });
+		}
+
+		const College = require('../../../models/college');
+		const college = await College.findOne({ '_concernPerson._id': req.user._id });
+		const concernIds = (college?._concernPerson || []).map((p) => p?._id).filter(Boolean);
+		const ownerScope = concernIds.length > 0 ? concernIds : [req.user._id];
+
+		const mobileCandidates = await Lead.find({
+			leadAddedBy: { $in: ownerScope },
+			mobile: { $regex: `${mobileLast10}$` },
+		})
+			.select('_id mobile')
+			.limit(25)
+			.lean();
+
+		const match = (mobileCandidates || []).find((doc) => {
+			return normalizeMobile(doc.mobile).slice(-10) === mobileLast10;
+		});
+
+		return res.json({
+			status: true,
+			isDuplicate: Boolean(match),
+			existingLeadId: match?._id || null,
+		});
+	} catch (error) {
+		console.error('Error checking mobile duplicate:', error);
+		return res.status(500).json({ status: false, message: 'Failed to check mobile duplicate' });
+	}
+});
+
 router.post('/add-lead', isCollege, async (req, res) => {
 	try {
 		const {
@@ -3440,6 +3484,7 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			mobile,
 			whatsapp,
 			leadOwner,
+			leadCoOwner,
 			remark,
 			landlineNumber,
 			status: requestedPipelineStatus,
@@ -3523,6 +3568,36 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			}
 		}
 
+		const normalizeMobile = (v) => String(v || '').replace(/\D/g, '');
+		const cleanMobile = normalizeMobile(mobile);
+		const mobileLast10 = cleanMobile.slice(-10);
+
+		const College = require("../../../models/college");
+		const college = await College.findOne({
+			'_concernPerson._id': req.user._id
+		});
+
+		let isDuplicateMobile = false;
+		if (mobileLast10.length === 10) {
+			const concernIds = (college?._concernPerson || [])
+				.map((p) => p?._id)
+				.filter(Boolean);
+			const ownerScope = concernIds.length > 0 ? concernIds : [req.user._id];
+
+			const mobileCandidates = await Lead.find({
+				leadAddedBy: { $in: ownerScope },
+				mobile: { $regex: `${mobileLast10}$` },
+			})
+				.select('_id mobile')
+				.limit(25)
+				.lean();
+
+			isDuplicateMobile = (mobileCandidates || []).some((doc) => {
+				const existingDigits = normalizeMobile(doc.mobile).slice(-10);
+				return existingDigits === mobileLast10;
+			});
+		}
+
 		// Handle leadOwner - convert name to ObjectId if needed, or skip if empty
 		let leadOwnerId = null;
 		if (leadOwner && leadOwner.trim()) {
@@ -3547,6 +3622,24 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			// If owner not found, leadOwnerId remains null (optional field)
 		}
 
+		// Handle leadCoOwner - same resolution as leadOwner
+		let leadCoOwnerId = null;
+		if (leadCoOwner && String(leadCoOwner).trim()) {
+			const coOwnerName = String(leadCoOwner).trim();
+			let coOwner = null;
+			if (mongoose.Types.ObjectId.isValid(coOwnerName)) {
+				coOwner = await User.findById(coOwnerName);
+			}
+			if (!coOwner) {
+				coOwner = await User.findOne({
+					name: { $regex: new RegExp(`^${coOwnerName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+				});
+			}
+			if (coOwner) {
+				leadCoOwnerId = coOwner._id;
+			}
+		}
+
 		let leadRankingId = null;
 		const rankingRaw = leadRanking != null ? String(leadRanking).trim() : '';
 		if (rankingRaw) {
@@ -3563,7 +3656,7 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			leadRankingId = rankingDoc._id;
 		}
 
-		const collegeIdForPipeline = req.user?.college?._id;
+		const collegeIdForPipeline = req.user?.college?._id || college?._id;
 		const pipelineStatusScope = collegeIdForPipeline
 			? {
 					$or: [
@@ -3585,8 +3678,30 @@ router.post('/add-lead', isCollege, async (req, res) => {
 		let resolvedStatusId = null;
 		let resolvedSubStatusId = null;
 
+		// Duplicate mobile → force Lead Status + Sub Status = "Duplicate"
+		if (isDuplicateMobile) {
+			let duplicateStatus = null;
+			if (collegeIdForPipeline) {
+				duplicateStatus = await StatusB2b.findOne({
+					college: collegeIdForPipeline,
+					title: { $regex: /^Duplicate$/i },
+				});
+			}
+			if (!duplicateStatus) {
+				duplicateStatus = await StatusB2b.findOne({
+					$and: [titleMatchExpr('duplicate'), pipelineStatusScope],
+				});
+			}
+			if (duplicateStatus) {
+				resolvedStatusId = duplicateStatus._id;
+				const subs = duplicateStatus.substatuses || [];
+				const dupSub = subs.find((s) => s?.title && /^Duplicate$/i.test(String(s.title).trim()));
+				resolvedSubStatusId = dupSub?._id || (subs[0]?._id) || null;
+			}
+		}
+
 		const rawStatus = requestedPipelineStatus != null ? String(requestedPipelineStatus).trim() : '';
-		if (rawStatus) {
+		if (!resolvedStatusId && rawStatus) {
 			let statusDoc = null;
 			if (mongoose.Types.ObjectId.isValid(rawStatus)) {
 				statusDoc = await StatusB2b.findOne({
@@ -3616,11 +3731,6 @@ router.post('/add-lead', isCollege, async (req, res) => {
 		}
 
 		// Find "Untouch Leads" status as default status
-		const College = require("../../../models/college");
-		const college = await College.findOne({
-			'_concernPerson._id': req.user._id
-		});
-
 		let defaultStatusId = null;
 		let defaultSubStatusId = null;
 
@@ -3664,7 +3774,7 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			concernPersonName,
 			designation,
 			email: normalizedEmail || undefined,
-			mobile,
+			mobile: mobileLast10 || cleanMobile || mobile,
 			whatsapp,
 			leadAddedBy: req.user._id,
 			remark,
@@ -3682,6 +3792,10 @@ router.post('/add-lead', isCollege, async (req, res) => {
 		// Only add leadOwner if we have a valid ObjectId
 		if (leadOwnerId) {
 			leadData.leadOwner = leadOwnerId;
+		}
+
+		if (leadCoOwnerId) {
+			leadData.leadCoOwner = leadCoOwnerId;
 		}
 
 		if (leadRankingId) {
@@ -3703,8 +3817,12 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			savedLead.logs.push({
 				user: req.user._id,
 				timestamp: new Date(),
-				action: `Lead added with ${statusMessage} (Approval: PENDING)`,
-				remarks: remark || `Lead created with ${statusMessage}`
+				action: isDuplicateMobile
+					? `Lead added as Duplicate (same mobile already exists) (Approval: PENDING)`
+					: `Lead added with ${statusMessage} (Approval: PENDING)`,
+				remarks: remark || (isDuplicateMobile
+					? 'Lead created with Duplicate status due to existing mobile number'
+					: `Lead created with ${statusMessage}`)
 			});
 
 			await savedLead.save();
@@ -3721,7 +3839,10 @@ router.post('/add-lead', isCollege, async (req, res) => {
 		res.status(201).json({
 			status: true,
 			data: savedLead,
-			message: 'Lead created successfully'
+			isDuplicateMobile: Boolean(isDuplicateMobile),
+			message: isDuplicateMobile
+				? 'Lead created successfully with Duplicate status (mobile already exists)'
+				: 'Lead created successfully'
 		});
 	} catch (error) {
 		console.error('Error creating lead:', error);
@@ -3809,7 +3930,8 @@ router.put('/leads/:id/approval', isCollege, async (req, res) => {
 		const updatedLead = await applyLeadCorePopulates(Lead.findById(lead._id))
 			.populate('status', 'name title substatuses')
 			.populate('leadAddedBy', 'name email')
-			.populate('leadOwner', 'name email');
+			.populate('leadOwner', 'name email')
+			.populate('leadCoOwner', 'name email');
 
 		return res.json({ status: true, data: updatedLead, message: 'Lead approval updated successfully' });
 	} catch (error) {
@@ -3987,12 +4109,14 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 		if (!isAdmin()) {
 			let teamMembers = await getAllTeamMembers(req.user._id);
 			const isOwner = teamMembers.some(member =>
-				lead.leadAddedBy.toString() === member.toString() ||
-				lead.leadOwner.toString() === member.toString()
+				(lead.leadAddedBy && lead.leadAddedBy.toString() === member.toString()) ||
+				(lead.leadOwner && lead.leadOwner.toString() === member.toString()) ||
+				(lead.leadCoOwner && lead.leadCoOwner.toString() === member.toString())
 			);
 			console.log('[B2B Update Status] Step 7: Ownership check (non-admin)', {
 				leadAddedBy: lead.leadAddedBy?.toString(),
 				leadOwner: lead.leadOwner?.toString(),
+				leadCoOwner: lead.leadCoOwner?.toString(),
 				teamMembersCount: teamMembers?.length,
 				isOwner
 			});
@@ -4176,7 +4300,8 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			.populate('followUpCall', 'followUpType description status scheduledDate completedDate')
 			.populate('followUpVisit', 'followUpType description status scheduledDate completedDate')
 			.populate('leadAddedBy', 'name email')
-			.populate('leadOwner', 'name email');
+			.populate('leadOwner', 'name email')
+			.populate('leadCoOwner', 'name email');
 
 		console.log('[B2B Update Status] Step 10: Success - sending response');
 		res.json({
@@ -4454,6 +4579,7 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 			mobile,
 			whatsapp,
 			leadOwner,
+			leadCoOwner,
 			landlineNumber,
 			remark
 		} = req.body;
@@ -4479,15 +4605,17 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 			});
 		}
 
-		// Permission: Admin OR leadAddedBy OR leadOwner can update
+		// Permission: Admin OR leadAddedBy OR leadOwner OR leadCoOwner can update
 		const userId = String(req.user?._id || '');
 		const leadAddedById = existingLead.leadAddedBy ? String(existingLead.leadAddedBy) : '';
 		const leadOwnerId = existingLead.leadOwner ? String(existingLead.leadOwner) : '';
+		const leadCoOwnerIdExisting = existingLead.leadCoOwner ? String(existingLead.leadCoOwner) : '';
 		const canEdit =
 			isAdminUser(req) ||
 			hasEditLeadsPermission() ||
 			leadAddedById === userId ||
-			leadOwnerId === userId;
+			leadOwnerId === userId ||
+			leadCoOwnerIdExisting === userId;
 
 		if (!canEdit) {
 			return res.status(403).json({
@@ -4556,6 +4684,27 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 					return res.status(400).json({ status: false, message: 'Lead owner not found' });
 				}
 				updatePayload.leadOwner = owner._id;
+			}
+		}
+
+		if (leadCoOwner !== undefined) {
+			const coOwnerRaw = leadCoOwner != null ? String(leadCoOwner).trim() : '';
+			if (!coOwnerRaw) {
+				updatePayload.leadCoOwner = null;
+			} else if (mongoose.Types.ObjectId.isValid(coOwnerRaw)) {
+				const coOwner = await User.findById(coOwnerRaw);
+				if (!coOwner) {
+					return res.status(400).json({ status: false, message: 'Lead co-owner not found' });
+				}
+				updatePayload.leadCoOwner = coOwner._id;
+			} else {
+				const coOwner = await User.findOne({
+					name: { $regex: new RegExp(`^${coOwnerRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+				});
+				if (!coOwner) {
+					return res.status(400).json({ status: false, message: 'Lead co-owner not found' });
+				}
+				updatePayload.leadCoOwner = coOwner._id;
 			}
 		}
 
@@ -4648,6 +4797,7 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 			{ path: 'typeOfB2B', select: 'name' },
 			{ path: 'leadAddedBy', select: 'name email' },
 			{ path: 'leadOwner', select: 'name email' },
+			{ path: 'leadCoOwner', select: 'name email' },
 		]);
 
 		res.json({
@@ -4678,11 +4828,12 @@ router.delete('/leads/:id', isCollege, async (req, res) => {
 			});
 		}
 
-		// Permission: Admin OR leadAddedBy OR leadOwner can delete
+		// Permission: Admin OR leadAddedBy OR leadOwner OR leadCoOwner can delete
 		const userId = String(req.user?._id || '');
 		const leadAddedById = lead.leadAddedBy ? String(lead.leadAddedBy) : '';
 		const leadOwnerId = lead.leadOwner ? String(lead.leadOwner) : '';
-		const canDelete = isAdminUser(req) || leadAddedById === userId || leadOwnerId === userId;
+		const leadCoOwnerId = lead.leadCoOwner ? String(lead.leadCoOwner) : '';
+		const canDelete = isAdminUser(req) || leadAddedById === userId || leadOwnerId === userId || leadCoOwnerId === userId;
 		if (!canDelete) {
 			return res.status(403).json({
 				status: false,
@@ -5097,9 +5248,6 @@ router.post('/leads/import', isCollege, async (req, res) => {
 			'designation': 'designation',
 			'whatsapp': 'whatsapp',
 			'landlinenumber': 'landlineNumber',
-			'leadowner': 'leadOwner',
-			'counsellor': 'leadOwner',
-			'counselor': 'leadOwner',
 			'leadstatus': 'leadStatus',
 			'performance': 'leadStatus',
 			'performancestatus': 'leadStatus',
@@ -5142,8 +5290,6 @@ router.post('/leads/import', isCollege, async (req, res) => {
 			'designati': 'designation',
 			'whatsappnumber': 'whatsapp',
 			'landline': 'landlineNumber',
-			'leadown': 'leadOwner',
-			'owner': 'leadOwner',
 			'remarks': 'remark',
 			'notes': 'remark',
 			'lat': 'latitude',
@@ -5246,6 +5392,7 @@ router.post('/leads/import', isCollege, async (req, res) => {
 		const bodyLeadStatus = req.body?.leadStatus ? String(req.body.leadStatus).trim() : '';
 		const bodyLeadSubStatus = req.body?.leadSubStatus ? String(req.body.leadSubStatus).trim() : '';
 		const bodyLeadOwner = req.body?.leadOwner ? String(req.body.leadOwner).trim() : '';
+		const bodyLeadCoOwner = req.body?.leadCoOwner ? String(req.body.leadCoOwner).trim() : '';
 		const bodyLeadRanking = req.body?.leadRanking ? String(req.body.leadRanking).trim() : '';
 
 		let defaultLeadRankingDoc = null;
@@ -5310,6 +5457,20 @@ router.post('/leads/import', isCollege, async (req, res) => {
 			}
 		}
 
+		let modalLeadCoOwnerId = null;
+		if (bodyLeadCoOwner) {
+			if (mongoose.Types.ObjectId.isValid(bodyLeadCoOwner)) {
+				const coOwner = await User.findById(bodyLeadCoOwner);
+				if (coOwner) modalLeadCoOwnerId = coOwner._id;
+			}
+			if (!modalLeadCoOwnerId) {
+				return res.status(400).json({
+					status: false,
+					message: 'Invalid Co-owner selected in the upload form. Please choose again.'
+				});
+			}
+		}
+
 		if (!defaultLeadCategoryDoc || !defaultB2bDepartmentDoc || !defaultB2bProjectDoc || !defaultTypeOfB2BDoc) {
 			return res.status(400).json({
 				status: false,
@@ -5345,6 +5506,7 @@ router.post('/leads/import', isCollege, async (req, res) => {
 		const useModalB2bType = Boolean(defaultTypeOfB2BDoc);
 		const useModalPipeline = Boolean(modalStatusId);
 		const useModalLeadOwner = Boolean(modalLeadOwnerId);
+		const useModalLeadCoOwner = Boolean(modalLeadCoOwnerId);
 		const useModalLeadRanking = Boolean(defaultLeadRankingDoc);
 
 		leads = leads.filter((row) => {
@@ -5671,31 +5833,10 @@ router.post('/leads/import', isCollege, async (req, res) => {
 
 				if (useModalLeadOwner) {
 					leadData.leadOwner = modalLeadOwnerId;
-				} else if (row.leadOwner && row.leadOwner.trim()) {
-					const ownerName = row.leadOwner.trim();
+				}
 
-					let owner = null;
-					if (mongoose.Types.ObjectId.isValid(ownerName)) {
-						owner = await User.findById(ownerName);
-					}
-
-					if (!owner) {
-						const ownerNorm = ownerName.toLowerCase();
-						owner = await User.findOne({
-							$expr: {
-								$eq: [
-									{ $toLower: { $trim: { input: '$name' } } },
-									ownerNorm
-								]
-							}
-						});
-					}
-					
-					if (owner) {
-						leadData.leadOwner = owner._id;
-					} else {
-						// console.log(`Row ${i + 2}: Lead Owner "${ownerName}" not found. Continuing without owner.`);
-					}
+				if (useModalLeadCoOwner) {
+					leadData.leadCoOwner = modalLeadCoOwnerId;
 				}
 
 				// Add coordinates if provided
@@ -5901,7 +6042,7 @@ router.get('/dashboard', isCollege, async (req, res) => {
 			let teamMembers = await getAllTeamMembers(req.user._id);
 			// Ownership Conditions for team members
 			ownershipConditions = teamMembers.map(member => ({
-				$or: [{ leadAddedBy: member }, { leadOwner: member }]
+				$or: [{ leadAddedBy: member }, { leadOwner: member }, { leadCoOwner: member }]
 			}));
 		}
 

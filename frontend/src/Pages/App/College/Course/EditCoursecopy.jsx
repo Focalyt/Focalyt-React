@@ -322,8 +322,8 @@ const EditCourse = () => {
           sectors: course.sectors ? course.sectors.map(c => c._id) : [],
           courseFeeType: course.courseFeeType || '',
           courseLevel: course.courseLevel || '',
-          vertical: course.vertical || '',
-          project: course.project || '',
+          vertical: course.vertical?._id || course.vertical || '',
+          project: course.project?._id || course.project || '',
           projectName: course.projectName || '',
           typeOfProject: course.typeOfProject || '',
           courseType: course.courseType || '',
@@ -548,7 +548,7 @@ const EditCourse = () => {
     const selectedValues = Array.from(selectedOptions).map(option => option.value);
     setFormData({
       ...formData,
-      center: selectedValues ? [selectedValues] : []
+      center: selectedValues
     });
   };
 
@@ -558,11 +558,10 @@ const EditCourse = () => {
   }, [formData.sectors])
 
   const handleSectorChange = (e) => {
-    const selectedValues = Array.from(e.target.selectedOptions).map(option => option.value);
-    console.log('selectedValues', selectedValues);
+    const value = e.target.value;
     setFormData({
       ...formData,
-      sectors: selectedValues ? [selectedValues] : []
+      sectors: value ? [value] : []
     });
   };
 
@@ -1186,19 +1185,37 @@ const EditCourse = () => {
   const validateForm = () => {
     const errors = {};
     const requiredFields = [
-      'courseLevel', 'name', 'duration', 'qualification',
-      'trainingMode', 'address', 'ojt', 'emiOptionAvailable'
+      'courseLevel',
+      'courseFeeType',
+      'vertical',
+      'project',
+      'name',
+      'duration',
+      'qualification',
     ];
 
-    requiredFields.forEach(field => {
-      if (!formData[field] || formData[field].trim() === '') {
-        errors[field] = `This field is required`;
+    // Only require fields that are actually visible
+    if (formData.courseType === 'coursejob') {
+      requiredFields.push('ojt');
+    }
+    if (formData.courseFeeType === 'Paid') {
+      requiredFields.push('emiOptionAvailable');
+    }
+
+    const isEmpty = (value) => {
+      if (value === undefined || value === null) return true;
+      if (Array.isArray(value)) return value.length === 0;
+      return String(value).trim() === '';
+    };
+
+    requiredFields.forEach((field) => {
+      if (isEmpty(formData[field])) {
+        errors[field] = 'This field is required';
       }
     });
 
-    // Set all errors at once
     setFormErrors(errors);
-    return Object.keys(errors).length === 0;
+    return errors;
   };
 
   // Reset form to initial state
@@ -1214,7 +1231,31 @@ const EditCourse = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!validateForm()) return;
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      const fieldIdMap = {
+        courseLevel: 'courseLevel',
+        courseFeeType: 'courseFeeType',
+        vertical: 'vertical',
+        project: 'project',
+        name: 'name',
+        duration: 'duration',
+        qualification: 'qualification',
+        ojt: 'ojt',
+        emiOptionAvailable: 'emiOptionAvailable',
+      };
+      const firstErrorField = Object.keys(errors)[0];
+      const fieldId = fieldIdMap[firstErrorField];
+      if (fieldId) {
+        const el = document.getElementById(fieldId);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.focus();
+        }
+      }
+      alert('Please fill in all required fields');
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -1225,30 +1266,34 @@ const EditCourse = () => {
       // Append form fields - FIXED VERSION
       Object.entries(formData).forEach(([key, value]) => {
         if (key !== 'photos' && key !== 'videos' && key !== 'testimonialvideos' &&
-          key !== 'brochure' && key !== 'thumbnail') {
+          key !== 'brochure' && key !== 'thumbnail' && key !== 'isContact') {
 
           // Special handling for sectors
-          if (key === 'sectors' && Array.isArray(value)) {
-            // Send multiple values with same field name
-            value.forEach(v => form.append('sectors', v));
+          if (key === 'sectors') {
+            const sectorValues = Array.isArray(value) ? value.flat() : (value ? [value] : []);
+            sectorValues.filter(Boolean).forEach((v) => form.append('sectors', v));
           }
           // Keep center as array format
           else if (key === 'center' && Array.isArray(value)) {
-            value.forEach(v => form.append(`center`, v));
+            value.flat().filter(Boolean).forEach((v) => form.append('center', v));
+          }
+          // Skip empty counselor phone numbers (schema expects Number)
+          else if (
+            (key === 'counslerphonenumber' || key === 'counslerwhatsappnumber') &&
+            (value === '' || value === null || value === undefined)
+          ) {
+            return;
           }
           // Handle other arrays (if any)
           else if (Array.isArray(value)) {
             value.forEach(v => form.append(`${key}[]`, v));
           }
           // Handle single values
-          else {
+          else if (value !== undefined && value !== null) {
             form.append(key, value);
           }
         }
       });
-
-      // Rest of your code remains same...
-
 
       // Append new files
       if (selectedVideos.length > 0) {
@@ -1306,7 +1351,7 @@ const EditCourse = () => {
       }
     } catch (error) {
       console.error('Error updating course:', error);
-      alert('Error updating course. Please try again.');
+      alert(error.response?.data?.message || 'Error updating course. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

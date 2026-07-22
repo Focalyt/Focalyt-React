@@ -2936,6 +2936,8 @@ const CRMDashboard = () => {
     leadStatus: '',
     sector: '',
     followupStatus: '',
+    hasFollowUpCall: '', // '' | true | false
+    hasFollowUpVisit: '', // '' | true | false
     // Date filter states
     createdFromDate: null,
     createdToDate: null,
@@ -3124,6 +3126,9 @@ const CRMDashboard = () => {
       subStatuses: null,
       statuses: null,
       followupStatus: '',
+      hasFollowUpCall: '',
+      hasFollowUpVisit: '',
+      approvalStatus: '',
     };
 
     setFilterData(clearedFilters);
@@ -4223,11 +4228,15 @@ console.log('API Response:', response.data);
         const fc = followupRes.data.data;
         setFollowupDashCounts({
           call: {
-            done: fc.done || 0,
-            planned: fc.planned || 0,
-            missed: fc.missed || 0,
+            done: fc.call?.done ?? fc.done ?? 0,
+            planned: fc.call?.planned ?? fc.planned ?? 0,
+            missed: fc.call?.missed ?? fc.missed ?? 0,
           },
-          visit: { done: 0, planned: 0, missed: 0 },
+          visit: {
+            done: fc.visit?.done ?? 0,
+            planned: fc.visit?.planned ?? 0,
+            missed: fc.visit?.missed ?? 0,
+          },
         });
       }
 
@@ -4335,6 +4344,16 @@ console.log('API Response:', response.data);
       if (filters.approvalStatus) queryParams.set('approvalStatus', filters.approvalStatus);
       if (filters.subStatuses) queryParams.set('subStatuses', filters.subStatuses);
       if (filters.followupStatus) queryParams.set('followupStatus', filters.followupStatus);
+      if (filters.hasFollowUpCall === true || filters.hasFollowUpCall === 'yes') {
+        queryParams.set('hasFollowUpCall', 'true');
+      } else if (filters.hasFollowUpCall === false || filters.hasFollowUpCall === 'no') {
+        queryParams.set('hasFollowUpCall', 'false');
+      }
+      if (filters.hasFollowUpVisit === true || filters.hasFollowUpVisit === 'yes') {
+        queryParams.set('hasFollowUpVisit', 'true');
+      } else if (filters.hasFollowUpVisit === false || filters.hasFollowUpVisit === 'no') {
+        queryParams.set('hasFollowUpVisit', 'false');
+      }
       if (leadViewTab === 'myRefer' && userData?._id) {
         queryParams.set('registeredByMe', userData._id);
       }
@@ -5254,6 +5273,9 @@ console.log('API Response:', response.data);
   };
 
   const getProfileFollowupDateLabel = (profile, type) => {
+    const bucket = getProfileFollowupBucket(profile, type);
+    if (bucket === 'missed' || bucket === 'done') return 'NA';
+
     const bySlot = getProfileFollowupSlot(profile, type);
     const slotDate = bySlot?.scheduledDate || bySlot?.followupDate;
     if (slotDate) return formatFollowupDate(slotDate);
@@ -5272,7 +5294,7 @@ console.log('API Response:', response.data);
         return formatFollowupDate(legacy.followupDate);
       }
     }
-    return 'N/A';
+    return 'NA';
   };
 
   const getProfileFollowupDateDisplay = (profile, type) => {
@@ -5282,13 +5304,13 @@ console.log('API Response:', response.data);
     if (bucket === 'missed') {
       return {
         label: 'Next Follow-up Date:',
-        value: 'N/A',
+        value: 'NA',
       };
     }
     if (bucket === 'done') {
       return {
         label: 'Completed on:',
-        value: dateLabel !== 'N/A' ? dateLabel : '—',
+        value: dateLabel !== 'NA' ? dateLabel : '—',
       };
     }
     if (bucket === 'planned') {
@@ -5299,9 +5321,24 @@ console.log('API Response:', response.data);
     }
     return {
       label: 'Next Follow-up Date:',
-      value: 'N/A',
+      value: 'NA',
     };
   };
+
+  const getProfileFollowupDoneCount = (profile, type) => {
+    const t = String(type || '').toLowerCase() === 'visit' ? 'visit' : 'call';
+    const apiCount = Number(profile?.followupStats?.[t]?.done);
+    if (Number.isFinite(apiCount) && apiCount > 0) return apiCount;
+    return getProfileFollowupBucket(profile, type) === 'done' ? 1 : 0;
+  };
+
+  const profileHasFollowup = (profile, type) => (
+    Boolean(getProfileFollowupBucket(profile, type)) || getProfileFollowupDoneCount(profile, type) > 0
+  );
+
+  const profileHasAnyFollowup = (profile) => (
+    profileHasFollowup(profile, 'Call') || profileHasFollowup(profile, 'Visit')
+  );
 
   const formatProfileNextActionDate = (profile, type = 'Call') => {
     const bucket = getProfileFollowupBucket(profile, type);
@@ -12449,7 +12486,7 @@ useEffect(() => {
                   }}
                 >
                   <div className="fw-semibold text-dark">{tpl.name}</div>
-                  <div className="small text-muted">{tpl.category} Ã¢â‚¬Â¢ {tpl.language} Ã¢â‚¬Â¢ {tpl.status}</div>
+                  <div className="small text-muted">{tpl.category} {tpl.language} {tpl.status}</div>
                 </div>
               ))
             )}
@@ -12529,7 +12566,7 @@ useEffect(() => {
                                 {log.action ? (
                                   log.action.split(';').map((actionPart, actionIndex) => (
                                     <div key={actionIndex} className="mb-1">
-                                      Ã¢â‚¬Â¢ {actionPart.trim()}
+                                       {actionPart.trim()}
                                     </div>
                                   ))
                                 ) : (
@@ -15718,6 +15755,50 @@ useEffect(() => {
                         </select>
                       </div>
 
+                      <div className="col-md-3">
+                        <label className="form-label fw-medium text-dark mb-2">
+                          <i className="fas fa-phone text-primary me-2"></i>
+                          Followup Calling
+                        </label>
+                        <select
+                          className="form-select"
+                          value={filterData.hasFollowUpCall === true || filterData.hasFollowUpCall === 'yes' ? 'yes' : filterData.hasFollowUpCall === false || filterData.hasFollowUpCall === 'no' ? 'no' : ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setFilterData((prev) => ({
+                              ...prev,
+                              hasFollowUpCall: v === 'yes' ? true : v === 'no' ? false : '',
+                            }));
+                          }}
+                        >
+                          <option value="">Select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="col-md-3">
+                        <label className="form-label fw-medium text-dark mb-2">
+                          <i className="fas fa-map-marker-alt text-primary me-2"></i>
+                          Followup Visit
+                        </label>
+                        <select
+                          className="form-select"
+                          value={filterData.hasFollowUpVisit === true || filterData.hasFollowUpVisit === 'yes' ? 'yes' : filterData.hasFollowUpVisit === false || filterData.hasFollowUpVisit === 'no' ? 'no' : ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setFilterData((prev) => ({
+                              ...prev,
+                              hasFollowUpVisit: v === 'yes' ? true : v === 'no' ? false : '',
+                            }));
+                          }}
+                        >
+                          <option value="">Select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
                     </div>
 
 
@@ -16347,7 +16428,7 @@ useEffect(() => {
                                     </div>
 
                                     <div className="lhm__row3">
-                                      <div className="lhm__followup-box">
+                                      <div className={`lhm__followup-box${!profileHasAnyFollowup(profile) ? ' lhm__followup-box--empty' : ''}`}>
                                         <span className="lhm__followup-title">Followup Calling</span>
                                         <button
                                           type="button"
@@ -16362,12 +16443,12 @@ useEffect(() => {
                                           {(() => {
                                             const b = getProfileFollowupBucket(profile, 'Call');
                                             return [
-                                              { label: 'Done', value: b === 'done' ? 1 : 0, bg: '#dbeafe', color: '#1d4ed8' },
-                                              { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#ffedd5', color: '#c2410c' },
-                                              { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#fee2e2', color: '#b91c1c' },
+                                              { label: 'Done', value: getProfileFollowupDoneCount(profile, 'Call'), bg: 'rgb(18, 179, 255)' },
+                                              { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: 'rgb(12, 125, 180)' },
+                                              { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: 'rgb(8, 80, 120)' },
                                             ];
                                           })().map((s) => (
-                                            <div key={s.label} className="lhm__stat-card" style={{ background: s.bg, color: s.color || '#fff' }}>
+                                            <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
                                               <span className="lhm__stat-label">{s.label}</span>
                                               <span className="lhm__stat-divider" />
                                               <span className="lhm__stat-val">{String(s.value).padStart(2, '0')}</span>
@@ -16375,18 +16456,12 @@ useEffect(() => {
                                           ))}
                                         </div>
                                         <div className="lhm__followup-date">
-                                          {(() => {
-                                            const fd = getProfileFollowupDateDisplay(profile, 'Call');
-                                            return (
-                                              <>
-                                                <span>{fd.label}</span><span>{fd.value}</span>
-                                              </>
-                                            );
-                                          })()}
+                                          <span>Next Follow-up Date:</span>
+                                          <span>{getProfileFollowupDateLabel(profile, 'Call')}</span>
                                         </div>
                                       </div>
 
-                                      <div className="lhm__followup-box">
+                                      <div className={`lhm__followup-box${!profileHasAnyFollowup(profile) ? ' lhm__followup-box--empty' : ''}`}>
                                         <span className="lhm__followup-title">Followup Visit</span>
                                         <button
                                           type="button"
@@ -16401,12 +16476,12 @@ useEffect(() => {
                                           {(() => {
                                             const b = getProfileFollowupBucket(profile, 'Visit');
                                             return [
-                                              { label: 'Done', value: b === 'done' ? 1 : 0, bg: '#d1fae5', color: '#047857' },
-                                              { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#ede9fe', color: '#6d28d9' },
-                                              { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#fee2e2', color: '#b91c1c' },
+                                              { label: 'Done', value: getProfileFollowupDoneCount(profile, 'Visit'), bg: 'rgb(75, 85, 99)' },
+                                              { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: 'rgb(55, 65, 81)' },
+                                              { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: 'rgb(35, 42, 52)' },
                                             ];
                                           })().map((s) => (
-                                            <div key={s.label} className="lhm__stat-card" style={{ background: s.bg, color: s.color || '#fff' }}>
+                                            <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
                                               <span className="lhm__stat-label">{s.label}</span>
                                               <span className="lhm__stat-divider" />
                                               <span className="lhm__stat-val">{String(s.value).padStart(2, '0')}</span>
@@ -16414,14 +16489,8 @@ useEffect(() => {
                                           ))}
                                         </div>
                                         <div className="lhm__followup-date">
-                                          {(() => {
-                                            const fd = getProfileFollowupDateDisplay(profile, 'Visit');
-                                            return (
-                                              <>
-                                                <span>{fd.label}</span><span>{fd.value}</span>
-                                              </>
-                                            );
-                                          })()}
+                                          <span>Next Follow-up Date:</span>
+                                          <span>{getProfileFollowupDateLabel(profile, 'Visit')}</span>
                                         </div>
                                       </div>
 
@@ -16696,28 +16765,21 @@ useEffect(() => {
                                           </div>
                                         </div>
 
-                                        <div className="lead-strip-v3__panel lead-strip-v3__panel--followup-call">
+                                        <div className={`lead-strip-v3__panel lead-strip-v3__panel--followup-call${!profileHasAnyFollowup(profile) ? ' lead-strip-v3__panel--no-followup' : ''}`}>
                                           <div className="lead-strip-v3__panel-head">
                                             <span className="lead-strip-v3__panel-title">
                                               <i className="fas fa-phone-alt" aria-hidden="true"></i> Followup Calling
                                             </span>
                                           </div>
                                           {renderStatGrid([
-                                            { key: 'fc-done', label: 'Done', value: callBucket === 'done' ? 1 : 0, bg: '#dbeafe', color: '#1d4ed8' },
-                                            { key: 'fc-planned', label: 'Planned', value: callBucket === 'planned' ? 1 : 0, bg: '#ffedd5', color: '#c2410c' },
-                                            { key: 'fc-missed', label: 'Missed', value: callBucket === 'missed' ? 1 : 0, bg: '#fee2e2', color: '#b91c1c' },
+                                            { key: 'fc-done', label: 'Done', value: getProfileFollowupDoneCount(profile, 'Call'), bg: 'rgb(18, 179, 255)' },
+                                            { key: 'fc-planned', label: 'Planned', value: callBucket === 'planned' ? 1 : 0, bg: 'rgb(12, 125, 180)' },
+                                            { key: 'fc-missed', label: 'Missed', value: callBucket === 'missed' ? 1 : 0, bg: 'rgb(8, 80, 120)' },
                                           ])}
                                           <div className="lead-strip-v3__footer">
                                             <div className="lead-strip-v3__footer-main">
-                                              {(() => {
-                                                const fd = getProfileFollowupDateDisplay(profile, 'Call');
-                                                return (
-                                                  <>
-                                                    <span className="lead-strip-v3__footer-label">{fd.label}</span>
-                                                    <span className="lead-strip-v3__footer-val">{fd.value}</span>
-                                                  </>
-                                                );
-                                              })()}
+                                              <span className="lead-strip-v3__footer-label">Next Follow-up Date:</span>
+                                              <span className="lead-strip-v3__footer-val">{getProfileFollowupDateLabel(profile, 'Call')}</span>
                                             </div>
                                             <button
                                               type="button"
@@ -16731,28 +16793,21 @@ useEffect(() => {
                                           </div>
                                         </div>
 
-                                        <div className="lead-strip-v3__panel lead-strip-v3__panel--followup-visit">
+                                        <div className={`lead-strip-v3__panel lead-strip-v3__panel--followup-visit${!profileHasAnyFollowup(profile) ? ' lead-strip-v3__panel--no-followup' : ''}`}>
                                           <div className="lead-strip-v3__panel-head">
                                             <span className="lead-strip-v3__panel-title">
                                               <i className="fas fa-user-check" aria-hidden="true"></i> Followup Visit
                                             </span>
                                           </div>
                                           {renderStatGrid([
-                                            { key: 'fv-done', label: 'Done', value: visitBucket === 'done' ? 1 : 0, bg: '#d1fae5', color: '#047857' },
-                                            { key: 'fv-planned', label: 'Planned', value: visitBucket === 'planned' ? 1 : 0, bg: '#ede9fe', color: '#6d28d9' },
-                                            { key: 'fv-missed', label: 'Missed', value: visitBucket === 'missed' ? 1 : 0, bg: '#fee2e2', color: '#b91c1c' },
+                                            { key: 'fv-done', label: 'Done', value: getProfileFollowupDoneCount(profile, 'Visit'), bg: 'rgb(75, 85, 99)' },
+                                            { key: 'fv-planned', label: 'Planned', value: visitBucket === 'planned' ? 1 : 0, bg: 'rgb(55, 65, 81)' },
+                                            { key: 'fv-missed', label: 'Missed', value: visitBucket === 'missed' ? 1 : 0, bg: 'rgb(35, 42, 52)' },
                                           ])}
                                           <div className="lead-strip-v3__footer">
                                             <div className="lead-strip-v3__footer-main">
-                                              {(() => {
-                                                const fd = getProfileFollowupDateDisplay(profile, 'Visit');
-                                                return (
-                                                  <>
-                                                    <span className="lead-strip-v3__footer-label">{fd.label}</span>
-                                                    <span className="lead-strip-v3__footer-val">{fd.value}</span>
-                                                  </>
-                                                );
-                                              })()}
+                                              <span className="lead-strip-v3__footer-label">Next Follow-up Date:</span>
+                                              <span className="lead-strip-v3__footer-val">{getProfileFollowupDateLabel(profile, 'Visit')}</span>
                                             </div>
                                             <button
                                               type="button"
@@ -28072,6 +28127,26 @@ max-width: 600px;
           min-height: 0;
         }
 
+        .lead-strip-v3__panel--no-followup{
+          background: #ff4646;
+          border-color: #ff4646;
+        }
+
+        .lead-strip-v3__panel--no-followup .lead-strip-v3__panel-title{
+          color: #fff;
+        }
+
+        .lead-strip-v3__panel--no-followup .lead-strip-v3__footer-label,
+        .lead-strip-v3__panel--no-followup .lead-strip-v3__footer-val{
+          color: #7f1d1d;
+        }
+
+        .lead-strip-v3__panel--no-followup .lead-strip-v3__footer-cal{
+          background: #ef4444;
+          border-color: #dc2626;
+          color: #fff;
+        }
+
         .lead-strip-v3__panel--performance{
           border-top: 3px solid #3b82f6;
           flex: 1 1 clamp(170px, 15vw, 210px);
@@ -29360,6 +29435,19 @@ max-width: 600px;
           padding: 8px 8px 6px;
           background: rgba(255,255,255,0.12);
         }
+        .lhm__followup-box--empty{
+          background: #ff4646;
+          border-color: #ff4646;
+        }
+        .lhm__followup-box--empty .lhm__followup-date{
+          color: #7f1d1d;
+          border-top-color: rgba(127, 29, 29, 0.25);
+        }
+        .lhm__followup-box--empty .lhm__editbtn{
+          background: #ef4444;
+          border-color: #dc2626;
+          color: #fff;
+        }
         .lhm__followup-title{
           display: block;
           font-size: 10px;
@@ -29740,12 +29828,37 @@ max-width: 600px;
             scroll-snap-align: start;
           }
 
+          .lhm__followup-box--empty{
+            background: #ff4646;
+            border-color: #ff4646;
+          }
+
+          .lhm__followup-box--empty .lhm__followup-title{
+            color: #fff;
+          }
+
+          .lhm__followup-box--empty .lhm__followup-date{
+            color: #7f1d1d;
+            border-top-color: rgba(127, 29, 29, 0.25);
+          }
+
+          .lhm__followup-box--empty .lhm__editbtn{
+            background: #ef4444;
+            border-color: #dc2626;
+            color: #fff;
+          }
+
           .lhm__row3 .lhm__followup-box:first-child{
             border-top: 3px solid #0ea5e9;
           }
 
           .lhm__row3 .lhm__followup-box:nth-child(2){
             border-top: 3px solid #8b5cf6;
+          }
+
+          .lhm__row3 .lhm__followup-box--empty:first-child,
+          .lhm__row3 .lhm__followup-box--empty:nth-child(2){
+            border-top-color: #ff4646;
           }
 
           .lhm__followup-title{

@@ -13,7 +13,7 @@ const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage, UploadCandidates, Placement, PlacementStatus, BatchMonitor } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, CoursesCopy, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage, UploadCandidates, Placement, PlacementStatus, BatchMonitor } = require("../../models");
 const { ReEnquire } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
@@ -43,6 +43,7 @@ const videoTimestampRoutes = require("./videoTimestamp");
 
 //Trainer route 
 const trainerRoutes = require('./trainer');
+const sessionPlanRoutes = require('./sessionPlan');
 
 //b2b routes
 const b2bRoutes = require("./b2b/b2b");
@@ -131,6 +132,7 @@ router.use("/dripmarketing", isCollege, dripmarketingRoutes);
 router.use("/lrp", isCollege, lrpRoutes);
 router.use("/video-timestamp", videoTimestampRoutes);
 router.use("/trainer", trainerRoutes)
+router.use("/session-plans", isCollege, sessionPlanRoutes)
 const readXlsxFile = require("read-excel-file/node");
 const appliedCourses = require("../../models/appliedCourses");
 
@@ -1955,9 +1957,48 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 
 		const data = results[0]
 
-		const followup = await B2cFollowup.findOne({ appliedCourseId: data._id, status: 'planned' })
+		const mapFollowupSlot = (f) => (f ? {
+			_id: f._id,
+			followupDate: f.followupDate,
+			scheduledDate: f.followupDate,
+			remarks: f.remarks,
+			status: f.status,
+			followUpType: f.followUpType || 'Call',
+		} : null);
 
-		data.followup = followup
+		const courseSlots = await AppliedCourses.findById(data._id)
+			.select('followUpCall followUpVisit')
+			.populate('followUpCall')
+			.populate('followUpVisit')
+			.lean();
+
+		let followUpCall = mapFollowupSlot(courseSlots?.followUpCall);
+		let followUpVisit = mapFollowupSlot(courseSlots?.followUpVisit);
+
+		if (!followUpCall || !followUpVisit) {
+			const plannedFollowups = await B2cFollowup.find({
+				appliedCourseId: data._id,
+				status: 'planned',
+			}).sort({ followupDate: -1, createdAt: -1 }).lean();
+
+			plannedFollowups.forEach((f) => {
+				const type = String(f.followUpType || 'Call').toLowerCase();
+				if (type === 'visit') {
+					if (!followUpVisit) followUpVisit = mapFollowupSlot(f);
+				} else if (!followUpCall) {
+					followUpCall = mapFollowupSlot(f);
+				}
+			});
+		}
+
+		const followup = followUpCall || followUpVisit || await B2cFollowup.findOne({
+			appliedCourseId: data._id,
+			status: 'planned',
+		}).lean();
+
+		data.followup = mapFollowupSlot(followup) || followup;
+		data.followUpCall = followUpCall;
+		data.followUpVisit = followUpVisit;
 
 		// console.log("data", data)
 
@@ -1993,7 +2034,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
 			nextActionFromDate, nextActionToDate,
 			projects, verticals, course, center, counselor, subStatuses, batch, registeredByMe,
-			followupStatus, approvalStatus
+			followupStatus, approvalStatus,
+			hasFollowUpCall, hasFollowUpVisit,
 		} = req.query;
 
 		// console.log("substautes", subStatuses)
@@ -2091,6 +2133,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				registeredByMe: registeredByMe || null,
 				followupAppliedIds,
 				approvalStatus,
+				hasFollowUpCall,
+				hasFollowUpVisit,
 			},
 			pagination: { skip, limit }
 		});
@@ -2117,19 +2161,55 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 
 		const appliedIds = results.map(r => r._id);
-		const followups = await B2cFollowup
-			.find({ appliedCourseId: { $in: appliedIds }, status: 'planned' })
-			.sort({ followupDate: -1, createdAt: -1 })
-			.lean();
+		const mapFollowupSlot = (f) => (f ? {
+			_id: f._id,
+			followupDate: f.followupDate,
+			scheduledDate: f.followupDate,
+			remarks: f.remarks,
+			status: f.status,
+			followUpType: f.followUpType || 'Call',
+		} : null);
+
+		const [slotDocs, followups] = await Promise.all([
+			AppliedCourses.find({ _id: { $in: appliedIds } })
+				.select('followUpCall followUpVisit')
+				.lean(),
+			B2cFollowup
+				.find({ appliedCourseId: { $in: appliedIds }, status: 'planned' })
+				.sort({ followupDate: -1, createdAt: -1 })
+				.lean(),
+		]);
+
+		const slotIdSet = new Set();
+		const courseSlotIds = new Map();
+		(slotDocs || []).forEach((doc) => {
+			const key = String(doc._id);
+			courseSlotIds.set(key, {
+				callId: doc.followUpCall ? String(doc.followUpCall) : null,
+				visitId: doc.followUpVisit ? String(doc.followUpVisit) : null,
+			});
+			if (doc.followUpCall) slotIdSet.add(String(doc.followUpCall));
+			if (doc.followUpVisit) slotIdSet.add(String(doc.followUpVisit));
+		});
+
+		const slotRows = slotIdSet.size
+			? await B2cFollowup.find({ _id: { $in: [...slotIdSet] } }).lean()
+			: [];
+		const slotById = new Map((slotRows || []).map((f) => [String(f._id), f]));
+
 		const followupByCourse = new Map();
+		const callByCourse = new Map();
+		const visitByCourse = new Map();
 		followups.forEach(f => {
 			const key = f.appliedCourseId.toString();
+			const type = String(f.followUpType || 'Call').toLowerCase();
+			if (type === 'visit') {
+				if (!visitByCourse.has(key)) visitByCourse.set(key, f);
+			} else if (!callByCourse.has(key)) {
+				callByCourse.set(key, f);
+			}
 			if (!followupByCourse.has(key)) {
-				followupByCourse.set(key, {
-					_id: f._id,
-					followupDate: f.followupDate,
-					remarks: f.remarks
-				});
+				followupByCourse.set(key, mapFollowupSlot(f));
 			}
 		});
 
@@ -2149,7 +2229,15 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				);
 			}
 
-			const followup = followupByCourse.get(doc._id.toString()) || null;
+			const courseKey = doc._id.toString();
+			const slotIds = courseSlotIds.get(courseKey) || {};
+			const followUpCall = mapFollowupSlot(
+				(slotIds.callId && slotById.get(slotIds.callId)) || callByCourse.get(courseKey) || null
+			);
+			const followUpVisit = mapFollowupSlot(
+				(slotIds.visitId && slotById.get(slotIds.visitId)) || visitByCourse.get(courseKey) || null
+			);
+			const followup = followUpCall || followUpVisit || followupByCourse.get(courseKey) || null;
 
 			return {
 				_id: doc._id,
@@ -2200,6 +2288,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				},
 				uploadedDocs: doc.uploadedDocs || [],
 				followup,
+				followUpCall,
+				followUpVisit,
 				createdAt: doc.createdAt,
 				updatedAt: doc.updatedAt,
 				approval: doc.approval,
@@ -3041,6 +3131,31 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 		baseMatch = { $and: [baseMatch, approvalClause] };
 	}
 
+	const followupSlotFilters = [];
+	if (String(filters.hasFollowUpCall).toLowerCase() === 'true') {
+		followupSlotFilters.push({ followUpCall: { $exists: true, $ne: null } });
+	} else if (String(filters.hasFollowUpCall).toLowerCase() === 'false') {
+		followupSlotFilters.push({
+			$or: [
+				{ followUpCall: { $exists: false } },
+				{ followUpCall: null },
+			],
+		});
+	}
+	if (String(filters.hasFollowUpVisit).toLowerCase() === 'true') {
+		followupSlotFilters.push({ followUpVisit: { $exists: true, $ne: null } });
+	} else if (String(filters.hasFollowUpVisit).toLowerCase() === 'false') {
+		followupSlotFilters.push({
+			$or: [
+				{ followUpVisit: { $exists: false } },
+				{ followUpVisit: null },
+			],
+		});
+	}
+	if (followupSlotFilters.length > 0) {
+		baseMatch = { $and: [baseMatch, ...followupSlotFilters] };
+	}
+
 	pipeline.push({ $match: baseMatch });
 
 	// Essential lookups only - get minimal required data
@@ -3177,6 +3292,8 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 			leadAssignment: 1,
 			remarks: 1,
 			followup: 1,
+			followUpCall: 1,
+			followUpVisit: 1,
 		}
 	});
 
@@ -7601,6 +7718,48 @@ router.get('/all_courses_centerwise', async (req, res) => {
 	}
 });
 
+/** CoursesCopy list for Academic Coordinator session planning (includes courseStructure) */
+router.get('/all_coursescopy', async (req, res) => {
+	try {
+		const courses = await CoursesCopy.find({ status: true, isDeleted: { $ne: true } })
+			.populate('trainers', 'name email mobile')
+			.populate('vertical', 'name')
+			.populate('project', 'name')
+			.sort({ createdAt: -1 });
+
+		res.json({ success: true, data: courses });
+	} catch (error) {
+		console.error('Error fetching coursecopy list:', error);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
+
+router.get('/all_coursescopy_centerwise', async (req, res) => {
+	try {
+		const { centerId, projectId } = req.query;
+		if (!centerId || !projectId) {
+			return res.status(400).json({ success: false, message: 'centerId and projectId are required.' });
+		}
+
+		const courses = await CoursesCopy.find({
+			center: centerId,
+			project: projectId,
+			status: true,
+			isDeleted: { $ne: true },
+		})
+			.populate('trainers', 'name email mobile')
+			.populate('createdBy', 'name email')
+			.populate('vertical', 'name')
+			.populate('project', 'name')
+			.sort({ createdAt: -1 });
+
+		res.json({ success: true, data: courses });
+	} catch (error) {
+		console.error('Error fetching center-wise coursecopy list:', error);
+		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
+
 //Batch APi
 
 router.post('/add_batch', isCollege, async (req, res) => {
@@ -8069,6 +8228,7 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 					_course: { $first: '$courseData' },
 					center: { $first: '$centerData._id' },
 					status: { $first: '$status' },
+					followUpType: { $first: '$followUpType' },
 				}
 			}
 
@@ -8108,11 +8268,21 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 		const followupCounts = await B2cFollowup.aggregate(aggregate
 		);
 
+		const emptyBucket = () => ({ done: 0, planned: 0, missed: 0 });
+		const byType = {
+			call: emptyBucket(),
+			visit: emptyBucket(),
+		};
 		let doneCount = 0
 		let plannedCount = 0
 		let missedCount = 0
 
 		followupCounts.forEach(item => {
+			const typeKey = String(item.followUpType || 'Call').toLowerCase() === 'visit' ? 'visit' : 'call';
+			const statusKey = String(item.status || '').toLowerCase();
+			if (statusKey === 'done' || statusKey === 'planned' || statusKey === 'missed') {
+				byType[typeKey][statusKey] += 1;
+			}
 			if (item.status == 'done') {
 				doneCount++
 			}
@@ -8127,7 +8297,9 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 		let count = {
 			'done': doneCount,
 			'planned': plannedCount,
-			'missed': missedCount
+			'missed': missedCount,
+			call: byType.call,
+			visit: byType.visit,
 		}
 
 
@@ -10166,28 +10338,73 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 	try {
 		const user = req.user;
 		const collegeId = req.college._id;
-		// console.log("req", req.college._id);
-		let { appliedCourseId, followupDate, remarks, folloupType, id, googleCalendarEvent = false } = req.body;
-
+		let {
+			appliedCourseId,
+			followupDate,
+			remarks,
+			folloupType,
+			id,
+			followUpType = 'Call',
+			googleCalendarEvent = false
+		} = req.body;
 
 		if (!folloupType) {
 			folloupType = 'new';
 		}
 
+		const normalizedType = String(followUpType || 'Call').trim().toLowerCase() === 'visit' ? 'Visit' : 'Call';
+		const slotField = normalizedType === 'Visit' ? 'followUpVisit' : 'followUpCall';
+
+		if (typeof appliedCourseId === 'string' && mongoose.Types.ObjectId.isValid(appliedCourseId)) {
+			appliedCourseId = new mongoose.Types.ObjectId(appliedCourseId);
+		}
+
+		const mapSlot = (f) => (f ? {
+			_id: f._id,
+			followupDate: f.followupDate,
+			scheduledDate: f.followupDate,
+			remarks: f.remarks,
+			status: f.status,
+			followUpType: f.followUpType || 'Call',
+		} : null);
+
+		const loadSlotsForCourse = async (courseId) => {
+			const course = await AppliedCourses.findById(courseId)
+				.select('followUpCall followUpVisit')
+				.populate('followUpCall')
+				.populate('followUpVisit')
+				.lean();
+			return {
+				followUpCall: mapSlot(course?.followUpCall),
+				followUpVisit: mapSlot(course?.followUpVisit),
+				followup: mapSlot(course?.followUpCall) || mapSlot(course?.followUpVisit) || null,
+			};
+		};
+
 		if (folloupType === 'new') {
-
-			if (typeof appliedCourseId === 'string' && mongoose.Types.ObjectId.isValid(appliedCourseId)) {
-				appliedCourseId = new mongoose.Types.ObjectId(appliedCourseId);
-			}
-
-			const existingFollowup = await B2cFollowup.findOne({ appliedCourseId, createdBy: user._id, status: 'planned' });
+			const existingFollowup = await B2cFollowup.findOne({
+				appliedCourseId,
+				status: 'planned',
+				followUpType: normalizedType,
+			});
 
 			if (existingFollowup) {
-				return res.status(400).json({ status: false, message: "Followup already exists, Please update the followup" });
+				return res.status(400).json({
+					status: false,
+					message: `${normalizedType} followup already exists, Please update the followup`
+				});
 			}
 
-
-			const followup = await B2cFollowup.create({ collegeId, followupDate, appliedCourseId, createdBy: user._id, counsellorId: user._id, remarks });
+			const followup = await B2cFollowup.create({
+				collegeId,
+				followupDate,
+				appliedCourseId,
+				createdBy: user._id,
+				counsellorId: user._id,
+				remarks,
+				followUpType: normalizedType,
+				status: 'planned',
+			});
 
 			if (!followup) {
 				return res.status(400).json({ status: false, message: "Followup not created" });
@@ -10211,64 +10428,68 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 				}
 			}
 
-			let actionParts = [];
-			actionParts.push(`Followup added to ${new Date(followupDate).toLocaleString()}`);
-
-
-			if (remarks) {
-				//   actionParts.push(`Remarks updated: "${remarks}"`);
-				actionParts.push(`Remarks updated`);  // Remarks included 
-
-			}
-
-
+			const actionParts = [
+				`${normalizedType} followup added to ${new Date(followupDate).toLocaleString()}`
+			];
+			if (remarks) actionParts.push('Remarks updated');
 
 			const newLogEntry = {
 				user: user._id,
-				action: actionParts.join('; '), // Combine all actions in one log message
-				remarks: remarks || '', // Optional remarks in the log
-				timestamp: new Date() // Add timestamp if your schema supports it
+				action: actionParts.join('; '),
+				remarks: remarks || '',
+				timestamp: new Date()
 			};
 
-			const updateAppliedRemarks = await AppliedCourses.findOneAndUpdate({ _id: appliedCourseId }, {
-				$set: { remarks: remarks, followupDate: followupDate },
-				$push: { logs: newLogEntry }
-			});
+			const updateAppliedRemarks = await AppliedCourses.findOneAndUpdate(
+				{ _id: appliedCourseId },
+				{
+					$set: {
+						remarks,
+						followupDate,
+						[slotField]: followup._id,
+					},
+					$push: { logs: newLogEntry }
+				},
+				{ new: true }
+			);
 
 			if (!updateAppliedRemarks) {
 				return res.status(400).json({ status: false, message: "Applied course remarks not updated" });
 			}
 
-
-
-
-
-
-			return res.status(200).json({ status: true, message: "Followup created successfully", data: followup });
-
+			const slots = await loadSlotsForCourse(appliedCourseId);
+			return res.status(200).json({
+				status: true,
+				message: `${normalizedType} followup created successfully`,
+				data: followup,
+				followup: slots.followup,
+				followUpCall: slots.followUpCall,
+				followUpVisit: slots.followUpVisit,
+			});
 		}
-		else if (folloupType === 'update') {
+
+		if (folloupType === 'update') {
 			const existingFollowup = await B2cFollowup.findOne({ _id: id, status: 'planned' });
 
 			if (!existingFollowup) {
 				return res.status(400).json({ status: false, message: "Followup not found" });
 			}
 
-
 			existingFollowup.status = 'done';
 			existingFollowup.updatedBy = user._id;
 			existingFollowup.statusUpdatedAt = new Date();
 			existingFollowup.updatedAt = new Date();
+			await existingFollowup.save();
 
-			const updatedFollowup = await existingFollowup.save({ new: true });
 			const newFollowup = await B2cFollowup.create({
-				appliedCourseId: appliedCourseId,
-				followupDate: followupDate,
-				remarks: remarks,
+				appliedCourseId,
+				followupDate,
+				remarks,
 				status: 'planned',
 				createdBy: user._id,
-				collegeId: collegeId,
-				counsellorId: user._id
+				collegeId,
+				counsellorId: user._id,
+				followUpType: normalizedType,
 			});
 
 			if (googleCalendarEvent && req.user.googleAuthToken?.accessToken) {
@@ -10288,11 +10509,11 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 					return res.status(400).json({ status: false, message: googleEvent.error });
 				}
 			}
-			let actionParts = [];
-			actionParts.push(`Followup updated to ${new Date(followupDate).toLocaleString()}`);
-			if (remarks) {
-				actionParts.push(`Remarks updated`);
-			}
+
+			const actionParts = [
+				`${normalizedType} followup updated to ${new Date(followupDate).toLocaleString()}`
+			];
+			if (remarks) actionParts.push('Remarks updated');
 
 			const newLogEntry = {
 				user: user._id,
@@ -10301,17 +10522,30 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 				timestamp: new Date()
 			};
 
-			const updateAppliedRemarks = await AppliedCourses.findOneAndUpdate({ _id: appliedCourseId }, {
-				$set: { remarks: remarks, followupDate: followupDate },
-				$push: { logs: newLogEntry }
+			await AppliedCourses.findOneAndUpdate(
+				{ _id: appliedCourseId },
+				{
+					$set: {
+						remarks,
+						followupDate,
+						[slotField]: newFollowup._id,
+					},
+					$push: { logs: newLogEntry }
+				}
+			);
+
+			const slots = await loadSlotsForCourse(appliedCourseId);
+			return res.status(200).json({
+				status: true,
+				message: `${normalizedType} followup updated successfully`,
+				data: newFollowup,
+				followup: slots.followup,
+				followUpCall: slots.followUpCall,
+				followUpVisit: slots.followUpVisit,
 			});
-
-			return res.status(200).json({ status: true, message: "Followup updated successfully", data: newFollowup });
-
-
 		}
 
-
+		return res.status(400).json({ status: false, message: 'Invalid folloupType' });
 	} catch (err) {
 		console.log(err);
 		return res.status(500).send({ status: false, message: err.message });

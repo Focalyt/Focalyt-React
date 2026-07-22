@@ -201,6 +201,7 @@ const ViewCourses = () => {
       departmentName: course.vertical?.name || '',
       projectName: course.project?.name || course.projectName || '',
       centerName: firstCenter?.name || '',
+      courseStructure: course.courseStructure || null,
       filters: {
         department: resolveId(course.vertical),
         project: resolveId(course.project),

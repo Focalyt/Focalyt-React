@@ -290,16 +290,29 @@ const SESSION_TYPE = {
 
 const DEFAULT_COURSE_STRUCTURE = { unit: true, chapter: true, session: true };
 
-const normalizeCourseStructure = (structure) => ({
-  unit: structure?.unit ?? DEFAULT_COURSE_STRUCTURE.unit,
-  chapter: structure?.chapter ?? DEFAULT_COURSE_STRUCTURE.chapter,
-  session: true,
-});
+const normalizeCourseStructure = (structure) => {
+  if (!structure || typeof structure !== 'object') {
+    return { ...DEFAULT_COURSE_STRUCTURE };
+  }
+  return {
+    unit: structure.unit === true,
+    chapter: structure.chapter === true,
+    session: true,
+  };
+};
 
-const getCourseStructureFromMeta = (courses = [], courseId) => {
-  if (!courseId) return { ...DEFAULT_COURSE_STRUCTURE };
+const getCourseStructureFromMeta = (courses = [], courseId, fallbackStructure) => {
+  if (!courseId) {
+    return normalizeCourseStructure(fallbackStructure);
+  }
   const course = courses.find((item) => String(item._id) === String(courseId));
-  return normalizeCourseStructure(course?.courseStructure);
+  if (course?.courseStructure) {
+    return normalizeCourseStructure(course.courseStructure);
+  }
+  if (fallbackStructure) {
+    return normalizeCourseStructure(fallbackStructure);
+  }
+  return { ...DEFAULT_COURSE_STRUCTURE };
 };
 
 const buildStructurePathLabel = (structure = DEFAULT_COURSE_STRUCTURE) => {
@@ -573,36 +586,73 @@ const TotSection = ({
   );
 };
 
-const STORAGE_PREFIX = 'acCoordinatorSessions:';
-const ACTIVITY_TYPES_STORAGE_KEY = 'acCoordinatorActivityTypes';
-
-const DEFAULT_ACTIVITY_TYPES = [
-  { id: 'act-1', name: 'Classroom Session', color: '#2563eb' },
-  { id: 'act-2', name: 'Extra Curricular Activity', color: '#8b5cf6' },
-  { id: 'act-3', name: 'Interview Skills', color: '#f59e0b' },
-  { id: 'act-4', name: 'Quiz', color: '#10b981' },
-  { id: 'act-5', name: 'Practical / Lab', color: '#ec4899' },
-  { id: 'act-6', name: 'Assessment', color: '#ef4444' },
-];
+const STORAGE_PREFIX = 'acCoordinatorSessions:'; // legacy — sessions now persist via API
+const ACTIVITY_TYPES_STORAGE_KEY = 'acCoordinatorActivityTypes'; // legacy
 
 const PRESET_COLORS = [
   '#2563eb', '#8b5cf6', '#f59e0b', '#10b981', '#ec4899', '#ef4444',
   '#06b6d4', '#84cc16', '#f97316', '#6366f1', '#14b8a6', '#a855f7',
 ];
 
-const loadActivityTypes = () => {
-  try {
-    const raw = localStorage.getItem(ACTIVITY_TYPES_STORAGE_KEY);
-    if (!raw) return DEFAULT_ACTIVITY_TYPES;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length ? parsed : DEFAULT_ACTIVITY_TYPES;
-  } catch {
-    return DEFAULT_ACTIVITY_TYPES;
-  }
+const authHeaders = (token) => ({ 'x-auth': token });
+
+const fetchActivityTypesApi = async (backendUrl, token) => {
+  const res = await axios.get(`${backendUrl}/college/session-plans/activity-types`, {
+    headers: authHeaders(token),
+  });
+  const types = res.data?.data;
+  return Array.isArray(types) ? types : [];
 };
 
-const persistActivityTypes = (types) => {
-  localStorage.setItem(ACTIVITY_TYPES_STORAGE_KEY, JSON.stringify(types));
+const saveActivityTypesApi = async (backendUrl, token, types) => {
+  const res = await axios.put(
+    `${backendUrl}/college/session-plans/activity-types`,
+    { types },
+    { headers: authHeaders(token) }
+  );
+  return res.data?.data || types;
+};
+
+const fetchSessionsApi = async (backendUrl, token, batchId, courseId = '') => {
+  const params = new URLSearchParams();
+  if (batchId) params.set('batch', batchId);
+  if (courseId) params.set('course', courseId);
+  const res = await axios.get(`${backendUrl}/college/session-plans?${params.toString()}`, {
+    headers: authHeaders(token),
+  });
+  return Array.isArray(res.data?.data) ? res.data.data : [];
+};
+
+const createSessionApi = async (backendUrl, token, payload) => {
+  const res = await axios.post(`${backendUrl}/college/session-plans`, payload, {
+    headers: authHeaders(token),
+  });
+  if (!res.data?.status) throw new Error(res.data?.message || 'Failed to create session');
+  return res.data.data;
+};
+
+const updateSessionApi = async (backendUrl, token, sessionId, payload) => {
+  const res = await axios.put(`${backendUrl}/college/session-plans/${sessionId}`, payload, {
+    headers: authHeaders(token),
+  });
+  if (!res.data?.status) throw new Error(res.data?.message || 'Failed to update session');
+  return res.data.data;
+};
+
+const patchSessionApi = async (backendUrl, token, sessionId, payload) => {
+  const res = await axios.patch(`${backendUrl}/college/session-plans/${sessionId}`, payload, {
+    headers: authHeaders(token),
+  });
+  if (!res.data?.status) throw new Error(res.data?.message || 'Failed to update session');
+  return res.data.data;
+};
+
+const deleteSessionApi = async (backendUrl, token, sessionId) => {
+  const res = await axios.delete(`${backendUrl}/college/session-plans/${sessionId}`, {
+    headers: authHeaders(token),
+  });
+  if (!res.data?.status) throw new Error(res.data?.message || 'Failed to delete session');
+  return true;
 };
 
 const getActivityTypeById = (types, id) => types.find((type) => type.id === id) || null;
@@ -1044,13 +1094,8 @@ const loadStoredSessions = (batchId) => {
   }
 };
 
-const persistStoredSessions = (batchId, list) => {
-  if (!batchId) return;
-  try {
-    localStorage.setItem(`${STORAGE_PREFIX}${batchId}`, JSON.stringify(list));
-  } catch (error) {
-    console.error('Failed to save sessions to localStorage', error);
-  }
+const persistStoredSessions = () => {
+  // no-op: sessions are persisted via /college/session-plans API
 };
 
 const createEmptySessionDraft = () => ({
@@ -1613,13 +1658,7 @@ const SessionDetailSidePanel = ({
           )}
         </div>
 
-        <div className="ac-side-panel__section">
-          <h5>Schedule</h5>
-          <div className="ac-side-panel__grid">
-            <div><em>Date</em><strong>{session.date || formatSessionDate(session.sessionDate)}</strong></div>
-            <div><em>Time</em><strong>{timeRange}</strong></div>
-          </div>
-        </div>
+        
 
         <div className="ac-side-panel__section">
           <h5>Activity &amp; TOT</h5>
@@ -2264,6 +2303,7 @@ const readSessionDeepLink = (locationState) => {
     departmentName: incoming.departmentName || '',
     projectName: incoming.projectName || '',
     centerName: incoming.centerName || '',
+    courseStructure: incoming.courseStructure || null,
     filters: {
       department: String(incoming.filters?.department || ''),
       project: String(incoming.filters?.project || ''),
@@ -2308,6 +2348,33 @@ const AcademicCoordinatorModule = () => {
   const token = userData.token;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
 
+  const [permissions, setPermissions] = useState();
+
+  const updatedPermission = async () => {
+    const respose = await axios.get(`${backendUrl}/college/permission`, {
+      headers: { 'x-auth': token },
+    });
+    if (respose.data.status) {
+      setPermissions(respose.data.permissions);
+    }
+  };
+
+  useEffect(() => {
+    if (token) updatedPermission();
+  }, []);
+
+  const canViewTrainingPermission =
+    (permissions?.custom_permissions?.can_view_training && permissions?.permission_type === 'Custom') ||
+    permissions?.permission_type === 'Admin';
+
+  const canBeSeniorTrainerPermission =
+    (permissions?.custom_permissions?.can_be_senior_trainer && permissions?.permission_type === 'Custom') ||
+    permissions?.permission_type === 'Admin';
+
+  const canBeTrainerPermission =
+    (permissions?.custom_permissions?.can_be_trainer && permissions?.permission_type === 'Custom') ||
+    permissions?.permission_type === 'Admin';
+
   const [reportDate, setReportDate] = useState(new Date());
   const [filters, setFilters] = useState(() => {
     const boot = deepLinkBoot.current;
@@ -2348,7 +2415,7 @@ const AcademicCoordinatorModule = () => {
   const [pathBatchesLoading, setPathBatchesLoading] = useState(false);
   const [filterOptionsLoading, setFilterOptionsLoading] = useState(true);
   const [sessions, setSessions] = useState([]);
-  const [activityTypes, setActivityTypes] = useState(() => loadActivityTypes());
+  const [activityTypes, setActivityTypes] = useState([]);
   const [activityTypesModalOpen, setActivityTypesModalOpen] = useState(false);
   const [quickSearch, setQuickSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -2373,8 +2440,18 @@ const AcademicCoordinatorModule = () => {
     } catch (_) {
       // ignore
     }
-    if (location.state || new URLSearchParams(location.search).get('skipWizard')) {
-      navigate('/institute/academicCoordinator', { replace: true, state: null });
+    // Important: On refresh, router `location.state` is lost and only the URL/query
+    // remains. If we strip the query params here, the page can't reconstruct the
+    // deep-linked wizard step and falls back to STEP 1.
+    //
+    // So: always clear router state, but preserve `courseId/skipWizard` query.
+    const searchParams = new URLSearchParams(location.search);
+    const hasDeepLinkQuery = searchParams.get('skipWizard') === '1' || searchParams.has('courseId');
+    if (location.state || hasDeepLinkQuery) {
+      const nextUrl = hasDeepLinkQuery
+        ? `/institute/academicCoordinator?${searchParams.toString()}`
+        : '/institute/academicCoordinator';
+      navigate(nextUrl, { replace: true, state: null });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -2394,7 +2471,11 @@ const AcademicCoordinatorModule = () => {
   }, [filters, verticalOptions, projectOptions, centerOptions, courseOptions, batchOptions]);
 
   const selectedCourseStructure = useMemo(
-    () => getCourseStructureFromMeta(allCoursesMeta, filters.course),
+    () => getCourseStructureFromMeta(
+      allCoursesMeta,
+      filters.course,
+      bootstrapRef.current?.courseStructure
+    ),
     [allCoursesMeta, filters.course]
   );
 
@@ -2517,7 +2598,7 @@ const AcademicCoordinatorModule = () => {
         ] = await Promise.allSettled([
           axios.get(`${backendUrl}/college/list_all_projects`, requestConfig),
           axios.get(`${backendUrl}/college/list_all_centers`, requestConfig),
-          axios.get(`${backendUrl}/college/all_courses`, requestConfig),
+          axios.get(`${backendUrl}/college/all_coursescopy`, requestConfig),
           axios.get(`${backendUrl}/college/filters-data`, requestConfig),
         ]);
 
@@ -2576,7 +2657,7 @@ const AcademicCoordinatorModule = () => {
     const fetchCenterCourses = async () => {
       setCenterCoursesLoading(true);
       try {
-        const res = await axios.get(`${backendUrl}/college/all_courses_centerwise`, {
+        const res = await axios.get(`${backendUrl}/college/all_coursescopy_centerwise`, {
           params: { centerId: filters.center, projectId: filters.project },
           headers: { 'x-auth': token },
         });
@@ -2660,14 +2741,52 @@ const AcademicCoordinatorModule = () => {
   }, [filters.center, filters.course, token, backendUrl]);
 
   useEffect(() => {
+    if (!token) return undefined;
+    let cancelled = false;
+    const loadTypes = async () => {
+      try {
+        const types = await fetchActivityTypesApi(backendUrl, token);
+        if (!cancelled) setActivityTypes(types);
+      } catch (err) {
+        console.error('Failed to load activity types', err);
+        if (!cancelled) setActivityTypes([]);
+      }
+    };
+    loadTypes();
+    return () => { cancelled = true; };
+  }, [backendUrl, token]);
+
+  useEffect(() => {
     if (!filters.batch) {
       setSessions([]);
       setSelectedSessionId('');
-      return;
+      return undefined;
     }
-    setSessions(loadStoredSessions(filters.batch));
-    setSelectedSessionId('');
-  }, [filters.batch]);
+    if (!token) return undefined;
+
+    let cancelled = false;
+    const loadSessions = async () => {
+      try {
+        const courseId = String(filters.batch).startsWith('course:')
+          ? String(filters.batch).replace(/^course:/, '')
+          : (filters.course || '');
+        const data = await fetchSessionsApi(backendUrl, token, filters.batch, courseId);
+        if (!cancelled) {
+          setSessions(data);
+          setSelectedSessionId('');
+        }
+      } catch (err) {
+        console.error('Failed to load sessions', err);
+        if (!cancelled) {
+          // Fallback to any legacy local data once
+          setSessions(loadStoredSessions(filters.batch));
+          notify('Failed to load sessions from server');
+        }
+      }
+    };
+    loadSessions();
+    return () => { cancelled = true; };
+  }, [filters.batch, filters.course, backendUrl, token]);
 
   // Deep-link: fill department/project/center from course meta (wizard already skipped)
   useEffect(() => {
@@ -2765,23 +2884,39 @@ const AcademicCoordinatorModule = () => {
     setSelectedSessionId((prev) => (resolveSessionSelectionId(prev) === resolvedId ? '' : resolvedId));
   };
 
-  const loadDummySessions = () => {
+  const loadDummySessions = async () => {
     if (!filters.batch) return;
+    if (!filters.course && !String(filters.batch).startsWith('course:')) {
+      notify('Select a course before loading demo sessions');
+      return;
+    }
     const hasData = sessions.length > 0;
     if (hasData && !window.confirm('Replace current sessions with demo dummy data?')) return;
     const context = buildContextFromFilters(filters, pathLabels);
     const dummy = createDummySessions(context);
-    persistSessions(dummy);
-    setSelectedSessionId(dummy[0]?.id || '');
-    notify('Demo dummy sessions loaded');
-  };
-
-  const persistSessions = useCallback((next) => {
-    setSessions(next);
-    if (filters.batch) {
-      persistStoredSessions(filters.batch, next);
+    try {
+      // Soft-delete existing then create demo rows
+      await Promise.all(
+        sessions.map((session) => deleteSessionApi(backendUrl, token, session.id).catch(() => null))
+      );
+      const created = [];
+      for (const item of dummy) {
+        const { id: _id, createdAt: _c, updatedAt: _u, ...payload } = item;
+        const saved = await createSessionApi(backendUrl, token, {
+          ...payload,
+          course: filters.course || String(filters.batch).replace(/^course:/, ''),
+          batch: String(filters.batch).startsWith('course:') ? '' : filters.batch,
+        });
+        created.push(saved);
+      }
+      setSessions(created);
+      setSelectedSessionId(created[0]?.id || '');
+      notify('Demo dummy sessions loaded');
+    } catch (err) {
+      console.error(err);
+      notify(err.message || 'Failed to load demo sessions');
     }
-  }, [filters.batch]);
+  };
 
   const filteredSessions = useMemo(() => {
     const query = quickSearch.trim().toLowerCase();
@@ -3115,12 +3250,18 @@ const AcademicCoordinatorModule = () => {
     }));
   };
 
-  const handleActivityTypesSave = (nextTypes) => {
-    setActivityTypes(nextTypes);
-    persistActivityTypes(nextTypes);
+  const handleActivityTypesSave = async (nextTypes) => {
+    try {
+      const saved = await saveActivityTypesApi(backendUrl, token, nextTypes);
+      setActivityTypes(saved);
+      notify('Activity types saved');
+    } catch (err) {
+      console.error(err);
+      notify(err.response?.data?.message || err.message || 'Failed to save activity types');
+    }
   };
 
-  const saveSession = () => {
+  const saveSession = async () => {
     const { draft, editingId } = modal;
     if (!draft?.title?.trim()) {
       notify('Please enter session name');
@@ -3128,6 +3269,10 @@ const AcademicCoordinatorModule = () => {
     }
     if (!draft?.sessionDate) {
       notify('Please select session date');
+      return;
+    }
+    if (!filters.course && !draft.course) {
+      notify('Please select a course');
       return;
     }
 
@@ -3205,50 +3350,66 @@ const AcademicCoordinatorModule = () => {
       sessionActivities: normalizeSessionActivities(
         draft.sessionActivities?.length ? draft.sessionActivities : getSessionActivities(draft)
       ),
-      updatedAt: new Date().toISOString(),
+      department: filters.department || draft.department || '',
+      project: filters.project || draft.project || '',
+      center: filters.center || draft.center || '',
+      course: filters.course || draft.course || '',
+      batch: String(filters.batch || '').startsWith('course:') ? '' : (filters.batch || draft.batch || ''),
+      departmentName: pathLabels.departmentName,
+      projectName: pathLabels.projectName,
+      centerName: pathLabels.centerName,
+      courseTrade: pathLabels.courseTrade,
+      batchCode: pathLabels.batchCode,
     };
 
-    const sessionId = editingId || `AC-${Date.now()}`;
-    const savedSession = {
-      ...normalized,
-      id: sessionId,
-      createdAt: existing?.createdAt || new Date().toISOString(),
-    };
+    try {
+      let savedSession;
+      if (editingId) {
+        savedSession = await updateSessionApi(backendUrl, token, editingId, normalized);
+        setSessions((prev) => prev.map((s) => (s.id === editingId ? savedSession : s)));
+        notify(`Session updated: ${savedSession.title}`);
+      } else {
+        savedSession = await createSessionApi(backendUrl, token, normalized);
+        setSessions((prev) => [...prev, savedSession]);
+        notify(`Session created: ${savedSession.title}`);
+      }
 
-    if (editingId) {
-      persistSessions(sessions.map((s) => (s.id === editingId ? savedSession : s)));
-      notify(`Session updated: ${savedSession.title}`);
-    } else {
-      persistSessions([...sessions, savedSession]);
-      notify(`Session created: ${savedSession.title}`);
+      setQuickSearch('');
+      setStatusFilter('all');
+      setActivityFilter('all');
+      setSelectedSessionId(savedSession.id);
+      closeModal();
+    } catch (err) {
+      console.error(err);
+      notify(err.response?.data?.message || err.message || 'Failed to save session');
     }
-
-    setQuickSearch('');
-    setStatusFilter('all');
-    setActivityFilter('all');
-    setSelectedSessionId(sessionId);
-    closeModal();
   };
 
-  const deleteSession = (session) => {
+  const deleteSession = async (session) => {
     if (!window.confirm(`Delete session "${session.title}"?`)) return;
-    persistSessions(sessions.filter((s) => s.id !== session.id));
-    if (selectedSessionId === session.id) setSelectedSessionId('');
-    notify('Session plan deleted');
+    try {
+      await deleteSessionApi(backendUrl, token, session.id);
+      setSessions((prev) => prev.filter((s) => s.id !== session.id));
+      if (selectedSessionId === session.id) setSelectedSessionId('');
+      notify('Session plan deleted');
+    } catch (err) {
+      console.error(err);
+      notify(err.response?.data?.message || err.message || 'Failed to delete session');
+    }
   };
 
   const fetchSeniorTrainers = useCallback(async () => {
     if (!token) return;
     setSeniorTrainersLoading(true);
     try {
-      const res = await axios.get(`${backendUrl}/college/trainer/trainers`, {
+      const res = await axios.get(`${backendUrl}/college/users/training-role-users?roleType=senior`, {
         headers: { 'x-auth': token },
       });
       const trainers = (res.data?.data || [])
-        .filter((trainer) => trainer.status !== false)
+        .filter((trainer) => trainer._id)
         .map((trainer) => ({
           value: String(trainer._id),
-          label: trainer.name || trainer.email || 'Trainer',
+          label: trainer.name || trainer.email || 'Senior Trainer',
         }));
       setSeniorTrainerOptions(trainers);
     } catch (err) {
@@ -3266,29 +3427,48 @@ const AcademicCoordinatorModule = () => {
   };
   const closeReferModal = () => setReferModal({ open: false, session: null });
 
-  const sendToSenior = (session, seniorTrainer) => {
+  const sendToSenior = async (session, seniorTrainer) => {
     if (!seniorTrainer?.id) {
       notify('Please select a Senior Trainer');
       return;
     }
-    persistSessions(sessions.map((s) => (
-      s.id === session.id
-        ? {
-          ...s,
-          workflowStatus: WORKFLOW_STATUS.SENT_TO_SENIOR,
-          seniorTrainerId: seniorTrainer.id,
-          seniorTrainerName: seniorTrainer.name,
-        }
-        : s
-    )));
-    closeReferModal();
-    notify(`Referred to ${seniorTrainer.name}`);
+    try {
+      const updated = await patchSessionApi(backendUrl, token, session.id, {
+        workflowStatus: WORKFLOW_STATUS.SENT_TO_SENIOR,
+        seniorTrainerId: seniorTrainer.id,
+        seniorTrainerName: seniorTrainer.name,
+      });
+      setSessions((prev) => prev.map((s) => (s.id === session.id ? updated : s)));
+      closeReferModal();
+      notify(`Referred to ${seniorTrainer.name}`);
+    } catch (err) {
+      console.error(err);
+      notify(err.response?.data?.message || err.message || 'Failed to refer session');
+    }
   };
 
   const canEditSession = (session) => (
-    session.workflowStatus === WORKFLOW_STATUS.SCHEDULED
-    || session.workflowStatus === WORKFLOW_STATUS.SENT_TO_SENIOR
+    canViewTrainingPermission
+    && (
+      session.workflowStatus === WORKFLOW_STATUS.SCHEDULED
+      || session.workflowStatus === WORKFLOW_STATUS.SENT_TO_SENIOR
+    )
   );
+
+  if (permissions && !canViewTrainingPermission) {
+    return (
+      <div className="ac-portal">
+        <style>{AC_CSS}</style>
+        <div className="ac-empty-state" style={{ marginTop: 40, textAlign: 'center', padding: 48 }}>
+          <i className="fas fa-lock" style={{ fontSize: 32, color: '#94a3b8', marginBottom: 12 }} />
+          <h3 style={{ margin: '0 0 8px' }}>Access denied</h3>
+          <p style={{ margin: 0, color: '#64748b' }}>
+            You need <strong>View Training</strong> permission (or Admin) to use Academic Coordinator.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="ac-portal">

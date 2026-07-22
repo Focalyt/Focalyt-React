@@ -121,6 +121,7 @@ const B2BLeadSchema = new mongoose.Schema({
   whatsapp: { type: String },
   landlineNumber: { type: String },
   leadOwner: { type: ObjectId, ref: 'User' }, // Could be ref to user in future
+  leadCoOwner: { type: ObjectId, ref: 'User' },
   previousLeadOwners: { type: [ObjectId], ref: 'User' },
   leadAddedBy: { type: ObjectId, ref: 'User' },
   remark: { type: String },

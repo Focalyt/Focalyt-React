@@ -1,4 +1,4 @@
-const { Schema, model, models } = require('mongoose');
+const { Schema, model } = require('mongoose');
 const { ObjectId } = Schema.Types;
 
 const materialItemSchema = new Schema(
@@ -19,6 +19,7 @@ const materialItemSchema = new Schema(
 
 const activityItemSchema = new Schema(
   {
+    id: { type: String, trim: true, default: '' },
     key: { type: String, trim: true, default: '' },
     name: { type: String, trim: true, default: '' },
     color: { type: String, default: '' },
@@ -32,6 +33,14 @@ const totQuestionSchema = new Schema(
     options: { type: [String], default: [] },
     correctIndex: { type: Number, default: 0 },
     marks: { type: Number, default: 0 },
+  },
+  { _id: true }
+);
+
+const subSessionItemSchema = new Schema(
+  {
+    name: { type: String, trim: true, default: '' },
+    duration: { type: String, trim: true, default: '' },
   },
   { _id: true }
 );
@@ -53,11 +62,14 @@ const sessionPlanSchema = new Schema(
     studentCount: { type: Number, default: 0 },
 
     title: { type: String, trim: true, required: true },
+    sessionType: { type: String, trim: true, default: 'student' },
     sessionNumber: { type: String, trim: true, default: '' },
     hours: { type: String, default: '' },
+    /** @deprecated legacy single sub-session fields — use subSessionItems */
     subSessions: { type: String, default: '' },
     subSessionName: { type: String, default: '' },
     duration: { type: String, default: '' },
+    subSessionItems: { type: [subSessionItemSchema], default: [] },
 
     unitNumber: { type: String, default: '' },
     unitName: { type: String, default: '' },
@@ -69,9 +81,7 @@ const sessionPlanSchema = new Schema(
 
     classroomLabResources: { type: String, default: '' },
 
-    /** Document list: [{ name, description, type, requirement }] */
     standardTlm: { type: [materialItemSchema], default: [] },
-    /** Document list: [{ name, description, type, requirement }] */
     trainerBasedTlm: { type: [materialItemSchema], default: [] },
 
     notes: { type: String, default: '' },
@@ -99,7 +109,7 @@ const sessionPlanSchema = new Schema(
     totQuestionBank: { type: [totQuestionSchema], default: [] },
     totQuestionBankLastUpdated: { type: Date, default: null },
 
-    workflowStatus: { type: String, trim: true, default: '', index: true },
+    workflowStatus: { type: String, trim: true, default: 'Scheduled', index: true },
 
     createdBy: { type: ObjectId, ref: 'User', required: true, index: true },
     seniorTrainer: { type: ObjectId, ref: 'User', default: null, index: true },

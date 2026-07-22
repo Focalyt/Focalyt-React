@@ -801,6 +801,7 @@ const B2BSales = () => {
     leadStatus: '',
     leadSubStatus: '',
     leadOwner: '',
+    leadCoOwner: '',
     leadRanking: ''
   });
   const [bulkUploadFormErrors, setBulkUploadFormErrors] = useState({});
@@ -836,6 +837,7 @@ const B2BSales = () => {
     whatsapp: '',
     landlineNumber: '',
     leadOwner: '',
+    leadCoOwner: '',
     leadStatus: '',
     leadSubStatus: '',
     leadRanking: '',
@@ -845,6 +847,8 @@ const B2BSales = () => {
   // Form validation state
   const [formErrors, setFormErrors] = useState({});
   const [extractedNumbers, setExtractedNumbers] = useState([]);
+  const [isDuplicateMobile, setIsDuplicateMobile] = useState(false);
+  const mobileDuplicateCheckRef = useRef(0);
 
   //refer lead stats
   const [concernPersons, setConcernPersons] = useState([]);
@@ -1642,6 +1646,13 @@ const B2BSales = () => {
     // Extract numbers
     const extracted = extractMobileNumbers(cleanValue);
     setExtractedNumbers(extracted);
+
+    if (name === 'mobile' && !editingLeadId) {
+      const digits = String(cleanValue || '').replace(/\D/g, '').slice(-10);
+      if (digits.length !== 10) {
+        setIsDuplicateMobile(false);
+      }
+    }
   };
 
   // Validate lead form
@@ -3053,13 +3064,15 @@ const B2BSales = () => {
     const permissionType = permissions?.permission_type || userData?.permissions?.permission_type;
     if (permissionType === 'Admin') return true;
 
-    // Check if user is the lead owner or lead added by
+    // Check if user is the lead owner, co-owner, or lead added by
     const userId = userData._id;
     const leadAddedById = lead.leadAddedBy?._id || lead.leadAddedBy;
     const leadOwnerId = lead.leadOwner?._id || lead.leadOwner;
+    const leadCoOwnerId = lead.leadCoOwner?._id || lead.leadCoOwner;
 
     return leadAddedById?.toString() === userId?.toString() ||
-      leadOwnerId?.toString() === userId?.toString();
+      leadOwnerId?.toString() === userId?.toString() ||
+      leadCoOwnerId?.toString() === userId?.toString();
   };
 
   const canEditLeadDetails = (lead) => {
@@ -3139,6 +3152,11 @@ const B2BSales = () => {
     } else if (editingLeadId) {
       leadData.leadOwner = null;
     }
+    if (leadFormData.leadCoOwner && String(leadFormData.leadCoOwner).trim()) {
+      leadData.leadCoOwner = String(leadFormData.leadCoOwner).trim();
+    } else if (editingLeadId) {
+      leadData.leadCoOwner = null;
+    }
     if (leadFormData.leadRanking && String(leadFormData.leadRanking).trim()) {
       leadData.leadRanking = String(leadFormData.leadRanking).trim();
     } else if (editingLeadId) {
@@ -3204,7 +3222,11 @@ const B2BSales = () => {
 
       if (response.data.status) {
         // Show success message
-        alert('Lead added successfully!');
+        alert(
+          response.data.isDuplicateMobile || response.data.message?.toLowerCase?.().includes('duplicate')
+            ? (response.data.message || 'Lead created with Duplicate status (mobile already exists)')
+            : 'Lead added successfully!'
+        );
 
         // Refresh the leads list and status counts
         fetchLeads(null, 1);
@@ -3229,6 +3251,7 @@ const B2BSales = () => {
           whatsapp: '',
           landlineNumber: '',
           leadOwner: '',
+          leadCoOwner: '',
           leadStatus: '',
           leadSubStatus: '',
           leadRanking: '',
@@ -3236,6 +3259,7 @@ const B2BSales = () => {
         });
         setFormErrors({});
         setExtractedNumbers([]);
+        setIsDuplicateMobile(false);
         setSelectedLocation(null);
         setShowMap(false);
         setAddLeadSubStatuses([]);
@@ -3285,6 +3309,7 @@ const B2BSales = () => {
       whatsapp: lead.whatsapp || '',
       landlineNumber: lead.landlineNumber || '',
       leadOwner: lead.leadOwner?._id || lead.leadOwner || '',
+      leadCoOwner: lead.leadCoOwner?._id || lead.leadCoOwner || '',
       leadStatus: '',
       leadSubStatus: '',
       leadRanking: lead.leadRanking?._id || lead.leadRanking || '',
@@ -3323,6 +3348,7 @@ const B2BSales = () => {
       whatsapp: '',
       landlineNumber: '',
       leadOwner: '',
+      leadCoOwner: '',
       leadStatus: '',
       leadSubStatus: '',
       leadRanking: '',
@@ -3330,6 +3356,7 @@ const B2BSales = () => {
     });
     setFormErrors({});
     setExtractedNumbers([]);
+    setIsDuplicateMobile(false);
     setSelectedLocation(null);
     setShowMap(false);
     setAddLeadSubStatuses([]);
@@ -3358,6 +3385,7 @@ const B2BSales = () => {
       whatsapp: '',
       landlineNumber: '',
       leadOwner: uid,
+      leadCoOwner: '',
       leadStatus: '',
       leadSubStatus: '',
       leadRanking: '',
@@ -3508,6 +3536,7 @@ const B2BSales = () => {
       leadStatus: '',
       leadSubStatus: '',
       leadOwner: uid,
+      leadCoOwner: '',
       leadRanking: '',
     });
     setBulkUploadFormErrors({});
@@ -3523,10 +3552,10 @@ const B2BSales = () => {
   // Bulk Upload Functions (Excel only — same columns as backend import)
   const downloadB2bLeadsSampleExcel = () => {
     const rows = [
-      ['Business Name', 'Concern Person Name', 'Mobile', 'Email', 'Address', 'City', 'State', 'Designation', 'WhatsApp', 'Landline Number', 'Counsellor', 'Remark'],
-      ['ABC Company', 'John Doe', '9876543210', 'john@abc.com', '123 Main Street', 'Mumbai', 'Maharashtra', 'Manager', '9876543210', '0221234567', 'Counsellor Name', 'Sample remark'],
-      ['XYZ Corp', 'Jane Smith', '9876543211', 'jane@xyz.com',  '456 Park Avenue', 'Delhi', 'Delhi', 'Director', '9876543211', '0111234567', 'Owner Name', 'Another remark'],
-      ['Tech Solutions', 'Raj Kumar', '9876543212', 'raj@tech.com','789 Tech Park', 'Bangalore', 'Karnataka', 'CEO', '9876543212', '0801234567', 'Owner Name', 'Technology company']
+      ['Business Name', 'Concern Person Name', 'Mobile', 'Email', 'Address', 'City', 'State', 'Designation', 'WhatsApp', 'Landline Number', 'Remark'],
+      ['ABC Company', 'John Doe', '9876543210', 'john@abc.com', '123 Main Street', 'Mumbai', 'Maharashtra', 'Manager', '9876543210', '0221234567', 'Sample remark'],
+      ['XYZ Corp', 'Jane Smith', '9876543211', 'jane@xyz.com',  '456 Park Avenue', 'Delhi', 'Delhi', 'Director', '9876543211', '0111234567', 'Another remark'],
+      ['Tech Solutions', 'Raj Kumar', '9876543212', 'raj@tech.com','789 Tech Park', 'Bangalore', 'Karnataka', 'CEO', '9876543212', '0801234567', 'Technology company']
     ];
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -3612,6 +3641,9 @@ const B2BSales = () => {
     }
     if (bulkUploadFormData.leadOwner) {
       formData.append('leadOwner', bulkUploadFormData.leadOwner);
+    }
+    if (bulkUploadFormData.leadCoOwner) {
+      formData.append('leadCoOwner', bulkUploadFormData.leadCoOwner);
     }
     if (bulkUploadFormData.leadRanking) {
       formData.append('leadRanking', bulkUploadFormData.leadRanking);
@@ -3716,6 +3748,80 @@ const B2BSales = () => {
   const [statuses, setStatuses] = useState([
     { _id: '', name: '', count: 0 },
 
+  ]);
+
+  // When adding a lead, if mobile already exists → auto set Status/Sub-status to Duplicate
+  useEffect(() => {
+    if (!showAddLeadModal || editingLeadId) {
+      setIsDuplicateMobile(false);
+      return undefined;
+    }
+
+    const digits = String(leadFormData.mobile || '').replace(/\D/g, '').slice(-10);
+    if (digits.length !== 10 || !token || !backendUrl) {
+      setIsDuplicateMobile(false);
+      return undefined;
+    }
+
+    const requestId = ++mobileDuplicateCheckRef.current;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await axios.get(`${backendUrl}/college/b2b/check-mobile-duplicate`, {
+          params: { mobile: digits },
+          headers: { 'x-auth': token },
+        });
+        if (requestId !== mobileDuplicateCheckRef.current) return;
+
+        const isDup = Boolean(res.data?.isDuplicate);
+        setIsDuplicateMobile(isDup);
+        if (!isDup) return;
+
+        const dupStatus = (statuses || []).find((s) =>
+          /^duplicate$/i.test(String(s?.name || s?.title || '').trim())
+        );
+        if (!dupStatus?._id) return;
+
+        setLeadFormData((prev) => {
+          if (String(prev.leadStatus) === String(dupStatus._id)) return prev;
+          return {
+            ...prev,
+            leadStatus: dupStatus._id,
+            leadSubStatus: '',
+          };
+        });
+      } catch (err) {
+        if (requestId === mobileDuplicateCheckRef.current) {
+          console.error('Duplicate mobile check failed:', err);
+        }
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [showAddLeadModal, editingLeadId, leadFormData.mobile, token, backendUrl, statuses]);
+
+  // After Duplicate status is selected, pick Duplicate sub-status once options load
+  useEffect(() => {
+    if (!showAddLeadModal || editingLeadId || !isDuplicateMobile) return;
+    if (!leadFormData.leadStatus || addLeadSubStatusesLoading) return;
+    if (!Array.isArray(addLeadSubStatuses) || addLeadSubStatuses.length === 0) return;
+
+    const dupSub = addLeadSubStatuses.find((ss) =>
+      /^duplicate$/i.test(String(ss?.title || ss?.name || '').trim())
+    );
+    const nextSubId = dupSub?._id || addLeadSubStatuses[0]?._id;
+    if (!nextSubId) return;
+
+    setLeadFormData((prev) => {
+      if (String(prev.leadSubStatus) === String(nextSubId)) return prev;
+      return { ...prev, leadSubStatus: nextSubId };
+    });
+  }, [
+    showAddLeadModal,
+    editingLeadId,
+    isDuplicateMobile,
+    leadFormData.leadStatus,
+    addLeadSubStatuses,
+    addLeadSubStatusesLoading,
   ]);
 
   // edit status and set followup
@@ -5183,7 +5289,7 @@ const B2BSales = () => {
     // Check permission before opening panel
     if (profile && (panel === 'StatusChange' || panel === 'SetFollowup')) {
       if (!canUpdateLead(profile)) {
-        alert('You do not have permission to update this lead. Only the lead owner or the person who added the lead can update it.');
+        alert('You do not have permission to update this lead. Only the lead owner, co-owner, or the person who added the lead can update it.');
         return;
       }
     }
@@ -9542,6 +9648,10 @@ const renderWhatsAppPanel = () => {
                                   <div className="lead-meta-v2__value text-capitalize" title={lead.leadOwner?.name || '—'}>{lead.leadOwner?.name || '—'}</div>
                                 </div>
                                 <div className="lead-meta-v2__item">
+                                  <div className="lead-meta-v2__label">Co-owner</div>
+                                  <div className="lead-meta-v2__value text-capitalize" title={lead.leadCoOwner?.name || '—'}>{lead.leadCoOwner?.name || '—'}</div>
+                                </div>
+                                <div className="lead-meta-v2__item">
                                   <div className="lead-meta-v2__label">Added by</div>
                                   <div className="lead-meta-v2__value text-capitalize" title={lead.leadAddedBy?.name || '—'}>{lead.leadAddedBy?.name || '—'}</div>
                                 </div>
@@ -10683,6 +10793,11 @@ const renderWhatsAppPanel = () => {
                           {formErrors.mobile}
                         </div>
                       )}
+                      {!editingLeadId && isDuplicateMobile && (
+                        <div className="form-text text-danger fw-semibold">
+                          This mobile already exists. Lead Status / Sub Status will be set to Duplicate.
+                        </div>
+                      )}
                     </div>
 
                     {/* WhatsApp */}
@@ -10750,6 +10865,33 @@ const renderWhatsAppPanel = () => {
                           )}
                         {users?.map(user => (
                           <option key={user?._id} value={user?._id}>
+                            {user?.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Co-owner */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-user-friends text-primary me-1"></i>
+                        Co-owner
+                      </label>
+                      <select
+                        className="form-select"
+                        name="leadCoOwner"
+                        value={leadFormData.leadCoOwner}
+                        onChange={handleLeadInputChange}
+                      >
+                        <option value="">Select Co-owner</option>
+                        {userData?._id &&
+                          !users?.some((u) => String(u?._id) === String(userData._id)) && (
+                            <option key={`co-me-${userData._id}`} value={String(userData._id)}>
+                              {userData.name || 'Me'}
+                            </option>
+                          )}
+                        {users?.map(user => (
+                          <option key={`co-${user?._id}`} value={user?._id}>
                             {user?.name}
                           </option>
                         ))}
@@ -10942,11 +11084,11 @@ const renderWhatsAppPanel = () => {
                     Instructions:
                   </h6>
                   <ul className="mb-0 small">
-                    <li>Step 1: Select Lead Source, B2B Department, B2B Project, Type of B2B, Lead Status, Sub Status, and Counsellor below.</li>
+                    <li>Step 1: Select Lead Source, B2B Department, B2B Project, Type of B2B, Lead Status, Sub Status, Counsellor, and Co-owner below.</li>
                     <li>Step 2: Upload an Excel file (.xlsx or .xls, max 10MB).</li>
                     <li><strong>Required in Excel:</strong> Business Name, Concern Person Name, Mobile.</li>
                     <li>All imported leads use your selections above. You do not need those columns in Excel.</li>
-                    <li>Counsellor is optional; if selected, all imported leads are assigned to that counsellor.</li>
+                    <li>Counsellor and Co-owner are optional; if selected, all imported leads are assigned accordingly.</li>
                   </ul>
                 </div>
 
@@ -11133,6 +11275,32 @@ const renderWhatsAppPanel = () => {
                         )}
                       {users?.map((user) => (
                         <option key={user?._id} value={user?._id}>
+                          {user?.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-user-friends text-primary me-1"></i>
+                      Co-owner
+                    </label>
+                    <select
+                      className="form-select"
+                      name="leadCoOwner"
+                      value={bulkUploadFormData.leadCoOwner}
+                      onChange={handleBulkUploadInputChange}
+                      disabled={bulkUploadLoading}
+                    >
+                      <option value="">Select Co-owner</option>
+                      {userData?._id &&
+                        !users?.some((u) => String(u?._id) === String(userData._id)) && (
+                          <option key={`bulk-co-me-${userData._id}`} value={String(userData._id)}>
+                            {userData.name || 'Me'}
+                          </option>
+                        )}
+                      {users?.map((user) => (
+                        <option key={`bulk-co-${user?._id}`} value={user?._id}>
                           {user?.name}
                         </option>
                       ))}
@@ -12466,8 +12634,8 @@ const renderWhatsAppPanel = () => {
   }
 
   .lead-header-v2 .b2b-dash-section--no-followup{
-    background: #fecaca;
-    border-color: #fca5a5;
+    background: #ff4646;
+    border-color: #ff4646;
   }
 
   .lead-header-v2 .b2b-dash-section--no-followup .ActionsDates,
