@@ -135,9 +135,15 @@ connectDB();
 mongoose.Promise = global.Promise;
 
 process.on("SIGINT", () => {
-	server.close((err) => {
+	server.close(async (err) => {
 		if (err) process.exit(1);
-		mongoose.connection.close(() => process.exit(0));
+		try {
+			await mongoose.connection.close();
+			process.exit(0);
+		} catch (closeErr) {
+			console.error("Error closing MongoDB connection:", closeErr.message);
+			process.exit(1);
+		}
 	});
 });
 
