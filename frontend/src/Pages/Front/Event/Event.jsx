@@ -86,6 +86,27 @@ export function EventCard({ event, bucketUrl, closed, onPlayVideo }) {
           >
             Apply Now →
           </a>
+          {event?.guidelines ? (
+            <a
+              className="btn-secondary btn-guidelines"
+              href={resolveMediaUrl(bucketUrl, event.guidelines) || event.guidelines}
+              target="_blank"
+              rel="noopener noreferrer"
+              download
+              title="Download Guidelines"
+            >
+              Download
+            </a>
+          ) : (
+            <button
+              type="button"
+              className="btn-secondary btn-guidelines disabled"
+              disabled
+              title="Guidelines not available"
+            >
+              Download
+            </button>
+          )}
         </div>
       </div>
     </article>
@@ -453,7 +474,15 @@ function Event() {
 .foc-events-page .event-status {
   font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
 }
-.foc-events-page .event-actions { margin-top: 2px; }
+.foc-events-page .event-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+.foc-events-page .event-actions > a,
+.foc-events-page .event-actions > button {
+  flex: 1;
+}
 .foc-events-page .btn-primary {
   font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
   display: block;
@@ -478,6 +507,33 @@ function Event() {
   transform: none;
 }
 .foc-events-page .btn-primary.disabled { opacity: .55; cursor: not-allowed; pointer-events: none; }
+.foc-events-page .btn-guidelines {
+  font-family: var(--foc-font-sans), Inter, system-ui, sans-serif;
+  display: block;
+  width: 100%;
+  text-align: center;
+  text-decoration: none;
+  padding: 8px 10px;
+  border-radius: 50px;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0;
+  background: transparent;
+  color: var(--home-card-cta);
+  border: 1.5px solid var(--home-card-cta);
+  box-shadow: none;
+  cursor: pointer;
+  transition: background .2s var(--ease), color .2s var(--ease);
+}
+.foc-events-page .btn-guidelines:hover:not(.disabled) {
+  background: var(--home-card-cta);
+  color: var(--foc-color-text-inverse);
+}
+.foc-events-page .btn-guidelines.disabled {
+  opacity: .55;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 .foc-events-page .events-empty { text-align: center; padding: 15px 0px; color: var(--muted); }
 .foc-events-page .events-empty h3 { font-family: var(--foc-font-display); color: var(--text); margin-bottom: 8px; }
 .foc-events-page #eventVid { width: 100%; border-radius: 10px; outline: none; }
