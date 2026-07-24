@@ -118,6 +118,7 @@ const B2BLeadSchema = new mongoose.Schema({
   designation: { type: String },
   email: { type: String},
   mobile: { type: String, required: true },
+  isDuplicateMobile: { type: Boolean, default: false, index: true },
   whatsapp: { type: String },
   landlineNumber: { type: String },
   leadOwner: { type: ObjectId, ref: 'User' }, // Could be ref to user in future

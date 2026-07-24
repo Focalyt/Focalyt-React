@@ -128,6 +128,17 @@ function getLeadGroupRootId(lead) {
   return String(lead.crossSaleRootId || lead.parentLeadId || lead._id || '');
 }
 
+function isDuplicatePerformanceStatus(status) {
+  return /^duplicate$/i.test(String(status?.statusName || status?.name || '').trim());
+}
+
+/** Synthetic Performance filter for duplicate-mobile leads (not a pipeline status id) */
+const DUPLICATE_MOBILE_FILTER = '__duplicate_mobile__';
+
+function isDuplicateMobileFilter(statusFilter) {
+  return String(statusFilter) === DUPLICATE_MOBILE_FILTER;
+}
+
 function buildLeadRemarkSuggestion({ leadFormData, leadCategoryOptions, typeOfB2BOptions }) {
   const business = safeStr(leadFormData?.businessName);
   const city = safeStr(leadFormData?.city);
@@ -1719,10 +1730,19 @@ const B2BSales = () => {
   });
 
   const sortedPerformanceStatuses = useMemo(() => {
-    const list = [...(statusCounts || [])];
+    const list = [...(statusCounts || [])].filter((s) => !isDuplicatePerformanceStatus(s));
     list.sort((a, b) => (a.statusIndex ?? 9999) - (b.statusIndex ?? 9999));
     return list;
   }, [statusCounts]);
+
+  const [duplicateMobileCount, setDuplicateMobileCount] = useState(0);
+
+  // Dedicated Duplicate chip — filters by isDuplicateMobile flag (lead keeps its real status)
+  const duplicatePerformanceStatus = useMemo(() => ({
+    statusId: DUPLICATE_MOBILE_FILTER,
+    statusName: 'Duplicate',
+    count: duplicateMobileCount,
+  }), [duplicateMobileCount]);
 
   const dashboardB2BCounts = useMemo(() => {
     const list = Array.isArray(leads) ? leads : [];
@@ -2120,7 +2140,11 @@ const B2BSales = () => {
           const params = {
             page: 1,
             limit: validNumValue.toString(),
-            ...(selectedStatusFilter && { status: selectedStatusFilter })
+            ...(isDuplicateMobileFilter(selectedStatusFilter)
+              ? { isDuplicateMobile: true }
+              : selectedStatusFilter
+                ? { status: selectedStatusFilter }
+                : {})
           };
           appendLeadFilterParams(params, eff);
 
@@ -2786,7 +2810,9 @@ const B2BSales = () => {
         limit: 20,
       };
 
-      if (statusFilter) {
+      if (isDuplicateMobileFilter(statusFilter)) {
+        params.isDuplicateMobile = true;
+      } else if (statusFilter) {
         params.status = statusFilter;
       }
 
@@ -2839,6 +2865,7 @@ const B2BSales = () => {
       if (response.data.status) {
         setStatusCounts(response.data.data.statusCounts || []);
         setTotalLeads(response.data.data.totalLeads || 0);
+        setDuplicateMobileCount(response.data.data.duplicateMobileCount || 0);
         const fc = response.data.data.followupDashboardCounts;
         if (fc?.call && fc?.visit) {
           setFollowupDashboardCounts(fc);
@@ -2854,22 +2881,26 @@ const B2BSales = () => {
   };
 
   const getPerformanceExportMeta = () => {
+    if (isDuplicateMobileFilter(selectedStatusFilter)) {
+      const count = pageSize > 0 ? pageSize : (duplicateMobileCount || leads.length);
+      return { label: 'DUPLICATE', count, statusId: null, isDuplicateMobile: true };
+    }
     if (selectedStatusFilter) {
       const status = (statusCounts || []).find(
         (s) => String(s.statusId) === String(selectedStatusFilter)
       );
       const label = String(status?.statusName || 'Status').toUpperCase().replace(/\s+/g, '_');
       const count = pageSize > 0 ? pageSize : (status?.count ?? leads.length);
-      return { label, count, statusId: selectedStatusFilter };
+      return { label, count, statusId: selectedStatusFilter, isDuplicateMobile: false };
     }
     const count = pageSize > 0 ? pageSize : (totalLeads || leads.length);
-    return { label: 'ALL', count, statusId: null };
+    return { label: 'ALL', count, statusId: null, isDuplicateMobile: false };
   };
 
   const downloadPerformanceLeads = async () => {
     if (!token || downloadingPerformanceLeads) return;
 
-    const { label, count, statusId } = getPerformanceExportMeta();
+    const { label, count, statusId, isDuplicateMobile } = getPerformanceExportMeta();
     if (!count || count < 1) {
       alert('No leads available to download for this Performance tab.');
       return;
@@ -2891,7 +2922,8 @@ const B2BSales = () => {
           sortBy: 'updatedAt',
           sortOrder: 'desc',
         };
-        if (statusId) params.status = statusId;
+        if (isDuplicateMobile) params.isDuplicateMobile = true;
+        else if (statusId) params.status = statusId;
         appendLeadFilterParams(params, eff);
 
         const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
@@ -3331,8 +3363,8 @@ const B2BSales = () => {
       if (response.data.status) {
         // Show success message
         alert(
-          response.data.isDuplicateMobile || response.data.message?.toLowerCase?.().includes('duplicate')
-            ? (response.data.message || 'Lead created with Duplicate status (mobile already exists)')
+          response.data.isDuplicateMobile
+            ? (response.data.message || 'Lead added successfully (duplicate mobile — also listed under Duplicate).')
             : 'Lead added successfully!'
         );
 
@@ -3858,7 +3890,7 @@ const B2BSales = () => {
 
   ]);
 
-  // When adding a lead, if mobile already exists → auto set Status/Sub-status to Duplicate
+  // When adding a lead, if mobile already exists → flag only (keep user Status / Sub Status)
   useEffect(() => {
     if (!showAddLeadModal || editingLeadId) {
       setIsDuplicateMobile(false);
@@ -3879,24 +3911,7 @@ const B2BSales = () => {
           headers: { 'x-auth': token },
         });
         if (requestId !== mobileDuplicateCheckRef.current) return;
-
-        const isDup = Boolean(res.data?.isDuplicate);
-        setIsDuplicateMobile(isDup);
-        if (!isDup) return;
-
-        const dupStatus = (statuses || []).find((s) =>
-          /^duplicate$/i.test(String(s?.name || s?.title || '').trim())
-        );
-        if (!dupStatus?._id) return;
-
-        setLeadFormData((prev) => {
-          if (String(prev.leadStatus) === String(dupStatus._id)) return prev;
-          return {
-            ...prev,
-            leadStatus: dupStatus._id,
-            leadSubStatus: '',
-          };
-        });
+        setIsDuplicateMobile(Boolean(res.data?.isDuplicate));
       } catch (err) {
         if (requestId === mobileDuplicateCheckRef.current) {
           console.error('Duplicate mobile check failed:', err);
@@ -3905,32 +3920,7 @@ const B2BSales = () => {
     }, 350);
 
     return () => clearTimeout(timer);
-  }, [showAddLeadModal, editingLeadId, leadFormData.mobile, token, backendUrl, statuses]);
-
-  // After Duplicate status is selected, pick Duplicate sub-status once options load
-  useEffect(() => {
-    if (!showAddLeadModal || editingLeadId || !isDuplicateMobile) return;
-    if (!leadFormData.leadStatus || addLeadSubStatusesLoading) return;
-    if (!Array.isArray(addLeadSubStatuses) || addLeadSubStatuses.length === 0) return;
-
-    const dupSub = addLeadSubStatuses.find((ss) =>
-      /^duplicate$/i.test(String(ss?.title || ss?.name || '').trim())
-    );
-    const nextSubId = dupSub?._id || addLeadSubStatuses[0]?._id;
-    if (!nextSubId) return;
-
-    setLeadFormData((prev) => {
-      if (String(prev.leadSubStatus) === String(nextSubId)) return prev;
-      return { ...prev, leadSubStatus: nextSubId };
-    });
-  }, [
-    showAddLeadModal,
-    editingLeadId,
-    isDuplicateMobile,
-    leadFormData.leadStatus,
-    addLeadSubStatuses,
-    addLeadSubStatusesLoading,
-  ]);
+  }, [showAddLeadModal, editingLeadId, leadFormData.mobile, token, backendUrl]);
 
   // edit status and set followup
   const [seletectedStatus, setSelectedStatus] = useState('');
@@ -4831,7 +4821,11 @@ const B2BSales = () => {
         const params = {
           page: 1,
           limit: String(needed),
-          ...(selectedStatusFilter && { status: selectedStatusFilter })
+          ...(isDuplicateMobileFilter(selectedStatusFilter)
+            ? { isDuplicateMobile: true }
+            : selectedStatusFilter
+              ? { status: selectedStatusFilter }
+              : {})
         };
         appendLeadFilterParams(params, { ...filters });
         const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
@@ -8586,6 +8580,27 @@ const renderWhatsAppPanel = () => {
                                 </button>
                               );
                             })}
+                            {duplicatePerformanceStatus && (
+                              <button
+                                key={duplicatePerformanceStatus.statusId || 'duplicate'}
+                                type="button"
+                                className="b2b-perf-chip"
+                                title="Filter leads with duplicate mobile (also listed under their own status)"
+                                style={{
+                                  padding: '6px 14px',
+                                  fontSize: '12px',
+                                  fontWeight: 600,
+                                  borderRadius: '999px',
+                                  cursor: 'pointer',
+                                  color: isDuplicateMobileFilter(selectedStatusFilter) ? '#fff' : '#6b7280',
+                                  backgroundColor: isDuplicateMobileFilter(selectedStatusFilter) ? '#6b7280' : '#fff',
+                                  border: isDuplicateMobileFilter(selectedStatusFilter) ? 'none' : '1.5px solid #6b7280'
+                                }}
+                                onClick={() => handleStatusCardClick(duplicatePerformanceStatus.statusId)}
+                              >
+                                DUPLICATE ({duplicatePerformanceStatus.count ?? 0})
+                              </button>
+                            )}
                           </>
                         )}
                       </div>
@@ -8933,7 +8948,10 @@ const renderWhatsAppPanel = () => {
                   )}
                   {selectedStatusFilter && (
                     <span className="badge rounded-pill text-bg-light border">
-                      Status: {statusCounts?.find((s) => String(s.statusId) === String(selectedStatusFilter))?.statusName || 'Selected'}
+                      Status:{' '}
+                      {isDuplicateMobileFilter(selectedStatusFilter)
+                        ? 'Duplicate'
+                        : (statusCounts?.find((s) => String(s.statusId) === String(selectedStatusFilter))?.statusName || 'Selected')}
                     </span>
                   )}
                   <button
@@ -10955,11 +10973,11 @@ const renderWhatsAppPanel = () => {
                           {formErrors.mobile}
                         </div>
                       )}
-                      {!editingLeadId && isDuplicateMobile && (
+                      {/* {!editingLeadId && isDuplicateMobile && (
                         <div className="form-text text-danger fw-semibold">
-                          This mobile already exists. Lead Status / Sub Status will be set to Duplicate.
+                          This mobile already exists. Your Status / Sub Status will be kept; lead will also appear under Duplicate.
                         </div>
-                      )}
+                      )} */}
                     </div>
 
                     {/* WhatsApp */}

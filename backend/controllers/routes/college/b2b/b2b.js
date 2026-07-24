@@ -2113,9 +2113,26 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 		// Get total count
 		const totalLeads = await Lead.countDocuments(baseQuery);
 
-		// Get count by status
+		const duplicateStatusIds = statuses
+			.filter((s) => /^duplicate$/i.test(String(s.title || '').trim()))
+			.map((s) => s._id);
+		const duplicateMobileFilter = duplicateStatusIds.length
+			? {
+					$or: [
+						{ isDuplicateMobile: true },
+						{ status: { $in: duplicateStatusIds } },
+					],
+			  }
+			: { isDuplicateMobile: true };
+		const duplicateMobileCount = await Lead.countDocuments(
+			mergeLeadQuery(baseQuery, duplicateMobileFilter)
+		);
+
+		// Get count by status (exclude pipeline "Duplicate" — shown via Duplicate chip + flag)
 		const statusCounts = await Promise.all(
-			statuses.map(async (status) => {
+			statuses
+				.filter((status) => !/^duplicate$/i.test(String(status.title || '').trim()))
+				.map(async (status) => {
 				const count = await Lead.countDocuments({
 					...baseQuery,
 					status: status._id
@@ -2149,6 +2166,7 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 			data: {
 				statusCounts,
 				totalLeads,
+				duplicateMobileCount,
 				collegeId: college._id,
 				followupDashboardCounts
 			},
@@ -2734,7 +2752,8 @@ router.get('/leads', isCollege, async (req, res) => {
 			followUpVisitBucket,
 			documentsStatusIn,
 			approvalStatus,
-			referredByMe
+			referredByMe,
+			isDuplicateMobile
 		} = req.query;
 
 		const referredByMeActive = isReferredByMeQuery(referredByMe);
@@ -2799,6 +2818,22 @@ router.get('/leads', isCollege, async (req, res) => {
 				.map((id) => convertToObjectId(id))
 				.filter(Boolean);
 
+		let duplicateMobileQuery = null;
+		if (String(isDuplicateMobile).toLowerCase() === 'true') {
+			const College = require('../../../models/college');
+			const collegeDoc = await College.findOne({ '_concernPerson._id': req.user._id }).select('_id');
+			const dupStatuses = await StatusB2b.find({
+				...(collegeDoc?._id ? { college: collegeDoc._id } : {}),
+				title: { $regex: /^Duplicate$/i },
+			})
+				.select('_id')
+				.lean();
+			const dupIds = (dupStatuses || []).map((s) => s._id).filter(Boolean);
+			duplicateMobileQuery = dupIds.length
+				? { $or: [{ isDuplicateMobile: true }, { status: { $in: dupIds } }] }
+				: { isDuplicateMobile: true };
+		}
+
 		// Build the final query
 		const finalQuery = {
 			$and: [
@@ -2811,6 +2846,7 @@ router.get('/leads', isCollege, async (req, res) => {
 				// Other filters - Convert to ObjectId if valid
 				...(statusIn ? [{ status: { $in: parseIdList(statusIn) } }] : []),
 				...(!statusIn && status ? [{ status: convertToObjectId(status) }] : []),
+				...(duplicateMobileQuery ? [duplicateMobileQuery] : []),
 
 				...(leadCategoryIn ? [{ leadCategory: { $in: parseIdList(leadCategoryIn) } }] : []),
 				...(!leadCategoryIn && leadCategory ? [{ leadCategory: convertToObjectId(leadCategory) }] : []),
@@ -3678,27 +3714,7 @@ router.post('/add-lead', isCollege, async (req, res) => {
 		let resolvedStatusId = null;
 		let resolvedSubStatusId = null;
 
-		// Duplicate mobile → force Lead Status + Sub Status = "Duplicate"
-		if (isDuplicateMobile) {
-			let duplicateStatus = null;
-			if (collegeIdForPipeline) {
-				duplicateStatus = await StatusB2b.findOne({
-					college: collegeIdForPipeline,
-					title: { $regex: /^Duplicate$/i },
-				});
-			}
-			if (!duplicateStatus) {
-				duplicateStatus = await StatusB2b.findOne({
-					$and: [titleMatchExpr('duplicate'), pipelineStatusScope],
-				});
-			}
-			if (duplicateStatus) {
-				resolvedStatusId = duplicateStatus._id;
-				const subs = duplicateStatus.substatuses || [];
-				const dupSub = subs.find((s) => s?.title && /^Duplicate$/i.test(String(s.title).trim()));
-				resolvedSubStatusId = dupSub?._id || (subs[0]?._id) || null;
-			}
-		}
+		// Keep user-selected status even when mobile is duplicate (flagged via isDuplicateMobile)
 
 		const rawStatus = requestedPipelineStatus != null ? String(requestedPipelineStatus).trim() : '';
 		if (!resolvedStatusId && rawStatus) {
@@ -3779,6 +3795,7 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			leadAddedBy: req.user._id,
 			remark,
 			landlineNumber,
+			isDuplicateMobile: Boolean(isDuplicateMobile),
 			approval: { status: 'PENDING' }
 		};
 
@@ -3807,9 +3824,9 @@ router.post('/add-lead', isCollege, async (req, res) => {
 
 
 		let savedLead = await newLead.save();
+		let statusMessage = 'default status';
 
 		if (savedLead) {
-			let statusMessage = 'default status';
 			if (finalStatusId) {
 				const sd = await StatusB2b.findById(finalStatusId).select('title');
 				statusMessage = sd?.title || 'pipeline status';
@@ -3818,10 +3835,10 @@ router.post('/add-lead', isCollege, async (req, res) => {
 				user: req.user._id,
 				timestamp: new Date(),
 				action: isDuplicateMobile
-					? `Lead added as Duplicate (same mobile already exists) (Approval: PENDING)`
+					? `Lead added with ${statusMessage} (duplicate mobile) (Approval: PENDING)`
 					: `Lead added with ${statusMessage} (Approval: PENDING)`,
 				remarks: remark || (isDuplicateMobile
-					? 'Lead created with Duplicate status due to existing mobile number'
+					? `Lead created with ${statusMessage}; mobile already exists (flagged as duplicate)`
 					: `Lead created with ${statusMessage}`)
 			});
 
@@ -3841,7 +3858,7 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			data: savedLead,
 			isDuplicateMobile: Boolean(isDuplicateMobile),
 			message: isDuplicateMobile
-				? 'Lead created successfully with Duplicate status (mobile already exists)'
+				? `Lead created successfully`
 				: 'Lead created successfully'
 		});
 	} catch (error) {
