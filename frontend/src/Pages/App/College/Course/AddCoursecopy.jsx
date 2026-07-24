@@ -825,7 +825,7 @@ const AddCourse = () => {
 
           setFormData(prev => ({
             ...prev,
-            testimonialvideos: [...prev.testimonialvideos, file]
+            testimonialvideos: [...(prev.testimonialvideos || []), file]
           }));
 
           // Create preview object
@@ -898,7 +898,7 @@ const AddCourse = () => {
 
         setFormData(prevData => ({
           ...prevData,
-          photos: [...prevData.photos, file]
+          photos: [...(prevData.photos || []), file]
         }));
 
 

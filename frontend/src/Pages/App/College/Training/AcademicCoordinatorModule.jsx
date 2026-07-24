@@ -22,7 +22,7 @@ const WORKFLOW_STATUS = {
   SENT_TO_SENIOR: 'Sent to Senior Trainer',
   ASSIGNED: 'Assigned',
   IN_PROGRESS: 'In Progress',
- 
+
 };
 
 const STATUS_TONE = {
@@ -539,50 +539,50 @@ const TotSection = ({
         </div>
       )}
 
-    <label className="ac-tot-check">
-      <input
-        type="checkbox"
-        checked={draft.requireTotCompletionProofs === true}
-        onChange={(e) => onFieldChange('requireTotCompletionProofs', e.target.checked)}
-      />
-      <span>Trainer must submit completion proofs after TOT</span>
-    </label>
+      <label className="ac-tot-check">
+        <input
+          type="checkbox"
+          checked={draft.requireTotCompletionProofs === true}
+          onChange={(e) => onFieldChange('requireTotCompletionProofs', e.target.checked)}
+        />
+        <span>Trainer must submit completion proofs after TOT</span>
+      </label>
 
-    {draft.requireTotCompletionProofs === true && (
+      {draft.requireTotCompletionProofs === true && (
+        <MaterialDefinitionSection
+          title="TOT completion proofs"
+          addLabel="Add proof"
+          emptyText="No completion proofs defined yet."
+          nameColumnLabel="Proof name"
+          typeColumnLabel="Proof type"
+          namePlaceholder="e.g. Signed TOT certificate"
+          items={draft.totCompletionProofs || []}
+          typeOptions={PROOF_TYPE_OPTIONS}
+          onAdd={onAddTotCompletionProof}
+          onChange={onTotCompletionProofChange}
+          onRemove={onRemoveTotCompletionProof}
+        />
+      )}
+
       <MaterialDefinitionSection
-        title="TOT completion proofs"
-        addLabel="Add proof"
-        emptyText="No completion proofs defined yet."
-        nameColumnLabel="Proof name"
-        typeColumnLabel="Proof type"
-        namePlaceholder="e.g. Signed TOT certificate"
-        items={draft.totCompletionProofs || []}
-        typeOptions={PROOF_TYPE_OPTIONS}
-        onAdd={onAddTotCompletionProof}
-        onChange={onTotCompletionProofChange}
-        onRemove={onRemoveTotCompletionProof}
+        title="TOT learning material"
+        addLabel="Add TOT material"
+        emptyText="No TOT material defined yet."
+        items={draft.totMaterials || []}
+        typeOptions={LEARNING_MATERIAL_TYPE_OPTIONS}
+        onAdd={onAddTotMaterial}
+        onChange={onTotMaterialChange}
+        onRemove={onRemoveTotMaterial}
       />
-    )}
 
-    <MaterialDefinitionSection
-      title="TOT learning material"
-      addLabel="Add TOT material"
-      emptyText="No TOT material defined yet."
-      items={draft.totMaterials || []}
-      typeOptions={LEARNING_MATERIAL_TYPE_OPTIONS}
-      onAdd={onAddTotMaterial}
-      onChange={onTotMaterialChange}
-      onRemove={onRemoveTotMaterial}
-    />
-
-    <TotQuestionBankSection
-      questions={draft.totQuestionBank || []}
-      onQuestionChange={onTotQuestionChange}
-      onQuestionOptionChange={onTotQuestionOptionChange}
-      onAddQuestion={onAddTotQuestion}
-      onRemoveQuestion={onRemoveTotQuestion}
-    />
-  </div>
+      <TotQuestionBankSection
+        questions={draft.totQuestionBank || []}
+        onQuestionChange={onTotQuestionChange}
+        onQuestionOptionChange={onTotQuestionOptionChange}
+        onAddQuestion={onAddTotQuestion}
+        onRemoveQuestion={onRemoveTotQuestion}
+      />
+    </div>
   );
 };
 
@@ -1582,29 +1582,29 @@ const SessionDetailSidePanel = ({
 
       <div className="ac-side-panel__body">
         {(hasUnitInfo(session) || hasChapterInfo(session) || subTopicLines.length > 0) && (
-        <div className="ac-side-panel__section">
-          <h5>Structure</h5>
-          {hasUnitInfo(session) && (
-            <div className="ac-side-panel__grid ac-side-panel__grid--single">
-              <div><em>Unit</em><strong>{getUnitLabel(session)}</strong></div>
-            </div>
-          )}
-          {hasChapterInfo(session) && (
-            <div className="ac-side-panel__grid ac-side-panel__grid--single">
-              <div><em>Chapter</em><strong>{formatChapterLabel(session) || '—'}</strong></div>
-            </div>
-          )}
-          {subTopicLines.length > 0 && (
-            <div className="ac-side-panel__subtopics">
-              <em>Sub topics</em>
-              <ul>
-                {subTopicLines.map((topic) => (
-                  <li key={topic}>{topic}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
+          <div className="ac-side-panel__section">
+            <h5>Structure</h5>
+            {hasUnitInfo(session) && (
+              <div className="ac-side-panel__grid ac-side-panel__grid--single">
+                <div><em>Unit</em><strong>{getUnitLabel(session)}</strong></div>
+              </div>
+            )}
+            {hasChapterInfo(session) && (
+              <div className="ac-side-panel__grid ac-side-panel__grid--single">
+                <div><em>Chapter</em><strong>{formatChapterLabel(session) || '—'}</strong></div>
+              </div>
+            )}
+            {subTopicLines.length > 0 && (
+              <div className="ac-side-panel__subtopics">
+                <em>Sub topics</em>
+                <ul>
+                  {subTopicLines.map((topic) => (
+                    <li key={topic}>{topic}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         )}
 
         <div className="ac-side-panel__section">
@@ -1658,7 +1658,7 @@ const SessionDetailSidePanel = ({
           )}
         </div>
 
-        
+
 
         <div className="ac-side-panel__section">
           <h5>Activity &amp; TOT</h5>
@@ -2059,7 +2059,7 @@ const SessionPlanModal = ({
             </label>
           </div>
 
-         
+
           <MaterialDefinitionSection
             title="Student learning material"
             addLabel="Add material"
@@ -2071,7 +2071,7 @@ const SessionPlanModal = ({
             onRemove={onRemoveLearningMaterial}
           />
 
-<MaterialDefinitionSection
+          <MaterialDefinitionSection
             title="Student Required documents"
             addLabel="Add document"
             emptyText="No documents defined yet."
@@ -2081,7 +2081,7 @@ const SessionPlanModal = ({
             onChange={onEvidenceChange}
             onRemove={onRemoveEvidence}
           />
- <MaterialDefinitionSection
+          <MaterialDefinitionSection
             title="Standard TLM"
             addLabel="Add document"
             emptyText="No standard TLM documents defined yet."
@@ -2144,9 +2144,9 @@ const SessionPlanModal = ({
             />
           </label>
 
-          
 
-          
+
+
         </div>
 
         <div className="ac-modal__foot">
@@ -2426,10 +2426,13 @@ const AcademicCoordinatorModule = () => {
   const [seniorTrainersLoading, setSeniorTrainersLoading] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState('');
   const [toast, setToast] = useState('');
-
+  const [toastKey, setToastKey] = useState(0);
+  const toastTimerRef = useRef(null);
   const notify = (msg) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast(msg);
-    setTimeout(() => setToast(''), 2500);
+    setToastKey((k) => k + 1);
+    toastTimerRef.current = setTimeout(() => setToast(''), 2500);
   };
 
   // Clear router query/state after deep-link is consumed (keep module cache for Strict Mode remount)
@@ -3203,9 +3206,11 @@ const AcademicCoordinatorModule = () => {
       ...prev.draft,
       totQuestionBank: (prev.draft.totQuestionBank || []).map((question, i) => (
         i === questionIndex
-          ? { ...question, options: question.options.map((option, optIdx) => (
-            optIdx === optionIndex ? value : option
-          )) }
+          ? {
+            ...question, options: question.options.map((option, optIdx) => (
+              optIdx === optionIndex ? value : option
+            ))
+          }
           : question
       )),
     },
@@ -3572,7 +3577,7 @@ const AcademicCoordinatorModule = () => {
             totalSessions={sessions.length}
           />
 
-          
+
 
           <div className="ac-filters">
             <input
@@ -3683,8 +3688,11 @@ const AcademicCoordinatorModule = () => {
       )}
 
       {toast && (
-        <div className="ac-toast">
-          <i className="fas fa-check-circle" /> {toast}
+        <div key={toastKey} className="ac-toast">
+          <div className="ac-toast__body">
+            <i className="fas fa-check-circle" /> {toast}
+          </div>
+          <div className="ac-toast__progress" />
         </div>
       )}
     </div>
@@ -4289,8 +4297,20 @@ const AC_CSS = `
   }
 
   .ac-toast {
-    position: fixed; bottom: 20px; right: 20px; background: #1e293b; color: #fff; padding: 10px 16px;
-    border-radius: 10px; font-size: 13px; font-weight: 600; z-index: 500; display: flex; align-items: center; gap: 8px;
+    position: fixed; top: 20px; right: 20px; min-width: 260px; max-width: min(420px, calc(100vw - 40px));
+    background: #16a34a; color: #fff; border-radius: 10px; font-size: 13px; font-weight: 600;
+    z-index: 10000; overflow: hidden; box-shadow: 0 10px 28px rgba(22, 163, 74, 0.35);
+  }
+     .ac-toast__body {
+    display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+  }
+  .ac-toast__progress {
+    height: 3px; background: rgba(255, 255, 255, 0.9); transform-origin: left center;
+    animation: ac-toast-progress 10s linear forwards;
+  }
+  @keyframes ac-toast-progress {
+    from { transform: scaleX(1); }
+    to { transform: scaleX(0); }
   }
 
   .ac-dual-calendars {
