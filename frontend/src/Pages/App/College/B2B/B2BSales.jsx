@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import DatePicker from 'react-date-picker';
+import Calendar from 'react-calendar';
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
@@ -125,6 +126,17 @@ function getLeadAddressLine(lead) {
 function getLeadGroupRootId(lead) {
   if (!lead) return '';
   return String(lead.crossSaleRootId || lead.parentLeadId || lead._id || '');
+}
+
+function isDuplicatePerformanceStatus(status) {
+  return /^duplicate$/i.test(String(status?.statusName || status?.name || '').trim());
+}
+
+/** Synthetic Performance filter for duplicate-mobile leads (not a pipeline status id) */
+const DUPLICATE_MOBILE_FILTER = '__duplicate_mobile__';
+
+function isDuplicateMobileFilter(statusFilter) {
+  return String(statusFilter) === DUPLICATE_MOBILE_FILTER;
 }
 
 function buildLeadRemarkSuggestion({ leadFormData, leadCategoryOptions, typeOfB2BOptions }) {
@@ -799,7 +811,9 @@ const B2BSales = () => {
     typeOfB2B: '',
     leadStatus: '',
     leadSubStatus: '',
-    leadOwner: ''
+    leadOwner: '',
+    leadCoOwner: '',
+    leadRanking: ''
   });
   const [bulkUploadFormErrors, setBulkUploadFormErrors] = useState({});
   const [bulkUploadSubStatuses, setBulkUploadSubStatuses] = useState([]);
@@ -807,8 +821,12 @@ const B2BSales = () => {
 
   // Bulk inputs state
   const [showBulkInputs, setShowBulkInputs] = useState(false);
-  const [bulkMode, setBulkMode] = useState('');
+  const [bulkMode, setBulkMode] = useState(''); // 'whatsapp' | 'bulkrefer' | 'bulkaction'
   const [input1Value, setInput1Value] = useState('');
+  const [modalType, setModalType] = useState(null); // 'whatsapp'
+  const [selectedWhatsappNumbers, setSelectedWhatsappNumbers] = useState([]);
+  const [selectedWhatsappTemplateModal, setSelectedWhatsappTemplateModal] = useState('');
+  const [isSendingBulkWhatsapp, setIsSendingBulkWhatsapp] = useState(false);
 
   // Lead form state
   const [leadFormData, setLeadFormData] = useState({
@@ -830,14 +848,18 @@ const B2BSales = () => {
     whatsapp: '',
     landlineNumber: '',
     leadOwner: '',
+    leadCoOwner: '',
     leadStatus: '',
     leadSubStatus: '',
+    leadRanking: '',
     remark: ''
   });
 
   // Form validation state
   const [formErrors, setFormErrors] = useState({});
   const [extractedNumbers, setExtractedNumbers] = useState([]);
+  const [isDuplicateMobile, setIsDuplicateMobile] = useState(false);
+  const mobileDuplicateCheckRef = useRef(0);
 
   //refer lead stats
   const [concernPersons, setConcernPersons] = useState([]);
@@ -901,6 +923,10 @@ const B2BSales = () => {
   /** Sub-statuses for the Add Lead modal (loaded from `/statusB2b/:id/substatus`) */
   const [addLeadSubStatuses, setAddLeadSubStatuses] = useState([]);
   const [addLeadSubStatusesLoading, setAddLeadSubStatusesLoading] = useState(false);
+
+  // Lead Ranking state
+  const [leadRankings, setLeadRankings] = useState([]);
+  const [leadRankingsLoading, setLeadRankingsLoading] = useState(false);
 
   // Google Maps API
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -1011,6 +1037,17 @@ const B2BSales = () => {
         return;
       }
 
+      if (showPanel === 'editPanel' || showPanel === 'bulkstatuschange') {
+        if (!seletectedStatus) {
+          alert('Please select a status');
+          return;
+        }
+        if (!seletectedSubStatus?._id) {
+          alert('Please select a sub-status');
+          return;
+        }
+      }
+
       // Determine whether follow-up fields are filled
       const hasFollowup =
         (showPanel === 'followUp') ||
@@ -1048,7 +1085,7 @@ const B2BSales = () => {
 
         const statusData = {
           status: seletectedStatus,
-          subStatus: seletectedSubStatus?._id || null,
+          subStatus: seletectedSubStatus._id,
           remarks: followupFormData.remarks || 'Bulk status updated via B2B panel'
         };
 
@@ -1080,10 +1117,20 @@ const B2BSales = () => {
       }
 
       // 2) Edit panel: change status (and optionally set follow-up + Google Calendar) via B2B status API
-      if (showPanel === 'editPanel' && selectedProfile && seletectedStatus) {
+      if (showPanel === 'editPanel' && selectedProfile && seletectedStatus && seletectedSubStatus?._id) {
+        if (seletectedSubStatus?.hasRemarks && !followupFormData.remarks?.trim()) {
+          alert('Remarks are mandatory for this status. Please add remarks.');
+          return;
+        }
+
+        if (seletectedSubStatus?.hasFollowup && !hasFollowupData) {
+          alert('Follow-up date and time are mandatory for this status.');
+          return;
+        }
+
         const statusData = {
           status: seletectedStatus,
-          subStatus: seletectedSubStatus?._id || null,
+          subStatus: seletectedSubStatus._id,
           remarks: followupFormData.remarks || 'Status updated via B2B panel'
         };
 
@@ -1124,6 +1171,9 @@ const B2BSales = () => {
         alert(`✅ ${followupFormData.followUpType === 'Visit' ? 'Visit' : 'Call'} follow-up saved and scheduled successfully!`);
         // ensure UI updates immediately (even if custom event listener misses)
         await fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
+        if (leadViewTab === 'all') {
+          await fetchStatusCounts();
+        }
       }
 
       window.dispatchEvent(new CustomEvent('b2b-followup-updated'));
@@ -1143,6 +1193,10 @@ const B2BSales = () => {
   };
 
   const getLeadFollowupDateLabel = (lead, type) => {
+    // Missed / done followups have no upcoming date
+    const bucket = getLeadFollowupBucket(lead, type);
+    if (bucket === 'missed' || bucket === 'done') return 'NA';
+
     const t = String(type || '').toLowerCase();
     const bySlot = t === 'visit'
       ? (lead?.followUpVisit || null)
@@ -1157,7 +1211,7 @@ const B2BSales = () => {
       }
     }
     if (legacy?.followupDate) return formatFollowupDate(legacy.followupDate);
-    return '—';
+    return 'NA';
   };
 
   const getFollowupBucket = (followUpLike) => {
@@ -1186,6 +1240,22 @@ const B2BSales = () => {
     if (t === 'call' && legacyType === 'visit') return null;
     return getFollowupBucket(legacy);
   };
+
+  const getLeadFollowupDoneCount = (lead, type) => {
+    const t = String(type || '').toLowerCase() === 'visit' ? 'visit' : 'call';
+    const apiCount = Number(lead?.followupStats?.[t]?.done);
+    if (Number.isFinite(apiCount) && apiCount > 0) return apiCount;
+    return getLeadFollowupBucket(lead, type) === 'done' ? 1 : 0;
+  };
+
+  const leadHasFollowup = (lead, type) => (
+    Boolean(getLeadFollowupBucket(lead, type)) || getLeadFollowupDoneCount(lead, type) > 0
+  );
+
+  // Light-red empty style only when neither Call nor Visit followup exists
+  const leadHasAnyFollowup = (lead) => (
+    leadHasFollowup(lead, 'Call') || leadHasFollowup(lead, 'Visit')
+  );
 
   const getLeadDocumentsBucket = (lead) => {
     const required = Array.isArray(lead?.leadCategory?.documents) ? lead.leadCategory.documents : [];
@@ -1415,6 +1485,20 @@ const B2BSales = () => {
           (typeOfB2BRes.data.data || []).filter((type) => type.isActive !== false)
         );
       }
+
+      try {
+        setLeadRankingsLoading(true);
+        const rankingsRes = await axios.get(`${backendUrl}/college/b2b/lead-rankings?status=true`, {
+          headers: { 'x-auth': token }
+        });
+        if (rankingsRes.data.status) {
+          setLeadRankings(
+            (rankingsRes.data.data || []).filter((ranking) => ranking.isActive !== false)
+          );
+        }
+      } finally {
+        setLeadRankingsLoading(false);
+      }
     } catch (err) {
       console.error('Failed to fetch B2B dropdown options:', err);
     }
@@ -1573,6 +1657,13 @@ const B2BSales = () => {
     // Extract numbers
     const extracted = extractMobileNumbers(cleanValue);
     setExtractedNumbers(extracted);
+
+    if (name === 'mobile' && !editingLeadId) {
+      const digits = String(cleanValue || '').replace(/\D/g, '').slice(-10);
+      if (digits.length !== 10) {
+        setIsDuplicateMobile(false);
+      }
+    }
   };
 
   // Validate lead form
@@ -1620,6 +1711,7 @@ const B2BSales = () => {
   // Add state for leads data
   const [leads, setLeads] = useState([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
+  const [downloadingPerformanceLeads, setDownloadingPerformanceLeads] = useState(false);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState(null);
   const [leadViewTab, setLeadViewTab] = useState('all'); // 'all' | 'myRefer'
   const [myReferLeadsCount, setMyReferLeadsCount] = useState(0);
@@ -1638,20 +1730,19 @@ const B2BSales = () => {
   });
 
   const sortedPerformanceStatuses = useMemo(() => {
-    const order = ['HOT', 'WARM', 'COLD', 'PROSPECT'];
-    const list = [...(statusCounts || [])];
-    list.sort((a, b) => {
-      const na = (a.statusName || '').toUpperCase();
-      const nb = (b.statusName || '').toUpperCase();
-      const ia = order.indexOf(na);
-      const ib = order.indexOf(nb);
-      if (ia === -1 && ib === -1) return 0;
-      if (ia === -1) return 1;
-      if (ib === -1) return -1;
-      return ia - ib;
-    });
+    const list = [...(statusCounts || [])].filter((s) => !isDuplicatePerformanceStatus(s));
+    list.sort((a, b) => (a.statusIndex ?? 9999) - (b.statusIndex ?? 9999));
     return list;
   }, [statusCounts]);
+
+  const [duplicateMobileCount, setDuplicateMobileCount] = useState(0);
+
+  // Dedicated Duplicate chip — filters by isDuplicateMobile flag (lead keeps its real status)
+  const duplicatePerformanceStatus = useMemo(() => ({
+    statusId: DUPLICATE_MOBILE_FILTER,
+    statusName: 'Duplicate',
+    count: duplicateMobileCount,
+  }), [duplicateMobileCount]);
 
   const dashboardB2BCounts = useMemo(() => {
     const list = Array.isArray(leads) ? leads : [];
@@ -1677,8 +1768,8 @@ const B2BSales = () => {
     b2bDepartment: '',
     typeOfB2B: [],
     leadOwner: [],
-    hasFollowUpCall: false,
-    hasFollowUpVisit: false,
+    hasFollowUpCall: '', // '' | true | false
+    hasFollowUpVisit: '', // '' | true | false
     followUpCallBucket: '', // '' | 'done' | 'planned' | 'missed'
     followUpVisitBucket: '',
     documentsStatus: [], // ['done','pending']
@@ -1698,6 +1789,18 @@ const B2BSales = () => {
     subStatus: []
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [headerDatePreset, setHeaderDatePreset] = useState('');
+  const [headerDateFrom, setHeaderDateFrom] = useState(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+  const [headerDateTo, setHeaderDateTo] = useState(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+  const [showHeaderDateRangePicker, setShowHeaderDateRangePicker] = useState(false);
 
   const filtersRef = useRef(filters);
   const leadViewTabRef = useRef(leadViewTab);
@@ -2006,9 +2109,9 @@ const B2BSales = () => {
     return () => window.removeEventListener('b2b-followup-updated', handler);
   }, []);
 
-  // Auto-select leads based on Input 1 value for bulk refer
+  // Auto-select leads based on Input 1 value for bulk WhatsApp / refer / action
   useEffect(() => {
-    if (bulkMode !== 'bulkrefer' && bulkMode !== 'bulkaction') {
+    if (bulkMode !== 'bulkrefer' && bulkMode !== 'bulkaction' && bulkMode !== 'whatsapp') {
       return;
     }
 
@@ -2037,7 +2140,11 @@ const B2BSales = () => {
           const params = {
             page: 1,
             limit: validNumValue.toString(),
-            ...(selectedStatusFilter && { status: selectedStatusFilter })
+            ...(isDuplicateMobileFilter(selectedStatusFilter)
+              ? { isDuplicateMobile: true }
+              : selectedStatusFilter
+                ? { status: selectedStatusFilter }
+                : {})
           };
           appendLeadFilterParams(params, eff);
 
@@ -2070,13 +2177,13 @@ const B2BSales = () => {
     }
   }, [input1Value, bulkMode, leads, totalLeads, filters, selectedStatusFilter, token]);
 
+  // Only clear dashboard drill-down chips (Done/Planned/Missed).
+  // Keep modal filters like hasFollowUpCall / hasFollowUpVisit intact.
   const getDashSubFiltersCleared = (base = filtersRef.current) => ({
     ...base,
     followUpCallBucket: '',
     followUpVisitBucket: '',
     documentsStatus: [],
-    hasFollowUpCall: false,
-    hasFollowUpVisit: false,
   });
 
   // Handle status card click (Performance: HOT, WARM, etc.)
@@ -2084,6 +2191,7 @@ const B2BSales = () => {
     setSelectedStatusFilter(statusId);
     setSelectedApprovalStatus(null);
     const next = getDashSubFiltersCleared();
+    syncFiltersRef(next);
     setFilters(next);
     setCurrentPage(1);
     fetchLeads(statusId, 1, getLeadFetchOverrides({ ...next, approvalStatus: null }));
@@ -2104,8 +2212,10 @@ const B2BSales = () => {
       || (Array.isArray(f.leadOwner) && f.leadOwner.length)
       || f.followUpCallBucket
       || f.followUpVisitBucket
-      || f.hasFollowUpCall
-      || f.hasFollowUpVisit
+      || f.hasFollowUpCall === true
+      || f.hasFollowUpCall === false
+      || f.hasFollowUpVisit === true
+      || f.hasFollowUpVisit === false
       || (Array.isArray(f.documentsStatus) && f.documentsStatus.length)
       || f.dateRange?.start
       || f.dateRange?.end
@@ -2121,10 +2231,49 @@ const B2BSales = () => {
     );
   };
 
+  const resetHeaderDateFilterState = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    setHeaderDatePreset('');
+    setHeaderDateFrom(today);
+    setHeaderDateTo(today);
+    setShowHeaderDateRangePicker(false);
+  };
+
+  const toDateInputValue = (date) => {
+    if (!date) return null;
+    const d = date instanceof Date ? date : new Date(date);
+    if (Number.isNaN(d.getTime())) return null;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const parseDateInputValue = (value) => {
+    if (!value) return null;
+    if (value instanceof Date) {
+      const d = new Date(value);
+      d.setHours(0, 0, 0, 0);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      const d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+
   const showAllLeads = () => {
     setLeadViewTab('all');
     setSelectedStatusFilter(null);
     setSelectedApprovalStatus(null);
+    resetHeaderDateFilterState();
     const cleared = {
       search: '',
       leadCategory: [],
@@ -2132,8 +2281,8 @@ const B2BSales = () => {
       b2bDepartment: '',
       typeOfB2B: [],
       leadOwner: [],
-      hasFollowUpCall: false,
-      hasFollowUpVisit: false,
+      hasFollowUpCall: '',
+      hasFollowUpVisit: '',
       followUpCallBucket: '',
       followUpVisitBucket: '',
       documentsStatus: [],
@@ -2143,6 +2292,7 @@ const B2BSales = () => {
       status: [],
       subStatus: []
     };
+    syncFiltersRef(cleared);
     setFilters(cleared);
     setCurrentPage(1);
     fetchLeads(null, 1, { ...cleared, approvalStatus: null });
@@ -2154,6 +2304,7 @@ const B2BSales = () => {
     setSelectedStatusFilter(null);
     setSelectedApprovalStatus(null);
     const next = getDashSubFiltersCleared();
+    syncFiltersRef(next);
     setFilters(next);
     setCurrentPage(1);
     fetchLeads(null, 1, getLeadFetchOverrides({ ...next, approvalStatus: null }));
@@ -2166,9 +2317,14 @@ const B2BSales = () => {
     clearFollowupDashFilters();
   };
 
+  const syncFiltersRef = (next) => {
+    filtersRef.current = next;
+    return next;
+  };
+
   // Filter handlers
   const handleFilterChange = (key, value) => {
-    setFilters(prev => ({
+    setFilters((prev) => syncFiltersRef({
       ...prev,
       [key]: value
     }));
@@ -2176,13 +2332,13 @@ const B2BSales = () => {
 
   const toCsv = (arr) => (Array.isArray(arr) ? arr.filter(Boolean).join(',') : '');
 
+  // Strip only dash drill-downs when computing status/approval totals.
+  // Modal Yes/No followup filters should still apply to those counts.
   const stripDashboardSubFilters = (eff) => ({
     ...eff,
     followUpCallBucket: '',
     followUpVisitBucket: '',
     documentsStatus: [],
-    hasFollowUpCall: false,
-    hasFollowUpVisit: false,
   });
 
   const appendLeadFilterParams = (params, eff, options = {}) => {
@@ -2206,8 +2362,10 @@ const B2BSales = () => {
     if (eff.nextActionDateRange?.end) params.nextActionToDate = eff.nextActionDateRange.end;
     if (Array.isArray(eff.status) && eff.status.length) params.statusIn = toCsv(eff.status);
     if (Array.isArray(eff.subStatus) && eff.subStatus.length) params.subStatusIn = toCsv(eff.subStatus);
-    if (eff.hasFollowUpCall) params.hasFollowUpCall = true;
-    if (eff.hasFollowUpVisit) params.hasFollowUpVisit = true;
+    if (eff.hasFollowUpCall === true || eff.hasFollowUpCall === 'yes') params.hasFollowUpCall = true;
+    else if (eff.hasFollowUpCall === false || eff.hasFollowUpCall === 'no') params.hasFollowUpCall = false;
+    if (eff.hasFollowUpVisit === true || eff.hasFollowUpVisit === 'yes') params.hasFollowUpVisit = true;
+    else if (eff.hasFollowUpVisit === false || eff.hasFollowUpVisit === 'no') params.hasFollowUpVisit = false;
     if (eff.followUpCallBucket) params.followUpCallBucket = eff.followUpCallBucket;
     if (eff.followUpVisitBucket) params.followUpVisitBucket = eff.followUpVisitBucket;
     if (Array.isArray(eff.documentsStatus) && eff.documentsStatus.length) {
@@ -2232,6 +2390,7 @@ const B2BSales = () => {
       setSelectedStatusFilter(null);
       setSelectedApprovalStatus(null);
     }
+    syncFiltersRef(next);
     setFilters(next);
     setCurrentPage(1);
     const overrides = getLeadFetchOverrides({ ...next, approvalStatus: null });
@@ -2257,7 +2416,7 @@ const B2BSales = () => {
     } else if (key === 'leadOwner') {
       next.leadOwner = value ? [value] : [];
     }
-    setFilters(next);
+    setFilters(syncFiltersRef(next));
     setCurrentPage(1);
     fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides(next));
     if (leadViewTab === 'all') {
@@ -2336,34 +2495,252 @@ const B2BSales = () => {
   );
 
   const handleDateRangeChange = (rangeKey, type, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [rangeKey]: {
+    setFilters((prev) => {
+      const nextRange = {
         ...(prev[rangeKey] || {}),
         [type]: value || null
+      };
+      if (rangeKey === 'dateRange') {
+        const start = type === 'start' ? (value || null) : nextRange.start;
+        const end = type === 'end' ? (value || null) : nextRange.end;
+        if (start || end) {
+          setHeaderDatePreset('custom');
+          const parsedStart = parseDateInputValue(start);
+          const parsedEnd = parseDateInputValue(end);
+          if (parsedStart) setHeaderDateFrom(parsedStart);
+          if (parsedEnd) setHeaderDateTo(parsedEnd);
+        } else {
+          resetHeaderDateFilterState();
+        }
       }
-    }));
+      return syncFiltersRef({
+        ...prev,
+        [rangeKey]: nextRange
+      });
+    });
   };
 
-  const applyFilters = (filterOverrides = {}) => {
+  const applyHeaderLeadCreationDateFilter = (from, to, preset) => {
+    const start = toDateInputValue(from);
+    const end = toDateInputValue(to);
+    const fromDate = parseDateInputValue(from) || new Date();
+    const toDate = parseDateInputValue(to) || new Date();
+    setHeaderDatePreset(preset);
+    setHeaderDateFrom(fromDate);
+    setHeaderDateTo(toDate);
+    const next = syncFiltersRef({
+      ...filtersRef.current,
+      dateRange: { start, end }
+    });
+    setFilters(next);
     setCurrentPage(1);
-    fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides(filterOverrides));
+    fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides(next));
     if (leadViewTab === 'all') {
-      fetchStatusCounts(filterOverrides);
-      fetchApprovalCounts(filterOverrides);
+      fetchStatusCounts(next);
+      fetchApprovalCounts(next);
+    }
+  };
+
+  const handleHeaderDateReset = () => {
+    resetHeaderDateFilterState();
+    const next = syncFiltersRef({
+      ...filtersRef.current,
+      dateRange: { start: null, end: null }
+    });
+    setFilters(next);
+    setCurrentPage(1);
+    fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides(next));
+    if (leadViewTab === 'all') {
+      fetchStatusCounts(next);
+      fetchApprovalCounts(next);
+    }
+  };
+
+  const handleHeaderDatePreset = (preset) => {
+    if (preset !== 'custom' && headerDatePreset === preset) {
+      handleHeaderDateReset();
+      return;
+    }
+
+    if (preset === 'custom') {
+      setHeaderDatePreset('custom');
+      setShowHeaderDateRangePicker((prev) => !prev);
+      return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let from = new Date(today);
+    let to = new Date(today);
+
+    if (preset === 'yesterday') {
+      from.setDate(from.getDate() - 1);
+      to.setDate(to.getDate() - 1);
+    } else if (preset === 'prev3days') {
+      from.setDate(from.getDate() - 2);
+    } else if (preset === 'thisMonth') {
+      from = new Date(today.getFullYear(), today.getMonth(), 1);
+    }
+
+    setShowHeaderDateRangePicker(false);
+    applyHeaderLeadCreationDateFilter(from, to, preset);
+  };
+
+  const handleHeaderCustomDateApply = () => {
+    if (!headerDateFrom || !headerDateTo) return;
+    applyHeaderLeadCreationDateFilter(headerDateFrom, headerDateTo, 'custom');
+    setShowHeaderDateRangePicker(false);
+  };
+
+  useEffect(() => {
+    if (!showHeaderDateRangePicker) return undefined;
+    const handleClickOutside = (e) => {
+      if (e.target.closest('.adm-header-date-range')) return;
+      if (e.target.closest('.react-calendar')) return;
+      if (e.target.closest('.react-date-picker__calendar')) return;
+      setShowHeaderDateRangePicker(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showHeaderDateRangePicker]);
+
+  const renderHeaderDateRangeFilter = (compact = false) => (
+    <div
+      className={`adm-header-date-range${compact ? ' adm-header-date-range--compact' : ''}`}
+    >
+      <div className="adm-header-date-range__pills">
+        {[
+          { id: 'today', label: 'Today' },
+          { id: 'yesterday', label: 'Yesterday' },
+          { id: 'prev3days', label: compact ? '3 Days' : 'Previous 3 days' },
+          { id: 'thisMonth', label: 'This Month' },
+        ].map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={`adm-header-date-range__pill${headerDatePreset === item.id ? ' adm-header-date-range__pill--active' : ''}`}
+            onClick={() => handleHeaderDatePreset(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
+        <div className="adm-header-date-range__custom-wrap">
+          <button
+            type="button"
+            className={`adm-header-date-range__pill adm-header-date-range__pill--range${headerDatePreset === 'custom' ? ' adm-header-date-range__pill--active' : ''}`}
+            onClick={() => handleHeaderDatePreset('custom')}
+          >
+            <i className="fas fa-calendar-alt me-1" aria-hidden="true" />
+            Date Range
+            <i
+              className={`fas fa-chevron-${showHeaderDateRangePicker ? 'up' : 'down'} ms-1`}
+              style={{ fontSize: '9px' }}
+              aria-hidden="true"
+            />
+          </button>
+          {showHeaderDateRangePicker && (
+            <div className="adm-header-date-range__dropdown">
+              <div className="adm-header-date-range__dropdown-title">Date Range</div>
+              <div className="adm-header-date-range__inputs row g-2">
+                <div className="col-6">
+                  <label className="form-label small mb-1">From</label>
+                  <div className="adm-header-date-range__date-display">
+                    {headerDateFrom ? moment(headerDateFrom).format('DD/MM/YYYY') : '—'}
+                  </div>
+                </div>
+                <div className="col-6">
+                  <label className="form-label small mb-1">To</label>
+                  <div className="adm-header-date-range__date-display">
+                    {headerDateTo ? moment(headerDateTo).format('DD/MM/YYYY') : '—'}
+                  </div>
+                </div>
+              </div>
+              <div className="adm-header-date-range__calendars-row">
+                <div className="adm-header-date-range__calendar-col">
+                  <Calendar
+                    onChange={(date) => {
+                      setHeaderDateFrom(date);
+                      setHeaderDatePreset('custom');
+                      if (date && headerDateTo && date > headerDateTo) {
+                        setHeaderDateTo(date);
+                      }
+                    }}
+                    value={headerDateFrom}
+                    maxDate={headerDateTo || new Date()}
+                    className="adm-header-date-range__calendar"
+                  />
+                </div>
+                <div className="adm-header-date-range__calendar-col">
+                  <Calendar
+                    onChange={(date) => {
+                      setHeaderDateTo(date);
+                      setHeaderDatePreset('custom');
+                      if (date && headerDateFrom && date < headerDateFrom) {
+                        setHeaderDateFrom(date);
+                      }
+                    }}
+                    value={headerDateTo}
+                    minDate={headerDateFrom}
+                    maxDate={new Date()}
+                    className="adm-header-date-range__calendar"
+                  />
+                </div>
+              </div>
+              {(headerDateFrom || headerDateTo) && (
+                <div className="adm-header-date-range__selected small mt-2">
+                  <i className="fas fa-info-circle me-1" aria-hidden="true" />
+                  {headerDateFrom && moment(headerDateFrom).format('DD MMM YYYY')}
+                  {headerDateFrom && headerDateTo && ' — '}
+                  {headerDateTo && moment(headerDateTo).format('DD MMM YYYY')}
+                </div>
+              )}
+              <button
+                type="button"
+                className="btn btn-sm w-100 mt-2 adm-header-date-range__apply-btn"
+                onClick={handleHeaderCustomDateApply}
+                disabled={!headerDateFrom || !headerDateTo}
+              >
+                Apply
+              </button>
+            </div>
+          )}
+        </div>
+        {(headerDatePreset || filters.dateRange?.start || filters.dateRange?.end) && (
+          <button
+            type="button"
+            className="adm-header-date-range__pill adm-header-date-range__pill--clear"
+            onClick={handleHeaderDateReset}
+            title="Clear date filter"
+          >
+            <i className="fas fa-times me-1" aria-hidden="true" />
+            Clear
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  const applyFilters = (filterOverrides = {}) => {
+    const merged = syncFiltersRef({ ...filtersRef.current, ...filterOverrides });
+    setCurrentPage(1);
+    fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides(merged));
+    if (leadViewTab === 'all') {
+      fetchStatusCounts(merged);
+      fetchApprovalCounts(merged);
     }
   };
 
   const clearFilters = () => {
-    setFilters({
+    resetHeaderDateFilterState();
+    const cleared = {
       search: '',
       leadCategory: [],
       b2bProject: '',
       b2bDepartment: '',
       typeOfB2B: [],
       leadOwner: [],
-      hasFollowUpCall: false,
-      hasFollowUpVisit: false,
+      hasFollowUpCall: '',
+      hasFollowUpVisit: '',
       followUpCallBucket: '',
       followUpVisitBucket: '',
       documentsStatus: [],
@@ -2381,12 +2758,14 @@ const B2BSales = () => {
       },
       status: [],
       subStatus: []
-    });
+    };
+    syncFiltersRef(cleared);
+    setFilters(cleared);
     setCurrentPage(1);
-    fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides());
+    fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides(cleared));
     if (leadViewTab === 'all') {
-      fetchStatusCounts();
-      fetchApprovalCounts();
+      fetchStatusCounts(cleared);
+      fetchApprovalCounts(cleared);
     }
   };
 
@@ -2431,7 +2810,9 @@ const B2BSales = () => {
         limit: 20,
       };
 
-      if (statusFilter) {
+      if (isDuplicateMobileFilter(statusFilter)) {
+        params.isDuplicateMobile = true;
+      } else if (statusFilter) {
         params.status = statusFilter;
       }
 
@@ -2484,6 +2865,7 @@ const B2BSales = () => {
       if (response.data.status) {
         setStatusCounts(response.data.data.statusCounts || []);
         setTotalLeads(response.data.data.totalLeads || 0);
+        setDuplicateMobileCount(response.data.data.duplicateMobileCount || 0);
         const fc = response.data.data.followupDashboardCounts;
         if (fc?.call && fc?.visit) {
           setFollowupDashboardCounts(fc);
@@ -2495,6 +2877,118 @@ const B2BSales = () => {
       console.error('Error fetching status counts:', error);
     } finally {
       setLoadingStatusCounts(false);
+    }
+  };
+
+  const getPerformanceExportMeta = () => {
+    if (isDuplicateMobileFilter(selectedStatusFilter)) {
+      const count = pageSize > 0 ? pageSize : (duplicateMobileCount || leads.length);
+      return { label: 'DUPLICATE', count, statusId: null, isDuplicateMobile: true };
+    }
+    if (selectedStatusFilter) {
+      const status = (statusCounts || []).find(
+        (s) => String(s.statusId) === String(selectedStatusFilter)
+      );
+      const label = String(status?.statusName || 'Status').toUpperCase().replace(/\s+/g, '_');
+      const count = pageSize > 0 ? pageSize : (status?.count ?? leads.length);
+      return { label, count, statusId: selectedStatusFilter, isDuplicateMobile: false };
+    }
+    const count = pageSize > 0 ? pageSize : (totalLeads || leads.length);
+    return { label: 'ALL', count, statusId: null, isDuplicateMobile: false };
+  };
+
+  const downloadPerformanceLeads = async () => {
+    if (!token || downloadingPerformanceLeads) return;
+
+    const { label, count, statusId, isDuplicateMobile } = getPerformanceExportMeta();
+    if (!count || count < 1) {
+      alert('No leads available to download for this Performance tab.');
+      return;
+    }
+
+    setDownloadingPerformanceLeads(true);
+    try {
+      const eff = { ...filtersRef.current };
+      const batchSize = 500;
+      const allLeads = [];
+      let page = 1;
+      let totalFromApi = count;
+
+      while (allLeads.length < totalFromApi) {
+        const remaining = totalFromApi - allLeads.length;
+        const params = {
+          page,
+          limit: Math.min(batchSize, remaining),
+          sortBy: 'updatedAt',
+          sortOrder: 'desc',
+        };
+        if (isDuplicateMobile) params.isDuplicateMobile = true;
+        else if (statusId) params.status = statusId;
+        appendLeadFilterParams(params, eff);
+
+        const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
+          headers: { 'x-auth': token },
+          params,
+        });
+
+        if (!response.data?.status) {
+          throw new Error(response.data?.message || 'Failed to fetch leads for download');
+        }
+
+        const batch = response.data.data?.leads || [];
+        const paginationTotal = response.data.data?.pagination?.totalLeads;
+        if (typeof paginationTotal === 'number' && paginationTotal >= 0) {
+          totalFromApi = paginationTotal;
+        }
+
+        if (!batch.length) break;
+        allLeads.push(...batch);
+        if (batch.length < params.limit) break;
+        page += 1;
+        if (page > 200) break;
+      }
+
+      if (!allLeads.length) {
+        alert('No leads available to download for this Performance tab.');
+        return;
+      }
+
+      const rows = allLeads.map((lead) => ({
+        'Business Name': lead.businessName || '',
+        'Concern Person Name': lead.concernPersonName || '',
+        Mobile: lead.mobile || '',
+        Email: lead.email || '',
+        WhatsApp: lead.whatsapp || '',
+        'Landline Number': lead.landlineNumber || '',
+        Designation: lead.designation || '',
+        Address: lead.address || '',
+        City: lead.city || '',
+        State: lead.state || '',
+        'B2B Department': getLeadB2bDepartmentName(lead),
+        'B2B Project': getLeadB2bProjectName(lead),
+        'Type of B2B': lead.typeOfB2B?.name || '',
+        'Lead Source': lead.leadCategory?.name || '',
+        Performance: lead.status?.title || lead.status?.name || '',
+        'Sub Status': getLeadSubStatusTitle(lead) || '',
+        'Lead Ranking': lead.leadRanking?.name || '',
+        Counsellor: lead.leadOwner?.name || '',
+        'Co-owner': lead.leadCoOwner?.name || '',
+        'Added By': lead.leadAddedBy?.name || '',
+        Remark: lead.remark || '',
+        'Created At': lead.createdAt ? moment(lead.createdAt).format('YYYY-MM-DD HH:mm') : '',
+        'Updated At': lead.updatedAt ? moment(lead.updatedAt).format('YYYY-MM-DD HH:mm') : '',
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Leads');
+      const dateStamp = moment().format('YYYY-MM-DD');
+      XLSX.writeFile(wb, `b2b_leads_${label}_${dateStamp}.xlsx`);
+    } catch (error) {
+      console.error('Error downloading performance leads:', error);
+      alert(error.response?.data?.message || error.message || 'Failed to download leads. Please try again.');
+    } finally {
+      setDownloadingPerformanceLeads(false);
     }
   };
 
@@ -2536,6 +3030,7 @@ const B2BSales = () => {
     setSelectedApprovalStatus(nextStatus);
     setSelectedStatusFilter(null);
     const next = getDashSubFiltersCleared();
+    syncFiltersRef(next);
     setFilters(next);
     setCurrentPage(1);
     fetchLeads(null, 1, getLeadFetchOverrides({ ...next, approvalStatus: nextStatus }));
@@ -2709,13 +3204,15 @@ const B2BSales = () => {
     const permissionType = permissions?.permission_type || userData?.permissions?.permission_type;
     if (permissionType === 'Admin') return true;
 
-    // Check if user is the lead owner or lead added by
+    // Check if user is the lead owner, co-owner, or lead added by
     const userId = userData._id;
     const leadAddedById = lead.leadAddedBy?._id || lead.leadAddedBy;
     const leadOwnerId = lead.leadOwner?._id || lead.leadOwner;
+    const leadCoOwnerId = lead.leadCoOwner?._id || lead.leadCoOwner;
 
     return leadAddedById?.toString() === userId?.toString() ||
-      leadOwnerId?.toString() === userId?.toString();
+      leadOwnerId?.toString() === userId?.toString() ||
+      leadCoOwnerId?.toString() === userId?.toString();
   };
 
   const canEditLeadDetails = (lead) => {
@@ -2795,6 +3292,16 @@ const B2BSales = () => {
     } else if (editingLeadId) {
       leadData.leadOwner = null;
     }
+    if (leadFormData.leadCoOwner && String(leadFormData.leadCoOwner).trim()) {
+      leadData.leadCoOwner = String(leadFormData.leadCoOwner).trim();
+    } else if (editingLeadId) {
+      leadData.leadCoOwner = null;
+    }
+    if (leadFormData.leadRanking && String(leadFormData.leadRanking).trim()) {
+      leadData.leadRanking = String(leadFormData.leadRanking).trim();
+    } else if (editingLeadId) {
+      leadData.leadRanking = null;
+    }
     if (selectedLocation) {
       leadData.coordinates = {
         type: 'Point',
@@ -2855,7 +3362,11 @@ const B2BSales = () => {
 
       if (response.data.status) {
         // Show success message
-        alert('Lead added successfully!');
+        alert(
+          response.data.isDuplicateMobile
+            ? (response.data.message || 'Lead added successfully (duplicate mobile — also listed under Duplicate).')
+            : 'Lead added successfully!'
+        );
 
         // Refresh the leads list and status counts
         fetchLeads(null, 1);
@@ -2880,12 +3391,15 @@ const B2BSales = () => {
           whatsapp: '',
           landlineNumber: '',
           leadOwner: '',
+          leadCoOwner: '',
           leadStatus: '',
           leadSubStatus: '',
+          leadRanking: '',
           remark: ''
         });
         setFormErrors({});
         setExtractedNumbers([]);
+        setIsDuplicateMobile(false);
         setSelectedLocation(null);
         setShowMap(false);
         setAddLeadSubStatuses([]);
@@ -2935,8 +3449,10 @@ const B2BSales = () => {
       whatsapp: lead.whatsapp || '',
       landlineNumber: lead.landlineNumber || '',
       leadOwner: lead.leadOwner?._id || lead.leadOwner || '',
+      leadCoOwner: lead.leadCoOwner?._id || lead.leadCoOwner || '',
       leadStatus: '',
       leadSubStatus: '',
+      leadRanking: lead.leadRanking?._id || lead.leadRanking || '',
       remark: lead.remark || ''
     });
     if (coords?.[0] != null && coords?.[1] != null) {
@@ -2972,12 +3488,15 @@ const B2BSales = () => {
       whatsapp: '',
       landlineNumber: '',
       leadOwner: '',
+      leadCoOwner: '',
       leadStatus: '',
       leadSubStatus: '',
+      leadRanking: '',
       remark: ''
     });
     setFormErrors({});
     setExtractedNumbers([]);
+    setIsDuplicateMobile(false);
     setSelectedLocation(null);
     setShowMap(false);
     setAddLeadSubStatuses([]);
@@ -3006,8 +3525,10 @@ const B2BSales = () => {
       whatsapp: '',
       landlineNumber: '',
       leadOwner: uid,
+      leadCoOwner: '',
       leadStatus: '',
       leadSubStatus: '',
+      leadRanking: '',
       remark: ''
     });
     setFormErrors({});
@@ -3155,6 +3676,8 @@ const B2BSales = () => {
       leadStatus: '',
       leadSubStatus: '',
       leadOwner: uid,
+      leadCoOwner: '',
+      leadRanking: '',
     });
     setBulkUploadFormErrors({});
     setBulkUploadSubStatuses([]);
@@ -3169,10 +3692,10 @@ const B2BSales = () => {
   // Bulk Upload Functions (Excel only — same columns as backend import)
   const downloadB2bLeadsSampleExcel = () => {
     const rows = [
-      ['Business Name', 'Concern Person Name', 'Mobile', 'Email', 'Address', 'City', 'State', 'Designation', 'WhatsApp', 'Landline Number', 'Counsellor', 'Remark'],
-      ['ABC Company', 'John Doe', '9876543210', 'john@abc.com', '123 Main Street', 'Mumbai', 'Maharashtra', 'Manager', '9876543210', '0221234567', 'Counsellor Name', 'Sample remark'],
-      ['XYZ Corp', 'Jane Smith', '9876543211', 'jane@xyz.com',  '456 Park Avenue', 'Delhi', 'Delhi', 'Director', '9876543211', '0111234567', 'Owner Name', 'Another remark'],
-      ['Tech Solutions', 'Raj Kumar', '9876543212', 'raj@tech.com','789 Tech Park', 'Bangalore', 'Karnataka', 'CEO', '9876543212', '0801234567', 'Owner Name', 'Technology company']
+      ['Business Name', 'Concern Person Name', 'Mobile', 'Email', 'Address', 'City', 'State', 'Designation', 'WhatsApp', 'Landline Number', 'Remark'],
+      ['ABC Company', 'John Doe', '9876543210', 'john@abc.com', '123 Main Street', 'Mumbai', 'Maharashtra', 'Manager', '9876543210', '0221234567', 'Sample remark'],
+      ['XYZ Corp', 'Jane Smith', '9876543211', 'jane@xyz.com',  '456 Park Avenue', 'Delhi', 'Delhi', 'Director', '9876543211', '0111234567', 'Another remark'],
+      ['Tech Solutions', 'Raj Kumar', '9876543212', 'raj@tech.com','789 Tech Park', 'Bangalore', 'Karnataka', 'CEO', '9876543212', '0801234567', 'Technology company']
     ];
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -3258,6 +3781,12 @@ const B2BSales = () => {
     }
     if (bulkUploadFormData.leadOwner) {
       formData.append('leadOwner', bulkUploadFormData.leadOwner);
+    }
+    if (bulkUploadFormData.leadCoOwner) {
+      formData.append('leadCoOwner', bulkUploadFormData.leadCoOwner);
+    }
+    if (bulkUploadFormData.leadRanking) {
+      formData.append('leadRanking', bulkUploadFormData.leadRanking);
     }
 
     try {
@@ -3361,6 +3890,38 @@ const B2BSales = () => {
 
   ]);
 
+  // When adding a lead, if mobile already exists → flag only (keep user Status / Sub Status)
+  useEffect(() => {
+    if (!showAddLeadModal || editingLeadId) {
+      setIsDuplicateMobile(false);
+      return undefined;
+    }
+
+    const digits = String(leadFormData.mobile || '').replace(/\D/g, '').slice(-10);
+    if (digits.length !== 10 || !token || !backendUrl) {
+      setIsDuplicateMobile(false);
+      return undefined;
+    }
+
+    const requestId = ++mobileDuplicateCheckRef.current;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await axios.get(`${backendUrl}/college/b2b/check-mobile-duplicate`, {
+          params: { mobile: digits },
+          headers: { 'x-auth': token },
+        });
+        if (requestId !== mobileDuplicateCheckRef.current) return;
+        setIsDuplicateMobile(Boolean(res.data?.isDuplicate));
+      } catch (err) {
+        if (requestId === mobileDuplicateCheckRef.current) {
+          console.error('Duplicate mobile check failed:', err);
+        }
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [showAddLeadModal, editingLeadId, leadFormData.mobile, token, backendUrl]);
+
   // edit status and set followup
   const [seletectedStatus, setSelectedStatus] = useState('');
   const [seletectedSubStatus, setSelectedSubStatus] = useState(null);
@@ -3442,7 +4003,26 @@ const B2BSales = () => {
     'Lead Details', ,
     'Documents'
   ];
-
+  // WhatsApp Panel states
+  const [whatsappMessages, setWhatsappMessages] = useState([
+  ]);
+  const [whatsappNewMessage, setWhatsappNewMessage] = useState('');
+  const [selectedWhatsappTemplate, setSelectedWhatsappTemplate] = useState(null);
+  const [showWhatsappTemplateMenu, setShowWhatsappTemplateMenu] = useState(false);
+  const [showWhatsappEmojiPicker, setShowWhatsappEmojiPicker] = useState(false);
+  const [showWhatsappFileMenu, setShowWhatsappFileMenu] = useState(false);
+  const [isSendingWhatsapp, setIsSendingWhatsapp] = useState(false);
+  const [hasActiveSession, setHasActiveSession] = useState(true); // Default true for demo
+  const whatsappMessagesEndRef = useRef(null);
+  const [whatsappTemplates, setWhatsappTemplates] = useState([]);
+  const [isLoadingChatHistory, setIsLoadingChatHistory] = useState(false);
+  const [sessionWindow, setSessionWindow] = useState({
+    isOpen: false,
+    openedAt: null,
+    expiresAt: null,
+    remainingTimeMs: 0
+  });
+  const [sessionCountdown, setSessionCountdown] = useState('24:00:00');
   // Check if device is mobile
   useEffect(() => {
     const checkIfMobile = () => {
@@ -3582,19 +4162,1236 @@ const B2BSales = () => {
     }
   };
 
+  // Check WhatsApp 24-hour session window status
+  const checkSessionWindow = async (phoneNumber) => {
+    try {
+      if (!phoneNumber || !token) {
+        console.error('Ã¢ÂÅ’ Phone number or token missing');
+        return;
+      }
+
+      const response = await axios.get(
+        `${backendUrl}/college/whatsapp/session-window/${phoneNumber}`,
+        {
+          headers: {
+            'x-auth': token
+          }
+        }
+      );
+
+      if (response.data.success) {
+        const { sessionWindow: sw } = response.data;
+        setSessionWindow({
+          isOpen: sw.isOpen,
+          openedAt: sw.lastIncomingMessageAt,
+          expiresAt: sw.expiresAt,
+          remainingTimeMs: sw.remainingTimeMs
+        });
+
+        console.log('Session window status:', {
+          isOpen: sw.isOpen,
+          canSendManualMessages: response.data.messaging.canSendManualMessages,
+          requiresTemplate: response.data.messaging.requiresTemplate,
+          expiresAt: sw.expiresAt
+        });
+      }
+    } catch (error) {
+      console.error('Ã¢ÂÅ’ Error checking session window:', error.response?.data || error.message);
+      // Set default state if error
+      setSessionWindow({
+        isOpen: false,
+        openedAt: null,
+        expiresAt: null,
+        remainingTimeMs: 0
+      });
+    }
+  };
+  useEffect(() => {
+    if (!sessionWindow.isOpen || !sessionWindow.expiresAt) {
+      setSessionCountdown('00:00:00');
+      return;
+    }
+
+    const updateCountdown = () => {
+      const now = new Date();
+      const expiresAt = new Date(sessionWindow.expiresAt);
+      const diff = expiresAt - now;
+
+      if (diff <= 0) {
+        setSessionCountdown('00:00:00');
+        // Session expired, refresh status
+        const phone = getLeadWhatsappPhone(selectedProfile);
+        if (phone) {
+          checkSessionWindow(phone);
+        }
+        return;
+      }
+
+      // Convert to hours, minutes, seconds
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      // Format as HH:MM:SS
+      const formatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      setSessionCountdown(formatted);
+    };
+
+    // Update immediately
+    updateCountdown();
+
+    // Update every second
+    const interval = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(interval);
+  }, [sessionWindow.isOpen, sessionWindow.expiresAt, selectedProfile]);
+
+  // Render message status icon (WhatsApp style)
+  const renderMessageStatus = (status, errorMessage = null) => {
+    switch (status) {
+      case 'sending':
+        return <i className="fas fa-clock" style={{ fontSize: '12px', color: '#8696a0', marginLeft: '4px' }} title="Sending..."></i>;
+      case 'sent':
+        return <i className="fas fa-check" style={{ fontSize: '12px', color: '#8696a0', marginLeft: '4px' }} title="Sent"></i>;
+      case 'delivered':
+        return (
+          <span style={{ position: 'relative', display: 'inline-block', width: '16px', height: '12px', marginLeft: '4px' }} title="Delivered">
+            <i className="fas fa-check" style={{ fontSize: '12px', color: '#8696a0', position: 'absolute', left: '0' }}></i>
+            <i className="fas fa-check" style={{ fontSize: '12px', color: '#8696a0', position: 'absolute', left: '3px' }}></i>
+          </span>
+        );
+      case 'read':
+        return (
+          <span style={{ position: 'relative', display: 'inline-block', width: '16px', height: '12px', marginLeft: '4px' }} title="Read">
+            <i className="fas fa-check" style={{ fontSize: '12px', color: '#53bdeb', position: 'absolute', left: '0' }}></i>
+            <i className="fas fa-check" style={{ fontSize: '12px', color: '#53bdeb', position: 'absolute', left: '3px' }}></i>
+          </span>
+        );
+      case 'failed':
+        return <i className="fas fa-exclamation-circle" style={{ fontSize: '12px', color: '#f44336', marginLeft: '4px', cursor: 'pointer' }} title={errorMessage || 'Message failed to send'}></i>;
+      default:
+        return null;
+    }
+  };
+  // Render WhatsApp Template Message
+  const renderTemplateMessage = (templateData, useSavedExamples = false) => {
+    if (!templateData || !templateData.components) {
+      return null;
+    }
+
+    const components = templateData.components;
+    const headerComponent = components.find(c => c.type === 'HEADER');
+    const bodyComponent = components.find(c => c.type === 'BODY');
+    const footerComponent = components.find(c => c.type === 'FOOTER');
+    const buttonsComponent = components.find(c => c.type === 'BUTTONS');
+    const carouselComponent = components.find(c => c.type === 'CAROUSEL');
+
+    return (
+      <div style={{ width: '100%' }}>
+        {/* Carousel Template */}
+        {carouselComponent && carouselComponent.cards && carouselComponent.cards.length > 0 && (
+          <div style={{ marginBottom: '8px' }}>
+            <div
+              className="d-flex overflow-auto pb-2"
+              style={{
+                gap: '8px',
+                scrollbarWidth: 'thin',
+                scrollbarColor: '#888 #f0f0f0'
+              }}
+            >
+              {carouselComponent.cards.map((card, cardIndex) => {
+                const cardHeader = card.components?.find(c => c.type === 'HEADER');
+                const cardBody = card.components?.find(c => c.type === 'BODY');
+                const cardButtons = card.components?.find(c => c.type === 'BUTTONS');
+                const cardMedia = templateData.carouselMedia?.[cardIndex];
+
+                return (
+                  <div
+                    key={cardIndex}
+                    style={{
+                      minWidth: '220px',
+                      maxWidth: '220px',
+                      backgroundColor: '#fff',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      border: '1px solid #e0e0e0'
+                    }}
+                  >
+                    {/* Card Media */}
+                    {cardHeader && cardMedia?.s3Url && (
+                      <div style={{ position: 'relative', width: '100%', height: '140px' }}>
+                        {cardMedia.mediaType === 'IMAGE' ? (
+                          <img
+                            src={cardMedia.s3Url}
+                            alt={`Card ${cardIndex + 1}`}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover'
+                            }}
+                          />
+                        ) : (
+                          <video
+                            controls
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover'
+                            }}
+                          >
+                            <source src={cardMedia.s3Url} type="video/mp4" />
+                          </video>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Card Body */}
+                    {cardBody && (
+                      <div style={{ padding: '10px', fontSize: '13px', lineHeight: '1.3' }}>
+                        {(() => {
 
 
+                          // Get candidate data for variable replacement
+                          const candidate = selectedProfile?._candidate;
+                          const registration = selectedProfile;
 
+                          // Get template variable mappings from selectedWhatsappTemplate
+                          const variableMappings = selectedWhatsappTemplate?.variableMappings || [];
 
+                          // Replace variables with actual candidate data using stored mappings
+                          let text = cardBody.text || '';
 
+                          if (variableMappings && variableMappings.length > 0) {
+                            // Use stored variable mappings from database
 
+                            variableMappings.forEach(mapping => {
+                              const position = mapping.position;
+                              const variableName = mapping.variableName;
 
+                              // Get value based on actual variable name from mapping
+                              let value = '';
+
+                              switch (variableName) {
+                                case 'name':
+                                  value = candidate?.name || registration?.concernPersonName || registration?.businessName || registration?.name || 'User';
+                                  break;
+                                case 'gender':
+                                  value = candidate?.gender || 'NA';
+                                  break;
+                                case 'mobile':
+                                  value = candidate?.mobile || registration?.whatsapp || registration?.mobile || 'Mobile';
+                                  break;
+                                case 'email':
+                                  value = candidate?.email || registration?.email || 'Email';
+                                  break;
+                                case 'course_name':
+                                  value = selectedProfile?._course?.name || registration?.b2bProject?.name || registration?.typeOfB2B?.name || 'Course Name';
+                                  break;
+                                case 'counselor_name':
+                                  value = selectedProfile?.counsellor?.name || selectedProfile?.leadOwner?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned';
+                                  break;
+                                case 'job_name':
+                                  value = candidate?.appliedJobs?.[0]?.title || registration?.designation || 'Job Title';
+                                  break;
+                                case 'project_name':
+                                  value = selectedProfile?.project?.name || selectedProfile?.b2bProject?.name || selectedProfile?.businessName || 'Project Name';
+                                  break;
+                                case 'batch_name':
+                                  value = selectedProfile?.batch?.name || selectedProfile?.b2bDepartment?.name || 'Batch Not Assigned';
+                                  break;
+                                case 'lead_owner_name':
+                                  value = selectedProfile?.registeredBy?.name || selectedProfile?.leadOwner?.name || selectedProfile?.leadAddedBy?.name || 'Self Registered';
+                                  break;
+                                default:
+                                  // Try direct property access
+                                  value = candidate?.[variableName] || registration?.[variableName] || `[${variableName}]`;
+                                  break;
+                              }
+
+                              // Replace the numbered variable with actual value
+                              text = text.replace(new RegExp(`\\{\\{${position}\\}\\}`, 'g'), value);
+                            });
+                          } else {
+                            // Fallback: Use default mapping if no stored mappings
+
+                            // Replace {{1}} with name
+                            text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
+
+                            // Replace {{2}} with gender
+                            text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
+
+                            // Replace {{3}} with mobile
+                            text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
+
+                            // Replace {{4}} with email
+                            text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
+
+                            // Replace {{5}} with course name
+                            text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || 'Course Name');
+
+                            // Replace {{6}} with counselor name
+                            text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned');
+
+                            // Replace {{7}} with job name
+                            text = text.replace(/\{\{7\}\}/g, selectedProfile?.appliedJobs?.[0]?.title || 'Job Title');
+
+                            // Replace {{8}} with project name (college name)
+                            text = text.replace(/\{\{8\}\}/g, selectedProfile?.project?.name || 'Project Name');
+
+                            // Replace {{9}} with batch name
+                            text = text.replace(/\{\{9\}\}/g, selectedProfile?.batch?.name || 'Batch Not Assigned');
+
+                            // Replace {{10}} with lead owner name
+                            text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Self Registered');
+                          }
+
+                          return text;
+                        })()}
+                      </div>
+                    )}
+
+                    {/* Card Buttons */}
+                    {cardButtons && cardButtons.buttons && cardButtons.buttons.length > 0 && (
+                      <div style={{ borderTop: '1px solid #e0e0e0' }}>
+                        {cardButtons.buttons.map((btn, btnIndex) => (
+                          <div
+                            key={btnIndex}
+                            style={{
+                              padding: '8px',
+                              textAlign: 'center',
+                              color: '#00A5F4',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              cursor: 'pointer',
+                              borderBottom: btnIndex < cardButtons.buttons.length - 1 ? '1px solid #e0e0e0' : 'none'
+                            }}
+                          >
+                            {btn.type === 'URL' && <i className="fas fa-external-link-alt me-1" style={{ fontSize: '11px' }}></i>}
+                            {btn.type === 'PHONE_NUMBER' && <i className="fas fa-phone me-1" style={{ fontSize: '11px' }}></i>}
+                            {btn.text}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ fontSize: '11px', color: '#667781', marginTop: '4px', fontStyle: 'italic' }}>
+              <i className="fas fa-images me-1"></i>Carousel Template ({carouselComponent.cards.length} cards)
+            </div>
+          </div>
+        )}
+
+        {/* Regular Template (Non-Carousel) */}
+        {!carouselComponent && (
+          <>
+            {/* Header */}
+            {headerComponent && (
+              <div className="mb-2">
+                {headerComponent.format === 'TEXT' && (
+                  <div style={{ fontSize: '15px', fontWeight: '600', color: '#000' }}>
+                    {headerComponent.text}
+                  </div>
+                )}
+                {headerComponent.format === 'IMAGE' && templateData.headerMedia?.s3Url && (
+                  <img
+                    src={templateData.headerMedia.s3Url}
+                    alt="Header"
+                    style={{
+                      width: '100%',
+                      maxHeight: '200px',
+                      objectFit: 'cover',
+                      borderRadius: '8px 8px 0 0',
+                      marginLeft: '-10px',
+                      marginTop: '-6px',
+                      marginRight: '-10px',
+                      marginBottom: '8px',
+                      width: 'calc(100% + 20px)'
+                    }}
+                  />
+                )}
+                {headerComponent.format === 'VIDEO' && templateData.headerMedia?.s3Url && (
+                  <video
+                    controls
+                    style={{
+                      width: '100%',
+                      maxHeight: '200px',
+                      borderRadius: '8px 8px 0 0',
+                      marginLeft: '-10px',
+                      marginTop: '-6px',
+                      marginRight: '-10px',
+                      marginBottom: '8px',
+                      width: 'calc(100% + 20px)'
+                    }}
+                  >
+                    <source src={templateData.headerMedia.s3Url} type="video/mp4" />
+                  </video>
+                )}
+                {headerComponent.format === 'DOCUMENT' && templateData.headerMedia?.s3Url && (
+                  <a
+                    href={templateData.headerMedia.s3Url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="d-flex align-items-center p-2 mb-2"
+                    style={{
+                      backgroundColor: '#f0f0f0',
+                      borderRadius: '6px',
+                      textDecoration: 'none',
+                      color: '#000'
+                    }}
+                  >
+                    <i className="fas fa-file-pdf me-2" style={{ fontSize: '20px', color: '#d32f2f' }}></i>
+                    <span style={{ fontSize: '13px' }}>{templateData.headerMedia.fileName || 'Document'}</span>
+                  </a>
+                )}
+              </div>
+            )}
+
+            {/* Body */}
+            {bodyComponent && (
+              <div style={{ fontSize: '14px', lineHeight: '1.4', color: '#000', marginBottom: '8px', whiteSpace: 'pre-wrap' }}>
+                {(() => {
+                  // For saved messages (useSavedExamples=true), use database example values
+                  if (useSavedExamples && bodyComponent.example && bodyComponent.example.body_text && Array.isArray(bodyComponent.example.body_text[0])) {
+                    const exampleValues = bodyComponent.example.body_text[0];
+                    let text = bodyComponent.text || '';
+
+                    // Replace each numbered variable with its saved example value
+                    const variableRegex = /\{\{(\d+)\}\}/g;
+                    const matches = [...text.matchAll(variableRegex)];
+
+                    matches.forEach((match, index) => {
+                      if (index < exampleValues.length && exampleValues[index]) {
+                        const position = match[1];
+                        const replaceRegex = new RegExp(`\\{\\{${position}\\}\\}`, 'g');
+                        text = text.replace(replaceRegex, exampleValues[index]);
+                      }
+                    });
+
+                    return text;
+                  }
+
+                  // For preview mode, get candidate data for variable replacement
+                  const candidate = selectedProfile?._candidate;
+                  const registration = selectedProfile;
+
+                  // Get template variable mappings from selectedWhatsappTemplate
+                  const variableMappings = selectedWhatsappTemplate?.variableMappings || [];
+
+                  // Replace variables with actual candidate data using stored mappings
+                  let text = bodyComponent.text || '';
+
+                  if (variableMappings && variableMappings.length > 0) {
+                    // Use stored variable mappings from database
+
+                    variableMappings.forEach(mapping => {
+                      const position = mapping.position;
+                      const variableName = mapping.variableName;
+
+                      // Get value based on actual variable name from mapping
+                      let value = '';
+
+                      switch (variableName) {
+                        case 'name':
+                          value = candidate?.name || registration?.concernPersonName || registration?.businessName || registration?.name || 'User';
+                          break;
+                        case 'gender':
+                          value = candidate?.gender || 'NA';
+                          break;
+                        case 'mobile':
+                          value = candidate?.mobile || registration?.whatsapp || registration?.mobile || 'Mobile';
+                          break;
+                        case 'email':
+                          value = candidate?.email || registration?.email || 'Email';
+                          break;
+                        case 'course_name':
+                          value = candidate?.appliedCourses?.[0]?.courseName || selectedProfile?.course?.name || selectedProfile?.b2bProject?.name || selectedProfile?.typeOfB2B?.name || 'Course Name';
+                          break;
+                        case 'counselor_name':
+                          value = selectedProfile?.counsellor?.name || selectedProfile?.leadOwner?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned';
+                          break;
+                        case 'job_name':
+                          value = selectedProfile?.appliedJobs?.[0]?.title || selectedProfile?.designation || 'Job Title';
+                          break;
+                        case 'project_name':
+                          value = selectedProfile?.project?.name || selectedProfile?.b2bProject?.name || selectedProfile?.businessName || 'Project Name';
+                          break;
+                        case 'batch_name':
+                          value = selectedProfile?.batch?.name || selectedProfile?.b2bDepartment?.name || 'Batch Not Assigned';
+                          break;
+                        case 'lead_owner_name':
+                          value = selectedProfile?.registeredBy?.name || selectedProfile?.leadOwner?.name || selectedProfile?.leadAddedBy?.name || 'Self Registered';
+                          break;
+                        default:
+                          // Try direct property access
+                          value = candidate?.[variableName] || registration?.[variableName] || `[${variableName}]`;
+                          break;
+                      }
+
+                      // Replace the numbered variable with actual value
+                      text = text.replace(new RegExp(`\\{\\{${position}\\}\\}`, 'g'), value);
+                    });
+                  } else {
+                    // Fallback: Use default mapping if no stored mappings
+
+                    // Replace {{1}} with name
+                    text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
+
+                    // Replace {{2}} with gender
+                    text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
+
+                    // Replace {{3}} with mobile
+                    text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
+
+                    // Replace {{4}} with email
+                    text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
+
+                    // Replace {{5}} with course name
+                    text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || selectedProfile?.course?.name || 'Course Name');
+
+                    // Replace {{6}} with counselor name
+                    text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned');
+
+                    // Replace {{7}} with job name
+                    text = text.replace(/\{\{7\}\}/g, selectedProfile?.appliedJobs?.[0]?.title || 'Job Title');
+
+                    // Replace {{8}} with project name (college name)
+                    text = text.replace(/\{\{8\}\}/g, selectedProfile?.project?.name || 'Project Name');
+
+                    // Replace {{9}} with batch name
+                    text = text.replace(/\{\{9\}\}/g, selectedProfile?.batch?.name || 'Batch Not Assigned');
+
+                    // Replace {{10}} with lead owner name
+                    text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Self Registered');
+                  }
+
+                  return text;
+                })()}
+              </div>
+            )}
+
+            {/* Footer */}
+            {footerComponent && (
+              <div style={{ fontSize: '12px', color: '#667781', marginTop: '6px', marginBottom: '8px' }}>
+                {footerComponent.text}
+              </div>
+            )}
+
+            {/* Buttons */}
+            {buttonsComponent && buttonsComponent.buttons && buttonsComponent.buttons.length > 0 && (
+              <div style={{ marginTop: '8px', borderTop: '1px solid #e0e0e0', paddingTop: '8px' }}>
+                {buttonsComponent.buttons.map((button, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      padding: '8px 12px',
+                      textAlign: 'center',
+                      color: '#00A5F4',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      borderBottom: index < buttonsComponent.buttons.length - 1 ? '1px solid #e0e0e0' : 'none'
+                    }}
+                  >
+                    {button.type === 'URL' && <i className="fas fa-external-link-alt me-2" style={{ fontSize: '12px' }}></i>}
+                    {button.type === 'PHONE_NUMBER' && <i className="fas fa-phone me-2" style={{ fontSize: '12px' }}></i>}
+                    {button.type === 'QUICK_REPLY' && <i className="fas fa-reply me-2" style={{ fontSize: '12px' }}></i>}
+                    {button.text}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  };
+
+  // Fetch WhatsApp Templates from backend
+  const fetchWhatsappTemplates = async () => {
+    try {
+      if (!token) {
+        alert('No token found in session storage.');
+        return;
+      }
+
+      // Ã¢Å“... Use our backend API instead of direct Meta API
+      const response = await axios.get(`${backendUrl}/college/whatsapp/templates`, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.success) {
+        const templates = response.data.data || [];
+        setWhatsappTemplates(Array.isArray(templates) ? templates : []);
+      } else {
+        console.error('Ã¢ÂÅ’ Backend API error:', response.data.message);
+        setWhatsappTemplates([]);
+      }
+    } catch (error) {
+      console.error('Ã¢ÂÅ’ Error fetching WhatsApp templates:', error);
+      setWhatsappTemplates([]);
+    }
+  };
+
+  const getLeadWhatsappPhone = (lead) => {
+    const raw = String(lead?.whatsapp || lead?.mobile || '').trim();
+    return raw.replace(/\D/g, '') || raw;
+  };
+
+  const getLeadContactName = (lead) =>
+    lead?.concernPersonName || lead?.businessName || 'Lead';
+
+  const getB2bTemplateVariableValue = (variableName, lead = selectedProfile) => {
+    if (!lead) return `[${variableName}]`;
+    switch (variableName) {
+      case 'name':
+        return getLeadContactName(lead);
+      case 'gender':
+        return 'NA';
+      case 'mobile':
+        return getLeadWhatsappPhone(lead) || 'Mobile';
+      case 'email':
+        return lead?.email || 'Email';
+      case 'course_name':
+        return lead?.b2bProject?.name || lead?.typeOfB2B?.name || 'Project';
+      case 'counselor_name':
+        return lead?.leadOwner?.name || 'Counselor not assigned';
+      case 'job_name':
+        return lead?.designation || 'Designation';
+      case 'project_name':
+        return lead?.b2bProject?.name || lead?.businessName || 'Project Name';
+      case 'batch_name':
+        return lead?.b2bDepartment?.name || 'Department';
+      case 'lead_owner_name':
+        return lead?.leadOwner?.name || lead?.leadAddedBy?.name || 'Self';
+      case 'business_name':
+        return lead?.businessName || 'Business';
+      case 'concern_person_name':
+        return lead?.concernPersonName || 'Concern Person';
+      case 'city':
+        return lead?.city || 'City';
+      case 'state':
+        return lead?.state || 'State';
+      default:
+        return lead?.[variableName] || `[${variableName}]`;
+    }
+  };
+
+  const closeBulkWhatsappModal = () => {
+    setModalType(null);
+    setSelectedWhatsappNumbers([]);
+    setSelectedWhatsappTemplateModal('');
+  };
+
+  const exitBulkMode = () => {
+    closeBulkWhatsappModal();
+    setShowBulkInputs(false);
+    setBulkMode('');
+    setInput1Value('');
+    setSelectedProfiles([]);
+  };
+
+  const handleBulkWhatsappSend = async () => {
+    if (!selectedWhatsappNumbers.length) {
+      alert('Please select at least one number type (Mobile / WhatsApp).');
+      return;
+    }
+    if (!selectedWhatsappTemplateModal) {
+      alert('Please select a WhatsApp template.');
+      return;
+    }
+    if (!token) {
+      alert('No token found in session storage.');
+      return;
+    }
+    if (!selectedProfiles?.length) {
+      alert('Please select leads first.');
+      return;
+    }
+
+    setIsSendingBulkWhatsapp(true);
+    try {
+      const selectedSet = new Set((selectedProfiles || []).map((id) => String(id)));
+      let leadsToSend = (leads || []).filter((l) => selectedSet.has(String(l._id)));
+
+      // Fetch more leads if selection goes beyond currently loaded page
+      if (leadsToSend.length < selectedProfiles.length) {
+        const needed = Math.max(selectedProfiles.length, parseInt(String(input1Value || '0'), 10) || selectedProfiles.length);
+        const params = {
+          page: 1,
+          limit: String(needed),
+          ...(isDuplicateMobileFilter(selectedStatusFilter)
+            ? { isDuplicateMobile: true }
+            : selectedStatusFilter
+              ? { status: selectedStatusFilter }
+              : {})
+        };
+        appendLeadFilterParams(params, { ...filters });
+        const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
+          headers: { 'x-auth': token },
+          params
+        });
+        const fetched = response.data?.data?.leads || [];
+        leadsToSend = fetched.filter((l) => selectedSet.has(String(l._id)));
+      }
+
+      if (!leadsToSend.length) {
+        alert('No selected leads found to send messages.');
+        setIsSendingBulkWhatsapp(false);
+        return;
+      }
+
+      const recipients = [];
+      const seenPhones = new Set();
+      leadsToSend.forEach((lead) => {
+        selectedWhatsappNumbers.forEach((numberType) => {
+          let raw = '';
+          if (numberType === 'Mobile') raw = lead.mobile || '';
+          else if (numberType === 'WhatsApp Number') raw = lead.whatsapp || lead.mobile || '';
+          const phone = String(raw).replace(/\D/g, '');
+          if (!phone || seenPhones.has(phone)) return;
+          seenPhones.add(phone);
+          recipients.push({ phone, leadId: lead._id, lead });
+        });
+      });
+
+      if (!recipients.length) {
+        alert('No valid phone numbers found for the selected number types.');
+        setIsSendingBulkWhatsapp(false);
+        return;
+      }
+
+      if (!window.confirm(`Send WhatsApp template to ${recipients.length} recipient(s)?`)) {
+        setIsSendingBulkWhatsapp(false);
+        return;
+      }
+
+      const template = whatsappTemplates.find(
+        (t) => String(t.id) === String(selectedWhatsappTemplateModal) || t.name === selectedWhatsappTemplateModal
+      );
+      if (!template) {
+        alert('Selected template not found. Please refresh templates and try again.');
+        setIsSendingBulkWhatsapp(false);
+        return;
+      }
+
+      const templateBody = template.components?.find((c) => c.type === 'BODY')?.text || '';
+      const variableMappings = template?.variableMappings || [];
+      const variableRegex = /\{\{(\d+)\}\}/g;
+      let successCount = 0;
+      const errors = [];
+
+      for (const recipient of recipients) {
+        try {
+          const matches = [...templateBody.matchAll(variableRegex)];
+          const variableValues = matches.map((match) => {
+            const position = parseInt(match[1], 10);
+            if (variableMappings?.length) {
+              const mapping = variableMappings.find((m) => m.position === position);
+              if (mapping) return getB2bTemplateVariableValue(mapping.variableName, recipient.lead);
+            }
+            switch (position) {
+              case 1: return getB2bTemplateVariableValue('name', recipient.lead);
+              case 2: return getB2bTemplateVariableValue('gender', recipient.lead);
+              case 3: return getB2bTemplateVariableValue('mobile', recipient.lead);
+              case 4: return getB2bTemplateVariableValue('email', recipient.lead);
+              case 5: return getB2bTemplateVariableValue('course_name', recipient.lead);
+              case 6: return getB2bTemplateVariableValue('counselor_name', recipient.lead);
+              case 7: return getB2bTemplateVariableValue('job_name', recipient.lead);
+              case 8: return getB2bTemplateVariableValue('project_name', recipient.lead);
+              case 9: return getB2bTemplateVariableValue('batch_name', recipient.lead);
+              case 10: return getB2bTemplateVariableValue('lead_owner_name', recipient.lead);
+              default: return '[Variable]';
+            }
+          });
+
+          const response = await axios.post(
+            `${backendUrl}/college/whatsapp/send-template`,
+            {
+              templateName: template.name,
+              to: recipient.phone,
+              candidateId: recipient.leadId,
+              registrationId: recipient.leadId,
+              collegeId: userData.college || userData.collegeId,
+              variableValues
+            },
+            { headers: { 'x-auth': token } }
+          );
+
+          if (response.status === 200 && response.data?.success && response.data?.data?.messageId) {
+            successCount += 1;
+          } else {
+            errors.push(`${recipient.phone}: ${response.data?.message || 'Failed to send'}`);
+          }
+        } catch (err) {
+          errors.push(`${recipient.phone}: ${err.response?.data?.message || err.message || 'Failed'}`);
+        }
+      }
+
+      if (successCount > 0) {
+        alert(`Sent successfully to ${successCount} recipient(s).${errors.length ? `\nFailed: ${errors.length}` : ''}`);
+        exitBulkMode();
+      } else {
+        alert(`Failed to send messages.\n${errors.slice(0, 5).join('\n')}`);
+      }
+    } catch (error) {
+      console.error('Bulk WhatsApp send failed:', error);
+      alert(error.response?.data?.message || 'Bulk WhatsApp send failed. Please try again.');
+    } finally {
+      setIsSendingBulkWhatsapp(false);
+    }
+  };
+
+  const emojis = ['😀', '😂', '❤️', '👍', '🙏', '😍', '🎉', '👏', '🔥', '💯', '✅', '🚀', '💪', '🙌', '😎', '🤝', '💼', '📱', '⭐', '✨'];
+
+  const fetchWhatsappHistory = async (phoneNumber) => {
+    try {
+      if (!phoneNumber || !token) {
+        console.error('Phone number or token missing:', { phoneNumber, hasToken: !!token });
+        return;
+      }
+
+      setIsLoadingChatHistory(true);
+
+      const response = await axios.get(
+        `${backendUrl}/college/whatsapp/chat-history/${phoneNumber}`,
+        {
+          headers: {
+            'x-auth': token
+          }
+        }
+      );
+
+      if (response.data.success) {
+        const formattedMessages = (response.data.data || []).map((msg, index) => ({
+          id: msg._id || msg.wamid || msg.whatsappMessageId || `msg-${index}`,
+          dbId: msg._id,
+          wamid: msg.wamid || msg.whatsappMessageId,
+          whatsappMessageId: msg.whatsappMessageId || msg.wamid,
+          text: msg.message,
+          sender: msg.direction === 'incoming' ? 'user' : 'agent',
+          time: new Date(msg.sentAt).toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          type: msg.messageType,
+          templateData: msg.templateData,
+          mediaUrl: msg.mediaUrl,
+          status: msg.status || (msg.direction === 'incoming' ? 'received' : 'sent'),
+          deliveredAt: msg.deliveredAt,
+          readAt: msg.readAt
+        }));
+
+        setWhatsappMessages(formattedMessages);
+      }
+    } catch (error) {
+      console.error('Error fetching chat history:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        alert('Session expired. Please login again.');
+      } else if (error.response?.status === 400) {
+        alert('Invalid phone number or missing information');
+      }
+      setWhatsappMessages([]);
+    } finally {
+      setIsLoadingChatHistory(false);
+    }
+  };
+
+  const openWhatsappPanel = async (profile = null) => {
+    const lead = profile || selectedProfile;
+    if (!lead) {
+      alert('Please select a lead first');
+      return;
+    }
+
+    const phone = getLeadWhatsappPhone(lead);
+    if (!phone) {
+      alert('WhatsApp / mobile number not found for this lead');
+      return;
+    }
+
+    setSelectedProfile(lead);
+    setShowPopup(null);
+    setMobileMoreLead(null);
+    setShowPanel('Whatsapp');
+    setWhatsappNewMessage('');
+    setSelectedWhatsappTemplate(null);
+    setShowWhatsappTemplateMenu(false);
+    setShowWhatsappEmojiPicker(false);
+    setShowWhatsappFileMenu(false);
+
+    if (!isMobile) {
+      setMainContentClass('col-8');
+      setTimeout(() => {
+        if (widthRef.current) {
+          window.dispatchEvent(new Event('resize'));
+        }
+      }, 200);
+    } else {
+      document.body.classList.add('panel-open');
+    }
+
+    await fetchWhatsappHistory(phone);
+    await checkSessionWindow(phone);
+  };
+
+  const handleWhatsappSendMessage = async () => {
+    if (!whatsappNewMessage.trim()) return;
+
+    if (!sessionWindow.isOpen) {
+      alert('24-hour window is closed. Please use a template message.');
+      return;
+    }
+
+    const phone = getLeadWhatsappPhone(selectedProfile);
+    if (!phone) {
+      alert('Phone number not found for this lead');
+      return;
+    }
+
+    const messageText = whatsappNewMessage.trim();
+    const tempId = `temp-${Date.now()}`;
+
+    const newMessage = {
+      id: tempId,
+      text: messageText,
+      sender: 'agent',
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      type: 'text',
+      status: 'sending'
+    };
+
+    setWhatsappMessages(prev => [...prev, newMessage]);
+    setWhatsappNewMessage('');
+    setShowWhatsappEmojiPicker(false);
+
+    try {
+      const response = await axios.post(
+        `${backendUrl}/college/whatsapp/send-message`,
+        {
+          to: phone,
+          message: messageText,
+          candidateId: selectedProfile?._id,
+          candidateName: getLeadContactName(selectedProfile)
+        },
+        {
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.data.success) {
+        setWhatsappMessages(prev =>
+          prev.map(msg =>
+            msg.id === tempId
+              ? {
+                ...msg,
+                id: response.data.data.messageId,
+                wamid: response.data.data.messageId,
+                status: 'sent'
+              }
+              : msg
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setWhatsappMessages(prev =>
+        prev.map(msg =>
+          msg.id === tempId
+            ? { ...msg, status: 'failed', errorMessage: error.response?.data?.message || 'Failed to send' }
+            : msg
+        )
+      );
+      alert(error.response?.data?.message || 'Failed to send message. Please try again.');
+    }
+  };
+
+  const handleWhatsappEmojiClick = (emoji) => {
+    setWhatsappNewMessage(whatsappNewMessage + emoji);
+    setShowWhatsappEmojiPicker(false);
+  };
+
+  const handleWhatsappFileUpload = async (event, fileType) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setShowWhatsappFileMenu(false);
+
+    if (!selectedProfile) {
+      alert('Please select a lead to send the file to.');
+      event.target.value = '';
+      return;
+    }
+
+    const phone = getLeadWhatsappPhone(selectedProfile);
+    if (!phone) {
+      alert('Lead mobile / WhatsApp number not found.');
+      event.target.value = '';
+      return;
+    }
+
+    const maxSize = 25 * 1024 * 1024;
+    if (file.size > maxSize) {
+      alert('File size exceeds 25MB. Please choose a smaller file.');
+      event.target.value = '';
+      return;
+    }
+
+    const tempId = `temp-${Date.now()}`;
+    const newMessage = {
+      id: tempId,
+      text: file.name,
+      sender: 'agent',
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      type: fileType,
+      status: 'sending',
+      mediaUrl: URL.createObjectURL(file),
+      fileName: file.name
+    };
+
+    setWhatsappMessages(prev => [...prev, newMessage]);
+
+    try {
+      const formData = new FormData();
+      if (fileType === 'audio') {
+        formData.append('audio', file);
+      } else {
+        formData.append('file', file);
+      }
+
+      formData.append('to', phone);
+      formData.append('candidateId', selectedProfile._id);
+      formData.append('candidateName', getLeadContactName(selectedProfile));
+
+      const endpoint = fileType === 'audio'
+        ? `${backendUrl}/college/whatsapp/send-audio`
+        : `${backendUrl}/college/whatsapp/send-file`;
+
+      const response = await axios.post(endpoint, formData, {
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (response.data.success) {
+        setWhatsappMessages(prev =>
+          prev.map(msg =>
+            msg.id === tempId
+              ? {
+                ...msg,
+                id: response.data.data.messageId,
+                wamid: response.data.data.messageId,
+                status: 'sent',
+                mediaUrl: response.data.data.s3Url
+              }
+              : msg
+          )
+        );
+      }
+    } catch (error) {
+      console.error(`Error sending ${fileType}:`, error);
+      setWhatsappMessages(prev =>
+        prev.map(msg =>
+          msg.id === tempId
+            ? { ...msg, status: 'failed', errorMessage: error.response?.data?.message || 'Failed to send' }
+            : msg
+        )
+      );
+      alert(error.response?.data?.message || `Failed to send ${fileType}. Please try again.`);
+    }
+
+    event.target.value = '';
+  };
+
+  const handleWhatsappSelectTemplate = (template) => {
+    setSelectedWhatsappTemplate(template);
+    setShowWhatsappTemplateMenu(false);
+  };
+
+  const handleWhatsappSendTemplate = async () => {
+    if (!selectedWhatsappTemplate) return;
+
+    const phone = getLeadWhatsappPhone(selectedProfile);
+    if (!phone) {
+      alert('Phone number not found for this lead');
+      return;
+    }
+
+    if (!selectedWhatsappTemplate.name) {
+      alert('Template name is missing');
+      return;
+    }
+
+    setIsSendingWhatsapp(true);
+
+    try {
+      if (!token) {
+        alert('No token found in session storage.');
+        return;
+      }
+
+      const templateBody = selectedWhatsappTemplate.components?.find(c => c.type === 'BODY')?.text || '';
+      const variableMappings = selectedWhatsappTemplate?.variableMappings || [];
+      const variableRegex = /\{\{(\d+)\}\}/g;
+      const matches = [...templateBody.matchAll(variableRegex)];
+
+      const variableValues = matches.map(match => {
+        const position = parseInt(match[1], 10);
+        if (variableMappings && variableMappings.length > 0) {
+          const mapping = variableMappings.find(m => m.position === position);
+          if (mapping) {
+            return getB2bTemplateVariableValue(mapping.variableName);
+          }
+        }
+        switch (position) {
+          case 1: return getB2bTemplateVariableValue('name');
+          case 2: return getB2bTemplateVariableValue('gender');
+          case 3: return getB2bTemplateVariableValue('mobile');
+          case 4: return getB2bTemplateVariableValue('email');
+          case 5: return getB2bTemplateVariableValue('course_name');
+          case 6: return getB2bTemplateVariableValue('counselor_name');
+          case 7: return getB2bTemplateVariableValue('job_name');
+          case 8: return getB2bTemplateVariableValue('project_name');
+          case 9: return getB2bTemplateVariableValue('batch_name');
+          case 10: return getB2bTemplateVariableValue('lead_owner_name');
+          default: return '[Variable]';
+        }
+      });
+
+      const sendindData = {
+        templateName: selectedWhatsappTemplate.name,
+        to: phone,
+        candidateId: selectedProfile?._id,
+        registrationId: selectedProfile?._id,
+        collegeId: userData.college || userData.collegeId,
+        variableValues
+      };
+
+      const response = await axios.post(`${backendUrl}/college/whatsapp/send-template`, sendindData, {
+        headers: { 'x-auth': token }
+      });
+
+      if (response.data.success) {
+        const generateFilledMessage = (templateText) => {
+          if (!templateText) return '';
+          let text = templateText;
+          if (variableMappings && variableMappings.length > 0) {
+            variableMappings.forEach(mapping => {
+              const value = getB2bTemplateVariableValue(mapping.variableName);
+              text = text.replace(new RegExp(`\\{\\{${mapping.position}\\}\\}`, 'g'), value);
+            });
+          } else {
+            text = text.replace(/\{\{1\}\}/g, getB2bTemplateVariableValue('name'));
+            text = text.replace(/\{\{2\}\}/g, getB2bTemplateVariableValue('gender'));
+            text = text.replace(/\{\{3\}\}/g, getB2bTemplateVariableValue('mobile'));
+            text = text.replace(/\{\{4\}\}/g, getB2bTemplateVariableValue('email'));
+            text = text.replace(/\{\{5\}\}/g, getB2bTemplateVariableValue('course_name'));
+            text = text.replace(/\{\{6\}\}/g, getB2bTemplateVariableValue('counselor_name'));
+            text = text.replace(/\{\{7\}\}/g, getB2bTemplateVariableValue('job_name'));
+            text = text.replace(/\{\{8\}\}/g, getB2bTemplateVariableValue('project_name'));
+            text = text.replace(/\{\{9\}\}/g, getB2bTemplateVariableValue('batch_name'));
+            text = text.replace(/\{\{10\}\}/g, getB2bTemplateVariableValue('lead_owner_name'));
+          }
+          return text;
+        };
+
+        const filledMessage = generateFilledMessage(templateBody);
+        const templateMessage = {
+          id: response.data.data.messageId || response.data.data._id || `msg-${Date.now()}`,
+          dbId: response.data.data._id,
+          wamid: response.data.data.messageId,
+          whatsappMessageId: response.data.data.messageId,
+          text: filledMessage || response.data.data.filledMessage || `Template: ${response.data.data.templateName}`,
+          sender: 'agent',
+          time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          type: 'template',
+          templateData: response.data.data.templateData || selectedWhatsappTemplate,
+          status: 'sent',
+          deliveredAt: null,
+          readAt: null
+        };
+
+        setWhatsappMessages(prev => [...prev, templateMessage]);
+        setSelectedWhatsappTemplate(null);
+        setHasActiveSession(true);
+      } else {
+        throw new Error(response.data.message || 'Failed to send template');
+      }
+    } catch (error) {
+      let errorMessage = 'Error sending template. Please try again.';
+      if (error.response?.data?.error?.error_user_msg) {
+        errorMessage = error.response.data.error.error_user_msg;
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      alert(`Error: ${errorMessage}`);
+    } finally {
+      setIsSendingWhatsapp(false);
+    }
+  };
+
+  // Close WhatsApp menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showWhatsappTemplateMenu) {
+        const templateButton = event.target.closest('.whatsapp-template-trigger');
+        const templateMenu = event.target.closest('.whatsapp-template-menu');
+        if (!templateButton && !templateMenu) {
+          setShowWhatsappTemplateMenu(false);
+        }
+      }
+      if (showWhatsappEmojiPicker) {
+        const emojiButton = event.target.closest('.whatsapp-emoji-trigger');
+        const emojiMenu = event.target.closest('.whatsapp-emoji-menu');
+        if (!emojiButton && !emojiMenu) {
+          setShowWhatsappEmojiPicker(false);
+        }
+      }
+      if (showWhatsappFileMenu) {
+        const fileButton = event.target.closest('.whatsapp-file-trigger');
+        const fileMenu = event.target.closest('.whatsapp-file-menu');
+        if (!fileButton && !fileMenu) {
+          setShowWhatsappFileMenu(false);
+        }
+      }
+    };
+
+    if (showWhatsappTemplateMenu || showWhatsappEmojiPicker || showWhatsappFileMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showWhatsappTemplateMenu, showWhatsappEmojiPicker, showWhatsappFileMenu]);
+
+  // Fetch templates when WhatsApp panel opens
+  useEffect(() => {
+    if (showPanel === 'Whatsapp' && whatsappTemplates.length === 0) {
+      fetchWhatsappTemplates();
+    }
+  }, [showPanel]);
+
+  // Auto-scroll to bottom when WhatsApp panel opens, messages change, or template selected
+  useEffect(() => {
+    if (showPanel === 'Whatsapp' && whatsappMessagesEndRef.current) {
+      whatsappMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [showPanel, whatsappMessages, selectedWhatsappTemplate]);
 
   const openEditPanel = async (profile = null, panel, followUpType = null) => {
     // Check permission before opening panel
     if (profile && (panel === 'StatusChange' || panel === 'SetFollowup')) {
       if (!canUpdateLead(profile)) {
-        alert('You do not have permission to update this lead. Only the lead owner or the person who added the lead can update it.');
+        alert('You do not have permission to update this lead. Only the lead owner, co-owner, or the person who added the lead can update it.');
         return;
       }
     }
@@ -3659,6 +5456,15 @@ const B2BSales = () => {
       setBulkMode('');
       setInput1Value('');
       setSelectedProfiles([]);
+    }
+    if (showPanel === 'Whatsapp') {
+      setWhatsappMessages([]);
+      setWhatsappNewMessage('');
+      setSelectedWhatsappTemplate(null);
+      setShowWhatsappTemplateMenu(false);
+      setShowWhatsappEmojiPicker(false);
+      setShowWhatsappFileMenu(false);
+      document.body.classList.remove('panel-open');
     }
     setShowPanel('');
     clearFollowupFormData();
@@ -3923,6 +5729,7 @@ const B2BSales = () => {
                     backgroundColor: '#f1f2f6'
                   }}
                   onChange={handleStatusChange}
+                  required
                 >
                   <option value="">Select Status</option>
                   {[...(statuses || [])]
@@ -3941,7 +5748,7 @@ const B2BSales = () => {
               {/* Sub-Status Selection */}
               <div className="mb-3">
                 <label htmlFor="subStatus" className="form-label small fw-medium text-dark">
-                  Sub-Status
+                  Sub-Status<span className="text-danger">*</span>
                 </label>
                 <select
                   className="form-select border-0 bgcolor"
@@ -3955,6 +5762,7 @@ const B2BSales = () => {
                     width: '100%'
                   }}
                   onChange={handleSubStatusChange}
+                  required
                 >
                   <option value="">Select Sub-Status</option>
                   {[...(subStatuses || [])]
@@ -4035,7 +5843,11 @@ const B2BSales = () => {
                 <button
                   type="submit"
                   className="btn updateStatus"
-                  disabled={isBulkStatusPanel && !selectedProfiles?.length}
+                  disabled={
+                    (isBulkStatusPanel && !selectedProfiles?.length) ||
+                    !seletectedStatus ||
+                    !seletectedSubStatus?._id
+                  }
                 >
                   {isBulkStatusPanel ? 'Update Bulk Status' : 'Update Status'}
                 </button>
@@ -4529,6 +6341,1142 @@ const B2BSales = () => {
     }
   }
 
+// Render WhatsApp Panel (Desktop Sidebar or Mobile Modal)
+const renderWhatsAppPanel = () => {
+  const panelContent = (
+    <div className="d-flex flex-column" style={{ height: '100%', backgroundColor: '#f0f2f5' }}>
+      {/* WhatsApp Header */}
+      <div className="bg-white border-bottom" style={{ padding: '16px 16px 12px 16px', position: 'relative' }}>
+
+        <div className="d-flex align-items-center mb-2">
+          <div
+            className="rounded-circle d-flex align-items-center justify-content-center text-white me-3"
+            style={{
+              width: '48px',
+              height: '48px',
+              fontSize: '20px',
+              fontWeight: '600',
+              background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+              flexShrink: 0
+            }}
+          >
+            {(getLeadContactName(selectedProfile)?.charAt(0) || 'L').toUpperCase()}
+          </div>
+          <div className="flex-grow-1">
+            <h6 className="mb-0 fw-bold" style={{ fontSize: '16px' }}>
+              {getLeadContactName(selectedProfile) || 'N/A'}
+            </h6>
+            <p className="mb-0 text-muted" style={{ fontSize: '13px' }}>
+              {getLeadWhatsappPhone(selectedProfile) || 'N/A'}
+            </p>
+          </div>
+          <button
+            className="btn-close"
+            onClick={closePanel}
+            style={{ marginLeft: '8px' }}
+          ></button>
+        </div>
+
+        {/* Session Status Badge - Below name */}
+        <div className="d-flex align-items-center" style={{ paddingLeft: '64px' }}>
+          {sessionWindow.isOpen ? (
+            <div
+              className="d-flex align-items-center px-2 py-1 rounded"
+              style={{
+                backgroundColor: '#D1F4E0',
+                border: '1px solid #25D366',
+                fontSize: '11px',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <div
+                className="rounded-circle me-1"
+                style={{
+                  width: '6px',
+                  height: '6px',
+                  backgroundColor: '#25D366'
+                }}
+              ></div>
+              <span className="fw-semibold" style={{ color: '#0A6E44' }}>
+                <i className="fas fa-clock me-1" style={{ fontSize: '10px' }}></i>
+                {sessionCountdown} remaining
+              </span>
+            </div>
+          ) : (
+            <div
+              className="d-flex align-items-center px-2 py-1 rounded"
+              style={{
+                backgroundColor: '#FFF3CD',
+                border: '1px solid #FFA500',
+                fontSize: '11px',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <i className="fas fa-clock me-1" style={{ color: '#FFA500', fontSize: '10px' }}></i>
+              <span className="fw-semibold" style={{ color: '#856404' }}>
+                No Active Window
+              </span>
+            </div>
+          )}
+        </div>
+
+      </div>
+
+      {/* Messages Area */}
+      <div
+        className="flex-grow-1 overflow-auto p-3"
+        style={{
+          backgroundColor: '#ECE5DD',
+          backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 0h100v100H0z\' fill=\'%23ECE5DD\'/%3E%3Cpath d=\'M50 0L0 50h100L50 0z\' fill=\'%23E1DCD5\' fill-opacity=\'0.1\'/%3E%3C/svg%3E")',
+          maxHeight: '55vh',
+          minHeight: '300px'
+        }}
+      >
+        {/* Loading State */}
+        {isLoadingChatHistory && (
+          <div className="d-flex justify-content-center align-items-center h-100">
+            <div className="text-center">
+              <div className="spinner-border text-success mb-2" role="status" style={{ width: '40px', height: '40px' }}>
+                <span className="visually-hidden">Loading...</span>
+              </div>
+              <p style={{ color: '#667781', fontSize: '14px' }}>Loading chat history...</p>
+            </div>
+          </div>
+        )}
+
+        {/* Messages */}
+        {!isLoadingChatHistory && whatsappMessages.map(message => (
+          <div key={message.id} className={`d-flex mb-2 ${message.sender === 'agent' ? 'justify-content-end' : 'justify-content-start'}`}>
+            <div style={{ maxWidth: message.type === 'template' ? '85%' : '75%' }}>
+              <div
+                className={`${message.sender === 'agent'
+                  ? 'text-white'
+                  : 'bg-white text-dark'
+                  }`}
+                style={{
+                  backgroundColor: message.sender === 'agent' ? '#DCF8C6' : '#FFFFFF',
+                  color: message.sender === 'agent' ? '#000' : '#000',
+                  borderRadius: '8px',
+                  borderBottomRightRadius: message.sender === 'agent' ? '2px' : '8px',
+                  borderBottomLeftRadius: message.sender === 'lead' ? '2px' : '8px',
+                  boxShadow: '0 1px 0.5px rgba(0,0,0,0.13)',
+                  padding: message.type === 'template' ? '6px 10px 8px' : '6px 10px 8px',
+                  overflow: 'hidden'
+                }}
+              >
+                {/* Render template message with components */}
+                {message.type === 'template' && message.templateData ? (
+                  <>
+                    {renderTemplateMessage(message.templateData, true)}
+                    <div
+                      className="d-flex align-items-center justify-content-end"
+                      style={{
+                        fontSize: '11px',
+                        color: '#667781',
+                        marginTop: '4px'
+                      }}
+                    >
+                      <span>{message.time}</span>
+                      {message.sender === 'agent' && renderMessageStatus(message.status)}
+                    </div>
+                  </>
+                ) : (
+                  /* Regular text/media message */
+                  <>
+                    {/* Render media if present */}
+                    {message.mediaUrl && message.type === 'image' && (
+                      <img
+                        src={message.mediaUrl}
+                        alt="Shared image"
+                        style={{
+                          maxWidth: '100%',
+                          borderRadius: '8px',
+                          marginBottom: message.text !== '[Image]' ? '8px' : '0',
+                          display: 'block'
+                        }}
+                      />
+                    )}
+                    {message.mediaUrl && message.type === 'video' && (
+                      <video
+                        controls
+                        style={{
+                          maxWidth: '100%',
+                          borderRadius: '8px',
+                          marginBottom: message.text !== '[Video]' ? '8px' : '0',
+                          display: 'block'
+                        }}
+                      >
+                        <source src={message.mediaUrl} type="video/mp4" />
+                        Your browser does not support the video tag.
+                      </video>
+                    )}
+                    {message.mediaUrl && message.type === 'audio' && (
+                      <audio
+                        controls
+                        style={{
+                          width: '100%',
+                          marginBottom: '4px'
+                        }}
+                      >
+                        <source src={message.mediaUrl} type="audio/mpeg" />
+                        Your browser does not support the audio tag.
+                      </audio>
+                    )}
+                    {message.mediaUrl && message.type === 'document' && (
+                      <a
+                        href={message.mediaUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="d-flex align-items-center text-decoration-none"
+                        style={{
+                          padding: '8px',
+                          backgroundColor: 'rgba(0,0,0,0.05)',
+                          borderRadius: '4px',
+                          marginBottom: '4px'
+                        }}
+                      >
+                        <i className="fas fa-file-pdf me-2" style={{ fontSize: '20px', color: '#DC3545' }}></i>
+                        <span style={{ fontSize: '13px', color: '#000' }}>{message.text}</span>
+                      </a>
+                    )}
+
+                    {/* Render text if it's not a default placeholder */}
+                    {message.text && !['[Image]', '[Video]', '[Audio]', '[Document]'].includes(message.text) && (
+                      <p className="mb-0" style={{ fontSize: '14px', lineHeight: '1.4', wordWrap: 'break-word' }}>
+                        {message.text}
+                      </p>
+                    )}
+
+                    <div
+                      className="d-flex align-items-center justify-content-end"
+                      style={{
+                        fontSize: '11px',
+                        color: '#667781',
+                        marginTop: '4px'
+                      }}
+                    >
+                      <span>{message.time}</span>
+                      {message.sender === 'agent' && renderMessageStatus(message.status)}
+                    </div>
+                  </>
+                )}
+              </div>
+              {message.sender === 'agent' && message.type === 'template' && (
+                <p className="text-muted text-end mb-0 mt-1" style={{ fontSize: '10px', fontStyle: 'italic' }}>
+                  <i className="fas fa-file-alt me-1"></i>Template Message
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {/* Selected Template Preview in Chat */}
+        {selectedWhatsappTemplate && (
+          <div className="d-flex justify-content-end mb-3" style={{ animation: 'slideInFromRight 0.3s ease-out' }}>
+            <div style={{ maxWidth: '85%', minWidth: '300px' }}>
+              <div
+                className="rounded-3 overflow-hidden"
+                style={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  boxShadow: '0 8px 20px rgba(102, 126, 234, 0.3), 0 3px 10px rgba(0,0,0,0.15)',
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  position: 'relative'
+                }}
+              >
+                {/* Decorative gradient overlay */}
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: '100%',
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%)',
+                  pointerEvents: 'none'
+                }}></div>
+
+                {/* Header */}
+                <div className="d-flex align-items-center justify-content-between p-3" style={{
+                  backgroundColor: 'rgba(255,255,255,0.15)',
+                  backdropFilter: 'blur(10px)',
+                  borderBottom: '1px solid rgba(255,255,255,0.2)'
+                }}>
+                  <div className="d-flex align-items-center">
+                    <div
+                      className="rounded-circle d-flex align-items-center justify-content-center me-2"
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        backgroundColor: 'rgba(255,255,255,0.95)',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                      }}
+                    >
+                      <i className="fas fa-file-alt" style={{ color: '#667eea', fontSize: '14px' }}></i>
+                    </div>
+                    <div>
+                      <p className="mb-0" style={{ fontSize: '11px', color: 'rgba(255,255,255,0.9)', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        WhatsApp Template
+                      </p>
+                      <p className="mb-0" style={{ fontSize: '13px', color: '#fff', fontWeight: '600' }}>
+                        {selectedWhatsappTemplate.name}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    className="btn btn-sm p-0"
+                    onClick={() => setSelectedWhatsappTemplate(null)}
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      backgroundColor: 'rgba(255,255,255,0.2)',
+                      border: '1px solid rgba(255,255,255,0.4)',
+                      borderRadius: '50%',
+                      color: '#fff',
+                      fontSize: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.35)';
+                      e.currentTarget.style.transform = 'rotate(90deg) scale(1.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)';
+                      e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
+                    }}
+                    title="Remove Template"
+                  >
+                    <i className="fas fa-times"></i>
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div className="p-3" style={{ backgroundColor: '#fff', position: 'relative' }}>
+                  {/* Category Badge */}
+                  <div className="mb-2">
+                    <span className="badge" style={{
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      color: '#fff',
+                      fontSize: '10px',
+                      padding: '5px 12px',
+                      fontWeight: '600',
+                      borderRadius: '20px',
+                      letterSpacing: '0.3px'
+                    }}>
+                      <i className="fas fa-tag me-1" style={{ fontSize: '9px' }}></i>
+                      {selectedWhatsappTemplate.category}
+                    </span>
+                  </div>
+
+                  {/* Template Content */}
+                  <div
+                    className="rounded-3 p-3 mb-2"
+                    style={{
+                      backgroundColor: '#f8f9fa',
+                      border: '2px solid #e9ecef',
+                      borderLeft: '4px solid #667eea',
+                      position: 'relative'
+                    }}
+                  >
+                    {(() => {
+                      const components = selectedWhatsappTemplate.components || [];
+
+                      // Check if it's a carousel template
+                      const carouselComponent = components.find(c => c.type === 'CAROUSEL');
+                      if (carouselComponent && carouselComponent.cards) {
+                        return (
+                          <div>
+                            {/* Carousel Body Text (if exists outside carousel) */}
+                            {(() => {
+                              const bodyComp = components.find(c => c.type === 'BODY');
+                              if (bodyComp && bodyComp.text) {
+                                return (
+                                  <p className="mb-3" style={{
+                                    fontSize: '13px',
+                                    color: '#2c3e50',
+                                    fontWeight: '500'
+                                  }}>
+                                    {bodyComp.text}
+                                  </p>
+                                );
+                              }
+                            })()}
+
+                            <p className="mb-2 small fw-semibold" style={{ color: '#667eea' }}>
+                              <i className="fas fa-images me-1"></i>
+                              Carousel ({carouselComponent.cards.length} cards)
+                            </p>
+
+                            <div style={{
+                              display: 'flex',
+                              gap: '12px',
+                              overflowX: 'auto',
+                              paddingBottom: '10px',
+                              scrollbarWidth: 'thin'
+                            }}>
+                              {carouselComponent.cards.map((card, idx) => {
+                                const cardHeader = card.components.find(c => c.type === 'HEADER');
+                                const cardBody = card.components.find(c => c.type === 'BODY');
+                                const cardButtons = card.components.find(c => c.type === 'BUTTONS');
+                                const imageUrl = cardHeader?.example?.header_handle?.[0];
+
+                                return (
+                                  <div key={idx} style={{
+                                    minWidth: '200px',
+                                    maxWidth: '200px',
+                                    border: '2px solid #dee2e6',
+                                    borderRadius: '12px',
+                                    overflow: 'hidden',
+                                    backgroundColor: '#fff',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                  }}>
+                                    {imageUrl && (
+                                      <>
+                                        <img
+                                          src={imageUrl}
+                                          alt={`Card ${idx + 1}`}
+                                          style={{
+                                            width: '100%',
+                                            height: '150px',
+                                            objectFit: 'cover'
+                                          }}
+                                          onError={(e) => {
+                                            e.target.style.display = 'none';
+                                            e.target.nextElementSibling.style.display = 'flex';
+                                          }}
+                                        />
+                                        <div style={{
+                                          display: 'none',
+                                          height: '150px',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          backgroundColor: '#e9ecef',
+                                          fontSize: '48px'
+                                        }}>
+                                          Ã°Å¸â€“Â¼Ã¯Â¸Â
+                                        </div>
+                                      </>
+                                    )}
+                                    <div style={{ padding: '12px' }}>
+                                      <p className="mb-2" style={{
+                                        fontSize: '12px',
+                                        lineHeight: '1.4',
+                                        color: '#2c3e50'
+                                      }}>
+                                        {(() => {
+                                          // Get candidate data for variable replacement
+                                          const candidate = selectedProfile?._candidate;
+                                          const registration = selectedProfile;
+
+                                          // Replace variables with actual candidate data
+                                          let text = cardBody?.text || '';
+
+                                          // Replace {{1}} with name
+                                          text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.name || 'User');
+
+                                          // Replace {{2}} with gender
+                                          text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'Male');
+
+                                          // Replace {{3}} with mobile
+                                          text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.mobile || 'Mobile');
+
+                                          // Replace {{4}} with email
+                                          text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
+
+                                          // Replace {{5}} with course name
+                                          text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || 'Course Name');
+
+                                          // Replace {{6}} with counselor name
+                                          text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned');
+
+                                          // Replace {{7}} with job name
+                                          text = text.replace(/\{\{7\}\}/g, selectedProfile?._job?.title || 'Job Title');
+
+                                          // Replace {{8}} with project name (college name)
+                                          text = text.replace(/\{\{8\}\}/g, candidate?._college?.name || 'Project Name');
+
+                                          // Replace {{9}} with batch name
+                                          text = text.replace(/\{\{9\}\}/g, selectedProfile?._batch?.name || 'Batch Not Assigned');
+
+                                          // Replace {{10}} with lead owner name
+                                          text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || 'Self Registered');
+
+                                          return text;
+                                        })()}
+                                      </p>
+                                      {cardButtons?.buttons && cardButtons.buttons.length > 0 && (
+                                        <div style={{
+                                          borderTop: '1px solid #dee2e6',
+                                          paddingTop: '8px',
+                                          marginTop: '8px'
+                                        }}>
+                                          {cardButtons.buttons.map((btn, bidx) => (
+                                            <div
+                                              key={bidx}
+                                              style={{
+                                                padding: '6px',
+                                                marginBottom: '4px',
+                                                textAlign: 'center',
+                                                fontSize: '11px',
+                                                color: '#007bff',
+                                                fontWeight: '500'
+                                              }}
+                                            >
+                                              {btn.type === 'QUICK_REPLY' && 'Ã¢â€ Â©Ã¯Â¸Â '}
+                                              {btn.text}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // Regular template with header (image/video), body, footer, buttons
+                      const headerComponent = components.find(c => c.type === 'HEADER');
+                      const bodyComponent = components.find(c => c.type === 'BODY');
+                      const footerComponent = components.find(c => c.type === 'FOOTER');
+                      const buttonsComponent = components.find(c => c.type === 'BUTTONS');
+
+                      return (
+                        <div>
+                          {/* Header - Image or Video */}
+                          {headerComponent && headerComponent.format === 'IMAGE' && headerComponent.example?.header_handle?.[0] && (
+                            <div style={{ marginBottom: '12px', marginLeft: '-12px', marginRight: '-12px', marginTop: '-12px' }}>
+                              <img
+                                src={headerComponent.example.header_handle[0]}
+                                alt="Template header"
+                                style={{
+                                  width: '100%',
+                                  maxHeight: '200px',
+                                  objectFit: 'cover',
+                                  borderRadius: '12px 12px 0 0'
+                                }}
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  e.target.nextElementSibling.style.display = 'flex';
+                                }}
+                              />
+                              <div style={{
+                                display: 'none',
+                                height: '200px',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: '#e9ecef',
+                                fontSize: '64px'
+                              }}>
+                                Ã°Å¸â€“Â¼Ã¯Â¸Â
+                              </div>
+                            </div>
+                          )}
+
+                          {headerComponent && headerComponent.format === 'VIDEO' && headerComponent.example?.header_handle?.[0] && (
+                            <div style={{ marginBottom: '12px', marginLeft: '-12px', marginRight: '-12px', marginTop: '-12px' }}>
+                              <video
+                                src={headerComponent.example.header_handle[0]}
+                                controls
+                                style={{
+                                  width: '100%',
+                                  maxHeight: '200px',
+                                  borderRadius: '12px 12px 0 0',
+                                  backgroundColor: '#000'
+                                }}
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  e.target.nextElementSibling.style.display = 'flex';
+                                }}
+                              >
+                                Your browser does not support the video tag.
+                              </video>
+                              <div style={{
+                                display: 'none',
+                                height: '200px',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: '#000',
+                                color: '#fff',
+                                fontSize: '64px'
+                              }}>
+                                Ã°Å¸Å½Â¥
+                              </div>
+                            </div>
+                          )}
+
+                          {headerComponent && headerComponent.format === 'TEXT' && (
+                            <p className="mb-2 fw-bold" style={{ fontSize: '14px', color: '#1a1a1a' }}>
+                              {headerComponent.text}
+                            </p>
+                          )}
+
+                          {/* Body */}
+                          {bodyComponent && (
+                            <p className={headerComponent?.format === 'IMAGE' || headerComponent?.format === 'VIDEO' ? 'mt-3 mb-2' : 'mb-2'} style={{
+                              fontSize: '13px',
+                              color: '#2c3e50',
+                              lineHeight: '1.6',
+                              whiteSpace: 'pre-wrap'
+                            }}>
+                              {(() => {
+                                // Get candidate data for variable replacement
+                                const candidate = selectedProfile?._candidate;
+                                const registration = selectedProfile;
+
+                                // Get template variable mappings from selectedWhatsappTemplate
+                                const variableMappings = selectedWhatsappTemplate?.variableMappings || [];
+
+                                // Replace variables with actual candidate data using stored mappings
+                                let text = bodyComponent.text || '';
+
+                                if (variableMappings && variableMappings.length > 0) {
+                                  // Use stored variable mappings from database
+
+                                  variableMappings.forEach(mapping => {
+                                    const position = mapping.position;
+                                    const variableName = mapping.variableName;
+
+                                    // Get value based on actual variable name from mapping
+                                    let value = '';
+
+                                    switch (variableName) {
+                                      case 'name':
+                                        value = candidate?.name || registration?.concernPersonName || registration?.businessName || registration?.name || 'User';
+                                        break;
+                                      case 'gender':
+                                        value = candidate?.gender || 'NA';
+                                        break;
+                                      case 'mobile':
+                                        value = candidate?.mobile || registration?.whatsapp || registration?.mobile || 'Mobile';
+                                        break;
+                                      case 'email':
+                                        value = candidate?.email || registration?.email || 'Email';
+                                        break;
+                                      case 'course_name':
+                                        value = selectedProfile?._course?.name || selectedProfile?.b2bProject?.name || selectedProfile?.typeOfB2B?.name || 'Course Name';
+                                        break;
+                                      case 'counselor_name':
+                                        value = selectedProfile?.counsellor?.name || selectedProfile?.leadOwner?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned';
+                                        break;
+                                      case 'job_name':
+                                        value = selectedProfile?._job?.title || selectedProfile?.designation || 'Job Title';
+                                        break;
+                                      case 'project_name':
+                                        value = selectedProfile?._project?.name || selectedProfile?.b2bProject?.name || selectedProfile?.businessName || 'Project Name';
+                                        break;
+                                      case 'batch_name':
+                                        value = selectedProfile?._batch?.name || selectedProfile?.b2bDepartment?.name || 'Batch Not Assigned';
+                                        break;
+                                      case 'lead_owner_name':
+                                        value = selectedProfile?.registeredBy?.name || selectedProfile?.leadOwner?.name || selectedProfile?.leadAddedBy?.name || 'Self Registered';
+                                        break;
+                                      default:
+                                        // Try direct property access
+                                        value = candidate?.[variableName] || registration?.[variableName] || `[${variableName}]`;
+                                        break;
+                                    }
+
+                                    // Replace the numbered variable with actual value
+                                    text = text.replace(new RegExp(`\\{\\{${position}\\}\\}`, 'g'), value);
+
+                                  });
+                                } else {
+                                  text = text.replace(/\{\{1\}\}/g, candidate?.name || registration?.concernPersonName || registration?.businessName || registration?.name || 'User');
+
+                                  text = text.replace(/\{\{2\}\}/g, candidate?.gender || 'NA');
+
+                                  text = text.replace(/\{\{3\}\}/g, candidate?.mobile || registration?.whatsapp || registration?.mobile || 'Mobile');
+
+                                  text = text.replace(/\{\{4\}\}/g, candidate?.email || registration?.email || 'Email');
+
+                                  text = text.replace(/\{\{5\}\}/g, candidate?.appliedCourses?.[0]?.courseName || selectedProfile?.b2bProject?.name || selectedProfile?.typeOfB2B?.name || 'Course Name');
+
+                                  // Replace {{6}} with counselor name
+                                  text = text.replace(/\{\{6\}\}/g, selectedProfile?.counsellor?.name || selectedProfile?.leadOwner?.name || selectedProfile?.leadAssignment?.[selectedProfile?.leadAssignment?.length - 1]?.counsellorName || 'Counselor not assigned');
+
+                                  // Replace {{7}} with job name
+                                  text = text.replace(/\{\{7\}\}/g, selectedProfile?._job?.title || selectedProfile?.designation || 'Job Title');
+
+                                  // Replace {{8}} with project name (college name)
+                                  text = text.replace(/\{\{8\}\}/g, selectedProfile?._project?.name || selectedProfile?.b2bProject?.name || selectedProfile?.businessName || 'Project Name');
+
+                                  // Replace {{9}} with batch name
+                                  text = text.replace(/\{\{9\}\}/g, selectedProfile?._batch?.name || selectedProfile?.b2bDepartment?.name || 'Batch Not Assigned');
+
+                                  // Replace {{10}} with lead owner name
+                                  text = text.replace(/\{\{10\}\}/g, selectedProfile?.registeredBy?.name || selectedProfile?.leadOwner?.name || selectedProfile?.leadAddedBy?.name || 'Self Registered');
+                                }
+
+                                return text;
+                              })()}
+                            </p>
+                          )}
+
+                          {/* Footer */}
+                          {footerComponent && (
+                            <p className="mb-2" style={{
+                              fontSize: '11px',
+                              color: '#6b7280',
+                              fontStyle: 'italic'
+                            }}>
+                              {footerComponent.text}
+                            </p>
+                          )}
+
+                          {/* Buttons */}
+                          {buttonsComponent && buttonsComponent.buttons && buttonsComponent.buttons.length > 0 && (
+                            <div style={{
+                              marginTop: '12px',
+                              paddingTop: '12px',
+                              borderTop: '1px solid #dee2e6'
+                            }}>
+                              {buttonsComponent.buttons.map((button, idx) => (
+                                <div
+                                  key={idx}
+                                  style={{
+                                    padding: '8px 12px',
+                                    marginBottom: '6px',
+                                    textAlign: 'center',
+                                    fontSize: '12px',
+                                    color: '#007bff',
+                                    border: '1px solid #007bff',
+                                    borderRadius: '6px',
+                                    backgroundColor: '#fff',
+                                    fontWeight: '500',
+                                    cursor: 'default'
+                                  }}
+                                >
+                                  {button.type === 'QUICK_REPLY' && 'Ã¢â€ Â©Ã¯Â¸Â '}
+                                  {button.type === 'URL' && 'Ã°Å¸â€N/A '}
+                                  {button.type === 'PHONE_NUMBER' && 'Ã°Å¸â€œÅ¾ '}
+                                  {button.text}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Footer Info */}
+                  <div className="d-flex align-items-center justify-content-between">
+                    <div className="d-flex align-items-center">
+                      <div
+                        className="rounded-circle me-2"
+                        style={{
+                          width: '8px',
+                          height: '8px',
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          boxShadow: '0 0 8px rgba(16, 185, 129, 0.5)',
+                          animation: 'pulse 2s ease-in-out infinite'
+                        }}
+                      ></div>
+                      <span style={{ fontSize: '11px', color: '#10b981', fontWeight: '600' }}>
+                        Ready to send
+                      </span>
+                    </div>
+                    <div className="d-flex align-items-center">
+                      <i className="fas fa-check-circle me-1" style={{ color: '#10b981', fontSize: '10px' }}></i>
+                      <span style={{ fontSize: '10px', color: '#6b7280', fontWeight: '500' }}>
+                        Pre-approved
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Scroll anchor */}
+        <div ref={whatsappMessagesEndRef} />
+      </div>
+
+      {/* Bottom Input Area */}
+      <div className="bg-white border-top p-3">
+        <div className="d-flex align-items-center gap-2">
+          {/* File Upload Button */}
+          <div className="position-relative">
+            <button
+              className="btn whatsapp-file-trigger"
+              onClick={() => {
+                setShowWhatsappFileMenu(!showWhatsappFileMenu);
+                setShowWhatsappTemplateMenu(false);
+                setShowWhatsappEmojiPicker(false);
+              }}
+              title="Attach File"
+              style={{
+                width: '42px',
+                height: '42px',
+                backgroundColor: 'transparent',
+                color: '#54656F',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <i className="fas fa-paperclip" style={{ fontSize: '20px' }}></i>
+            </button>
+
+            {/* File Menu Dropdown */}
+            {showWhatsappFileMenu && (
+              <div className="whatsapp-file-menu position-absolute bottom-100 start-0 mb-2 bg-white rounded shadow-lg border" style={{ width: '200px', zIndex: 1050 }}>
+                <div className="p-2">
+                  <input
+                    type="file"
+                    id="whatsapp-document-input"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+                    onChange={(e) => handleWhatsappFileUpload(e, 'document')}
+                    style={{ display: 'none' }}
+                  />
+                  <input
+                    type="file"
+                    id="whatsapp-image-input"
+                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                    onChange={(e) => handleWhatsappFileUpload(e, 'image')}
+                    style={{ display: 'none' }}
+                  />
+                  <input
+                    type="file"
+                    id="whatsapp-video-input"
+                    accept="video/mp4,video/mkv,video/mov,video/avi"
+                    onChange={(e) => handleWhatsappFileUpload(e, 'video')}
+                    style={{ display: 'none' }}
+                  />
+                  <input
+                    type="file"
+                    id="whatsapp-audio-input"
+                    accept="audio/mp3,audio/aac,audio/m4a,audio/amr,audio/ogg,audio/opus"
+                    onChange={(e) => handleWhatsappFileUpload(e, 'audio')}
+                    style={{ display: 'none' }}
+                  />
+
+                  <button
+                    className="btn btn-light w-100 text-start mb-2"
+                    onClick={() => document.getElementById('whatsapp-document-input').click()}
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+                  >
+                    <i className="fas fa-file-alt" style={{ fontSize: '18px', color: '#7F66FF' }}></i>
+                    <span>Document</span>
+                  </button>
+
+                  <button
+                    className="btn btn-light w-100 text-start mb-2"
+                    onClick={() => document.getElementById('whatsapp-image-input').click()}
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+                  >
+                    <i className="fas fa-image" style={{ fontSize: '18px', color: '#F02849' }}></i>
+                    <span>Image</span>
+                  </button>
+
+                  <button
+                    className="btn btn-light w-100 text-start mb-2"
+                    onClick={() => document.getElementById('whatsapp-video-input').click()}
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+                  >
+                    <i className="fas fa-video" style={{ fontSize: '18px', color: '#00A884' }}></i>
+                    <span>Video</span>
+                  </button>
+
+                  <button
+                    className="btn btn-light w-100 text-start"
+                    onClick={() => document.getElementById('whatsapp-audio-input').click()}
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px' }}
+                  >
+                    <i className="fas fa-microphone" style={{ fontSize: '18px', color: '#FF6B35' }}></i>
+                    <span>Audio</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          {/* <button
+            className="btn"
+            title="Attach File"
+            style={{
+              width: '42px',
+              height: '42px',
+              backgroundColor: 'transparent',
+              color: '#54656F',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <i className="fas fa-paperclip" style={{ fontSize: '20px' }}></i>
+          </button> */}
+
+          {/* Template Button */}
+          <div className="position-relative">
+            <button
+              className="btn whatsapp-template-trigger"
+              onClick={() => {
+                setShowWhatsappTemplateMenu(!showWhatsappTemplateMenu);
+                setShowWhatsappEmojiPicker(false);
+              }}
+              title="Templates"
+              style={{
+                width: '42px',
+                height: '42px',
+                backgroundColor: '#0B66E4',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <i className="fas fa-copy" style={{ fontSize: '18px' }}></i>
+            </button>
+
+            {/* Template Dropdown */}
+            {showWhatsappTemplateMenu && (
+              <div className="whatsapp-template-menu position-absolute bottom-100 start-0 mb-2 bg-white rounded shadow-lg border whatappMaxWidth" style={{ width: '300px', maxWidth: '300px', maxHeight: '400px', overflowY: 'auto', zIndex: 1050 }}>
+                <div className="p-3 border-bottom bg-light">
+                  <h6 className="mb-0 fw-bold">Select Template to Send</h6>
+                  <p className="mb-0 small text-muted">Templates are approved by WhatsApp</p>
+                </div>
+
+                {whatsappTemplates.length === 0 ? (
+                  <div className="p-4 text-center">
+                    <div className="spinner-border spinner-border-sm text-primary mb-2" role="status">
+                      <span className="visually-hidden">Loading...</span>
+                    </div>
+                    <p className="mb-0 small text-muted">Loading templates...</p>
+                  </div>
+                ) : (
+                  whatsappTemplates.map(template => (
+                    <div
+                      key={template.id}
+                      className="p-3 border-bottom"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => handleWhatsappSelectTemplate(template)}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <div className="d-flex justify-content-between align-items-center">
+                        <h6 className="mb-0 fw-semibold">{template.name}</h6>
+                        <div className="d-flex gap-1">
+                          <span className="badge bg-primary" style={{ fontSize: '9px' }}>{template.category}</span>
+                          {template.language && (
+                            <span className="badge bg-secondary" style={{ fontSize: '9px' }}>{template.language.toUpperCase()}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Message Input or Template Send Button */}
+          {selectedWhatsappTemplate ? (
+            // Template Selected - Show Send Button
+            <button
+              className="btn flex-grow-1"
+              onClick={handleWhatsappSendTemplate}
+              disabled={isSendingWhatsapp}
+              style={{
+                height: '42px',
+                backgroundColor: '#25D366',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '24px',
+                fontWeight: '500',
+                fontSize: '15px'
+              }}
+            >
+              {isSendingWhatsapp ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2"></span>
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <i className="fas fa-paper-plane me-2"></i>
+                  Send Template to {selectedProfile?._candidate?.name?.split(' ')[0] || 'User'}
+                </>
+              )}
+            </button>
+          ) : sessionWindow.isOpen ? (
+            // Active Session - Show Input
+            <>
+              <div className="position-relative flex-grow-1">
+                <input
+                  type="text"
+                  className="form-control"
+                  value={whatsappNewMessage}
+                  onChange={(e) => setWhatsappNewMessage(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleWhatsappSendMessage()}
+                  placeholder={`Message ${selectedProfile?._candidate?.name?.split(' ')[0] }...`}
+                  style={{
+                    height: '42px',
+                    paddingRight: '50px',
+                    borderRadius: '24px',
+                    border: '1px solid #E9EDEF',
+                    fontSize: '15px',
+                    backgroundColor: '#F0F2F5'
+                  }}
+                />
+                <button
+                  className="btn whatsapp-emoji-trigger position-absolute end-0 top-0"
+                  onClick={() => {
+                    setShowWhatsappEmojiPicker(!showWhatsappEmojiPicker);
+                    setShowWhatsappTemplateMenu(false);
+                  }}
+                  style={{
+                    height: '42px',
+                    width: '42px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#54656F'
+                  }}
+                >
+                  <i className="far fa-smile" style={{ fontSize: '20px' }}></i>
+                </button>
+
+                {/* Emoji Picker */}
+                {showWhatsappEmojiPicker && (
+                  <div className="whatsapp-emoji-menu position-absolute bottom-100 end-0 mb-2 bg-white rounded shadow-lg border p-3" style={{ zIndex: 1050 }}>
+                    <div className="d-flex flex-wrap gap-2 whatappemoji" style={{ width: '250px' }}>
+                      {emojis.map((emoji, index) => (
+                        <button
+                          key={index}
+                          className="btn btn-light"
+                          onClick={() => handleWhatsappEmojiClick(emoji)}
+                          style={{ fontSize: '20px', width: '25px', height: '25px', padding: 0 }}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Send/Voice Button */}
+              {whatsappNewMessage.trim() ? (
+                <button
+                  onClick={handleWhatsappSendMessage}
+                  style={{
+                    width: '42px',
+                    height: '42px',
+                    minWidth: '42px',
+                    minHeight: '42px',
+                    backgroundColor: '#25D366',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '50%',
+                    padding: '0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    flexShrink: 0
+                  }}
+                >
+                  <i className="fas fa-paper-plane" style={{ fontSize: '16px' }}></i>
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setWhatsappMessages([...whatsappMessages, {
+                      id: whatsappMessages.length + 1,
+                      text: 'Ã°Å¸Å½Â¤ Voice message',
+                      sender: 'agent',
+                      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                      type: 'voice'
+                    }]);
+                  }}
+                  style={{
+                    width: '42px',
+                    height: '42px',
+                    minWidth: '42px',
+                    minHeight: '42px',
+                    backgroundColor: '#25D366',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '50%',
+                    padding: '0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    flexShrink: 0
+                  }}
+                  title="Voice Message"
+                >
+                  <i className="fas fa-microphone" style={{ fontSize: '18px' }}></i>
+                </button>
+              )}
+            </>
+          ) : (
+            // No Session - Disabled Input with Tooltip
+            <div
+              className="position-relative flex-grow-1"
+              title="No active 24-hour window. User ka reply milne par manual messages bhej sakte hain. Abhi sirf approved templates use kar sakte hain."
+            >
+              <input
+                type="text"
+                className="form-control"
+                disabled
+                placeholder="No active window - Use templates only"
+                style={{
+                  height: '42px',
+                  borderRadius: '24px',
+                  border: '1px solid #E9EDEF',
+                  fontSize: '15px',
+                  backgroundColor: '#F5F5F5',
+                  color: '#8696A0',
+                  cursor: 'not-allowed'
+                }}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  if (isMobile) {
+    return showPanel === 'Whatsapp' ? (
+      <div
+        className='modal show d-block'
+        style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) closePanel();
+        }}
+      >
+        <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
+          <div className="modal-content" style={{ height: '80vh' }}>
+            {panelContent}
+          </div>
+        </div>
+      </div>
+    ) : null;
+  }
+
+  return showPanel === 'Whatsapp' ? (
+    <div id="whatsappPanel" style={{ height: `calc(100vh - ${navHeight + 80}px)`, minHeight: '500px' }}>
+      {panelContent}
+    </div>
+  ) : null;
+};
+
   useEffect(() => {
     if (showPanel === 'leadHistory') {
       fetchLeadLogs(selectedProfile._id);
@@ -4739,7 +7687,7 @@ const B2BSales = () => {
             >
               <div className="container-fluid">
                 <div className="row align-items-center gy-2">
-                  <div className="col-md-4 col-xl-3 d-none d-md-block">
+                  <div className="col-md-5 col-xl-4 d-none d-md-block">
                     <div className="d-flex align-items-center flex-wrap">
                       <h5 className="fw-bold text-dark mb-0 me-3" style={{ fontSize: '1.1rem' }}>B2B Cycle</h5>
                       <nav aria-label="breadcrumb">
@@ -4751,13 +7699,14 @@ const B2BSales = () => {
                         </ol>
                       </nav>
                     </div>
+                    {renderHeaderDateRangeFilter()}
                   </div>
 
-                  <div className="col-md-8 col-xl-9 d-none d-md-flex justify-content-end align-items-center">
-                    {showBulkInputs && (bulkMode === 'bulkrefer' || bulkMode === 'bulkaction') ? (
-                      <div className="d-flex justify-content-end align-items-center gap-2">
-                      {/* Bulk inputs (desktop top row when active) */}
-                      {showBulkInputs && (bulkMode === 'bulkrefer' || bulkMode === 'bulkaction') && (
+                  <div className="col-md-7 col-xl-8 d-none d-md-flex justify-content-end align-items-center">
+                    {showBulkInputs && (bulkMode === 'bulkrefer' || bulkMode === 'bulkaction' || bulkMode === 'whatsapp') ? (
+                      <div className="d-flex justify-content-end align-items-center gap-2 flex-wrap">
+                      {showBulkInputs && (bulkMode === 'bulkrefer' || bulkMode === 'bulkaction' || bulkMode === 'whatsapp') && (
+                        <>
                         <div style={{
                           display: "flex",
                           alignItems: "stretch",
@@ -4796,6 +7745,15 @@ const B2BSales = () => {
                               if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
                                 e.preventDefault();
                               }
+                              if (e.key === 'Enter' && bulkMode === 'whatsapp' && input1Value) {
+                                e.preventDefault();
+                                const numValue = parseInt(input1Value, 10);
+                                const maxValue = totalLeads || leads?.length || 0;
+                                if (numValue >= 1 && numValue <= maxValue && selectedProfiles?.length > 0) {
+                                  if (!whatsappTemplates.length) fetchWhatsappTemplates();
+                                  setModalType('whatsapp');
+                                }
+                              }
                             }}
                             style={{
                               width: "50%",
@@ -4827,6 +7785,40 @@ const B2BSales = () => {
                             }}
                           />
                         </div>
+                        <span className="text-muted" style={{ fontSize: '12px', whiteSpace: 'nowrap' }}>
+                          Selected: <span className="fw-semibold text-primary">{selectedProfiles?.length || 0}</span>
+                        </span>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={exitBulkMode}
+                          style={{ height: '32px', padding: '4px 10px', fontSize: '12px' }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-primary"
+                          onClick={() => {
+                            if (!selectedProfiles || selectedProfiles.length === 0) {
+                              alert('Please type a number in Input 1 to select leads first.');
+                              return;
+                            }
+                            if (bulkMode === 'whatsapp') {
+                              if (!whatsappTemplates.length) fetchWhatsappTemplates();
+                              setModalType('whatsapp');
+                            } else if (bulkMode === 'bulkaction') {
+                              openEditPanel(null, 'bulkstatuschange');
+                            } else {
+                              openRefferPanel(null, 'RefferAllLeads');
+                            }
+                          }}
+                          style={{ height: '32px', padding: '4px 10px', fontSize: '12px', whiteSpace: 'nowrap' }}
+                        >
+                          <i className={`fas ${bulkMode === 'bulkaction' ? 'fa-tasks' : bulkMode === 'whatsapp' ? 'fa-paper-plane' : 'fa-share'} me-1`}></i>
+                          {bulkMode === 'bulkaction' ? 'Change Status' : bulkMode === 'whatsapp' ? 'Send Messages' : 'Refer'}
+                        </button>
+                        </>
                       )}
                     </div>
                     ) : (
@@ -4934,6 +7926,64 @@ const B2BSales = () => {
                           Bulk Action
                         </button>
                       )}
+                      <button
+                          type="button"
+                          className="btn btn-sm border-0"
+                          disabled={loadingLeads || leads.length === 0}
+                          style={{
+                            padding: '8px 16px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            color: '#fff',
+                            backgroundColor: 'rgb(250, 85, 121)',
+                            borderRadius: '999px',
+                            opacity: loadingLeads || leads.length === 0 ? 0.55 : 1
+                          }}
+                          onClick={() => {
+                            setShowBulkInputs(true);
+                            setBulkMode('whatsapp');
+                            setInput1Value('');
+                            setSelectedProfiles([]);
+                            if (!whatsappTemplates.length) fetchWhatsappTemplates();
+                          }}
+                        >
+                          <i className="fab fa-whatsapp" style={{ fontSize: '11px' }}></i>
+                          Bulk Messages
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm border-0"
+                        onClick={downloadPerformanceLeads}
+                        disabled={downloadingPerformanceLeads || loadingStatusCounts || (!pageSize && !totalLeads && !leads.length)}
+                        title="Download all leads for the selected Performance tab"
+                        style={{
+                          padding: '8px 16px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          color: '#fff',
+                          backgroundColor: 'rgb(250, 85, 121)',
+                          borderRadius: '999px',
+                          opacity: downloadingPerformanceLeads || loadingStatusCounts || (!pageSize && !totalLeads && !leads.length) ? 0.55 : 1
+                        }}
+                      >
+                        {downloadingPerformanceLeads ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
+                            Downloading...
+                          </>
+                        ) : (
+                          <>
+                            <i className="fas fa-download" style={{ fontSize: '11px' }}></i>
+                            Download Leads
+                          </>
+                        )}
+                      </button>
                       </div>
 
                       <div className="d-flex align-items-center gap-2 ms-md-auto">
@@ -5040,7 +8090,10 @@ const B2BSales = () => {
 
                   {/* Mobile: filters on top row */}
                   <div className="col-12 d-md-none">
-                    {!(showBulkInputs && (bulkMode === 'bulkrefer' || bulkMode === 'bulkaction')) && renderCycleFilterDropdowns(true)}
+                    {renderHeaderDateRangeFilter(true)}
+                  </div>
+                  <div className="col-12 d-md-none">
+                    {!(showBulkInputs && (bulkMode === 'bulkrefer' || bulkMode === 'bulkaction' || bulkMode === 'whatsapp')) && renderCycleFilterDropdowns(true)}
                   </div>
 
                   {/* Mobile Layout */}
@@ -5124,6 +8177,47 @@ const B2BSales = () => {
                           Bulk Action
                         </button>
                       )}
+                      <button
+                        className="btn b2b-mobile-action-btn"
+                        disabled={loadingLeads || leads.length === 0}
+                        style={{
+                          opacity: loadingLeads || leads.length === 0 ? 0.55 : 1,
+                          cursor: loadingLeads || leads.length === 0 ? 'not-allowed' : 'pointer'
+                        }}
+                        onClick={() => {
+                          setShowBulkInputs(true);
+                          setBulkMode('whatsapp');
+                          setInput1Value('');
+                          setSelectedProfiles([]);
+                          if (!whatsappTemplates.length) fetchWhatsappTemplates();
+                        }}
+                      >
+                        <i className="fab fa-whatsapp" style={{ fontSize: '14px' }}></i>
+                        Bulk Messages
+                      </button>
+                      <button
+                        type="button"
+                        className="btn b2b-mobile-action-btn"
+                        onClick={downloadPerformanceLeads}
+                        disabled={downloadingPerformanceLeads || loadingStatusCounts || (!pageSize && !totalLeads && !leads.length)}
+                        title="Download all leads for the selected Performance tab"
+                        style={{
+                          opacity: downloadingPerformanceLeads || loadingStatusCounts || (!pageSize && !totalLeads && !leads.length) ? 0.55 : 1,
+                          cursor: downloadingPerformanceLeads || loadingStatusCounts || (!pageSize && !totalLeads && !leads.length) ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        {downloadingPerformanceLeads ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
+                            Downloading...
+                          </>
+                        ) : (
+                          <>
+                            <i className="fas fa-download" style={{ fontSize: '14px' }}></i>
+                            Download Leads
+                          </>
+                        )}
+                      </button>
                     </div>
 
                     <div className="d-flex align-items-center gap-2 b2b-mobile-toolbar__search flex-grow-1" style={{ minWidth: '200px' }}>
@@ -5219,7 +8313,7 @@ const B2BSales = () => {
 
                     <div className="row g-2">
                       {/* Mobile Bulk Input Fields */}
-                      {showBulkInputs && (bulkMode === 'bulkrefer' || bulkMode === 'bulkaction') && (
+                      {showBulkInputs && (bulkMode === 'bulkrefer' || bulkMode === 'bulkaction' || bulkMode === 'whatsapp') && (
                         <div className="col-12 mt-2">
                           <div style={{
                             display: "flex",
@@ -5257,6 +8351,15 @@ const B2BSales = () => {
                                 if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
                                   e.preventDefault();
                                 }
+                                if (e.key === 'Enter' && bulkMode === 'whatsapp' && input1Value) {
+                                  e.preventDefault();
+                                  const numValue = parseInt(input1Value, 10);
+                                  const maxValue = totalLeads || leads?.length || 0;
+                                  if (numValue >= 1 && numValue <= maxValue && selectedProfiles?.length > 0) {
+                                    if (!whatsappTemplates.length) fetchWhatsappTemplates();
+                                    setModalType('whatsapp');
+                                  }
+                                }
                               }}
                               style={{
                                 width: "50%",
@@ -5287,6 +8390,39 @@ const B2BSales = () => {
                                 cursor: "default"
                               }}
                             />
+                          </div>
+                          <div className="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                            <span className="text-muted" style={{ fontSize: '12px' }}>
+                              Selected: <span className="fw-semibold text-primary">{selectedProfiles?.length || 0}</span>
+                            </span>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-secondary"
+                              onClick={exitBulkMode}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-primary"
+                              onClick={() => {
+                                if (!selectedProfiles || selectedProfiles.length === 0) {
+                                  alert('Please type a number in Input 1 to select leads first.');
+                                  return;
+                                }
+                                if (bulkMode === 'whatsapp') {
+                                  if (!whatsappTemplates.length) fetchWhatsappTemplates();
+                                  setModalType('whatsapp');
+                                } else if (bulkMode === 'bulkaction') {
+                                  openEditPanel(null, 'bulkstatuschange');
+                                } else {
+                                  openRefferPanel(null, 'RefferAllLeads');
+                                }
+                              }}
+                            >
+                              <i className={`fas ${bulkMode === 'bulkaction' ? 'fa-tasks' : bulkMode === 'whatsapp' ? 'fa-paper-plane' : 'fa-share'} me-1`}></i>
+                              {bulkMode === 'bulkaction' ? 'Change Status' : bulkMode === 'whatsapp' ? 'Send Messages' : 'Refer'}
+                            </button>
                           </div>
                         </div>
                       )}
@@ -5444,6 +8580,27 @@ const B2BSales = () => {
                                 </button>
                               );
                             })}
+                            {duplicatePerformanceStatus && (
+                              <button
+                                key={duplicatePerformanceStatus.statusId || 'duplicate'}
+                                type="button"
+                                className="b2b-perf-chip"
+                                title="Filter leads with duplicate mobile (also listed under their own status)"
+                                style={{
+                                  padding: '6px 14px',
+                                  fontSize: '12px',
+                                  fontWeight: 600,
+                                  borderRadius: '999px',
+                                  cursor: 'pointer',
+                                  color: isDuplicateMobileFilter(selectedStatusFilter) ? '#fff' : '#6b7280',
+                                  backgroundColor: isDuplicateMobileFilter(selectedStatusFilter) ? '#6b7280' : '#fff',
+                                  border: isDuplicateMobileFilter(selectedStatusFilter) ? 'none' : '1.5px solid #6b7280'
+                                }}
+                                onClick={() => handleStatusCardClick(duplicatePerformanceStatus.statusId)}
+                              >
+                                DUPLICATE ({duplicatePerformanceStatus.count ?? 0})
+                              </button>
+                            )}
                           </>
                         )}
                       </div>
@@ -5475,9 +8632,9 @@ const B2BSales = () => {
                           <span className="b2b-dash-section__label">Followup Calling</span>
                           <div className="d-flex flex-wrap gap-2 pt-1">
                             {[
-                              { key: 'fc-done', bucket: 'done', label: 'Done', value: dashboardB2BCounts.call.done, bg: '#12b3ff' },
-                              { key: 'fc-planned', bucket: 'planned', label: 'Planned', value: dashboardB2BCounts.call.planned, bg: '#f59e0b' },
-                              { key: 'fc-missed', bucket: 'missed', label: 'Missed', value: dashboardB2BCounts.call.missed, bg: '#7c3d14' }
+                              { key: 'fc-done', bucket: 'done', label: 'Done', value: dashboardB2BCounts.call.done, bg: 'rgb(18, 179, 255)' },
+                              { key: 'fc-planned', bucket: 'planned', label: 'Planned', value: dashboardB2BCounts.call.planned, bg: 'rgb(12, 125, 180)' },
+                              { key: 'fc-missed', bucket: 'missed', label: 'Missed', value: dashboardB2BCounts.call.missed, bg: 'rgb(8, 80, 120)' }
                             ].map((row) => {
                               const selected = isFollowupDashSelected('Call', row.bucket);
                               return (
@@ -5505,9 +8662,9 @@ const B2BSales = () => {
                           <span className="b2b-dash-section__label">Followup Visit</span>
                           <div className="d-flex flex-wrap gap-2 pt-1">
                             {[
-                              { key: 'fv-done', bucket: 'done', label: 'Done', value: dashboardB2BCounts.visit.done, bg: '#4b5563' },
-                              { key: 'fv-planned', bucket: 'planned', label: 'Planned', value: dashboardB2BCounts.visit.planned, bg: '#4b5563' },
-                              { key: 'fv-missed', bucket: 'missed', label: 'Missed', value: dashboardB2BCounts.visit.missed, bg: '#7c3d14' }
+                              { key: 'fv-done', bucket: 'done', label: 'Done', value: dashboardB2BCounts.visit.done, bg: 'rgb(75, 85, 99)' },
+                              { key: 'fv-planned', bucket: 'planned', label: 'Planned', value: dashboardB2BCounts.visit.planned, bg: 'rgb(55, 65, 81)' },
+                              { key: 'fv-missed', bucket: 'missed', label: 'Missed', value: dashboardB2BCounts.visit.missed, bg: 'rgb(35, 42, 52)' }
                             ].map((row) => {
                               const selected = isFollowupDashSelected('Visit', row.bucket);
                               return (
@@ -5648,119 +8805,107 @@ const B2BSales = () => {
                 </div>
               </div>
 
-              {/* Bulk select bar (shows above lead cards) */}
-              {showBulkInputs && (bulkMode === 'bulkrefer' || bulkMode === 'bulkaction') && (
-                <div className="card border-0 shadow-sm mb-2" style={{ borderRadius: '12px' }}>
-                  <div className="card-body py-2">
-                    <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
-                      <div className="d-flex align-items-center gap-2">
-                        <span className="fw-semibold text-dark" style={{ fontSize: '13px' }}>
-                          <i className="fas fa-layer-group me-1 text-secondary"></i>
-                          Bulk Select
-                        </span>
-                        <div style={{
-                          display: "flex",
-                          alignItems: "stretch",
-                          border: "1px solid #dee2e6",
-                          borderRadius: "8px",
-                          backgroundColor: "#fff",
-                          overflow: "hidden",
-                          width: "220px",
-                          height: "36px"
-                        }}>
-                          <input
-                            type="text"
-                            placeholder="Input 1"
-                            value={input1Value}
-                            onChange={(e) => {
-                              const maxValue = totalLeads || leads?.length || 0;
-                              let inputValue = e.target.value.replace(/[^0-9]/g, '');
-                              if (inputValue === '') {
-                                setInput1Value('');
-                                return;
-                              }
-                              const numValue = parseInt(inputValue, 10);
-                              if (numValue < 1 || isNaN(numValue)) inputValue = '1';
-                              else if (numValue > maxValue) inputValue = maxValue.toString();
-                              setInput1Value(inputValue);
-                            }}
-                            onKeyDown={(e) => {
-                              if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
-                                e.preventDefault();
-                              }
-                            }}
-                            style={{
-                              width: "50%",
-                              border: "none",
-                              borderRight: "1px solid #dee2e6",
-                              outline: "none",
-                              padding: "6px 10px",
-                              fontSize: "12px",
-                              backgroundColor: "transparent",
-                              height: "100%",
-                              boxSizing: "border-box"
-                            }}
-                          />
-                          <input
-                            type="text"
-                            placeholder="Total"
-                            value={totalLeads || leads?.length || 0}
-                            readOnly
-                            style={{
-                              width: "50%",
-                              border: "none",
-                              outline: "none",
-                              padding: "6px 10px",
-                              fontSize: "12px",
-                              backgroundColor: "transparent",
-                              height: "100%",
-                              boxSizing: "border-box",
-                              cursor: "default"
-                            }}
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline-secondary"
-                          onClick={() => {
-                            setInput1Value('');
-                            setSelectedProfiles([]);
-                          }}
-                          title="Clear selection"
-                          style={{ height: '36px' }}
-                        >
-                          Clear
-                        </button>
-                      </div>
+              {/* Bulk select bar removed — inputs live in the header (desktop/mobile) */}
 
-                      <div className="d-flex align-items-center gap-2">
-                        <span className="text-muted" style={{ fontSize: '13px' }}>
-                          Selected: <span className="fw-semibold text-primary">{selectedProfiles?.length || 0}</span>
-                        </span>
+              {modalType === 'whatsapp' && (
+                <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
+                  <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered" style={{ maxWidth: '560px' }}>
+                    <div className="modal-content">
+                      <div className="modal-header">
+                        <h1 className="modal-title fs-5">
+                          <i className="fab fa-whatsapp text-success me-2"></i>
+                          Bulk WhatsApp Messages
+                        </h1>
+                        <button type="button" className="btn-close" onClick={closeBulkWhatsappModal} aria-label="Close"></button>
+                      </div>
+                      <div className="modal-body" style={{ padding: '20px' }}>
+                        <div className="mb-3">
+                          <span className="badge text-bg-light border">
+                            Selected leads: {selectedProfiles?.length || 0}
+                          </span>
+                        </div>
+                        <div className="mb-4">
+                          <h5 className="fw-bold mb-3" style={{ fontSize: '15px' }}>Select number type to send</h5>
+                          <div className="d-flex flex-column gap-2">
+                            {['Mobile', 'WhatsApp Number'].map((numberType) => (
+                              <div key={numberType} className="form-check">
+                                <input
+                                  className="form-check-input"
+                                  type="checkbox"
+                                  id={`b2b-whatsappNumber-${numberType}`}
+                                  checked={selectedWhatsappNumbers.includes(numberType)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedWhatsappNumbers([...selectedWhatsappNumbers, numberType]);
+                                    } else {
+                                      setSelectedWhatsappNumbers(selectedWhatsappNumbers.filter((n) => n !== numberType));
+                                    }
+                                  }}
+                                  style={{ cursor: 'pointer' }}
+                                />
+                                <label className="form-check-label" htmlFor={`b2b-whatsappNumber-${numberType}`} style={{ cursor: 'pointer' }}>
+                                  {numberType}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="mb-2">
+                          <label htmlFor="b2bWhatsappTemplate" className="form-label fw-bold mb-2">Select WhatsApp Template</label>
+                          <select
+                            className="form-select"
+                            id="b2bWhatsappTemplate"
+                            value={selectedWhatsappTemplateModal}
+                            onChange={(e) => setSelectedWhatsappTemplateModal(e.target.value)}
+                            disabled={whatsappTemplates.length === 0}
+                            style={{
+                              height: '48px',
+                              backgroundColor: whatsappTemplates.length === 0 ? '#e9ecef' : '#fff',
+                              cursor: whatsappTemplates.length === 0 ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            <option value="">
+                              {whatsappTemplates.length === 0 ? 'Loading templates...' : 'Select WhatsApp Template'}
+                            </option>
+                            {whatsappTemplates.map((template, index) => (
+                              <option key={template.id || template.name || index} value={template.id || template.name}>
+                                {template.name || template.id}
+                              </option>
+                            ))}
+                          </select>
+                          {whatsappTemplates.length === 0 && (
+                            <small className="text-muted d-block mt-1">
+                              <i className="fas fa-spinner fa-spin me-1"></i>
+                              Fetching templates...
+                            </small>
+                          )}
+                        </div>
+                      </div>
+                      <div className="modal-footer">
+                        <button type="button" className="btn btn-secondary" onClick={closeBulkWhatsappModal}>
+                          Close
+                        </button>
                         <button
                           type="button"
-                          className="btn btn-sm btn-outline-primary"
-                          onClick={() => {
-                            if (!selectedProfiles || selectedProfiles.length === 0) {
-                              alert('Please type a number in Input 1 to select leads first.');
-                              return;
-                            }
-                            if (bulkMode === 'bulkaction') {
-                              openEditPanel(null, 'bulkstatuschange');
-                            } else {
-                              openRefferPanel(null, 'RefferAllLeads');
-                            }
-                          }}
-                          style={{ height: '36px', whiteSpace: 'nowrap' }}
+                          className="btn btn-primary"
+                          onClick={handleBulkWhatsappSend}
+                          disabled={isSendingBulkWhatsapp}
+                          style={{ backgroundColor: 'rgb(250, 85, 121)', borderColor: 'rgb(250, 85, 121)' }}
                         >
-                          <i className={`fas ${bulkMode === 'bulkaction' ? 'fa-tasks' : 'fa-share'} me-1`}></i>
-                          {bulkMode === 'bulkaction' ? 'Change Status' : 'Refer'}
+                          {isSendingBulkWhatsapp ? (
+                            <>
+                              <span className="spinner-border spinner-border-sm me-2"></span>
+                              Sending...
+                            </>
+                          ) : (
+                            <>
+                              <i className="fab fa-whatsapp me-1"></i>
+                              Send Message
+                            </>
+                          )}
                         </button>
                       </div>
                     </div>
-                    <small className="text-muted d-block mt-1" style={{ fontSize: '12px' }}>
-                      Tip: this selects the first N leads from your current filters/status and highlights them below.
-                    </small>
                   </div>
                 </div>
               )}
@@ -5780,6 +8925,18 @@ const B2BSales = () => {
                   {filters.followUpVisitBucket && (
                     <span className="badge rounded-pill text-bg-light border">Visit: {filters.followUpVisitBucket}</span>
                   )}
+                  {(filters.hasFollowUpCall === true || filters.hasFollowUpCall === 'yes') && (
+                    <span className="badge rounded-pill text-bg-light border">Followup Calling: Yes</span>
+                  )}
+                  {(filters.hasFollowUpCall === false || filters.hasFollowUpCall === 'no') && (
+                    <span className="badge rounded-pill text-bg-light border">Followup Calling: No</span>
+                  )}
+                  {(filters.hasFollowUpVisit === true || filters.hasFollowUpVisit === 'yes') && (
+                    <span className="badge rounded-pill text-bg-light border">Followup Visit: Yes</span>
+                  )}
+                  {(filters.hasFollowUpVisit === false || filters.hasFollowUpVisit === 'no') && (
+                    <span className="badge rounded-pill text-bg-light border">Followup Visit: No</span>
+                  )}
                   {(filters.modifiedDateRange?.start || filters.modifiedDateRange?.end) && (
                     <span className="badge rounded-pill text-bg-light border">Modified date</span>
                   )}
@@ -5791,7 +8948,10 @@ const B2BSales = () => {
                   )}
                   {selectedStatusFilter && (
                     <span className="badge rounded-pill text-bg-light border">
-                      Status: {statusCounts?.find((s) => String(s.statusId) === String(selectedStatusFilter))?.statusName || 'Selected'}
+                      Status:{' '}
+                      {isDuplicateMobileFilter(selectedStatusFilter)
+                        ? 'Duplicate'
+                        : (statusCounts?.find((s) => String(s.statusId) === String(selectedStatusFilter))?.statusName || 'Selected')}
                     </span>
                   )}
                   <button
@@ -5855,7 +9015,7 @@ const B2BSales = () => {
                     const leadIndex = groupIndex;
                     return (
                     <div key={group.rootId || lead._id || groupIndex} className="col-12">
-                      <div className={`lead-card ${((bulkMode === 'bulkrefer' || bulkMode === 'bulkaction') && (selectedProfiles || []).includes(lead._id)) ? 'bulk-selected' : ''}`}>
+                      <div className={`lead-card ${((bulkMode === 'bulkrefer' || bulkMode === 'bulkaction' || bulkMode === 'whatsapp') && (selectedProfiles || []).includes(lead._id)) ? 'bulk-selected' : ''}`}>
                         {group.leads.length > 0 && (
                           <div className="lead-project-tabs" role="tablist" aria-label="B2B projects for this business">
                             {group.leads.map((projLead) => {
@@ -5911,7 +9071,19 @@ const B2BSales = () => {
                           >
                             <i className={leadDetailsVisible === leadIndex ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
                           </button>
-
+                          <button
+                            type="button"
+                            className="lead-header-v2__float-wa"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              openWhatsappPanel(lead);
+                            }}
+                            title="WhatsApp"
+                            aria-label="WhatsApp"
+                          >
+                            <i className="fab fa-whatsapp" aria-hidden="true"></i>
+                          </button>
                           {/* {aiLeadIntelById?.[lead._id] && (
                             <div
                               className="lead-header-v2__float-ai d-none d-md-inline-flex"
@@ -6150,7 +9322,7 @@ const B2BSales = () => {
                               </div>
                               <div className="lhm__row3">
                                 {/* Followup Calling */}
-                                <div className="lhm__followup-box">
+                                <div className={`lhm__followup-box${!leadHasAnyFollowup(lead) ? ' lhm__followup-box--empty' : ''}`}>
                                   <span className="lhm__followup-title">Followup Calling</span>
                                   <button
                                     type="button"
@@ -6165,9 +9337,9 @@ const B2BSales = () => {
                                     {(() => {
                                       const b = getLeadFollowupBucket(lead, 'Call');
                                       return [
-                                        { label: 'Done', value: b === 'done' ? 1 : 0, bg: '#12b3ff' },
-                                        { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#f59e0b' },
-                                        { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#7c3d14' },
+                                        { label: 'Done', value: getLeadFollowupDoneCount(lead, 'Call'), bg: 'rgb(18, 179, 255)' },
+                                        { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: 'rgb(12, 125, 180)' },
+                                        { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: 'rgb(8, 80, 120)' },
                                       ];
                                     })().map((s) => (
                                       <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
@@ -6183,7 +9355,7 @@ const B2BSales = () => {
                                 </div>
 
                                 {/* Followup Visit */}
-                                <div className="lhm__followup-box">
+                                <div className={`lhm__followup-box${!leadHasAnyFollowup(lead) ? ' lhm__followup-box--empty' : ''}`}>
                                   <span className="lhm__followup-title">Followup Visit</span>
                                   <button
                                     type="button"
@@ -6198,9 +9370,9 @@ const B2BSales = () => {
                                     {(() => {
                                       const b = getLeadFollowupBucket(lead, 'Visit');
                                       return [
-                                        { label: 'Done', value: b === 'done' ? 1 : 0, bg: '#4b5563' },
-                                        { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#4b5563' },
-                                        { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#7c3d14' },
+                                        { label: 'Done', value: getLeadFollowupDoneCount(lead, 'Visit'), bg: 'rgb(75, 85, 99)' },
+                                        { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: 'rgb(55, 65, 81)' },
+                                        { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: 'rgb(35, 42, 52)' },
                                       ];
                                     })().map((s) => (
                                       <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
@@ -6300,6 +9472,7 @@ const B2BSales = () => {
                                         placeholder="Mobile no"
                                         title={lead.mobile || 'NA'}
                                       />
+                                      
                                     </div>
                                   </div>
 
@@ -6397,6 +9570,8 @@ const B2BSales = () => {
                                   )}
                                 </div>
 
+                                
+
                                 {/* Refer / History pills — stacked vertically, no white box */}
                                 <div className="lead-header-v2__pills">
                                   <button
@@ -6442,6 +9617,20 @@ const B2BSales = () => {
                                   >
                                     <i className="fas fa-edit" aria-hidden="true"></i>
                                   </button>
+
+                                  {/* Lead Ranking — floating value only */}
+                                {(() => {
+                                  const rankingName = String(lead?.leadRanking?.name || '').trim();
+                                  const display = rankingName || 'NA';
+                                  return (
+                                    <div
+                                      className={`lead-header-v2__ranking${rankingName ? '' : ' lead-header-v2__ranking--na'}`}
+                                      title={`${display}`}
+                                    >
+                                      <span className="lead-header-v2__ranking-label">{display}</span>
+                                    </div>
+                                  );
+                                })()}
                                   <div className="lead-header-v2__perf-row">
                                     <span className="lead-header-v2__perf-label">Status</span>
                                     <input
@@ -6492,7 +9681,7 @@ const B2BSales = () => {
                                 {/* Followup Calling & Visit — Done/Planned/Missed with distinct colours */}
                                 <div className="lead-header-v2__dash">
                                   <div className="lead-header-v2__dash-col">
-                                    <div className="b2b-dash-section h-100">
+                                    <div className={`b2b-dash-section h-100${!leadHasAnyFollowup(lead) ? ' b2b-dash-section--no-followup' : ''}`}>
                                       <span className="b2b-dash-section__label">Followup Calling</span>
                                       <button
                                         type="button"
@@ -6507,9 +9696,9 @@ const B2BSales = () => {
                                         {(() => {
                                           const b = getLeadFollowupBucket(lead, 'Call');
                                           return [
-                                            { key: 'fc-done', label: 'Done', value: b === 'done' ? 1 : 0, bg: '#12b3ff' },
-                                            { key: 'fc-planned', label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#f59e0b' },
-                                            { key: 'fc-missed', label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#7c3d14' },
+                                            { key: 'fc-done', label: 'Done', value: getLeadFollowupDoneCount(lead, 'Call'), bg: 'rgb(18, 179, 255)' },
+                                            { key: 'fc-planned', label: 'Planned', value: b === 'planned' ? 1 : 0, bg: 'rgb(12, 125, 180)' },
+                                            { key: 'fc-missed', label: 'Missed', value: b === 'missed' ? 1 : 0, bg: 'rgb(8, 80, 120)' },
                                           ];
                                         })().map((row) => (
                                           <div
@@ -6531,7 +9720,7 @@ const B2BSales = () => {
                                     </div>
                                   </div>
                                   <div className="lead-header-v2__dash-col">
-                                    <div className="b2b-dash-section h-100">
+                                    <div className={`b2b-dash-section h-100${!leadHasAnyFollowup(lead) ? ' b2b-dash-section--no-followup' : ''}`}>
                                       <span className="b2b-dash-section__label">Followup Visit</span>
                                       <button
                                         type="button"
@@ -6546,9 +9735,9 @@ const B2BSales = () => {
                                         {(() => {
                                           const b = getLeadFollowupBucket(lead, 'Visit');
                                           return [
-                                            { key: 'fv-done', label: 'Done', value: b === 'done' ? 1 : 0, bg: '#4b5563' },
-                                            { key: 'fv-planned', label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#4b5563' },
-                                            { key: 'fv-missed', label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#7c3d14' },
+                                            { key: 'fv-done', label: 'Done', value: getLeadFollowupDoneCount(lead, 'Visit'), bg: 'rgb(75, 85, 99)' },
+                                            { key: 'fv-planned', label: 'Planned', value: b === 'planned' ? 1 : 0, bg: 'rgb(55, 65, 81)' },
+                                            { key: 'fv-missed', label: 'Missed', value: b === 'missed' ? 1 : 0, bg: 'rgb(35, 42, 52)' },
                                           ];
                                         })().map((row) => (
                                           <div
@@ -6639,6 +9828,10 @@ const B2BSales = () => {
                                   <div className="lead-meta-v2__value text-capitalize" title={lead.leadOwner?.name || '—'}>{lead.leadOwner?.name || '—'}</div>
                                 </div>
                                 <div className="lead-meta-v2__item">
+                                  <div className="lead-meta-v2__label">Co-owner</div>
+                                  <div className="lead-meta-v2__value text-capitalize" title={lead.leadCoOwner?.name || '—'}>{lead.leadCoOwner?.name || '—'}</div>
+                                </div>
+                                <div className="lead-meta-v2__item">
                                   <div className="lead-meta-v2__label">Added by</div>
                                   <div className="lead-meta-v2__value text-capitalize" title={lead.leadAddedBy?.name || '—'}>{lead.leadAddedBy?.name || '—'}</div>
                                 </div>
@@ -6649,6 +9842,15 @@ const B2BSales = () => {
                                 <div className="lead-meta-v2__item">
                                   <div className="lead-meta-v2__label">B2B Project</div>
                                   <div className="lead-meta-v2__value text-capitalize" title={getLeadB2bProjectName(lead)}>{getLeadB2bProjectName(lead)}</div>
+                                </div>
+                                <div className="lead-meta-v2__item">
+                                  <div className="lead-meta-v2__label">Lead Ranking</div>
+                                  <div
+                                    className="lead-meta-v2__value text-capitalize"
+                                    title={lead.leadRanking?.name || 'NA'}
+                                  >
+                                    {String(lead?.leadRanking?.name || '').trim() || 'NA'}
+                                  </div>
                                 </div>
                                 <div className="lead-meta-v2__item">
                                   <div className="lead-meta-v2__label">Lead Source</div>
@@ -6803,6 +10005,7 @@ const B2BSales = () => {
               {renderFollowupPanel()}
               {renderRefferPanel()}
               {renderLeadHistoryPanel()}
+              {renderWhatsAppPanel()}
 
             </div>
           )
@@ -6813,6 +10016,7 @@ const B2BSales = () => {
         {isMobile && renderFollowupPanel()}
         {isMobile && renderRefferPanel()}
         {isMobile && renderLeadHistoryPanel()}
+        {isMobile && renderWhatsAppPanel()}
 
         {/* Mobile-only: More actions modal */}
         {isMobile && mobileMoreLead && (
@@ -6838,6 +10042,20 @@ const B2BSales = () => {
                 </div>
                 <div className="modal-body p-3">
                   <div className="d-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <button
+                      type="button"
+                      className="lead-meta-v2__action-btn"
+                      onClick={() => {
+                        const l = mobileMoreLead;
+                        setMobileMoreLead(null);
+                        openWhatsappPanel(l);
+                      }}
+                      title="WhatsApp"
+                    >
+                      <i className="fab fa-whatsapp text-success"></i>
+                      WhatsApp
+                    </button>
+
                     <button
                       type="button"
                       className="lead-meta-v2__action-btn"
@@ -7029,15 +10247,18 @@ const B2BSales = () => {
                       <i className="fas fa-phone text-primary me-2"></i>
                       Followup Calling
                     </label>
-                    <div className="form-check form-switch m-0 pt-1">
-                      <input
-                        className="form-check-input"
-                        type="checkbox"
-                        role="switch"
-                        checked={Boolean(filters.hasFollowUpCall)}
-                        onChange={(e) => handleFilterChange('hasFollowUpCall', e.target.checked)}
-                      />
-                    </div>
+                    <select
+                      className="form-select"
+                      value={filters.hasFollowUpCall === true || filters.hasFollowUpCall === 'yes' ? 'yes' : filters.hasFollowUpCall === false || filters.hasFollowUpCall === 'no' ? 'no' : ''}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        handleFilterChange('hasFollowUpCall', v === 'yes' ? true : v === 'no' ? false : '');
+                      }}
+                    >
+                      <option value="">Select</option>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                    </select>
                   </div>
 
                   <div className="col-md-3">
@@ -7045,15 +10266,18 @@ const B2BSales = () => {
                       <i className="fas fa-map-marker-alt text-primary me-2"></i>
                       Followup Visit
                     </label>
-                    <div className="form-check form-switch m-0 pt-1">
-                      <input
-                        className="form-check-input"
-                        type="checkbox"
-                        role="switch"
-                        checked={Boolean(filters.hasFollowUpVisit)}
-                        onChange={(e) => handleFilterChange('hasFollowUpVisit', e.target.checked)}
-                      />
-                    </div>
+                    <select
+                      className="form-select"
+                      value={filters.hasFollowUpVisit === true || filters.hasFollowUpVisit === 'yes' ? 'yes' : filters.hasFollowUpVisit === false || filters.hasFollowUpVisit === 'no' ? 'no' : ''}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        handleFilterChange('hasFollowUpVisit', v === 'yes' ? true : v === 'no' ? false : '');
+                      }}
+                    >
+                      <option value="">Select</option>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                    </select>
                   </div>
 
                   <div className="col-md-6">
@@ -7749,6 +10973,11 @@ const B2BSales = () => {
                           {formErrors.mobile}
                         </div>
                       )}
+                      {/* {!editingLeadId && isDuplicateMobile && (
+                        <div className="form-text text-danger fw-semibold">
+                          This mobile already exists. Your Status / Sub Status will be kept; lead will also appear under Duplicate.
+                        </div>
+                      )} */}
                     </div>
 
                     {/* WhatsApp */}
@@ -7822,6 +11051,33 @@ const B2BSales = () => {
                       </select>
                     </div>
 
+                    {/* Co-owner */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-user-friends text-primary me-1"></i>
+                        Co-owner
+                      </label>
+                      <select
+                        className="form-select"
+                        name="leadCoOwner"
+                        value={leadFormData.leadCoOwner}
+                        onChange={handleLeadInputChange}
+                      >
+                        <option value="">Select Co-owner</option>
+                        {userData?._id &&
+                          !users?.some((u) => String(u?._id) === String(userData._id)) && (
+                            <option key={`co-me-${userData._id}`} value={String(userData._id)}>
+                              {userData.name || 'Me'}
+                            </option>
+                          )}
+                        {users?.map(user => (
+                          <option key={`co-${user?._id}`} value={user?._id}>
+                            {user?.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
                     {!editingLeadId && (
                     <>
                     {/* Status */}
@@ -7882,6 +11138,29 @@ const B2BSales = () => {
                       {leadFormData.leadStatus && !addLeadSubStatusesLoading && addLeadSubStatuses.length === 0 && (
                         <div className="form-text text-muted small">No sub-statuses configured for this status.</div>
                       )}
+                    </div>
+                    {/* Lead Ranking */}
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        <i className="fas fa-trophy text-primary me-1"></i>
+                        Lead Ranking
+                      </label>
+                      <select
+                        className="form-select"
+                        name="leadRanking"
+                        value={leadFormData.leadRanking || ''}
+                        onChange={handleLeadInputChange}
+                        disabled={leadRankingsLoading}
+                      >
+                        <option value="">
+                          {leadRankingsLoading ? 'Loading rankings...' : 'Select Lead Ranking'}
+                        </option>
+                        {leadRankings.map((ranking) => (
+                          <option key={ranking._id} value={ranking._id}>
+                            {ranking.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     </>
                     )}
@@ -7985,11 +11264,11 @@ const B2BSales = () => {
                     Instructions:
                   </h6>
                   <ul className="mb-0 small">
-                    <li>Step 1: Select Lead Source, B2B Department, B2B Project, Type of B2B, Lead Status, Sub Status, and Counsellor below.</li>
+                    <li>Step 1: Select Lead Source, B2B Department, B2B Project, Type of B2B, Lead Status, Sub Status, Counsellor, and Co-owner below.</li>
                     <li>Step 2: Upload an Excel file (.xlsx or .xls, max 10MB).</li>
                     <li><strong>Required in Excel:</strong> Business Name, Concern Person Name, Mobile.</li>
                     <li>All imported leads use your selections above. You do not need those columns in Excel.</li>
-                    <li>Counsellor is optional; if selected, all imported leads are assigned to that counsellor.</li>
+                    <li>Counsellor and Co-owner are optional; if selected, all imported leads are assigned accordingly.</li>
                   </ul>
                 </div>
 
@@ -8177,6 +11456,54 @@ const B2BSales = () => {
                       {users?.map((user) => (
                         <option key={user?._id} value={user?._id}>
                           {user?.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-user-friends text-primary me-1"></i>
+                      Co-owner
+                    </label>
+                    <select
+                      className="form-select"
+                      name="leadCoOwner"
+                      value={bulkUploadFormData.leadCoOwner}
+                      onChange={handleBulkUploadInputChange}
+                      disabled={bulkUploadLoading}
+                    >
+                      <option value="">Select Co-owner</option>
+                      {userData?._id &&
+                        !users?.some((u) => String(u?._id) === String(userData._id)) && (
+                          <option key={`bulk-co-me-${userData._id}`} value={String(userData._id)}>
+                            {userData.name || 'Me'}
+                          </option>
+                        )}
+                      {users?.map((user) => (
+                        <option key={`bulk-co-${user?._id}`} value={user?._id}>
+                          {user?.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-trophy text-primary me-1"></i>
+                      Lead Ranking
+                    </label>
+                    <select
+                      className="form-select"
+                      name="leadRanking"
+                      value={bulkUploadFormData.leadRanking || ''}
+                      onChange={handleBulkUploadInputChange}
+                      disabled={bulkUploadLoading || leadRankingsLoading}
+                    >
+                      <option value="">
+                        {leadRankingsLoading ? 'Loading rankings...' : 'Select Lead Ranking'}
+                      </option>
+                      {leadRankings.map((ranking) => (
+                        <option key={ranking._id} value={ranking._id}>
+                          {ranking.name}
                         </option>
                       ))}
                     </select>
@@ -8652,6 +11979,183 @@ const B2BSales = () => {
     border-radius: 12px;
     padding: 12px 14px;
   }
+  .adm-header-date-range{
+    position: relative;
+    margin-top: 8px;
+    overflow: visible;
+  }
+  .adm-header-date-range__pills{
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    overflow: visible;
+  }
+  .adm-header-date-range--compact .adm-header-date-range__pills{
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+  .adm-header-date-range--compact .adm-header-date-range__pills::-webkit-scrollbar{
+    display: none;
+  }
+  .adm-header-date-range__pill{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid #e5e7eb;
+    background: #fff;
+    color: #4b5563;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+    cursor: pointer;
+    box-sizing: border-box;
+    box-shadow: 0 2px 8px transparent;
+    transition: all 0.2s ease;
+  }
+  .adm-header-date-range__pill:hover{
+    border-color: rgba(250, 85, 121, 0.45);
+    color: rgb(250, 85, 121);
+    background: rgba(250, 85, 121, 0.06);
+  }
+  .adm-header-date-range__pill--active{
+    background: linear-gradient(135deg, #fc567b 13%, #fc567b 50%);
+    border-color: rgb(250, 85, 121);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(250, 85, 121, 0.22);
+  }
+  .adm-header-date-range__pill--active:hover{
+    background: linear-gradient(135deg, #fc567b 13%, #fc567b 50%);
+    color: #fff;
+  }
+  .adm-header-date-range__custom-wrap{
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+  .adm-header-date-range__pill--clear{
+    border-color: #fca5a5;
+    color: #dc2626;
+    background: #fff;
+  }
+  .adm-header-date-range__pill--clear:hover{
+    border-color: #f87171;
+    color: #b91c1c;
+    background: #fef2f2;
+  }
+  .adm-header-date-range__dropdown{
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 1060;
+    min-width: 560px;
+    max-width: 580px;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid #e8eaed;
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+    overflow: visible;
+  }
+  .adm-header-date-range--compact .adm-header-date-range__dropdown{
+    right: 0;
+    left: auto;
+    min-width: 300px;
+    max-width: 320px;
+  }
+  .adm-header-date-range__dropdown-title{
+    font-size: 12px;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 8px;
+  }
+  .adm-header-date-range__date-display{
+    display: flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 6px 10px;
+    border: 1.5px solid #e8eaed;
+    border-radius: 8px;
+    background: #f9fafb;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1f2937;
+  }
+  .adm-header-date-range__calendars-row{
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    align-items: flex-start;
+  }
+  .adm-header-date-range__calendar-col{
+    flex: 1;
+    min-width: 0;
+  }
+  .adm-header-date-range__calendar.react-calendar{
+    width: 100% !important;
+    max-width: 260px;
+    height: min-content !important;
+    border: 1px solid #e8eaed;
+    border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+    padding: 6px;
+    line-height: 1.2;
+    font-size: 11px;
+  }
+  .adm-header-date-range__calendar .react-calendar__navigation{
+    margin-bottom: 6px;
+  }
+  .adm-header-date-range__calendar .react-calendar__navigation button{
+    min-width: 28px;
+    font-size: 13px;
+  }
+  .adm-header-date-range__calendar .react-calendar__month-view__weekdays{
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .adm-header-date-range__calendar .react-calendar__tile{
+    padding: 6px 4px;
+    font-size: 11px;
+  }
+  .adm-header-date-range__calendar .react-calendar__tile--active,
+  .adm-header-date-range__calendar .react-calendar__tile--hasActive{
+    background: rgb(250, 85, 121) !important;
+    color: #fff;
+  }
+  .adm-header-date-range__calendar .react-calendar__tile--now{
+    background: rgba(250, 85, 121, 0.12);
+  }
+  .adm-header-date-range--compact .adm-header-date-range__calendars-row{
+    flex-direction: column;
+    gap: 8px;
+  }
+  .adm-header-date-range--compact .adm-header-date-range__calendar.react-calendar{
+    max-width: 100%;
+  }
+  .adm-header-date-range__selected{
+    color: rgb(250, 85, 121);
+    background: rgba(250, 85, 121, 0.08);
+    border-radius: 8px;
+    padding: 6px 8px;
+  }
+  .adm-header-date-range__apply-btn{
+    background: linear-gradient(135deg, #fc567b 13%, #fc567b 50%);
+    border: none;
+    color: #fff;
+    font-weight: 600;
+  }
+  .adm-header-date-range__apply-btn:hover{
+    background: linear-gradient(135deg, #e84d6f 13%, #e84d6f 50%);
+    color: #fff;
+  }
   .b2b-filter-date-ranges__head{
     font-size: 0.9rem;
     font-weight: 600;
@@ -8848,9 +12352,38 @@ const B2BSales = () => {
     background: rgba(255,255,255,0.98);
   }
 
+  .lead-header-v2__float-wa{
+    position: absolute;
+    top: 10px;
+    right: 54px; /* left of expand chevron */
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 1px solid rgba(37, 211, 102, 0.95);
+    background: rgba(37, 211, 102, 0.95);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    cursor: pointer;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+  }
+
+  .lead-header-v2__float-wa:hover{
+    background: rgba(37, 211, 102, 1);
+  }
+
+  .lead-header-v2__float-wa i{
+    font-size: 16px;
+  }
+
   @media (max-width: 768px){
     .lead-header-v2__float-icon{
       display: none;
+    }
+    .lead-header-v2__float-wa{
+      right: 10px; /* expand is hidden on mobile */
     }
   }
 
@@ -8962,6 +12495,21 @@ const B2BSales = () => {
     overflow: visible;
   }
 
+  .lead-header-v2__ranking{
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    align-self: flex-start;
+    justify-content: flex-start;
+    flex-shrink: 0;
+    margin-top: -2px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    z-index: 21;
+    overflow: visible;
+  }
+
   .lead-header-v2__approval-label{
     position: absolute;
     top: 0;
@@ -8976,6 +12524,30 @@ const B2BSales = () => {
     font-weight: 900;
     line-height: 18px;
     white-space: nowrap;
+  }
+
+  .lead-header-v2__ranking-label{
+    display: inline-flex;
+    align-items: center;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: rgba(11, 94, 215, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 18px;
+    white-space: nowrap;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    position: absolute;
+    left:0;
+    bottom:-86px
+  }
+
+  .lead-header-v2__ranking--na .lead-header-v2__ranking-label{
+    opacity: 0.85;
   }
 
   .lead-header-v2__approval-btn{
@@ -9239,6 +12811,23 @@ const B2BSales = () => {
     min-height: var(--lead-header-v2-block-h);
     display: flex;
     flex-direction: column;
+  }
+
+  .lead-header-v2 .b2b-dash-section--no-followup{
+    background: #ff4646;
+    border-color: #ff4646;
+  }
+
+  .lead-header-v2 .b2b-dash-section--no-followup .ActionsDates,
+  .lead-header-v2 .b2b-dash-section--no-followup .ActionsDates span:last-child{
+    color: #7f1d1d;
+    border-top-color: rgba(127, 29, 29, 0.25);
+  }
+
+  .lead-header-v2 .b2b-dash-section--no-followup .lead-header-v2__editbtn{
+    background: #ef4444;
+    border-color: #dc2626;
+    color: #fff;
   }
 
   /* Make stats row use remaining height so all blocks match */
@@ -9804,6 +13393,22 @@ position: absolute;
     scroll-snap-align: start;
   }
 
+  .lhm__followup-box--empty{
+    background: #fecaca;
+    border-color: #fca5a5;
+  }
+
+  .lhm__followup-box--empty .lhm__followup-date{
+    color: #7f1d1d;
+    border-top-color: rgba(127, 29, 29, 0.25);
+  }
+
+  .lhm__followup-box--empty .lhm__editbtn{
+    background: #ef4444;
+    border-color: #dc2626;
+    color: #fff;
+  }
+
   /* Bottom-right edit button (mobile header boxes) */
   .lhm__editbtn{
     position: absolute;
@@ -10203,7 +13808,8 @@ position: absolute;
     .lead-header-mob .lead-header-v2__status-stack{ width: clamp(120px, 42vw, 160px); }
   }
 
-  .b2b-panel-open .lead-header-v2__approval{
+  .b2b-panel-open .lead-header-v2__approval,
+  .b2b-panel-open .lead-header-v2__ranking{
     flex-wrap: wrap;
   }
 

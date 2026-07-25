@@ -743,6 +743,7 @@ router.get('/permissions/matrix', checkPermission('can_view_users'), async (req,
       'can_view_kyc', 'can_verify_reject_kyc', 'can_request_kyc',
       'can_view_training', 'can_add_vertical', 'can_add_project', 'can_add_center',
       'can_add_course', 'can_add_batch', 'can_assign_batch',
+      'can_be_senior_trainer', 'can_be_trainer',
       'can_view_users', 'can_add_users', 'can_edit_users', 'can_delete_users', 'can_manage_roles',
       'can_bulk_import', 'can_bulk_export', 'can_bulk_update', 'can_bulk_delete', 'can_bulk_communication'
     ];
@@ -1094,5 +1095,72 @@ router.get('/b2b-users', isCollege, async (req, res) => {
       message: 'Error fetching b2b users'
     });
   }
-})
+});
+
+router.get('/training-role-users', isCollege, async (req, res) => {
+  try {
+    const user = req.user;
+    const roleType = String(req.query.roleType || '').toLowerCase();
+
+    const permissionKey = roleType === 'senior'
+      ? 'can_be_senior_trainer'
+      : roleType === 'trainer'
+        ? 'can_be_trainer'
+        : null;
+
+    if (!permissionKey) {
+      return res.status(400).json({
+        success: false,
+        message: 'roleType must be "senior" or "trainer"',
+      });
+    }
+
+    const college = await College.findOne({
+      '_concernPerson._id': new mongoose.Types.ObjectId(user._id),
+    });
+
+    if (!college) {
+      return res.status(200).json({ success: true, data: [] });
+    }
+
+    const concernPersonIds = college._concernPerson?.map((cp) => cp._id) || [];
+    const concernPersons = await User.find({
+      _id: { $in: concernPersonIds },
+      role: 2,
+      status: true,
+      isDeleted: false,
+    })
+      .select('_id name email mobile designation permissions status')
+      .sort({ name: 1 })
+      .lean();
+
+    // Users with the role permission OR Admin access
+    const filtered = concernPersons
+      .filter((u) => {
+        const isAdmin = u.permissions?.permission_type === 'Admin';
+        const hasRolePermission = u.permissions?.custom_permissions?.[permissionKey] === true;
+        return isAdmin || hasRolePermission;
+      })
+      .map((u) => ({
+        _id: u._id,
+        name: u.name,
+        email: u.email,
+        mobile: u.mobile,
+        designation: u.designation || '',
+      }));
+
+    return res.status(200).json({
+      success: true,
+      data: filtered,
+      count: filtered.length,
+    });
+  } catch (err) {
+    console.error('Error fetching training-role-users:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching training role users',
+    });
+  }
+});
+
 module.exports = router;

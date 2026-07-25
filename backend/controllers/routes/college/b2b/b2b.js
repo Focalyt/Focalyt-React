@@ -51,6 +51,7 @@ const TypeOfB2B = require("../../../models/b2b/typeOfB2B");
 const B2BProject = require("../../../models/b2b/b2bProject");
 const B2BDepartment = require("../../../models/b2b/b2bDepartment");
 const LeadCategory = require("../../../models/b2b/leadCategory");
+const LeadRanking = require("../../../models/b2b/leadRanking");
 const defaultLeadModel = require("../../../models/b2b/lead");
 const FollowUp = require("../../../models/b2b/followUp");
 const StatusB2b = require("../../../models/statusB2b");
@@ -110,6 +111,36 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 		const legacyTypePattern = isVisit ? '^visit$' : '^call$';
 		const now = new Date();
 
+		// Done = leads with ≥1 completed followup of this type (same as card followupStats),
+		// not only when the *current* slot is still Completed.
+		if (b === 'done') {
+			const completedRows = await FollowUp.aggregate([
+				{
+					$match: {
+						$expr: {
+							$and: [
+								{ $eq: [{ $toLower: { $ifNull: ['$status', ''] } }, 'completed'] },
+								isVisit
+									? { $eq: [{ $toLower: { $ifNull: ['$followUpType', ''] } }, 'visit'] }
+									: { $ne: [{ $toLower: { $ifNull: ['$followUpType', ''] } }, 'visit'] }
+							]
+						}
+					}
+				},
+				{ $group: { _id: '$leadId' } }
+			]);
+
+			const doneIds = [
+				...new Set(
+					(completedRows || [])
+						.map((row) => String(row._id || ''))
+						.filter((id) => id && mongoose.Types.ObjectId.isValid(id))
+				)
+			].map((id) => new mongoose.Types.ObjectId(id));
+
+			return { _id: { $in: doneIds } };
+		}
+
 		const bucketExpr = (prefix) => {
 			const statusLower = { $toLower: { $ifNull: [`${prefix}.status`, ''] } };
 			const sched = `${prefix}.scheduledDate`;
@@ -119,9 +150,6 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 					{ $ne: [{ $type: sched }, 'missing'] }
 				]
 			};
-			if (b === 'done') {
-				return { $eq: [statusLower, 'completed'] };
-			}
 			const notDone = { $ne: [statusLower, 'completed'] };
 			if (b === 'planned') {
 				return { $and: [notDone, hasSched, { $gte: [sched, now] }] };
@@ -199,33 +227,192 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 		};
 	};
 
+	const parseLocalDateInput = (value) => {
+		if (!value || value === 'null') return null;
+		const str = String(value).trim();
+		if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+			const [year, month, day] = str.split('-').map(Number);
+			return new Date(year, month - 1, day);
+		}
+		const parsed = new Date(value);
+		return Number.isNaN(parsed.getTime()) ? null : parsed;
+	};
+
+	const getDateRangeBounds = (fromDate, toDate) => {
+		const bounds = {};
+		const parsedFrom = parseLocalDateInput(fromDate);
+		const parsedTo = parseLocalDateInput(toDate);
+
+		if (parsedFrom) {
+			const from = new Date(parsedFrom);
+			from.setHours(0, 0, 0, 0);
+			bounds.$gte = from;
+		}
+		if (parsedTo) {
+			const to = new Date(parsedTo);
+			to.setHours(23, 59, 59, 999);
+			bounds.$lte = to;
+		} else if (parsedFrom) {
+			const to = new Date(parsedFrom);
+			to.setHours(23, 59, 59, 999);
+			bounds.$lte = to;
+		}
+		return bounds;
+	};
+
+	const completeCurrentFollowupForType = async (lead, followUpType) => {
+		if (!lead) return;
+		const normalizedType = String(followUpType || 'Call').trim().toLowerCase();
+		const currentFollowUpId = normalizedType === 'visit' ? lead.followUpVisit : lead.followUpCall;
+		if (!currentFollowUpId) return;
+
+		await FollowUp.findOneAndUpdate(
+			{
+				_id: currentFollowUpId,
+				status: { $ne: 'Completed' }
+			},
+			{
+				status: 'Completed',
+				completedDate: new Date()
+			}
+		);
+	};
+
+	const attachFollowupStats = async (leads) => {
+		const list = Array.isArray(leads) ? leads : [];
+		const leadIds = list
+			.map((lead) => lead?._id)
+			.filter(Boolean);
+
+		if (!leadIds.length) return list.map((lead) => lead?.toObject ? lead.toObject() : lead);
+
+		const stats = await FollowUp.aggregate([
+			{
+				$match: {
+					leadId: { $in: leadIds },
+					$expr: {
+						$eq: [{ $toLower: '$status' }, 'completed']
+					}
+				}
+			},
+			{
+				$group: {
+					_id: {
+						leadId: '$leadId',
+						type: {
+							$cond: [
+								{ $eq: [{ $toLower: '$followUpType' }, 'visit'] },
+								'visit',
+								'call'
+							]
+						}
+					},
+					done: { $sum: 1 }
+				}
+			}
+		]);
+
+		const statsByLead = {};
+		stats.forEach((row) => {
+			const leadId = String(row?._id?.leadId || '');
+			const type = row?._id?.type === 'visit' ? 'visit' : 'call';
+			if (!leadId) return;
+			if (!statsByLead[leadId]) {
+				statsByLead[leadId] = {
+					call: { done: 0 },
+					visit: { done: 0 }
+				};
+			}
+			statsByLead[leadId][type].done = row.done || 0;
+		});
+
+		return list.map((lead) => {
+			const obj = lead?.toObject ? lead.toObject() : lead;
+			return {
+				...obj,
+				followupStats: statsByLead[String(obj?._id || '')] || {
+					call: { done: 0 },
+					visit: { done: 0 }
+				}
+			};
+		});
+	};
+
 	const buildLeadDateRangeCondition = (field, fromDate, toDate) => {
 		if (!fromDate && !toDate) return null;
-		return {
-			[field]: {
-				...(fromDate ? { $gte: new Date(fromDate) } : {}),
-				...(toDate ? { $lte: new Date(toDate) } : {})
-			}
-		};
+		return { [field]: getDateRangeBounds(fromDate, toDate) };
 	};
 
 	const resolveNextActionDateLeadFilter = async (fromDate, toDate) => {
 		if (!fromDate && !toDate) return null;
 
-		const scheduledDate = {};
-		if (fromDate) scheduledDate.$gte = new Date(fromDate);
-		if (toDate) scheduledDate.$lte = new Date(toDate);
+		const bounds = getDateRangeBounds(fromDate, toDate);
+		if (!bounds.$gte && !bounds.$lte) return null;
 
-		const followups = await FollowUp.find({ scheduledDate }).select('_id').lean();
-		const fuIds = followups.map((row) => row._id).filter(Boolean);
-		if (!fuIds.length) return { _id: { $in: [] } };
+		const scheduledDateExpr = (schedField) => {
+			const parts = [
+				{ $ne: [schedField, null] },
+				{ $ne: [{ $type: schedField }, 'missing'] },
+			];
+			if (bounds.$gte) parts.push({ $gte: [schedField, bounds.$gte] });
+			if (bounds.$lte) parts.push({ $lte: [schedField, bounds.$lte] });
+			return { $and: parts };
+		};
+
+		const slotPipelineFor = (slotField) => [
+			{ $match: { [slotField]: { $exists: true, $ne: null } } },
+			{
+				$lookup: {
+					from: 'followups',
+					localField: slotField,
+					foreignField: '_id',
+					as: 'fuArr'
+				}
+			},
+			{ $unwind: '$fuArr' },
+			{ $match: { $expr: scheduledDateExpr('$fuArr.scheduledDate') } },
+			{ $project: { _id: 1 } }
+		];
+
+		const legacyPipeline = [
+			{ $match: { followUp: { $exists: true, $ne: null } } },
+			{
+				$lookup: {
+					from: 'followups',
+					localField: 'followUp',
+					foreignField: '_id',
+					as: 'fuArr'
+				}
+			},
+			{ $unwind: '$fuArr' },
+			{ $match: { $expr: scheduledDateExpr('$fuArr.scheduledDate') } },
+			{ $project: { _id: 1 } }
+		];
+
+		const [callLeads, visitLeads, legacyLeads] = await Promise.all([
+			Lead.aggregate(slotPipelineFor('followUpCall')),
+			Lead.aggregate(slotPipelineFor('followUpVisit')),
+			Lead.aggregate(legacyPipeline),
+		]);
+
+		const ids = [
+			...new Set(
+				[...(callLeads || []), ...(visitLeads || []), ...(legacyLeads || [])]
+					.map((row) => String(row._id))
+					.filter(Boolean)
+			)
+		];
+
+		if (!ids.length) {
+			return { _id: { $in: [] } };
+		}
 
 		return {
-			$or: [
-				{ followUpCall: { $in: fuIds } },
-				{ followUpVisit: { $in: fuIds } },
-				{ followUp: { $in: fuIds } }
-			]
+			_id: {
+				$in: ids
+					.filter((id) => mongoose.Types.ObjectId.isValid(id))
+					.map((id) => new mongoose.Types.ObjectId(id))
+			}
 		};
 	};
 
@@ -1658,6 +1845,8 @@ router.delete('/lead-categories/:id', isCollege, async (req, res) => {
 	}
 });
 
+// Lead Ranking CRUD lives in ./leadRankingRoutes.js (mounted from college/index.js)
+
 // ==================== B2B LEAD MANAGEMENT ROUTES ====================
 
 // Get all leads with filtering and pagination
@@ -1711,7 +1900,7 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 			let teamMembers = await getAllTeamMembers(req.user._id);
 			// Ownership Conditions for team members
 			ownershipConditions = teamMembers.map(member => ({
-				$or: [{ leadAddedBy: member }, { leadOwner: member }]
+				$or: [{ leadAddedBy: member }, { leadOwner: member }, { leadCoOwner: member }]
 			}));
 		}
 
@@ -1839,9 +2028,23 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 		// Follow-up existence filters
 		if (String(hasFollowUpCall).toLowerCase() === 'true') {
 			filterConditions.push({ followUpCall: { $exists: true, $ne: null } });
+		} else if (String(hasFollowUpCall).toLowerCase() === 'false') {
+			filterConditions.push({
+				$or: [
+					{ followUpCall: { $exists: false } },
+					{ followUpCall: null }
+				]
+			});
 		}
 		if (String(hasFollowUpVisit).toLowerCase() === 'true') {
 			filterConditions.push({ followUpVisit: { $exists: true, $ne: null } });
+		} else if (String(hasFollowUpVisit).toLowerCase() === 'false') {
+			filterConditions.push({
+				$or: [
+					{ followUpVisit: { $exists: false } },
+					{ followUpVisit: null }
+				]
+			});
 		}
 
 		// Documents status filter (done/pending)
@@ -1910,9 +2113,26 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 		// Get total count
 		const totalLeads = await Lead.countDocuments(baseQuery);
 
-		// Get count by status
+		const duplicateStatusIds = statuses
+			.filter((s) => /^duplicate$/i.test(String(s.title || '').trim()))
+			.map((s) => s._id);
+		const duplicateMobileFilter = duplicateStatusIds.length
+			? {
+					$or: [
+						{ isDuplicateMobile: true },
+						{ status: { $in: duplicateStatusIds } },
+					],
+			  }
+			: { isDuplicateMobile: true };
+		const duplicateMobileCount = await Lead.countDocuments(
+			mergeLeadQuery(baseQuery, duplicateMobileFilter)
+		);
+
+		// Get count by status (exclude pipeline "Duplicate" — shown via Duplicate chip + flag)
 		const statusCounts = await Promise.all(
-			statuses.map(async (status) => {
+			statuses
+				.filter((status) => !/^duplicate$/i.test(String(status.title || '').trim()))
+				.map(async (status) => {
 				const count = await Lead.countDocuments({
 					...baseQuery,
 					status: status._id
@@ -1920,6 +2140,7 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 				return {
 					statusId: status._id,
 					statusName: status.title,
+					statusIndex: status.index,
 					count: count
 				};
 			})
@@ -1945,6 +2166,7 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 			data: {
 				statusCounts,
 				totalLeads,
+				duplicateMobileCount,
 				collegeId: college._id,
 				followupDashboardCounts
 			},
@@ -2064,7 +2286,8 @@ const generateSupervisionReportData = async (req) => {
 		filterAnd.push({
 			$or: [
 				{ leadAddedBy: { $in: team } },
-				{ leadOwner: { $in: team } }
+				{ leadOwner: { $in: team } },
+				{ leadCoOwner: { $in: team } }
 			]
 		});
 	}
@@ -2529,7 +2752,8 @@ router.get('/leads', isCollege, async (req, res) => {
 			followUpVisitBucket,
 			documentsStatusIn,
 			approvalStatus,
-			referredByMe
+			referredByMe,
+			isDuplicateMobile
 		} = req.query;
 
 		const referredByMeActive = isReferredByMeQuery(referredByMe);
@@ -2561,7 +2785,7 @@ router.get('/leads', isCollege, async (req, res) => {
 			let teamMembers = await getAllTeamMembers(req.user._id);
 			// Ownership Conditions for team members
 			ownershipConditions = teamMembers.map(member => ({
-				$or: [{ leadAddedBy: member }, { leadOwner: member }]
+				$or: [{ leadAddedBy: member }, { leadOwner: member }, { leadCoOwner: member }]
 			}));
 		}
 
@@ -2594,6 +2818,22 @@ router.get('/leads', isCollege, async (req, res) => {
 				.map((id) => convertToObjectId(id))
 				.filter(Boolean);
 
+		let duplicateMobileQuery = null;
+		if (String(isDuplicateMobile).toLowerCase() === 'true') {
+			const College = require('../../../models/college');
+			const collegeDoc = await College.findOne({ '_concernPerson._id': req.user._id }).select('_id');
+			const dupStatuses = await StatusB2b.find({
+				...(collegeDoc?._id ? { college: collegeDoc._id } : {}),
+				title: { $regex: /^Duplicate$/i },
+			})
+				.select('_id')
+				.lean();
+			const dupIds = (dupStatuses || []).map((s) => s._id).filter(Boolean);
+			duplicateMobileQuery = dupIds.length
+				? { $or: [{ isDuplicateMobile: true }, { status: { $in: dupIds } }] }
+				: { isDuplicateMobile: true };
+		}
+
 		// Build the final query
 		const finalQuery = {
 			$and: [
@@ -2606,6 +2846,7 @@ router.get('/leads', isCollege, async (req, res) => {
 				// Other filters - Convert to ObjectId if valid
 				...(statusIn ? [{ status: { $in: parseIdList(statusIn) } }] : []),
 				...(!statusIn && status ? [{ status: convertToObjectId(status) }] : []),
+				...(duplicateMobileQuery ? [duplicateMobileQuery] : []),
 
 				...(leadCategoryIn ? [{ leadCategory: { $in: parseIdList(leadCategoryIn) } }] : []),
 				...(!leadCategoryIn && leadCategory ? [{ leadCategory: convertToObjectId(leadCategory) }] : []),
@@ -2648,10 +2889,14 @@ router.get('/leads', isCollege, async (req, res) => {
 			// Follow-up existence filters
 			...(String(hasFollowUpCall).toLowerCase() === 'true'
 				? [{ followUpCall: { $exists: true, $ne: null } }]
-				: []),
+				: String(hasFollowUpCall).toLowerCase() === 'false'
+					? [{ $or: [{ followUpCall: { $exists: false } }, { followUpCall: null }] }]
+					: []),
 			...(String(hasFollowUpVisit).toLowerCase() === 'true'
 				? [{ followUpVisit: { $exists: true, $ne: null } }]
-				: []),
+				: String(hasFollowUpVisit).toLowerCase() === 'false'
+					? [{ $or: [{ followUpVisit: { $exists: false } }, { followUpVisit: null }] }]
+					: []),
 		]
 	};
 
@@ -2828,9 +3073,12 @@ router.get('/leads', isCollege, async (req, res) => {
 			.populate('followUpVisit', 'followUpType description status scheduledDate completedDate')
 			.populate('leadAddedBy', 'name email')
 			.populate('leadOwner', 'name email')
+			.populate('leadCoOwner', 'name email')
 			.sort(sortOptions)
 			.skip(skip)
 			.limit(Number(limit));
+
+		const leadsWithFollowupStats = await attachFollowupStats(leads);
 
 		// Debug: Log leadOwner data for first few leads
 		// if (leads.length > 0) {
@@ -2863,7 +3111,7 @@ router.get('/leads', isCollege, async (req, res) => {
 		res.json({
 			status: true,
 			data: {
-				leads,
+				leads: leadsWithFollowupStats,
 				pagination: {
 					currentPage: parseInt(page),
 					totalPages,
@@ -2901,6 +3149,7 @@ router.get('/leads/:id/cross-sales', isCollege, async (req, res) => {
 			.populate('followUpCall', 'followUpType description status scheduledDate completedDate')
 			.populate('followUpVisit', 'followUpType description status scheduledDate completedDate')
 			.populate('leadOwner', 'name email')
+			.populate('leadCoOwner', 'name email')
 			.populate('leadAddedBy', 'name email')
 			.sort({ createdAt: 1 })
 			.lean();
@@ -3016,6 +3265,7 @@ router.post('/leads/:id/cross-sale', isCollege, async (req, res) => {
 
 		const crossSaleLead = new Lead({
 			leadCategory: leadCategory || source.leadCategory,
+			leadRanking: source.leadRanking || undefined,
 			b2bProject,
 			b2bDepartment,
 			typeOfB2B,
@@ -3082,6 +3332,7 @@ router.post('/leads/:id/cross-sale', isCollege, async (req, res) => {
 		const populated = await applyLeadCorePopulates(Lead.findById(savedLead._id))
 			.populate('status', 'name title substatuses')
 			.populate('leadOwner', 'name email')
+			.populate('leadCoOwner', 'name email')
 			.populate('leadAddedBy', 'name email');
 
 		res.status(201).json({
@@ -3109,6 +3360,8 @@ router.get('/leads/:id', isCollege, async (req, res) => {
 			.populate('followUpCall', 'followUpType description status scheduledDate completedDate')
 			.populate('followUpVisit', 'followUpType description status scheduledDate completedDate')
 			.populate('leadAddedBy', 'name email')
+			.populate('leadOwner', 'name email')
+			.populate('leadCoOwner', 'name email')
 			.populate('remark.addedBy', 'name email');
 
 		if (!lead) {
@@ -3118,11 +3371,12 @@ router.get('/leads/:id', isCollege, async (req, res) => {
 			});
 		}
 
-		// Permission: Admin OR leadAddedBy OR leadOwner can view
+		// Permission: Admin OR leadAddedBy OR leadOwner OR leadCoOwner can view
 		const userId = String(req.user?._id || '');
 		const leadAddedById = lead.leadAddedBy ? String(lead.leadAddedBy?._id || lead.leadAddedBy) : '';
 		const leadOwnerId = lead.leadOwner ? String(lead.leadOwner?._id || lead.leadOwner) : '';
-		const canView = isAdminUser(req) || leadAddedById === userId || leadOwnerId === userId;
+		const leadCoOwnerId = lead.leadCoOwner ? String(lead.leadCoOwner?._id || lead.leadCoOwner) : '';
+		const canView = isAdminUser(req) || leadAddedById === userId || leadOwnerId === userId || leadCoOwnerId === userId;
 
 		if (!canView) {
 			return res.status(403).json({
@@ -3210,10 +3464,48 @@ router.get('/leads/:id/logs', isCollege, async (req, res) => {
 });
 
 // Create new lead
+// Check if mobile already exists (college concern-person scope)
+router.get('/check-mobile-duplicate', isCollege, async (req, res) => {
+	try {
+		const normalizeMobile = (v) => String(v || '').replace(/\D/g, '');
+		const mobileLast10 = normalizeMobile(req.query.mobile).slice(-10);
+		if (mobileLast10.length !== 10) {
+			return res.json({ status: true, isDuplicate: false });
+		}
+
+		const College = require('../../../models/college');
+		const college = await College.findOne({ '_concernPerson._id': req.user._id });
+		const concernIds = (college?._concernPerson || []).map((p) => p?._id).filter(Boolean);
+		const ownerScope = concernIds.length > 0 ? concernIds : [req.user._id];
+
+		const mobileCandidates = await Lead.find({
+			leadAddedBy: { $in: ownerScope },
+			mobile: { $regex: `${mobileLast10}$` },
+		})
+			.select('_id mobile')
+			.limit(25)
+			.lean();
+
+		const match = (mobileCandidates || []).find((doc) => {
+			return normalizeMobile(doc.mobile).slice(-10) === mobileLast10;
+		});
+
+		return res.json({
+			status: true,
+			isDuplicate: Boolean(match),
+			existingLeadId: match?._id || null,
+		});
+	} catch (error) {
+		console.error('Error checking mobile duplicate:', error);
+		return res.status(500).json({ status: false, message: 'Failed to check mobile duplicate' });
+	}
+});
+
 router.post('/add-lead', isCollege, async (req, res) => {
 	try {
 		const {
 			leadCategory,
+			leadRanking,
 			b2bProject,
 			b2bDepartment,
 			typeOfB2B,
@@ -3228,6 +3520,7 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			mobile,
 			whatsapp,
 			leadOwner,
+			leadCoOwner,
 			remark,
 			landlineNumber,
 			status: requestedPipelineStatus,
@@ -3311,6 +3604,36 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			}
 		}
 
+		const normalizeMobile = (v) => String(v || '').replace(/\D/g, '');
+		const cleanMobile = normalizeMobile(mobile);
+		const mobileLast10 = cleanMobile.slice(-10);
+
+		const College = require("../../../models/college");
+		const college = await College.findOne({
+			'_concernPerson._id': req.user._id
+		});
+
+		let isDuplicateMobile = false;
+		if (mobileLast10.length === 10) {
+			const concernIds = (college?._concernPerson || [])
+				.map((p) => p?._id)
+				.filter(Boolean);
+			const ownerScope = concernIds.length > 0 ? concernIds : [req.user._id];
+
+			const mobileCandidates = await Lead.find({
+				leadAddedBy: { $in: ownerScope },
+				mobile: { $regex: `${mobileLast10}$` },
+			})
+				.select('_id mobile')
+				.limit(25)
+				.lean();
+
+			isDuplicateMobile = (mobileCandidates || []).some((doc) => {
+				const existingDigits = normalizeMobile(doc.mobile).slice(-10);
+				return existingDigits === mobileLast10;
+			});
+		}
+
 		// Handle leadOwner - convert name to ObjectId if needed, or skip if empty
 		let leadOwnerId = null;
 		if (leadOwner && leadOwner.trim()) {
@@ -3335,7 +3658,41 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			// If owner not found, leadOwnerId remains null (optional field)
 		}
 
-		const collegeIdForPipeline = req.user?.college?._id;
+		// Handle leadCoOwner - same resolution as leadOwner
+		let leadCoOwnerId = null;
+		if (leadCoOwner && String(leadCoOwner).trim()) {
+			const coOwnerName = String(leadCoOwner).trim();
+			let coOwner = null;
+			if (mongoose.Types.ObjectId.isValid(coOwnerName)) {
+				coOwner = await User.findById(coOwnerName);
+			}
+			if (!coOwner) {
+				coOwner = await User.findOne({
+					name: { $regex: new RegExp(`^${coOwnerName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+				});
+			}
+			if (coOwner) {
+				leadCoOwnerId = coOwner._id;
+			}
+		}
+
+		let leadRankingId = null;
+		const rankingRaw = leadRanking != null ? String(leadRanking).trim() : '';
+		if (rankingRaw) {
+			if (!mongoose.Types.ObjectId.isValid(rankingRaw)) {
+				return res.status(400).json({ status: false, message: 'Invalid lead ranking' });
+			}
+			const rankingDoc = await LeadRanking.findById(rankingRaw);
+			if (!rankingDoc) {
+				return res.status(400).json({ status: false, message: 'Lead ranking not found' });
+			}
+			if (rankingDoc.isActive === false) {
+				return res.status(400).json({ status: false, message: 'Selected lead ranking is inactive' });
+			}
+			leadRankingId = rankingDoc._id;
+		}
+
+		const collegeIdForPipeline = req.user?.college?._id || college?._id;
 		const pipelineStatusScope = collegeIdForPipeline
 			? {
 					$or: [
@@ -3357,8 +3714,10 @@ router.post('/add-lead', isCollege, async (req, res) => {
 		let resolvedStatusId = null;
 		let resolvedSubStatusId = null;
 
+		// Keep user-selected status even when mobile is duplicate (flagged via isDuplicateMobile)
+
 		const rawStatus = requestedPipelineStatus != null ? String(requestedPipelineStatus).trim() : '';
-		if (rawStatus) {
+		if (!resolvedStatusId && rawStatus) {
 			let statusDoc = null;
 			if (mongoose.Types.ObjectId.isValid(rawStatus)) {
 				statusDoc = await StatusB2b.findOne({
@@ -3388,11 +3747,6 @@ router.post('/add-lead', isCollege, async (req, res) => {
 		}
 
 		// Find "Untouch Leads" status as default status
-		const College = require("../../../models/college");
-		const college = await College.findOne({
-			'_concernPerson._id': req.user._id
-		});
-
 		let defaultStatusId = null;
 		let defaultSubStatusId = null;
 
@@ -3436,11 +3790,12 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			concernPersonName,
 			designation,
 			email: normalizedEmail || undefined,
-			mobile,
+			mobile: mobileLast10 || cleanMobile || mobile,
 			whatsapp,
 			leadAddedBy: req.user._id,
 			remark,
 			landlineNumber,
+			isDuplicateMobile: Boolean(isDuplicateMobile),
 			approval: { status: 'PENDING' }
 		};
 
@@ -3456,14 +3811,22 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			leadData.leadOwner = leadOwnerId;
 		}
 
+		if (leadCoOwnerId) {
+			leadData.leadCoOwner = leadCoOwnerId;
+		}
+
+		if (leadRankingId) {
+			leadData.leadRanking = leadRankingId;
+		}
+
 		const newLead = new Lead(leadData);
 
 
 
 		let savedLead = await newLead.save();
+		let statusMessage = 'default status';
 
 		if (savedLead) {
-			let statusMessage = 'default status';
 			if (finalStatusId) {
 				const sd = await StatusB2b.findById(finalStatusId).select('title');
 				statusMessage = sd?.title || 'pipeline status';
@@ -3471,8 +3834,12 @@ router.post('/add-lead', isCollege, async (req, res) => {
 			savedLead.logs.push({
 				user: req.user._id,
 				timestamp: new Date(),
-				action: `Lead added with ${statusMessage} (Approval: PENDING)`,
-				remarks: remark || `Lead created with ${statusMessage}`
+				action: isDuplicateMobile
+					? `Lead added with ${statusMessage} (duplicate mobile) (Approval: PENDING)`
+					: `Lead added with ${statusMessage} (Approval: PENDING)`,
+				remarks: remark || (isDuplicateMobile
+					? `Lead created with ${statusMessage}; mobile already exists (flagged as duplicate)`
+					: `Lead created with ${statusMessage}`)
 			});
 
 			await savedLead.save();
@@ -3489,7 +3856,10 @@ router.post('/add-lead', isCollege, async (req, res) => {
 		res.status(201).json({
 			status: true,
 			data: savedLead,
-			message: 'Lead created successfully'
+			isDuplicateMobile: Boolean(isDuplicateMobile),
+			message: isDuplicateMobile
+				? `Lead created successfully`
+				: 'Lead created successfully'
 		});
 	} catch (error) {
 		console.error('Error creating lead:', error);
@@ -3577,7 +3947,8 @@ router.put('/leads/:id/approval', isCollege, async (req, res) => {
 		const updatedLead = await applyLeadCorePopulates(Lead.findById(lead._id))
 			.populate('status', 'name title substatuses')
 			.populate('leadAddedBy', 'name email')
-			.populate('leadOwner', 'name email');
+			.populate('leadOwner', 'name email')
+			.populate('leadCoOwner', 'name email');
 
 		return res.json({ status: true, data: updatedLead, message: 'Lead approval updated successfully' });
 	} catch (error) {
@@ -3755,12 +4126,14 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 		if (!isAdmin()) {
 			let teamMembers = await getAllTeamMembers(req.user._id);
 			const isOwner = teamMembers.some(member =>
-				lead.leadAddedBy.toString() === member.toString() ||
-				lead.leadOwner.toString() === member.toString()
+				(lead.leadAddedBy && lead.leadAddedBy.toString() === member.toString()) ||
+				(lead.leadOwner && lead.leadOwner.toString() === member.toString()) ||
+				(lead.leadCoOwner && lead.leadCoOwner.toString() === member.toString())
 			);
 			console.log('[B2B Update Status] Step 7: Ownership check (non-admin)', {
 				leadAddedBy: lead.leadAddedBy?.toString(),
 				leadOwner: lead.leadOwner?.toString(),
+				leadCoOwner: lead.leadCoOwner?.toString(),
 				teamMembersCount: teamMembers?.length,
 				isOwner
 			});
@@ -3852,7 +4225,8 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 				: new Date(followUpDate);
 			scheduledDateTime.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
 
-			const normalizedType = String(followUpType || 'Call').trim();
+			const normalizedType = String(followUpType || 'Call').trim() || 'Call';
+
 			savedFollowUp = new FollowUp({
 				leadId: id,
 				followUpType: normalizedType,
@@ -3862,6 +4236,7 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 				addedBy: req.user._id
 			});
 			await savedFollowUp.save();
+			await completeCurrentFollowupForType(lead, normalizedType);
 
 			lead.followUp = savedFollowUp._id;
 			if (normalizedType.toLowerCase() === 'visit') {
@@ -3876,6 +4251,20 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 				action: `${normalizedType} follow-up scheduled for ${scheduledDateTime.toLocaleDateString()} at ${followUpTime}`,
 				remarks: remarks || ''
 			});
+		} else if (statusChanged) {
+			// No new follow-up date → mark previous Call/Visit follow-ups as Done
+			const hadCall = Boolean(lead.followUpCall);
+			const hadVisit = Boolean(lead.followUpVisit);
+			await completeCurrentFollowupForType(lead, 'Call');
+			await completeCurrentFollowupForType(lead, 'Visit');
+			if (hadCall || hadVisit) {
+				lead.logs.push({
+					user: req.user._id,
+					timestamp: new Date(),
+					action: 'Previous follow-up marked as Done (status changed without new follow-up date)',
+					remarks: remarks || ''
+				});
+			}
 		}
 
 		await lead.save();
@@ -3928,7 +4317,8 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			.populate('followUpCall', 'followUpType description status scheduledDate completedDate')
 			.populate('followUpVisit', 'followUpType description status scheduledDate completedDate')
 			.populate('leadAddedBy', 'name email')
-			.populate('leadOwner', 'name email');
+			.populate('leadOwner', 'name email')
+			.populate('leadCoOwner', 'name email');
 
 		console.log('[B2B Update Status] Step 10: Success - sending response');
 		res.json({
@@ -4191,6 +4581,7 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 	try {
 		const {
 			leadCategory,
+			leadRanking,
 			b2bProject,
 			b2bDepartment,
 			typeOfB2B,
@@ -4205,6 +4596,7 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 			mobile,
 			whatsapp,
 			leadOwner,
+			leadCoOwner,
 			landlineNumber,
 			remark
 		} = req.body;
@@ -4230,15 +4622,17 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 			});
 		}
 
-		// Permission: Admin OR leadAddedBy OR leadOwner can update
+		// Permission: Admin OR leadAddedBy OR leadOwner OR leadCoOwner can update
 		const userId = String(req.user?._id || '');
 		const leadAddedById = existingLead.leadAddedBy ? String(existingLead.leadAddedBy) : '';
 		const leadOwnerId = existingLead.leadOwner ? String(existingLead.leadOwner) : '';
+		const leadCoOwnerIdExisting = existingLead.leadCoOwner ? String(existingLead.leadCoOwner) : '';
 		const canEdit =
 			isAdminUser(req) ||
 			hasEditLeadsPermission() ||
 			leadAddedById === userId ||
-			leadOwnerId === userId;
+			leadOwnerId === userId ||
+			leadCoOwnerIdExisting === userId;
 
 		if (!canEdit) {
 			return res.status(403).json({
@@ -4310,6 +4704,46 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 			}
 		}
 
+		if (leadCoOwner !== undefined) {
+			const coOwnerRaw = leadCoOwner != null ? String(leadCoOwner).trim() : '';
+			if (!coOwnerRaw) {
+				updatePayload.leadCoOwner = null;
+			} else if (mongoose.Types.ObjectId.isValid(coOwnerRaw)) {
+				const coOwner = await User.findById(coOwnerRaw);
+				if (!coOwner) {
+					return res.status(400).json({ status: false, message: 'Lead co-owner not found' });
+				}
+				updatePayload.leadCoOwner = coOwner._id;
+			} else {
+				const coOwner = await User.findOne({
+					name: { $regex: new RegExp(`^${coOwnerRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+				});
+				if (!coOwner) {
+					return res.status(400).json({ status: false, message: 'Lead co-owner not found' });
+				}
+				updatePayload.leadCoOwner = coOwner._id;
+			}
+		}
+
+		if (leadRanking !== undefined) {
+			const rankingRaw = leadRanking != null ? String(leadRanking).trim() : '';
+			if (!rankingRaw) {
+				updatePayload.leadRanking = null;
+			} else {
+				if (!mongoose.Types.ObjectId.isValid(rankingRaw)) {
+					return res.status(400).json({ status: false, message: 'Invalid lead ranking' });
+				}
+				const rankingDoc = await LeadRanking.findById(rankingRaw);
+				if (!rankingDoc) {
+					return res.status(400).json({ status: false, message: 'Lead ranking not found' });
+				}
+				if (rankingDoc.isActive === false) {
+					return res.status(400).json({ status: false, message: 'Selected lead ranking is inactive' });
+				}
+				updatePayload.leadRanking = rankingDoc._id;
+			}
+		}
+
 		if (b2bProject !== undefined) {
 			if (!b2bProject || !mongoose.Types.ObjectId.isValid(b2bProject)) {
 				return res.status(400).json({ status: false, message: 'Invalid B2B project' });
@@ -4374,11 +4808,13 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 			{ new: true, runValidators: true }
 		).populate([
 			{ path: 'leadCategory', select: 'name' },
+			{ path: 'leadRanking', select: 'name isActive' },
 			{ path: 'b2bProject', select: 'name' },
 			{ path: 'b2bDepartment', select: 'name' },
 			{ path: 'typeOfB2B', select: 'name' },
 			{ path: 'leadAddedBy', select: 'name email' },
 			{ path: 'leadOwner', select: 'name email' },
+			{ path: 'leadCoOwner', select: 'name email' },
 		]);
 
 		res.json({
@@ -4409,11 +4845,12 @@ router.delete('/leads/:id', isCollege, async (req, res) => {
 			});
 		}
 
-		// Permission: Admin OR leadAddedBy OR leadOwner can delete
+		// Permission: Admin OR leadAddedBy OR leadOwner OR leadCoOwner can delete
 		const userId = String(req.user?._id || '');
 		const leadAddedById = lead.leadAddedBy ? String(lead.leadAddedBy) : '';
 		const leadOwnerId = lead.leadOwner ? String(lead.leadOwner) : '';
-		const canDelete = isAdminUser(req) || leadAddedById === userId || leadOwnerId === userId;
+		const leadCoOwnerId = lead.leadCoOwner ? String(lead.leadCoOwner) : '';
+		const canDelete = isAdminUser(req) || leadAddedById === userId || leadOwnerId === userId || leadCoOwnerId === userId;
 		if (!canDelete) {
 			return res.status(403).json({
 				status: false,
@@ -4528,19 +4965,21 @@ router.post('/leads/:id/followup', isCollege, async (req, res) => {
 		scheduledDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
 
 		// Create new follow-up
+		const normalizedType = String(followUpType || 'Call').trim() || 'Call';
+
 		const newFollowUp = new FollowUp({
 			leadId: req.params.id,
-			followUpType: followUpType || 'Call',
-			description: description || (String(followUpType || 'Call').toLowerCase() === 'visit' ? 'Followup Visit' : 'Followup Calling'),
+			followUpType: normalizedType,
+			description: description || (normalizedType.toLowerCase() === 'visit' ? 'Followup Visit' : 'Followup Calling'),
 			scheduledDate: scheduledDateTime,
 			remarks: remarks,
 			addedBy: req.user._id
 		});
 
 		const savedFollowUp = await newFollowUp.save();
+		await completeCurrentFollowupForType(lead, normalizedType);
 
 		// Update lead with follow-up reference and add to logs
-		const normalizedType = String(followUpType || 'Call').trim();
 		lead.followUp = savedFollowUp._id; // keep legacy "last follow-up"
 		if (normalizedType.toLowerCase() === 'visit') {
 			lead.followUpVisit = savedFollowUp._id;
@@ -4826,9 +5265,6 @@ router.post('/leads/import', isCollege, async (req, res) => {
 			'designation': 'designation',
 			'whatsapp': 'whatsapp',
 			'landlinenumber': 'landlineNumber',
-			'leadowner': 'leadOwner',
-			'counsellor': 'leadOwner',
-			'counselor': 'leadOwner',
 			'leadstatus': 'leadStatus',
 			'performance': 'leadStatus',
 			'performancestatus': 'leadStatus',
@@ -4843,6 +5279,10 @@ router.post('/leads/import', isCollege, async (req, res) => {
 			'remark': 'remark',
 			'latitude': 'latitude',
 			'longitude': 'longitude',
+			'leadranking': 'leadRanking',
+			'ranking': 'leadRanking',
+			'leadrank': 'leadRanking',
+			'rank': 'leadRanking',
 			
 			'business': 'businessName',
 			'companyname': 'businessName',
@@ -4867,8 +5307,6 @@ router.post('/leads/import', isCollege, async (req, res) => {
 			'designati': 'designation',
 			'whatsappnumber': 'whatsapp',
 			'landline': 'landlineNumber',
-			'leadown': 'leadOwner',
-			'owner': 'leadOwner',
 			'remarks': 'remark',
 			'notes': 'remark',
 			'lat': 'latitude',
@@ -4971,6 +5409,10 @@ router.post('/leads/import', isCollege, async (req, res) => {
 		const bodyLeadStatus = req.body?.leadStatus ? String(req.body.leadStatus).trim() : '';
 		const bodyLeadSubStatus = req.body?.leadSubStatus ? String(req.body.leadSubStatus).trim() : '';
 		const bodyLeadOwner = req.body?.leadOwner ? String(req.body.leadOwner).trim() : '';
+		const bodyLeadCoOwner = req.body?.leadCoOwner ? String(req.body.leadCoOwner).trim() : '';
+		const bodyLeadRanking = req.body?.leadRanking ? String(req.body.leadRanking).trim() : '';
+
+		let defaultLeadRankingDoc = null;
 
 		if (bodyLeadCategory && mongoose.Types.ObjectId.isValid(bodyLeadCategory)) {
 			defaultLeadCategoryDoc = await LeadCategory.findById(bodyLeadCategory);
@@ -4983,6 +5425,27 @@ router.post('/leads/import', isCollege, async (req, res) => {
 		}
 		if (bodyTypeOfB2B && mongoose.Types.ObjectId.isValid(bodyTypeOfB2B)) {
 			defaultTypeOfB2BDoc = await TypeOfB2B.findById(bodyTypeOfB2B);
+		}
+		if (bodyLeadRanking) {
+			if (!mongoose.Types.ObjectId.isValid(bodyLeadRanking)) {
+				return res.status(400).json({
+					status: false,
+					message: 'Invalid Lead Ranking selected in the upload form. Please choose again.'
+				});
+			}
+			defaultLeadRankingDoc = await LeadRanking.findById(bodyLeadRanking);
+			if (!defaultLeadRankingDoc) {
+				return res.status(400).json({
+					status: false,
+					message: 'Lead Ranking not found. Please choose again.'
+				});
+			}
+			if (defaultLeadRankingDoc.isActive === false) {
+				return res.status(400).json({
+					status: false,
+					message: 'Selected Lead Ranking is inactive. Please choose an active ranking.'
+				});
+			}
 		}
 		if (bodyLeadStatus) {
 			const resolvedModal = await resolveBulkPipelineStatus(bodyLeadStatus);
@@ -5007,6 +5470,20 @@ router.post('/leads/import', isCollege, async (req, res) => {
 				return res.status(400).json({
 					status: false,
 					message: 'Invalid Counsellor selected in the upload form. Please choose again.'
+				});
+			}
+		}
+
+		let modalLeadCoOwnerId = null;
+		if (bodyLeadCoOwner) {
+			if (mongoose.Types.ObjectId.isValid(bodyLeadCoOwner)) {
+				const coOwner = await User.findById(bodyLeadCoOwner);
+				if (coOwner) modalLeadCoOwnerId = coOwner._id;
+			}
+			if (!modalLeadCoOwnerId) {
+				return res.status(400).json({
+					status: false,
+					message: 'Invalid Co-owner selected in the upload form. Please choose again.'
 				});
 			}
 		}
@@ -5046,6 +5523,8 @@ router.post('/leads/import', isCollege, async (req, res) => {
 		const useModalB2bType = Boolean(defaultTypeOfB2BDoc);
 		const useModalPipeline = Boolean(modalStatusId);
 		const useModalLeadOwner = Boolean(modalLeadOwnerId);
+		const useModalLeadCoOwner = Boolean(modalLeadCoOwnerId);
+		const useModalLeadRanking = Boolean(defaultLeadRankingDoc);
 
 		leads = leads.filter((row) => {
 			if (!row || typeof row !== 'object') return false;
@@ -5284,6 +5763,53 @@ router.post('/leads/import', isCollege, async (req, res) => {
 					rowPipelineSubStatusId = modalSubStatusId;
 				}
 
+				let leadRankingId = null;
+				if (useModalLeadRanking) {
+					leadRankingId = defaultLeadRankingDoc._id;
+				} else if (row.leadRanking != null && String(row.leadRanking).trim() !== '') {
+					const rowRanking = String(row.leadRanking).trim();
+					let rankingDoc = null;
+					if (mongoose.Types.ObjectId.isValid(rowRanking)) {
+						rankingDoc = await LeadRanking.findById(rowRanking);
+					}
+					if (!rankingDoc) {
+						const rankingNorm = rowRanking.toLowerCase();
+						rankingDoc = await LeadRanking.findOne({
+							$expr: {
+								$eq: [
+									{ $toLower: { $trim: { input: '$name' } } },
+									rankingNorm
+								]
+							},
+							isActive: true
+						});
+					}
+					if (!rankingDoc) {
+						const rankingNorm = rowRanking.toLowerCase();
+						rankingDoc = await LeadRanking.findOne({
+							$expr: {
+								$eq: [
+									{ $toLower: { $trim: { input: '$name' } } },
+									rankingNorm
+								]
+							}
+						});
+					}
+					if (!rankingDoc) {
+						const available = await LeadRanking.find({ isActive: true }).select('name').limit(10);
+						const names = available.map((r) => r.name).join(', ');
+						errors.push(
+							`Row ${i + 2}: Lead Ranking "${rowRanking}" not found. Available: ${names || 'None'}`
+						);
+						continue;
+					}
+					if (rankingDoc.isActive === false) {
+						errors.push(`Row ${i + 2}: Lead Ranking "${rowRanking}" is inactive`);
+						continue;
+					}
+					leadRankingId = rankingDoc._id;
+				}
+
 				// Create lead object
 				const leadData = {
 					leadCategory: leadCategory._id,
@@ -5304,6 +5830,10 @@ router.post('/leads/import', isCollege, async (req, res) => {
 					leadAddedBy: req.user._id
 				};
 
+				if (leadRankingId) {
+					leadData.leadRanking = leadRankingId;
+				}
+
 				if (rowPipelineStatusId) {
 					leadData.status = rowPipelineStatusId;
 					if (rowPipelineSubStatusId) {
@@ -5320,31 +5850,10 @@ router.post('/leads/import', isCollege, async (req, res) => {
 
 				if (useModalLeadOwner) {
 					leadData.leadOwner = modalLeadOwnerId;
-				} else if (row.leadOwner && row.leadOwner.trim()) {
-					const ownerName = row.leadOwner.trim();
+				}
 
-					let owner = null;
-					if (mongoose.Types.ObjectId.isValid(ownerName)) {
-						owner = await User.findById(ownerName);
-					}
-
-					if (!owner) {
-						const ownerNorm = ownerName.toLowerCase();
-						owner = await User.findOne({
-							$expr: {
-								$eq: [
-									{ $toLower: { $trim: { input: '$name' } } },
-									ownerNorm
-								]
-							}
-						});
-					}
-					
-					if (owner) {
-						leadData.leadOwner = owner._id;
-					} else {
-						// console.log(`Row ${i + 2}: Lead Owner "${ownerName}" not found. Continuing without owner.`);
-					}
+				if (useModalLeadCoOwner) {
+					leadData.leadCoOwner = modalLeadCoOwnerId;
 				}
 
 				// Add coordinates if provided
@@ -5550,7 +6059,7 @@ router.get('/dashboard', isCollege, async (req, res) => {
 			let teamMembers = await getAllTeamMembers(req.user._id);
 			// Ownership Conditions for team members
 			ownershipConditions = teamMembers.map(member => ({
-				$or: [{ leadAddedBy: member }, { leadOwner: member }]
+				$or: [{ leadAddedBy: member }, { leadOwner: member }, { leadCoOwner: member }]
 			}));
 		}
 

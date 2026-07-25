@@ -1,64 +1,39 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { CKEditor } from '@ckeditor/ckeditor5-react';
 import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
 import Choices from 'choices.js';
 import 'choices.js/public/assets/styles/choices.min.css';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 
-// Custom styles to match the original application
-const styles = {
-  errorField: {
-    borderColor: '#dc3545'
-  },
-  errorText: {
-    color: '#dc3545',
-    fontSize: '0.875em',
-    marginTop: '0.25rem'
-  },
-  ckEditor: {
-    '& .ck-editor__editable': {
-      minHeight: '200px',
-      maxHeight: '400px'
-    },
-    '& .ck.ck-editor': {
-      width: '100%'
-    },
-    '& .ck.ck-content': {
-      fontSize: '1rem',
-      lineHeight: '1.5'
-    }
-  }
-};
-
-const AddCourse = () => {
+const EditCourse = () => {
 
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
+
+  const { id } = useParams(); // Get course ID from URL
   const navigate = useNavigate();
-  const sectorRef = useRef(null);
-  const verticalRef = useRef(null);
-  const projectRef = useRef(null);
   const centerRef = useRef(null);
-  const choicesInstance = useRef(null);
-  const searchableChoicesInstances = useRef({});
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
-  const sortOptionsByName = (items = []) => {
-    if (!Array.isArray(items)) return [];
-
-    return [...items].sort((a, b) =>
-      String(a?.name || a?.title || '').localeCompare(
-        String(b?.name || b?.title || ''),
-        undefined,
-        { sensitivity: 'base', numeric: true }
-      )
-    );
+  const stripStorageKey = (value) => {
+    if (value == null || typeof value !== 'string') return value;
+    if (value.startsWith('blob:')) return value;
+    let key = value.trim();
+    const base = (bucketUrl || '').replace(/\/$/, '');
+    if (base && key.startsWith(base)) {
+      key = key.slice(base.length).replace(/^\//, '');
+    }
+    const s3Match = key.match(/amazonaws\.com\/(.+)$/i);
+    if (s3Match) key = s3Match[1];
+    return key.replace(/^\//, '');
   };
 
+  //vertical and project handle
+  const [selectedVertical, setSelectedVertical] = useState([]);
+  const [verticals, setVerticals] = useState([]);
+  const [projects, setProjects] = useState([]);
   // State for data from API
   const [sectors, setSectors] = useState([]);
   const [centers, setCenters] = useState([]);
@@ -68,91 +43,14 @@ const AddCourse = () => {
   const [selectedThumbnail, setSelectedThumbnail] = useState(null);
   const [selectedTestimonialVideos, setSelectedTestimonialVideos] = useState([]);
 
+  const choicesInstance = useRef(null);
+
   const [selectedPhotoPreviews, setSelectedPhotoPreviews] = useState([]);
   const [selectedThumbnailPreview, setSelectedThumbnailPreview] = useState(null);
   const [selectedTestimonialPreviews, setSelectedTestimonialPreviews] = useState([]);
   const [selectedBrochurePreview, setSelectedBrochurePreview] = useState(null);
-
-  //vertical and project handle
-  const [selectedVertical, setSelectedVertical] = useState([]);
-  const [verticals, setVerticals] = useState([]);
-  const [projects, setProjects] = useState([]);
-
-  // Basic form state
-  const [formData, setFormData] = useState(
-    {
-      sectors: '',
-      sector: [],
-      courseLevel: '',
-      courseFeeType: '',
-      projectName: '',
-      vertical: '',
-      project: '',
-      typeOfProject: '',
-      courseType: '',
-      name: '',
-      duration: '',
-      certifyingAgency: '',
-      certifyingAgencyWebsite: '',
-      qualification: '',
-      age: '',
-      experience: '',
-      trainingMode: '',
-      onlineTrainingTiming: '',
-      offlineTrainingTiming: '',
-      center: [],
-      address: '',
-      city: '',
-      state: '',
-      appLink: '',
-      addressInput: '',
-      ojt: '',
-      registrationCharges: '',
-      courseFee: '',
-      cutPrice: '',
-      examFee: '',
-      otherFee: '',
-      emiOptionAvailable: '',
-      maxEMITenure: '',
-      stipendDuringTraining: '',
-      lastDateForApply: '',
-      youtubeURL: '',
-      courseFeatures: '',
-      importantTerms: '',
-      isContact: false,
-      counslername: '',
-      counslerphonenumber: '',
-      counslerwhatsappnumber: '',
-      counsleremail: '',
-    });
-
-  // Course structure levels — saved with course for session planning
-  const [structureLevels, setStructureLevels] = useState({
-    unit: true,
-    chapter: true,
-    session: true,
-  });
-
-  const toggleStructureLevel = (level) => {
-    if (level === 'session') return;
-
-    setStructureLevels((prev) => ({
-      ...prev,
-      session: true,
-      [level]: !prev[level],
-    }));
-  };
-
-  const structurePathLabel = useMemo(() => {
-    const parts = [];
-    if (structureLevels.unit) parts.push('Unit');
-    if (structureLevels.chapter) parts.push('Chapter');
-    parts.push('Session');
-    return parts.join(' → ');
-  }, [structureLevels]);
-
   // Document requirements
-  const [docsRequired, setDocsRequired] = useState([]);
+  const [docsRequired, setDocsRequired] = useState([ ]);
   const [classResourcesRequired, setClassResourcesRequired] = useState([]);
   const [labResourcesRequired, setLabResourcesRequired] = useState([]);
 
@@ -166,7 +64,7 @@ const AddCourse = () => {
 
   // FAQ questions and answers
   const [questionAnswers, setQuestionAnswers] = useState([
-    { question: '<p>Do you offer a safe working environment?</p>', answer: '<p>Do you offer a safe working environment?</p>' }
+    { question: '', answer: '' }
   ]);
 
   // UI control states
@@ -174,7 +72,7 @@ const AddCourse = () => {
   const [showTrainingFields, setShowTrainingFields] = useState({
     online: false,
     offline: false,
-    trainingCenter: false
+    center: false
   });
   const [showAddressFields, setShowAddressFields] = useState({
     appLink: false,
@@ -186,12 +84,81 @@ const AddCourse = () => {
   const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
-  const showToast = (message, type = 'error') => {
-    if (type === 'error') toast.error(message);
-    else toast.success(message);
+
+  // Basic form state
+  const [formData, setFormData] = useState({
+    sectors: [],
+    courseFeeType: '',
+    courseLevel: '',
+    projectName: '',
+    typeOfProject: '',
+    courseType: '',
+    name: '',
+    duration: '',
+    certifyingAgency: '',
+    certifyingAgencyWebsite: '',
+    qualification: '',
+    age: '',
+    experience: '',
+    trainingMode: '',
+    onlineTrainingTiming: '',
+    offlineTrainingTiming: '',
+    center: [],
+    address: '',
+    city: '',
+    state: '',
+    appLink: '',
+    addressInput: '',
+    ojt: '',
+    registrationCharges: '',
+    courseFee: '',
+    cutPrice: '',
+    examFee: '',
+    otherFee: '',
+    emiOptionAvailable: '',
+    maxEMITenure: '',
+    stipendDuringTraining: '',
+    lastDateForApply: '',
+    youtubeURL: '',
+    courseFeatures: '',
+    importantTerms: '',
+    isContact: false,
+    counslername: '',
+    counslerphonenumber: '',
+    counslerwhatsappnumber: '',
+    counsleremail: '',
+    brochure: '',
+    thumbnail: '',
+    photos: [],
+    videos: [],
+    testimonialvideos: [],
+  });
+
+  // Course structure levels — saved with course for session planning
+  const [structureLevels, setStructureLevels] = useState({
+    unit: true,
+    chapter: true,
+    session: true
+  });
+
+  const toggleStructureLevel = (level) => {
+    if (level === 'session') return;
+
+    setStructureLevels((prev) => ({
+      ...prev,
+      session: true,
+      [level]: !prev[level]
+    }));
   };
 
-  // Fetch centers when project changes
+  const structurePathLabel = useMemo(() => {
+    const parts = [];
+    if (structureLevels.unit) parts.push('Unit');
+    if (structureLevels.chapter) parts.push('Chapter');
+    parts.push('Session');
+    return parts.join(' → ');
+  }, [structureLevels]);
+
   useEffect(() => {
     if (!formData.project) {
       setCenters([]); // Clear centers if project is empty     
@@ -205,7 +172,7 @@ const AddCourse = () => {
         });
 
         if (response.data.success) {
-          setCenters(sortOptionsByName(response.data.data)); // Set the centers
+          setCenters(response.data.data); // Set the centers
         } else {
           setCenters([]); // Handle case where no data is returned
         }
@@ -218,101 +185,7 @@ const AddCourse = () => {
     fetchCenters(); // Trigger the fetch function when project changes
   }, [formData.project, backendUrl, token]); // Re-run the effect whenever the project changes
 
-  // Fetch sectors and centers data on component mount
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Replace these URLs with your actual API endpoints
-        const sectorsResponse = await axios.get(`${backendUrl}/api/sectorList`);
-        console.log('Sectors response:', sectorsResponse.data);
-        setSectors(sortOptionsByName(Array.isArray(sectorsResponse.data) ? sectorsResponse.data : []));
-      } catch (error) {
-        console.error('Error fetching initial data:', error);
-        // Set empty arrays as fallback
-        setSectors([]);
-      }
-    };
 
-    fetchData();
-  }, [backendUrl]);
-
-  useEffect(() => {
-    const searchableConfigs = [
-      {
-        key: 'sector',
-        element: sectorRef.current,
-        value: formData.sectors,
-        optionsLength: sectors.length,
-        placeholder: 'Search sector'
-      },
-      {
-        key: 'vertical',
-        element: verticalRef.current,
-        value: formData.vertical,
-        optionsLength: verticals.length,
-        placeholder: 'Search vertical'
-      },
-      {
-        key: 'project',
-        element: projectRef.current,
-        value: formData.project,
-        optionsLength: projects.length,
-        placeholder: 'Search project'
-      }
-    ];
-
-    searchableConfigs.forEach(({ key, element, value, optionsLength, placeholder }) => {
-      const existingInstance = searchableChoicesInstances.current[key];
-
-      if (existingInstance) {
-        try {
-          existingInstance.destroy();
-        } catch (error) {
-          console.warn(`Error destroying ${key} Choices instance:`, error);
-        }
-        searchableChoicesInstances.current[key] = null;
-      }
-
-      if (!element || optionsLength === 0) return;
-
-      try {
-        const instance = new Choices(element, {
-          searchEnabled: true,
-          searchPlaceholderValue: placeholder,
-          itemSelectText: '',
-          shouldSort: false,
-          allowHTML: false,
-          placeholder: true,
-          placeholderValue: placeholder
-        });
-
-        if (value) {
-          instance.setChoiceByValue(value);
-        }
-
-        searchableChoicesInstances.current[key] = instance;
-      } catch (error) {
-        console.error(`Error initializing ${key} Choices:`, error);
-      }
-    });
-
-    return () => {
-      Object.keys(searchableChoicesInstances.current).forEach((key) => {
-        const instance = searchableChoicesInstances.current[key];
-        if (!instance) return;
-
-        try {
-          instance.destroy();
-        } catch (error) {
-          console.warn(`Error cleaning up ${key} Choices instance:`, error);
-        }
-
-        searchableChoicesInstances.current[key] = null;
-      });
-    };
-  }, [sectors, verticals, projects, formData.sectors, formData.vertical, formData.project]);
-
-  // Consolidated Choices.js management - FIXED VERSION
   useEffect(() => {
     // Cleanup previous instance
     const cleanupChoices = () => {
@@ -331,7 +204,7 @@ const AddCourse = () => {
     };
 
     // Initialize Choices.js when training center field is visible and centers are available
-    if (showTrainingFields.trainingCenter &&
+    if (showTrainingFields.center &&
       centerRef.current &&
       centers.length > 0) {
 
@@ -343,11 +216,9 @@ const AddCourse = () => {
         choicesInstance.current = new Choices(centerRef.current, {
           removeItemButton: true,
           searchEnabled: true,
-          searchPlaceholderValue: 'Search training center',
           itemSelectText: '',
           placeholder: false,
           allowHTML: false,
-          shouldSort: false,
           maxItemCount: -1,
           duplicateItemsAllowed: false,
           delimiter: ',',
@@ -357,8 +228,8 @@ const AddCourse = () => {
         });
 
         // Set selected values if any
-        if (formData.trainingCenter && formData.trainingCenter.length > 0) {
-          choicesInstance.current.setChoiceByValue(formData.trainingCenter);
+        if (formData.center && formData.center.length > 0) {
+          choicesInstance.current.setChoiceByValue(formData.center);
         }
       } catch (error) {
         console.error('Error initializing Choices:', error);
@@ -370,7 +241,7 @@ const AddCourse = () => {
 
     // Cleanup function
     return cleanupChoices;
-  }, [showTrainingFields.trainingCenter, centers, formData.trainingCenter]);
+  }, [showTrainingFields.center, centers, formData.center]);
 
   // Fetch verticals on mount
   useEffect(() => {
@@ -390,7 +261,7 @@ const AddCourse = () => {
             headers: { 'x-auth': token }
           });
           if (response.data.success) {
-            setProjects(sortOptionsByName(response.data.data));
+            setProjects(response.data.data);
           } else {
             setProjects([]);
             console.error('Failed to fetch projects');
@@ -413,34 +284,194 @@ const AddCourse = () => {
         headers: { 'x-auth': token }
       });
       // Update the whole enhancedEntities but keep other keys unchanged
-      setVerticals(sortOptionsByName(newVertical.data.data));
+      setVerticals(newVertical.data.data);
     } catch (error) {
       console.error('Error fetching verticals:', error);
       setVerticals([]);
     }
   };
 
+
+
+  // Fetch course, sectors and centers data on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const user = JSON.parse(sessionStorage.getItem('user'));
+        const headers = {
+          'x-auth': user.token,
+        };
+        // Fetch course data
+        const courseRes = await axios.get(`${backendUrl}/college/courses/editcoursecopy/${id}`, { headers });
+        console.log('courseRes', courseRes)
+        // Fetch sectors and centers data
+        const sectorsRes = await axios.get(`${backendUrl}/api/sectorList`);
+
+        console.log('Course data:', courseRes.data);
+        console.log('Sectors data:', sectorsRes.data);
+
+        // Set sectors and centers
+        setSectors(Array.isArray(sectorsRes.data) ? sectorsRes.data : []);
+
+
+        // Format the course data
+        const course = courseRes.data.course;
+        console.log('course...', courseRes.data.course);
+        // Initialize form data with course data
+        setFormData({
+          sectors: course.sectors ? course.sectors.map(c => c._id) : [],
+          courseFeeType: course.courseFeeType || '',
+          courseLevel: course.courseLevel || '',
+          vertical: course.vertical?._id || course.vertical || '',
+          project: course.project?._id || course.project || '',
+          projectName: course.projectName || '',
+          typeOfProject: course.typeOfProject || '',
+          courseType: course.courseType || '',
+          name: course.name || '',
+          duration: course.duration || '',
+          certifyingAgency: course.certifyingAgency || '',
+          certifyingAgencyWebsite: course.certifyingAgencyWebsite || '',
+          qualification: course.qualification || '',
+          age: course.age || '',
+          experience: course.experience || '',
+          trainingMode: course.trainingMode || '',
+          onlineTrainingTiming: course.onlineTrainingTiming || '',
+          offlineTrainingTiming: course.offlineTrainingTiming || '',
+          center: course.center ? course.center.map(c => c._id) : [],
+          address: course.address || '',
+          city: course.city || '',
+          state: course.state || '',
+          appLink: course.appLink || '',
+          addressInput: course.Address || '',
+          ojt: course.ojt || '',
+          registrationCharges: course.registrationCharges || '',
+          courseFee: course.courseFee || '',
+          cutPrice: course.cutPrice || '',
+          examFee: course.examFee || '',
+          otherFee: course.otherFee || '',
+          emiOptionAvailable: course.emiOptionAvailable || '',
+          maxEMITenure: course.maxEMITenure || '',
+          stipendDuringTraining: course.stipendDuringTraining || '',
+          lastDateForApply: course.lastDateForApply ? new Date(course.lastDateForApply).toISOString().split('T')[0] : '',
+          youtubeURL: course.youtubeURL || '',
+          courseFeatures: course.courseFeatures || '',
+          importantTerms: course.importantTerms || '',
+          brochure: stripStorageKey(course.brochure) || '',
+          thumbnail: stripStorageKey(course.thumbnail) || '',
+          photos: (course.photos || []).map(stripStorageKey),
+          videos: (course.videos || []).map(stripStorageKey),
+          testimonialvideos: (course.testimonialvideos || []).map(stripStorageKey),
+          isContact: !!course.counslername || !!course.counslerphonenumber,
+          counslername: course.counslername || '',
+          counslerphonenumber: course.counslerphonenumber || '',
+          counslerwhatsappnumber: course.counslerwhatsappnumber || '',
+          counsleremail: course.counsleremail || '',
+        });
+
+        if (course.courseStructure) {
+          setStructureLevels({
+            unit: course.courseStructure.unit !== undefined ? !!course.courseStructure.unit : true,
+            chapter: course.courseStructure.chapter !== undefined ? !!course.courseStructure.chapter : true,
+            session: true
+          });
+        }
+
+        // Set docs required
+        if (course.docsRequired && course.docsRequired.length > 0) {
+          setDocsRequired(course.docsRequired.map(doc => ({
+            _id: doc._id,
+            name: doc.Name,
+            mandatory: doc.mandatory ? true : false
+          })));
+        }
+
+        if (course.classResourcesRequired?.length) {
+          setClassResourcesRequired(course.classResourcesRequired.map((doc) => ({
+            _id: doc._id,
+            name: doc.Name || '',
+            description: doc.description || '',
+            uploadType: RESOURCE_UPLOAD_TYPES.includes(doc.uploadType) ? doc.uploadType : 'PDF',
+            mandatory: !!doc.mandatory,
+          })));
+        }
+
+        if (course.labResourcesRequired?.length) {
+          setLabResourcesRequired(course.labResourcesRequired.map((doc) => ({
+            _id: doc._id,
+            name: doc.Name || '',
+            description: doc.description || '',
+            uploadType: RESOURCE_UPLOAD_TYPES.includes(doc.uploadType) ? doc.uploadType : 'PDF',
+            mandatory: !!doc.mandatory,
+          })));
+        }
+
+        // Set question answers
+        if (course.questionAnswers && course.questionAnswers.length > 0) {
+          setQuestionAnswers(course.questionAnswers.map(qa => ({
+            question: qa.Question || '',
+            answer: qa.Answer || ''
+          })));
+        }
+
+        // Set UI state based on course data
+        setShowContactInfo(!!course.counslername || !!course.counslerphonenumber);
+        handleTrainingModeChange(course.trainingMode);
+        handleAddressChange(course.address);
+
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        alert('Error loading course data. Please try again.');
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Initialize Choices.js for multi-select fields when training center is visible
+  useEffect(() => {
+    if (showTrainingFields.center && centerRef.current) {
+      if (choicesInstance.current) {
+        choicesInstance.current.destroy(); // destroy previous instance
+      }
+
+      choicesInstance.current = new Choices(centerRef.current, {
+        removeItemButton: true,
+        searchEnabled: true,
+        itemSelectText: '',
+        placeholder: false,
+        allowHTML: false,
+        maxItemCount: -1,
+        duplicateItemsAllowed: false,
+        delimiter: ',',
+        paste: true,
+        maxItems: null,
+        silent: false
+      });
+
+      // Set selected options
+      if (formData.center?.length) {
+        choicesInstance.current.setChoiceByValue(formData.center);
+      }
+
+      // Remove empty option if it exists
+      const emptyOption = centerRef.current.querySelector('option[value=""]');
+      if (emptyOption) {
+        emptyOption.remove();
+      }
+
+      return () => {
+        if (choicesInstance.current) {
+          choicesInstance.current.destroy();
+        }
+      };
+    }
+  }, [showTrainingFields.center, centers, formData.center]);
+
   // Handle input field changes
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    // If vertical is changed, reset project selection
-    if (name === 'vertical') {
-      setFormData({
-        ...formData,
-        [name]: value,
-        project: '' // Reset project when vertical changes
-      });
-      setProjects([]); // Clear projects immediately
-    }
-    // If project is selected to the default value, reset it to empty string
-    else if (name === 'project' && value === '') {
-      setFormData({
-        ...formData,
-        [name]: ''  // Reset to empty string when the default option is selected
-      });
-    }
-    else if (name === 'courseFeeType') {
+    if (name === 'courseFeeType') {
       setFormData({
         ...formData,
         courseFeeType: value,
@@ -454,8 +485,7 @@ const AddCourse = () => {
           maxEMITenure: ''
         } : {})
       });
-    }
-    else if (name === 'courseType') {
+    } else if (name === 'courseType') {
       setFormData({
         ...formData,
         courseType: value,
@@ -464,8 +494,7 @@ const AddCourse = () => {
           stipendDuringTraining: ''
         } : {})
       });
-    }
-    else {
+    } else {
       setFormData({
         ...formData,
         [name]: value
@@ -481,7 +510,7 @@ const AddCourse = () => {
     }
 
     // Handle specific field changes that affect UI
-   if (name === 'trainingMode') {
+    if (name === 'trainingMode') {
       handleTrainingModeChange(value);
     } else if (name === 'address') {
       handleAddressChange(value);
@@ -493,7 +522,7 @@ const AddCourse = () => {
     setShowTrainingFields({
       online: value === 'Online' || value === 'Blended',
       offline: value === 'Offline' || value === 'Blended',
-      trainingCenter: value === 'Offline' || value === 'Blended'
+      center: value === 'Offline' || value === 'Blended'
     });
   };
 
@@ -519,7 +548,20 @@ const AddCourse = () => {
     const selectedValues = Array.from(selectedOptions).map(option => option.value);
     setFormData({
       ...formData,
-      center: selectedValues ? [selectedValues] : []
+      center: selectedValues
+    });
+  };
+
+
+  useEffect(() => {
+    console.log('selected sectos', formData)
+  }, [formData.sectors])
+
+  const handleSectorChange = (e) => {
+    const value = e.target.value;
+    setFormData({
+      ...formData,
+      sectors: value ? [value] : []
     });
   };
 
@@ -571,319 +613,17 @@ const AddCourse = () => {
     return true;
   };
 
-  // Add a new document field
-  const addDocumentField = () => {
-    setDocsRequired([...docsRequired, { name: '', mandatory: false }]);
-  };
+  // File upload handlers
+  // const handlePhotoUpload = (e) => {
+  //   const files = Array.from(e.target.files);
+  //   setSelectedPhotos(files);
 
-  // Remove a document field
-  const removeDocumentField = (index) => {
-    setDocsRequired(docsRequired.filter((_, i) => i !== index));
-  };
-
-  // Update document field value
-  const updateDocumentField = (index, value, field) => {
-    const updatedDocs = [...docsRequired];
-    if(field === 'name'){ 
-      updatedDocs[index].name = value;
-    }else if(field === 'mandatory'){
-      updatedDocs[index].mandatory = value === 'true' ? true : false;
-    }
-    setDocsRequired(updatedDocs);
-  };
-
-  const addClassResourceField = () => {
-    setClassResourcesRequired([...classResourcesRequired, createEmptyResource()]);
-  };
-
-  const removeClassResourceField = (index) => {
-    setClassResourcesRequired(classResourcesRequired.filter((_, i) => i !== index));
-  };
-
-  const updateClassResourceField = (index, value, field) => {
-    const updated = [...classResourcesRequired];
-    if (field === 'mandatory') {
-      updated[index].mandatory = value === 'true' || value === true;
-    } else {
-      updated[index][field] = value;
-    }
-    setClassResourcesRequired(updated);
-  };
-
-  const addLabResourceField = () => {
-    setLabResourcesRequired([...labResourcesRequired, createEmptyResource()]);
-  };
-
-  const removeLabResourceField = (index) => {
-    setLabResourcesRequired(labResourcesRequired.filter((_, i) => i !== index));
-  };
-
-  const updateLabResourceField = (index, value, field) => {
-    const updated = [...labResourcesRequired];
-    if (field === 'mandatory') {
-      updated[index].mandatory = value === 'true' || value === true;
-    } else {
-      updated[index][field] = value;
-    }
-    setLabResourcesRequired(updated);
-  };
-
-  const mapResourceForSubmit = (items = []) =>
-    items
-      .filter((item) => item.name?.trim())
-      .map((item) => ({
-        Name: item.name.trim(),
-        description: item.description?.trim() || '',
-        uploadType: RESOURCE_UPLOAD_TYPES.includes(item.uploadType) ? item.uploadType : 'PDF',
-        mandatory: !!item.mandatory,
-        status: true,
-        ...(item._id ? { _id: item._id } : {}),
-      }));
-
-  // Add a new question-answer pair
-  const addQuestionAnswer = () => {
-    setQuestionAnswers([...questionAnswers, { question: '', answer: '' }]);
-  };
-
-  // Update question or answer
-  const updateQuestionAnswer = (index, field, content) => {
-    const updatedQA = [...questionAnswers];
-    updatedQA[index][field] = content;
-    setQuestionAnswers(updatedQA);
-  };
-
-  // Validate form — only fields marked * in Course Information (plus conditional fields)
-  const validateForm = () => {
-    const errors = {};
-    const requiredFields = [
-      'courseLevel',
-      'courseFeeType',
-      'vertical',
-      'project',
-      'name',
-      'duration',
-      'qualification',
-    ];
-
-    // Optional but recommended when shown
-    if (formData.courseType === 'coursejob') {
-      requiredFields.push('ojt');
-    }
-    if (formData.courseFeeType === 'Paid') {
-      requiredFields.push('emiOptionAvailable');
-    }
-
-    const isEmpty = (value) => {
-      if (value === undefined || value === null) return true;
-      if (Array.isArray(value)) return value.length === 0;
-      return String(value).trim() === '';
-    };
-
-    requiredFields.forEach((field) => {
-      if (isEmpty(formData[field])) {
-        errors[field] = 'This field is required';
-      }
-    });
-
-    setFormErrors(errors);
-    if (Object.keys(errors).length > 0) {
-      showToast('Please fill in all required fields marked with *');
-    }
-    return errors;
-  };
-
-  // Reset form to initial state
-  const resetForm = () => {
-    // Reset all form fields
-    setFormData(
-      {
-      sectors: '',
-      sector: [],
-      courseLevel: '',
-      courseFeeType: '',
-      projectName: '',
-      vertical: '',
-      project: '',
-      typeOfProject: '',
-      courseType: '',
-      name: '',
-      duration: '',
-      certifyingAgency: '',
-      certifyingAgencyWebsite: '',
-      qualification: '',
-      age: '',
-      experience: '',
-      trainingMode: '',
-      onlineTrainingTiming: '',
-      offlineTrainingTiming: '',
-      trainingCenter: [],
-      address: '',
-      city: '',
-      state: '',
-      appLink: '',
-      addressInput: '',
-      ojt: '',
-      registrationCharges: '',
-      courseFee: '',
-      cutPrice: '',
-      examFee: '',
-      otherFee: '',
-      emiOptionAvailable: '',
-      maxEMITenure: '',
-      stipendDuringTraining: '',
-      lastDateForApply: '',
-      youtubeURL: '',
-      courseFeatures: '',
-      importantTerms: '',
-      isContact: false,
-      counslername: '',
-      counslerphonenumber: '',
-      counslerwhatsappnumber: '',
-      counsleremail: '',
-    });
-
-    // Reset file states
-    setSelectedVideos([]);
-    setSelectedPhotos([]);
-    setSelectedBrochure(null);
-    setSelectedThumbnail(null);
-    setSelectedTestimonialVideos([]);
-
-    // Reset docs required
-    setDocsRequired([{ name: '' }]);
-    setClassResourcesRequired([]);
-    setLabResourcesRequired([]);
-
-    // Reset questions and answers
-    setQuestionAnswers([
-      { question: '<p>Do you offer a safe working environment?</p>', answer: '<p>Do you offer a safe working environment?</p>' }
-    ]);
-
-    // Reset UI state
-    setShowProjectFields(false);
-    setShowTrainingFields({
-      online: false,
-      offline: false,
-      trainingCenter: false
-    });
-    setShowAddressFields({
-      appLink: false,
-      addressInput: false
-    });
-    setShowContactInfo(false);
-
-    // Reset form validation
-    setFormErrors({});
-    setIsSubmitting(false);
-    setSubmitSuccess(false);
-  };
-
-
-  const handleBrochureUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-
-    try {
-      // Validate brochure file
-      if (validateFile(file, 'brochure')) {
-        // Cleanup previous preview
-        if (selectedBrochurePreview && selectedBrochurePreview.url) {
-          URL.revokeObjectURL(selectedBrochurePreview.url);
-        }
-        setFormData(prevData => ({
-          ...prevData,
-          brochure: file
-        }));
-
-        setSelectedBrochure(file);
-
-        // Create preview object
-
-
-        console.log('Brochure uploaded successfully:', file.name);
-      }
-    } catch (error) {
-      alert(error.message);
-      e.target.value = ''; // Reset input
-    }
-  };
-
-  const handleTestimonialVideoUpload = (e) => {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-
-    try {
-      // Validate all files first
-      const validFiles = [];
-      const previews = [];
-
-      files.forEach(file => {
-        // Validate testimonial video
-        if (validateTestimonialVideo(file)) {
-          validFiles.push(file);
-
-          setFormData(prev => ({
-            ...prev,
-            testimonialvideos: [...(prev.testimonialvideos || []), file]
-          }));
-
-          // Create preview object
-          // previews.push({
-          //   file: file,
-          //   url: URL.createObjectURL(file),
-          //   name: file.name,
-          //   size: file.size,
-          //   type: file.type
-          // });
-        }
-      });
-
-      if (validFiles.length > 0) {
-        setSelectedTestimonialVideos(prev => [...prev, ...validFiles]);
-        setSelectedTestimonialPreviews(prev => [...prev, ...previews]);
-
-        console.log(`${validFiles.length} testimonial video(s) uploaded successfully`);
-      }
-    } catch (error) {
-      alert(error.message);
-      e.target.value = ''; // Reset input
-    }
-  };
-
-  const validateTestimonialVideo = (file) => {
-    const maxSize = 50 * 1024 * 1024; // 50MB for testimonial videos
-    const allowedTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/avi', 'video/mov'];
-
-    if (!allowedTypes.includes(file.type)) {
-      throw new Error('Please upload testimonial videos in MP4, WebM, OGG, AVI, or MOV format');
-    }
-
-    if (file.size > maxSize) {
-      throw new Error('Testimonial video file must be less than 50MB');
-    }
-
-    return true;
-  };
-
-  const removeAllTestimonials = () => {
-    if (window.confirm('Are you sure you want to remove all testimonial videos?')) {
-      // Cleanup object URLs
-      selectedTestimonialPreviews.forEach(preview => {
-        URL.revokeObjectURL(preview.url);
-      });
-
-      setSelectedTestimonialVideos([]);
-      setSelectedTestimonialPreviews([]);
-
-      // Reset file input
-      const testimonialInput = document.getElementById('testimonialvideos');
-      if (testimonialInput) {
-        testimonialInput.value = '';
-      }
-    }
-  };
-
+  //   const previews = files.map(file => ({
+  //     file: file,
+  //     url: URL.createObjectURL(file),
+  //     name: file.name
+  //   }));
+  // };
   const handlePhotoUpload = (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
@@ -895,13 +635,11 @@ const AddCourse = () => {
     files.forEach(file => {
       if (validateFile(file, 'photos')) {
         validFiles.push(file);
-
-        setFormData(prevData => ({
-          ...prevData,
-          photos: [...(prevData.photos || []), file]
-        }));
-
-
+        previews.push({
+          file,
+          url: URL.createObjectURL(file),
+          name: file.name,
+        });
       }
     });
 
@@ -913,31 +651,10 @@ const AddCourse = () => {
     }
   };
 
-  const handleThumbnailUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  useEffect(() => {
+    console.log(formData.photos, 'formData.photos');
+  }, [formData.photos])
 
-    try {
-      if (validateFile(file, 'thumbnail')) {
-        // Cleanup previous preview
-        if (selectedThumbnailPreview && selectedThumbnailPreview.url) {
-          URL.revokeObjectURL(selectedThumbnailPreview.url);
-        }
-
-        setFormData(prevData => ({
-          ...prevData,
-          thumbnail: URL.createObjectURL(file)
-        }));
-
-        setSelectedThumbnail(file);
-
-        console.log('Thumbnail uploaded successfully:', file.name);
-      }
-    } catch (error) {
-      alert(error.message);
-      e.target.value = '';
-    }
-  };
 
   const handleVideoUpload = (e) => {
     const file = e.target.files[0];
@@ -956,30 +673,21 @@ const AddCourse = () => {
         });
       }
 
-      // Update state with new video
       setSelectedVideos([file]);
-      setFormData(prevData => ({
-        ...prevData,
-        videos: [file]
-      }));
-
       console.log('Video replaced with:', file.name);
     }
   };
 
   const getFileUrl = (file) => {
-
-    if (typeof file === 'string') {
-      // Check if the file is already a URL starting with Amazon bucket URL
-      if (file.includes(bucketUrl) || file.includes('http') || file.includes('blob')) {
-        return file; // Return the file URL as is if it starts with the bucket URL
-      } else {
-        return `${bucketUrl}/${file}`; // Prepend the bucket URL to the file path if it's not already a complete URL
-      }
-    } else if (file instanceof File) {
-      // For new video files, create an object URL
+    if (file instanceof File) {
       return URL.createObjectURL(file);
-
+    }
+    if (typeof file === 'string') {
+      if (file.startsWith('blob:')) return file;
+      const key = stripStorageKey(file);
+      if (!key) return '';
+      const base = (bucketUrl || '').replace(/\/$/, '');
+      return `${base}/${key}`;
     }
     return '';
   };
@@ -1054,132 +762,477 @@ const AddCourse = () => {
     };
   }, [selectedBrochurePreview]);
 
-  const removeFile = async (fileType, key) => {
+  const getBrochureIcon = (file) => {
+    let fileType;
 
-    const confirm = window.confirm('Are you sure you want to remove this file?');
-    if (!confirm) {
-      return;
-    }
-    if (fileType === 'video') {
-      // Clean up object URL if it's a new video file
+    if (file instanceof File) {
+      fileType = file.type;
+    } else {
+      const fileExtension = file.split('.').pop().toLowerCase();  // Get the extension from the URL
 
-
-
-      // Remove from formData
-      setFormData(prev => ({
-        ...prev,
-        videos: [] // Empty array for single video
-      }));
-
-      // Clear selectedVideos
-      setSelectedVideos([]);
-
-      // Reset the file input
-      const videoInput = document.getElementById('videos');
-      if (videoInput) {
-        videoInput.value = '';
-
-      }
-
-
-    } else if (fileType === 'photo') {
-
-      console.log(key, 'key');
-      // Remove from formData.photos (server photos)
-      if (typeof key === 'string') {
-        setFormData(prev => ({
-          ...prev,
-          photos: prev.photos.filter(p => p !== key)
-        }));
-      }
-
-      // Remove from selectedPhotos and cleanup object URL
-      if (key instanceof File) {
-        // Find and cleanup object URL
-
-        const previewToRemove = selectedPhotoPreviews.find(p => p.file === key);
-        if (previewToRemove) {
-          URL.revokeObjectURL(previewToRemove.url);
-        }
-
-        setSelectedPhotos(prev => prev.filter(p => p !== key));
-        setSelectedPhotoPreviews(prev => prev.filter(p => p.file !== key));
-        setFormData(prev => ({
-          ...prev,
-          photos: prev.photos.filter(p => p !== key)
-        }));
-
-        const photoInput = document.getElementById('photos');
-        if (photoInput) {
-          photoInput.value = '';
-        }
-
-
+      // Use the file extension to determine the MIME type (file type)
+      if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
+        fileType = 'image/' + fileExtension;
+      } else if (['mp4', 'avi', 'mov'].includes(fileExtension)) {
+        fileType = 'video/' + fileExtension;
+      } else if (['pdf'].includes(fileExtension)) {
+        fileType = 'application/pdf';
+      } else if (['txt'].includes(fileExtension)) {
+        fileType = 'text/plain';
+      } else {
+        fileType = 'application/octet-stream';  // Default for unsupported extensions
       }
     }
-    if (fileType === 'brochure') {
-      if (typeof key === 'string') {
-        setFormData(prev => ({ ...prev, brochure: '' }));
+
+    if (fileType.includes('pdf')) return 'fa-file-pdf text-danger';
+    if (fileType.includes('doc')) return 'fa-file-word text-primary';
+    if (fileType.includes('image')) return 'fa-file-image text-success';
+    return 'fa-file text-secondary';
+  };
+  const getFileType = (file) => {
+    let fileType;
+
+    if (file instanceof File) {
+      fileType = file.type;
+    } else {
+      const fileExtension = file.split('.').pop().toLowerCase();  // Get the extension from the URL
+
+      // Use the file extension to determine the MIME type (file type)
+      if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
+        fileType = 'image/' + fileExtension;
+      } else if (['mp4', 'avi', 'mov'].includes(fileExtension)) {
+        fileType = 'video/' + fileExtension;
+      } else if (['pdf'].includes(fileExtension)) {
+        fileType = 'application/pdf';
+      } else if (['txt'].includes(fileExtension)) {
+        fileType = 'text/plain';
+      } else {
+        fileType = 'application/octet-stream';  // Default for unsupported extensions
       }
+    }
 
-      if (key instanceof File) {
-        if (selectedBrochurePreview && selectedBrochurePreview.url) {
-          URL.revokeObjectURL(selectedBrochurePreview.url);
+    if (fileType.includes('pdf')) return 'pdf';
+    if (fileType.includes('doc')) return 'doc';
+    if (fileType.includes('image')) return 'image';
+    return 'file';
+  };
+
+
+  // const handleTestimonialVideoUpload = (e) => {
+  //   const files = Array.from(e.target.files);
+  //   setSelectedTestimonialVideos(files);
+  // };
+
+  const handleTestimonialVideoUpload = (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+
+    try {
+      // Validate all files first
+      const validFiles = [];
+      const previews = [];
+
+      files.forEach(file => {
+        // Validate testimonial video
+        if (validateTestimonialVideo(file)) {
+          validFiles.push(file);
+
+          previews.push({
+            file,
+            url: URL.createObjectURL(file),
+            name: file.name,
+          });
         }
+      });
 
-        setSelectedBrochure(null);
-        setSelectedBrochurePreview(null);
+      if (validFiles.length > 0) {
+        setSelectedTestimonialVideos(prev => [...prev, ...validFiles]);
+        setSelectedTestimonialPreviews(prev => [...prev, ...previews]);
 
-        const brochureInput = document.getElementById('brochure');
-        if (brochureInput) {
-          brochureInput.value = '';
-        }
-        setFormData(prev => ({ ...prev, brochure: '' }));
+        console.log(`${validFiles.length} testimonial video(s) uploaded successfully`);
       }
-    } else if (fileType === 'thumbnail') {
-      // Remove server thumbnail
-      if (typeof key === 'string') {
-        setFormData(prev => ({ ...prev, thumbnail: '' }));
-      }
+    } catch (error) {
+      alert(error.message);
+      e.target.value = ''; // Reset input
+    }
+  };
 
-      // Remove new thumbnail and cleanup object URL
-      if (key instanceof File) {
-        if (selectedThumbnailPreview && selectedThumbnailPreview.url) {
-          URL.revokeObjectURL(selectedThumbnailPreview.url);
-        }
+  const validateTestimonialVideo = (file) => {
+    const maxSize = 50 * 1024 * 1024; // 50MB for testimonial videos
+    const allowedTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/avi', 'video/mov'];
 
-        setSelectedThumbnail(null);
-        setSelectedThumbnailPreview(null);
-        setFormData(prev => ({ ...prev, thumbnail: '' }));
+    if (!allowedTypes.includes(file.type)) {
+      throw new Error('Please upload testimonial videos in MP4, WebM, OGG, AVI, or MOV format');
+    }
 
-        const thumbnailInput = document.getElementById('thumbnail');
-        if (thumbnailInput) {
-          thumbnailInput.value = '';
-        }
-      }
-    } else if (fileType === 'testimonial') {
-      setFormData(prev => ({ ...prev, testimonialvideos: prev.testimonialvideos.filter(t => t !== key) }));
-      setSelectedTestimonialVideos(prev => prev.filter(t => t !== key));
-      setSelectedTestimonialPreviews(prev => prev.filter(t => t.file !== key));
+    if (file.size > maxSize) {
+      throw new Error('Testimonial video file must be less than 50MB');
+    }
+
+    return true;
+  };
+
+  const removeAllTestimonials = () => {
+    if (window.confirm('Are you sure you want to remove all testimonial videos?')) {
+      // Cleanup object URLs
+      selectedTestimonialPreviews.forEach(preview => {
+        URL.revokeObjectURL(preview.url);
+      });
+
+      setSelectedTestimonialVideos([]);
+      setSelectedTestimonialPreviews([]);
+
+      // Reset file input
       const testimonialInput = document.getElementById('testimonialvideos');
       if (testimonialInput) {
         testimonialInput.value = '';
       }
     }
+  };
+
+  // const handleBrochureUpload = (e) => {
+  //   const file = e.target.files[0];
+  //   if (validateFile(file, 'brochure')) {
+  //     setSelectedBrochure(file);
+  //   }
+  // };
+
+  const handleBrochureUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+
+    try {
+      // Validate brochure file
+      if (validateFile(file, 'brochure')) {
+        // Cleanup previous preview
+        if (selectedBrochurePreview && selectedBrochurePreview.url) {
+          URL.revokeObjectURL(selectedBrochurePreview.url);
+        }
+        setSelectedBrochure(file);
+
+        // Create preview object
+
+
+        console.log('Brochure uploaded successfully:', file.name);
+      }
+    } catch (error) {
+      alert(error.message);
+      e.target.value = ''; // Reset input
+    }
+  };
+
+
+  // const handleThumbnailUpload = (e) => {
+  //   const file = e.target.files[0];
+  //   if (validateFile(file, 'thumbnail')) {
+  //     setSelectedThumbnail(file);
+  //   }
+  // };
+
+  const handleThumbnailUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      if (validateFile(file, 'thumbnail')) {
+        // Cleanup previous preview
+        if (selectedThumbnailPreview && selectedThumbnailPreview.url) {
+          URL.revokeObjectURL(selectedThumbnailPreview.url);
+        }
+
+        setSelectedThumbnail(file);
+        setSelectedThumbnailPreview({
+          url: URL.createObjectURL(file),
+          name: file.name,
+        });
+
+        console.log('Thumbnail uploaded successfully:', file.name);
+      }
+    } catch (error) {
+      alert(error.message);
+      e.target.value = '';
+    }
+  };
+
+  // Handle remove file from server (DB stores S3 key only)
+  const removeFile = async (fileType, key) => {
+    const confirm = window.confirm('Are you sure you want to remove this file?');
+    if (!confirm) return;
+
+    let shouldCallApi = false;
+    let fileUrl = '';
+
+    if (fileType === 'video') {
+      if (selectedVideos.length > 0) {
+        setSelectedVideos([]);
+        const videoInput = document.getElementById('videos');
+        if (videoInput) videoInput.value = '';
+        return;
+      }
+      if (formData.videos?.length > 0 && typeof formData.videos[0] === 'string') {
+        fileUrl = stripStorageKey(formData.videos[0]);
+        setFormData(prev => ({ ...prev, videos: [] }));
+        shouldCallApi = true;
+      }
+    } else if (fileType === 'photo') {
+      if (key instanceof File) {
+        const previewToRemove = selectedPhotoPreviews.find(p => p.file === key);
+        if (previewToRemove) URL.revokeObjectURL(previewToRemove.url);
+        setSelectedPhotos(prev => prev.filter(p => p !== key));
+        setSelectedPhotoPreviews(prev => prev.filter(p => p.file !== key));
+        const photoInput = document.getElementById('photos');
+        if (photoInput) photoInput.value = '';
+        return;
+      }
+      if (typeof key === 'string') {
+        fileUrl = stripStorageKey(key);
+        setFormData(prev => ({
+          ...prev,
+          photos: prev.photos.filter(p => stripStorageKey(p) !== fileUrl),
+        }));
+        shouldCallApi = true;
+      }
+    } else if (fileType === 'brochure') {
+      if (selectedBrochure) {
+        if (selectedBrochurePreview?.url) URL.revokeObjectURL(selectedBrochurePreview.url);
+        setSelectedBrochure(null);
+        setSelectedBrochurePreview(null);
+        const brochureInput = document.getElementById('brochure');
+        if (brochureInput) brochureInput.value = '';
+        return;
+      }
+      if (formData.brochure) {
+        setFormData(prev => ({ ...prev, brochure: '' }));
+        shouldCallApi = true;
+      }
+    } else if (fileType === 'thumbnail') {
+      if (selectedThumbnail) {
+        if (selectedThumbnailPreview?.url) URL.revokeObjectURL(selectedThumbnailPreview.url);
+        setSelectedThumbnail(null);
+        setSelectedThumbnailPreview(null);
+        const thumbnailInput = document.getElementById('thumbnail');
+        if (thumbnailInput) thumbnailInput.value = '';
+        return;
+      }
+      if (formData.thumbnail) {
+        setFormData(prev => ({ ...prev, thumbnail: '' }));
+        shouldCallApi = true;
+      }
+    } else if (fileType === 'testimonial') {
+      if (key instanceof File) {
+        setSelectedTestimonialVideos(prev => prev.filter(t => t !== key));
+        setSelectedTestimonialPreviews(prev => prev.filter(t => t.file !== key));
+        const testimonialInput = document.getElementById('testimonialvideos');
+        if (testimonialInput) testimonialInput.value = '';
+        return;
+      }
+      if (typeof key === 'string') {
+        fileUrl = stripStorageKey(key);
+        setFormData(prev => ({
+          ...prev,
+          testimonialvideos: prev.testimonialvideos.filter(t => stripStorageKey(t) !== fileUrl),
+        }));
+        shouldCallApi = true;
+      }
+    }
+
+    if (!shouldCallApi) return;
+
+    try {
+      const response = await axios.put(`${backendUrl}/college/courses/remove_course_media/${id}`, {
+        fileType,
+        fileUrl: fileUrl || undefined,
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-auth': token,
+        },
+      });
+      alert(response.data.message);
+    } catch (error) {
+      console.error(error);
+      alert('Failed to remove file');
+    }
 
 
 
+    // Handle other file types...
+    // switch (fileType) {
+    //   case 'photo':
+    //     setFormData(prev => ({ ...prev, photos: prev.photos.filter(p => p !== key) }));
+    //     break;
+    //   case 'testimonial':
+    //     setFormData(prev => ({ ...prev, testimonialvideos: prev.testimonialvideos.filter(t => t !== key) }));
+    //     break;
+    //   case 'brochure':
+    //     setFormData(prev => ({ ...prev, brochure: '' }));
+    //     break;
+    //   case 'thumbnail':
+    //     setFormData(prev => ({ ...prev, thumbnail: '' }));
+    //     break;
+    //   case 'testimonialvideo':
+    //     setFormData(prev => ({ ...prev, testimonialvideos: prev.testimonialvideos.filter(t => t !== key) }));
+    //     break;
+    //   default:
+    //     break;
+    // }
+  };
+
+  // Add a new document field
+  const addDocumentField = () => {
+    setDocsRequired([...docsRequired, { name: '', mandatory: false }]);
+  };
+
+  // Update document field value
+  const updateDocumentField = (index, value, field) => {
+    const updatedDocs = [...docsRequired];
+    if(field === 'name'){
+      updatedDocs[index].name = value;
+    }else if(field === 'mandatory'){
+      updatedDocs[index].mandatory = value === 'true' ? true : false;
+    }
+    setDocsRequired(updatedDocs);
+  };
+
+  // Remove document field
+  const removeDocumentField = (index) => {
+    const updatedDocs = [...docsRequired];
+    updatedDocs.splice(index, 1);
+    setDocsRequired(updatedDocs);
+  };
+
+  const addClassResourceField = () => {
+    setClassResourcesRequired([...classResourcesRequired, createEmptyResource()]);
+  };
+
+  const removeClassResourceField = (index) => {
+    setClassResourcesRequired(classResourcesRequired.filter((_, i) => i !== index));
+  };
+
+  const updateClassResourceField = (index, value, field) => {
+    const updated = [...classResourcesRequired];
+    if (field === 'mandatory') {
+      updated[index].mandatory = value === 'true' || value === true;
+    } else {
+      updated[index][field] = value;
+    }
+    setClassResourcesRequired(updated);
+  };
+
+  const addLabResourceField = () => {
+    setLabResourcesRequired([...labResourcesRequired, createEmptyResource()]);
+  };
+
+  const removeLabResourceField = (index) => {
+    setLabResourcesRequired(labResourcesRequired.filter((_, i) => i !== index));
+  };
+
+  const updateLabResourceField = (index, value, field) => {
+    const updated = [...labResourcesRequired];
+    if (field === 'mandatory') {
+      updated[index].mandatory = value === 'true' || value === true;
+    } else {
+      updated[index][field] = value;
+    }
+    setLabResourcesRequired(updated);
+  };
+
+  const mapResourceForSubmit = (items = []) =>
+    items
+      .filter((item) => item.name?.trim())
+      .map((item) => ({
+        ...(item._id ? { _id: item._id } : {}),
+        Name: item.name.trim(),
+        description: item.description?.trim() || '',
+        uploadType: RESOURCE_UPLOAD_TYPES.includes(item.uploadType) ? item.uploadType : 'PDF',
+        mandatory: !!item.mandatory,
+        status: true,
+      }));
+
+  // Handle document disabling (server call)
+  const disableDocument = async (docId) => {
+    if (window.confirm('Are you sure you want to remove this document?')) {
+      try {
+        const res = await axios.patch(`${backendUrl}/college/courses/${id}/disable-doc/${docId}`,docId,{
+          headers: {
+            'x-auth': token
+          }
+        });
+        alert(res.data.message);
+        // Remove from local state
+        setDocsRequired(prev => prev.filter(doc => doc._id !== docId));
+      } catch (error) {
+        console.error('Error disabling document:', error);
+        alert('Failed to disable document');
+      }
+    }
+  };
+
+  // Add a new question-answer pair
+  const addQuestionAnswer = () => {
+    setQuestionAnswers([...questionAnswers, { question: '', answer: '' }]);
+  };
+
+  // Update question or answer
+  const updateQuestionAnswer = (index, field, content) => {
+    const updatedQA = [...questionAnswers];
+    updatedQA[index][field] = content;
+    setQuestionAnswers(updatedQA);
+  };
+
+  // Validate form
+  const validateForm = () => {
+    const errors = {};
+    const requiredFields = [
+      'courseLevel',
+      'courseFeeType',
+      'vertical',
+      'project',
+      'name',
+      'duration',
+      'qualification',
+    ];
+
+    // Only require fields that are actually visible
+    if (formData.courseType === 'coursejob') {
+      requiredFields.push('ojt');
+    }
+    if (formData.courseFeeType === 'Paid') {
+      requiredFields.push('emiOptionAvailable');
+    }
+
+    const isEmpty = (value) => {
+      if (value === undefined || value === null) return true;
+      if (Array.isArray(value)) return value.length === 0;
+      return String(value).trim() === '';
+    };
+
+    requiredFields.forEach((field) => {
+      if (isEmpty(formData[field])) {
+        errors[field] = 'This field is required';
+      }
+    });
+
+    setFormErrors(errors);
+    return errors;
+  };
+
+  // Reset form to initial state
+  const resetForm = () => {
+    if (window.confirm('Are you sure you want to reset the form? All unsaved changes will be lost.')) {
+      window.location.reload();
+    }
   };
 
   // Handle form submission
+  // Fixed handleSubmit function - Replace your existing one
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    console.log(docsRequired, 'docsRequired')
-
     const errors = validateForm();
     if (Object.keys(errors).length > 0) {
-      // Field id map — same order as requiredFields
       const fieldIdMap = {
         courseLevel: 'courseLevel',
         courseFeeType: 'courseFeeType',
@@ -1200,102 +1253,105 @@ const AddCourse = () => {
           el.focus();
         }
       }
+      alert('Please fill in all required fields');
       return;
     }
 
-    const user = JSON.parse(sessionStorage.getItem('user'));
+    setIsSubmitting(true);
 
-    const form = new FormData();
+    try {
+      const user = JSON.parse(sessionStorage.getItem('user'));
+      const form = new FormData();
 
-    // Append basic fields
-    Object.entries(formData).forEach(([key, value]) => {
-      if (key !== 'photos' && key !== 'videos' && key !== 'testimonialvideos' &&
-        key !== 'brochure' && key !== 'thumbnail') {
+      // Append form fields - FIXED VERSION
+      Object.entries(formData).forEach(([key, value]) => {
+        if (key !== 'photos' && key !== 'videos' && key !== 'testimonialvideos' &&
+          key !== 'brochure' && key !== 'thumbnail' && key !== 'isContact') {
 
-        // Special handling for sectors
-        if (key === 'sectors') {
-          const sectorValues = Array.isArray(value) ? value : (value ? [value] : []);
-          sectorValues.forEach((v) => form.append('sectors', v));
+          // Special handling for sectors
+          if (key === 'sectors') {
+            const sectorValues = Array.isArray(value) ? value.flat() : (value ? [value] : []);
+            sectorValues.filter(Boolean).forEach((v) => form.append('sectors', v));
+          }
+          // Keep center as array format
+          else if (key === 'center' && Array.isArray(value)) {
+            value.flat().filter(Boolean).forEach((v) => form.append('center', v));
+          }
+          // Skip empty counselor phone numbers (schema expects Number)
+          else if (
+            (key === 'counslerphonenumber' || key === 'counslerwhatsappnumber') &&
+            (value === '' || value === null || value === undefined)
+          ) {
+            return;
+          }
+          // Handle other arrays (if any)
+          else if (Array.isArray(value)) {
+            value.forEach(v => form.append(`${key}[]`, v));
+          }
+          // Handle single values
+          else if (value !== undefined && value !== null) {
+            form.append(key, value);
+          }
         }
-        // Keep center as array format
-        else if (key === 'center' && Array.isArray(value)) {
-          value.forEach(v => form.append(`center`, v));
-        }
-        // Handle other arrays (if any)
-        else if (Array.isArray(value)) {
-          value.forEach(v => form.append(`${key}[]`, v));
-        }
-        // Handle single values
-        else if (value !== undefined && value !== null) {
-          form.append(key, value);
-        }
+      });
+
+      // Append new files
+      if (selectedVideos.length > 0) {
+        selectedVideos.forEach(file => form.append('videos', file));
       }
-    });
 
-    // Append files
-    if (selectedVideos.length > 0) {
-      selectedVideos.forEach(file => form.append('videos', file));
-    }
+      if (selectedPhotos.length > 0) {
+        selectedPhotos.forEach(file => form.append('photos', file));
+      }
 
-    if (selectedPhotos.length > 0) {
-      selectedPhotos.forEach(file => form.append('photos', file));
-    }
+      if (selectedBrochure) {
+        form.append('brochure', selectedBrochure);
+      }
 
-    if (selectedBrochure) {
-      form.append('brochure', selectedBrochure);
-    }
+      if (selectedThumbnail) {
+        form.append('thumbnail', selectedThumbnail);
+      }
 
-    if (selectedThumbnail) {
-      form.append('thumbnail', selectedThumbnail);
-    }
+      if (selectedTestimonialVideos.length > 0) {
+        selectedTestimonialVideos.forEach(file => form.append('testimonialvideos', file));
+      }
 
-    if (selectedTestimonialVideos.length > 0) {
-      selectedTestimonialVideos.forEach(file => form.append('testimonialvideos', file));
-    }
-
-    console.log(docsRequired.map(doc => ({
-      Name: doc.name,
-      mandatory: doc.mandatory
-    })), 'docsRequired')
-
-    // Append JSON fields
-    if(docsRequired.length > 0){
+      // Append docs required
       form.append('docsRequired', JSON.stringify(docsRequired.map(doc => ({
+        _id: doc._id,
         Name: doc.name,
         mandatory: doc.mandatory
       }))));
-    }
 
-    form.append('classResourcesRequired', JSON.stringify(mapResourceForSubmit(classResourcesRequired)));
-    form.append('labResourcesRequired', JSON.stringify(mapResourceForSubmit(labResourcesRequired)));
-    
-    form.append('questionAnswers', JSON.stringify(questionAnswers));
-    form.append('courseStructure', JSON.stringify({ ...structureLevels, session: true }));
+      form.append('classResourcesRequired', JSON.stringify(mapResourceForSubmit(classResourcesRequired)));
+      form.append('labResourcesRequired', JSON.stringify(mapResourceForSubmit(labResourcesRequired)));
 
-    // CreatedBy & college
-    form.append('createdBy', JSON.stringify({
-      type: 'college',
-      id: user._id
-    }));
-    form.append('college', user.collegeId);
+      // Append question answers
+      form.append('questionAnswers', JSON.stringify(questionAnswers.map(qa => ({
+        Question: qa.question,
+        Answer: qa.answer
+      }))));
 
-    try {
-      setIsSubmitting(true);
-      const response = await axios.post(`${backendUrl}/college/courses/addcoursecopy`, form, {
+      // Append course structure
+      form.append('courseStructure', JSON.stringify({ ...structureLevels, session: true }));
+
+      const response = await axios.put(`${backendUrl}/college/courses/editcoursecopy/${id}`, form, {
         headers: {
           'Content-Type': 'multipart/form-data',
-          'x-auth': user.token
+          'x-auth': user?.token || sessionStorage.getItem('token')
         }
       });
+
       if (response.data.status) {
-        alert("Course added successfully");
-        window.location.reload();
+        setSubmitSuccess(true);
+        alert('Course updated successfully');
+        navigate('/institute/viewcoursecopy');
       } else {
-        alert(response.data.message || "Failed to add course");
+        alert(response.data.message || 'Failed to update course');
       }
     } catch (error) {
-      console.error(error);
-      alert("Error while submitting course");
+      console.error('Error updating course:', error);
+      alert(error.response?.data?.message || 'Error updating course. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -1314,49 +1370,32 @@ const AddCourse = () => {
 
   return (
     <div className="content-body">
-      {/* Modern Gradient Header */}
-      <div style={{
-        background: 'linear-gradient(90deg, #E11D48 , #ff5770 )',
-        borderRadius: '16px',
-        padding: '24px 32px',
-        marginBottom: '28px',
-        color: 'white',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '16px',
-        boxShadow: '0 10px 25px rgba(252, 43, 90, 0.35)'
-      }}>
-        <div style={{
-          background: 'rgba(255,255,255,0.2)',
-          borderRadius: '12px',
-          padding: '10px 14px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <i className="fa fa-graduation-cap" style={{ fontSize: '22px' }}></i>
-        </div>
-        <div>
-          <h2 style={{ margin: 0, fontWeight: 700, fontSize: '22px', letterSpacing: '-0.02em' }}>Add New Course</h2>
-          <p style={{ margin: '4px 0 0', opacity: 0.8, fontSize: '13px' }}>
-            <a href="/institute/dashboard" style={{ color: 'rgba(255,255,255,0.85)', textDecoration: 'none' }}>Home</a>
-            <span style={{ margin: '0 8px', opacity: 0.6 }}>›</span>
-            <span>Add Course</span>
-          </p>
+      {/* Header */}
+      <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
+        <div className="content-header-left col-md-9 col-12 mb-2">
+          <div className="row breadcrumbs-top">
+            <div className="col-12">
+              <h3 className="content-header-title float-left mb-0">Edit Course</h3>
+              <div className="breadcrumb-wrapper col-12">
+                <ol className="breadcrumb">
+                  <li className="breadcrumb-item"><a href="/institute/dashboard">Home</a></li>
+                  <li className="breadcrumb-item active">Edit Course</li>
+                </ol>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <ToastContainer position="top-right" autoClose={4000} hideProgressBar={false} closeOnClick pauseOnHover />
-
-      {/* Success Message */}
+      {/* Success Message (if form successfully submitted) */}
       {submitSuccess && (
         <div className="alert alert-success mb-2" role="alert">
-          Course added successfully!
+          Course updated successfully!
         </div>
       )}
 
       {/* Form */}
-      <form className="form-horizontal" id="addCourseForm" onSubmit={handleSubmit}>
+      <form className="form-horizontal" id="editCourseForm" onSubmit={handleSubmit}>
         {/* Course Information Section */}
         <section id="course-info">
           <div className="row">
@@ -1369,15 +1408,14 @@ const AddCourse = () => {
                   <div className="card-body">
                     <div className="row">
                       {/* Sector */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="sectorblock">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="sectorblock">
                         <label htmlFor="sectors">Sector</label>
                         <select
-                          className={`form-control ${formErrors.sector ? 'is-invalid' : ''}`}
+                          className={`form-control ${formErrors.sectors ? 'is-invalid' : ''}`}
                           name="sectors"
                           id="sectors"
-                          ref={sectorRef}
-                          value={formData.sectors}
-                          onChange={handleChange}
+                          value={formData.sectors[0]}
+                          onChange={handleSectorChange}
                         >
                           <option value="">Select Sector</option>
                           {Array.isArray(sectors) && sectors.length > 0 ? (
@@ -1388,12 +1426,12 @@ const AddCourse = () => {
                             <option disabled>No sectors available</option>
                           )}
                         </select>
-                        {formErrors.sector && <div className="invalid-feedback">{formErrors.sector}</div>}
+                        {formErrors.sectors && <div className="invalid-feedback">{formErrors.sectors}</div>}
                       </div>
 
                       {/* Course Level */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="courseblock">
-                        <label htmlFor="courseLevel" style={{ color: formErrors.courseLevel ? '#ef4444' : '' }}>Course Level <span style={{ color: '#ef4444' }}>*</span></label>
+                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseblock">
+                        <label htmlFor="courseLevel">Course Level</label>
                         <select
                           className={`form-control ${formErrors.courseLevel ? 'is-invalid' : ''}`}
                           name="courseLevel"
@@ -1410,12 +1448,11 @@ const AddCourse = () => {
                         {formErrors.courseLevel && <div className="invalid-feedback">{formErrors.courseLevel}</div>}
                       </div>
 
-
                       {/* Course Fee Type */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="courseFeeTypeblock">
-                        <label htmlFor="courseFeeType" style={{ color: formErrors.courseFeeType ? '#ef4444' : '' }}>Course Fee Type <span style={{ color: '#ef4444' }}>*</span></label>
+                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseFeeTypeblock">
+                        <label htmlFor="courseFeeType">Course Fee Type</label>
                         <select
-                          className={`form-control ${formErrors.courseFeeType ? 'is-invalid' : ''}`}
+                          className="form-control"
                           name="courseFeeType"
                           id="courseFeeType"
                           value={formData.courseFeeType}
@@ -1425,19 +1462,15 @@ const AddCourse = () => {
                           <option value="Paid">Paid</option>
                           <option value="Free">Free</option>
                         </select>
-                        {formErrors.courseFeeType && <div className="invalid-feedback">{formErrors.courseFeeType}</div>}
                       </div>
 
-                      
-
                       {/* Vertical */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="courseProjectblock">
-                        <label htmlFor="vertical" style={{ color: formErrors.vertical ? '#ef4444' : '' }}>Vertical <span style={{ color: '#ef4444' }}>*</span></label>
+                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
+                        <label htmlFor="vertical">Vertical</label>
                         <select
-                          className={`form-control ${formErrors.vertical ? 'is-invalid' : ''}`}
+                          className="form-control"
                           name="vertical"
                           id="vertical"
-                          ref={verticalRef}
                           value={formData.vertical}
                           onChange={handleChange}
                         >
@@ -1446,17 +1479,15 @@ const AddCourse = () => {
                             <option key={vertical._id || index} value={vertical._id}>{vertical.name}</option>
                           ))}
                         </select>
-                        {formErrors.vertical && <div className="invalid-feedback">{formErrors.vertical}</div>}
                       </div>
 
                       {/* Project */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="courseProjectblock">
-                        <label htmlFor="project" style={{ color: formErrors.project ? '#ef4444' : '' }}>Project <span style={{ color: '#ef4444' }}>*</span></label>
+                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseProjectblock">
+                        <label htmlFor="project">Project</label>
                         <select
-                          className={`form-control ${formErrors.project ? 'is-invalid' : ''}`}
+                          className="form-control"
                           name="project"
                           id="project"
-                          ref={projectRef}
                           value={formData.project}
                           onChange={handleChange}
                         >
@@ -1465,11 +1496,10 @@ const AddCourse = () => {
                             <option key={project._id || index} value={project._id}>{project.name}</option>
                           ))}
                         </select>
-                        {formErrors.project && <div className="invalid-feedback">{formErrors.project}</div>}
                       </div>
 
                       {/* Course Type */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="courseTypeblock">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="courseTypeblock">
                         <label htmlFor="courseType">Course Type</label>
                         <select
                           className="form-control"
@@ -1485,8 +1515,8 @@ const AddCourse = () => {
                       </div>
 
                       {/* Name */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="nameblock">
-                        <label htmlFor="name" style={{ color: formErrors.name ? '#ef4444' : '' }}>Name <span style={{ color: '#ef4444' }}>*</span></label>
+                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="nameblock">
+                        <label htmlFor="name">Name</label>
                         <input
                           className={`form-control ${formErrors.name ? 'is-invalid' : ''}`}
                           type="text"
@@ -1499,8 +1529,8 @@ const AddCourse = () => {
                       </div>
 
                       {/* Duration */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="durationblock">
-                        <label htmlFor="duration" style={{ color: formErrors.duration ? '#ef4444' : '' }}>Duration <span style={{ color: '#ef4444' }}>*</span></label>
+                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="durationblock">
+                        <label htmlFor="duration">Duration</label>
                         <input
                           className={`form-control ${formErrors.duration ? 'is-invalid' : ''}`}
                           type="text"
@@ -1513,7 +1543,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* Certifying Agency */}
-                      {/* <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
+                      {/* <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
                         <label htmlFor="certifyingAgency">Certifying Agency</label>
                         <input
                           className="form-control"
@@ -1526,8 +1556,8 @@ const AddCourse = () => {
                       </div> */}
 
                       {/* Certifying Agency Website */}
-                      {/* <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
-                        <label style={{whiteSpace: 'nowrap'}} htmlFor="certifyingAgencyWebsite">Certifying Agency Website</label>
+                      {/* <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
+                        <label htmlFor="certifyingAgencyWebsite">Certifying Agency Website</label>
                         <input
                           className="form-control"
                           type="text"
@@ -1539,8 +1569,8 @@ const AddCourse = () => {
                       </div> */}
 
                       {/* Qualification */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="qualificationblock">
-                        <label htmlFor="qualification" style={{ color: formErrors.qualification ? '#ef4444' : '' }}>Qualification <span style={{ color: '#ef4444' }}>*</span></label>
+                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="qualificationblock">
+                        <label htmlFor="qualification">Qualification</label>
                         <select
                           className={`form-control ${formErrors.qualification ? 'is-invalid' : ''}`}
                           name="qualification"
@@ -1560,7 +1590,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* Age */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
                         <label htmlFor="age">Age</label>
                         <input
                           className="form-control"
@@ -1573,7 +1603,7 @@ const AddCourse = () => {
                       </div>
 
                       {/* Experience */}
-                      {/* <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
                         <label htmlFor="experience">Experience</label>
                         <input
                           className="form-control"
@@ -1583,10 +1613,10 @@ const AddCourse = () => {
                           value={formData.experience}
                           onChange={handleChange}
                         />
-                      </div> */}
+                      </div>
 
                       {/* Training Mode */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="trainingblock">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="trainingblock">
                         <label htmlFor="trainingMode">Training Mode</label>
                         <select
                           className={`form-control ${formErrors.trainingMode ? 'is-invalid' : ''}`}
@@ -1605,7 +1635,7 @@ const AddCourse = () => {
 
                       {/* Online Training Timing (conditional) */}
                       {showTrainingFields.online && (
-                        <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="onlinetrainingblock">
+                        <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="onlinetrainingblock">
                           <label htmlFor="onlineTrainingTiming">Online training Timing</label>
                           <textarea
                             className="form-control"
@@ -1619,7 +1649,7 @@ const AddCourse = () => {
 
                       {/* Offline Training Timing (conditional) */}
                       {showTrainingFields.offline && (
-                        <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="offlinetrainingblock">
+                        <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="offlinetrainingblock">
                           <label htmlFor="offlineTrainingTiming">Offline training Timing</label>
                           <textarea
                             className="form-control"
@@ -1632,14 +1662,15 @@ const AddCourse = () => {
                       )}
 
                       {/* Training Center (conditional) */}
-                      {showTrainingFields.trainingCenter && (
-                        <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="trainingCenterblock">
-                          <label htmlFor="trainingCenter">Training Center</label>
+                      {showTrainingFields.center && (
+                        <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="centerblock">
+                          <label htmlFor="center">Training Center</label>
                           <select
                             className="form-control"
                             name="center"
                             id="center"
                             multiple
+                            value={formData.center}
                             ref={centerRef}
                             onChange={(e) => handlecenterChange(e.target.selectedOptions)}
                           >
@@ -1655,7 +1686,7 @@ const AddCourse = () => {
                       )}
 
                       {/* Address */}
-                      {/* <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="addressblock">
+                      {/* <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="addressblock">
                         <label htmlFor="address">Address</label>
                         <select
                           className={`form-control ${formErrors.address ? 'is-invalid' : ''}`}
@@ -1673,7 +1704,7 @@ const AddCourse = () => {
                       </div> */}
 
                       {/* City */}
-                      {/* <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="cityblock">
+                      {/* <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="cityblock">
                         <label htmlFor="city">City</label>
                         <input
                           className="form-control"
@@ -1686,7 +1717,7 @@ const AddCourse = () => {
                       </div> */}
 
                       {/* State */}
-                      {/* <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="stateblock">
+                      {/* <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="stateblock">
                         <label htmlFor="state">State</label>
                         <input
                           className="form-control"
@@ -1700,7 +1731,7 @@ const AddCourse = () => {
 
                       {/* App Link (conditional) */}
                       {showAddressFields.appLink && (
-                        <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="applinkblock">
+                        <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="applinkblock">
                           <label htmlFor="appLink">App link</label>
                           <input
                             className="form-control"
@@ -1715,7 +1746,7 @@ const AddCourse = () => {
 
                       {/* Address Input (conditional) */}
                       {showAddressFields.addressInput && (
-                        <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="addressinputblock">
+                        <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="addressinputblock">
                           <label htmlFor="addressInput">Address</label>
                           <input
                             className="form-control"
@@ -1731,8 +1762,8 @@ const AddCourse = () => {
                       {formData.courseType === 'coursejob' && (
                         <>
                           {/* OJT */}
-                          <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="ojtblock">
-                            <label htmlFor="ojt" style={{ color: formErrors.ojt ? '#ef4444' : '' }}>OJT <span style={{ color: '#ef4444' }}>*</span></label>
+                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="ojtblock">
+                            <label htmlFor="ojt">OJT</label>
                             <select
                               className={`form-control ${formErrors.ojt ? 'is-invalid' : ''}`}
                               name="ojt"
@@ -1748,7 +1779,7 @@ const AddCourse = () => {
                           </div>
 
                           {/* Stipend During Training */}
-                          <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
+                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
                             <label htmlFor="stipendDuringTraining">Stipend During Training</label>
                             <input
                               className="form-control"
@@ -1765,7 +1796,7 @@ const AddCourse = () => {
                       {formData.courseFeeType === 'Paid' && (
                         <>
                           {/* Registration Charges */}
-                          <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
+                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
                             <label htmlFor="registrationCharges">Registration Charges</label>
                             <input
                               className="form-control"
@@ -1778,7 +1809,7 @@ const AddCourse = () => {
                           </div>
 
                           {/* Course Fee */}
-                          <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
+                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
                             <label htmlFor="courseFee">Course Fee</label>
                             <input
                               className="form-control"
@@ -1791,7 +1822,7 @@ const AddCourse = () => {
                           </div>
 
                           {/* Cut Price */}
-                          <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
+                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
                             <label htmlFor="cutPrice">Cut Price</label>
                             <input
                               className="form-control"
@@ -1804,7 +1835,7 @@ const AddCourse = () => {
                           </div>
 
                           {/* Exam Fee */}
-                          <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
+                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
                             <label htmlFor="examFee">Exam Fee</label>
                             <input
                               className="form-control"
@@ -1817,7 +1848,7 @@ const AddCourse = () => {
                           </div>
 
                           {/* Other Fee */}
-                          <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
+                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
                             <label htmlFor="otherFee">Other fee if any</label>
                             <input
                               className="form-control"
@@ -1830,8 +1861,8 @@ const AddCourse = () => {
                           </div>
 
                           {/* EMI Option */}
-                          <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="emioptionblock">
-                            <label htmlFor="emiOptionAvailable" style={{ color: formErrors.emiOptionAvailable ? '#ef4444' : '' }}>EMI Option Available <span style={{ color: '#ef4444' }}>*</span></label>
+                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1" id="emioptionblock">
+                            <label htmlFor="emiOptionAvailable">EMI Option Available</label>
                             <select
                               className={`form-control ${formErrors.emiOptionAvailable ? 'is-invalid' : ''}`}
                               name="emiOptionAvailable"
@@ -1847,7 +1878,7 @@ const AddCourse = () => {
                           </div>
 
                           {/* Max EMI Tenure */}
-                          <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
+                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
                             <label htmlFor="maxEMITenure">Max EMI Tenure</label>
                             <input
                               className="form-control"
@@ -1862,7 +1893,7 @@ const AddCourse = () => {
                       )}
 
                       {/* Last Date for Apply */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1">
+                      <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
                         <label htmlFor="lastDateForApply">Last date for apply</label>
                         <input
                           className="form-control"
@@ -1891,6 +1922,574 @@ const AddCourse = () => {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Class Resource Required Section */}
+        <section id="classResourceRequired">
+          <div className="row">
+            <div className="col-xl-12 col-lg-12">
+              <div className="card">
+                <div className="card-header border border-top-0 border-left-0 border-right-0">
+                  <h4 className="card-title pb-1">Class Resource Required</h4>
+                </div>
+                <div className="card-content">
+                  <div className="card-body">
+                    <div id="classResourceContainer">
+                      {classResourcesRequired.map((doc, index) => (
+                        <div className="row requiredDocsRow" key={doc._id || `class-res-${index}`}>
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                            <label>Document Name</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="e.g. Projector, Whiteboard"
+                              value={doc.name || ''}
+                              onChange={(e) => updateClassResourceField(index, e.target.value, 'name')}
+                            />
+                          </div>
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                            <label>Description</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="Short description"
+                              value={doc.description || ''}
+                              onChange={(e) => updateClassResourceField(index, e.target.value, 'description')}
+                            />
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1">
+                            <label>Upload Type</label>
+                            <select
+                              className="form-control"
+                              value={doc.uploadType || 'PDF'}
+                              onChange={(e) => updateClassResourceField(index, e.target.value, 'uploadType')}
+                            >
+                              {RESOURCE_UPLOAD_TYPES.map((type) => (
+                                <option key={type} value={type}>{type}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1">
+                            <label>Mandatory</label>
+                            <select
+                              className="form-control"
+                              value={String(!!doc.mandatory)}
+                              onChange={(e) => updateClassResourceField(index, e.target.value, 'mandatory')}
+                            >
+                              <option value="true">Yes</option>
+                              <option value="false">No</option>
+                            </select>
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1 d-flex align-items-end">
+                            <button
+                              type="button"
+                              className="btn btn-danger"
+                              onClick={() => removeClassResourceField(index)}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="col-xl-12 mb-1 px-0 text-right">
+                      <button
+                        type="button"
+                        className="btn btn-success text-white add-another-button"
+                        onClick={addClassResourceField}
+                      >
+                        {classResourcesRequired.length > 0 ? 'Add Another' : 'Add Document'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Lab Resource Required Section */}
+        <section id="labResourceRequired">
+          <div className="row">
+            <div className="col-xl-12 col-lg-12">
+              <div className="card">
+                <div className="card-header border border-top-0 border-left-0 border-right-0">
+                  <h4 className="card-title pb-1">Lab Resource Required</h4>
+                </div>
+                <div className="card-content">
+                  <div className="card-body">
+                    <div id="labResourceContainer">
+                      {labResourcesRequired.map((doc, index) => (
+                        <div className="row requiredDocsRow" key={doc._id || `lab-res-${index}`}>
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                            <label>Document Name</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="e.g. Lab kit, Tools"
+                              value={doc.name || ''}
+                              onChange={(e) => updateLabResourceField(index, e.target.value, 'name')}
+                            />
+                          </div>
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                            <label>Description</label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="Short description"
+                              value={doc.description || ''}
+                              onChange={(e) => updateLabResourceField(index, e.target.value, 'description')}
+                            />
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1">
+                            <label>Upload Type</label>
+                            <select
+                              className="form-control"
+                              value={doc.uploadType || 'PDF'}
+                              onChange={(e) => updateLabResourceField(index, e.target.value, 'uploadType')}
+                            >
+                              {RESOURCE_UPLOAD_TYPES.map((type) => (
+                                <option key={type} value={type}>{type}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1">
+                            <label>Mandatory</label>
+                            <select
+                              className="form-control"
+                              value={String(!!doc.mandatory)}
+                              onChange={(e) => updateLabResourceField(index, e.target.value, 'mandatory')}
+                            >
+                              <option value="true">Yes</option>
+                              <option value="false">No</option>
+                            </select>
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1 d-flex align-items-end">
+                            <button
+                              type="button"
+                              className="btn btn-danger"
+                              onClick={() => removeLabResourceField(index)}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="col-xl-12 mb-1 px-0 text-right">
+                      <button
+                        type="button"
+                        className="btn btn-success text-white add-another-button"
+                        onClick={addLabResourceField}
+                      >
+                        {labResourcesRequired.length > 0 ? 'Add Another' : 'Add Document'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Documents Required Section */}
+        <section id="docsRequired">
+          <div className="row">
+            <div className="col-xl-12 col-lg-12">
+              <div className="card">
+                <div className="card-header border border-top-0 border-left-0 border-right-0">
+                  <h4 className="card-title pb-1">Documents Required</h4>
+                </div>
+                <div className="card-content">
+                  <div className="card-body">
+                    <div id="documentContainer">
+                      {docsRequired.map((doc, index) => (
+                        <div className="row requiredDocsRow" key={doc._id || index}>
+                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1 doc-item">
+                            <label>Document Name</label>
+                            <div className="input-group">
+                              <input
+                                type="text"
+                                className="form-control docsName"
+                                value={doc.name || ''}
+                                onChange={(e) => updateDocumentField(index, e.target.value,'name')}
+                              />
+                              <div className="input-group-append">
+                                <button
+                                  className="btn btn-danger remove-doc"
+                                  type="button"
+                                  onClick={() => doc._id ? disableDocument(doc._id) : removeDocumentField(index)}
+                                >
+                                  X
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1 doc-item">
+                            <label>Mandatory</label>
+                            <select name="mandatory-doc" className="form-control" value={doc.mandatory} onChange={(e) => updateDocumentField(index, e.target.value,'mandatory')}>
+                              <option value="true">Yes</option>
+                              <option value="false">No</option>
+                            </select>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="col-xl-12 mb-1 px-0 text-right">
+                      <button
+                        type="button"
+                        className="btn btn-success text-white add-another-button"
+                        onClick={addDocumentField}
+                      >
+                        {docsRequired.length > 0 ? 'Add Another' : 'Add Document'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Add Docs Section */}
+        <section id="add-docs">
+          <div className="row">
+
+            <div className="col-xl-12">
+              <div className="card">
+                <div className="card-header border border-top-0 border-left-0 border-right-0">
+                  <h4 className="card-title pb-1">Add Docs</h4>
+                </div>
+                <div className="row">
+                  <div className="col-xl-3">
+                    <div className="uploadedVideos card m-2 p-1">
+                      <h5 className="m-2 text-center">Videos</h5>
+                      <div className='innerUploadedVideos' style={{ height: '140px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+
+
+                        {/* Video Preview */}
+                        {(selectedVideos[0] || (formData.videos && formData.videos.length > 0)) ? (
+
+                          <div className="card m-0">
+                            {/* <div className="card-body p-0 position-relative"> */}
+                            {/* Video Preview with forced re-render */}
+                            <video
+                              key={selectedVideos[0] ? selectedVideos[0].name : formData.videos[0]}
+                              width="100%"
+                              height="auto"
+                              controls
+                              style={{ borderRadius: '5px' }}
+                            >
+                              <source src={getFileUrl(selectedVideos[0] || formData.videos[0])} type="video/mp4" />
+                              <source src={getFileUrl(selectedVideos[0] || formData.videos[0])} type="video/webm" />
+                              <source src={getFileUrl(selectedVideos[0] || formData.videos[0])} type="video/ogg" />
+                              Your browser does not support the video tag.
+                            </video>
+
+                            {/* Remove button */}
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-danger position-absolute"
+                              style={{ right: '5px', top: '5px', zIndex: 10 }}
+                              onClick={() => removeFile('video', selectedVideos[0] || formData.videos[0])}
+                            >
+                              <i className="fa fa-times"></i>
+                            </button>
+
+                            {/* </div> */}
+                          </div>
+
+                        )
+                          :
+                          <p>No videos uploaded</p>
+                        }
+
+
+                      </div>
+                      <div className='innerUploadedVideos' style={{ height: '70px', width: '100%' }}>
+                        <div className="col-xl-12 col-xl-lg-12 col-md-12 col-sm-12 col-12 mb-1">
+                          <label htmlFor="videos">
+                            {(selectedVideos[0] || (formData.videos && formData.videos.length > 0)) ? 'Replace Video' : 'Add Video'}
+                          </label>
+                          <input
+                            name="videos"
+                            id="videos"
+                            type="file"
+                            accept="video/*"
+                            onChange={handleVideoUpload}
+                            key={`video-input-${Date.now()}`} // Force input reset
+                            style={{ width: '100%', fontSize: '12px' }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-xl-3">
+                    <div className="uploadedPhotos  card m-2 p-1">
+                      <h5 className="m-2 text-center">Photos</h5>
+                      <div className='innerUploadedPhotos' style={{ height: '140px', width: '100%', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center', justifyContent: 'center' }}>
+                        {(formData.photos?.length > 0 || selectedPhotos.length > 0) ? (
+                          <>
+                          {formData.photos.map((photo, i) => (
+                            <div className=" position-relative w-25" key={`photo-${i}`}>
+                              <div className="card-body p-1 text-center ">
+
+                                <a href={getFileUrl(photo)} target="_blank" rel="noopener noreferrer" className="text-primary">
+                                  <img
+                                    src={getFileUrl(photo)}
+                                    alt={`Photo ${i + 1}`}
+                                    className="img-fluid mb-1"
+                                    style={{ maxHeight: '100px' }}
+                                  />
+                                </a>
+                                {/* <img
+                                      src={getFileUrl(photo)}
+                                      alt={`Photo ${i + 1}`}
+                                      className="img-fluid mb-1"
+                                      style={{ maxHeight: '100px' }}
+                                    /> */}
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-danger position-absolute" style={{ width: "15px", height: "15px", top: '-4px', right: '-4px' }}
+                                  onClick={() => removeFile('photo', photo)}
+                                >
+                                  <i className="fa fa-times" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: '10px', transform: 'translateY(-4px' }}></i>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                          {selectedPhotos.map((photo, i) => (
+                            <div className=" position-relative w-25" key={`photo-new-${i}`}>
+                              <div className="card-body p-1 text-center ">
+                                <img
+                                  src={getFileUrl(photo)}
+                                  alt={`New photo ${i + 1}`}
+                                  className="img-fluid mb-1"
+                                  style={{ maxHeight: '100px' }}
+                                />
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-danger position-absolute" style={{ width: "15px", height: "15px", top: '-4px', right: '-4px' }}
+                                  onClick={() => removeFile('photo', photo)}
+                                >
+                                  <i className="fa fa-times" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: '10px', transform: 'translateY(-4px' }}></i>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                          </>
+                        ) : <p>No photos uploaded</p>}
+                      </div>
+                      <div className='innerUploadedPhotos' style={{ height: '70px', width: '100%' }}>
+                        <div className="col-12 mb-1" id="uploadgallery">
+                          <label htmlFor="photos">Add New Photos</label>
+                          <input
+                            type="file"
+                            id="photos"
+                            name="photos"
+                            accept="image/*"
+                            multiple
+                            onChange={handlePhotoUpload}
+                            style={{ width: '100%', fontSize: '12px' }}
+                          />
+                        </div>
+
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-xl-3">
+                    <div className="brouchers card m-2 p-1">
+                      <h5 className="m-2 text-center">Brouchers</h5>
+
+                      <div className='innerUploadedBrouchers' style={{ height: '140px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {(formData.brochure || selectedBrochure) ? (
+                          <div className="card-body p-3 position-relative">
+                            <div className="d-flex align-items-center justify-content-center" onClick={() => window.open(getFileUrl(selectedBrochure || formData.brochure), '_blank')}>
+                              <div className="brochure-icon mr-3">
+                                <i style={{ fontSize: '100px' }} className={`fa-solid fa-file`}></i>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-danger position-absolute"
+                                  style={{ right: '10px', top: '10px' }}
+                                  onClick={(e) => { e.stopPropagation(); removeFile('brochure', selectedBrochure || formData.brochure); }}
+                                  title="Remove brochure"
+                                >
+                                  <i className="fa fa-times"></i>
+                                </button>
+                              </div>
+
+                            </div>
+                          </div>)
+                          :
+                          <p>No brouchers uploaded</p>
+                        }
+
+                      </div>
+                      <div className='innerUploadedBrouchers' style={{ height: '70px', width: '100%' }}>
+                        <div className="col-12 mb-1" id="brochures">
+                          <label htmlFor="brochure">Add New Brochure</label>
+                          <input
+                            type="file"
+                            id="brochure"
+                            name="brochure"
+                            accept=".pdf,.doc,.docx"
+                            onChange={handleBrochureUpload} style={{ width: '100%', fontSize: '12px' }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-xl-3">
+                    <div className="thumbnails card m-2 p-1">
+                      <h5 className="m-2 text-center">Thumbnails</h5>
+                      <div className='innerUploadedThumbnails' style={{ height: '140px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+
+                        {(formData.thumbnail || selectedThumbnail) ? (
+
+                          <div className="thumbnail-preview-container p-1 position-relative">
+                            <img
+                              src={getFileUrl(selectedThumbnail || formData.thumbnail)}
+                              alt="Thumbnail"
+                              className="img-fluid rounded"
+                              style={{
+                                width: '100%',
+                                objectFit: 'cover',
+                                cursor: 'pointer'
+                              }}
+                            />
+
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-danger position-absolute"
+                              style={{
+                                right: '5px',
+                                top: '5px',
+                                width: '25px',
+                                height: '25px',
+                                padding: '0',
+                                borderRadius: '50%',
+                                fontSize: '12px',
+                                zIndex: 10
+                              }}
+                              onClick={() => removeFile('thumbnail', selectedThumbnail || formData.thumbnail)}
+                              title="Remove thumbnail"
+                            >
+                              ×
+                            </button>
+                          </div>
+
+
+                        )
+                          :
+                          <p>No thumbnails uploaded</p>
+                        }
+
+                      </div>
+                      <div className='innerUploadedThumbnails' style={{ height: '70px', width: '100%' }}>
+                        <div className="col-12 mb-1" id="thumbnails">
+                          <label htmlFor="thumbnail">Add New Thumbnail</label>
+                          <input
+                            type="file"
+                            id="thumbnail"
+                            name="thumbnail"
+                            accept="image/*"
+                            onChange={handleThumbnailUpload} style={{ width: '100%', fontSize: '12px' }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        {/* Testimonial Videos Section */}
+        <section id="testimonial-videos">
+          <div className="row" style={{minHeight:'170px'}}>
+            <div className="col-xl-12 col-lg-12">
+             
+              <div>
+                <div className="card">
+                  <div className="card-header border border-top-0 border-left-0 border-right-0">
+                    <h4 className="card-title pb-1">Testimonial Videos</h4>
+                  </div>
+
+                  <div className="row">
+                    <div className="col-xl-3 m-2">
+                      <div className="col-12 mb-1 d-flex justify-content-center h-100 flex-column ps-3">
+                        <label htmlFor="testimonialvideos">Add New Testimonial Videos</label>
+                        <input
+                          type="file"
+                          id="testimonialvideos"
+                          name="testimonialvideos"
+                          accept="video/*"
+                          multiple
+                          onChange={handleTestimonialVideoUpload} style={{width:'100%', fontSize:'12px' , textAlign:'center'}}
+                        />
+                      </div>
+
+                    </div>
+                    {formData.testimonialvideos?.map((video, i) => (
+                    <div className="col-xl-3 m-2">
+                      <div className="card" style={{height:'138px', width:'100%'}}>
+                            {/* Existing Testimonial Videos */}
+                           
+                                <div key={`testimonial-${i}`} className="col-12 mb-2">
+                              
+                                      <video key={`testimonial-server-${i}`}
+                                        width="100%"
+                                        height="auto"
+                                        controls className="text-primary">
+                                        <source src={getFileUrl(video)} type="video/mp4" />
+                                        <source src={getFileUrl(video)} type="video/webm" />
+                                        <source src={getFileUrl(video)} type="video/ogg" />
+                                        Your browser does not support the video tag.
+                                      </video>
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-danger ml-2 position-absolute" style={{right:'1px'}}
+                                        onClick={() => removeFile('testimonial', video)}
+                                      >
+                                        <i className="fa fa-times"></i>
+                                      </button>
+                                    </div>
+                                  
+                             
+                      </div>
+                    </div>
+                    ))}
+                    {selectedTestimonialVideos.map((video, i) => (
+                    <div className="col-xl-3 m-2" key={`testimonial-new-${i}`}>
+                      <div className="card position-relative" style={{height:'138px', width:'100%'}}>
+                        <video width="100%" height="auto" controls className="text-primary">
+                          <source src={getFileUrl(video)} type="video/mp4" />
+                          Your browser does not support the video tag.
+                        </video>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-danger ml-2 position-absolute" style={{right:'1px'}}
+                          onClick={() => removeFile('testimonial', video)}
+                        >
+                          <i className="fa fa-times"></i>
+                        </button>
+                      </div>
+                    </div>
+                    ))}
+                  </div>
+
+                </div>
+
+              </div>
+
+            </div>
+            <div className="col-12">
+
             </div>
           </div>
         </section>
@@ -1947,584 +2546,16 @@ const AddCourse = () => {
                         title="Session level is always required"
                       >
                         <i className="fas fa-play-circle" aria-hidden="true" /> Session
-                        <span className="course-structure-level__badge">Required</span>
+                        <span className="badge badge-primary ms-2">REQUIRED</span>
                       </button>
                     </div>
 
-                    <ul className="course-structure-rules">
-                      <li>Session is mandatory for every course.</li>
-                      
-                    </ul>
+                    <p className="course-structure-note">
+                      Session is mandatory for every course.
+                    </p>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Class Resource Required Section */}
-        <section id="classResourceRequired">
-          <div className="row">
-            <div className="col-xl-12 col-lg-12">
-              <div className="card">
-                <div className="card-header border border-top-0 border-left-0 border-right-0">
-                  <h4 className="card-title pb-1">Class Resource Required</h4>
-                </div>
-                <div className="card-content">
-                  <div className="card-body">
-                    <div id="classResourceContainer">
-                      {classResourcesRequired.map((doc, index) => (
-                        <div className="row requiredDocsRow" key={`class-res-${index}`}>
-                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
-                            <label>Document Name</label>
-                            <input
-                              type="text"
-                              className="form-control"
-                              placeholder="e.g. Projector, Whiteboard"
-                              value={doc.name}
-                              onChange={(e) => updateClassResourceField(index, e.target.value, 'name')}
-                            />
-                          </div>
-                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
-                            <label>Description</label>
-                            <input
-                              type="text"
-                              className="form-control"
-                              placeholder="Short description"
-                              value={doc.description}
-                              onChange={(e) => updateClassResourceField(index, e.target.value, 'description')}
-                            />
-                          </div>
-                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1">
-                            <label>Upload Type</label>
-                            <select
-                              className="form-control"
-                              value={doc.uploadType || 'PDF'}
-                              onChange={(e) => updateClassResourceField(index, e.target.value, 'uploadType')}
-                            >
-                              {RESOURCE_UPLOAD_TYPES.map((type) => (
-                                <option key={type} value={type}>{type}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1">
-                            <label>Mandatory</label>
-                            <select
-                              className="form-control"
-                              value={String(!!doc.mandatory)}
-                              onChange={(e) => updateClassResourceField(index, e.target.value, 'mandatory')}
-                            >
-                              <option value="true">Yes</option>
-                              <option value="false">No</option>
-                            </select>
-                          </div>
-                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1 d-flex align-items-end">
-                            <button
-                              type="button"
-                              onClick={() => removeClassResourceField(index)}
-                              style={{
-                                background: 'white',
-                                color: '#ef4444',
-                                border: '1.5px solid #ef4444',
-                                borderRadius: '8px',
-                                padding: '8px 14px',
-                                fontWeight: 600,
-                                fontSize: '13px',
-                                cursor: 'pointer',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              <i className="fa fa-trash" style={{ marginRight: '5px' }}></i>
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="col-xl-12 mb-1 px-0 text-right">
-                      <button
-                        type="button"
-                        className="btn btn-success text-white add-another-button"
-                        onClick={addClassResourceField}
-                      >
-                        {classResourcesRequired.length > 0 ? 'Add Another' : 'Add Document'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Lab Resource Required Section */}
-        <section id="labResourceRequired">
-          <div className="row">
-            <div className="col-xl-12 col-lg-12">
-              <div className="card">
-                <div className="card-header border border-top-0 border-left-0 border-right-0">
-                  <h4 className="card-title pb-1">Lab Resource Required</h4>
-                </div>
-                <div className="card-content">
-                  <div className="card-body">
-                    <div id="labResourceContainer">
-                      {labResourcesRequired.map((doc, index) => (
-                        <div className="row requiredDocsRow" key={`lab-res-${index}`}>
-                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
-                            <label>Document Name</label>
-                            <input
-                              type="text"
-                              className="form-control"
-                              placeholder="e.g. Lab kit, Tools"
-                              value={doc.name}
-                              onChange={(e) => updateLabResourceField(index, e.target.value, 'name')}
-                            />
-                          </div>
-                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
-                            <label>Description</label>
-                            <input
-                              type="text"
-                              className="form-control"
-                              placeholder="Short description"
-                              value={doc.description}
-                              onChange={(e) => updateLabResourceField(index, e.target.value, 'description')}
-                            />
-                          </div>
-                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1">
-                            <label>Upload Type</label>
-                            <select
-                              className="form-control"
-                              value={doc.uploadType || 'PDF'}
-                              onChange={(e) => updateLabResourceField(index, e.target.value, 'uploadType')}
-                            >
-                              {RESOURCE_UPLOAD_TYPES.map((type) => (
-                                <option key={type} value={type}>{type}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1">
-                            <label>Mandatory</label>
-                            <select
-                              className="form-control"
-                              value={String(!!doc.mandatory)}
-                              onChange={(e) => updateLabResourceField(index, e.target.value, 'mandatory')}
-                            >
-                              <option value="true">Yes</option>
-                              <option value="false">No</option>
-                            </select>
-                          </div>
-                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1 d-flex align-items-end">
-                            <button
-                              type="button"
-                              onClick={() => removeLabResourceField(index)}
-                              style={{
-                                background: 'white',
-                                color: '#ef4444',
-                                border: '1.5px solid #ef4444',
-                                borderRadius: '8px',
-                                padding: '8px 14px',
-                                fontWeight: 600,
-                                fontSize: '13px',
-                                cursor: 'pointer',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              <i className="fa fa-trash" style={{ marginRight: '5px' }}></i>
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="col-xl-12 mb-1 px-0 text-right">
-                      <button
-                        type="button"
-                        className="btn btn-success text-white add-another-button"
-                        onClick={addLabResourceField}
-                      >
-                        {labResourcesRequired.length > 0 ? 'Add Another' : 'Add Document'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Documents Required Section */}
-        <section id="docsRequired">
-          <div className="row">
-            <div className="col-xl-12 col-lg-12">
-              <div className="card">
-                <div className="card-header border border-top-0 border-left-0 border-right-0">
-                  <h4 className="card-title pb-1">Student Documents Required</h4>
-                </div>
-                <div className="card-content">
-                  <div className="card-body">
-                    <div id="documentContainer">
-                      {docsRequired.map((doc, index) => (
-                        <div className="row requiredDocsRow" key={index}>
-                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
-                            <label>Document Name</label>
-                            <input
-                              type="text"
-                              className="form-control docsName"
-                              value={doc.name}
-                              onChange={(e) => updateDocumentField(index, e.target.value,'name')}
-                            />
-                          </div>
-                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
-                            <label>Mandatory</label>
-                            <select name="mandatory-doc" className="form-control" value={doc.mandatory} onChange={(e) => updateDocumentField(index, e.target.value,'mandatory')}>
-                              <option value="">Select Mandatory</option>
-                              <option value="true">Yes</option>
-                              <option value="false">No</option>
-                            </select>
-                          </div>
-                          <div className="col-xl-1 col-sm-12 col-12 mb-1 d-flex align-items-end">
-                            <button
-                              type="button"
-                              onClick={() => removeDocumentField(index)}
-                              style={{
-                                background: 'white',
-                                color: '#ef4444',
-                                border: '1.5px solid #ef4444',
-                                borderRadius: '8px',
-                                padding: '8px 14px',
-                                fontWeight: 600,
-                                fontSize: '13px',
-                                cursor: 'pointer',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              <i className="fa fa-trash" style={{ marginRight: '5px' }}></i>
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="col-xl-12 mb-1 px-0 text-right">
-                      <button
-                        type="button"
-                        className="btn btn-success text-white add-another-button"
-                        onClick={addDocumentField}
-                      >
-                        {docsRequired.length > 0 ? 'Add Another' : 'Add Document'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Add Docs Section */}
-        <section id="add-docs">
-          <div className="row">
-
-            <div className="col-xl-12">
-              <div className="card">
-                <div className="card-header border border-top-0 border-left-0 border-right-0">
-                  <h4 className="card-title pb-1">Add Docs</h4>
-                </div>
-                <div className="row">
-                  <div className="col-xl-3">
-                    <div className="uploadedVideos card m-2 p-1">
-                      <h5 className="m-2 text-center">Videos</h5>
-                      <div className='innerUploadedVideos' style={{ height: '140px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-
-
-                        {/* Video Preview */}
-                        {formData.videos && formData.videos.length > 0 ? (
-
-                          <div className="card m-0">
-                            {/* <div className="card-body p-0 position-relative"> */}
-                            {/* Video Preview with forced re-render */}
-                            <video
-                              key={formData.videos[0] instanceof File ? formData.videos[0].name + Date.now() : formData.videos[0]}
-                              width="100%"
-                              height="auto"
-                              controls
-                              style={{ borderRadius: '5px' }}
-                            >
-                              <source src={getFileUrl(formData.videos[0])} type="video/mp4" />
-                              <source src={getFileUrl(formData.videos[0])} type="video/webm" />
-                              <source src={getFileUrl(formData.videos[0])} type="video/ogg" />
-                              Your browser does not support the video tag.
-                            </video>
-
-                            {/* Remove button */}
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-danger position-absolute"
-                              style={{ right: '5px', top: '5px', zIndex: 10 }}
-                              onClick={() => removeFile('video', formData.videos[0])}
-                            >
-                              <i className="fa fa-times"></i>
-                            </button>
-
-                            {/* </div> */}
-                          </div>
-
-                        )
-                          :
-                          <p>No videos uploaded</p>
-                        }
-
-
-                      </div>
-                      <div className='innerUploadedVideos' style={{ height: '70px', width: '100%' }}>
-                        <div className="col-xl-12 col-xl-lg-12 col-md-12 col-sm-12 col-12 mb-1">
-                          <label htmlFor="videos">
-                            {formData.videos && formData.videos.length > 0 ? 'Replace Video' : 'Add Video'}
-                          </label>
-                          <input
-                            name="videos"
-                            id="videos"
-                            type="file"
-                            accept="video/*"
-                            onChange={handleVideoUpload}
-                            key={`video-input-${Date.now()}`} // Force input reset
-                            style={{ width: '100%', fontSize: '12px' }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="col-xl-3">
-                    <div className="uploadedPhotos  card m-2 p-1">
-                      <h5 className="m-2 text-center">Photos</h5>
-                      <div className='innerUploadedPhotos' style={{ height: '140px', width: '100%', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center', justifyContent: 'center' }}>
-                        {formData.photos && formData.photos.length > 0 ? (
-                          formData.photos.map((photo, i) => (
-                            <div className=" position-relative w-25" key={`photo-${i}`}>
-                              <div className="card-body p-1 text-center ">
-
-                                <a href={getFileUrl(photo)} target="_blank" rel="noopener noreferrer" className="text-primary">
-                                  <img
-                                    src={getFileUrl(photo)}
-                                    alt={`Photo ${i + 1}`}
-                                    className="img-fluid mb-1"
-                                    style={{ maxHeight: '100px' }}
-                                  />
-                                </a>
-                                {/* <img
-                                      src={getFileUrl(photo)}
-                                      alt={`Photo ${i + 1}`}
-                                      className="img-fluid mb-1"
-                                      style={{ maxHeight: '100px' }}
-                                    /> */}
-                                <button
-                                  type="button"
-                                  className="btn btn-sm btn-danger position-absolute" style={{ width: "15px", height: "15px", top: '-4px', right: '-4px' }}
-                                  onClick={() => removeFile('photo', photo)}
-                                >
-                                  <i className="fa fa-times" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: '10px', transform: 'translateY(-4px' }}></i>
-                                </button>
-                              </div>
-                            </div>
-                          ))
-                        ) : <p>No photos uploaded</p>}
-                      </div>
-                      <div className='innerUploadedPhotos' style={{ height: '70px', width: '100%' }}>
-                        <div className="col-12 mb-1" id="uploadgallery">
-                          <label htmlFor="photos">Add New Photos</label>
-                          <input
-                            type="file"
-                            id="photos"
-                            name="photos"
-                            accept="image/*"
-                            multiple
-                            onChange={handlePhotoUpload}
-                            style={{ width: '100%', fontSize: '12px' }}
-                          />
-                        </div>
-
-                      </div>
-                    </div>
-                  </div>
-                  <div className="col-xl-3">
-                    <div className="brouchers card m-2 p-1">
-                      <h5 className="m-2 text-center">Brouchers</h5>
-
-                      <div className='innerUploadedBrouchers' style={{ height: '140px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {formData.brochure ? (
-                          <div className="card-body p-3 position-relative">
-                            <div className="d-flex align-items-center justify-content-center" onClick={() => window.open(getFileUrl(formData.brochure), '_blank')}>
-                              <div className="brochure-icon mr-3">
-                                <i style={{ fontSize: '100px' }} className={`fa-solid fa-file`}></i>
-                                <button
-                                  type="button"
-                                  className="btn btn-sm btn-danger position-absolute"
-                                  style={{ right: '10px', top: '10px' }}
-                                  onClick={() => removeFile('brochure', formData.brochure)}
-                                  title="Remove brochure"
-                                >
-                                  <i className="fa fa-times"></i>
-                                </button>
-                              </div>
-
-                            </div>
-                          </div>)
-                          :
-                          <p>No brouchers uploaded</p>
-                        }
-
-                      </div>
-                      <div className='innerUploadedBrouchers' style={{ height: '70px', width: '100%' }}>
-                        <div className="col-12 mb-1" id="brochures">
-                          <label htmlFor="brochure">Add New Brochure</label>
-                          <input
-                            type="file"
-                            id="brochure"
-                            name="brochure"
-                            accept=".pdf,.doc,.docx"
-                            onChange={handleBrochureUpload} style={{ width: '100%', fontSize: '12px' }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="col-xl-3">
-                    <div className="thumbnails card m-2 p-1">
-                      <h5 className="m-2 text-center">Thumbnails</h5>
-                      <div className='innerUploadedThumbnails' style={{ height: '140px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-
-                        {formData.thumbnail ? (
-
-                          <div className="thumbnail-preview-container p-1 position-relative">
-                            <img
-                              src={formData.thumbnail}
-                              alt="New Thumbnail"
-                              className="img-fluid rounded"
-                              style={{
-                                width: '100%',
-                                objectFit: 'cover',
-                                cursor: 'pointer'
-                              }}
-                            />
-
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-danger position-absolute"
-                              style={{
-                                right: '5px',
-                                top: '5px',
-                                width: '25px',
-                                height: '25px',
-                                padding: '0',
-                                borderRadius: '50%',
-                                fontSize: '12px',
-                                zIndex: 10
-                              }}
-                              onClick={() => removeFile('thumbnail', formData.thumbnail)}
-                              title="Remove thumbnail"
-                            >
-                              ×
-                            </button>
-                          </div>
-
-
-                        )
-                          :
-                          <p>No thumbnails uploaded</p>
-                        }
-
-                      </div>
-                      <div className='innerUploadedThumbnails' style={{ height: '70px', width: '100%' }}>
-                        <div className="col-12 mb-1" id="thumbnails">
-                          <label htmlFor="thumbnail">Add New Thumbnail</label>
-                          <input
-                            type="file"
-                            id="thumbnail"
-                            name="thumbnail"
-                            accept="image/*"
-                            onChange={handleThumbnailUpload} style={{ width: '100%', fontSize: '12px' }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </section>
-
-        {/* Testimonial Videos Section */}
-        <section id="testimonial-videos">
-          <div className="row" style={{ minHeight: '170px' }}>
-            <div className="col-xl-12 col-lg-12">
-
-              <div>
-                <div className="card">
-                  <div className="card-header border border-top-0 border-left-0 border-right-0">
-                    <h4 className="card-title pb-1">Testimonial Videos</h4>
-                  </div>
-
-                  <div className="row" style={{ minHeight: '170px' }}>
-                    <div className="col-xl-3 m-2">
-                      <div className="col-12 mb-1 d-flex justify-content-center h-100 flex-column ps-3">
-                        <label htmlFor="testimonialvideos">Add New Testimonial Videos</label>
-                        <input
-                          type="file"
-                          id="testimonialvideos"
-                          name="testimonialvideos"
-                          accept="video/*"
-                          multiple
-                          onChange={handleTestimonialVideoUpload} style={{ width: '100%', fontSize: '12px', textAlign: 'center' }}
-                        />
-                      </div>
-
-                    </div>
-                    {formData.testimonialvideos && formData.testimonialvideos.length > 0 && (
-
-                      formData.testimonialvideos.map((video, i) => (
-                        <div className="col-xl-3 m-2">
-                          <div className="card" style={{ height: '138px', width: '100%' }}>
-                            {/* Existing Testimonial Videos */}
-
-                            <div key={`testimonial-${i}`} className="col-12 mb-2">
-
-                              <video key={formData.videos[0] instanceof File ? formData.videos[0].name + Date.now() : formData.videos[0]}
-                                width="100%"
-                                height="auto"
-                                controls className="text-primary">
-                                <source src={getFileUrl(video)} type="video/mp4" />
-                                <source src={getFileUrl(video)} type="video/webm" />
-                                <source src={getFileUrl(video)} type="  video/ogg" />
-                                Your browser does not support the video tag.
-                              </video>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-danger ml-2 position-absolute" style={{ right: '1px' }}
-                                onClick={() => removeFile('testimonial', video)}
-                              >
-                                <i className="fa fa-times"></i>
-                              </button>
-                            </div>
-
-
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                </div>
-
-              </div>
-
-            </div>
-            <div className="col-12">
-
             </div>
           </div>
         </section>
@@ -2758,343 +2789,161 @@ const AddCourse = () => {
 
         {/* Submit Buttons */}
         <div className="row mt-3 mb-5">
-          <div className="col-lg-12 col-md-12 col-sm-12 col-12" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+          <div className="col-lg-12 col-md-12 col-sm-12 col-12 text-right">
             <button
               type="button"
               onClick={resetForm}
-              style={{
-                background: 'white',
-                color: '#ef4444',
-                border: '2px solid #ef4444',
-                borderRadius: '10px',
-                padding: '10px 28px',
-                fontWeight: 600,
-                fontSize: '14px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={e => { e.target.style.background = '#ef4444'; e.target.style.color = 'white'; }}
-              onMouseLeave={e => { e.target.style.background = 'white'; e.target.style.color = '#ef4444'; }}
+              className="btn btn-danger waves-effect waves-light mr-2"
+              disabled={isSubmitting}
             >
-              <i className="fa fa-refresh" style={{ marginRight: '6px' }}></i>
               Reset
             </button>
             <button
               type="submit"
-              style={{
-                background: 'linear-gradient(90deg, #E11D48 , #ff5770 )',
-                color: 'white',
-                border: 'none',
-                borderRadius: '10px',
-                padding: '10px 32px',
-                fontWeight: 600,
-                fontSize: '14px',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(252, 43, 90, 0.4)',
-                transition: 'all 0.2s',
-              }}
+              className="btn btn-success px-lg-4 waves-effect waves-light ms-2"
+              disabled={isSubmitting}
             >
-              <i className="fa fa-save" style={{ marginRight: '6px' }}></i>
-              Save Course
+              {isSubmitting ? 'Saving...' : 'Save'}
             </button>
           </div>
         </div>
       </form>
-      <style>{`
-        /* ===== Modern AddCourse Page Styles ===== */
+      <style>
+        {
+          `
+          #videos{
+          width:100%;
+           font-size:12px
+                  }
+           .newPhotos{
+           width:70px;
+           height:70px
+           }
+          .ck-editor__editable_inline {
+            height: 100px;
+          }
+          
+          .choices__list--multiple .choices__item {
+            position: relative !important;
+            margin: 3px 5px 3px 0 !important;
+            padding: 3px 20px 3px 5px !important;
+            border: 1px solid #aaa !important;
+            max-width: 100% !important;
+            border-radius: 3px !important;
+            background-color: #eee !important;
+            color: #333 !important;
+            line-height: 13px !important;
+            cursor: default !important;
+          }
+          
+          .choices[data-type*=select-multiple] .choices__button {
+            position: absolute;
+            right: 0;
+            top: 0;
+            padding: 2px 6px;
+            margin-right: 0;
+            border: none;
+            background-color: transparent;
+            border-left: 1px solid #aaa;
+            color: #333;
+          }
 
-        @keyframes slideInRight {
-          from { opacity: 0; transform: translateX(40px); }
-          to   { opacity: 1; transform: translateX(0); }
+          .course-structure-hint {
+            font-size: 13px;
+            color: #64748b;
+            margin-bottom: 14px;
+            line-height: 1.5;
+          }
+          .course-structure-path-preview {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            padding: 10px 14px;
+            margin-bottom: 14px;
+            border-radius: 10px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+          }
+          .course-structure-path-preview__label {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #64748b;
+          }
+          .course-structure-path-preview strong {
+            font-size: 14px;
+            color: #1d4ed8;
+          }
+          .course-structure-levels {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+          }
+          .course-structure-arrow {
+            color: #94a3b8;
+            font-size: 12px;
+            line-height: 1;
+          }
+          .course-structure-level {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border-radius: 999px;
+            border: 1.5px solid #e2e8f0;
+            background: #f8fafc;
+            color: #64748b;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            user-select: none;
+            transition: border-color 0.15s, background 0.15s, color 0.15s;
+          }
+          .course-structure-level:hover:not(:disabled) {
+            border-color: #93c5fd;
+            background: #f0f9ff;
+          }
+          .course-structure-level.is-active {
+            border-color: #2563eb;
+            background: #eff6ff;
+            color: #1d4ed8;
+          }
+          .course-structure-level.is-locked {
+            cursor: not-allowed;
+            opacity: 1;
+          }
+          .course-structure-level.is-disabled,
+          .course-structure-level:disabled:not(.is-locked) {
+            opacity: 0.45;
+            cursor: not-allowed;
+            border-color: #e2e8f0;
+            background: #f1f5f9;
+            color: #94a3b8;
+          }
+          .course-structure-level__badge {
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            padding: 2px 7px;
+            border-radius: 999px;
+            background: #dbeafe;
+            color: #1d4ed8;
+          }
+          .course-structure-rules {
+            margin: 0;
+            padding-left: 18px;
+            color: #64748b;
+          }
+          `
         }
-
-        .content-body {
-          background: #f1f5f9;
-          min-height: 100vh;
-        }
-
-        #course-info .card,
-        #docsRequired .card,
-        #add-docs .card,
-        #testimonial-videos .card,
-        #extra-features .card,
-        #counselor-info .card,
-        #faq-section .card {
-          border-radius: 16px !important;
-          border: none !important;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04) !important;
-          margin-bottom: 24px !important;
-        }
-
-        .card .card-header {
-          display: flex !important;
-          align-items: center !important;
-          flex-wrap: wrap !important;
-          justify-content: space-between !important;
-          border-bottom: 1px solid #f1f5f9 !important;
-          padding: 20px 24px 16px !important;
-          background-color: transparent !important;
-        }
-
-        .card .card-header .card-title {
-          font-size: 0.95rem !important;
-          font-weight: 700 !important;
-          color: #1e293b !important;
-          letter-spacing: -0.01em !important;
-          margin-bottom: 0 !important;
-          padding-left: 14px !important;
-          position: relative !important;
-        }
-        .card .card-header .card-title::before {
-          content: '';
-          position: absolute;
-          left: 0;
-          top: 50%;
-          transform: translateY(-50%);
-          width: 4px;
-          height: 18px;
-          background: linear-gradient(135deg, #FC2B5A, #764ba2);
-          border-radius: 4px;
-        }
-
-        .card-body {
-          padding: 20px 24px 24px !important;
-        }
-
-        .course-structure-hint {
-          font-size: 13px;
-          color: #64748b;
-          margin-bottom: 14px;
-          line-height: 1.5;
-        }
-        .course-structure-path-preview {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          flex-wrap: wrap;
-          padding: 10px 14px;
-          margin-bottom: 14px;
-          border-radius: 10px;
-          background: #f8fafc;
-          border: 1px solid #e2e8f0;
-        }
-        .course-structure-path-preview__label {
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.04em;
-          text-transform: uppercase;
-          color: #64748b;
-        }
-        .course-structure-path-preview strong {
-          font-size: 14px;
-          color: #1d4ed8;
-        }
-        .course-structure-levels {
-          display: flex;
-          flex-wrap: wrap;
-          align-items: center;
-          gap: 10px;
-          margin-bottom: 12px;
-        }
-        .course-structure-arrow {
-          color: #94a3b8;
-          font-size: 12px;
-          line-height: 1;
-        }
-        .course-structure-level {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 16px;
-          border-radius: 999px;
-          border: 1.5px solid #e2e8f0;
-          background: #f8fafc;
-          color: #64748b;
-          font-size: 13px;
-          font-weight: 700;
-          cursor: pointer;
-          user-select: none;
-          transition: border-color 0.15s, background 0.15s, color 0.15s;
-        }
-        .course-structure-level:hover:not(:disabled) {
-          border-color: #93c5fd;
-          background: #f0f9ff;
-        }
-        .course-structure-level.is-active {
-          border-color: #2563eb;
-          background: #eff6ff;
-          color: #1d4ed8;
-        }
-        .course-structure-level.is-locked {
-          cursor: not-allowed;
-          opacity: 1;
-        }
-        .course-structure-level.is-disabled,
-        .course-structure-level:disabled:not(.is-locked) {
-          opacity: 0.45;
-          cursor: not-allowed;
-          border-color: #e2e8f0;
-          background: #f1f5f9;
-          color: #94a3b8;
-        }
-        .course-structure-level__badge {
-          font-size: 10px;
-          font-weight: 800;
-          letter-spacing: 0.03em;
-          text-transform: uppercase;
-          padding: 2px 7px;
-          border-radius: 999px;
-          background: #dbeafe;
-          color: #1d4ed8;
-        }
-        .course-structure-rules {
-          margin: 0;
-          padding-left: 18px;
-          color: #64748b;
-          font-size: 12px;
-          line-height: 1.6;
-        }
-
-        label {
-          font-size: 12px !important;
-          font-weight: 600 !important;
-          color: #64748b;
-          margin-bottom: 6px !important;
-          text-transform: uppercase !important;
-          letter-spacing: 0.05em !important;
-        }
-
-        .form-control {
-          border: 1.5px solid #e2e8f0 !important;
-          border-radius: 10px !important;
-          padding: 9px 14px !important;
-          height: auto !important;
-          min-height: 42px !important;
-          font-size: 14px !important;
-          color: #1e293b !important;
-          background: #f8fafc !important;
-          transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease !important;
-          box-shadow: none !important;
-        }
-        .form-control:focus {
-          border-color: #FC2B5A !important;
-          box-shadow: 0 0 0 3px rgba(252, 43, 90, 0.12) !important;
-          background: #ffffff !important;
-          outline: none !important;
-        }
-        .form-control.is-invalid {
-          border-color: #ef4444 !important;
-          background: #fff8f8 !important;
-        }
-        .invalid-feedback {
-          font-size: 12px !important;
-          color: #ef4444 !important;
-          margin-top: 4px !important;
-        }
-
-        .add-another-button, .add-button {
-          background: linear-gradient(135deg, #10b981, #059669) !important;
-          border: none !important;
-          border-radius: 10px !important;
-          padding: 9px 20px !important;
-          font-weight: 600 !important;
-          font-size: 13px !important;
-          color: white !important;
-          box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3) !important;
-        }
-
-        .uploadedVideos.card,
-        .uploadedPhotos.card,
-        .brouchers.card,
-        .thumbnails.card {
-          border-radius: 14px !important;
-          border: 2px dashed #cbd5e1 !important;
-          box-shadow: none !important;
-          background: #fafbfc !important;
-          transition: border-color 0.2s !important;
-        }
-        .uploadedVideos.card:hover,
-        .uploadedPhotos.card:hover,
-        .brouchers.card:hover,
-        .thumbnails.card:hover {
-          border-color: #FC2B5A !important;
-        }
-        .uploadedVideos h5,
-        .uploadedPhotos h5,
-        .brouchers h5,
-        .thumbnails h5 {
-          font-size: 13px !important;
-          font-weight: 700 !important;
-          color: #475569 !important;
-          text-transform: uppercase !important;
-          letter-spacing: 0.06em !important;
-        }
-
-        input[type="file"] {
-          font-size: 12px !important;
-          border: 1.5px solid #e2e8f0 !important;
-          border-radius: 8px !important;
-          padding: 6px 10px !important;
-          background: white !important;
-          cursor: pointer !important;
-          width: 100% !important;
-        }
-
-        .requiredDocsRow {
-          border-bottom: 1px solid #f1f5f9 !important;
-          padding-bottom: 12px !important;
-          margin-bottom: 4px !important;
-        }
-
-        .ck-editor__editable_inline {
-          min-height: 120px !important;
-          border-radius: 0 0 8px 8px !important;
-          font-size: 14px !important;
-        }
-        .ck.ck-editor__top .ck-sticky-panel .ck-toolbar {
-          border-radius: 8px 8px 0 0 !important;
-        }
-
-        .questionanswerrow {
-          background: #fafbfc !important;
-          border-radius: 12px !important;
-          padding: 16px !important;
-          border: 1px solid #f1f5f9 !important;
-        }
-
-        .btn-sm.btn-danger {
-          background: #ef4444 !important;
-          border: none !important;
-          border-radius: 6px !important;
-        }
-
-        .choices__inner {
-          border: 1.5px solid #e2e8f0 !important;
-          border-radius: 10px !important;
-          background: #f8fafc !important;
-          font-size: 14px !important;
-        }
-        .choices__list--dropdown {
-          border-radius: 10px !important;
-          border: 1.5px solid #e2e8f0 !important;
-          box-shadow: 0 4px 16px rgba(0,0,0,0.08) !important;
-        }
-
-        .alert-success {
-          border-radius: 10px !important;
-          border: none !important;
-          background: #d1fae5 !important;
-          color: #065f46 !important;
-          font-weight: 600 !important;
-        }
-
-        .form-check-inline input[type="radio"] {
-          accent-color: #FC2B5A !important;
-          cursor: pointer !important;
-        }
-      `}</style>
-    </div>
+      </style>
+    </div >
   );
 };
 
-export default AddCourse;
+export default EditCourse;

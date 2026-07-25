@@ -844,7 +844,7 @@ const CRMDashboard = () => {
   const [kycShowRejectForm, setKycShowRejectForm] = useState(false);
   const [kycMarkingId, setKycMarkingId] = useState(null);
   const [kycCounts, setKycCounts] = useState({ all: 0, pendingDocs: 0, pendingVerification: 0, rejected: 0, verified: 0 });
-  const [milestoneCounts, setMilestoneCounts] = useState({ kycDone: 0, admission: 0 });
+  const [milestoneCounts, setMilestoneCounts] = useState({ admission: 0 });
   const [selectedMilestoneFilter, setSelectedMilestoneFilter] = useState(null);
   const [setPreVerification, showSetPreVerification] = useState(false);
   const [questionFormData, setQuestionFormData] = useState({});
@@ -1133,6 +1133,7 @@ const CRMDashboard = () => {
   const [showPopup, setShowPopup] = useState(null);
   const [activeCrmFilter, setActiveCrmFilter] = useState(0);
   const [input1Value, setInput1Value] = useState('');
+  const skipBulkAutoSelectRef = useRef(false); // when true, Input 1 change came from checkbox sync — don't re-select first N
   const [showBulkInputs, setShowBulkInputs] = useState(false);
   const [bulkMode, setBulkMode] = useState(null); // 'whatsapp' or 'bulkaction'
 
@@ -1574,10 +1575,18 @@ const CRMDashboard = () => {
 
 
   const handleCheckboxChange = (profile, checked) => {
-    if (checked) {
-      setSelectedProfiles(prev => [...(Array.isArray(prev) ? prev : []), profile._id]);
-    } else {
-      setSelectedProfiles(prev => (Array.isArray(prev) ? prev : []).filter(id => id !== profile._id));
+    const profileId = String(profile?._id ?? '');
+    const list = Array.isArray(selectedProfiles) ? selectedProfiles : [];
+    const next = checked
+      ? (list.some((id) => String(id) === profileId) ? list : [...list, profile._id])
+      : list.filter((id) => String(id) !== profileId);
+
+    setSelectedProfiles(next);
+
+    // Keep Input 1 count in sync when user manually checks/unchecks leads
+    if (bulkMode === 'whatsapp' || bulkMode === 'bulkrefer' || bulkMode === 'bulkaction') {
+      skipBulkAutoSelectRef.current = true;
+      setInput1Value(next.length > 0 ? String(next.length) : '');
     }
   };
 
@@ -2742,27 +2751,39 @@ const CRMDashboard = () => {
     }
   }, [backendUrl, token, buildListFilterQueryParts, cycleFilters, applyKycFilterCounts]);
 
-  const fetchMilestoneCounts = useCallback(async () => {
+  const fetchMilestoneCounts = useCallback(async (filters = filterDataRef.current || {}) => {
     if (!token) return;
     try {
       const fd = formDataRef.current || formData;
       const queryParams = new URLSearchParams({
         page: '1',
         limit: '1',
+        ...(filters.name && { name: filters.name }),
+        ...(filters.courseType && { courseType: filters.courseType }),
+        ...(filters.status && filters.status !== 'true' && { status: filters.status }),
+        ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
+        ...(filters.sector && { sector: filters.sector }),
+        ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
+        ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
+        ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
+        ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
+        ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
+        ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+        ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
+        ...(filters.approvalStatus && { approvalStatus: filters.approvalStatus }),
         ...buildListFilterQueryParts(fd, cycleFilters),
       });
-      const [kycRes, admissionRes] = await Promise.all([
-        axios.get(`${backendUrl}/college/kycCandidates?${queryParams}`, {
-          headers: { 'x-auth': token },
-        }),
-        axios.get(`${backendUrl}/college/admission-list?${queryParams}`, {
-          headers: { 'x-auth': token },
-        }),
-      ]);
-      setMilestoneCounts({
-        kycDone: kycRes.data?.crmFilterCounts?.doneKyc ?? 0,
-        admission: admissionRes.data?.crmFilterCounts?.all ?? admissionRes.data?.totalCount ?? 0,
+
+      const dashboardRes = await axios.get(`${backendUrl}/college/dashbord-data?${queryParams}`, {
+        headers: { 'x-auth': token },
       });
+
+      const leads = dashboardRes.data?.success && Array.isArray(dashboardRes.data?.data)
+        ? dashboardRes.data.data
+        : [];
+      const admissionCount = leads.filter((lead) => lead?.admissionDone).length;
+
+      setMilestoneCounts({ admission: admissionCount });
     } catch (e) {
       console.error('Milestone counts fetch error', e);
     }
@@ -2915,6 +2936,8 @@ const CRMDashboard = () => {
     leadStatus: '',
     sector: '',
     followupStatus: '',
+    hasFollowUpCall: '', // '' | true | false
+    hasFollowUpVisit: '', // '' | true | false
     // Date filter states
     createdFromDate: null,
     createdToDate: null,
@@ -3055,6 +3078,15 @@ const CRMDashboard = () => {
 
 
 
+  const resetHeaderDateFilterState = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    setHeaderDatePreset('');
+    setHeaderDateFrom(today);
+    setHeaderDateTo(today);
+    setShowHeaderDateRangePicker(false);
+  };
+
   // 5. Clear functions
   const clearDateFilter = (filterType) => {
     let newFilterData = { ...filterData };
@@ -3062,6 +3094,7 @@ const CRMDashboard = () => {
     if (filterType === 'created') {
       newFilterData.createdFromDate = null;
       newFilterData.createdToDate = null;
+      resetHeaderDateFilterState();
     } else if (filterType === 'modified') {
       newFilterData.modifiedFromDate = null;
       newFilterData.modifiedToDate = null;
@@ -3093,6 +3126,9 @@ const CRMDashboard = () => {
       subStatuses: null,
       statuses: null,
       followupStatus: '',
+      hasFollowUpCall: '',
+      hasFollowUpVisit: '',
+      approvalStatus: '',
     };
 
     setFilterData(clearedFilters);
@@ -3112,6 +3148,7 @@ const CRMDashboard = () => {
       batch: '',
       counsellor: '',
     });
+    resetHeaderDateFilterState();
     setLeadViewTab('all');
     setSelectedApprovalFilter(null);
     setSelectedFollowupBucket('');
@@ -4191,11 +4228,15 @@ console.log('API Response:', response.data);
         const fc = followupRes.data.data;
         setFollowupDashCounts({
           call: {
-            done: fc.done || 0,
-            planned: fc.planned || 0,
-            missed: fc.missed || 0,
+            done: fc.call?.done ?? fc.done ?? 0,
+            planned: fc.call?.planned ?? fc.planned ?? 0,
+            missed: fc.call?.missed ?? fc.missed ?? 0,
           },
-          visit: { done: 0, planned: 0, missed: 0 },
+          visit: {
+            done: fc.visit?.done ?? 0,
+            planned: fc.visit?.planned ?? 0,
+            missed: fc.visit?.missed ?? 0,
+          },
         });
       }
 
@@ -4272,6 +4313,22 @@ console.log('API Response:', response.data);
       queryParams.set('kyc', 'true');
     } else if (milestoneFilter === 'admission') {
       listEndpoint = 'admission-list';
+      const hasDateFilter = Boolean(
+        filters.createdFromDate
+        || filters.createdToDate
+        || filters.modifiedFromDate
+        || filters.modifiedToDate
+        || filters.nextActionFromDate
+        || filters.nextActionToDate
+      );
+      if (!hasDateFilter) {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date();
+        todayEnd.setHours(23, 59, 59, 999);
+        queryParams.set('createdFromDate', todayStart.toISOString());
+        queryParams.set('createdToDate', todayEnd.toISOString());
+      }
     } else if (shouldFetchKycCandidates) {
       listEndpoint = 'kycCandidates';
       const kycFetchParams = activeKycFilter ? getKycDashFetchParams(activeKycFilter) : null;
@@ -4287,6 +4344,16 @@ console.log('API Response:', response.data);
       if (filters.approvalStatus) queryParams.set('approvalStatus', filters.approvalStatus);
       if (filters.subStatuses) queryParams.set('subStatuses', filters.subStatuses);
       if (filters.followupStatus) queryParams.set('followupStatus', filters.followupStatus);
+      if (filters.hasFollowUpCall === true || filters.hasFollowUpCall === 'yes') {
+        queryParams.set('hasFollowUpCall', 'true');
+      } else if (filters.hasFollowUpCall === false || filters.hasFollowUpCall === 'no') {
+        queryParams.set('hasFollowUpCall', 'false');
+      }
+      if (filters.hasFollowUpVisit === true || filters.hasFollowUpVisit === 'yes') {
+        queryParams.set('hasFollowUpVisit', 'true');
+      } else if (filters.hasFollowUpVisit === false || filters.hasFollowUpVisit === 'no') {
+        queryParams.set('hasFollowUpVisit', 'false');
+      }
       if (leadViewTab === 'myRefer' && userData?._id) {
         queryParams.set('registeredByMe', userData._id);
       }
@@ -4307,14 +4374,14 @@ console.log('API Response:', response.data);
           applyKycFilterCounts(data.crmFilterCounts);
         }
         if (milestoneFilter === 'kycDone' || milestoneFilter === 'admission') {
-          await fetchMilestoneCounts();
+          await fetchMilestoneCounts(filters);
         } else if (shouldFetchKycCandidates) {
-          await fetchMilestoneCounts();
+          await fetchMilestoneCounts(filters);
         } else {
           await fetchRegistrationCrmFilterCounts(filters, page, null);
           await fetchDashboardCounts(filters);
           await fetchKycCounts();
-          await fetchMilestoneCounts();
+          await fetchMilestoneCounts(filters);
         }
       } else {
         console.error('Failed to fetch profile data', response.data.message);
@@ -5124,18 +5191,10 @@ console.log('API Response:', response.data);
 
   const milestoneDashOptions = [
     {
-      key: 'milestone-kyc-done',
-      milestone: 'kycDone',
-      label: 'KYC Done',
-      title: 'Leads with KYC milestone completed',
-      valueKey: 'kycDone',
-      bg: '#8b5cf6',
-    },
-    {
       key: 'milestone-admission',
       milestone: 'admission',
       label: 'Admission',
-      title: 'Leads moved to admission',
+      title: 'Admissions matching current filters (same as Dashboard)',
       valueKey: 'admission',
       bg: '#059669',
     },
@@ -5214,6 +5273,9 @@ console.log('API Response:', response.data);
   };
 
   const getProfileFollowupDateLabel = (profile, type) => {
+    const bucket = getProfileFollowupBucket(profile, type);
+    if (bucket === 'missed' || bucket === 'done') return 'NA';
+
     const bySlot = getProfileFollowupSlot(profile, type);
     const slotDate = bySlot?.scheduledDate || bySlot?.followupDate;
     if (slotDate) return formatFollowupDate(slotDate);
@@ -5232,7 +5294,7 @@ console.log('API Response:', response.data);
         return formatFollowupDate(legacy.followupDate);
       }
     }
-    return 'N/A';
+    return 'NA';
   };
 
   const getProfileFollowupDateDisplay = (profile, type) => {
@@ -5242,13 +5304,13 @@ console.log('API Response:', response.data);
     if (bucket === 'missed') {
       return {
         label: 'Next Follow-up Date:',
-        value: 'N/A',
+        value: 'NA',
       };
     }
     if (bucket === 'done') {
       return {
         label: 'Completed on:',
-        value: dateLabel !== 'N/A' ? dateLabel : '—',
+        value: dateLabel !== 'NA' ? dateLabel : '—',
       };
     }
     if (bucket === 'planned') {
@@ -5259,9 +5321,24 @@ console.log('API Response:', response.data);
     }
     return {
       label: 'Next Follow-up Date:',
-      value: 'N/A',
+      value: 'NA',
     };
   };
+
+  const getProfileFollowupDoneCount = (profile, type) => {
+    const t = String(type || '').toLowerCase() === 'visit' ? 'visit' : 'call';
+    const apiCount = Number(profile?.followupStats?.[t]?.done);
+    if (Number.isFinite(apiCount) && apiCount > 0) return apiCount;
+    return getProfileFollowupBucket(profile, type) === 'done' ? 1 : 0;
+  };
+
+  const profileHasFollowup = (profile, type) => (
+    Boolean(getProfileFollowupBucket(profile, type)) || getProfileFollowupDoneCount(profile, type) > 0
+  );
+
+  const profileHasAnyFollowup = (profile) => (
+    profileHasFollowup(profile, 'Call') || profileHasFollowup(profile, 'Visit')
+  );
 
   const formatProfileNextActionDate = (profile, type = 'Call') => {
     const bucket = getProfileFollowupBucket(profile, type);
@@ -5619,6 +5696,12 @@ console.log('API Response:', response.data);
   // Auto-select profiles based on Input 1 value (bulk WhatsApp, bulk Refer, bulk Action)
   useEffect(() => {
     if (bulkMode !== 'whatsapp' && bulkMode !== 'bulkrefer' && bulkMode !== 'bulkaction') {
+      return;
+    }
+
+    // Checkbox uncheck/check already updated selectedProfiles — only sync the count display
+    if (skipBulkAutoSelectRef.current) {
+      skipBulkAutoSelectRef.current = false;
       return;
     }
 
@@ -9156,6 +9239,8 @@ useEffect(() => {
           </>
         )}
           {(Boolean(profile.kyc) || profile?.docCounts?.totalRequired === 0) && (
+            
+            <>
             <button
               type="button"
               className="lead-strip-v3__actions-item"
@@ -9164,7 +9249,26 @@ useEffect(() => {
               <i className="fas fa-arrow-right text-primary" aria-hidden="true"></i>
               Move to Admission
             </button>
+            <button
+            className="lead-strip-v3__actions-item"
+            style={{
+              width: "100%",
+              padding: "8px 16px",
+              border: "none",
+              background: "none",
+              textAlign: "left",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontWeight: "600"
+            }}
+            onClick={() => handleDownloadAdmissionForm(profile)}
+          >
+            Download Admission Form
+</button>
+</>
           )}
+
+                                       
           <button
             type="button"
             className="lead-strip-v3__actions-item"
@@ -12382,7 +12486,7 @@ useEffect(() => {
                   }}
                 >
                   <div className="fw-semibold text-dark">{tpl.name}</div>
-                  <div className="small text-muted">{tpl.category} Ã¢â‚¬Â¢ {tpl.language} Ã¢â‚¬Â¢ {tpl.status}</div>
+                  <div className="small text-muted">{tpl.category} {tpl.language} {tpl.status}</div>
                 </div>
               ))
             )}
@@ -12462,7 +12566,7 @@ useEffect(() => {
                                 {log.action ? (
                                   log.action.split(';').map((actionPart, actionIndex) => (
                                     <div key={actionIndex} className="mb-1">
-                                      Ã¢â‚¬Â¢ {actionPart.trim()}
+                                       {actionPart.trim()}
                                     </div>
                                   ))
                                 ) : (
@@ -12737,7 +12841,24 @@ useEffect(() => {
     fetchProfileData(newFilterData, 1);
   };
 
+  const handleHeaderDateReset = () => {
+    const newFilterData = {
+      ...filterData,
+      createdFromDate: null,
+      createdToDate: null,
+    };
+    setFilterData(newFilterData);
+    resetHeaderDateFilterState();
+    setCurrentPage(1);
+    fetchProfileData(newFilterData, 1);
+  };
+
   const handleHeaderDatePreset = (preset) => {
+    if (preset !== 'custom' && headerDatePreset === preset) {
+      handleHeaderDateReset();
+      return;
+    }
+
     if (preset === 'custom') {
       setHeaderDatePreset('custom');
       setShowHeaderDateRangePicker((prev) => !prev);
@@ -12869,6 +12990,17 @@ useEffect(() => {
             </div>
           )}
         </div>
+        {(headerDatePreset || filterData.createdFromDate || filterData.createdToDate) && (
+          <button
+            type="button"
+            className="adm-header-date-range__pill adm-header-date-range__pill--clear"
+            onClick={handleHeaderDateReset}
+            title="Clear date filter"
+          >
+            <i className="fas fa-times me-1" aria-hidden="true" />
+            Clear
+          </button>
+        )}
       </div>
     </div>
   );
@@ -13007,6 +13139,78 @@ useEffect(() => {
       alert(e.response?.data?.message || 'Failed to mark KYC done');
     } finally {
       setKycMarkingId(null);
+    }
+  };
+
+  const handleDownloadAdmissionForm = async (profile) => {
+    try {
+      if (!profile || !profile._id) {
+        alert('No profile selected');
+        return;
+      }
+
+      // Check if backend URL and token exist
+      if (!backendUrl) {
+        alert('Backend URL not configured');
+        return;
+      }
+
+      if (!token) {
+        alert('Authentication token missing');
+        return;
+      }
+
+      // Send GET request to backend API to generate PDF
+      const response = await axios.get(
+        `${backendUrl}/college/generate-application-form/${profile._id}`,
+        {
+          headers: {
+            'x-auth': token,
+          },
+          responseType: 'blob' // Important: Set response type to blob for PDF
+        }
+      );
+
+      if (response.data.status === false) {
+        alert(response.data.message || 'Failed to download admission form');
+        return;
+      }
+
+      // Create a blob from the PDF data
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+
+      // Create a download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `application_form_${profile._id}.pdf`;
+
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+
+      // Clean up
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      alert('Admission form downloaded successfully!');
+
+    } catch (error) {
+      console.error('Error downloading admission form:', error);
+
+      // Check if it's an error response with a message
+      if (error.response && error.response.data) {
+        try {
+          // Try to parse error response as JSON to get error message
+          const errorText = await error.response.data.text();
+          const errorData = JSON.parse(errorText);
+          alert(errorData.message || 'Failed to download admission form');
+        } catch (parseError) {
+          alert('Failed to download admission form');
+        }
+      } else {
+        alert('Failed to download admission form');
+      }
     }
   };
 
@@ -13428,7 +13632,7 @@ useEffect(() => {
       )}
 
       <div className="row g-2 mt-1 mb-2 align-items-stretch b2b-followup-scroll-row">
-        <div className="col-12 col-lg-3 b2b-followup-scroll-col">
+        <div className="col-12 col-lg-2 b2b-followup-scroll-col">
           <div className="b2b-dash-section h-100">
             <span className="b2b-dash-section__label">Followup Calling</span>
             <div className="d-flex flex-wrap gap-1 pt-1">
@@ -13458,7 +13662,7 @@ useEffect(() => {
             </div>
           </div>
         </div>
-        <div className="col-12 col-lg-3 b2b-followup-scroll-col">
+        <div className="col-12 col-lg-2 b2b-followup-scroll-col">
           <div className="b2b-dash-section h-100">
             <span className="b2b-dash-section__label">Followup Visit</span>
             <div className="d-flex flex-wrap gap-1 pt-1">
@@ -13518,10 +13722,7 @@ useEffect(() => {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* <div className="row g-2 mt-1 mb-2 align-items-stretch">
-        <div className="col-12 col-lg-6">
+        <div className="col-12 col-lg-2">
           <div className="b2b-dash-section h-100">
             <span className="b2b-dash-section__label">Milestones</span>
             <div className="d-flex flex-wrap gap-1 pt-1">
@@ -13531,7 +13732,7 @@ useEffect(() => {
                   <button
                     key={row.key}
                     type="button"
-                    className={`b2b-dash-stat-card text-center text-white flex-grow-1 border-0${selected ? ' b2b-dash-stat-card--active' : ''}`}
+                    className={`b2b-dash-stat-card text-center text-white w-100 border-0${selected ? ' b2b-dash-stat-card--active' : ''}`}
                     style={{ background: row.bg }}
                     onClick={() => handleMilestoneDashClick(row.milestone)}
                     title={row.title}
@@ -13548,7 +13749,7 @@ useEffect(() => {
             </div>
           </div>
         </div>
-      </div> */}
+      </div>
       </>
       )}
 
@@ -14190,7 +14391,7 @@ useEffect(() => {
             display: flex;
             flex-wrap: wrap;
             align-items: center;
-            gap: 4px;
+            gap: 6px 8px;
             overflow: visible;
           }
           .adm-header-date-range--compact .adm-header-date-range__pills{
@@ -14213,11 +14414,14 @@ useEffect(() => {
             color: #4b5563;
             font-size: 11px;
             font-weight: 600;
-            line-height: 1.2;
-            padding: 5px 10px;
+            line-height: 1;
+            height: 28px;
+            padding: 0 10px;
             border-radius: 999px;
             white-space: nowrap;
             cursor: pointer;
+            box-sizing: border-box;
+            box-shadow: 0 2px 8px transparent;
             transition: all 0.2s ease;
           }
           .adm-header-date-range__pill:hover{
@@ -14237,6 +14441,18 @@ useEffect(() => {
           }
           .adm-header-date-range__custom-wrap{
             position: relative;
+            display: inline-flex;
+            align-items: center;
+          }
+          .adm-header-date-range__pill--clear{
+            border-color: #fca5a5;
+            color: #dc2626;
+            background: #fff;
+          }
+          .adm-header-date-range__pill--clear:hover{
+            border-color: #f87171;
+            color: #b91c1c;
+            background: #fef2f2;
           }
           .adm-header-date-range__dropdown{
             position: absolute;
@@ -14673,7 +14889,7 @@ useEffect(() => {
             >
               <div className="container-fluid">
                 <div className="row align-items-center gy-2">
-                  <div className="col-md-4 col-xl-3 d-none d-md-block">
+                  <div className="col-md-4 col-xl-4 d-none d-md-block">
                     <h5 className="fw-bold text-dark mb-1" style={{ fontSize: '1.1rem' }}>Sales B2C</h5>
                     {renderHeaderDateRangeFilter()}
                   </div>
@@ -14685,7 +14901,7 @@ useEffect(() => {
                     {renderHeaderDateRangeFilter(true)}
                   </div>
 
-                  <div className="col-md-8 col-xl-9 d-none d-md-flex justify-content-end align-items-center">
+                  <div className="col-md-8 col-xl-8 d-none d-md-flex justify-content-end align-items-center">
                     {renderCycleFilterDropdowns()}
                   </div>
 
@@ -15539,6 +15755,50 @@ useEffect(() => {
                         </select>
                       </div>
 
+                      <div className="col-md-3">
+                        <label className="form-label fw-medium text-dark mb-2">
+                          <i className="fas fa-phone text-primary me-2"></i>
+                          Followup Calling
+                        </label>
+                        <select
+                          className="form-select"
+                          value={filterData.hasFollowUpCall === true || filterData.hasFollowUpCall === 'yes' ? 'yes' : filterData.hasFollowUpCall === false || filterData.hasFollowUpCall === 'no' ? 'no' : ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setFilterData((prev) => ({
+                              ...prev,
+                              hasFollowUpCall: v === 'yes' ? true : v === 'no' ? false : '',
+                            }));
+                          }}
+                        >
+                          <option value="">Select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
+                      <div className="col-md-3">
+                        <label className="form-label fw-medium text-dark mb-2">
+                          <i className="fas fa-map-marker-alt text-primary me-2"></i>
+                          Followup Visit
+                        </label>
+                        <select
+                          className="form-select"
+                          value={filterData.hasFollowUpVisit === true || filterData.hasFollowUpVisit === 'yes' ? 'yes' : filterData.hasFollowUpVisit === false || filterData.hasFollowUpVisit === 'no' ? 'no' : ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setFilterData((prev) => ({
+                              ...prev,
+                              hasFollowUpVisit: v === 'yes' ? true : v === 'no' ? false : '',
+                            }));
+                          }}
+                        >
+                          <option value="">Select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+
                     </div>
 
 
@@ -16168,7 +16428,7 @@ useEffect(() => {
                                     </div>
 
                                     <div className="lhm__row3">
-                                      <div className="lhm__followup-box">
+                                      <div className={`lhm__followup-box${!profileHasAnyFollowup(profile) ? ' lhm__followup-box--empty' : ''}`}>
                                         <span className="lhm__followup-title">Followup Calling</span>
                                         <button
                                           type="button"
@@ -16183,12 +16443,12 @@ useEffect(() => {
                                           {(() => {
                                             const b = getProfileFollowupBucket(profile, 'Call');
                                             return [
-                                              { label: 'Done', value: b === 'done' ? 1 : 0, bg: '#dbeafe', color: '#1d4ed8' },
-                                              { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#ffedd5', color: '#c2410c' },
-                                              { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#fee2e2', color: '#b91c1c' },
+                                              { label: 'Done', value: getProfileFollowupDoneCount(profile, 'Call'), bg: 'rgb(18, 179, 255)' },
+                                              { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: 'rgb(12, 125, 180)' },
+                                              { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: 'rgb(8, 80, 120)' },
                                             ];
                                           })().map((s) => (
-                                            <div key={s.label} className="lhm__stat-card" style={{ background: s.bg, color: s.color || '#fff' }}>
+                                            <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
                                               <span className="lhm__stat-label">{s.label}</span>
                                               <span className="lhm__stat-divider" />
                                               <span className="lhm__stat-val">{String(s.value).padStart(2, '0')}</span>
@@ -16196,18 +16456,12 @@ useEffect(() => {
                                           ))}
                                         </div>
                                         <div className="lhm__followup-date">
-                                          {(() => {
-                                            const fd = getProfileFollowupDateDisplay(profile, 'Call');
-                                            return (
-                                              <>
-                                                <span>{fd.label}</span><span>{fd.value}</span>
-                                              </>
-                                            );
-                                          })()}
+                                          <span>Next Follow-up Date:</span>
+                                          <span>{getProfileFollowupDateLabel(profile, 'Call')}</span>
                                         </div>
                                       </div>
 
-                                      <div className="lhm__followup-box">
+                                      <div className={`lhm__followup-box${!profileHasAnyFollowup(profile) ? ' lhm__followup-box--empty' : ''}`}>
                                         <span className="lhm__followup-title">Followup Visit</span>
                                         <button
                                           type="button"
@@ -16222,12 +16476,12 @@ useEffect(() => {
                                           {(() => {
                                             const b = getProfileFollowupBucket(profile, 'Visit');
                                             return [
-                                              { label: 'Done', value: b === 'done' ? 1 : 0, bg: '#d1fae5', color: '#047857' },
-                                              { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: '#ede9fe', color: '#6d28d9' },
-                                              { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: '#fee2e2', color: '#b91c1c' },
+                                              { label: 'Done', value: getProfileFollowupDoneCount(profile, 'Visit'), bg: 'rgb(75, 85, 99)' },
+                                              { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: 'rgb(55, 65, 81)' },
+                                              { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: 'rgb(35, 42, 52)' },
                                             ];
                                           })().map((s) => (
-                                            <div key={s.label} className="lhm__stat-card" style={{ background: s.bg, color: s.color || '#fff' }}>
+                                            <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
                                               <span className="lhm__stat-label">{s.label}</span>
                                               <span className="lhm__stat-divider" />
                                               <span className="lhm__stat-val">{String(s.value).padStart(2, '0')}</span>
@@ -16235,14 +16489,8 @@ useEffect(() => {
                                           ))}
                                         </div>
                                         <div className="lhm__followup-date">
-                                          {(() => {
-                                            const fd = getProfileFollowupDateDisplay(profile, 'Visit');
-                                            return (
-                                              <>
-                                                <span>{fd.label}</span><span>{fd.value}</span>
-                                              </>
-                                            );
-                                          })()}
+                                          <span>Next Follow-up Date:</span>
+                                          <span>{getProfileFollowupDateLabel(profile, 'Visit')}</span>
                                         </div>
                                       </div>
 
@@ -16517,28 +16765,21 @@ useEffect(() => {
                                           </div>
                                         </div>
 
-                                        <div className="lead-strip-v3__panel lead-strip-v3__panel--followup-call">
+                                        <div className={`lead-strip-v3__panel lead-strip-v3__panel--followup-call${!profileHasAnyFollowup(profile) ? ' lead-strip-v3__panel--no-followup' : ''}`}>
                                           <div className="lead-strip-v3__panel-head">
                                             <span className="lead-strip-v3__panel-title">
                                               <i className="fas fa-phone-alt" aria-hidden="true"></i> Followup Calling
                                             </span>
                                           </div>
                                           {renderStatGrid([
-                                            { key: 'fc-done', label: 'Done', value: callBucket === 'done' ? 1 : 0, bg: '#dbeafe', color: '#1d4ed8' },
-                                            { key: 'fc-planned', label: 'Planned', value: callBucket === 'planned' ? 1 : 0, bg: '#ffedd5', color: '#c2410c' },
-                                            { key: 'fc-missed', label: 'Missed', value: callBucket === 'missed' ? 1 : 0, bg: '#fee2e2', color: '#b91c1c' },
+                                            { key: 'fc-done', label: 'Done', value: getProfileFollowupDoneCount(profile, 'Call'), bg: 'rgb(18, 179, 255)' },
+                                            { key: 'fc-planned', label: 'Planned', value: callBucket === 'planned' ? 1 : 0, bg: 'rgb(12, 125, 180)' },
+                                            { key: 'fc-missed', label: 'Missed', value: callBucket === 'missed' ? 1 : 0, bg: 'rgb(8, 80, 120)' },
                                           ])}
                                           <div className="lead-strip-v3__footer">
                                             <div className="lead-strip-v3__footer-main">
-                                              {(() => {
-                                                const fd = getProfileFollowupDateDisplay(profile, 'Call');
-                                                return (
-                                                  <>
-                                                    <span className="lead-strip-v3__footer-label">{fd.label}</span>
-                                                    <span className="lead-strip-v3__footer-val">{fd.value}</span>
-                                                  </>
-                                                );
-                                              })()}
+                                              <span className="lead-strip-v3__footer-label">Next Follow-up Date:</span>
+                                              <span className="lead-strip-v3__footer-val">{getProfileFollowupDateLabel(profile, 'Call')}</span>
                                             </div>
                                             <button
                                               type="button"
@@ -16552,28 +16793,21 @@ useEffect(() => {
                                           </div>
                                         </div>
 
-                                        <div className="lead-strip-v3__panel lead-strip-v3__panel--followup-visit">
+                                        <div className={`lead-strip-v3__panel lead-strip-v3__panel--followup-visit${!profileHasAnyFollowup(profile) ? ' lead-strip-v3__panel--no-followup' : ''}`}>
                                           <div className="lead-strip-v3__panel-head">
                                             <span className="lead-strip-v3__panel-title">
                                               <i className="fas fa-user-check" aria-hidden="true"></i> Followup Visit
                                             </span>
                                           </div>
                                           {renderStatGrid([
-                                            { key: 'fv-done', label: 'Done', value: visitBucket === 'done' ? 1 : 0, bg: '#d1fae5', color: '#047857' },
-                                            { key: 'fv-planned', label: 'Planned', value: visitBucket === 'planned' ? 1 : 0, bg: '#ede9fe', color: '#6d28d9' },
-                                            { key: 'fv-missed', label: 'Missed', value: visitBucket === 'missed' ? 1 : 0, bg: '#fee2e2', color: '#b91c1c' },
+                                            { key: 'fv-done', label: 'Done', value: getProfileFollowupDoneCount(profile, 'Visit'), bg: 'rgb(75, 85, 99)' },
+                                            { key: 'fv-planned', label: 'Planned', value: visitBucket === 'planned' ? 1 : 0, bg: 'rgb(55, 65, 81)' },
+                                            { key: 'fv-missed', label: 'Missed', value: visitBucket === 'missed' ? 1 : 0, bg: 'rgb(35, 42, 52)' },
                                           ])}
                                           <div className="lead-strip-v3__footer">
                                             <div className="lead-strip-v3__footer-main">
-                                              {(() => {
-                                                const fd = getProfileFollowupDateDisplay(profile, 'Visit');
-                                                return (
-                                                  <>
-                                                    <span className="lead-strip-v3__footer-label">{fd.label}</span>
-                                                    <span className="lead-strip-v3__footer-val">{fd.value}</span>
-                                                  </>
-                                                );
-                                              })()}
+                                              <span className="lead-strip-v3__footer-label">Next Follow-up Date:</span>
+                                              <span className="lead-strip-v3__footer-val">{getProfileFollowupDateLabel(profile, 'Visit')}</span>
                                             </div>
                                             <button
                                               type="button"
@@ -16804,6 +17038,23 @@ useEffect(() => {
                                                   Move to Admission
                                                 </button>
                                               )}
+
+<button
+                                                    className="lead-strip-v3__actions-item"
+                                                    style={{
+                                                      width: "100%",
+                                                      padding: "8px 16px",
+                                                      border: "none",
+                                                      background: "none",
+                                                      textAlign: "left",
+                                                      cursor: "pointer",
+                                                      fontSize: "12px",
+                                                      fontWeight: "600"
+                                                    }}
+                                                    onClick={() => handleDownloadAdmissionForm(profile)}
+                                                  >
+                                                    Download Admission Form
+                                                  </button>
 
                                               <button
                                                 className="dropdown-item"
@@ -27876,6 +28127,26 @@ max-width: 600px;
           min-height: 0;
         }
 
+        .lead-strip-v3__panel--no-followup{
+          background: #ff4646;
+          border-color: #ff4646;
+        }
+
+        .lead-strip-v3__panel--no-followup .lead-strip-v3__panel-title{
+          color: #fff;
+        }
+
+        .lead-strip-v3__panel--no-followup .lead-strip-v3__footer-label,
+        .lead-strip-v3__panel--no-followup .lead-strip-v3__footer-val{
+          color: #7f1d1d;
+        }
+
+        .lead-strip-v3__panel--no-followup .lead-strip-v3__footer-cal{
+          background: #ef4444;
+          border-color: #dc2626;
+          color: #fff;
+        }
+
         .lead-strip-v3__panel--performance{
           border-top: 3px solid #3b82f6;
           flex: 1 1 clamp(170px, 15vw, 210px);
@@ -29164,6 +29435,19 @@ max-width: 600px;
           padding: 8px 8px 6px;
           background: rgba(255,255,255,0.12);
         }
+        .lhm__followup-box--empty{
+          background: #ff4646;
+          border-color: #ff4646;
+        }
+        .lhm__followup-box--empty .lhm__followup-date{
+          color: #7f1d1d;
+          border-top-color: rgba(127, 29, 29, 0.25);
+        }
+        .lhm__followup-box--empty .lhm__editbtn{
+          background: #ef4444;
+          border-color: #dc2626;
+          color: #fff;
+        }
         .lhm__followup-title{
           display: block;
           font-size: 10px;
@@ -29544,12 +29828,37 @@ max-width: 600px;
             scroll-snap-align: start;
           }
 
+          .lhm__followup-box--empty{
+            background: #ff4646;
+            border-color: #ff4646;
+          }
+
+          .lhm__followup-box--empty .lhm__followup-title{
+            color: #fff;
+          }
+
+          .lhm__followup-box--empty .lhm__followup-date{
+            color: #7f1d1d;
+            border-top-color: rgba(127, 29, 29, 0.25);
+          }
+
+          .lhm__followup-box--empty .lhm__editbtn{
+            background: #ef4444;
+            border-color: #dc2626;
+            color: #fff;
+          }
+
           .lhm__row3 .lhm__followup-box:first-child{
             border-top: 3px solid #0ea5e9;
           }
 
           .lhm__row3 .lhm__followup-box:nth-child(2){
             border-top: 3px solid #8b5cf6;
+          }
+
+          .lhm__row3 .lhm__followup-box--empty:first-child,
+          .lhm__row3 .lhm__followup-box--empty:nth-child(2){
+            border-top-color: #ff4646;
           }
 
           .lhm__followup-title{

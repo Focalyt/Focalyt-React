@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import axios from 'axios';
+import { useLocation, useNavigate } from 'react-router-dom';
 import DatePicker from 'react-date-picker';
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 
 const PINK = '#fa5579';
 const BLUE = '#2563eb';
+const GREEN = '#059669';
 
 const getOptionLabel = (options = [], value) =>
   options.find((option) => String(option.value) === String(value))?.label || '';
@@ -20,7 +22,7 @@ const WORKFLOW_STATUS = {
   SENT_TO_SENIOR: 'Sent to Senior Trainer',
   ASSIGNED: 'Assigned',
   IN_PROGRESS: 'In Progress',
- 
+
 };
 
 const STATUS_TONE = {
@@ -59,6 +61,7 @@ const LEARNING_MATERIAL_TYPE_OPTIONS = ['PDF', 'Video', 'Document', 'Presentatio
 const createMaterialItem = (defaultType = 'Document') => ({
   id: `MAT${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
   name: '',
+  description: '',
   type: defaultType,
   requirement: DOC_REQUIREMENT.MANDATORY,
 });
@@ -69,8 +72,42 @@ const normalizeMaterialItems = (items = []) =>
     .map((item) => ({
       ...item,
       name: item.name.trim(),
+      description: item.description?.trim() || '',
+      type: item.type || 'Document',
       requirement: item.requirement || DOC_REQUIREMENT.MANDATORY,
       requirementLabel: getDocRequirementLabel(item.requirement),
+    }));
+
+/** Migrate old string TLM fields into document list shape */
+const normalizeTlmList = (value) => {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    return [{
+      ...createMaterialItem('Document'),
+      name: value.trim(),
+      description: '',
+    }];
+  }
+  return [];
+};
+
+const createTotQuestionDraft = () => ({
+  id: `TQ${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+  question: '',
+  options: ['', '', '', ''],
+  correctIndex: 0,
+  marks: 1,
+});
+
+const normalizeTotQuestions = (questions = []) =>
+  (questions || [])
+    .filter((item) => item && item.question?.trim() && Array.isArray(item.options) && item.options.length >= 2)
+    .map((item) => ({
+      id: String(item.id || `TQ-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`),
+      question: String(item.question || '').trim(),
+      options: item.options.map((option) => String(option || '').trim()),
+      correctIndex: Number.isFinite(item.correctIndex) ? item.correctIndex : 0,
+      marks: Number(item.marks) || 1,
     }));
 
 const countMaterialsByRequirement = (items = []) => {
@@ -92,8 +129,11 @@ const MaterialDefinitionSection = ({
   items = [],
   typeOptions = EVIDENCE_TYPE_OPTIONS,
   nameColumnLabel = 'Name',
+  descriptionColumnLabel = 'Description',
   typeColumnLabel = 'Type',
   namePlaceholder = 'Enter name',
+  descriptionPlaceholder = 'Enter description',
+  showDescription = false,
   onAdd,
   onChange,
   onRemove,
@@ -105,29 +145,41 @@ const MaterialDefinitionSection = ({
         <i className="fas fa-plus" /> {addLabel}
       </button>
     </div>
-    <p className="ac-evidence-hint">{hint}</p>
+    {hint ? <p className="ac-evidence-hint">{hint}</p> : null}
     {items.length === 0 && (
       <p className="ac-evidence-empty">{emptyText}</p>
     )}
     {items.length > 0 && (
-      <div className="ac-evidence-row ac-evidence-row--head">
+      <div className={`ac-evidence-row ac-evidence-row--head${showDescription ? ' ac-evidence-row--with-desc' : ''}`}>
         <span>{nameColumnLabel}</span>
+        {showDescription && <span>{descriptionColumnLabel}</span>}
         <span>{typeColumnLabel}</span>
         <span>Requirement</span>
         <span />
       </div>
     )}
     {items.map((item, index) => (
-      <div key={item.id || index} className="ac-evidence-row">
+      <div
+        key={item.id || index}
+        className={`ac-evidence-row${showDescription ? ' ac-evidence-row--with-desc' : ''}`}
+      >
         <input
           className="ac-input"
           placeholder={namePlaceholder}
-          value={item.name}
+          value={item.name || ''}
           onChange={(e) => onChange(index, 'name', e.target.value)}
         />
+        {showDescription && (
+          <input
+            className="ac-input"
+            placeholder={descriptionPlaceholder}
+            value={item.description || ''}
+            onChange={(e) => onChange(index, 'description', e.target.value)}
+          />
+        )}
         <select
           className="ac-input"
-          value={item.type}
+          value={item.type || typeOptions[0]}
           onChange={(e) => onChange(index, 'type', e.target.value)}
         >
           {typeOptions.map((type) => (
@@ -156,9 +208,119 @@ const MaterialDefinitionSection = ({
   </div>
 );
 
+const TotQuestionBankSection = ({
+  questions = [],
+  onQuestionChange,
+  onQuestionOptionChange,
+  onAddQuestion,
+  onRemoveQuestion,
+}) => (
+  <div className="ac-question-bank">
+    <div className="ac-question-bank__head">
+      <h6>TOT MCQ question bank</h6>
+      <button type="button" className="ac-mini-btn" onClick={onAddQuestion}>
+        <i className="fas fa-plus" /> Add question
+      </button>
+    </div>
+    <p className="ac-question-bank__hint">
+      Add MCQ questions for the TOT session. The assigned trainer will see these questions.
+    </p>
+    {questions.length === 0 ? (
+      <p className="ac-question-bank__empty">No TOT questions added yet. Add one to begin.</p>
+    ) : (
+      questions.map((question, index) => (
+        <div key={question.id || index} className="ac-question-card">
+          <div className="ac-question-card__top">
+            <label className="ac-field ac-field--full">
+              <span>Question {index + 1}</span>
+              <input
+                className="ac-input"
+                placeholder="Enter question text"
+                value={question.question}
+                onChange={(e) => onQuestionChange(index, 'question', e.target.value)}
+              />
+            </label>
+            <label className="ac-field ac-field--full">
+              <span>Marks</span>
+              <input
+                className="ac-input"
+                type="number"
+                min="1"
+                value={question.marks || 1}
+                onChange={(e) => onQuestionChange(index, 'marks', e.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              className="ac-remove-btn ac-remove-btn--question"
+              onClick={() => onRemoveQuestion(index)}
+              aria-label="Remove question"
+            >
+              <i className="fas fa-trash" />
+            </button>
+          </div>
+          <div className="ac-option-grid">
+            {question.options.map((option, optionIndex) => (
+              <label key={optionIndex} className="ac-option-row">
+                <input
+                  type="radio"
+                  name={`tot-question-${question.id}-correct`}
+                  checked={question.correctIndex === optionIndex}
+                  onChange={() => onQuestionChange(index, 'correctIndex', optionIndex)}
+                />
+                <input
+                  className="ac-input ac-input--small"
+                  placeholder={`Option ${String.fromCharCode(65 + optionIndex)}`}
+                  value={option}
+                  onChange={(e) => onQuestionOptionChange(index, optionIndex, e.target.value)}
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+      ))
+    )}
+  </div>
+);
+
 const SESSION_TYPE = {
   STUDENT: 'student',
   TOT: 'tot',
+};
+
+const DEFAULT_COURSE_STRUCTURE = { unit: true, chapter: true, session: true };
+
+const normalizeCourseStructure = (structure) => {
+  if (!structure || typeof structure !== 'object') {
+    return { ...DEFAULT_COURSE_STRUCTURE };
+  }
+  return {
+    unit: structure.unit === true,
+    chapter: structure.chapter === true,
+    session: true,
+  };
+};
+
+const getCourseStructureFromMeta = (courses = [], courseId, fallbackStructure) => {
+  if (!courseId) {
+    return normalizeCourseStructure(fallbackStructure);
+  }
+  const course = courses.find((item) => String(item._id) === String(courseId));
+  if (course?.courseStructure) {
+    return normalizeCourseStructure(course.courseStructure);
+  }
+  if (fallbackStructure) {
+    return normalizeCourseStructure(fallbackStructure);
+  }
+  return { ...DEFAULT_COURSE_STRUCTURE };
+};
+
+const buildStructurePathLabel = (structure = DEFAULT_COURSE_STRUCTURE) => {
+  const parts = [];
+  if (structure.unit) parts.push('Unit');
+  if (structure.chapter) parts.push('Chapter');
+  parts.push('Session');
+  return parts.join(' → ');
 };
 
 const hasLinkedTot = (session = {}) => (
@@ -192,6 +354,99 @@ const mapSessionForTotCalendar = (session = {}) => ({
     : (session.totTrainingMethod || session.trainingMethod || ''),
 });
 
+const resolveSessionSelectionId = (sessionId) => (
+  String(sessionId).endsWith('-tot') ? String(sessionId).replace(/-tot$/, '') : sessionId
+);
+
+const TOTAL_SESSION_SLOTS = 30;
+
+const buildFixedSessionSlots = (sessions = [], total = TOTAL_SESSION_SLOTS) => {
+  const byNumber = {};
+  sessions.forEach((session) => {
+    const num = parseInt(String(session.sessionNumber ?? ''), 10);
+    if (!Number.isFinite(num) || num < 1 || num > total) return;
+    if (!byNumber[num]) byNumber[num] = session;
+  });
+  return Array.from({ length: total }, (_, index) => {
+    const sessionNumber = index + 1;
+    return {
+      key: `slot-${sessionNumber}`,
+      sessionNumber: String(sessionNumber),
+      session: byNumber[sessionNumber] || null,
+    };
+  });
+};
+
+const SessionPlanCalendar = ({
+  title,
+  icon,
+  accent = GREEN,
+  sessions,
+  selectedSessionId,
+  onSelectSession,
+}) => {
+  const cells = useMemo(() => buildFixedSessionSlots(sessions), [sessions]);
+
+  return (
+    <div className="ac-calendar" style={{ '--calendar-accent': accent }}>
+      <div className="ac-calendar__title-bar">
+        <div className="ac-calendar__title">
+          <i className={`fas ${icon}`} />
+          <span>{title}</span>
+        </div>
+        <span className="ac-calendar__count">{sessions.length} / {TOTAL_SESSION_SLOTS} plan(s)</span>
+      </div>
+      <div className="ac-calendar__head">
+        <h3>Session plans</h3>
+        <span className="ac-calendar__head-hint">Session 1–{TOTAL_SESSION_SLOTS} · dates assigned later by Senior Trainer</span>
+      </div>
+      <div className="ac-calendar__weekdays" aria-hidden="true">
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+          <span key={day}>{day}</span>
+        ))}
+      </div>
+      <div className="ac-calendar__grid">
+        {cells.map((cell) => {
+          const { session, sessionNumber } = cell;
+          if (!session) {
+            return (
+              <div
+                key={cell.key}
+                className="ac-calendar__day ac-calendar__day--slot"
+              >
+                <span className="ac-calendar__day-num">{sessionNumber}</span>
+                <span className="ac-calendar__session-title ac-calendar__session-title--muted">Not planned</span>
+              </div>
+            );
+          }
+
+          const color = session.sessionActivities?.[0]?.color
+            || session.activityColor
+            || (session.sessionType === SESSION_TYPE.TOT ? BLUE : GREEN);
+          const isSelected = resolveSessionSelectionId(selectedSessionId) === resolveSessionSelectionId(session.id);
+
+          return (
+            <button
+              key={cell.key}
+              type="button"
+              className={`ac-calendar__day ac-calendar__day--session${isSelected ? ' ac-calendar__day--selected' : ''}`}
+              style={{ '--event-color': color }}
+              onClick={() => onSelectSession(session.id)}
+              title={`Session ${sessionNumber}: ${session.title || 'Untitled'}`}
+            >
+              <span className="ac-calendar__day-num">{sessionNumber}</span>
+              <span className="ac-calendar__session-title">{session.title || 'Untitled session'}</span>
+              {session.topicCovered ? (
+                <span className="ac-calendar__session-topic">{session.topicCovered}</span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const PROOF_TYPE_OPTIONS = ['Document', 'Image', 'Video', 'PDF'];
 
 const validateTotBeforeSave = (draft) => {
@@ -210,6 +465,10 @@ const TotSection = ({
   onTotMaterialChange,
   onAddTotMaterial,
   onRemoveTotMaterial,
+  onTotQuestionChange,
+  onTotQuestionOptionChange,
+  onAddTotQuestion,
+  onRemoveTotQuestion,
   onTotCompletionProofChange,
   onAddTotCompletionProof,
   onRemoveTotCompletionProof,
@@ -280,75 +539,120 @@ const TotSection = ({
         </div>
       )}
 
-    <label className="ac-tot-check">
-      <input
-        type="checkbox"
-        checked={draft.requireTotCompletionProofs === true}
-        onChange={(e) => onFieldChange('requireTotCompletionProofs', e.target.checked)}
-      />
-      <span>Trainer must submit completion proofs after TOT</span>
-    </label>
+      <label className="ac-tot-check">
+        <input
+          type="checkbox"
+          checked={draft.requireTotCompletionProofs === true}
+          onChange={(e) => onFieldChange('requireTotCompletionProofs', e.target.checked)}
+        />
+        <span>Trainer must submit completion proofs after TOT</span>
+      </label>
 
-    {draft.requireTotCompletionProofs === true && (
+      {draft.requireTotCompletionProofs === true && (
+        <MaterialDefinitionSection
+          title="TOT completion proofs"
+          addLabel="Add proof"
+          emptyText="No completion proofs defined yet."
+          nameColumnLabel="Proof name"
+          typeColumnLabel="Proof type"
+          namePlaceholder="e.g. Signed TOT certificate"
+          items={draft.totCompletionProofs || []}
+          typeOptions={PROOF_TYPE_OPTIONS}
+          onAdd={onAddTotCompletionProof}
+          onChange={onTotCompletionProofChange}
+          onRemove={onRemoveTotCompletionProof}
+        />
+      )}
+
       <MaterialDefinitionSection
-        title="TOT completion proofs"
-        addLabel="Add proof"
-        emptyText="No completion proofs defined yet."
-        nameColumnLabel="Proof name"
-        typeColumnLabel="Proof type"
-        namePlaceholder="e.g. Signed TOT certificate"
-        items={draft.totCompletionProofs || []}
-        typeOptions={PROOF_TYPE_OPTIONS}
-        onAdd={onAddTotCompletionProof}
-        onChange={onTotCompletionProofChange}
-        onRemove={onRemoveTotCompletionProof}
+        title="TOT learning material"
+        addLabel="Add TOT material"
+        emptyText="No TOT material defined yet."
+        items={draft.totMaterials || []}
+        typeOptions={LEARNING_MATERIAL_TYPE_OPTIONS}
+        onAdd={onAddTotMaterial}
+        onChange={onTotMaterialChange}
+        onRemove={onRemoveTotMaterial}
       />
-    )}
 
-    <MaterialDefinitionSection
-      title="TOT learning material"
-      addLabel="Add TOT material"
-      emptyText="No TOT material defined yet."
-      items={draft.totMaterials || []}
-      typeOptions={LEARNING_MATERIAL_TYPE_OPTIONS}
-      onAdd={onAddTotMaterial}
-      onChange={onTotMaterialChange}
-      onRemove={onRemoveTotMaterial}
-    />
-  </div>
+      <TotQuestionBankSection
+        questions={draft.totQuestionBank || []}
+        onQuestionChange={onTotQuestionChange}
+        onQuestionOptionChange={onTotQuestionOptionChange}
+        onAddQuestion={onAddTotQuestion}
+        onRemoveQuestion={onRemoveTotQuestion}
+      />
+    </div>
   );
 };
 
-const STORAGE_PREFIX = 'acCoordinatorSessions:';
-const ACTIVITY_TYPES_STORAGE_KEY = 'acCoordinatorActivityTypes';
-
-const DEFAULT_ACTIVITY_TYPES = [
-  { id: 'act-1', name: 'Classroom Session', color: '#2563eb' },
-  { id: 'act-2', name: 'Extra Curricular Activity', color: '#8b5cf6' },
-  { id: 'act-3', name: 'Interview Skills', color: '#f59e0b' },
-  { id: 'act-4', name: 'Quiz', color: '#10b981' },
-  { id: 'act-5', name: 'Practical / Lab', color: '#ec4899' },
-  { id: 'act-6', name: 'Assessment', color: '#ef4444' },
-];
+const STORAGE_PREFIX = 'acCoordinatorSessions:'; // legacy — sessions now persist via API
+const ACTIVITY_TYPES_STORAGE_KEY = 'acCoordinatorActivityTypes'; // legacy
 
 const PRESET_COLORS = [
   '#2563eb', '#8b5cf6', '#f59e0b', '#10b981', '#ec4899', '#ef4444',
   '#06b6d4', '#84cc16', '#f97316', '#6366f1', '#14b8a6', '#a855f7',
 ];
 
-const loadActivityTypes = () => {
-  try {
-    const raw = localStorage.getItem(ACTIVITY_TYPES_STORAGE_KEY);
-    if (!raw) return DEFAULT_ACTIVITY_TYPES;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length ? parsed : DEFAULT_ACTIVITY_TYPES;
-  } catch {
-    return DEFAULT_ACTIVITY_TYPES;
-  }
+const authHeaders = (token) => ({ 'x-auth': token });
+
+const fetchActivityTypesApi = async (backendUrl, token) => {
+  const res = await axios.get(`${backendUrl}/college/session-plans/activity-types`, {
+    headers: authHeaders(token),
+  });
+  const types = res.data?.data;
+  return Array.isArray(types) ? types : [];
 };
 
-const persistActivityTypes = (types) => {
-  localStorage.setItem(ACTIVITY_TYPES_STORAGE_KEY, JSON.stringify(types));
+const saveActivityTypesApi = async (backendUrl, token, types) => {
+  const res = await axios.put(
+    `${backendUrl}/college/session-plans/activity-types`,
+    { types },
+    { headers: authHeaders(token) }
+  );
+  return res.data?.data || types;
+};
+
+const fetchSessionsApi = async (backendUrl, token, batchId, courseId = '') => {
+  const params = new URLSearchParams();
+  if (batchId) params.set('batch', batchId);
+  if (courseId) params.set('course', courseId);
+  const res = await axios.get(`${backendUrl}/college/session-plans?${params.toString()}`, {
+    headers: authHeaders(token),
+  });
+  return Array.isArray(res.data?.data) ? res.data.data : [];
+};
+
+const createSessionApi = async (backendUrl, token, payload) => {
+  const res = await axios.post(`${backendUrl}/college/session-plans`, payload, {
+    headers: authHeaders(token),
+  });
+  if (!res.data?.status) throw new Error(res.data?.message || 'Failed to create session');
+  return res.data.data;
+};
+
+const updateSessionApi = async (backendUrl, token, sessionId, payload) => {
+  const res = await axios.put(`${backendUrl}/college/session-plans/${sessionId}`, payload, {
+    headers: authHeaders(token),
+  });
+  if (!res.data?.status) throw new Error(res.data?.message || 'Failed to update session');
+  return res.data.data;
+};
+
+const patchSessionApi = async (backendUrl, token, sessionId, payload) => {
+  const res = await axios.patch(`${backendUrl}/college/session-plans/${sessionId}`, payload, {
+    headers: authHeaders(token),
+  });
+  if (!res.data?.status) throw new Error(res.data?.message || 'Failed to update session');
+  return res.data.data;
+};
+
+const deleteSessionApi = async (backendUrl, token, sessionId) => {
+  const res = await axios.delete(`${backendUrl}/college/session-plans/${sessionId}`, {
+    headers: authHeaders(token),
+  });
+  if (!res.data?.status) throw new Error(res.data?.message || 'Failed to delete session');
+  return true;
 };
 
 const getActivityTypeById = (types, id) => types.find((type) => type.id === id) || null;
@@ -790,19 +1094,18 @@ const loadStoredSessions = (batchId) => {
   }
 };
 
-const persistStoredSessions = (batchId, list) => {
-  if (!batchId) return;
-  try {
-    localStorage.setItem(`${STORAGE_PREFIX}${batchId}`, JSON.stringify(list));
-  } catch (error) {
-    console.error('Failed to save sessions to localStorage', error);
-  }
+const persistStoredSessions = () => {
+  // no-op: sessions are persisted via /college/session-plans API
 };
 
 const createEmptySessionDraft = () => ({
   id: '',
   title: '',
   sessionNumber: '',
+  hours: '',
+  subSessions: '',
+  subSessionName: '',
+  duration: '',
   unitNumber: '',
   unitName: '',
   chapterNumber: '',
@@ -810,6 +1113,9 @@ const createEmptySessionDraft = () => ({
   subTopics: '',
   topicCovered: '',
   trainingMethod: '',
+  classroomLabResources: '',
+  standardTlm: [],
+  trainerBasedTlm: [],
   sessionDate: getTodayInputValue(),
   startTime: '10:00',
   endTime: '12:00',
@@ -827,6 +1133,8 @@ const createEmptySessionDraft = () => ({
   totTrainerName: '',
   totStatus: 'pending',
   totCompletionProofs: [],
+  totQuestionBank: [],
+  totQuestionBankLastUpdated: '',
   sessionActivities: [],
   notes: '',
   evidenceDocs: [],
@@ -1229,7 +1537,7 @@ const SessionDetailSidePanel = ({
   onClose,
   onEdit,
   onDelete,
-  onSendToSenior,
+  onOpenReferModal,
 }) => {
   if (!session) {
     return (
@@ -1274,29 +1582,29 @@ const SessionDetailSidePanel = ({
 
       <div className="ac-side-panel__body">
         {(hasUnitInfo(session) || hasChapterInfo(session) || subTopicLines.length > 0) && (
-        <div className="ac-side-panel__section">
-          <h5>Structure</h5>
-          {hasUnitInfo(session) && (
-            <div className="ac-side-panel__grid ac-side-panel__grid--single">
-              <div><em>Unit</em><strong>{getUnitLabel(session)}</strong></div>
-            </div>
-          )}
-          {hasChapterInfo(session) && (
-            <div className="ac-side-panel__grid ac-side-panel__grid--single">
-              <div><em>Chapter</em><strong>{formatChapterLabel(session) || '—'}</strong></div>
-            </div>
-          )}
-          {subTopicLines.length > 0 && (
-            <div className="ac-side-panel__subtopics">
-              <em>Sub topics</em>
-              <ul>
-                {subTopicLines.map((topic) => (
-                  <li key={topic}>{topic}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
+          <div className="ac-side-panel__section">
+            <h5>Structure</h5>
+            {hasUnitInfo(session) && (
+              <div className="ac-side-panel__grid ac-side-panel__grid--single">
+                <div><em>Unit</em><strong>{getUnitLabel(session)}</strong></div>
+              </div>
+            )}
+            {hasChapterInfo(session) && (
+              <div className="ac-side-panel__grid ac-side-panel__grid--single">
+                <div><em>Chapter</em><strong>{formatChapterLabel(session) || '—'}</strong></div>
+              </div>
+            )}
+            {subTopicLines.length > 0 && (
+              <div className="ac-side-panel__subtopics">
+                <em>Sub topics</em>
+                <ul>
+                  {subTopicLines.map((topic) => (
+                    <li key={topic}>{topic}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         )}
 
         <div className="ac-side-panel__section">
@@ -1308,13 +1616,49 @@ const SessionDetailSidePanel = ({
         </div>
 
         <div className="ac-side-panel__section">
-          <h5>Schedule</h5>
+          <h5>Session details</h5>
           <div className="ac-side-panel__grid">
-            <div><em>Date</em><strong>{session.date || formatSessionDate(session.sessionDate)}</strong></div>
-            <div><em>Time</em><strong>{timeRange}</strong></div>
-            <div><em>Method</em><strong>{session.trainingMethod || '—'}</strong></div>
+            <div><em>Session Number</em><strong>{session.sessionNumber || '—'}</strong></div>
+            <div><em>Session Name</em><strong>{session.title || '—'}</strong></div>
+            <div><em>Hrs.</em><strong>{session.hours || '—'}</strong></div>
+            <div><em>Sub Sessions</em><strong>{session.subSessions || '—'}</strong></div>
+            <div><em>Sub Session Name</em><strong>{session.subSessionName || '—'}</strong></div>
+            <div><em>Duration</em><strong>{session.duration || '—'}</strong></div>
+            <div><em>Teaching Method</em><strong>{session.trainingMethod || '—'}</strong></div>
           </div>
+          {session.topicCovered && (
+            <div className="ac-side-panel__grid ac-side-panel__grid--single" style={{ marginTop: 10 }}>
+              <div><em>Topics Covered</em><strong style={{ whiteSpace: 'pre-wrap' }}>{session.topicCovered}</strong></div>
+            </div>
+          )}
+          {session.classroomLabResources && (
+            <div className="ac-side-panel__grid ac-side-panel__grid--single" style={{ marginTop: 10 }}>
+              <div><em>Class Room &amp; Lab Resources</em><strong style={{ whiteSpace: 'pre-wrap' }}>{session.classroomLabResources}</strong></div>
+            </div>
+          )}
+          {normalizeTlmList(session.standardTlm).length > 0 && (
+            <div className="ac-side-panel__grid ac-side-panel__grid--single" style={{ marginTop: 10 }}>
+              <div>
+                <em>Standard TLM</em>
+                <strong>
+                  {normalizeTlmList(session.standardTlm).map((item) => item.name).filter(Boolean).join(', ')}
+                </strong>
+              </div>
+            </div>
+          )}
+          {normalizeTlmList(session.trainerBasedTlm).length > 0 && (
+            <div className="ac-side-panel__grid ac-side-panel__grid--single" style={{ marginTop: 10 }}>
+              <div>
+                <em>Trainer based TLM</em>
+                <strong>
+                  {normalizeTlmList(session.trainerBasedTlm).map((item) => item.name).filter(Boolean).join(', ')}
+                </strong>
+              </div>
+            </div>
+          )}
         </div>
+
+
 
         <div className="ac-side-panel__section">
           <h5>Activity &amp; TOT</h5>
@@ -1365,8 +1709,8 @@ const SessionDetailSidePanel = ({
           <i className="fas fa-trash" /> Delete
         </button>
         {session.workflowStatus === WORKFLOW_STATUS.SCHEDULED && (
-          <button type="button" className="ac-btn ac-btn--outline ac-btn--sm" onClick={() => onSendToSenior(session)}>
-            <i className="fas fa-paper-plane" /> Send to Senior
+          <button type="button" className="ac-btn ac-btn--outline ac-btn--sm" onClick={() => onOpenReferModal(session)}>
+            <i className="fas fa-paper-plane" /> Refer Session
           </button>
         )}
       </footer>
@@ -1464,6 +1808,7 @@ const SessionPlanModal = ({
   draft,
   isEdit,
   batchSummary,
+  courseStructure = DEFAULT_COURSE_STRUCTURE,
   onClose,
   onSave,
   onFieldChange,
@@ -1473,17 +1818,31 @@ const SessionPlanModal = ({
   onLearningMaterialChange,
   onAddLearningMaterial,
   onRemoveLearningMaterial,
+  onStandardTlmChange,
+  onAddStandardTlm,
+  onRemoveStandardTlm,
+  onTrainerBasedTlmChange,
+  onAddTrainerBasedTlm,
+  onRemoveTrainerBasedTlm,
   onTotMaterialChange,
   onAddTotMaterial,
   onRemoveTotMaterial,
   onTotCompletionProofChange,
   onAddTotCompletionProof,
   onRemoveTotCompletionProof,
+  onTotQuestionChange,
+  onTotQuestionOptionChange,
+  onAddTotQuestion,
+  onRemoveTotQuestion,
   activityTypes,
   onActivityTypeToggle,
   onClearActivityTypes,
 }) => {
   if (!draft) return null;
+
+  const showUnit = courseStructure.unit === true;
+  const showChapter = courseStructure.chapter === true;
+  const structurePathLabel = buildStructurePathLabel(courseStructure);
 
   return (
     <div className="ac-modal-backdrop">
@@ -1516,6 +1875,10 @@ const SessionPlanModal = ({
                 <strong>{draft.batchCode}</strong>
               </div>
             )}
+            <div>
+              <span>Planning path</span>
+              <strong>{structurePathLabel}</strong>
+            </div>
           </div>
 
           <ActivityTypeSelector
@@ -1528,69 +1891,77 @@ const SessionPlanModal = ({
             onClearAll={onClearActivityTypes}
           />
 
-          <div className="ac-section-label">
-            <i className="fas fa-layer-group" /> Unit <small>(optional)</small>
-          </div>
+          {showUnit && (
+            <>
+              <div className="ac-section-label">
+                <i className="fas fa-layer-group" /> Unit
+              </div>
 
-          <div className="ac-form-grid">
-            <label className="ac-field">
-              <span>Unit number</span>
-              <input
-                className="ac-input"
-                type="text"
-                inputMode="numeric"
-                placeholder="e.g. 1"
-                value={draft.unitNumber || ''}
-                onChange={(e) => onFieldChange('unitNumber', e.target.value)}
-              />
-            </label>
-            <label className="ac-field ac-field--span-2">
-              <span>Unit name</span>
-              <input
-                className="ac-input"
-                placeholder="e.g. Foundation Skills"
-                value={draft.unitName || ''}
-                onChange={(e) => onFieldChange('unitName', e.target.value)}
-              />
-            </label>
-          </div>
+              <div className="ac-form-grid">
+                <label className="ac-field">
+                  <span>Unit number</span>
+                  <input
+                    className="ac-input"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="e.g. 1"
+                    value={draft.unitNumber || ''}
+                    onChange={(e) => onFieldChange('unitNumber', e.target.value)}
+                  />
+                </label>
+                <label className="ac-field ac-field--span-2">
+                  <span>Unit name</span>
+                  <input
+                    className="ac-input"
+                    placeholder="e.g. Foundation Skills"
+                    value={draft.unitName || ''}
+                    onChange={(e) => onFieldChange('unitName', e.target.value)}
+                  />
+                </label>
+              </div>
+            </>
+          )}
 
-          <div className="ac-section-label">
-            <i className="fas fa-book" /> Chapter details <small>(optional)</small>
-          </div>
+          {showChapter && (
+            <>
+              <div className="ac-section-label">
+                <i className="fas fa-book" /> Chapter details
+              </div>
 
-          <div className="ac-form-grid">
-            <label className="ac-field">
-              <span>Chapter number</span>
-              <input
-                className="ac-input"
-                type="text"
-                inputMode="numeric"
-                placeholder="e.g. 1"
-                value={draft.chapterNumber || ''}
-                onChange={(e) => onFieldChange('chapterNumber', e.target.value)}
-              />
-            </label>
-            <label className="ac-field ac-field--span-2">
-              <span>Chapter name</span>
-              <input
-                className="ac-input"
-                placeholder="e.g. Introduction to Retail Sales"
-                value={draft.chapterName || ''}
-                onChange={(e) => onFieldChange('chapterName', e.target.value)}
-              />
-            </label>
-            <label className="ac-field ac-field--full">
-              <span>Sub topics</span>
-              <textarea
-                className="ac-input ac-input--textarea"
-                rows="3"
-                placeholder="List sub topics — one per line or comma separated"
-                value={draft.subTopics || ''}
-                onChange={(e) => onFieldChange('subTopics', e.target.value)}
-              />
-            </label>
-          </div>
+              <div className="ac-form-grid">
+                <label className="ac-field">
+                  <span>Chapter number</span>
+                  <input
+                    className="ac-input"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="e.g. 1"
+                    value={draft.chapterNumber || ''}
+                    onChange={(e) => onFieldChange('chapterNumber', e.target.value)}
+                  />
+                </label>
+                <label className="ac-field ac-field--span-2">
+                  <span>Chapter name</span>
+                  <input
+                    className="ac-input"
+                    placeholder="e.g. Introduction to Retail Sales"
+                    value={draft.chapterName || ''}
+                    onChange={(e) => onFieldChange('chapterName', e.target.value)}
+                  />
+                </label>
+                <label className="ac-field ac-field--full">
+                  <span>Sub topics</span>
+                  <textarea
+                    className="ac-input ac-input--textarea"
+                    rows="3"
+                    placeholder="List sub topics — one per line or comma separated"
+                    value={draft.subTopics || ''}
+                    onChange={(e) => onFieldChange('subTopics', e.target.value)}
+                  />
+                </label>
+              </div>
+            </>
+          )}
 
           <div className="ac-section-label">
             <i className="fas fa-user-graduate" /> Session details
@@ -1598,7 +1969,7 @@ const SessionPlanModal = ({
 
           <div className="ac-form-grid">
             <label className="ac-field">
-              <span>Session number</span>
+              <span>Session Number</span>
               <input
                 className="ac-input"
                 type="text"
@@ -1609,7 +1980,7 @@ const SessionPlanModal = ({
               />
             </label>
             <label className="ac-field ac-field--span-2">
-              <span>Session title *</span>
+              <span>Session Name *</span>
               <input
                 className="ac-input"
                 placeholder="e.g. Product categories and selling points"
@@ -1618,7 +1989,57 @@ const SessionPlanModal = ({
               />
             </label>
             <label className="ac-field">
-              <span>Training method</span>
+              <span>Hrs.</span>
+              <input
+                className="ac-input"
+                type="text"
+                inputMode="decimal"
+                placeholder="e.g. 2"
+                value={draft.hours || ''}
+                onChange={(e) => onFieldChange('hours', e.target.value)}
+              />
+            </label>
+            <label className="ac-field">
+              <span>Sub Sessions</span>
+              <input
+                className="ac-input"
+                type="text"
+                inputMode="numeric"
+                placeholder="e.g. 2"
+                value={draft.subSessions || ''}
+                onChange={(e) => onFieldChange('subSessions', e.target.value)}
+              />
+            </label>
+            <label className="ac-field">
+              <span>Sub Session Name</span>
+              <input
+                className="ac-input"
+                placeholder="e.g. Greeting practice"
+                value={draft.subSessionName || ''}
+                onChange={(e) => onFieldChange('subSessionName', e.target.value)}
+              />
+            </label>
+            <label className="ac-field">
+              <span>Duration</span>
+              <input
+                className="ac-input"
+                placeholder="e.g. 45 min"
+                value={draft.duration || ''}
+                onChange={(e) => onFieldChange('duration', e.target.value)}
+              />
+            </label>
+            <label className="ac-field ac-field--full">
+              <span>Topics Covered</span>
+              <textarea
+                className="ac-input ac-input--textarea"
+                rows="3"
+                placeholder="List topics covered in this session"
+                value={draft.topicCovered || ''}
+                onChange={(e) => onFieldChange('topicCovered', e.target.value)}
+              />
+            </label>
+            <label className="ac-field ac-field--span-2">
+              <span>Teaching Method</span>
               <input
                 className="ac-input"
                 placeholder="Classroom, practical, role-play..."
@@ -1626,35 +2047,18 @@ const SessionPlanModal = ({
                 onChange={(e) => onFieldChange('trainingMethod', e.target.value)}
               />
             </label>
-            <label className="ac-field">
-              <span>Session date *</span>
-              <input
-                type="date"
-                className="ac-input"
-                value={draft.sessionDate}
-                onChange={(e) => onFieldChange('sessionDate', e.target.value)}
+            <label className="ac-field ac-field--full">
+              <span>Class Room &amp; Lab Resources</span>
+              <textarea
+                className="ac-input ac-input--textarea"
+                rows="2"
+                placeholder="Projector, whiteboard, lab kits, tools..."
+                value={draft.classroomLabResources || ''}
+                onChange={(e) => onFieldChange('classroomLabResources', e.target.value)}
               />
             </label>
-            <label className="ac-field">
-              <span>Start time</span>
-              <input
-                type="time"
-                className="ac-input"
-                value={draft.startTime}
-                onChange={(e) => onFieldChange('startTime', e.target.value)}
-              />
-            </label>
-            <label className="ac-field">
-              <span>End time</span>
-              <input
-                type="time"
-                className="ac-input"
-                value={draft.endTime}
-                onChange={(e) => onFieldChange('endTime', e.target.value)}
-              />
-            </label>
-         
           </div>
+
 
           <MaterialDefinitionSection
             title="Student learning material"
@@ -1665,6 +2069,44 @@ const SessionPlanModal = ({
             onAdd={onAddLearningMaterial}
             onChange={onLearningMaterialChange}
             onRemove={onRemoveLearningMaterial}
+          />
+
+          <MaterialDefinitionSection
+            title="Student Required documents"
+            addLabel="Add document"
+            emptyText="No documents defined yet."
+            items={draft.evidenceDocs || []}
+            typeOptions={EVIDENCE_TYPE_OPTIONS}
+            onAdd={onAddEvidence}
+            onChange={onEvidenceChange}
+            onRemove={onRemoveEvidence}
+          />
+          <MaterialDefinitionSection
+            title="Standard TLM"
+            addLabel="Add document"
+            emptyText="No standard TLM documents defined yet."
+            showDescription
+            items={normalizeTlmList(draft.standardTlm)}
+            typeOptions={LEARNING_MATERIAL_TYPE_OPTIONS}
+            namePlaceholder="e.g. Handbook PDF"
+            descriptionPlaceholder="Short description"
+            onAdd={onAddStandardTlm}
+            onChange={onStandardTlmChange}
+            onRemove={onRemoveStandardTlm}
+          />
+
+          <MaterialDefinitionSection
+            title="Trainer based TLM"
+            addLabel="Add document"
+            emptyText="No trainer based TLM documents defined yet."
+            showDescription
+            items={normalizeTlmList(draft.trainerBasedTlm)}
+            typeOptions={LEARNING_MATERIAL_TYPE_OPTIONS}
+            namePlaceholder="e.g. Trainer notes"
+            descriptionPlaceholder="Short description"
+            onAdd={onAddTrainerBasedTlm}
+            onChange={onTrainerBasedTlmChange}
+            onRemove={onRemoveTrainerBasedTlm}
           />
 
           <label className="ac-tot-check ac-tot-check--include">
@@ -1682,6 +2124,10 @@ const SessionPlanModal = ({
             onTotMaterialChange={onTotMaterialChange}
             onAddTotMaterial={onAddTotMaterial}
             onRemoveTotMaterial={onRemoveTotMaterial}
+            onTotQuestionChange={onTotQuestionChange}
+            onTotQuestionOptionChange={onTotQuestionOptionChange}
+            onAddTotQuestion={onAddTotQuestion}
+            onRemoveTotQuestion={onRemoveTotQuestion}
             onTotCompletionProofChange={onTotCompletionProofChange}
             onAddTotCompletionProof={onAddTotCompletionProof}
             onRemoveTotCompletionProof={onRemoveTotCompletionProof}
@@ -1698,18 +2144,9 @@ const SessionPlanModal = ({
             />
           </label>
 
-          <MaterialDefinitionSection
-            title="Required documents"
-            addLabel="Add document"
-            emptyText="No documents defined yet."
-            items={draft.evidenceDocs || []}
-            typeOptions={EVIDENCE_TYPE_OPTIONS}
-            onAdd={onAddEvidence}
-            onChange={onEvidenceChange}
-            onRemove={onRemoveEvidence}
-          />
 
-          
+
+
         </div>
 
         <div className="ac-modal__foot">
@@ -1723,7 +2160,187 @@ const SessionPlanModal = ({
   );
 };
 
+const ReferSessionModal = ({
+  session,
+  trainerOptions = [],
+  loadingTrainers = false,
+  onClose,
+  onConfirm,
+  onNotify,
+}) => {
+  const [selectedTrainerId, setSelectedTrainerId] = useState('');
+
+  useEffect(() => {
+    setSelectedTrainerId('');
+  }, [session?.id]);
+
+  if (!session) return null;
+
+  const sessionLabel = session.sessionNumber
+    ? `Session ${session.sessionNumber}: ${session.title}`
+    : session.title;
+
+  const handleConfirm = () => {
+    if (!selectedTrainerId) {
+      onNotify?.('Please select a Senior Trainer');
+      return;
+    }
+    if (!session) {
+      onNotify?.('No session selected to refer.');
+      return;
+    }
+    const selected = trainerOptions.find((trainer) => trainer.value === selectedTrainerId);
+    onConfirm(session, {
+      id: selectedTrainerId,
+      name: selected?.label || '',
+    });
+  };
+
+  return (
+    <div className="ac-modal-backdrop">
+      <div className="ac-modal ac-modal--confirm" role="dialog" aria-modal="true">
+        <div className="ac-modal__head">
+          <div>
+            <h5>Refer Session</h5>
+            <span>Send to Senior Trainer</span>
+          </div>
+          <button type="button" className="ac-modal__close" onClick={onClose} aria-label="Close">
+            <i className="fas fa-times" />
+          </button>
+        </div>
+
+        <div className="ac-modal__body">
+          <p className="ac-refer-modal__text">
+            Refer <strong>{sessionLabel}</strong> to Senior Trainer.
+          </p>
+
+          <label className="ac-field ac-field--full">
+            <span>Senior Trainer</span>
+            <select
+              className="ac-select ac-select--full"
+              value={selectedTrainerId}
+              onChange={(e) => setSelectedTrainerId(e.target.value)}
+              disabled={loadingTrainers}
+            >
+              <option value="">Select Senior Trainer</option>
+              {trainerOptions.map((trainer) => (
+                <option key={trainer.value} value={trainer.value}>
+                  {trainer.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="ac-modal__foot">
+          <button type="button" className="ac-btn ac-btn--ghost" onClick={onClose}>Cancel</button>
+          <button
+            type="button"
+            className="ac-btn ac-btn--primary"
+            onClick={handleConfirm}
+            disabled={loadingTrainers}
+          >
+            <i className="fas fa-paper-plane" /> Refer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+let pendingAcDeepLink = null;
+
+const readSessionDeepLink = (locationState) => {
+  if (pendingAcDeepLink) return pendingAcDeepLink;
+
+  let fromStorage = null;
+  try {
+    const raw = sessionStorage.getItem('acSessionDeepLink');
+    if (raw) fromStorage = JSON.parse(raw);
+  } catch (_) {
+    fromStorage = null;
+  }
+
+  const incoming = locationState || fromStorage;
+  const params = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search)
+    : null;
+
+  if (!incoming) {
+    const courseIdFromQuery = params?.get('courseId');
+    if (!courseIdFromQuery || params?.get('skipWizard') !== '1') return null;
+    pendingAcDeepLink = {
+      skipPathPicker: true,
+      courseName: '',
+      departmentName: '',
+      projectName: '',
+      centerName: '',
+      filters: {
+        department: '',
+        project: '',
+        center: '',
+        course: String(courseIdFromQuery),
+        batch: `course:${courseIdFromQuery}`,
+      },
+    };
+    return pendingAcDeepLink;
+  }
+
+  const courseId = String(
+    incoming.filters?.course
+    || incoming.courseId
+    || params?.get('courseId')
+    || ''
+  );
+  if (!courseId) return null;
+
+  const skipPathPicker = incoming.skipPathPicker !== false
+    || params?.get('skipWizard') === '1';
+
+  pendingAcDeepLink = {
+    skipPathPicker,
+    courseName: incoming.courseName || '',
+    departmentName: incoming.departmentName || '',
+    projectName: incoming.projectName || '',
+    centerName: incoming.centerName || '',
+    courseStructure: incoming.courseStructure || null,
+    filters: {
+      department: String(incoming.filters?.department || ''),
+      project: String(incoming.filters?.project || ''),
+      center: String(incoming.filters?.center || ''),
+      course: courseId,
+      batch: String(incoming.filters?.batch || `course:${courseId}`),
+    },
+  };
+  return pendingAcDeepLink;
+};
+
+const clearPendingAcDeepLink = () => {
+  pendingAcDeepLink = null;
+  try {
+    sessionStorage.removeItem('acSessionDeepLink');
+  } catch (_) {
+    // ignore
+  }
+};
+
 const AcademicCoordinatorModule = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const bootstrapRef = useRef(null);
+  const deepLinkBoot = useRef(null);
+
+  if (!deepLinkBoot.current) {
+    deepLinkBoot.current = readSessionDeepLink(location.state);
+    if (deepLinkBoot.current?.skipPathPicker) {
+      bootstrapRef.current = {
+        ...deepLinkBoot.current,
+        pathApplied: false,
+        batchApplied: !!deepLinkBoot.current.filters.batch,
+      };
+    }
+  }
+
   const userData = useMemo(
     () => JSON.parse(sessionStorage.getItem('user') || '{}'),
     []
@@ -1731,19 +2348,66 @@ const AcademicCoordinatorModule = () => {
   const token = userData.token;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
 
+  const [permissions, setPermissions] = useState();
+
+  const updatedPermission = async () => {
+    const respose = await axios.get(`${backendUrl}/college/permission`, {
+      headers: { 'x-auth': token },
+    });
+    if (respose.data.status) {
+      setPermissions(respose.data.permissions);
+    }
+  };
+
+  useEffect(() => {
+    if (token) updatedPermission();
+  }, []);
+
+  const canViewTrainingPermission =
+    (permissions?.custom_permissions?.can_view_training && permissions?.permission_type === 'Custom') ||
+    permissions?.permission_type === 'Admin';
+
+  const canBeSeniorTrainerPermission =
+    (permissions?.custom_permissions?.can_be_senior_trainer && permissions?.permission_type === 'Custom') ||
+    permissions?.permission_type === 'Admin';
+
+  const canBeTrainerPermission =
+    (permissions?.custom_permissions?.can_be_trainer && permissions?.permission_type === 'Custom') ||
+    permissions?.permission_type === 'Admin';
+
   const [reportDate, setReportDate] = useState(new Date());
-  const [filters, setFilters] = useState({
-    department: '',
-    project: '',
-    center: '',
-    course: '',
-    batch: '',
+  const [filters, setFilters] = useState(() => {
+    const boot = deepLinkBoot.current;
+    if (boot?.skipPathPicker && boot.filters?.course) {
+      return {
+        department: boot.filters.department || '',
+        project: boot.filters.project || '',
+        center: boot.filters.center || '',
+        course: boot.filters.course,
+        // Set immediately so Department/Project/Center wizard never shows
+        batch: boot.filters.batch || `course:${boot.filters.course}`,
+      };
+    }
+    return {
+      department: '',
+      project: '',
+      center: '',
+      course: '',
+      batch: '',
+    };
   });
   const [verticalOptions, setVerticalOptions] = useState([]);
   const [projectOptions, setProjectOptions] = useState([]);
   const [centerOptions, setCenterOptions] = useState([]);
   const [courseOptions, setCourseOptions] = useState([]);
-  const [batchOptions, setBatchOptions] = useState([]);
+  const [batchOptions, setBatchOptions] = useState(() => {
+    const boot = deepLinkBoot.current;
+    if (boot?.skipPathPicker && boot.filters?.course) {
+      const batchId = boot.filters.batch || `course:${boot.filters.course}`;
+      return [{ value: batchId, label: boot.courseName || 'Course plan' }];
+    }
+    return [];
+  });
   const [allCoursesMeta, setAllCoursesMeta] = useState([]);
   const [allCentersMeta, setAllCentersMeta] = useState([]);
   const [centerWiseCourseIds, setCenterWiseCourseIds] = useState(new Set());
@@ -1751,28 +2415,72 @@ const AcademicCoordinatorModule = () => {
   const [pathBatchesLoading, setPathBatchesLoading] = useState(false);
   const [filterOptionsLoading, setFilterOptionsLoading] = useState(true);
   const [sessions, setSessions] = useState([]);
-  const [activityTypes, setActivityTypes] = useState(() => loadActivityTypes());
+  const [activityTypes, setActivityTypes] = useState([]);
   const [activityTypesModalOpen, setActivityTypesModalOpen] = useState(false);
   const [quickSearch, setQuickSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [activityFilter, setActivityFilter] = useState('all');
   const [modal, setModal] = useState({ open: false, draft: null, editingId: null });
+  const [referModal, setReferModal] = useState({ open: false, session: null });
+  const [seniorTrainerOptions, setSeniorTrainerOptions] = useState([]);
+  const [seniorTrainersLoading, setSeniorTrainersLoading] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState('');
   const [toast, setToast] = useState('');
-
+  const [toastKey, setToastKey] = useState(0);
+  const toastTimerRef = useRef(null);
   const notify = (msg) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast(msg);
-    setTimeout(() => setToast(''), 2500);
+    setToastKey((k) => k + 1);
+    toastTimerRef.current = setTimeout(() => setToast(''), 2500);
   };
 
-  const pathLabels = useMemo(() => ({
-    departmentName: getOptionLabel(verticalOptions, filters.department),
-    projectName: getOptionLabel(projectOptions, filters.project),
-    centerName: getOptionLabel(centerOptions, filters.center),
-    courseTrade: getOptionLabel(courseOptions, filters.course),
-    batchCode: getOptionLabel(batchOptions, filters.batch),
-    studentCount: 0,
-  }), [filters, verticalOptions, projectOptions, centerOptions, courseOptions, batchOptions]);
+  // Clear router query/state after deep-link is consumed (keep module cache for Strict Mode remount)
+  useEffect(() => {
+    if (!deepLinkBoot.current?.skipPathPicker) return;
+    try {
+      sessionStorage.removeItem('acSessionDeepLink');
+    } catch (_) {
+      // ignore
+    }
+    // Important: On refresh, router `location.state` is lost and only the URL/query
+    // remains. If we strip the query params here, the page can't reconstruct the
+    // deep-linked wizard step and falls back to STEP 1.
+    //
+    // So: always clear router state, but preserve `courseId/skipWizard` query.
+    const searchParams = new URLSearchParams(location.search);
+    const hasDeepLinkQuery = searchParams.get('skipWizard') === '1' || searchParams.has('courseId');
+    if (location.state || hasDeepLinkQuery) {
+      const nextUrl = hasDeepLinkQuery
+        ? `/institute/academicCoordinator?${searchParams.toString()}`
+        : '/institute/academicCoordinator';
+      navigate(nextUrl, { replace: true, state: null });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const pathLabels = useMemo(() => {
+    const boot = bootstrapRef.current;
+    return {
+      departmentName: getOptionLabel(verticalOptions, filters.department) || boot?.departmentName || '',
+      projectName: getOptionLabel(projectOptions, filters.project) || boot?.projectName || '',
+      centerName: getOptionLabel(centerOptions, filters.center) || boot?.centerName || '',
+      courseTrade: getOptionLabel(courseOptions, filters.course) || boot?.courseName || '',
+      batchCode: getOptionLabel(batchOptions, filters.batch)
+        || (String(filters.batch || '').startsWith('course:')
+          ? (boot?.courseName || 'Course plan')
+          : ''),
+      studentCount: 0,
+    };
+  }, [filters, verticalOptions, projectOptions, centerOptions, courseOptions, batchOptions]);
+
+  const selectedCourseStructure = useMemo(
+    () => getCourseStructureFromMeta(
+      allCoursesMeta,
+      filters.course,
+      bootstrapRef.current?.courseStructure
+    ),
+    [allCoursesMeta, filters.course]
+  );
 
   const filterProjectOptions = useMemo(() => {
     if (!filters.department) return [];
@@ -1893,7 +2601,7 @@ const AcademicCoordinatorModule = () => {
         ] = await Promise.allSettled([
           axios.get(`${backendUrl}/college/list_all_projects`, requestConfig),
           axios.get(`${backendUrl}/college/list_all_centers`, requestConfig),
-          axios.get(`${backendUrl}/college/all_courses`, requestConfig),
+          axios.get(`${backendUrl}/college/all_coursescopy`, requestConfig),
           axios.get(`${backendUrl}/college/filters-data`, requestConfig),
         ]);
 
@@ -1952,7 +2660,7 @@ const AcademicCoordinatorModule = () => {
     const fetchCenterCourses = async () => {
       setCenterCoursesLoading(true);
       try {
-        const res = await axios.get(`${backendUrl}/college/all_courses_centerwise`, {
+        const res = await axios.get(`${backendUrl}/college/all_coursescopy_centerwise`, {
           params: { centerId: filters.center, projectId: filters.project },
           headers: { 'x-auth': token },
         });
@@ -1976,7 +2684,10 @@ const AcademicCoordinatorModule = () => {
   useEffect(() => {
     if (!token) return undefined;
     if (!filters.center) {
-      setBatchOptions([]);
+      // Keep synthetic course-plan option when deep-linking without a center yet
+      if (!bootstrapRef.current?.skipPathPicker) {
+        setBatchOptions([]);
+      }
       return undefined;
     }
 
@@ -1990,16 +2701,39 @@ const AcademicCoordinatorModule = () => {
           headers: { 'x-auth': token },
         });
         if (res.data?.success) {
-          setBatchOptions((res.data.data || []).map((batch) => ({
+          const nextBatches = (res.data.data || []).map((batch) => ({
             value: String(batch._id),
             label: batch.name,
-          })));
+          }));
+          if (nextBatches.length) {
+            setBatchOptions(nextBatches);
+          } else if (bootstrapRef.current?.skipPathPicker && filters.course) {
+            const syntheticId = `course:${filters.course}`;
+            setBatchOptions([{
+              value: syntheticId,
+              label: bootstrapRef.current.courseName || 'Course plan',
+            }]);
+          } else {
+            setBatchOptions([]);
+          }
+        } else if (bootstrapRef.current?.skipPathPicker && filters.course) {
+          setBatchOptions([{
+            value: `course:${filters.course}`,
+            label: bootstrapRef.current.courseName || 'Course plan',
+          }]);
         } else {
           setBatchOptions([]);
         }
       } catch (err) {
         console.error('Failed to fetch batches:', err);
-        setBatchOptions([]);
+        if (bootstrapRef.current?.skipPathPicker && filters.course) {
+          setBatchOptions([{
+            value: `course:${filters.course}`,
+            label: bootstrapRef.current.courseName || 'Course plan',
+          }]);
+        } else {
+          setBatchOptions([]);
+        }
       } finally {
         setPathBatchesLoading(false);
       }
@@ -2010,14 +2744,128 @@ const AcademicCoordinatorModule = () => {
   }, [filters.center, filters.course, token, backendUrl]);
 
   useEffect(() => {
+    if (!token) return undefined;
+    let cancelled = false;
+    const loadTypes = async () => {
+      try {
+        const types = await fetchActivityTypesApi(backendUrl, token);
+        if (!cancelled) setActivityTypes(types);
+      } catch (err) {
+        console.error('Failed to load activity types', err);
+        if (!cancelled) setActivityTypes([]);
+      }
+    };
+    loadTypes();
+    return () => { cancelled = true; };
+  }, [backendUrl, token]);
+
+  useEffect(() => {
     if (!filters.batch) {
       setSessions([]);
       setSelectedSessionId('');
-      return;
+      return undefined;
     }
-    setSessions(loadStoredSessions(filters.batch));
-    setSelectedSessionId('');
-  }, [filters.batch]);
+    if (!token) return undefined;
+
+    let cancelled = false;
+    const loadSessions = async () => {
+      try {
+        const courseId = String(filters.batch).startsWith('course:')
+          ? String(filters.batch).replace(/^course:/, '')
+          : (filters.course || '');
+        const data = await fetchSessionsApi(backendUrl, token, filters.batch, courseId);
+        if (!cancelled) {
+          setSessions(data);
+          setSelectedSessionId('');
+        }
+      } catch (err) {
+        console.error('Failed to load sessions', err);
+        if (!cancelled) {
+          // Fallback to any legacy local data once
+          setSessions(loadStoredSessions(filters.batch));
+          notify('Failed to load sessions from server');
+        }
+      }
+    };
+    loadSessions();
+    return () => { cancelled = true; };
+  }, [filters.batch, filters.course, backendUrl, token]);
+
+  // Deep-link: fill department/project/center from course meta (wizard already skipped)
+  useEffect(() => {
+    const boot = bootstrapRef.current;
+    if (!boot?.skipPathPicker || boot.pathApplied) return;
+    if (!filters.course) return;
+
+    const courseMeta = allCoursesMeta.find(
+      (item) => String(item._id) === String(filters.course)
+    );
+
+    if (!courseMeta && allCoursesMeta.length === 0) return;
+
+    const department = String(
+      filters.department
+      || boot.filters?.department
+      || courseMeta?.vertical?._id
+      || courseMeta?.vertical
+      || ''
+    );
+    const project = String(
+      filters.project
+      || boot.filters?.project
+      || courseMeta?.project?._id
+      || courseMeta?.project
+      || ''
+    );
+
+    let center = String(filters.center || boot.filters?.center || '');
+    if (!center && courseMeta) {
+      const centers = Array.isArray(courseMeta.center) ? courseMeta.center : [];
+      const firstCenter = centers[0];
+      center = String(firstCenter?._id || firstCenter || courseMeta.centerId || '');
+    }
+    if (!center && project && allCentersMeta.length) {
+      const projectCenter = allCentersMeta.find((centerItem) =>
+        centerItem?.projects?.some((p) => String(p._id || p) === String(project))
+      );
+      if (projectCenter) center = String(projectCenter._id);
+    }
+
+    if (courseMeta?.name && !boot.courseName) {
+      boot.courseName = courseMeta.name;
+    }
+
+    setFilters((prev) => ({
+      ...prev,
+      department: department || prev.department,
+      project: project || prev.project,
+      center: center || prev.center,
+      course: prev.course || String(boot.filters.course),
+      batch: prev.batch || `course:${boot.filters.course}`,
+    }));
+    boot.pathApplied = true;
+  }, [filters.course, filters.department, filters.project, filters.center, allCoursesMeta, allCentersMeta]);
+
+  // Deep-link: when real batches load, prefer first batch over synthetic course plan
+  useEffect(() => {
+    const boot = bootstrapRef.current;
+    if (!boot?.skipPathPicker) return;
+    if (!filters.course || !filters.center) return;
+    if (pathBatchesLoading) return;
+    if (!batchOptions.length) return;
+
+    const hasRealBatch = batchOptions.some((opt) => !String(opt.value).startsWith('course:'));
+    if (!hasRealBatch) return;
+
+    const currentIsSynthetic = String(filters.batch || '').startsWith('course:');
+    if (!currentIsSynthetic && filters.batch) return;
+
+    const firstReal = batchOptions.find((opt) => !String(opt.value).startsWith('course:'));
+    if (firstReal) {
+      setFilters((prev) => ({ ...prev, batch: firstReal.value }));
+      boot.batchApplied = true;
+    }
+  }, [filters.course, filters.center, filters.batch, batchOptions, pathBatchesLoading]);
 
   const sortedSessions = useMemo(
     () => [...sessions].sort((a, b) => {
@@ -2035,26 +2883,43 @@ const AcademicCoordinatorModule = () => {
   );
 
   const handleSelectSession = (sessionId) => {
-    setSelectedSessionId((prev) => (prev === sessionId ? '' : sessionId));
+    const resolvedId = resolveSessionSelectionId(sessionId);
+    setSelectedSessionId((prev) => (resolveSessionSelectionId(prev) === resolvedId ? '' : resolvedId));
   };
 
-  const loadDummySessions = () => {
+  const loadDummySessions = async () => {
     if (!filters.batch) return;
+    if (!filters.course && !String(filters.batch).startsWith('course:')) {
+      notify('Select a course before loading demo sessions');
+      return;
+    }
     const hasData = sessions.length > 0;
     if (hasData && !window.confirm('Replace current sessions with demo dummy data?')) return;
     const context = buildContextFromFilters(filters, pathLabels);
     const dummy = createDummySessions(context);
-    persistSessions(dummy);
-    setSelectedSessionId(dummy[0]?.id || '');
-    notify('Demo dummy sessions loaded');
-  };
-
-  const persistSessions = useCallback((next) => {
-    setSessions(next);
-    if (filters.batch) {
-      persistStoredSessions(filters.batch, next);
+    try {
+      // Soft-delete existing then create demo rows
+      await Promise.all(
+        sessions.map((session) => deleteSessionApi(backendUrl, token, session.id).catch(() => null))
+      );
+      const created = [];
+      for (const item of dummy) {
+        const { id: _id, createdAt: _c, updatedAt: _u, ...payload } = item;
+        const saved = await createSessionApi(backendUrl, token, {
+          ...payload,
+          course: filters.course || String(filters.batch).replace(/^course:/, ''),
+          batch: String(filters.batch).startsWith('course:') ? '' : filters.batch,
+        });
+        created.push(saved);
+      }
+      setSessions(created);
+      setSelectedSessionId(created[0]?.id || '');
+      notify('Demo dummy sessions loaded');
+    } catch (err) {
+      console.error(err);
+      notify(err.message || 'Failed to load demo sessions');
     }
-  }, [filters.batch]);
+  };
 
   const filteredSessions = useMemo(() => {
     const query = quickSearch.trim().toLowerCase();
@@ -2087,6 +2952,16 @@ const AcademicCoordinatorModule = () => {
   );
 
   const tocTree = useMemo(() => buildCourseToc(filteredSessions), [filteredSessions]);
+
+  const totSessions = useMemo(
+    () => filteredSessions.filter((session) => appearsOnTotCalendar(session)).map(mapSessionForTotCalendar),
+    [filteredSessions]
+  );
+
+  const studentSessions = useMemo(
+    () => filteredSessions.filter((session) => appearsOnStudentCalendar(session)),
+    [filteredSessions]
+  );
 
   const stats = useMemo(() => ({
     total: sessions.length,
@@ -2132,6 +3007,9 @@ const AcademicCoordinatorModule = () => {
   };
 
   const handleSessionPathReset = () => {
+    clearPendingAcDeepLink();
+    bootstrapRef.current = null;
+    deepLinkBoot.current = null;
     setFilters({ department: '', project: '', center: '', course: '', batch: '' });
   };
 
@@ -2166,6 +3044,8 @@ const AcademicCoordinatorModule = () => {
         totTrainingProofs: session.totTrainingProofs || [],
         preSessionRequirements: session.preSessionRequirements || [],
         totCompletionProofs: session.totCompletionProofs || [],
+        standardTlm: normalizeTlmList(session.standardTlm),
+        trainerBasedTlm: normalizeTlmList(session.trainerBasedTlm),
       },
     });
   };
@@ -2175,15 +3055,17 @@ const AcademicCoordinatorModule = () => {
   const updateDraft = (field, value) => {
     setModal((prev) => {
       const next = { ...prev.draft, [field]: value };
-      const topicSyncFields = ['chapterNumber', 'chapterName', 'subTopics'];
+      const topicSyncFields = ['chapterNumber', 'chapterName', 'subTopics', 'topicCovered'];
       if (next.includeTot !== false && next.totUseSameTopics !== false) {
         if (topicSyncFields.includes(field)) {
-          next.totTopicCovered = buildTopicSummary(next);
+          next.totTopicCovered = field === 'topicCovered'
+            ? (value || '')
+            : (next.topicCovered?.trim() || buildTopicSummary(next));
         }
         if (field === 'trainingMethod') next.totTrainingMethod = value;
       }
       if (field === 'totUseSameTopics' && value === true) {
-        next.totTopicCovered = buildTopicSummary(next);
+        next.totTopicCovered = next.topicCovered?.trim() || buildTopicSummary(next);
         next.totTrainingMethod = next.trainingMethod || '';
       }
       return { ...prev, draft: next };
@@ -2230,6 +3112,68 @@ const AcademicCoordinatorModule = () => {
   const addDraftLearningMaterial = () => addDraftListItem('learningMaterials', 'PDF');
   const removeDraftLearningMaterial = (index) => removeDraftListItem('learningMaterials', index);
 
+  const updateDraftStandardTlm = (index, field, value) => {
+    setModal((prev) => {
+      const list = normalizeTlmList(prev.draft.standardTlm);
+      return {
+        ...prev,
+        draft: {
+          ...prev.draft,
+          standardTlm: list.map((item, i) => (i === index ? { ...item, [field]: value } : item)),
+        },
+      };
+    });
+  };
+  const addDraftStandardTlm = () => {
+    setModal((prev) => ({
+      ...prev,
+      draft: {
+        ...prev.draft,
+        standardTlm: [...normalizeTlmList(prev.draft.standardTlm), createMaterialItem('PDF')],
+      },
+    }));
+  };
+  const removeDraftStandardTlm = (index) => {
+    setModal((prev) => ({
+      ...prev,
+      draft: {
+        ...prev.draft,
+        standardTlm: normalizeTlmList(prev.draft.standardTlm).filter((_, i) => i !== index),
+      },
+    }));
+  };
+
+  const updateDraftTrainerBasedTlm = (index, field, value) => {
+    setModal((prev) => {
+      const list = normalizeTlmList(prev.draft.trainerBasedTlm);
+      return {
+        ...prev,
+        draft: {
+          ...prev.draft,
+          trainerBasedTlm: list.map((item, i) => (i === index ? { ...item, [field]: value } : item)),
+        },
+      };
+    });
+  };
+  const addDraftTrainerBasedTlm = () => {
+    setModal((prev) => ({
+      ...prev,
+      draft: {
+        ...prev.draft,
+        trainerBasedTlm: [...normalizeTlmList(prev.draft.trainerBasedTlm), createMaterialItem('PDF')],
+      },
+    }));
+  };
+  const removeDraftTrainerBasedTlm = (index) => {
+    setModal((prev) => ({
+      ...prev,
+      draft: {
+        ...prev.draft,
+        trainerBasedTlm: normalizeTlmList(prev.draft.trainerBasedTlm).filter((_, i) => i !== index),
+      },
+    }));
+  };
+
   const updateDraftTotMaterial = (index, field, value) => updateDraftListItem('totMaterials', index, field, value);
   const addDraftTotMaterial = () => addDraftListItem('totMaterials', 'PDF');
   const removeDraftTotMaterial = (index) => removeDraftListItem('totMaterials', index);
@@ -2245,6 +3189,48 @@ const AcademicCoordinatorModule = () => {
   const updateDraftTotCompletionProof = (index, field, value) => updateDraftListItem('totCompletionProofs', index, field, value);
   const addDraftTotCompletionProof = () => addDraftListItem('totCompletionProofs', 'PDF');
   const removeDraftTotCompletionProof = (index) => removeDraftListItem('totCompletionProofs', index);
+
+  const updateDraftTotQuestion = (index, field, value) => setModal((prev) => ({
+    ...prev,
+    draft: {
+      ...prev.draft,
+      totQuestionBank: (prev.draft.totQuestionBank || []).map((question, i) => (
+        i === index ? { ...question, [field]: value } : question
+      )),
+    },
+  }));
+
+  const updateDraftTotQuestionOption = (questionIndex, optionIndex, value) => setModal((prev) => ({
+    ...prev,
+    draft: {
+      ...prev.draft,
+      totQuestionBank: (prev.draft.totQuestionBank || []).map((question, i) => (
+        i === questionIndex
+          ? {
+            ...question, options: question.options.map((option, optIdx) => (
+              optIdx === optionIndex ? value : option
+            ))
+          }
+          : question
+      )),
+    },
+  }));
+
+  const addDraftTotQuestion = () => setModal((prev) => ({
+    ...prev,
+    draft: {
+      ...prev.draft,
+      totQuestionBank: [...(prev.draft.totQuestionBank || []), createTotQuestionDraft()],
+    },
+  }));
+
+  const removeDraftTotQuestion = (index) => setModal((prev) => ({
+    ...prev,
+    draft: {
+      ...prev.draft,
+      totQuestionBank: (prev.draft.totQuestionBank || []).filter((_, i) => i !== index),
+    },
+  }));
 
   const handleActivityTypeToggle = (activityType) => {
     setModal((prev) => {
@@ -2269,19 +3255,29 @@ const AcademicCoordinatorModule = () => {
     }));
   };
 
-  const handleActivityTypesSave = (nextTypes) => {
-    setActivityTypes(nextTypes);
-    persistActivityTypes(nextTypes);
+  const handleActivityTypesSave = async (nextTypes) => {
+    try {
+      const saved = await saveActivityTypesApi(backendUrl, token, nextTypes);
+      setActivityTypes(saved);
+      notify('Activity types saved');
+    } catch (err) {
+      console.error(err);
+      notify(err.response?.data?.message || err.message || 'Failed to save activity types');
+    }
   };
 
-  const saveSession = () => {
+  const saveSession = async () => {
     const { draft, editingId } = modal;
     if (!draft?.title?.trim()) {
-      notify('Please enter session title');
+      notify('Please enter session name');
       return;
     }
     if (!draft?.sessionDate) {
       notify('Please select session date');
+      return;
+    }
+    if (!filters.course && !draft.course) {
+      notify('Please select a course');
       return;
     }
 
@@ -2292,6 +3288,7 @@ const AcademicCoordinatorModule = () => {
     }
 
     const existing = editingId ? sessions.find((s) => s.id === editingId) : null;
+    const normalizedTotQuestionBank = normalizeTotQuestions(draft.totQuestionBank);
 
     const {
       activityTypeId: _legacyActivityTypeId,
@@ -2303,11 +3300,15 @@ const AcademicCoordinatorModule = () => {
     const normalized = {
       ...draftWithoutLegacyActivity,
       sessionType: SESSION_TYPE.STUDENT,
+      totQuestionBank: normalizedTotQuestionBank,
+      totQuestionBankLastUpdated: normalizedTotQuestionBank.length
+        ? new Date().toISOString()
+        : existing?.totQuestionBankLastUpdated || '',
       includeTot: draft.includeTot !== false,
       totUseSameTopics: draft.includeTot !== false ? draft.totUseSameTopics !== false : false,
       totTopicCovered: draft.includeTot !== false
         ? (draft.totUseSameTopics !== false
-          ? buildTopicSummary(draft)
+          ? (draft.topicCovered?.trim() || buildTopicSummary(draft))
           : (draft.totTopicCovered?.trim() || ''))
         : '',
       totTrainingMethod: draft.includeTot !== false
@@ -2325,13 +3326,20 @@ const AcademicCoordinatorModule = () => {
       seniorTrainerName: existing?.seniorTrainerName || '',
       title: draft.title.trim(),
       sessionNumber: draft.sessionNumber?.toString().trim() || '',
-      unitNumber: draft.unitNumber?.toString().trim() || '',
-      unitName: draft.unitName?.trim() || '',
-      chapterNumber: draft.chapterNumber?.toString().trim() || '',
-      chapterName: draft.chapterName?.trim() || '',
-      subTopics: draft.subTopics?.trim() || '',
-      topicCovered: buildTopicSummary(draft),
+      hours: draft.hours?.toString().trim() || '',
+      subSessions: draft.subSessions?.toString().trim() || '',
+      subSessionName: draft.subSessionName?.trim() || '',
+      duration: draft.duration?.trim() || '',
+      unitNumber: selectedCourseStructure.unit ? draft.unitNumber?.toString().trim() || '' : '',
+      unitName: selectedCourseStructure.unit ? draft.unitName?.trim() || '' : '',
+      chapterNumber: selectedCourseStructure.chapter ? draft.chapterNumber?.toString().trim() || '' : '',
+      chapterName: selectedCourseStructure.chapter ? draft.chapterName?.trim() || '' : '',
+      subTopics: selectedCourseStructure.chapter ? draft.subTopics?.trim() || '' : '',
+      topicCovered: draft.topicCovered?.trim() || buildTopicSummary(draft),
       trainingMethod: draft.trainingMethod?.trim() || '',
+      classroomLabResources: draft.classroomLabResources?.trim() || '',
+      standardTlm: normalizeMaterialItems(normalizeTlmList(draft.standardTlm)),
+      trainerBasedTlm: normalizeMaterialItems(normalizeTlmList(draft.trainerBasedTlm)),
       notes: draft.notes?.trim() || '',
       date: formatSessionDate(draft.sessionDate),
       workflowStatus: draft.workflowStatus || WORKFLOW_STATUS.SCHEDULED,
@@ -2347,51 +3355,125 @@ const AcademicCoordinatorModule = () => {
       sessionActivities: normalizeSessionActivities(
         draft.sessionActivities?.length ? draft.sessionActivities : getSessionActivities(draft)
       ),
-      updatedAt: new Date().toISOString(),
+      department: filters.department || draft.department || '',
+      project: filters.project || draft.project || '',
+      center: filters.center || draft.center || '',
+      course: filters.course || draft.course || '',
+      batch: String(filters.batch || '').startsWith('course:') ? '' : (filters.batch || draft.batch || ''),
+      departmentName: pathLabels.departmentName,
+      projectName: pathLabels.projectName,
+      centerName: pathLabels.centerName,
+      courseTrade: pathLabels.courseTrade,
+      batchCode: pathLabels.batchCode,
     };
 
-    const sessionId = editingId || `AC-${Date.now()}`;
-    const savedSession = {
-      ...normalized,
-      id: sessionId,
-      createdAt: existing?.createdAt || new Date().toISOString(),
-    };
+    try {
+      let savedSession;
+      if (editingId) {
+        savedSession = await updateSessionApi(backendUrl, token, editingId, normalized);
+        setSessions((prev) => prev.map((s) => (s.id === editingId ? savedSession : s)));
+        notify(`Session updated: ${savedSession.title}`);
+      } else {
+        savedSession = await createSessionApi(backendUrl, token, normalized);
+        setSessions((prev) => [...prev, savedSession]);
+        notify(`Session created: ${savedSession.title}`);
+      }
 
-    if (editingId) {
-      persistSessions(sessions.map((s) => (s.id === editingId ? savedSession : s)));
-      notify(`Session updated: ${savedSession.title}`);
-    } else {
-      persistSessions([...sessions, savedSession]);
-      notify(`Session created: ${savedSession.title}`);
+      setQuickSearch('');
+      setStatusFilter('all');
+      setActivityFilter('all');
+      setSelectedSessionId(savedSession.id);
+      closeModal();
+    } catch (err) {
+      console.error(err);
+      notify(err.response?.data?.message || err.message || 'Failed to save session');
     }
-
-    setQuickSearch('');
-    setStatusFilter('all');
-    setActivityFilter('all');
-    setSelectedSessionId(sessionId);
-    closeModal();
   };
 
-  const deleteSession = (session) => {
+  const deleteSession = async (session) => {
     if (!window.confirm(`Delete session "${session.title}"?`)) return;
-    persistSessions(sessions.filter((s) => s.id !== session.id));
-    if (selectedSessionId === session.id) setSelectedSessionId('');
-    notify('Session plan deleted');
+    try {
+      await deleteSessionApi(backendUrl, token, session.id);
+      setSessions((prev) => prev.filter((s) => s.id !== session.id));
+      if (selectedSessionId === session.id) setSelectedSessionId('');
+      notify('Session plan deleted');
+    } catch (err) {
+      console.error(err);
+      notify(err.response?.data?.message || err.message || 'Failed to delete session');
+    }
   };
 
-  const sendToSenior = (session) => {
-    persistSessions(sessions.map((s) => (
-      s.id === session.id
-        ? { ...s, workflowStatus: WORKFLOW_STATUS.SENT_TO_SENIOR }
-        : s
-    )));
-    notify('Sent to Senior Trainer for review & assignment');
+  const fetchSeniorTrainers = useCallback(async () => {
+    if (!token) return;
+    setSeniorTrainersLoading(true);
+    try {
+      const res = await axios.get(`${backendUrl}/college/users/training-role-users?roleType=senior`, {
+        headers: { 'x-auth': token },
+      });
+      const trainers = (res.data?.data || [])
+        .filter((trainer) => trainer._id)
+        .map((trainer) => ({
+          value: String(trainer._id),
+          label: trainer.name || trainer.email || 'Senior Trainer',
+        }));
+      setSeniorTrainerOptions(trainers);
+    } catch (err) {
+      console.error('Failed to fetch senior trainers:', err);
+      setSeniorTrainerOptions([]);
+      notify('Failed to load senior trainers');
+    } finally {
+      setSeniorTrainersLoading(false);
+    }
+  }, [backendUrl, token]);
+
+  const openReferModal = (session) => {
+    setReferModal({ open: true, session });
+    fetchSeniorTrainers();
+  };
+  const closeReferModal = () => setReferModal({ open: false, session: null });
+
+  const sendToSenior = async (session, seniorTrainer) => {
+    if (!seniorTrainer?.id) {
+      notify('Please select a Senior Trainer');
+      return;
+    }
+    try {
+      const updated = await patchSessionApi(backendUrl, token, session.id, {
+        workflowStatus: WORKFLOW_STATUS.SENT_TO_SENIOR,
+        seniorTrainerId: seniorTrainer.id,
+        seniorTrainerName: seniorTrainer.name,
+      });
+      setSessions((prev) => prev.map((s) => (s.id === session.id ? updated : s)));
+      closeReferModal();
+      notify(`Referred to ${seniorTrainer.name}`);
+    } catch (err) {
+      console.error(err);
+      notify(err.response?.data?.message || err.message || 'Failed to refer session');
+    }
   };
 
   const canEditSession = (session) => (
-    session.workflowStatus === WORKFLOW_STATUS.SCHEDULED
-    || session.workflowStatus === WORKFLOW_STATUS.SENT_TO_SENIOR
+    canViewTrainingPermission
+    && (
+      session.workflowStatus === WORKFLOW_STATUS.SCHEDULED
+      || session.workflowStatus === WORKFLOW_STATUS.SENT_TO_SENIOR
+    )
   );
+
+  if (permissions && !canViewTrainingPermission) {
+    return (
+      <div className="ac-portal">
+        <style>{AC_CSS}</style>
+        <div className="ac-empty-state" style={{ marginTop: 40, textAlign: 'center', padding: 48 }}>
+          <i className="fas fa-lock" style={{ fontSize: 32, color: '#94a3b8', marginBottom: 12 }} />
+          <h3 style={{ margin: '0 0 8px' }}>Access denied</h3>
+          <p style={{ margin: 0, color: '#64748b' }}>
+            You need <strong>View Training</strong> permission (or Admin) to use Academic Coordinator.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="ac-portal">
@@ -2495,6 +3577,8 @@ const AcademicCoordinatorModule = () => {
             totalSessions={sessions.length}
           />
 
+
+
           <div className="ac-filters">
             <input
               type="text"
@@ -2540,7 +3624,7 @@ const AcademicCoordinatorModule = () => {
               onClose={() => setSelectedSessionId('')}
               onEdit={openEditModal}
               onDelete={deleteSession}
-              onSendToSenior={sendToSenior}
+              onOpenReferModal={openReferModal}
             />
           </div>
         </>
@@ -2551,6 +3635,7 @@ const AcademicCoordinatorModule = () => {
           draft={modal.draft}
           isEdit={!!modal.editingId}
           batchSummary={batchSummary}
+          courseStructure={selectedCourseStructure}
           onClose={closeModal}
           onSave={saveSession}
           onFieldChange={updateDraft}
@@ -2560,15 +3645,36 @@ const AcademicCoordinatorModule = () => {
           onLearningMaterialChange={updateDraftLearningMaterial}
           onAddLearningMaterial={addDraftLearningMaterial}
           onRemoveLearningMaterial={removeDraftLearningMaterial}
+          onStandardTlmChange={updateDraftStandardTlm}
+          onAddStandardTlm={addDraftStandardTlm}
+          onRemoveStandardTlm={removeDraftStandardTlm}
+          onTrainerBasedTlmChange={updateDraftTrainerBasedTlm}
+          onAddTrainerBasedTlm={addDraftTrainerBasedTlm}
+          onRemoveTrainerBasedTlm={removeDraftTrainerBasedTlm}
           onTotMaterialChange={updateDraftTotMaterial}
           onAddTotMaterial={addDraftTotMaterial}
           onRemoveTotMaterial={removeDraftTotMaterial}
           onTotCompletionProofChange={updateDraftTotCompletionProof}
           onAddTotCompletionProof={addDraftTotCompletionProof}
           onRemoveTotCompletionProof={removeDraftTotCompletionProof}
+          onTotQuestionChange={updateDraftTotQuestion}
+          onTotQuestionOptionChange={updateDraftTotQuestionOption}
+          onAddTotQuestion={addDraftTotQuestion}
+          onRemoveTotQuestion={removeDraftTotQuestion}
           activityTypes={activityTypes}
           onActivityTypeToggle={handleActivityTypeToggle}
           onClearActivityTypes={handleClearActivityTypes}
+        />
+      )}
+
+      {referModal.open && referModal.session && (
+        <ReferSessionModal
+          session={referModal.session}
+          trainerOptions={seniorTrainerOptions}
+          loadingTrainers={seniorTrainersLoading}
+          onClose={closeReferModal}
+          onConfirm={sendToSenior}
+          onNotify={notify}
         />
       )}
 
@@ -2582,8 +3688,11 @@ const AcademicCoordinatorModule = () => {
       )}
 
       {toast && (
-        <div className="ac-toast">
-          <i className="fas fa-check-circle" /> {toast}
+        <div key={toastKey} className="ac-toast">
+          <div className="ac-toast__body">
+            <i className="fas fa-check-circle" /> {toast}
+          </div>
+          <div className="ac-toast__progress" />
         </div>
       )}
     </div>
@@ -2713,6 +3822,7 @@ const AC_CSS = `
     min-width: 180px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 14px;
     font-size: 13px; background: #fff; font-weight: 600;
   }
+  .ac-select--full { width: 100%; min-width: 0; }
 
   .ac-btn {
     display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 12px;
@@ -3068,6 +4178,9 @@ const AC_CSS = `
   .ac-section-label small { font-size: 10px; font-weight: 600; text-transform: none; color: #94a3b8; margin-left: 4px; }
   .ac-side-panel__grid--single { grid-template-columns: 1fr; }
   .ac-toc-group { margin: 4px 0 8px; }
+  .ac-modal--confirm { width: min(420px, 100%); }
+  .ac-refer-modal__text { margin: 0; font-size: 14px; line-height: 1.55; color: #475569; }
+
   .ac-tot-info-box {
     display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; margin-bottom: 12px;
     background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; font-size: 12px; color: #1e40af;
@@ -3170,6 +4283,7 @@ const AC_CSS = `
   .ac-evidence-hint { margin: 0 0 12px; font-size: 12px; color: #64748b; }
   .ac-evidence-empty { margin: 0; font-size: 12px; color: #94a3b8; font-style: italic; }
   .ac-evidence-row { display: grid; grid-template-columns: 1fr 130px 150px 40px; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .ac-evidence-row--with-desc { grid-template-columns: 1.1fr 1.3fr 120px 140px 40px; }
   .ac-evidence-row--head { margin-bottom: 6px; }
   .ac-evidence-row--head span {
     font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8;
@@ -3183,13 +4297,107 @@ const AC_CSS = `
   }
 
   .ac-toast {
-    position: fixed; bottom: 20px; right: 20px; background: #1e293b; color: #fff; padding: 10px 16px;
-    border-radius: 10px; font-size: 13px; font-weight: 600; z-index: 500; display: flex; align-items: center; gap: 8px;
+    position: fixed; top: 20px; right: 20px; min-width: 260px; max-width: min(420px, calc(100vw - 40px));
+    background: #16a34a; color: #fff; border-radius: 10px; font-size: 13px; font-weight: 600;
+    z-index: 10000; overflow: hidden; box-shadow: 0 10px 28px rgba(22, 163, 74, 0.35);
+  }
+     .ac-toast__body {
+    display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+  }
+  .ac-toast__progress {
+    height: 3px; background: rgba(255, 255, 255, 0.9); transform-origin: left center;
+    animation: ac-toast-progress 10s linear forwards;
+  }
+  @keyframes ac-toast-progress {
+    from { transform: scaleX(1); }
+    to { transform: scaleX(0); }
+  }
+
+  .ac-dual-calendars {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; margin-bottom: 16px;
+  }
+  .ac-calendar {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; min-width: 0;
+    box-shadow: 0 10px 28px rgba(15,23,42,0.06);
+  }
+  .ac-calendar__title-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 12px 14px; border-bottom: 1px solid #eef2f7;
+    background: color-mix(in srgb, var(--calendar-accent, ${GREEN}) 8%, white);
+  }
+  .ac-calendar__title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 900; color: #0f172a; }
+  .ac-calendar__title i { color: var(--calendar-accent, ${GREEN}); }
+  .ac-calendar__count {
+    font-size: 11px; font-weight: 800; color: var(--calendar-accent, ${GREEN});
+    background: color-mix(in srgb, var(--calendar-accent, ${GREEN}) 14%, white);
+    padding: 4px 10px; border-radius: 999px;
+  }
+  .ac-calendar__head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 8px; padding: 14px 14px 0;
+  }
+  .ac-calendar__head h3 { margin: 0; font-size: 1.05rem; font-weight: 900; }
+  .ac-calendar__head-hint { font-size: 11px; font-weight: 700; color: #94a3b8; }
+  .ac-calendar__weekdays {
+    display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px;
+    padding: 0 14px 6px;
+  }
+  .ac-calendar__weekdays span {
+    text-align: center; font-size: 10px; font-weight: 800; color: #94a3b8;
+    text-transform: uppercase; letter-spacing: 0.04em; padding: 4px 0;
+  }
+  .ac-calendar__grid {
+    display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px; padding: 0 14px 14px; width: 100%; box-sizing: border-box;
+  }
+  .ac-calendar__day {
+    box-sizing: border-box; min-width: 0; width: 100%; max-width: 100%;
+    min-height: 88px; height: 100%;
+    border: 1px solid #eef2f7; border-radius: 10px; padding: 6px;
+    background: #fafbfc; display: flex; flex-direction: column; gap: 3px;
+    text-align: left; overflow: hidden;
+  }
+  .ac-calendar__day--muted { opacity: 0.35; }
+  .ac-calendar__day--slot {
+    background: #f8fafc; border-style: dashed; border-color: #e2e8f0;
+  }
+  .ac-calendar__day--slot .ac-calendar__day-num { color: #94a3b8; }
+  .ac-calendar__day--session {
+    margin: 0; font: inherit; color: inherit; appearance: none; -webkit-appearance: none;
+    cursor: pointer; border: 1px solid #eef2f7;
+    background: color-mix(in srgb, var(--event-color, ${BLUE}) 8%, white);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .ac-calendar__day--session:hover {
+    border-color: color-mix(in srgb, var(--event-color, ${BLUE}) 45%, #e2e8f0);
+  }
+  .ac-calendar__day--selected {
+    border-color: var(--event-color, ${GREEN});
+    box-shadow: inset 0 0 0 1.5px var(--event-color, ${GREEN});
+    background: color-mix(in srgb, var(--event-color, ${GREEN}) 16%, white);
+  }
+  .ac-calendar__day-num {
+    flex-shrink: 0; font-size: 12px; font-weight: 900; line-height: 1;
+    color: var(--event-color, #334155);
+  }
+  .ac-calendar__session-title {
+    font-size: 10px; font-weight: 700; color: #0f172a; line-height: 1.3;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden; word-break: break-word; overflow-wrap: anywhere;
+  }
+  .ac-calendar__session-title--muted { color: #94a3b8; font-weight: 600; }
+  .ac-calendar__session-topic {
+    margin-top: auto; font-size: 9px; font-weight: 600; color: #64748b;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+  }
+  .ac-calendar__empty {
+    margin: 0; padding: 24px 14px 28px; text-align: center; font-size: 13px; font-weight: 700; color: #94a3b8;
   }
 
   @media (max-width: 1100px) {
     .ac-workspace, .ac-workspace--toc { grid-template-columns: 1fr; }
     .ac-toc-panel, .ac-side-panel { position: static; max-height: none; }
+    .ac-dual-calendars { grid-template-columns: 1fr; }
   }
   @media (max-width: 768px) {
     .ac-stats-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -3198,6 +4406,7 @@ const AC_CSS = `
     .ac-form-grid { grid-template-columns: 1fr; }
     .ac-field--span-2 { grid-column: span 1; }
     .ac-evidence-row { grid-template-columns: 1fr; }
+    .ac-calendar__day { min-height: 72px; }
     .ac-session-card__foot-right { margin-left: 0; width: 100%; }
     .ac-toolbar { flex-direction: column; align-items: stretch; }
     .ac-toolbar__actions { width: 100%; }

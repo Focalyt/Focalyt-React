@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import DatePicker from 'react-date-picker';
+import Calendar from 'react-calendar';
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 
@@ -9,7 +10,7 @@ const BLUE = '#2563eb';
 const AMBER = '#d97706';
 const GREEN = '#059669';
 
-const AC_SESSIONS_STORAGE_PREFIX = 'acCoordinatorSessions:';
+const AC_SESSIONS_STORAGE_PREFIX = 'acCoordinatorSessions:'; // legacy
 const SESSION_TYPE = { TOT: 'tot', STUDENT: 'student' };
 
 const WORKFLOW_STATUS = {
@@ -28,12 +29,6 @@ const STATUS_TONE = {
   [WORKFLOW_STATUS.COMPLETED]: 'green',
 };
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-
 const getOptionLabel = (options = [], value) =>
   options.find((option) => String(option.value) === String(value))?.label || '';
 
@@ -45,6 +40,35 @@ const mapApiOptions = (items = []) =>
 const formatSessionDate = (dateValue) => {
   if (!dateValue) return '';
   return new Date(dateValue).toLocaleDateString('en-IN');
+};
+
+const authHeaders = (token) => ({ 'x-auth': token });
+
+const fetchCoordinatorSessionsApi = async (backendUrl, token, options = {}) => {
+  const {
+    batchId = '',
+    courseId = '',
+    seniorTrainerId = '',
+    includeCoursePlans = false,
+  } = options;
+  const params = new URLSearchParams();
+  if (batchId) params.set('batch', batchId);
+  if (courseId) params.set('course', courseId);
+  if (seniorTrainerId) params.set('seniorTrainerId', seniorTrainerId);
+  if (includeCoursePlans) params.set('includeCoursePlans', 'true');
+  params.set('excludeScheduled', 'true');
+  const res = await axios.get(`${backendUrl}/college/session-plans?${params.toString()}`, {
+    headers: authHeaders(token),
+  });
+  return Array.isArray(res.data?.data) ? res.data.data : [];
+};
+
+const patchCoordinatorSessionApi = async (backendUrl, token, sessionId, payload) => {
+  const res = await axios.patch(`${backendUrl}/college/session-plans/${sessionId}`, payload, {
+    headers: authHeaders(token),
+  });
+  if (!res.data?.status) throw new Error(res.data?.message || 'Failed to update session');
+  return res.data.data;
 };
 
 const getSessionActivities = (session = {}) => {
@@ -89,6 +113,45 @@ const loadCoordinatorSessions = (batchId) => {
   } catch {
     return [];
   }
+};
+
+const filterSessionsForSeniorTrainer = (sessions = [], userId = '') => {
+  // Show every plan that AC has referred (not still in Scheduled).
+  // Optional assignee check is only used when caller wants strict ownership.
+  return sessions.filter((session) => session.workflowStatus !== WORKFLOW_STATUS.SCHEDULED);
+};
+
+const applyPathFilters = (sessions = [], filters = {}) => {
+  let list = sessions;
+  if (filters.center) {
+    list = list.filter((session) => String(session.center || '') === String(filters.center));
+  }
+  if (filters.course) {
+    list = list.filter((session) => String(session.course || '') === String(filters.course));
+  }
+  if (filters.batch) {
+    if (String(filters.batch).startsWith('course:')) {
+      const courseId = String(filters.batch).replace(/^course:/, '');
+      list = list.filter((session) => (
+        String(session.course || '') === courseId
+        && (!session.batch || session.batch === 'null')
+      ));
+    } else {
+      list = list.filter((session) => (
+        String(session.batch || '') === String(filters.batch)
+        || (
+          (!session.batch || session.batch === 'null')
+          && filters.course
+          && String(session.course || '') === String(filters.course)
+        )
+      ));
+    }
+  }
+  return list;
+};
+
+const persistCoordinatorSessions = () => {
+  // no-op: sessions persist via /college/session-plans API
 };
 
 const parseSessionDateKey = (session) => {
@@ -147,18 +210,6 @@ const getSessionDateValue = (session) => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
-const getSessionAssignDate = (session) => {
-  if (session?.date) return session.date;
-  if (session?.sessionDate) return formatSessionDate(session.sessionDate);
-  return '—';
-};
-
-const getSessionDayName = (session) => {
-  const date = getSessionDateValue(session);
-  if (!date) return '—';
-  return date.toLocaleDateString('en-IN', { weekday: 'long' });
-};
-
 const getSessionTypeLabel = (session) => {
   if (session.sessionType === SESSION_TYPE.TOT && session.includeTot !== true) return 'TOT';
   if (session.includeTot === true) return 'Student + TOT';
@@ -187,47 +238,75 @@ const sortSessionsByDate = (list = []) => [...list].sort((a, b) => {
   return (a.startTime || '').localeCompare(b.startTime || '');
 });
 
-const buildMonthGrid = (year, month) => {
-  const firstDay = new Date(year, month, 1);
-  const startOffset = firstDay.getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const daysInPrevMonth = new Date(year, month, 0).getDate();
-  const cells = [];
+const TOTAL_SESSION_SLOTS = 30;
 
-  for (let i = startOffset - 1; i >= 0; i -= 1) {
-    const day = daysInPrevMonth - i;
-    const date = new Date(year, month - 1, day);
-    cells.push({
-      date,
-      dateKey: date.toISOString().slice(0, 10),
-      day,
-      isCurrentMonth: false,
-    });
+const buildFixedSessionSlots = (sessions = [], total = TOTAL_SESSION_SLOTS) => {
+  const byNumber = {};
+  const unnumbered = [];
+
+  sessions.forEach((session) => {
+    const num = parseInt(String(session.sessionNumber ?? ''), 10);
+    if (Number.isFinite(num) && num >= 1 && num <= total) {
+      if (!byNumber[num]) byNumber[num] = session;
+      else unnumbered.push(session);
+      return;
+    }
+    unnumbered.push(session);
+  });
+
+  let freeSlot = 1;
+  unnumbered.forEach((session) => {
+    while (freeSlot <= total && byNumber[freeSlot]) freeSlot += 1;
+    if (freeSlot > total) return;
+    byNumber[freeSlot] = session;
+    freeSlot += 1;
+  });
+
+  return Array.from({ length: total }, (_, index) => {
+    const sessionNumber = index + 1;
+    return {
+      key: `slot-${sessionNumber}`,
+      sessionNumber: String(sessionNumber),
+      session: byNumber[sessionNumber] || null,
+    };
+  });
+};
+
+const SESSION_PALETTE = [
+  '#2563eb', '#059669', '#d97706', '#db2777', '#7c3aed',
+  '#0891b2', '#ea580c', '#4f46e5', '#16a34a', '#e11d48',
+  '#0d9488', '#c026d3', '#ca8a04', '#1d4ed8', '#be123c',
+];
+
+const toLocalDateKey = (dateValue) => {
+  if (!dateValue) return '';
+  if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateValue)) {
+    return dateValue.slice(0, 10);
   }
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    const date = new Date(year, month, day);
-    cells.push({
-      date,
-      dateKey: date.toISOString().slice(0, 10),
-      day,
-      isCurrentMonth: true,
-    });
+const getSessionAssignDateKey = (session = {}, assignmentDrafts = {}) => {
+  const sourceId = resolveSessionSelectionId(session.id);
+  const draft = assignmentDrafts[sourceId] || assignmentDrafts[session.id];
+  return draft?.assignDate || parseSessionDateKey(session) || '';
+};
+
+const getTimetableSessionColor = (session, index = 0) => {
+  const activities = getSessionActivities(session);
+  if (activities[0]?.color) return activities[0].color;
+  const seed = String(session.id || session.title || index);
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+    hash |= 0;
   }
-
-  let nextMonthDay = 1;
-  while (cells.length % 7 !== 0) {
-    const date = new Date(year, month + 1, nextMonthDay);
-    cells.push({
-      date,
-      dateKey: date.toISOString().slice(0, 10),
-      day: nextMonthDay,
-      isCurrentMonth: false,
-    });
-    nextMonthDay += 1;
-  }
-
-  return cells;
+  return SESSION_PALETTE[Math.abs(hash) % SESSION_PALETTE.length];
 };
 
 const TrainingCalendar = ({
@@ -235,26 +314,10 @@ const TrainingCalendar = ({
   icon,
   accent = GREEN,
   sessions,
-  calendarMonth,
-  onMonthChange,
   selectedSessionId,
   onSelectSession,
 }) => {
-  const year = calendarMonth.getFullYear();
-  const month = calendarMonth.getMonth();
-  const todayKey = new Date().toISOString().slice(0, 10);
-  const grid = useMemo(() => buildMonthGrid(year, month), [year, month]);
-
-  const sessionsByDate = useMemo(() => {
-    const map = {};
-    sessions.forEach((session) => {
-      const key = parseSessionDateKey(session);
-      if (!key) return;
-      if (!map[key]) map[key] = [];
-      map[key].push(session);
-    });
-    return map;
-  }, [sessions]);
+  const cells = useMemo(() => buildFixedSessionSlots(sessions), [sessions]);
 
   return (
     <div className="st-calendar" style={{ '--calendar-accent': accent }}>
@@ -263,62 +326,245 @@ const TrainingCalendar = ({
           <i className={`fas ${icon}`} />
           <span>{title}</span>
         </div>
-        <span className="st-calendar__count">{sessions.length} plan(s)</span>
+        <span className="st-calendar__count">{sessions.length} / {TOTAL_SESSION_SLOTS} plan(s)</span>
       </div>
       <div className="st-calendar__head">
-        <button type="button" className="st-calendar__nav" onClick={() => onMonthChange(-1)}>
-          <i className="fas fa-chevron-left" />
-        </button>
-        <h3>{MONTH_NAMES[month]} {year}</h3>
-        <button type="button" className="st-calendar__nav" onClick={() => onMonthChange(1)}>
-          <i className="fas fa-chevron-right" />
-        </button>
+        <h3>Session plans</h3>
+        <span className="st-calendar__head-hint">Session 1–{TOTAL_SESSION_SLOTS} · dates assigned later</span>
       </div>
 
-      <div className="st-calendar__weekdays">
-        {WEEKDAYS.map((day) => (
+      <div className="st-calendar__weekdays" aria-hidden="true">
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
           <span key={day}>{day}</span>
         ))}
       </div>
 
       <div className="st-calendar__grid">
-        {grid.map((cell) => {
-          const daySessions = sessionsByDate[cell.dateKey] || [];
-          const isToday = cell.dateKey === todayKey;
-          return (
-            <div
-              key={cell.dateKey}
-              className={`st-calendar__day${cell.isCurrentMonth ? '' : ' st-calendar__day--muted'}${isToday ? ' st-calendar__day--today' : ''}`}
-            >
-              <span className="st-calendar__day-num">{cell.day}</span>
-              <div className="st-calendar__events">
-                {daySessions.slice(0, 3).map((session) => {
-                  const color = getSessionChipColor(session);
-                  const isSelected = resolveSessionSelectionId(selectedSessionId) === resolveSessionSelectionId(session.id);
-                  return (
-                    <button
-                      key={session.id}
-                      type="button"
-                      className={`st-calendar__event${isSelected ? ' st-calendar__event--selected' : ''}`}
-                      style={{ '--event-color': color }}
-                      onClick={() => onSelectSession(session.id)}
-                      title={`${session.title} · ${session.startTime || ''}`}
-                    >
-                      <span className="st-calendar__event-dot" />
-                      <span className="st-calendar__event-text">{session.title}</span>
-                    </button>
-                  );
-                })}
-                {daySessions.length > 3 && (
-                  <span className="st-calendar__more">+{daySessions.length - 3} more</span>
-                )}
+        {cells.map((cell) => {
+          const { session, sessionNumber } = cell;
+          if (!session) {
+            return (
+              <div
+                key={cell.key}
+                className="st-calendar__day st-calendar__day--slot"
+              >
+                <span className="st-calendar__day-num">{sessionNumber}</span>
+                <span className="st-calendar__session-title st-calendar__session-title--muted">Not planned</span>
               </div>
-            </div>
+            );
+          }
+
+          const color = getSessionChipColor(session);
+          const isSelected = resolveSessionSelectionId(selectedSessionId) === resolveSessionSelectionId(session.id);
+
+          return (
+            <button
+              key={cell.key}
+              type="button"
+              className={`st-calendar__day st-calendar__day--session${isSelected ? ' st-calendar__day--selected' : ''}`}
+              style={{ '--event-color': color }}
+              onClick={() => onSelectSession(session.id)}
+              title={`Session ${sessionNumber}: ${session.title || 'Untitled'}`}
+            >
+              <span className="st-calendar__day-num">{sessionNumber}</span>
+              <span className="st-calendar__session-title">{session.title || 'Untitled session'}</span>
+              {session.topicCovered ? (
+                <span className="st-calendar__session-topic">{session.topicCovered}</span>
+              ) : null}
+            </button>
           );
         })}
       </div>
     </div>
   );
+};
+
+/** Month timetable: see how many sessions fall on each day, each in a distinct color */
+const SessionDayTimetable = ({
+  sessions = [],
+  assignmentDrafts = {},
+  selectedSessionId,
+  onSelectSession,
+}) => {
+  const [activeMonth, setActiveMonth] = useState(() => new Date());
+  const [focusedDateKey, setFocusedDateKey] = useState('');
+
+  const sessionsByDate = useMemo(() => {
+    const map = {};
+    sessions.forEach((session, index) => {
+      const dateKey = getSessionAssignDateKey(session, assignmentDrafts);
+      if (!dateKey) return;
+      if (!map[dateKey]) map[dateKey] = [];
+      map[dateKey].push({
+        ...session,
+        _timetableColor: getTimetableSessionColor(session, index),
+      });
+    });
+    Object.keys(map).forEach((key) => {
+      map[key] = sortSessionsByDate(map[key]);
+    });
+    return map;
+  }, [sessions, assignmentDrafts]);
+
+  const datedCount = useMemo(
+    () => Object.values(sessionsByDate).reduce((sum, list) => sum + list.length, 0),
+    [sessionsByDate]
+  );
+
+  const focusedSessions = focusedDateKey ? (sessionsByDate[focusedDateKey] || []) : [];
+
+  const tileContent = useCallback(({ date, view }) => {
+    if (view !== 'month') return null;
+    const dateKey = toLocalDateKey(date);
+    const daySessions = sessionsByDate[dateKey] || [];
+    if (!daySessions.length) return null;
+
+    return (
+      <div className="st-day-tt__events">
+        <span className="st-day-tt__badge">{daySessions.length} session{daySessions.length > 1 ? 's' : ''}</span>
+        {daySessions.slice(0, 4).map((session) => {
+          const isSelected = resolveSessionSelectionId(selectedSessionId) === resolveSessionSelectionId(session.id);
+          const timeLabel = [session.startTime, session.endTime].filter(Boolean).join('–') || 'Time TBA';
+          return (
+            <button
+              key={session.id}
+              type="button"
+              className={`st-day-tt__chip${isSelected ? ' st-day-tt__chip--selected' : ''}`}
+              style={{ '--event-color': session._timetableColor }}
+              title={`${session.title || 'Session'} · ${timeLabel}`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onSelectSession(session.id);
+              }}
+            >
+              <span className="st-day-tt__chip-dot" style={{ background: session._timetableColor }} />
+              <span className="st-day-tt__chip-time">{timeLabel}</span>
+              <span className="st-day-tt__chip-title">{session.title || 'Untitled'}</span>
+            </button>
+          );
+        })}
+        {daySessions.length > 4 ? (
+          <span className="st-day-tt__more">+{daySessions.length - 4} more</span>
+        ) : null}
+      </div>
+    );
+  }, [sessionsByDate, selectedSessionId, onSelectSession]);
+
+  const tileClassName = useCallback(({ date, view }) => {
+    if (view !== 'month') return null;
+    const dateKey = toLocalDateKey(date);
+    const daySessions = sessionsByDate[dateKey] || [];
+    const classes = [];
+    if (daySessions.length) classes.push('st-day-tt__tile--busy');
+    if (focusedDateKey && dateKey === focusedDateKey) classes.push('st-day-tt__tile--focused');
+    if (daySessions.some((s) => resolveSessionSelectionId(s.id) === resolveSessionSelectionId(selectedSessionId))) {
+      classes.push('st-day-tt__tile--selected');
+    }
+    return classes.length ? classes.join(' ') : null;
+  }, [sessionsByDate, focusedDateKey, selectedSessionId]);
+
+  return (
+    <section className="st-day-tt">
+      <div className="st-day-tt__title-bar">
+        <div className="st-day-tt__title">
+          <i className="fas fa-calendar-week" />
+          <span>Session Timetable</span>
+        </div>
+        <span className="st-day-tt__count">
+          {datedCount} dated · {sessions.length} total plan(s)
+        </span>
+      </div>
+      
+
+      <div className="st-day-tt__layout">
+        <div className="st-day-tt__calendar">
+          <Calendar
+            activeStartDate={activeMonth}
+            onActiveStartDateChange={({ activeStartDate }) => {
+              if (activeStartDate) setActiveMonth(activeStartDate);
+            }}
+            onClickDay={(value) => {
+              const dateKey = toLocalDateKey(value);
+              setFocusedDateKey(dateKey);
+              const daySessions = sessionsByDate[dateKey] || [];
+              if (daySessions.length === 1) onSelectSession(daySessions[0].id);
+            }}
+            tileContent={tileContent}
+            tileClassName={tileClassName}
+            prev2Label={null}
+            next2Label={null}
+            showNeighboringMonth={false}
+          />
+        </div>
+
+        <aside className="st-day-tt__side">
+          <div className="st-day-tt__side-head">
+            <h4>
+              {focusedDateKey
+                ? new Date(`${focusedDateKey}T12:00:00`).toLocaleDateString('en-IN', {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                })
+                : 'Day detail'}
+            </h4>
+            <span>
+              {focusedDateKey
+                ? `${focusedSessions.length} session${focusedSessions.length === 1 ? '' : 's'}`
+                : 'Click a date'}
+            </span>
+          </div>
+
+          {!focusedDateKey ? (
+            <p className="st-day-tt__side-empty">Select a date on the calendar to see that day’s sessions.</p>
+          ) : focusedSessions.length === 0 ? (
+            <p className="st-day-tt__side-empty">No sessions on this day.</p>
+          ) : (
+            <ul className="st-day-tt__side-list">
+              {focusedSessions.map((session) => {
+                const isSelected = resolveSessionSelectionId(selectedSessionId) === resolveSessionSelectionId(session.id);
+                const timeLabel = [session.startTime, session.endTime].filter(Boolean).join(' – ') || 'Time TBA';
+                return (
+                  <li key={session.id}>
+                    <button
+                      type="button"
+                      className={`st-day-tt__side-item${isSelected ? ' st-day-tt__side-item--selected' : ''}`}
+                      style={{ '--event-color': session._timetableColor }}
+                      onClick={() => onSelectSession(session.id)}
+                    >
+                      <span className="st-day-tt__side-swatch" style={{ background: session._timetableColor }} />
+                      <span className="st-day-tt__side-meta">
+                        <strong>{session.title || 'Untitled session'}</strong>
+                        <em>{timeLabel}</em>
+                        <small>{getSessionTypeLabel(session)}{session.sessionNumber ? ` · #${session.sessionNumber}` : ''}</small>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {datedCount === 0 ? (
+            <p className="st-day-tt__side-empty st-day-tt__side-empty--warn">
+              No assign dates yet. Use the session list below to set dates.
+            </p>
+          ) : null}
+        </aside>
+      </div>
+    </section>
+  );
+};
+
+const getDayNameFromDate = (dateValue) => {
+  if (!dateValue) return '—';
+  const date = typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)
+    ? new Date(`${dateValue}T12:00:00`)
+    : new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('en-IN', { weekday: 'long' });
 };
 
 const SessionTable = ({
@@ -334,6 +580,11 @@ const SessionTable = ({
   loadingBatches,
   onFilterChange,
   onFilterReset,
+  assignmentDrafts = {},
+  trainerOptions = [],
+  loadingTrainers = false,
+  onAssignmentChange,
+  canAssignTrainers = true,
 }) => (
   <section className="st-sessions-table-wrap">
     <div className="st-sessions-table__head">
@@ -407,9 +658,8 @@ const SessionTable = ({
 
     {sessions.length === 0 ? (
       <p className="st-sessions-table__empty">
-        {filters.batch
-          ? 'No sessions to show for this batch.'
-          : 'Select center, course and batch to load sessions.'}
+        No referred sessions found. Ask Academic Coordinator to refer a plan to this Senior Trainer account.
+        Path filters above are optional and only narrow the list.
       </p>
     ) : (
       <div className="st-sessions-table-scroll">
@@ -428,6 +678,9 @@ const SessionTable = ({
             {sessions.map((session, index) => {
               const isSelected = resolveSessionSelectionId(selectedSessionId) === resolveSessionSelectionId(session.id);
               const typeBadge = getSessionTypeBadgeKind(session);
+              const draft = assignmentDrafts[session.id] || { assignDate: '', trainerId: '' };
+              const assignDate = draft.assignDate || parseSessionDateKey(session);
+
               return (
                 <tr
                   key={session.id}
@@ -437,7 +690,6 @@ const SessionTable = ({
                   <td>{index + 1}</td>
                   <td>
                     <strong>{session.title || 'Untitled session'}</strong>
-                    <small>{session.startTime || '—'} – {session.endTime || '—'}</small>
                   </td>
                   <td>
                     <span className={`st-table-type st-table-type--${typeBadge}`}>
@@ -445,9 +697,31 @@ const SessionTable = ({
                     </span>
                     <small>{getSessionActivityLabel(session)}</small>
                   </td>
-                  <td>{getSessionAssignDate(session)}</td>
-                  <td>{getSessionDayName(session)}</td>
-                  <td>{session.fieldTrainerName || session.seniorTrainerName || '—'}</td>
+                  <td className="st-table-cell--control" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="date"
+                      className="st-table-input"
+                      value={assignDate}
+                      disabled={!canAssignTrainers}
+                      onChange={(e) => onAssignmentChange?.(session.id, 'assignDate', e.target.value)}
+                    />
+                  </td>
+                  <td>{getDayNameFromDate(assignDate)}</td>
+                  <td className="st-table-cell--control" onClick={(e) => e.stopPropagation()}>
+                    <select
+                      className="st-table-select"
+                      value={draft.trainerId || ''}
+                      disabled={loadingTrainers || !canAssignTrainers}
+                      onChange={(e) => onAssignmentChange?.(session.id, 'trainerId', e.target.value)}
+                    >
+                      <option value="">{loadingTrainers ? 'Loading...' : 'Select trainer'}</option>
+                      {trainerOptions.map((trainer) => (
+                        <option key={trainer.value} value={trainer.value}>
+                          {trainer.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
                 </tr>
               );
             })}
@@ -506,7 +780,7 @@ const SeniorSessionCard = ({ session }) => {
 
       <div className="st-session-card__grid">
         <div><em>Date</em><strong>{session.date || formatSessionDate(session.sessionDate)}</strong></div>
-        <div><em>Time</em><strong>{session.startTime || '—'} – {session.endTime || '—'}</strong></div>
+        {/* <div><em>Time</em><strong>{session.startTime || '—'} – {session.endTime || '—'}</strong></div> */}
         <div><em>Method</em><strong>{session.trainingMethod || '—'}</strong></div>
         <div><em>Senior Trainer</em><strong>{session.seniorTrainerName || 'Not assigned'}</strong></div>
         <div><em>Field Trainer</em><strong>{session.fieldTrainerName || '—'}</strong></div>
@@ -559,7 +833,27 @@ const SeniorSessionCard = ({ session }) => {
 const SeniorTrainerModule = () => {
   const userData = useMemo(() => JSON.parse(sessionStorage.getItem('user') || '{}'), []);
   const token = userData.token;
+  const seniorTrainerId = userData._id || userData.id;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
+
+  const [permissions, setPermissions] = useState();
+
+  const updatedPermission = async () => {
+    const respose = await axios.get(`${backendUrl}/college/permission`, {
+      headers: { 'x-auth': token },
+    });
+    if (respose.data.status) {
+      setPermissions(respose.data.permissions);
+    }
+  };
+
+  useEffect(() => {
+    if (token) updatedPermission();
+  }, []);
+
+  const canBeSeniorTrainerPermission =
+    (permissions?.custom_permissions?.can_be_senior_trainer && permissions?.permission_type === 'Custom') ||
+    permissions?.permission_type === 'Admin';
 
   const [reportDate, setReportDate] = useState(new Date());
   const [filters, setFilters] = useState({
@@ -577,8 +871,10 @@ const SeniorTrainerModule = () => {
   const [loadingBatches, setLoadingBatches] = useState(false);
 
   const [sessions, setSessions] = useState([]);
-  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [selectedSessionId, setSelectedSessionId] = useState('');
+  const [assignmentDrafts, setAssignmentDrafts] = useState({});
+  const [trainerOptions, setTrainerOptions] = useState([]);
+  const [loadingTrainers, setLoadingTrainers] = useState(false);
 
   const pathLabels = useMemo(() => ({
     centerName: getOptionLabel(centerOptions, filters.center),
@@ -608,17 +904,133 @@ const SeniorTrainerModule = () => {
   }, [filters.center, allCentersMeta, courseOptions, allCoursesMeta]);
 
   const reloadSessions = useCallback(() => {
-    if (!filters.batch) {
-      setSessions([]);
+    if (!token) {
+      const local = filters.batch
+        ? filterSessionsForSeniorTrainer(loadCoordinatorSessions(filters.batch), seniorTrainerId)
+        : [];
+      setSessions(applyPathFilters(local, filters));
       return;
     }
-    setSessions(loadCoordinatorSessions(filters.batch));
-  }, [filters.batch]);
+
+    // Always load referred sessions for this senior trainer (batch filter is optional)
+    fetchCoordinatorSessionsApi(backendUrl, token, {
+      seniorTrainerId: '',
+      excludeScheduled: true,
+    })
+      .then((data) => {
+        const mine = filterSessionsForSeniorTrainer(data, seniorTrainerId);
+        setSessions(applyPathFilters(mine, filters));
+      })
+      .catch((err) => {
+        console.error('Failed to load sessions', err);
+        const local = filters.batch
+          ? filterSessionsForSeniorTrainer(loadCoordinatorSessions(filters.batch), seniorTrainerId)
+          : [];
+        setSessions(applyPathFilters(local, filters));
+      });
+  }, [filters, seniorTrainerId, backendUrl, token]);
 
   useEffect(() => {
     reloadSessions();
     setSelectedSessionId('');
   }, [reloadSessions]);
+
+  useEffect(() => {
+    setAssignmentDrafts((prev) => {
+      const next = {};
+      sessions.forEach((session) => {
+        const existing = prev[session.id];
+        next[session.id] = {
+          assignDate: existing?.assignDate ?? parseSessionDateKey(session),
+          trainerId: existing?.trainerId ?? session.fieldTrainerId ?? '',
+        };
+      });
+      return next;
+    });
+  }, [sessions]);
+
+  useEffect(() => {
+    if (!token) return undefined;
+    let cancelled = false;
+
+    const fetchTrainers = async () => {
+      setLoadingTrainers(true);
+      try {
+        const res = await axios.get(`${backendUrl}/college/users/training-role-users?roleType=trainer`, {
+          headers: { 'x-auth': token },
+        });
+        if (cancelled) return;
+        const trainers = (res.data?.data || [])
+          .filter((trainer) => trainer._id)
+          .map((trainer) => ({
+            value: String(trainer._id),
+            label: trainer.name || trainer.email || 'Trainer',
+          }));
+        setTrainerOptions(trainers);
+      } catch (err) {
+        console.error('Failed to fetch trainers:', err);
+        if (!cancelled) setTrainerOptions([]);
+      } finally {
+        if (!cancelled) setLoadingTrainers(false);
+      }
+    };
+
+    fetchTrainers();
+    return () => { cancelled = true; };
+  }, [backendUrl, token]);
+
+  const handleAssignmentChange = useCallback((sessionId, field, value) => {
+    setAssignmentDrafts((prev) => {
+      const nextDrafts = {
+        ...prev,
+        [sessionId]: {
+          ...prev[sessionId],
+          [field]: value,
+        },
+      };
+
+      const draft = nextDrafts[sessionId];
+      const trainerId = draft.trainerId || '';
+      const trainerName = trainerId
+        ? (trainerOptions.find((trainer) => String(trainer.value) === String(trainerId))?.label || '')
+        : '';
+      const sessionDate = draft.assignDate || '';
+      const formattedDate = formatSessionDate(sessionDate);
+      const workflowStatus = trainerId
+        ? WORKFLOW_STATUS.ASSIGNED
+        : WORKFLOW_STATUS.SENT_TO_SENIOR;
+
+      setSessions((prevSessions) => prevSessions.map((session) => {
+        if (session.id !== sessionId) return session;
+        return {
+          ...session,
+          fieldTrainerId: trainerId,
+          fieldTrainerName: trainerName || session.fieldTrainerName || '',
+          sessionDate: sessionDate || session.sessionDate,
+          date: formattedDate || session.date,
+          workflowStatus: trainerId
+            ? WORKFLOW_STATUS.ASSIGNED
+            : (session.workflowStatus === WORKFLOW_STATUS.ASSIGNED
+              ? WORKFLOW_STATUS.SENT_TO_SENIOR
+              : session.workflowStatus),
+        };
+      }));
+
+      if (token) {
+        patchCoordinatorSessionApi(backendUrl, token, sessionId, {
+          fieldTrainerId: trainerId,
+          fieldTrainerName: trainerName,
+          sessionDate: sessionDate || undefined,
+          date: formattedDate || undefined,
+          workflowStatus,
+        }).catch((err) => {
+          console.error('Failed to save assignment', err);
+        });
+      }
+
+      return nextDrafts;
+    });
+  }, [trainerOptions, backendUrl, token]);
 
   useEffect(() => {
     const onFocus = () => reloadSessions();
@@ -742,7 +1154,6 @@ const SeniorTrainerModule = () => {
   const handleFilterReset = () => {
     setFilters({ center: '', course: '', batch: '' });
     setSelectedSessionId('');
-    setSessions([]);
   };
 
   const totSessions = useMemo(
@@ -762,21 +1173,25 @@ const SeniorTrainerModule = () => {
     return sessions.find((session) => session.id === resolvedId) || null;
   }, [sessions, selectedSessionId]);
 
-  const handleMonthChange = (delta) => {
-    setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
-  };
-
   const handleSelectSession = (sessionId) => {
     const resolvedId = resolveSessionSelectionId(sessionId);
     setSelectedSessionId((prev) => (resolveSessionSelectionId(prev) === resolvedId ? '' : resolvedId));
-    const session = sessions.find((item) => item.id === resolvedId);
-    if (session?.sessionDate) {
-      const date = new Date(session.sessionDate);
-      if (!Number.isNaN(date.getTime())) {
-        setCalendarMonth(new Date(date.getFullYear(), date.getMonth(), 1));
-      }
-    }
   };
+
+  if (permissions && !canBeSeniorTrainerPermission) {
+    return (
+      <div className="st-portal">
+        <style>{ST_CSS}</style>
+        <div style={{ marginTop: 40, textAlign: 'center', padding: 48 }}>
+          <i className="fas fa-lock" style={{ fontSize: 32, color: '#94a3b8', marginBottom: 12 }} />
+          <h3 style={{ margin: '0 0 8px' }}>Access denied</h3>
+          <p style={{ margin: 0, color: '#64748b' }}>
+            You need <strong>Senior Trainer</strong> permission (or Admin) to use this module.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="st-portal">
@@ -792,6 +1207,9 @@ const SeniorTrainerModule = () => {
             <span>Training Module</span><span>/</span>
             <span className="st-breadcrumb--active">Senior Trainer</span>
           </nav>
+          <p className="st-subtitle">
+            View plans referred by Academic Coordinator and assign field trainers.
+          </p>
 
         </div>
         <div className="st-header-meta">
@@ -826,26 +1244,29 @@ const SeniorTrainerModule = () => {
       <div className="st-workspace">
         <div className="st-dual-calendars">
           <TrainingCalendar
-            title="Session Calendar"
-            icon="fa-user-graduate"
-            accent={GREEN}
-            sessions={studentSessions}
-            calendarMonth={calendarMonth}
-            onMonthChange={handleMonthChange}
-            selectedSessionId={selectedSessionId}
-            onSelectSession={handleSelectSession}
-          />
-          <TrainingCalendar
             title="TOT Calendar"
             icon="fa-chalkboard-teacher"
             accent={BLUE}
             sessions={totSessions}
-            calendarMonth={calendarMonth}
-            onMonthChange={handleMonthChange}
+            selectedSessionId={selectedSessionId}
+            onSelectSession={handleSelectSession}
+          />
+          <TrainingCalendar
+            title="Session Calendar"
+            icon="fa-user-graduate"
+            accent={GREEN}
+            sessions={studentSessions}
             selectedSessionId={selectedSessionId}
             onSelectSession={handleSelectSession}
           />
         </div>
+
+        <SessionDayTimetable
+          sessions={tableSessions}
+          assignmentDrafts={assignmentDrafts}
+          selectedSessionId={selectedSessionId}
+          onSelectSession={handleSelectSession}
+        />
 
         <SessionTable
           sessions={tableSessions}
@@ -860,6 +1281,10 @@ const SeniorTrainerModule = () => {
           loadingBatches={loadingBatches}
           onFilterChange={handleFilterChange}
           onFilterReset={handleFilterReset}
+          assignmentDrafts={assignmentDrafts}
+          trainerOptions={trainerOptions}
+          loadingTrainers={loadingTrainers}
+          onAssignmentChange={handleAssignmentChange}
         />
 
         <div className="st-detail-panel">
@@ -869,15 +1294,15 @@ const SeniorTrainerModule = () => {
             <div className="st-detail-empty">
               <i className="fas fa-hand-pointer" />
               <h4>Select a session</h4>
-              <p>Click any event on the Session or TOT calendar, or a row in the table, to view its full plan card.</p>
-              {!filters.batch && (
+              <p>Click any session cell on the Session or TOT grid, or a row in the table, to view its full plan card.</p>
+              {!filters.batch && sessions.length === 0 && (
                 <p className="st-detail-empty__hint">
-                  Select Center → Course → Batch in the session list filters to load plans.
+                  No referred sessions yet. Ask Academic Coordinator to refer a plan to your account.
                 </p>
               )}
               {filters.batch && !totSessions.length && !studentSessions.length && (
                 <p className="st-detail-empty__hint">
-                  No sessions found for this batch. Create plans in Academic Coordinator first.
+                  No sessions match this Center/Course/Batch filter. Clear filters to see all referred plans.
                 </p>
               )}
             </div>
@@ -918,7 +1343,7 @@ const ST_CSS = `
   .st-header-date .react-date-picker { border: none; font-size: 13px; }
   .st-header-date .react-date-picker__wrapper { border: none; background: transparent; }
 
-  .st-filters, .st-toolbar, .st-calendar, .st-detail-panel, .st-session-card, .st-sessions-table-wrap, .st-empty-state {
+  .st-filters, .st-toolbar, .st-calendar, .st-day-tt, .st-detail-panel, .st-session-card, .st-sessions-table-wrap, .st-empty-state {
     background: #fff; border: 1px solid #e2e8f0; border-radius: 18px;
     box-shadow: 0 10px 28px rgba(15,23,42,0.05);
   }
@@ -976,8 +1401,14 @@ const ST_CSS = `
   .st-stat--amber strong { color: ${AMBER}; }
 
   .st-workspace { display: flex; flex-direction: column; gap: 16px; }
-  .st-dual-calendars { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
-  .st-calendar { padding: 0; overflow: hidden; }
+  .st-dual-calendars {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start;
+  }
+  .st-calendar {
+    padding: 0; overflow: hidden; min-width: 0; background: #fff;
+    border: 1px solid #e2e8f0; border-radius: 16px;
+    box-shadow: 0 10px 28px rgba(15,23,42,0.06);
+  }
   .st-calendar__title-bar {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
     padding: 12px 14px; border-bottom: 1px solid #eef2f7; background: color-mix(in srgb, var(--calendar-accent, ${GREEN}) 8%, white);
@@ -989,42 +1420,199 @@ const ST_CSS = `
     background: color-mix(in srgb, var(--calendar-accent, ${GREEN}) 14%, white);
     padding: 4px 10px; border-radius: 999px;
   }
-  .st-calendar__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding: 14px 14px 0; }
-  .st-calendar__head h3 { margin: 0; font-size: 1.1rem; font-weight: 900; }
-  .st-calendar__nav {
-    width: 36px; height: 36px; border-radius: 10px; border: 1px solid #e2e8f0; background: #fff; cursor: pointer; color: #475569;
+  .st-calendar__head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 8px; padding: 14px 14px 0;
   }
+  .st-calendar__head h3 { margin: 0; font-size: 1.05rem; font-weight: 900; }
+  .st-calendar__head-hint { font-size: 11px; font-weight: 700; color: #94a3b8; }
   .st-calendar__weekdays {
-    display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 6px; padding: 0 14px;
+    display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px;
+    padding: 0 14px 6px;
   }
   .st-calendar__weekdays span {
-    text-align: center; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; padding: 6px 0;
+    text-align: center; font-size: 10px; font-weight: 800; color: #94a3b8;
+    text-transform: uppercase; letter-spacing: 0.04em; padding: 4px 0;
   }
-  .st-calendar__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding: 0 14px 14px; }
+  .st-calendar__grid {
+    display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px; padding: 0 14px 14px; width: 100%; box-sizing: border-box;
+  }
   .st-calendar__day {
-    min-height: 96px; border: 1px solid #eef2f7; border-radius: 10px; padding: 6px; background: #fafbfc;
-    display: flex; flex-direction: column; gap: 4px;
+    box-sizing: border-box; min-width: 0; width: 100%; max-width: 100%;
+    min-height: 88px; height: 100%;
+    border: 1px solid #eef2f7; border-radius: 10px; padding: 6px;
+    background: #fafbfc; display: flex; flex-direction: column; gap: 3px;
+    text-align: left; overflow: hidden;
   }
-  .st-calendar__day--muted { opacity: 0.45; }
-  .st-calendar__day--today { border-color: ${GREEN}; box-shadow: inset 0 0 0 1px ${GREEN}; }
-  .st-calendar__day-num { font-size: 12px; font-weight: 800; color: #334155; }
-  .st-calendar__events { display: flex; flex-direction: column; gap: 3px; }
-  .st-calendar__event {
-    display: flex; align-items: center; gap: 5px; width: 100%; border: none; border-radius: 6px;
-    padding: 3px 6px; background: color-mix(in srgb, var(--event-color, ${BLUE}) 14%, white);
-    cursor: pointer; text-align: left;
+  .st-calendar__day--muted { opacity: 0.35; }
+  .st-calendar__day--slot {
+    background: #f8fafc; border-style: dashed; border-color: #e2e8f0;
   }
-  .st-calendar__event--selected {
-    background: color-mix(in srgb, var(--event-color, ${BLUE}) 28%, white);
-    box-shadow: inset 0 0 0 1.5px var(--event-color, ${BLUE});
+  .st-calendar__day--slot .st-calendar__day-num { color: #94a3b8; }
+  .st-calendar__day--session {
+    margin: 0; font: inherit; color: inherit; appearance: none; -webkit-appearance: none;
+    cursor: pointer; border: 1px solid #eef2f7;
+    background: color-mix(in srgb, var(--event-color, ${BLUE}) 8%, white);
+    transition: border-color 0.15s, box-shadow 0.15s;
   }
-  .st-calendar__event-dot {
-    width: 7px; height: 7px; border-radius: 999px; background: var(--event-color, ${BLUE}); flex-shrink: 0;
+  .st-calendar__day--session:hover {
+    border-color: color-mix(in srgb, var(--event-color, ${BLUE}) 45%, #e2e8f0);
   }
-  .st-calendar__event-text {
-    font-size: 10px; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  .st-calendar__day--selected {
+    border-color: var(--event-color, ${GREEN});
+    box-shadow: inset 0 0 0 1.5px var(--event-color, ${GREEN});
+    background: color-mix(in srgb, var(--event-color, ${GREEN}) 16%, white);
   }
-  .st-calendar__more { font-size: 10px; color: #94a3b8; font-weight: 700; padding-left: 4px; }
+  .st-calendar__day-num {
+    flex-shrink: 0; font-size: 12px; font-weight: 900; line-height: 1;
+    color: var(--event-color, #334155);
+  }
+  .st-calendar__session-title {
+    font-size: 10px; font-weight: 700; color: #0f172a; line-height: 1.3;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden; word-break: break-word; overflow-wrap: anywhere;
+  }
+  .st-calendar__session-title--muted { color: #94a3b8; font-weight: 600; }
+  .st-calendar__session-topic {
+    margin-top: auto; font-size: 9px; font-weight: 600; color: #64748b;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+  }
+  .st-calendar__empty {
+    margin: 0; padding: 24px 14px 28px; text-align: center; font-size: 13px; font-weight: 700; color: #94a3b8;
+  }
+
+  .st-day-tt { padding: 0; overflow: hidden; }
+  .st-day-tt__title-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    padding: 12px 16px; border-bottom: 1px solid #eef2f7;
+    background: linear-gradient(90deg, #eff6ff, #ecfdf5);
+  }
+  .st-day-tt__title {
+    display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 900; color: #0f172a;
+  }
+  .st-day-tt__title i { color: ${BLUE}; }
+  .st-day-tt__count {
+    font-size: 11px; font-weight: 800; color: ${GREEN};
+    background: #ecfdf5; padding: 4px 10px; border-radius: 999px;
+  }
+  .st-day-tt__hint {
+    margin: 0; padding: 10px 16px 0; font-size: 12px; font-weight: 600; color: #64748b; line-height: 1.45;
+  }
+  .st-day-tt__layout {
+    display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(240px, 0.9fr);
+    gap: 14px; padding: 12px 14px 16px; align-items: start;
+  }
+  .st-day-tt__calendar .react-calendar {
+    width: 100%; border: none; background: transparent; font-family: inherit;
+  }
+  .st-day-tt__calendar .react-calendar__navigation {
+    display: flex; align-items: center; gap: 4px; margin-bottom: 8px;
+  }
+  .st-day-tt__calendar .react-calendar__navigation button {
+    min-width: 36px; border-radius: 10px; font-size: 13px; font-weight: 800; color: #0f172a;
+  }
+  .st-day-tt__calendar .react-calendar__navigation button:enabled:hover {
+    background: #eff6ff;
+  }
+  .st-day-tt__calendar .react-calendar__month-view__weekdays {
+    text-align: center; text-transform: uppercase; font-size: 10px; font-weight: 800; color: #94a3b8;
+  }
+  .st-day-tt__calendar .react-calendar__month-view__weekdays__weekday { padding: 6px 0; }
+  .st-day-tt__calendar .react-calendar__month-view__weekdays__weekday abbr { text-decoration: none; }
+  .st-day-tt__calendar .react-calendar__tile {
+    min-height: 108px; height: auto !important; padding: 6px 4px 4px;
+    border-radius: 12px; border: 1px solid transparent; background: #fafbfc;
+    display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start;
+    gap: 4px; overflow: hidden;
+  }
+  .st-day-tt__calendar .react-calendar__tile:enabled:hover { background: #f1f5f9; }
+  .st-day-tt__calendar .react-calendar__tile--now {
+    background: #eff6ff;
+  }
+  .st-day-tt__calendar .react-calendar__tile--active {
+    background: #ecfdf5 !important; color: inherit;
+  }
+  .st-day-tt__calendar .react-calendar__tile > abbr {
+    align-self: flex-start; font-size: 12px; font-weight: 900; color: #334155;
+  }
+  .st-day-tt__tile--busy {
+    border-color: #e2e8f0 !important; background: #fff !important;
+  }
+  .st-day-tt__tile--focused,
+  .st-day-tt__tile--selected {
+    box-shadow: inset 0 0 0 1.5px ${BLUE};
+  }
+  .st-day-tt__events {
+    display: flex; flex-direction: column; gap: 3px; width: 100%; min-width: 0;
+  }
+  .st-day-tt__badge {
+    align-self: flex-start; font-size: 9px; font-weight: 800; color: #1e40af;
+    background: #dbeafe; border-radius: 999px; padding: 1px 6px; margin-bottom: 1px;
+  }
+  .st-day-tt__chip {
+    width: 100%; margin: 0; border: none; border-radius: 6px; padding: 3px 5px;
+    text-align: left; cursor: pointer; appearance: none; -webkit-appearance: none;
+    background: color-mix(in srgb, var(--event-color, ${BLUE}) 14%, white);
+    border-left: 3px solid var(--event-color, ${BLUE});
+    display: grid; grid-template-columns: 8px minmax(0, 1fr); grid-template-rows: auto auto;
+    column-gap: 5px; row-gap: 0; align-items: center; min-width: 0;
+  }
+  .st-day-tt__chip:hover {
+    background: color-mix(in srgb, var(--event-color, ${BLUE}) 24%, white);
+  }
+  .st-day-tt__chip--selected {
+    box-shadow: 0 0 0 1.5px var(--event-color, ${BLUE});
+  }
+  .st-day-tt__chip-dot {
+    width: 7px; height: 7px; border-radius: 50%; grid-row: 1 / span 2;
+  }
+  .st-day-tt__chip-time {
+    font-size: 9px; font-weight: 800; color: var(--event-color, ${BLUE});
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .st-day-tt__chip-title {
+    font-size: 9px; font-weight: 700; color: #0f172a; line-height: 1.25;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .st-day-tt__more {
+    font-size: 9px; font-weight: 800; color: #64748b; padding: 0 2px;
+  }
+  .st-day-tt__side {
+    border: 1px solid #e2e8f0; border-radius: 14px; background: #f8fafc; padding: 12px;
+    min-height: 280px;
+  }
+  .st-day-tt__side-head {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+    margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;
+  }
+  .st-day-tt__side-head h4 { margin: 0; font-size: 13px; font-weight: 900; color: #0f172a; }
+  .st-day-tt__side-head span { font-size: 11px; font-weight: 800; color: ${BLUE}; }
+  .st-day-tt__side-empty {
+    margin: 12px 0 0; font-size: 12px; font-weight: 600; color: #94a3b8; line-height: 1.45;
+  }
+  .st-day-tt__side-empty--warn { color: ${AMBER}; }
+  .st-day-tt__side-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .st-day-tt__side-item {
+    width: 100%; display: flex; gap: 10px; align-items: flex-start; text-align: left;
+    border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; padding: 10px;
+    cursor: pointer; appearance: none; -webkit-appearance: none;
+  }
+  .st-day-tt__side-item:hover { border-color: color-mix(in srgb, var(--event-color, ${BLUE}) 40%, #e2e8f0); }
+  .st-day-tt__side-item--selected {
+    border-color: var(--event-color, ${BLUE});
+    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--event-color, ${BLUE}) 35%, white);
+  }
+  .st-day-tt__side-swatch {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 4px;
+  }
+  .st-day-tt__side-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .st-day-tt__side-meta strong {
+    font-size: 13px; font-weight: 800; color: #0f172a;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .st-day-tt__side-meta em { font-style: normal; font-size: 11px; font-weight: 800; color: var(--event-color, ${BLUE}); }
+  .st-day-tt__side-meta small { font-size: 11px; font-weight: 600; color: #64748b; }
 
   .st-detail-panel { padding: 16px; min-height: auto; }
   .st-detail-empty { text-align: center; padding: 48px 20px; color: #64748b; }
@@ -1070,6 +1658,15 @@ const ST_CSS = `
   .st-table-type--tot { background: #dbeafe; color: #1d4ed8; }
   .st-table-type--linked { background: #ede9fe; color: #6d28d9; }
   .st-table-type--student { background: #d1fae5; color: #065f46; }
+  .st-table-cell--control { min-width: 150px; }
+  .st-table-input, .st-table-select {
+    width: 100%; min-width: 130px; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 8px 10px; font-size: 12px; font-weight: 600; color: #0f172a; background: #fff;
+  }
+  .st-table-input:focus, .st-table-select:focus {
+    outline: none; border-color: ${GREEN}; box-shadow: 0 0 0 3px rgba(5,150,105,0.12);
+  }
+  .st-table-select:disabled { background: #f8fafc; color: #94a3b8; cursor: not-allowed; }
 
   .st-session-card { overflow: hidden; border-left: 4px solid ${GREEN}; }
   .st-session-card--no-activity { border-left-color: #cbd5e1; }
@@ -1121,6 +1718,7 @@ const ST_CSS = `
   @media (max-width: 1100px) {
     .st-dual-calendars { grid-template-columns: 1fr; }
     .st-filters__grid { grid-template-columns: 1fr; }
+    .st-day-tt__layout { grid-template-columns: 1fr; }
   }
   @media (max-width: 768px) {
     .st-calendar__day { min-height: 72px; }

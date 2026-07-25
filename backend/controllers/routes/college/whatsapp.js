@@ -3666,9 +3666,8 @@ async function handleIncomingMessages(messages, metadata) {
 							$or: [
 								{ mobile: phoneNumberWithCode },
 								{ mobile: phoneNumberWithoutCode },
-								{ mobile: { $regex: phoneWithoutCountryCode, $options: 'i' } }
 							]
-						});
+						}).select('_id name mobile');
 						if (candidate) {
 							console.log('   - Found candidate:', {
 								id: candidate._id,

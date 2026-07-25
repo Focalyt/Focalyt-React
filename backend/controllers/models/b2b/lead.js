@@ -97,6 +97,7 @@ function normalizeB2BApproval(approval) {
 
 const B2BLeadSchema = new mongoose.Schema({
   leadCategory: { type: ObjectId, ref: 'LeadCategory', required: true },
+  leadRanking: { type: ObjectId, ref: 'LeadRanking' },
   b2bProject: { type: ObjectId, ref: 'B2BProject' },
   b2bDepartment: { type: ObjectId, ref: 'B2BDepartment' },
   /** Root lead id for cross-sale group (same business, multiple projects) */
@@ -117,9 +118,11 @@ const B2BLeadSchema = new mongoose.Schema({
   designation: { type: String },
   email: { type: String},
   mobile: { type: String, required: true },
+  isDuplicateMobile: { type: Boolean, default: false, index: true },
   whatsapp: { type: String },
   landlineNumber: { type: String },
   leadOwner: { type: ObjectId, ref: 'User' }, // Could be ref to user in future
+  leadCoOwner: { type: ObjectId, ref: 'User' },
   previousLeadOwners: { type: [ObjectId], ref: 'User' },
   leadAddedBy: { type: ObjectId, ref: 'User' },
   remark: { type: String },

@@ -88,6 +88,7 @@ import AppliedEvents from './Pages/App/Candidate/Events/AppliedEvents';
 import CandidateManagementPortal from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal';
 import CandidateManagementPortal_old from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal_copy';
 import AddCourse from './Pages/App/College/Course/AddCourse';
+import AddCoursecopy from './Pages/App/College/Course/AddCoursecopy';
 import ViewCourses from './Pages/App/College/Course/ViewCourse';
 import EditCourse from './Pages/App/College/Course/EditCourse';
 import Registrations from './Pages/App/College/Course/Registrations';
@@ -109,8 +110,7 @@ import Target from './Pages/App/College/Target/Target';
 import Lrp from './Pages/App/College/LRP/Lrp';
 import LrpView from './Pages/App/College/LRP/LrpView';
 import VideoTimestamp from './Pages/App/College/VideoTimestamp/VideoTimestamp';
-
-
+import AcademicCoordinator from './Pages/App/College/Training/AcademicCoordinatorModule';
 import CompanyLayout from './Component/Layouts/App/Company';
 import CompanyLogin from './Pages/App/Company/CompanyLogin/CompanyLogin';
 import CompanyRegister from './Pages/App/Company/CompanyRegister/CompanyRegister';
@@ -122,6 +122,8 @@ import OngoingHiring from './Pages/App/Company/Hirings/OnGoingHiring';
 import ShortListedCandidate from './Pages/App/Company/Candidate/ShortListedCandidate';
 import AddJd from './Pages/App/Company/Jobs/AddJd';
 import Coins from './Pages/App/Company/Coins/MyPieCoins';
+import Ranking from './Pages/App/College/Settings/LeadRanking/Ranking';
+
 // import EditJob from './Pages/App/Company/Jobs/editJob';
 import ViewJd from './Pages/App/Company/Jobs/ViewJd';
 import IntCandiate from './Pages/App/Company/Candidate/IntrestedCandidates';
@@ -144,6 +146,7 @@ import Source from './Pages/App/College/Settings/Source/Source';
 import Partners from './Pages/App/College/Settings/Partners/Partners';
 import MisReport from './Pages/App/College/MisReport/MisReport';
 import DripMarketing from './Pages/App/College/DripMarketing/Dripmarketing'
+import DripMarketingB2B from './Pages/App/College/DripMarketing/DripmarketingB2B'
 import ReEnquire from './Pages/App/College/Course/ReEnquire';
 import TrainerManagement from './Pages/App/College/Settings/TrainerManagement/TrainerManagement';
 import WhatsappChat from './Pages/App/College/Whatapp/WhatsappChat';
@@ -152,6 +155,9 @@ import EmailTemplate from './Pages/App/College/Email/EmailTemplate';
 import TrainerModule from './Pages/App/College/Course/TrainerModule';
 import AcademicCoordinatorModule from './Pages/App/College/Training/AcademicCoordinatorModule';
 import SeniorTrainerModule from './Pages/App/College/Training/SeniorTrainerModule';
+import Editcoursecopy from './Pages/App/College/Course/EditCoursecopy';
+import Viewcoursecopy from './Pages/App/College/Course/ViewCoursecopy';
+import LeadRanking from './Pages/App/College/Settings/LeadRanking/LeadRanking';
 // Trainer module
 import TrainerLayout from './Component/Layouts/App/Trainer'
 import TrainerLogin from './Pages/App/Trainer/TrainerLogin/TrainerLogin'
@@ -295,8 +301,11 @@ const Layout = () => {
           <Route path="availablejobs" element={<AvailableJobs/>}/>
           <Route path="candidatemanagment" element={<CandidateManagementPortal/>}/>
           <Route path='addcourse' element={<AddCourse/>}/>
-          <Route path='viewcourse' element={<ViewCourses/>}/>
-          <Route path='registration' element={<Registrations/>}/>
+          <Route path='addcoursecopy' element={<AddCoursecopy/>}/>
+          <Route path='editcoursecopy/:id' element={<Editcoursecopy/>}/>
+          <Route path='viewcoursecopy' element={<Viewcoursecopy/>}/>
+         <Route path='viewcourse' element={<ViewCourses/>}/>
+          <Route path='registrationold' element={<Registrations/>}/>
           <Route path='admissionpost' element={<AdmissionPost/>}/>
           {/* <Route path='editcourse' element={<EditCourse/>}/> */}
           <Route path="institute/courses/edit/:id" element={<EditCourse />} />
@@ -323,12 +332,16 @@ const Layout = () => {
           <Route path='typeOfB2b' element={<TypeB2b/>}/>
           <Route path='b2bProject' element={<B2BProject/>}/>
           <Route path='b2bDepartment' element={<B2BDepartment/>}/>
+          <Route path='ranking' element={<LeadRanking/>}/>
+          <Route path='rank' element={<Ranking/>}/>
+          <Route path='leadRanking' element={<LeadRanking/>}/>
           <Route path='typeOfCategory' element={<TypeCategory/>}/>
           <Route path='calenderb2c' element={<CalenderFolowupB2C/>}/>
           <Route path='source' element={<Source/>}/>
           <Route path='partners' element={<Partners/>}/>
           <Route path='misreport/:batchId' element={<MisReport/>}/>
           <Route path='dripmarketing' element={<DripMarketing/>}/>
+          <Route path='dripmarketing-b2b' element={<DripMarketingB2B/>}/>
           <Route path='re-enquire' element={<ReEnquire/>}/>
           <Route path='trainerManagement' element={<TrainerManagement/>}/>
           <Route path='whatsappChat' element={<WhatsappChat/>}/>
@@ -341,7 +354,9 @@ const Layout = () => {
           <Route path='training' element={<TrainerModule/>}/>
           <Route path='training/academic-coordinator' element={<AcademicCoordinatorModule/>}/>
           <Route path='training/senior-trainer' element={<SeniorTrainerModule/>}/>
-          <Route path='registrationsold' element={<Regitrationsold/>}/>
+          <Route path='registration' element={<Regitrationsold/>}/>
+          <Route path='academicCoordinator' element={<AcademicCoordinator/>}/>
+          <Route path='seniorTrainer' element={<SeniorTrainerModule/>}/>
         </Route>
 
         {/* company  */}

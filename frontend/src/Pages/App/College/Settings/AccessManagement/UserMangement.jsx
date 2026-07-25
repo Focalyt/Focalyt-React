@@ -283,6 +283,8 @@ const UserManagement = ({
       { key: 'can_view_kyc', label: 'View KYC' },
       { key: 'can_verify_reject_kyc', label: 'Verify KYC' },
       { key: 'can_view_training', label: 'View Training' },
+      { key: 'can_be_senior_trainer', label: 'Senior Trainer' },
+      { key: 'can_be_trainer', label: 'Trainer' },
       { key: 'can_add_course', label: 'Add Course' },
       { key: 'can_view_users', label: 'View Users' },
       { key: 'can_add_users', label: 'Add Users' },

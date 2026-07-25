@@ -52,6 +52,8 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
       can_add_course: false,
       can_add_batch: false,
       can_assign_batch: false,
+      can_be_senior_trainer: false,
+      can_be_trainer: false,
 
       // User Management
       can_view_users: false,
@@ -104,6 +106,8 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
         can_add_course: true,
         can_add_batch: true,
         can_assign_batch: true,
+        can_be_senior_trainer: true,
+        can_be_trainer: true,
         can_view_users: true,
         can_add_users: true,
         can_edit_users: true,
@@ -139,6 +143,8 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
         can_add_course: false,
         can_add_batch: false,
         can_assign_batch: false,
+        can_be_senior_trainer: false,
+        can_be_trainer: false,
         can_view_users: true,
         can_add_users: false,
         can_edit_users: false,
@@ -210,7 +216,7 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
       }
 
       // Training Management Dependencies
-      if (['can_add_vertical', 'can_add_project', 'can_add_center', 'can_add_course', 'can_add_batch', 'can_assign_batch'].includes(permission) && value === true) {
+      if (['can_add_vertical', 'can_add_project', 'can_add_center', 'can_add_course', 'can_add_batch', 'can_assign_batch', 'can_be_senior_trainer', 'can_be_trainer'].includes(permission) && value === true) {
         updatedPermissions.can_view_training = true;
       }
       if (permission === 'can_view_training' && value === false) {
@@ -220,6 +226,8 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
         updatedPermissions.can_add_course = false;
         updatedPermissions.can_add_batch = false;
         updatedPermissions.can_assign_batch = false;
+        updatedPermissions.can_be_senior_trainer = false;
+        updatedPermissions.can_be_trainer = false;
       }
 
       // User Management Dependencies
@@ -657,7 +665,9 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
                       can_add_center: '🏫 Add Center',
                       can_add_course: '📚 Add Course',
                       can_add_batch: '👥 Add Batch',
-                      can_assign_batch: '🎯 Assign Batch'
+                      can_assign_batch: '🎯 Assign Batch',
+                      can_be_senior_trainer: '🛡️ Senior Trainer',
+                      can_be_trainer: '👨‍🏫 Trainer'
                     }).map(([permission, label]) => (
                       <div key={permission} className="col-md-6">
                         <div className="form-check">

@@ -876,16 +876,16 @@ function CollegeLayout({ children }) {
                         <span className="menu-title">{t('dashboard')}</span>
                       </Link>
                     </li> */}
-                    <li className={`nav-item ${location.pathname === '/institute/registration' ? 'active' : ''}`}>
+                    {/* <li className={`nav-item ${location.pathname === '/institute/registration' ? 'active' : ''}`}>
                       <Link to="/institute/registration" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faUserFriends} />
                         <span className="menu-title">{t('admission_cycle_pre')}</span>
                       </Link>
-                    </li>
+                    </li> */}
                     <li className={`nav-item ${location.pathname === '/institute/registrationsold' ? 'active' : ''}`}>
-                      <Link to="/institute/registrationsold" onClick={() => handleSidebarClose()}>
+                      <Link to="/institute/registration" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faUserFriends} />
-                        <span className="menu-title">{t('Admission New')}</span>
+                        <span className="menu-title">{t('Sales B2C')}</span>
                       </Link>
                     </li>
                     <li className={`nav-item ${location.pathname === '/institute/admissionpost' ? 'active' : ''}`}>
@@ -905,7 +905,7 @@ function CollegeLayout({ children }) {
                         )}
                       </Link>
                     </li>
-                    <li className={`nav-item ${location.pathname === '/institute/calenderb2c' ? 'active' : ''}`}>
+                    {/* <li className={`nav-item ${location.pathname === '/institute/calenderb2c' ? 'active' : ''}`}>
                       <Link
                         to="/institute/calenderb2c"
                         onClick={() => handleSidebarClose()}
@@ -934,7 +934,7 @@ function CollegeLayout({ children }) {
                           </span>
                         )}
                       </Link>
-                    </li>
+                    </li> */}
                     <li className={`nav-item ${location.pathname === '/institute/myfollowup' ? 'active' : ''}`}>
                       <Link to="/institute/myfollowup" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faBell} />
@@ -1123,7 +1123,12 @@ function CollegeLayout({ children }) {
                   <span className="menu-title">{t('upload_candidates')}</span>
                 </Link>
               </li>
-
+              {/* <li className={`nav-item ${location.pathname === '/institute/ranking' ? 'active' : ''}`}>
+                <Link to="/institute/ranking" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faClipboardList} />
+                  <span className="menu-title">{t('Lead Ranking')}</span>
+                </Link>
+              </li> */}
               {/* Upload Templates */}
               <li className={`nav-item ${location.pathname === '/institute/uploadTemplates' ? 'active' : ''}`}>
                 <Link to="/institute/uploadTemplates" onClick={() => handleSidebarClose()}>
@@ -1349,6 +1354,12 @@ function CollegeLayout({ children }) {
                       {/* <FontAwesomeIcon icon={faDrip} /> */}
                       <FontAwesomeIcon icon={faBullhorn} />
                       <span className="menu-title">{t('drip_marketing')}</span>
+                    </Link>
+                  </li>
+                  <li className={`nav-item ${location.pathname === '/institute/dripmarketing-b2b' ? 'active' : ''}`}>
+                    <Link to="/institute/dripmarketing-b2b" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faBullhorn} />
+                      <span className="menu-title">B2B Drip Marketing</span>
                     </Link>
                   </li>
                 </ul>

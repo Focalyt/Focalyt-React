@@ -2034,19 +2034,31 @@ const STYLES = `
 }
 .event-actions .btn-secondary {
   background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text);
-  padding: 10px 12px;
-  border-radius: 12px;
-  font-weight: 700;
+  border: 1.5px solid var(--home-card-cta, var(--foc-navy-deep, #0d2146));
+  color: var(--home-card-cta, var(--foc-navy-deep, #0d2146));
+  padding: 8px 10px;
+  border-radius: 50px;
+  font-weight: 600;
   font-size: 12px;
-  letter-spacing: .04em;
+  letter-spacing: 0;
   transition: .2s;
+  cursor: pointer;
 }
-.event-actions .btn-secondary:hover {
-  border-color: var(--cyan);
-  color: var(--cyan);
-  box-shadow: 0 0 18px var(--cyan-glow);
+.event-actions .btn-secondary:hover:not(.disabled) {
+  background: var(--home-card-cta, var(--foc-navy-deep, #0d2146));
+  border-color: var(--home-card-cta, var(--foc-navy-deep, #0d2146));
+  color: #fff;
+  box-shadow: none;
+}
+.event-actions .btn-secondary.disabled,
+.event-actions .btn-guidelines.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.event-actions button.btn-secondary {
+  flex: 1;
+  width: 100%;
 }
 
 .courses-grid {

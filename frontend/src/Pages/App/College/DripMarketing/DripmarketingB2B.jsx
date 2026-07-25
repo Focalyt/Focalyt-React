@@ -119,7 +119,7 @@ const MultiselectDropdown = ({ options, value, onChange, placeholder = "Select o
 };
 
 
-const DripMarketing = () => {
+const DripMarketingB2B = () => {
     // Backend configuration
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
@@ -148,18 +148,17 @@ const DripMarketing = () => {
     const [subStatuses, setSubStatuses] = useState([]);
     const [selectedStatus, setSelectedStatus] = useState('');
     const [selectedSubStatus, setSelectedSubStatus] = useState('');
-    const [verticals, setVerticals] = useState([]);
+    const [departments, setDepartments] = useState([]);
     const [projects, setProjects] = useState([]);
-    const [selectedVertical, setSelectedVertical] = useState(null);
+    const [selectedDepartment, setSelectedDepartment] = useState(null);
     const [selectedProject, setSelectedProject] = useState(null);
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [centers, setCenters] = useState([]);
-    const [courseName, setCourseName] = useState([]);
-    const [batches, setBatches] = useState([]);
+    const [typeOfB2BList, setTypeOfB2BList] = useState([]);
+    const [leadCategories, setLeadCategories] = useState([]);
+    const [leadRankings, setLeadRankings] = useState([]);
     const [leadOwner, setLeadOwner] = useState([]);
     const [registeredBy, setRegisteredBy] = useState([]);
-    const [jobName, setJobName] = useState([]);
 
     const [whatappTemplateField, setWhatappTemplateField] = useState(false);
     const [whatsappTemplates, setWhatsappTemplates] = useState([]);
@@ -167,24 +166,14 @@ const DripMarketing = () => {
     useEffect(() => {
         fetchRules();
         fetchStatuses();
-        fetchCourses();
-        fetchBatches();
+        fetchDepartments();
+        fetchProjects();
+        fetchTypeOfB2B();
+        fetchLeadCategories();
+        fetchLeadRankings();
         fetchleadOwnwer();
-        fetchJobData();
         fetchWhatsappTemplates();
     }, []);
-
-    // Cleanup modal on component unmount
-    // useEffect(() => {
-    //     return () => {
-    //         forceCloseModal();
-    //     };
-    // }, []);
-
-
-    useEffect(() => {
-        fetchVerticals();
-    }, [token]);
 
     const [dropdownStates, setDropdownStates] = useState({
         verticals: false,
@@ -258,30 +247,17 @@ const DripMarketing = () => {
     }
 
 
-    useEffect(() => {
-        // Only fetch projects if we have verticals loaded and a token
-        if (verticals.length > 0 && token) {
-            // Initially fetch all projects (no vertical selected)
-            fetchProjects();
-        }
-    }, [verticals, token]);
-
-    useEffect(() => {
-        fetchCenters();
-    }, [])
-    const handleVerticalChange = (verticalId) => {
-
-        const selectedVertical = verticals.find(v => v.id === verticalId);
-        setSelectedVertical(selectedVertical);
-
+    const handleDepartmentChange = (departmentId) => {
+        const selected = departments.find(d => d._id === departmentId || d.id === departmentId);
+        setSelectedDepartment(selected || null);
+        fetchProjects(departmentId);
+        fetchTypeOfB2B(departmentId);
     };
 
-    // Function to clear vertical selection and fetch all projects
-    const clearVerticalSelection = () => {
-        setSelectedVertical(null);
-        setProjects([]);
+    const clearDepartmentSelection = () => {
+        setSelectedDepartment(null);
         fetchProjects();
-        setCenters([]);
+        fetchTypeOfB2B();
     };
 
     // Function to handle occurrence count change and create communication blocks
@@ -321,84 +297,46 @@ const DripMarketing = () => {
     };
 
 
-    const fetchVerticals = async () => {
+    const fetchDepartments = async () => {
         try {
-            if (!token) {
-                console.warn('No token found in session storage.');
-                return;
-            }
-
-            const newVertical = await axios.get(`${backendUrl}/college/dripmarketing/getVerticals`, { headers: { 'x-auth': token } });
-
-
-            // Check if data exists and is an array
-            if (newVertical.data && newVertical.data.data && Array.isArray(newVertical.data.data)) {
-                const verticalList = newVertical.data.data.map(v => ({
-                    id: v._id,
-                    name: v.name,
-                    status: v.status === true ? 'active' : 'inactive',
-                    code: v.code,
-                    projects: v.projects,
-                    createdAt: v.createdAt
-                }));
-
-                setVerticals(verticalList);
+            if (!token) return;
+            const response = await axios.get(`${backendUrl}/college/b2b/b2b-departments?status=true`, {
+                headers: { 'x-auth': token }
+            });
+            if (response.data?.status && Array.isArray(response.data.data)) {
+                setDepartments(response.data.data);
             } else {
-                console.warn('No verticals data found or data is not an array');
-                setVerticals([]);
+                setDepartments([]);
             }
         } catch (error) {
-            console.error('Error fetching verticals:', error);
-            setVerticals([]);
+            console.error('Error fetching B2B departments:', error);
+            setDepartments([]);
         }
     };
 
-    const fetchProjects = async (selectedVerticalId = null) => {
-
-        // Use the passed parameter or fall back to selectedVertical
-        let verticalId = selectedVerticalId || selectedVertical?.id;
-
-
+    const fetchProjects = async (departmentId = null) => {
         if (!token) {
-            console.warn('No authentication token available');
             setError('Authentication required');
             return;
         }
-
         setLoading(true);
         setError(null);
-
         try {
-            // let url = `${backendUrl}/college/dripmarketing/list-projects`;
-            let url = `${backendUrl}/college/dripmarketing/list_all_projects`;
-
-
-            if (verticalId) {
-                url += `?vertical=${verticalId}`;
-            }
-
-
-
+            let url = `${backendUrl}/college/b2b/b2b-projects?status=true`;
+            const deptId = departmentId || selectedDepartment?._id || selectedDepartment?.id;
+            if (deptId) url += `&department=${deptId}`;
 
             const response = await axios.get(url, {
-                headers: {
-                    'x-auth': token,
-                    'Content-Type': 'application/json'
-                }
+                headers: { 'x-auth': token, 'Content-Type': 'application/json' }
             });
 
-
-
-            if (response.data && response.data.success && Array.isArray(response.data.data)) {
+            if (response.data?.status && Array.isArray(response.data.data)) {
                 setProjects(response.data.data);
-
             } else {
-
                 setProjects([]);
-                setError('No projects found');
             }
         } catch (err) {
-            console.error('Fetch projects error:', err);
+            console.error('Fetch B2B projects error:', err);
             setError(err.response?.data?.message || err.message || 'Failed to load projects');
             setProjects([]);
         } finally {
@@ -406,72 +344,55 @@ const DripMarketing = () => {
         }
     };
 
-    const fetchCenters = async () => {
-        // Get projectId from selectedProject prop or URL (for refresh cases)
-        const projectId = selectedProject?._id;
-
-        setLoading(true);
-        setError(null);
+    const fetchTypeOfB2B = async (departmentId = null) => {
         try {
-
-            const response = await fetch(`${backendUrl}/college/dripmarketing/list-centers`, {
-                headers: {
-                    'x-auth': token,
-                },
-            });
-            if (!response.ok) throw new Error('Failed to fetch centers');
-
-            const data = await response.json();
-
-            if (data.success) {
-                setCenters(data.data);
-
+            if (!token) return;
+            let url = `${backendUrl}/college/b2b/type-of-b2b?status=true`;
+            const deptId = departmentId || selectedDepartment?._id || selectedDepartment?.id;
+            if (deptId) url += `&department=${deptId}`;
+            const response = await axios.get(url, { headers: { 'x-auth': token } });
+            if (response.data?.status && Array.isArray(response.data.data)) {
+                setTypeOfB2BList(response.data.data);
             } else {
-                setError('Failed to load centers');
+                setTypeOfB2BList([]);
             }
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
+        } catch (error) {
+            console.error('Error fetching type of B2B:', error);
+            setTypeOfB2BList([]);
         }
-    }
+    };
 
-    const fetchCourses = async () => {
+    const fetchLeadCategories = async () => {
         try {
-            const response = await axios.get(`${backendUrl}/college/dripmarketing/all_courses`, {
+            if (!token) return;
+            const response = await axios.get(`${backendUrl}/college/b2b/lead-categories?status=true`, {
                 headers: { 'x-auth': token }
             });
-            if (response.data.success) {
-                setCourseName(response.data.data);
-
-            }
-        }
-        catch (error) {
-            console.error('Error fetching courses:', error);
-        }
-    }
-    const fetchBatches = async () => {
-        setLoading(true);
-        setError('');
-
-        try {
-            const response = await axios.get(`${backendUrl}/college/dripmarketing/get_batches`, {
-
-                headers: {
-                    'x-auth': token  // Pass the token in the headers for authentication
-                }
-            });
-
-            if (response.data.success) {
-                setBatches(response.data.data);
+            if (response.data?.status && Array.isArray(response.data.data)) {
+                setLeadCategories(response.data.data);
             } else {
-                setError('Failed to fetch batches');
+                setLeadCategories([]);
             }
-        } catch (err) {
-            console.error('Error fetching batches:', err);
-            setError('Server error');
-        } finally {
-            setLoading(false);
+        } catch (error) {
+            console.error('Error fetching lead categories:', error);
+            setLeadCategories([]);
+        }
+    };
+
+    const fetchLeadRankings = async () => {
+        try {
+            if (!token) return;
+            const response = await axios.get(`${backendUrl}/college/b2b/lead-rankings?status=true`, {
+                headers: { 'x-auth': token }
+            });
+            if (response.data?.status && Array.isArray(response.data.data)) {
+                setLeadRankings(response.data.data);
+            } else {
+                setLeadRankings([]);
+            }
+        } catch (error) {
+            console.error('Error fetching lead rankings:', error);
+            setLeadRankings([]);
         }
     };
 
@@ -482,40 +403,19 @@ const DripMarketing = () => {
                 return;
             }
 
-            const response = await axios.get(`${backendUrl}/college/dripmarketing/leadowner`, {
+            const response = await axios.get(`${backendUrl}/college/users/b2b-users`, {
                 headers: { 'x-auth': token }
             });
 
             if (response.data.success) {
-                setLeadOwner(response.data.concernPersons);
-                setRegisteredBy(response.data.concernPersons);
-
+                const users = response.data.data || [];
+                setLeadOwner(users);
+                setRegisteredBy(users);
             } else {
-                console.error('Failed to fetch concern persons:', response.data.message);
+                console.error('Failed to fetch B2B users:', response.data.message);
             }
         } catch (error) {
-            console.error('Error fetching concern persons:', error);
-        }
-    };
-
-    const fetchJobData = async () => {
-        try {
-
-
-
-            if (!token) {
-                console.warn('No token found in session storage.');
-                return;
-            }
-
-            const response = await axios.get(`${backendUrl}/college/dripmarketing/joblisting`, {
-                headers: { 'x-auth': token }
-            });
-
-            setJobName(response.data.data);
-
-        } catch (error) {
-            console.error("Error fetching course data:", error);
+            console.error('Error fetching B2B users:', error);
         }
     };
 
@@ -532,7 +432,6 @@ const DripMarketing = () => {
 
             if (response.data.success) {
                 const list = Array.isArray(response.data.data) ? response.data.data : [];
-                // Prefer APPROVED templates for drip sends; fall back to all if none approved
                 const approved = list.filter((t) => String(t?.status || '').toUpperCase() === 'APPROVED');
                 setWhatsappTemplates(approved.length > 0 ? approved : list);
             } else {
@@ -545,8 +444,6 @@ const DripMarketing = () => {
         }
     };
 
-    // Fetch all statuses
-
     const fetchStatuses = async () => {
         try {
             if (!token) {
@@ -554,36 +451,48 @@ const DripMarketing = () => {
                 return;
             }
 
-            const response = await axios.get(`${backendUrl}/college/dripmarketing/status`, {
+            const response = await axios.get(`${backendUrl}/college/statusB2b`, {
                 headers: { 'x-auth': token }
             });
 
             if (response.data.success) {
                 setStatuses(response.data.data);
-
             }
         } catch (error) {
-            console.error('Error fetching statuses:', error);
+            console.error('Error fetching B2B statuses:', error);
         }
     };
+
     useEffect(() => {
         fetchSubStatuses();
-    }, []);
-    // Fetch sub-statuses based on selected status
-    const fetchSubStatuses = async () => {
+    }, [statuses]);
+
+    const fetchSubStatuses = async (statusId = null) => {
         try {
+            if (statusId) {
+                const response = await axios.get(`${backendUrl}/college/statusB2b/${statusId}/substatus`, {
+                    headers: { 'x-auth': token }
+                });
+                if (response.data.success) {
+                    setSubStatuses(response.data.data || []);
+                }
+                return;
+            }
 
-
-            const response = await axios.get(`${backendUrl}/college/dripmarketing/substatus`, {
-                headers: { 'x-auth': token }
+            // Flatten all substatuses from loaded statuses
+            const all = [];
+            (statuses || []).forEach((st) => {
+                (st.substatuses || []).forEach((sub) => {
+                    all.push({ ...sub, parentStatusId: st._id });
+                });
             });
-
-            if (response.data.success) {
-                setSubStatuses(response.data.data);
-
+            if (all.length) {
+                setSubStatuses(all);
+            } else if (statuses?.length) {
+                setSubStatuses([]);
             }
         } catch (error) {
-            console.error('Error fetching sub-statuses:', error);
+            console.error('Error fetching B2B sub-statuses:', error);
         }
     };
 
@@ -635,6 +544,7 @@ const DripMarketing = () => {
                     })),
                     recipient: ruleData.communication.recipient,
                 },
+                leadType: 'b2b',
 
 
             };
@@ -704,7 +614,7 @@ const DripMarketing = () => {
     const fetchRules = async () => {
 
         try {
-            const response = await axios.get(`${backendUrl}/college/dripmarketing/get-dripmarketing-rule`, {
+            const response = await axios.get(`${backendUrl}/college/dripmarketing/get-dripmarketing-rule?leadType=b2b`, {
                 headers: { 'x-auth': token }
             });
             // console.log(response.data.data, 'response.data.data')
@@ -763,6 +673,7 @@ const DripMarketing = () => {
                     })),
                     recipient: ruleData.communication.recipient,
                 },
+                leadType: 'b2b',
 
 
             };
@@ -1035,16 +946,15 @@ const DripMarketing = () => {
         status: [],
         subStatus: [],
         leadOwner: [],
+        leadCoOwner: [],
+        leadAddedBy: [],
         registeredBy: [],
-        courseName: [],
-        jobName: [],
-        // email: [],
-        // mobile: [],
-        project: [],
-        vertical: [],
-        center: [],
-        course: [],
-        batch: []
+        b2bProject: [],
+        b2bDepartment: [],
+        typeOfB2B: [],
+        leadCategory: [],
+        leadRanking: [],
+        project: []
     };
 
     // Function to get value options based on selected activity type
@@ -1059,45 +969,40 @@ const DripMarketing = () => {
                 value: subStatus._id,
                 label: subStatus.title
             }));
-        } else if (activityType === 'vertical') {
-            return verticals.map(vertical => ({
-                value: vertical.id,
-                label: vertical.name
+        } else if (activityType === 'b2bDepartment') {
+            return departments.map(d => ({
+                value: d._id,
+                label: d.name
             }));
-        } else if (activityType === 'project') {
+        } else if (activityType === 'b2bProject' || activityType === 'project') {
             return projects.map(project => ({
                 value: project._id,
                 label: project.name
             }));
-        } else if (activityType === 'batch') {
-            return batches.map(batch => ({
-                value: batch._id,
-                label: batch.name
+        } else if (activityType === 'typeOfB2B') {
+            return typeOfB2BList.map(t => ({
+                value: t._id,
+                label: t.name
             }));
-        } else if (activityType === 'center') {
-            return centers.map(center => ({
-                value: center._id,
-                label: center.name
+        } else if (activityType === 'leadCategory') {
+            return leadCategories.map(c => ({
+                value: c._id,
+                label: c.name
             }));
-        } else if (activityType === 'course') {
-            return courseName.map(course => ({
-                value: course._id,
-                label: course.name
+        } else if (activityType === 'leadRanking') {
+            return leadRankings.map(r => ({
+                value: r._id,
+                label: r.name
             }));
-        } else if (activityType === 'leadOwner') {
+        } else if (activityType === 'leadOwner' || activityType === 'leadCoOwner') {
             return leadOwner.map(owner => ({
                 value: owner._id,
                 label: owner.name
             }));
-        } else if (activityType === 'registeredBy') {
-            return registeredBy.map(registeredBy => ({
-                value: registeredBy._id,
-                label: registeredBy.name
-            }));
-        } else if (activityType === 'jobName') {
-            return jobName?.map(job => ({
-                value: job?._id,
-                label: job?.title
+        } else if (activityType === 'leadAddedBy' || activityType === 'registeredBy') {
+            return registeredBy.map(user => ({
+                value: user._id,
+                label: user.name
             }));
         }
         return activityTypeValueOptions[activityType] || [];
@@ -1147,14 +1052,15 @@ const DripMarketing = () => {
         status: [],
         subStatus: [],
         leadOwner: [],
+        leadCoOwner: [],
+        leadAddedBy: [],
         registeredBy: [],
-        courseName: [],
-        jobName: [],
-        project: [],
-        vertical: [],
-        center: [],
-        course: [],
-        batch: []
+        b2bProject: [],
+        b2bDepartment: [],
+        typeOfB2B: [],
+        leadCategory: [],
+        leadRanking: [],
+        project: []
     };
 
     // Function to get THEN value options
@@ -1169,45 +1075,40 @@ const DripMarketing = () => {
                 value: subStatus._id,
                 label: subStatus.title
             }));
-        } else if (activityType === 'vertical') {
-            return verticals.map(vertical => ({
-                value: vertical.id,
-                label: vertical.name
+        } else if (activityType === 'b2bDepartment') {
+            return departments.map(d => ({
+                value: d._id,
+                label: d.name
             }));
-        } else if (activityType === 'project') {
+        } else if (activityType === 'b2bProject' || activityType === 'project') {
             return projects.map(project => ({
                 value: project._id,
                 label: project.name
             }));
-        } else if (activityType === 'batch') {
-            return batches.map(batch => ({
-                value: batch._id,
-                label: batch.name
+        } else if (activityType === 'typeOfB2B') {
+            return typeOfB2BList.map(t => ({
+                value: t._id,
+                label: t.name
             }));
-        } else if (activityType === 'center') {
-            return centers.map(center => ({
-                value: center._id,
-                label: center.name
+        } else if (activityType === 'leadCategory') {
+            return leadCategories.map(c => ({
+                value: c._id,
+                label: c.name
             }));
-        } else if (activityType === 'course') {
-            return courseName.map(course => ({
-                value: course._id,
-                label: course.name
+        } else if (activityType === 'leadRanking') {
+            return leadRankings.map(r => ({
+                value: r._id,
+                label: r.name
             }));
-        } else if (activityType === 'leadOwner') {
+        } else if (activityType === 'leadOwner' || activityType === 'leadCoOwner') {
             return leadOwner.map(owner => ({
                 value: owner._id,
                 label: owner.name
             }));
-        } else if (activityType === 'registeredBy') {
-            return registeredBy.map(registeredBy => ({
-                value: registeredBy._id,
-                label: registeredBy.name
-            }));
-        } else if (activityType === 'jobName') {
-            return jobName?.map(job => ({
-                value: job?._id,
-                label: job?.title
+        } else if (activityType === 'leadAddedBy' || activityType === 'registeredBy') {
+            return registeredBy.map(user => ({
+                value: user._id,
+                label: user.name
             }));
         }
         return thenValueOptions[activityType] || [];
@@ -1256,14 +1157,15 @@ const DripMarketing = () => {
         status: [],
         subStatus: [],
         leadOwner: [],
+        leadCoOwner: [],
+        leadAddedBy: [],
         registeredBy: [],
-        courseName: [],
-        jobName: [],
-        project: [],
-        vertical: [],
-        center: [],
-        course: [],
-        batch: []
+        b2bProject: [],
+        b2bDepartment: [],
+        typeOfB2B: [],
+        leadCategory: [],
+        leadRanking: [],
+        project: []
     };
 
     const getThenFirstValueOptions = (activityType) => {
@@ -1277,45 +1179,40 @@ const DripMarketing = () => {
                 value: subStatus._id,
                 label: subStatus.title
             }));
-        } else if (activityType === 'vertical') {
-            return verticals.map(vertical => ({
-                value: vertical.id,
-                label: vertical.name
+        } else if (activityType === 'b2bDepartment') {
+            return departments.map(d => ({
+                value: d._id,
+                label: d.name
             }));
-        } else if (activityType === 'project') {
+        } else if (activityType === 'b2bProject' || activityType === 'project') {
             return projects.map(project => ({
                 value: project._id,
                 label: project.name
             }));
-        } else if (activityType === 'batch') {
-            return batches.map(batch => ({
-                value: batch._id,
-                label: batch.name
+        } else if (activityType === 'typeOfB2B') {
+            return typeOfB2BList.map(t => ({
+                value: t._id,
+                label: t.name
             }));
-        } else if (activityType === 'center') {
-            return centers.map(center => ({
-                value: center._id,
-                label: center.name
+        } else if (activityType === 'leadCategory') {
+            return leadCategories.map(c => ({
+                value: c._id,
+                label: c.name
             }));
-        } else if (activityType === 'course') {
-            return courseName.map(course => ({
-                value: course._id,
-                label: course.name
+        } else if (activityType === 'leadRanking') {
+            return leadRankings.map(r => ({
+                value: r._id,
+                label: r.name
             }));
-        } else if (activityType === 'leadOwner') {
+        } else if (activityType === 'leadOwner' || activityType === 'leadCoOwner') {
             return leadOwner.map(owner => ({
                 value: owner._id,
                 label: owner.name
             }));
-        } else if (activityType === 'registeredBy') {
-            return registeredBy.map(registeredBy => ({
-                value: registeredBy._id,
-                label: registeredBy.name
-            }));
-        } else if (activityType === 'jobName') {
-            return jobName?.map(job => ({
-                value: job?._id,
-                label: job?.title
+        } else if (activityType === 'leadAddedBy' || activityType === 'registeredBy') {
+            return registeredBy.map(user => ({
+                value: user._id,
+                label: user.name
             }));
         }
         return thenFirstValueOptions[activityType] || [];
@@ -1747,27 +1644,27 @@ const DripMarketing = () => {
 
 
         // Check if this is a vertical value selection
-        if (activityType === 'vertical' && value) {
+        if (activityType === 'b2bDepartment' && value) {
             if (Array.isArray(value)) {
                 // Handle multiselect for vertical
                 if (value.includes('all') || value.length === 0) {
                     // If "All Verticals" is selected or no selection, clear vertical selection and fetch all projects
-                    clearVerticalSelection();
+                    clearDepartmentSelection();
                 } else if (value.length === 1) {
                     // If only one vertical is selected, use that vertical
-                    handleVerticalChange(value[0]);
+                    handleDepartmentChange(value[0]);
                 } else {
                     // If multiple verticals are selected, clear selection and fetch all projects
-                    clearVerticalSelection();
+                    clearDepartmentSelection();
                 }
             } else {
                 // Handle single select for vertical
                 if (value === 'all') {
                     // If "All Verticals" is selected, clear vertical selection and fetch all projects
-                    clearVerticalSelection();
+                    clearDepartmentSelection();
                 } else {
                     // If a specific vertical is selected, update vertical selection and fetch its projects
-                    handleVerticalChange(value);
+                    handleDepartmentChange(value);
                 }
             }
         }
@@ -1985,27 +1882,27 @@ const DripMarketing = () => {
 
 
         // Check if this is a vertical value selection in sub-condition
-        if (activityType === 'vertical' && value) {
+        if (activityType === 'b2bDepartment' && value) {
             if (Array.isArray(value)) {
                 // Handle multiselect for vertical
                 if (value.includes('all') || value.length === 0) {
                     // If "All Verticals" is selected or no selection, clear vertical selection and fetch all projects
-                    clearVerticalSelection();
+                    clearDepartmentSelection();
                 } else if (value.length === 1) {
                     // If only one vertical is selected, use that vertical
-                    handleVerticalChange(value[0]);
+                    handleDepartmentChange(value[0]);
                 } else {
                     // If multiple verticals are selected, clear selection and fetch all projects
-                    clearVerticalSelection();
+                    clearDepartmentSelection();
                 }
             } else {
                 // Handle single select for vertical
                 if (value === 'all') {
                     // If "All Verticals" is selected, clear vertical selection and fetch all projects
-                    clearVerticalSelection();
+                    clearDepartmentSelection();
                 } else {
                     // If a specific vertical is selected, update vertical selection and fetch its projects
-                    handleVerticalChange(value);
+                    handleDepartmentChange(value);
                 }
             }
         }
@@ -2180,7 +2077,7 @@ const DripMarketing = () => {
                     <div className="modal-dialog modal-dialog-scrollable">
                         <div className="modal-content">
                             <div className="modal-header">
-                                <h1 className="modal-title fs-5" id="staticBackdropLabel">{modalMode === 'edit' ? 'Edit Rule' : 'Add Rule'}</h1>
+                                <h1 className="modal-title fs-5" id="staticBackdropLabel">{modalMode === 'edit' ? 'Edit B2B Rule' : 'Add B2B Rule'}</h1>
                                 <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close" ></button>
                             </div>
                             <div className="modal-body">
@@ -2349,21 +2246,18 @@ const DripMarketing = () => {
                                                                                         value={(conditionSelections[index] || [''])[conditionIdx] || ''}
                                                                                         onChange={(e) => handleSelectChange(index, conditionIdx, e.target.value)}
                                                                                     >
-                                                                                        <option value="">Activity type</option>
-
-
+                                                                                                                                                                                <option value="">Activity type</option>
                                                                                         <option value="state">State</option>
                                                                                         <option value="status">Status</option>
                                                                                         <option value="subStatus">Sub Status</option>
                                                                                         <option value="leadOwner">Lead Owner</option>
-                                                                                        <option value="registeredBy">Registered By</option>
-
-                                                                                        <option value="jobName">Job Name</option>
-                                                                                        <option value="project">Project</option>
-                                                                                        <option value="vertical">Vertical</option>
-                                                                                        <option value="batch">Batch</option>
-                                                                                        <option value="center">Center</option>
-                                                                                        <option value="course">Course</option>
+                                                                                        <option value="leadCoOwner">Lead Co-Owner</option>
+                                                                                        <option value="leadAddedBy">Lead Added By</option>
+                                                                                        <option value="b2bProject">B2B Project</option>
+                                                                                        <option value="b2bDepartment">B2B Department</option>
+                                                                                        <option value="typeOfB2B">Type of B2B</option>
+                                                                                        <option value="leadCategory">Lead Category</option>
+                                                                                        <option value="leadRanking">Lead Ranking</option>
                                                                                     </select>
                                                                                 </div>
 
@@ -2483,19 +2377,18 @@ const DripMarketing = () => {
                                                                                     }
                                                                                 }));
                                                                             }}>
-                                                                                <option value="">Activity Type</option>
+                                                                                                                                                                <option value="">Activity Type</option>
                                                                                 <option value="state">State</option>
                                                                                 <option value="status">Status</option>
                                                                                 <option value="subStatus">Sub Status</option>
                                                                                 <option value="leadOwner">Lead Owner</option>
-                                                                                <option value="registeredBy">Registered By</option>
-
-                                                                                <option value="jobName">Job Name</option>
-                                                                                <option value="project">Project</option>
-                                                                                <option value="vertical">Vertical</option>
-                                                                                <option value="batch">Batch</option>
-                                                                                <option value="center">Center</option>
-                                                                                <option value="course">Course</option>
+                                                                                <option value="leadCoOwner">Lead Co-Owner</option>
+                                                                                <option value="leadAddedBy">Lead Added By</option>
+                                                                                <option value="b2bProject">B2B Project</option>
+                                                                                <option value="b2bDepartment">B2B Department</option>
+                                                                                <option value="typeOfB2B">Type of B2B</option>
+                                                                                <option value="leadCategory">Lead Category</option>
+                                                                                <option value="leadRanking">Lead Ranking</option>
                                                                             </select>
                                                                         </div>
                                                                         {ruleData.primaryAction.activityType !== '' && (
@@ -2558,18 +2451,18 @@ const DripMarketing = () => {
                                                                                             handleThenConditionChange(index, 'values', []); // Clear values when activity type changes
                                                                                         }}
                                                                                     >
-                                                                                        <option value="">Activity Type</option>
-                                                                                        <option value="state">State</option>
-                                                                                        <option value="status">Status</option>
-                                                                                        <option value="subStatus">Sub Status</option>
-                                                                                        <option value="leadOwner">Lead Owner</option>
-                                                                                        <option value="registeredBy">Registered By</option>
-                                                                                        <option value="jobName">Job Name</option>
-                                                                                        <option value="project">Project</option>
-                                                                                        <option value="vertical">Vertical</option>
-                                                                                        <option value="batch">Batch</option>
-                                                                                        <option value="center">Center</option>
-                                                                                        <option value="course">Course</option>
+                                                                                                                                                                        <option value="">Activity Type</option>
+                                                                                <option value="state">State</option>
+                                                                                <option value="status">Status</option>
+                                                                                <option value="subStatus">Sub Status</option>
+                                                                                <option value="leadOwner">Lead Owner</option>
+                                                                                <option value="leadCoOwner">Lead Co-Owner</option>
+                                                                                <option value="leadAddedBy">Lead Added By</option>
+                                                                                <option value="b2bProject">B2B Project</option>
+                                                                                <option value="b2bDepartment">B2B Department</option>
+                                                                                <option value="typeOfB2B">Type of B2B</option>
+                                                                                <option value="leadCategory">Lead Category</option>
+                                                                                <option value="leadRanking">Lead Ranking</option>
                                                                                     </select>
                                                                                 </div>
                                                                                 {action.activityType && (
@@ -2841,7 +2734,7 @@ const DripMarketing = () => {
                 <div className="modal-dialog modal-dialog-scrollable">
                     <div className="modal-content">
                         <div className="modal-header">
-                            <h1 className="modal-title fs-5" id="staticBackdropLabel">Edit Drip Marketing Rule</h1>
+                            <h1 className="modal-title fs-5" id="staticBackdropLabel">Edit B2B Drip Marketing Rule</h1>
                             <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div className="modal-body">
@@ -3686,4 +3579,4 @@ padding-left:5px;
     )
 }
 
-export default DripMarketing
+export default DripMarketingB2B

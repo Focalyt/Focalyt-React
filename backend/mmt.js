@@ -27,6 +27,8 @@ const missedFollowupSchedular = require("./schedular/missedFollowupSchedular");
 missedFollowupSchedular();
 const dataBaseBackup = require("./schedular/dataBaseBackup");
 dataBaseBackup();
+const dripMarketingScheduler = require("./schedular/dripMarketingScheduler");
+dripMarketingScheduler();
 // const counselorPerformanceEmailScheduler = require("./schedular/counselorPerformanceEmailScheduler");
 // counselorPerformanceEmailScheduler();
 //upload('
@@ -132,12 +134,30 @@ connectDB();
 
 mongoose.Promise = global.Promise;
 
-process.on("SIGINT", () => {
-	server.close((err) => {
-		if (err) process.exit(1);
-		mongoose.connection.close(() => process.exit(0));
+let isShuttingDown = false;
+const gracefulShutdown = (signal) => {
+	if (isShuttingDown) return;
+	isShuttingDown = true;
+	console.log(`Received ${signal}. Shutting down gracefully...`);
+
+	server.close(async (err) => {
+		if (err) {
+			console.error("Error closing HTTP server:", err.message);
+			process.exit(1);
+		}
+		try {
+			await mongoose.connection.close();
+			console.log("MongoDB connection closed");
+			process.exit(0);
+		} catch (closeErr) {
+			console.error("Error closing MongoDB connection:", closeErr.message);
+			process.exit(1);
+		}
 	});
-});
+};
+
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 
 // Middleware to block a specific IP address
 const blockIPMiddleware = (req, res, next) => {
