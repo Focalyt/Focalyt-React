@@ -17,6 +17,8 @@ const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
 
 const BATCH_LEADS_PER_RULE = 100;
 const JOBS_PER_TICK = 50;
+const LEAD_SCAN_LIMIT = 2000;
+const MAX_EXCLUDED_LEAD_IDS = 20000;
 let isRunning = false;
 
 function isB2BRule(rule) {
@@ -414,39 +416,150 @@ async function getCollegeCourseIds(collegeId) {
   return courses.map((c) => c._id);
 }
 
-async function findCandidateLeads(rule) {
+/**
+ * Condition activityTypes that map to a plain field on the lead document, so
+ * they can be evaluated by Mongo instead of in JS. Anything absent from these
+ * maps (vertical, project, state, ...) lives on a populated document and still
+ * has to be filtered in memory by evaluateConditionBlocks.
+ */
+const B2C_QUERY_FIELDS = {
+  status: '_leadStatus',
+  subStatus: '_leadSubStatus',
+  course: '_course',
+  courseName: '_course',
+  center: '_center',
+  batch: 'batch',
+  leadOwner: 'counsellor',
+  registeredBy: 'registeredBy'
+};
+
+const B2B_QUERY_FIELDS = {
+  status: 'status',
+  subStatus: 'subStatus',
+  leadOwner: 'leadOwner',
+  leadCoOwner: 'leadCoOwner',
+  leadAddedBy: 'leadAddedBy',
+  registeredBy: 'leadAddedBy',
+  b2bProject: 'b2bProject',
+  project: 'b2bProject',
+  b2bDepartment: 'b2bDepartment',
+  typeOfB2B: 'typeOfB2B',
+  leadCategory: 'leadCategory',
+  leadRanking: 'leadRanking',
+  state: 'state'
+};
+
+function toQueryValue(value) {
+  const str = toIdString(value);
+  return /^[0-9a-fA-F]{24}$/.test(str) ? new mongoose.Types.ObjectId(str) : str;
+}
+
+function conditionToFilter(condition, fieldMap) {
+  const field = fieldMap[condition?.activityType];
+  if (!field) return null;
+  const values = normalizeValues(condition.values).map(toQueryValue);
+  if (!values.length) return null;
+  return condition.operator === 'not_equals'
+    ? { [field]: { $nin: values } }
+    : { [field]: { $in: values } };
+}
+
+/**
+ * Translate the rule's condition blocks into a Mongo filter. Only conditions
+ * that are guaranteed to be mandatory are pushed down, so the filter can never
+ * drop a lead that evaluateConditionBlocks would have accepted.
+ */
+function buildLeadPrefilter(rule) {
+  const blocks = rule.conditionBlocks || [];
+  if (!blocks.length) return null;
+  if ((rule.interBlockLogicOperator || 'and').toLowerCase() !== 'and') return null;
+
+  const fieldMap = isB2BRule(rule) ? B2B_QUERY_FIELDS : B2C_QUERY_FIELDS;
+  const filters = [];
+
+  for (const block of blocks) {
+    const conditions = block.conditions || [];
+    if (!conditions.length) continue;
+
+    if ((block.intraBlockLogicOperator || 'and').toLowerCase() === 'or') {
+      const parts = conditions.map((c) => conditionToFilter(c, fieldMap));
+      // An unmappable branch could satisfy the OR on its own, so the whole
+      // block has to stay in memory unless every branch is mappable.
+      if (parts.every(Boolean)) filters.push({ $or: parts });
+    } else {
+      for (const condition of conditions) {
+        const filter = conditionToFilter(condition, fieldMap);
+        if (filter) filters.push(filter);
+      }
+    }
+  }
+
+  return filters.length ? { $and: filters } : null;
+}
+
+/** Leads this rule has already acted on — skipped so each tick makes progress. */
+async function getProcessedLeadIds(rule) {
+  const fromJobs = await DripMarketingJob.distinct('leadId', { ruleId: rule._id });
+  const fromLogs = (rule.executionLogs || []).map((log) => log.leadId).filter(Boolean);
+  const unique = new Map();
+  for (const id of [...fromJobs, ...fromLogs]) unique.set(toIdString(id), id);
+  return [...unique.values()];
+}
+
+function applyLeadScope(query, rule, excludeLeadIds) {
+  const prefilter = buildLeadPrefilter(rule);
+  if (prefilter) Object.assign(query, prefilter);
+  if (excludeLeadIds.length && excludeLeadIds.length <= MAX_EXCLUDED_LEAD_IDS) {
+    query._id = { $nin: excludeLeadIds };
+  }
+  return query;
+}
+
+async function findCandidateLeads(rule, excludeLeadIds = []) {
   const courseIds = await getCollegeCourseIds(rule.collegeId);
   if (!courseIds.length) return [];
 
-  const leads = await AppliedCourses.find({
-    _course: { $in: courseIds },
-    admissionDone: { $ne: true },
-    dropout: { $ne: true }
-  })
+  const query = applyLeadScope(
+    {
+      _course: { $in: courseIds },
+      admissionDone: { $ne: true },
+      dropout: { $ne: true }
+    },
+    rule,
+    excludeLeadIds
+  );
+
+  return AppliedCourses.find(query)
+    .sort({ createdAt: -1 })
     .populate('_candidate', 'name mobile email address permanentAddress state')
     .populate('_course', 'name vertical project college')
     .populate('counsellor', 'name mobile email')
     .populate('registeredBy', 'name mobile email')
-    .limit(BATCH_LEADS_PER_RULE * 5)
+    .limit(LEAD_SCAN_LIMIT)
     .lean();
-
-  return leads;
 }
 
-async function findB2BLeads(rule) {
+async function findB2BLeads(rule, excludeLeadIds = []) {
   const college = await College.findById(rule.collegeId).select('_concernPerson').lean();
   const userIds = (college?._concernPerson || [])
     .map((p) => p?._id || p)
     .filter(Boolean);
   if (!userIds.length) return [];
 
-  return Lead.find({
-    $or: [
-      { leadAddedBy: { $in: userIds } },
-      { leadOwner: { $in: userIds } },
-      { leadCoOwner: { $in: userIds } }
-    ]
-  })
+  const query = applyLeadScope(
+    {
+      $or: [
+        { leadAddedBy: { $in: userIds } },
+        { leadOwner: { $in: userIds } },
+        { leadCoOwner: { $in: userIds } }
+      ]
+    },
+    rule,
+    excludeLeadIds
+  );
+
+  return Lead.find(query)
+    .sort({ createdAt: -1 })
     .populate('leadOwner', 'name mobile email')
     .populate('leadCoOwner', 'name mobile email')
     .populate('leadAddedBy', 'name mobile email')
@@ -456,7 +569,7 @@ async function findB2BLeads(rule) {
     .populate('leadCategory', 'name')
     .populate('leadRanking', 'name')
     .populate('status', 'title')
-    .limit(BATCH_LEADS_PER_RULE * 5)
+    .limit(LEAD_SCAN_LIMIT)
     .lean();
 }
 
@@ -489,7 +602,10 @@ async function processRule(rule) {
   }
 
   const leadType = isB2BRule(rule) ? 'b2b' : 'b2c';
-  const leads = leadType === 'b2b' ? await findB2BLeads(rule) : await findCandidateLeads(rule);
+  const excludeLeadIds = await getProcessedLeadIds(rule);
+  const leads = leadType === 'b2b'
+    ? await findB2BLeads(rule, excludeLeadIds)
+    : await findCandidateLeads(rule, excludeLeadIds);
   let matched = 0;
 
   for (const lead of leads) {
@@ -579,8 +695,40 @@ async function sendWhatsAppTemplate(to, templateName, collegeId) {
   };
 }
 
+/**
+ * A rule that was paused or deleted after queueing must not keep sending, so
+ * its still-pending jobs are retired before the send batch is picked. Doing it
+ * here rather than in the send loop keeps the per-tick budget for real sends.
+ */
+async function cancelJobsForInactiveRules() {
+  const pendingFilter = { status: 'pending' };
+  const ruleIds = await DripMarketingJob.distinct('ruleId', pendingFilter);
+  if (!ruleIds.length) return 0;
+
+  const activeIds = await DripMarketingRule.distinct('_id', {
+    _id: { $in: ruleIds },
+    isActive: true
+  });
+  const activeSet = new Set(activeIds.map(toIdString));
+  const staleIds = ruleIds.filter((id) => !activeSet.has(toIdString(id)));
+  if (!staleIds.length) return 0;
+
+  const result = await DripMarketingJob.updateMany(
+    { ...pendingFilter, ruleId: { $in: staleIds } },
+    { $set: { status: 'skipped', error: 'Rule is inactive or deleted' } }
+  );
+
+  const cancelled = result.modifiedCount || 0;
+  if (cancelled) {
+    console.log(`[Drip] Cancelled ${cancelled} queued job(s) from ${staleIds.length} inactive/deleted rule(s)`);
+  }
+  return cancelled;
+}
+
 async function processDueJobs() {
   const now = new Date();
+  const cancelled = await cancelJobsForInactiveRules();
+
   const jobs = await DripMarketingJob.find({
     status: 'pending',
     scheduledAt: { $lte: now }
@@ -651,7 +799,7 @@ async function processDueJobs() {
     }
   }
 
-  return { sent, failed, checked: jobs.length };
+  return { sent, failed, cancelled, checked: jobs.length };
 }
 
 async function runDripMarketingTick() {
@@ -682,7 +830,7 @@ async function runDripMarketingTick() {
     const jobResult = await processDueJobs();
 
     console.log(
-      `[Drip] Tick done in ${Date.now() - started}ms — rules=${rules.length} matched=${totalMatched} jobsSent=${jobResult.sent} jobsFailed=${jobResult.failed}`
+      `[Drip] Tick done in ${Date.now() - started}ms — rules=${rules.length} matched=${totalMatched} jobsSent=${jobResult.sent} jobsFailed=${jobResult.failed} jobsCancelled=${jobResult.cancelled}`
     );
 
     return { rules: rules.length, matched: totalMatched, ...jobResult };
@@ -692,8 +840,8 @@ async function runDripMarketingTick() {
 }
 
 function dripMarketingScheduler() {
-  // Every minute — evaluate rules + send due WhatsApp jobs
-  cron.schedule('* * * * *', async () => {
+  // Every 30 minutes — evaluate rules + send due WhatsApp jobs
+  cron.schedule('*/1 * * * *', async () => {
     try {
       await runDripMarketingTick();
     } catch (err) {
@@ -701,7 +849,7 @@ function dripMarketingScheduler() {
     }
   });
 
-  console.log('[Drip] Marketing scheduler started (every 1 minute)');
+  console.log('[Drip] Marketing scheduler started (every 30 minutes)');
 }
 
 module.exports = dripMarketingScheduler;
