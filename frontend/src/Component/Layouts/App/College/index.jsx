@@ -1356,6 +1356,12 @@ function CollegeLayout({ children }) {
                       <span className="menu-title">{t('drip_marketing')}</span>
                     </Link>
                   </li>
+                  <li className={`nav-item ${location.pathname === '/institute/dripmarketing-b2b' ? 'active' : ''}`}>
+                    <Link to="/institute/dripmarketing-b2b" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faBullhorn} />
+                      <span className="menu-title">B2B Drip Marketing</span>
+                    </Link>
+                  </li>
                 </ul>
               </li>
 

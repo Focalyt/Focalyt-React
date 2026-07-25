@@ -146,6 +146,7 @@ import Source from './Pages/App/College/Settings/Source/Source';
 import Partners from './Pages/App/College/Settings/Partners/Partners';
 import MisReport from './Pages/App/College/MisReport/MisReport';
 import DripMarketing from './Pages/App/College/DripMarketing/Dripmarketing'
+import DripMarketingB2B from './Pages/App/College/DripMarketing/DripmarketingB2B'
 import ReEnquire from './Pages/App/College/Course/ReEnquire';
 import TrainerManagement from './Pages/App/College/Settings/TrainerManagement/TrainerManagement';
 import WhatsappChat from './Pages/App/College/Whatapp/WhatsappChat';
@@ -340,6 +341,7 @@ const Layout = () => {
           <Route path='partners' element={<Partners/>}/>
           <Route path='misreport/:batchId' element={<MisReport/>}/>
           <Route path='dripmarketing' element={<DripMarketing/>}/>
+          <Route path='dripmarketing-b2b' element={<DripMarketingB2B/>}/>
           <Route path='re-enquire' element={<ReEnquire/>}/>
           <Route path='trainerManagement' element={<TrainerManagement/>}/>
           <Route path='whatsappChat' element={<WhatsappChat/>}/>

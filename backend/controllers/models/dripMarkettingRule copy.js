@@ -4,29 +4,12 @@
 
 const mongoose = require('mongoose');
 
-/** Shared activity types for B2C (admission) + B2B drip rules */
-const DRIP_ACTIVITY_TYPES = [
-  // B2C
-  'state', 'status', 'subStatus', 'leadOwner', 'registeredBy',
-  'courseName', 'jobName', 'project', 'vertical', 'center', 'course', 'batch',
-  // B2B
-  'leadCoOwner', 'leadAddedBy', 'b2bProject', 'b2bDepartment',
-  'typeOfB2B', 'leadCategory', 'leadRanking'
-];
-
 const DripMarketingRuleSchema = new mongoose.Schema({
   // Rule Basic Info
   collegeId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'College',
     required: true
-  },
-  /** b2c = AppliedCourses (admission); b2b = B2BLead */
-  leadType: {
-    type: String,
-    enum: ['b2c', 'b2b'],
-    default: 'b2c',
-    index: true
   },
   name: {
     type: String,
@@ -50,7 +33,8 @@ const DripMarketingRuleSchema = new mongoose.Schema({
       activityType: {
         type: String,
         required: true,
-        enum: DRIP_ACTIVITY_TYPES
+        enum: ['state', 'status', 'subStatus', 'leadOwner', 'registeredBy', 
+               'courseName', 'jobName', 'project', 'vertical', 'center', 'course', 'batch']
       },
       operator: {
         type: String,
@@ -83,7 +67,8 @@ const DripMarketingRuleSchema = new mongoose.Schema({
     activityType: {
       type: String,
       required: true,
-      enum: DRIP_ACTIVITY_TYPES
+      enum: ['state', 'status', 'subStatus', 'leadOwner', 'registeredBy',
+             'courseName', 'jobName', 'project', 'vertical', 'center', 'course', 'batch']
     },
     values: {
       type: [mongoose.Schema.Types.Mixed],
@@ -96,7 +81,8 @@ const DripMarketingRuleSchema = new mongoose.Schema({
     activityType: {
       type: String,
       required: true,
-      enum: DRIP_ACTIVITY_TYPES
+      enum: ['state', 'status', 'subStatus', 'leadOwner', 'registeredBy',
+             'courseName', 'jobName', 'project', 'vertical', 'center', 'course', 'batch']
     },
     values: {
       type: [mongoose.Schema.Types.Mixed],
@@ -330,7 +316,6 @@ DripMarketingRuleSchema.index({ startDate: 1, startTime: 1 });
 DripMarketingRuleSchema.index({ 'executionLogs.leadId': 1 });
 DripMarketingRuleSchema.index({ 'config.priority': -1 });
 DripMarketingRuleSchema.index({ tags: 1 });
-DripMarketingRuleSchema.index({ collegeId: 1, leadType: 1, isActive: 1 });
 
 // Middleware
 DripMarketingRuleSchema.pre('save', function(next) {

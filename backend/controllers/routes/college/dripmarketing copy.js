@@ -361,7 +361,7 @@ router.get('/leadowner', [isCollege], async (req, res) => {
 
 router.post('/create-dripmarketing-rule', [isCollege], async (req, res) => {
 	try {
-		let {name, startDate, startTime, conditionBlocks, interBlockLogicOperator, primaryAction, additionalActions, communication ,uiState, leadType} = req.body;
+		let {name, startDate, startTime, conditionBlocks, interBlockLogicOperator, primaryAction, additionalActions, communication ,uiState} = req.body;
 		
 		if(!name  || !startDate || !startTime || !conditionBlocks || !interBlockLogicOperator || !primaryAction || !additionalActions || !communication) {
 			return res.status(400).json({ success: false, message: 'All fields are required' });
@@ -371,7 +371,6 @@ router.post('/create-dripmarketing-rule', [isCollege], async (req, res) => {
 
 		const collegeId = req.user.college._id;
 		const user = req.user;
-		const resolvedLeadType = leadType === 'b2b' ? 'b2b' : 'b2c';
 
 
 		const datePart = startDate.split("T")[0];  // "2025-09-20"
@@ -382,7 +381,7 @@ router.post('/create-dripmarketing-rule', [isCollege], async (req, res) => {
 
 		const dripMarketingRule = new DripMarketingRule({
 			name,
-			leadType: resolvedLeadType,
+			
 			startDate: startDateTime,
 			
 			conditionBlocks,
@@ -391,7 +390,7 @@ router.post('/create-dripmarketing-rule', [isCollege], async (req, res) => {
 			additionalActions,
 			communication,
 			collegeId: collegeId,
-			uiState,
+			
 			createdBy: user._id,
 			
 		});
@@ -439,12 +438,11 @@ router.put('/status-update/:id', [isCollege], async (req, res) => {
 
 router.put('/update-dripmarketing-rule/:id', [isCollege], async (req, res) => {
 try{
-	let {name, startDate, startTime,  conditionBlocks, interBlockLogicOperator, primaryAction, additionalActions, communication ,uiState, leadType} = req.body;
+	let {name, startDate, startTime,  conditionBlocks, interBlockLogicOperator, primaryAction, additionalActions, communication ,uiState} = req.body;
 
 	// console.log("req.body",req.body)
 	const collegeId = req.user.college._id;
 	const user = req.user;
-	const resolvedLeadType = leadType === 'b2b' ? 'b2b' : (leadType === 'b2c' ? 'b2c' : undefined);
 
 	
 
@@ -453,21 +451,7 @@ try{
 	const startDateTimeString = `${datePart}T${startTime}`;
 	const startDateTime = new Date(startDateTimeString);
 
-	const updatePayload = {
-		name,
-		startDate: startDateTime,
-		conditionBlocks,
-		interBlockLogicOperator,
-		primaryAction,
-		additionalActions,
-		communication,
-		uiState,
-		collegeId: collegeId,
-		updatedBy: user._id
-	};
-	if (resolvedLeadType) updatePayload.leadType = resolvedLeadType;
-
-	const dripMarketingRule = await DripMarketingRule.findByIdAndUpdate(req.params.id, updatePayload, {new: true});
+	const dripMarketingRule = await DripMarketingRule.findByIdAndUpdate(req.params.id, {name, startDate: startDateTime,  conditionBlocks, interBlockLogicOperator, primaryAction, additionalActions, communication, uiState, collegeId: collegeId, updatedBy: user._id}, {new: true});
 	console.log("dripMarketingRule",dripMarketingRule)
 
 	return res.status(200).json({ success: true, message: 'Drip Marketing Rule updated successfully', data: dripMarketingRule });
@@ -482,15 +466,7 @@ router.get('/get-dripmarketing-rule', [isCollege], async (req, res) => {
 	try {
 		// console.log("edit rules")
 		const collegeId = req.user.college._id;
-		const leadType = req.query.leadType === 'b2b' ? 'b2b' : 'b2c';
-		const filter = { collegeId };
-		if (leadType === 'b2b') {
-			filter.leadType = 'b2b';
-		} else {
-			// Backward compatible: old rules without leadType are treated as b2c
-			filter.$or = [{ leadType: 'b2c' }, { leadType: { $exists: false } }, { leadType: null }];
-		}
-		const dripMarketingRule = await DripMarketingRule.find(filter).populate('createdBy');
+		const dripMarketingRule = await DripMarketingRule.find({ collegeId: collegeId }).populate('createdBy');
 		
 		// Format the data to separate date and time for frontend
 		const formattedRules = dripMarketingRule.map(rule => {
@@ -548,8 +524,7 @@ router.get('/jobs', [isCollege], async (req, res) => {
 		const jobs = await DripMarketingJob.find(filter)
 			.sort({ createdAt: -1 })
 			.limit(200)
-			// leadRef (refPath) → AppliedCourses or B2BLead
-			.populate('leadId')
+			.populate('leadId', '_candidate _course _leadStatus')
 			.lean();
 
 		return res.status(200).json({ success: true, data: jobs });

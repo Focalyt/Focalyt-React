@@ -17,17 +17,10 @@ const DripMarketingJobSchema = new mongoose.Schema({
     required: true,
     index: true
   },
-  /** AppliedCourses (b2c) or B2BLead (b2b) — see leadType */
   leadId: {
     type: mongoose.Schema.Types.ObjectId,
-    // ref: 'AppliedCourses',
+    ref: 'AppliedCourses',
     required: true,
-    index: true
-  },
-  leadType: {
-    type: String,
-    enum: ['b2c', 'b2b'],
-    default: 'b2c',
     index: true
   },
   mode: {
