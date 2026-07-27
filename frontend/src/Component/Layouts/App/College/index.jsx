@@ -941,6 +941,12 @@ function CollegeLayout({ children }) {
                         <span className="menu-title">{t('follow_up')}</span>
                       </Link>
                     </li>
+                    <li className={`nav-item ${location.pathname === '/institute/dripmarketing' ? 'active' : ''}`}>
+                      <Link to="/institute/dripmarketing" onClick={() => handleSidebarClose()}>
+                        <FontAwesomeIcon icon={faBullhorn} />
+                        <span className="menu-title">{t('drip_marketing')}</span>
+                      </Link>
+                    </li>
                     {/* <li className={`nav-item ${location.pathname === '/institute/re-enquire' ? 'active' : ''}`}>
                     <Link to="/institute/re-enquire" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faBell} />
@@ -1020,6 +1026,12 @@ function CollegeLayout({ children }) {
                             {todayB2bFollowupCount > 99 ? '99+' : todayB2bFollowupCount}
                           </span>
                         )}
+                      </Link>
+                    </li>
+                    <li className={`nav-item ${location.pathname === '/institute/dripmarketing-b2b' ? 'active' : ''}`}>
+                      <Link to="/institute/dripmarketing-b2b" onClick={() => handleSidebarClose()}>
+                        <FontAwesomeIcon icon={faBullhorn} />
+                        <span className="menu-title">Drip Marketing</span>
                       </Link>
                     </li>
                   </ul>
@@ -1345,22 +1357,6 @@ function CollegeLayout({ children }) {
                         </Link>
                       </li>
                     </ul>
-                  </li>
-                  
-
-                  <li className={`nav-item ${location.pathname === '/institute/dripmarketing' ? 'active' : ''}`}>
-                    <Link to="/institute/dripmarketing" onClick={() => handleSidebarClose()}>
-                      {/* <FontAwesomeIcon icon={} /> */}
-                      {/* <FontAwesomeIcon icon={faDrip} /> */}
-                      <FontAwesomeIcon icon={faBullhorn} />
-                      <span className="menu-title">{t('drip_marketing')}</span>
-                    </Link>
-                  </li>
-                  <li className={`nav-item ${location.pathname === '/institute/dripmarketing-b2b' ? 'active' : ''}`}>
-                    <Link to="/institute/dripmarketing-b2b" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={faBullhorn} />
-                      <span className="menu-title">B2B Drip Marketing</span>
-                    </Link>
                   </li>
                 </ul>
               </li>
