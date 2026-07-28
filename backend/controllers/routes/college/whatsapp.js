@@ -4,7 +4,7 @@ const axios = require('axios');
 const uuid = require('uuid/v1');
 const multer = require('multer');
 const FormData = require('form-data');
-const { College, WhatsAppMessage, WhatsAppTemplate, Candidate } = require('../../models');
+const { College, WhatsAppMessage, WhatsAppTemplate, Candidate, CandidateProfile, AppliedCourses, Courses, DripMarketingJob, Lead } = require('../../models');
 const { isCollege } = require('../../../helpers');
 const {
 	bucketName,
@@ -3120,6 +3120,111 @@ router.get('/debug-candidate/:mobile', [isCollege], async (req, res) => {
 });
 
 /**
+ * Resolve collegeId for an inbound WhatsApp number when there is no prior chat.
+ * Order: previous WhatsAppMessage → drip job → B2C AppliedCourses → B2BLead.
+ */
+async function resolveCollegeIdForWhatsAppPhone(from) {
+	const digits = String(from || '').replace(/\D/g, '');
+	const last10 = digits.length >= 10 ? digits.slice(-10) : digits;
+	const phoneVariants = [
+		from,
+		digits,
+		last10,
+		`+${digits}`,
+		`+91${last10}`,
+		`91${last10}`
+	].filter(Boolean);
+
+	// 1) Prior chat history
+	const lastMessage = await WhatsAppMessage.findOne({
+		$or: [
+			{ from: { $in: phoneVariants } },
+			{ to: { $in: phoneVariants } }
+		]
+	}).sort({ sentAt: -1 }).select('collegeId').lean();
+	if (lastMessage?.collegeId) {
+		console.log('✅ Found collegeId from previous WhatsAppMessage:', lastMessage.collegeId);
+		return lastMessage.collegeId;
+	}
+
+	// 2) Drip marketing job (template sent by drip scheduler)
+	const dripJob = await DripMarketingJob.findOne({
+		collegeId: { $exists: true, $ne: null },
+		$or: [
+			{ phone: { $in: phoneVariants } },
+			...(last10 ? [{ phone: { $regex: last10 + '$' } }] : [])
+		]
+	}).sort({ sentAt: -1, createdAt: -1 }).select('collegeId').lean();
+	if (dripJob?.collegeId) {
+		console.log('✅ Found collegeId from DripMarketingJob:', dripJob.collegeId);
+		return dripJob.collegeId;
+	}
+
+	// 3) B2C candidate profile → applied course → course.college
+	const mobileNumber = last10 ? Number(last10) : null;
+	const candidate = await CandidateProfile.findOne({
+		$or: [
+			...(mobileNumber ? [{ mobile: mobileNumber }] : []),
+			{ mobile: last10 },
+			{ mobile: digits },
+			{ whatsapp: mobileNumber },
+			{ whatsapp: last10 }
+		].filter(Boolean)
+	}).select('_id').lean();
+
+	if (candidate?._id) {
+		const applied = await AppliedCourses.findOne({ _candidate: candidate._id })
+			.sort({ createdAt: -1 })
+			.select('_course')
+			.lean();
+		if (applied?._course) {
+			const course = await Courses.findById(applied._course).select('college').lean();
+			if (course?.college) {
+				console.log('✅ Found collegeId from AppliedCourses/Courses:', course.college);
+				return course.college;
+			}
+		}
+	}
+
+	// 4) B2B lead → college via drip job on that lead, or College._concernPerson
+	const b2bLead = await Lead.findOne({
+		$or: [
+			{ mobile: last10 },
+			{ mobile: digits },
+			{ mobile: String(mobileNumber) },
+			{ whatsapp: last10 },
+			{ whatsapp: digits },
+			{ whatsapp: String(mobileNumber) }
+		]
+	}).sort({ createdAt: -1 }).select('_id leadAddedBy leadOwner').lean();
+
+	if (b2bLead) {
+		const jobForLead = await DripMarketingJob.findOne({ leadId: b2bLead._id })
+			.sort({ createdAt: -1 })
+			.select('collegeId')
+			.lean();
+		if (jobForLead?.collegeId) {
+			console.log('✅ Found collegeId from B2B drip job:', jobForLead.collegeId);
+			return jobForLead.collegeId;
+		}
+
+		const userIds = [b2bLead.leadAddedBy, b2bLead.leadOwner].filter(Boolean);
+		if (userIds.length) {
+			const college = await College.findOne({
+				'_concernPerson._id': { $in: userIds }
+			}).select('_id').lean();
+			if (college?._id) {
+				console.log('✅ Found collegeId from B2BLead concern person:', college._id);
+				return college._id;
+			}
+		}
+	}
+
+	console.warn('⚠️ Could not resolve collegeId for phone:', from);
+	return null;
+}
+
+/**
  * Check WhatsApp 24-hour session window status
  * GET /api/college/whatsapp/session-window/:mobile
  * Checks directly from WhatsAppMessage collection instead of Candidate
@@ -3565,22 +3670,12 @@ async function handleIncomingMessages(messages, metadata) {
 
 			// Save incoming message to database
 			try {
-				// Look up collegeId from the last message with this phone number
+				// Resolve collegeId from prior chat, drip job, B2C lead, or B2B lead
 				let collegeId = null;
 				try {
-					const lastMessage = await WhatsAppMessage.findOne({
-						$or: [
-							{ from: from },
-							{ to: from }
-						]
-					}).sort({ sentAt: -1 }).limit(1);
-					
-					if (lastMessage && lastMessage.collegeId) {
-						collegeId = lastMessage.collegeId;
-						console.log('✅ Found collegeId from previous conversation:', collegeId);
-					} else {
-						console.warn('⚠️ No previous message found for phone number:', from);
-						// Skip saving this message if we can't find the college
+					collegeId = await resolveCollegeIdForWhatsAppPhone(from);
+					if (!collegeId) {
+						console.warn('⚠️ No collegeId resolved for phone number:', from);
 						console.log('⚠️ Skipping message save - collegeId is required');
 						return;
 					}

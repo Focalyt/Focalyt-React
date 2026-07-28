@@ -819,6 +819,7 @@ const CRMDashboard = () => {
   const [showHeaderDateRangePicker, setShowHeaderDateRangePicker] = useState(false);
   const [leadViewTab, setLeadViewTab] = useState('all');
   const [myReferLeadsCount, setMyReferLeadsCount] = useState(0);
+  const [noFollowupLeadsCount, setNoFollowupLeadsCount] = useState(0);
   const [approvalCounts, setApprovalCounts] = useState({ total: 0, approved: 0, pending: 0, rejected: 0 });
   const [selectedApprovalFilter, setSelectedApprovalFilter] = useState(null);
   const [followupDashCounts, setFollowupDashCounts] = useState({
@@ -4253,6 +4254,19 @@ console.log('API Response:', response.data);
           setMyReferLeadsCount(referRes.data.totalCount || 0);
         }
       }
+
+      const noFollowupParams = new URLSearchParams({
+        page: '1',
+        hasFollowUpCall: 'false',
+        hasFollowUpVisit: 'false',
+        ...listParts,
+      });
+      const noFollowupRes = await axios.get(`${backendUrl}/college/appliedCandidates?${noFollowupParams}`, {
+        headers: { 'x-auth': token },
+      });
+      if (noFollowupRes.data?.success) {
+        setNoFollowupLeadsCount(noFollowupRes.data.totalCount || 0);
+      }
     } catch (err) {
       console.error('Error fetching dashboard counts:', err);
     }
@@ -4266,7 +4280,8 @@ console.log('API Response:', response.data);
     milestoneFilterOverride = undefined,
     options = {}
   ) => {
-    const { silent = false } = options;
+    const { silent = false, leadViewTabOverride } = options;
+    const activeLeadViewTab = leadViewTabOverride ?? leadViewTab;
 
     if (!silent) {
       setIsLoadingProfiles(true);
@@ -4354,8 +4369,12 @@ console.log('API Response:', response.data);
       } else if (filters.hasFollowUpVisit === false || filters.hasFollowUpVisit === 'no') {
         queryParams.set('hasFollowUpVisit', 'false');
       }
-      if (leadViewTab === 'myRefer' && userData?._id) {
+      if (activeLeadViewTab === 'myRefer' && userData?._id) {
         queryParams.set('registeredByMe', userData._id);
+      }
+      if (activeLeadViewTab === 'noFollowup') {
+        queryParams.set('hasFollowUpCall', 'false');
+        queryParams.set('hasFollowUpVisit', 'false');
       }
     }
 
@@ -5058,7 +5077,7 @@ console.log('API Response:', response.data);
     setLeadViewTab(tab);
     setCurrentPage(1);
     setSelectedMilestoneFilter(null);
-    fetchProfileData(filterData, 1, null, null, null);
+    fetchProfileData(filterData, 1, null, null, null, { leadViewTabOverride: tab });
   };
 
   const handleApprovalCardClick = (approval) => {
@@ -13491,6 +13510,23 @@ useEffect(() => {
             onClick={() => handleLeadViewTabChange('myRefer')}
           >
             My Referred Leads ({myReferLeadsCount})
+          </button>
+          <button
+            type="button"
+            className="b2b-perf-chip"
+            style={{
+              padding: '6px 14px',
+              fontSize: '12px',
+              fontWeight: 600,
+              borderRadius: '999px',
+              cursor: 'pointer',
+              color: leadViewTab === 'noFollowup' ? '#fff' : 'rgb(250, 85, 121)',
+              backgroundColor: leadViewTab === 'noFollowup' ? 'rgb(250, 85, 121)' : '#fff',
+              border: leadViewTab === 'noFollowup' ? 'none' : '1.5px solid rgb(250, 85, 121)',
+            }}
+            onClick={() => handleLeadViewTabChange('noFollowup')}
+          >
+            No Followup ({noFollowupLeadsCount})
           </button>
         </div>
       </div>

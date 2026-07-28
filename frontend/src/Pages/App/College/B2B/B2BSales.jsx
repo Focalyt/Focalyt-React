@@ -1713,8 +1713,9 @@ const B2BSales = () => {
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [downloadingPerformanceLeads, setDownloadingPerformanceLeads] = useState(false);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState(null);
-  const [leadViewTab, setLeadViewTab] = useState('all'); // 'all' | 'myRefer'
+  const [leadViewTab, setLeadViewTab] = useState('all'); // 'all' | 'myRefer' | 'noFollowup'
   const [myReferLeadsCount, setMyReferLeadsCount] = useState(0);
+  const [noFollowupLeadsCount, setNoFollowupLeadsCount] = useState(0);
 
   const [aiLeadIntelById, setAiLeadIntelById] = useState({});
   const [aiLeadIntelLoading, setAiLeadIntelLoading] = useState(false);
@@ -1854,10 +1855,28 @@ const B2BSales = () => {
     }
   };
 
+  const fetchNoFollowupLeadsCount = async () => {
+    try {
+      const response = await axios.get(`${backendUrl}/college/b2b/leads/status-count`, {
+        headers: { 'x-auth': token },
+        params: { hasFollowUpCall: false, hasFollowUpVisit: false }
+      });
+      if (response.data.status) {
+        setNoFollowupLeadsCount(response.data.data?.totalLeads ?? 0);
+      }
+    } catch (error) {
+      console.error('Error fetching no-followup leads count:', error);
+    }
+  };
+
   const getLeadFetchOverrides = (extra = {}, viewTab = leadViewTabRef.current) => {
     const overrides = { ...extra };
     if (viewTab === 'myRefer') {
       overrides.referredByMe = true;
+    }
+    if (viewTab === 'noFollowup') {
+      overrides.hasFollowUpCall = false;
+      overrides.hasFollowUpVisit = false;
     }
     return overrides;
   };
@@ -2089,6 +2108,7 @@ const B2BSales = () => {
   useEffect(() => {
     fetchLeads(null, 1);
     fetchMyReferLeadsCount();
+    fetchNoFollowupLeadsCount();
   }, []);
 
   // When a follow-up is saved, refresh the list so dates update per-lead
@@ -2100,6 +2120,7 @@ const B2BSales = () => {
         currentPageRef.current,
         getLeadFetchOverrides()
       );
+      fetchNoFollowupLeadsCount();
       if (leadViewTabRef.current === 'all') {
         fetchStatusCounts();
         fetchApprovalCounts();
@@ -2228,6 +2249,7 @@ const B2BSales = () => {
       || selectedStatusFilter
       || selectedApprovalStatus
       || leadViewTab === 'myRefer'
+      || leadViewTab === 'noFollowup'
     );
   };
 
@@ -8483,6 +8505,23 @@ const renderWhatsAppPanel = () => {
                         >
                           My Referred Leads ({myReferLeadsCount})
                         </button>
+                        <button
+                          type="button"
+                          className="b2b-perf-chip"
+                          style={{
+                            padding: '6px 14px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            borderRadius: '999px',
+                            cursor: 'pointer',
+                            color: leadViewTab === 'noFollowup' ? '#fff' : 'rgb(250, 85, 121)',
+                            backgroundColor: leadViewTab === 'noFollowup' ? 'rgb(250, 85, 121)' : '#fff',
+                            border: leadViewTab === 'noFollowup' ? 'none' : '1.5px solid rgb(250, 85, 121)'
+                          }}
+                          onClick={() => handleLeadViewTabChange('noFollowup')}
+                        >
+                          No Followup ({noFollowupLeadsCount})
+                        </button>
                       </div>
                     </div>
 
@@ -8946,6 +8985,9 @@ const renderWhatsAppPanel = () => {
                   {leadViewTab === 'myRefer' && (
                     <span className="badge rounded-pill text-bg-light border">My Refer Leads</span>
                   )}
+                  {leadViewTab === 'noFollowup' && (
+                    <span className="badge rounded-pill text-bg-light border">No Followup</span>
+                  )}
                   {selectedStatusFilter && (
                     <span className="badge rounded-pill text-bg-light border">
                       Status:{' '}
@@ -8984,16 +9026,20 @@ const renderWhatsAppPanel = () => {
                   <h5 className="mt-3 text-muted">
                     {leadViewTab === 'myRefer'
                       ? 'No referred leads found'
-                      : hasAnyActiveFilters()
-                        ? 'No leads match your filters'
-                        : 'No B2B Leads Found'}
+                      : leadViewTab === 'noFollowup'
+                        ? 'No leads without followup found'
+                        : hasAnyActiveFilters()
+                          ? 'No leads match your filters'
+                          : 'No B2B Leads Found'}
                   </h5>
                   <p className="text-muted mb-3">
                     {leadViewTab === 'myRefer'
                       ? 'Leads you refer to other counsellors will appear here.'
-                      : hasAnyActiveFilters()
-                        ? 'Remove filters to see all leads again, or try a different filter.'
-                        : 'Start by adding your first B2B lead using the "Add Lead" button.'}
+                      : leadViewTab === 'noFollowup'
+                        ? 'Leads with no call and no visit followup will appear here.'
+                        : hasAnyActiveFilters()
+                          ? 'Remove filters to see all leads again, or try a different filter.'
+                          : 'Start by adding your first B2B lead using the "Add Lead" button.'}
                   </p>
                   {hasAnyActiveFilters() && (
                     <button

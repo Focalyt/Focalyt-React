@@ -7,6 +7,7 @@ const {
   AppliedCourses,
   Courses,
   WhatsAppTemplate,
+  WhatsAppMessage,
   Lead,
   College
 } = require('../controllers/models');
@@ -691,8 +692,42 @@ async function sendWhatsAppTemplate(to, templateName, collegeId) {
   return {
     messageId: response.data?.messages?.[0]?.id || null,
     phone: formattedPhone,
-    raw: response.data
+    raw: response.data,
+    templateName: template.templateName
   };
+}
+
+/** Persist drip send so webhook can resolve collegeId and session-window can see history */
+async function saveDripOutgoingMessage({ collegeId, phone, templateName, messageId, lead, leadType }) {
+  try {
+    const doc = {
+      collegeId,
+      to: phone,
+      message: `Template: ${templateName}`,
+      messageType: 'template',
+      templateName,
+      status: 'sent',
+      direction: 'outgoing',
+      whatsappMessageId: messageId || null,
+      sentAt: new Date()
+    };
+    if (leadType === 'b2c' && lead?._candidate) {
+      const candidateId = lead._candidate._id || lead._candidate;
+      if (candidateId) {
+        doc.candidateId = candidateId;
+        doc.candidateName = lead._candidate.name || null;
+      }
+    } else if (leadType === 'b2b' && lead) {
+      doc.candidateName = lead.concernPersonName || lead.businessName || null;
+    }
+    const saved = await WhatsAppMessage.create(doc);
+    console.log(`[Drip] Saved outgoing WhatsAppMessage ${saved._id} to=${phone}`);
+    return saved;
+  } catch (err) {
+    // Do not fail the drip job if chat history write fails
+    console.error('[Drip] Failed to save outgoing WhatsAppMessage:', err.message);
+    return null;
+  }
 }
 
 /**
@@ -780,6 +815,14 @@ async function processDueJobs() {
         job.attempts += 1;
         job.error = undefined;
         await job.save();
+        await saveDripOutgoingMessage({
+          collegeId: job.collegeId,
+          phone: result.phone,
+          templateName: result.templateName || job.templateId,
+          messageId: result.messageId,
+          lead,
+          leadType
+        });
         sent += 1;
         console.log(`[Drip] WhatsApp sent to ${result.phone} template=${job.templateId} job=${job._id}`);
       } else {
@@ -840,7 +883,7 @@ async function runDripMarketingTick() {
 }
 
 function dripMarketingScheduler() {
-  // Every 30 minutes — evaluate rules + send due WhatsApp jobs
+  // Every minute — evaluate rules + send due WhatsApp jobs
   cron.schedule('*/1 * * * *', async () => {
     try {
       await runDripMarketingTick();
