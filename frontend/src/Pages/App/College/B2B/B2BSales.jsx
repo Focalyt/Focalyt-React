@@ -2130,6 +2130,20 @@ const B2BSales = () => {
     return () => window.removeEventListener('b2b-followup-updated', handler);
   }, []);
 
+  // Max selectable count for bulk actions = active Performance tab (not overall Total)
+  const getBulkSelectableLeadCount = () => {
+    if (isDuplicateMobileFilter(selectedStatusFilter)) {
+      return pageSize > 0 ? pageSize : (duplicateMobileCount || leads?.length || 0);
+    }
+    if (selectedStatusFilter) {
+      const status = (statusCounts || []).find(
+        (s) => String(s.statusId) === String(selectedStatusFilter)
+      );
+      return pageSize > 0 ? pageSize : (status?.count ?? leads?.length ?? 0);
+    }
+    return pageSize > 0 ? pageSize : (totalLeads || leads?.length || 0);
+  };
+
   // Auto-select leads based on Input 1 value for bulk WhatsApp / refer / action
   useEffect(() => {
     if (bulkMode !== 'bulkrefer' && bulkMode !== 'bulkaction' && bulkMode !== 'whatsapp') {
@@ -2147,8 +2161,8 @@ const B2BSales = () => {
       return;
     }
 
-    // Get total available leads
-    const totalAvailableLeads = totalLeads || leads.length;
+    // Cap to leads in the currently selected Performance tab
+    const totalAvailableLeads = getBulkSelectableLeadCount();
     const validNumValue = Math.min(numValue, totalAvailableLeads);
 
     // If user wants more leads than currently loaded, fetch them
@@ -2196,7 +2210,20 @@ const B2BSales = () => {
       const leadsToSelect = selectedLeadsData.map(lead => lead._id);
       setSelectedProfiles(leadsToSelect);
     }
-  }, [input1Value, bulkMode, leads, totalLeads, filters, selectedStatusFilter, token]);
+  }, [input1Value, bulkMode, leads, totalLeads, pageSize, statusCounts, duplicateMobileCount, filters, selectedStatusFilter, token]);
+
+  // If Performance tab changes while bulk mode is open, clamp Input 1 to the new tab count
+  useEffect(() => {
+    if (bulkMode !== 'bulkrefer' && bulkMode !== 'bulkaction' && bulkMode !== 'whatsapp') {
+      return;
+    }
+    if (input1Value === '') return;
+    const maxValue = getBulkSelectableLeadCount();
+    const numValue = parseInt(input1Value, 10);
+    if (!isNaN(numValue) && numValue > maxValue) {
+      setInput1Value(maxValue > 0 ? String(maxValue) : '');
+    }
+  }, [selectedStatusFilter, pageSize, statusCounts, duplicateMobileCount, totalLeads, bulkMode]);
 
   // Only clear dashboard drill-down chips (Done/Planned/Missed).
   // Keep modal filters like hasFollowUpCall / hasFollowUpVisit intact.
@@ -2903,8 +2930,8 @@ const B2BSales = () => {
   };
 
   const getPerformanceExportMeta = () => {
+    const count = getBulkSelectableLeadCount();
     if (isDuplicateMobileFilter(selectedStatusFilter)) {
-      const count = pageSize > 0 ? pageSize : (duplicateMobileCount || leads.length);
       return { label: 'DUPLICATE', count, statusId: null, isDuplicateMobile: true };
     }
     if (selectedStatusFilter) {
@@ -2912,10 +2939,8 @@ const B2BSales = () => {
         (s) => String(s.statusId) === String(selectedStatusFilter)
       );
       const label = String(status?.statusName || 'Status').toUpperCase().replace(/\s+/g, '_');
-      const count = pageSize > 0 ? pageSize : (status?.count ?? leads.length);
       return { label, count, statusId: selectedStatusFilter, isDuplicateMobile: false };
     }
-    const count = pageSize > 0 ? pageSize : (totalLeads || leads.length);
     return { label: 'ALL', count, statusId: null, isDuplicateMobile: false };
   };
 
@@ -7745,7 +7770,7 @@ const renderWhatsAppPanel = () => {
                             placeholder="Input 1"
                             value={input1Value}
                             onChange={(e) => {
-                              const maxValue = totalLeads || leads?.length || 0;
+                              const maxValue = getBulkSelectableLeadCount();
                               let inputValue = e.target.value.replace(/[^0-9]/g, '');
 
                               if (inputValue === '') {
@@ -7770,7 +7795,7 @@ const renderWhatsAppPanel = () => {
                               if (e.key === 'Enter' && bulkMode === 'whatsapp' && input1Value) {
                                 e.preventDefault();
                                 const numValue = parseInt(input1Value, 10);
-                                const maxValue = totalLeads || leads?.length || 0;
+                                const maxValue = getBulkSelectableLeadCount();
                                 if (numValue >= 1 && numValue <= maxValue && selectedProfiles?.length > 0) {
                                   if (!whatsappTemplates.length) fetchWhatsappTemplates();
                                   setModalType('whatsapp');
@@ -7792,7 +7817,7 @@ const renderWhatsAppPanel = () => {
                           <input
                             type="text"
                             placeholder="Input 2"
-                            value={totalLeads || leads?.length || 0}
+                            value={getBulkSelectableLeadCount()}
                             readOnly
                             style={{
                               width: "50%",
@@ -8351,7 +8376,7 @@ const renderWhatsAppPanel = () => {
                               placeholder="Input 1"
                               value={input1Value}
                               onChange={(e) => {
-                                const maxValue = totalLeads || leads?.length || 0;
+                                const maxValue = getBulkSelectableLeadCount();
                                 let inputValue = e.target.value.replace(/[^0-9]/g, '');
 
                                 if (inputValue === '') {
@@ -8376,7 +8401,7 @@ const renderWhatsAppPanel = () => {
                                 if (e.key === 'Enter' && bulkMode === 'whatsapp' && input1Value) {
                                   e.preventDefault();
                                   const numValue = parseInt(input1Value, 10);
-                                  const maxValue = totalLeads || leads?.length || 0;
+                                  const maxValue = getBulkSelectableLeadCount();
                                   if (numValue >= 1 && numValue <= maxValue && selectedProfiles?.length > 0) {
                                     if (!whatsappTemplates.length) fetchWhatsappTemplates();
                                     setModalType('whatsapp');
@@ -8398,7 +8423,7 @@ const renderWhatsAppPanel = () => {
                             <input
                               type="text"
                               placeholder="Input 2"
-                              value={totalLeads || leads?.length || 0}
+                              value={getBulkSelectableLeadCount()}
                               readOnly
                               style={{
                                 width: "50%",
