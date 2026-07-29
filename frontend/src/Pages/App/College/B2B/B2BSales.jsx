@@ -1946,7 +1946,11 @@ const B2BSales = () => {
         if (aPrimary !== bPrimary) return aPrimary ? -1 : 1;
         return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
       });
-      return { ...group, leads: sorted };
+      // Cross-sale siblings are fetched without the active filters, so the group can contain
+      // leads the user did not ask for. Open on a member that came from the filtered list.
+      const matchedIds = new Set(group.membersFromList.map((l) => String(l._id)));
+      const defaultLead = sorted.find((l) => matchedIds.has(String(l._id))) || sorted[0];
+      return { ...group, leads: sorted, defaultLeadId: defaultLead?._id };
     });
   }, [leads, crossSaleCache]);
 
@@ -9080,7 +9084,7 @@ const renderWhatsAppPanel = () => {
               ) : (
                 <div className="row g-2 mt-3 b2b-leads-list">
                   {leadDisplayGroups.map((group, groupIndex) => {
-                    const activeLeadId = activeProjectByGroup[group.rootId] || group.leads[0]?._id;
+                    const activeLeadId = activeProjectByGroup[group.rootId] || group.defaultLeadId || group.leads[0]?._id;
                     const lead = group.leads.find((l) => String(l._id) === String(activeLeadId)) || group.leads[0];
                     if (!lead) return null;
                     const leadIndex = groupIndex;
