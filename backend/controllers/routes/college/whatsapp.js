@@ -1826,7 +1826,9 @@ function formatPhoneNumber(phoneNumber) {
  * Since URL is already saved in database during template creation
  */
 function getMediaUrl(s3Url) {
-  return s3Url || null;
+  // DB stores S3 keys; Meta needs a public https:// URI
+  const publicUrl = resolvePublicUrl(s3Url);
+  return publicUrl || null;
 }
 
 /**
