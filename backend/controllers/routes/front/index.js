@@ -26,9 +26,13 @@ const {
 	CourseSectors,
 	Contact, Post , StudentRegistration,
 	AppRelease,
+	CareerApplication,
 } = require("../../models");
 const Team = require('../../models/team'); // PostSchema import करें
 const { resolvePublicUrl } = require('../../../helpers/s3Storage');
+const { uploadSinglefile } = require('../functions/images');
+const { updateSpreadSheetCarrerValues } = require('../services/googleservice');
+const { baseUrl } = require('../../../config');
 const bcrypt = require("bcryptjs");
 const router = express.Router();
 const {
@@ -1741,5 +1745,163 @@ router.route('/parser')
 		  });
 		}
 	  });
+
+router.post("/career", async (req, res) => {
+	try {
+		const fullName = (req.body.fullName || req.body.name || "").trim();
+		const email = (req.body.email || "").trim().toLowerCase();
+		const mobileRaw = (req.body.mobile || req.body.number || "").trim();
+		const mobile = mobileRaw.replace(/[\s\-()]/g, "").replace(/^\+91/, "");
+		const city = (req.body.city || req.body.location || "").trim();
+		const applyingFor = (req.body.applyingFor || req.body.position || "").trim();
+		const experience = (req.body.experience || "").trim();
+
+		const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		const mobileRe = /^[6-9]\d{9}$/;
+
+		if (!fullName || fullName.length < 2) {
+			return res.status(400).json({
+				status: "error",
+				message: "Please enter a valid full name",
+			});
+		}
+		if (!email || !emailRe.test(email)) {
+			return res.status(400).json({
+				status: "error",
+				message: "Please enter a valid email ID",
+			});
+		}
+		if (!mobile || !mobileRe.test(mobile)) {
+			return res.status(400).json({
+				status: "error",
+				message: "Please enter a valid 10-digit mobile number",
+			});
+		}
+		if (!applyingFor) {
+			return res.status(400).json({
+				status: "error",
+				message: "Applying for is required",
+			});
+		}
+		if (!experience) {
+			return res.status(400).json({
+				status: "error",
+				message: "Experience is required",
+			});
+		}
+
+		const cvFile = req.files?.resume || req.files?.cv;
+		if (!cvFile) {
+			return res.status(400).json({
+				status: "error",
+				message: "CV file missing",
+			});
+		}
+
+		const resumeName = String(cvFile.name || "").toLowerCase();
+		const resumeMime = String(cvFile.mimetype || "").toLowerCase();
+		const allowedMime = [
+			"application/pdf",
+			"application/msword",
+			"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		];
+		const allowedExt = /\.(pdf|doc|docx)$/;
+		if (!allowedMime.includes(resumeMime) && !allowedExt.test(resumeName)) {
+			return res.status(400).json({
+				status: "error",
+				message: "Resume must be a PDF or DOC file",
+			});
+		}
+		if (cvFile.size && cvFile.size > 5 * 1024 * 1024) {
+			return res.status(400).json({
+				status: "error",
+				message: "CV must be 5 MB or smaller",
+			});
+		}
+
+		const cvKey = await uploadSinglefile(cvFile);
+		const resumeUrl = resolvePublicUrl(cvKey);
+
+		const capitalizeWords = (str) => {
+			if (!str) return "";
+			return str
+				.split(" ")
+				.map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+				.join(" ");
+		};
+
+		const savedApplication = await CareerApplication.create({
+			fullName: capitalizeWords(fullName),
+			email,
+			mobile,
+			city,
+			applyingFor,
+			experience,
+			resume: resumeUrl,
+		});
+
+		const sheetData = [
+			moment(new Date()).utcOffset("+05:30").format("DD/MM/YYYY"),
+			moment(new Date()).utcOffset("+05:30").format("hh:mm A"),
+			capitalizeWords(fullName),
+			mobile,
+			email,
+			experience,
+			applyingFor,
+			resumeUrl,
+			city,
+			true,
+		];
+
+		try {
+			await updateSpreadSheetCarrerValues(sheetData);
+		} catch (sheetErr) {
+			console.error("Career sheet update skipped:", sheetErr.message);
+		}
+
+		const subject = "New Career Application - Focalyt";
+		const msg = `
+			<html lang="en">
+				<body>
+					<div>
+						<p>You have received a new career application:</p>
+						<ul>
+							<li>Full name: ${capitalizeWords(fullName)} (${mobile})</li>
+							<li>Email: ${email}</li>
+							<li>City: ${city}</li>
+							<li>Applying for: ${applyingFor}</li>
+							<li>Experience: ${experience}</li>
+							<li>Resume: ${resumeUrl}</li>
+						</ul>
+					</div>
+				</body>
+			</html>
+		`;
+
+		try {
+			await sendMail(subject, msg, "hrm@focalyt.com", [
+				{
+					filename: cvFile.name,
+					path: resumeUrl,
+				},
+			]);
+		} catch (mailErr) {
+			console.error("Career email skipped:", mailErr.message);
+		}
+
+		return res.status(201).json({
+			status: "success",
+			message: "Application submitted successfully",
+			data: savedApplication,
+		});
+	} catch (error) {
+		console.error("Career application error:", error);
+		return res.status(500).json({
+			status: "error",
+			message: "Something went wrong while submitting application",
+			error: error.message,
+		});
+	}
+});
 
 module.exports = router;

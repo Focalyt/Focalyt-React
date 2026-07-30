@@ -420,15 +420,15 @@ function Footer() {
                       <label className="career-label career-label-required" htmlFor="career-experience">
                         <Clock size={14} aria-hidden /> Years of Experience
                       </label>
-                      <select id="career-experience" name="experience" value={formData.experience} onChange={handleChange} required>
-                        <option value="" disabled>
-                          Select experience
-                        </option>
-                        <option value="fresher">Fresher</option>
-                        <option value="1-3">1–3 years</option>
-                        <option value="3-5">3–5 years</option>
-                        <option value="5+">5+ years</option>
-                      </select>
+                      <input
+                        id="career-experience"
+                        type="text"
+                        name="experience"
+                        value={formData.experience}
+                        onChange={handleChange}
+                        required
+                        placeholder="e.g. Fresher, 2 years"
+                      />
                     </div>
                     <div className="col-12 career-field">
                       <label className="career-label career-label-required" htmlFor="career-cv">

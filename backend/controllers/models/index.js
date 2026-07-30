@@ -7,6 +7,7 @@ module.exports.AppUpdate = require('./appUpdate');
 module.exports.AppRelease = require('./appRelease');
 module.exports.User = require('./users');
 module.exports.CareerObjective = require('./careerObjective');
+module.exports.CareerApplication = require('./careerApplication');
 module.exports.City = require('./cities');
 module.exports.Candidate = require('./candidate');
 module.exports.CandidateProfile = require('./candidateProfile');
