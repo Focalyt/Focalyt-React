@@ -127,18 +127,21 @@ function Marketing() {
         submissionData.append("city", formData.city.trim());
         submissionData.append("applyingFor", formData.applyingFor.trim());
         submissionData.append("experience", formData.experience.trim());
+        // Primary field for new API + alias for older production handlers
         submissionData.append("resume", formData.resume);
+        submissionData.append("cv", formData.resume);
 
-        await axios.post(`${backendUrl}/career`, submissionData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await axios.post(`${backendUrl}/career`, submissionData);
         alert("Application submitted successfully!");
         setFormData(EMPTY_FORM);
         setErrors({});
         if (fileInputRef.current) fileInputRef.current.value = "";
       } catch (err) {
         console.error("Career form error:", err);
-        const msg = err?.response?.data?.message || "Something went wrong while submitting.";
+        const msg =
+          err?.response?.data?.message ||
+          (typeof err?.response?.data === "string" ? err.response.data : null) ||
+          "Something went wrong while submitting.";
         alert(msg);
       } finally {
         setSubmitting(false);
@@ -184,13 +187,6 @@ function Marketing() {
             </div>
 
             <div className="mkt-form-card">
-              <div className="mkt-form-head">
-                <div>
-                  <h2 className="mkt-form-title">Quick Application</h2>
-                  <p className="mkt-form-sub">Takes less than 2 minutes</p>
-                </div>
-              </div>
-
               <form className="mkt-form" onSubmit={handleSubmit} noValidate>
                 <div className="mkt-fields">
                   <div className={`mkt-field ${errors.fullName ? "has-error" : ""}`}>
@@ -460,24 +456,6 @@ function Marketing() {
   border-radius: var(--mkt-radius);
   padding: 22px 18px 20px;
   box-shadow: 0 8px 28px rgba(26, 29, 46, 0.04);
-}
-.foc-marketing-page .mkt-form-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-.foc-marketing-page .mkt-form-title {
-  margin: 0;
-  font-size: 1.15rem;
-  font-weight: 800;
-  color: var(--mkt-text);
-}
-.foc-marketing-page .mkt-form-sub {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: var(--mkt-muted);
 }
 .foc-marketing-page .mkt-fields {
   display: grid;

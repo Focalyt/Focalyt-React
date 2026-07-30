@@ -1790,11 +1790,15 @@ router.post("/career", async (req, res) => {
 			});
 		}
 
-		const cvFile = req.files?.resume || req.files?.cv;
+		const cvFile = req.files?.resume || req.files?.cv || (req.files && Object.values(req.files)[0]);
 		if (!cvFile) {
 			return res.status(400).json({
 				status: "error",
 				message: "CV file missing",
+				receivedFields: {
+					body: Object.keys(req.body || {}),
+					files: req.files ? Object.keys(req.files) : [],
+				},
 			});
 		}
 
