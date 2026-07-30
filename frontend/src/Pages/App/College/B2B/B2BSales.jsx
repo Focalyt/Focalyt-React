@@ -823,6 +823,9 @@ const B2BSales = () => {
   const [showBulkInputs, setShowBulkInputs] = useState(false);
   const [bulkMode, setBulkMode] = useState(''); // 'whatsapp' | 'bulkrefer' | 'bulkaction'
   const [input1Value, setInput1Value] = useState('');
+  const [debouncedBulkCount, setDebouncedBulkCount] = useState('');
+  const bulkSelectionFromCheckboxRef = useRef(false);
+  const bulkSelectionModeRef = useRef('count'); // 'count' | 'manual'
   const [modalType, setModalType] = useState(null); // 'whatsapp'
   const [selectedWhatsappNumbers, setSelectedWhatsappNumbers] = useState([]);
   const [selectedWhatsappTemplateModal, setSelectedWhatsappTemplateModal] = useState('');
@@ -2148,73 +2151,127 @@ const B2BSales = () => {
     return pageSize > 0 ? pageSize : (totalLeads || leads?.length || 0);
   };
 
-  // Auto-select leads based on Input 1 value for bulk WhatsApp / refer / action
+  const resetBulkSelectionState = () => {
+    setDebouncedBulkCount('');
+    bulkSelectionFromCheckboxRef.current = false;
+    bulkSelectionModeRef.current = 'count';
+  };
+
+  const isLeadBulkSelected = (leadId) =>
+    (selectedProfiles || []).some((id) => String(id) === String(leadId));
+
+  // Card checkbox ↔ Input 1 count (same pattern as B2C)
+  const handleLeadBulkCheckboxChange = (lead, checked) => {
+    if (!lead?._id) return;
+    const idStr = String(lead._id);
+    const prev = Array.isArray(selectedProfiles) ? selectedProfiles : [];
+    const next = checked
+      ? (prev.some((id) => String(id) === idStr) ? prev : [...prev, lead._id])
+      : prev.filter((id) => String(id) !== idStr);
+
+    bulkSelectionModeRef.current = 'manual';
+    bulkSelectionFromCheckboxRef.current = true;
+    setSelectedProfiles(next);
+    setInput1Value(next.length > 0 ? String(next.length) : '');
+  };
+
+  // Debounce Input 1 for fetch/auto-select; sync immediately when card checkbox changes count
+  useEffect(() => {
+    if (bulkSelectionFromCheckboxRef.current) {
+      setDebouncedBulkCount(input1Value);
+      bulkSelectionFromCheckboxRef.current = false;
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      setDebouncedBulkCount(input1Value);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [input1Value]);
+
+  // Auto-select first N lead cards from debounced count (abort prior request)
   useEffect(() => {
     if (bulkMode !== 'bulkrefer' && bulkMode !== 'bulkaction' && bulkMode !== 'whatsapp') {
-      return;
+      return undefined;
     }
 
     if (!leads || leads.length === 0) {
-      return;
+      return undefined;
     }
 
-    const numValue = input1Value === '' ? 0 : parseInt(input1Value, 10);
+    const numValue = debouncedBulkCount === '' ? 0 : parseInt(debouncedBulkCount, 10);
 
     if (isNaN(numValue) || numValue < 1) {
       setSelectedProfiles([]);
-      return;
+      return undefined;
     }
 
-    // Cap to leads in the currently selected Performance tab
     const totalAvailableLeads = getBulkSelectableLeadCount();
     const validNumValue = Math.min(numValue, totalAvailableLeads);
+    const fetchLimit = Math.max(validNumValue, totalAvailableLeads);
+    const controller = new AbortController();
 
-    // If user wants more leads than currently loaded, fetch them
-    if (validNumValue > leads.length && validNumValue > 0) {
-      const fetchLeadsForSelection = async () => {
-        if (!token) return;
+    const applyBulkSelection = (leadsList) => {
+      const availableLeads = leadsList.slice(0, fetchLimit);
 
-        try {
-          const eff = { ...filters };
-          const params = {
-            page: 1,
-            limit: validNumValue.toString(),
-            ...(isDuplicateMobileFilter(selectedStatusFilter)
-              ? { isDuplicateMobile: true }
-              : selectedStatusFilter
-                ? { status: selectedStatusFilter }
-                : {})
-          };
-          appendLeadFilterParams(params, eff);
+      // Manual checkbox: keep user selection (prune missing ids only)
+      if (bulkSelectionModeRef.current === 'manual') {
+        const available = new Set(availableLeads.map((lead) => String(lead._id)));
+        setSelectedProfiles((prev) =>
+          (prev || []).filter((id) => available.has(String(id)))
+        );
+        return;
+      }
 
-          const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
-            headers: { 'x-auth': token },
-            params: params
-          });
+      // Count-driven: check first N card checkboxes
+      setSelectedProfiles(availableLeads.slice(0, validNumValue).map((lead) => lead._id));
+    };
 
-          if (response.data.status && response.data.data.leads) {
-            const fetchedLeads = response.data.data.leads;
-            const selectedLeadsData = fetchedLeads.slice(0, validNumValue);
-            const leadsToSelect = selectedLeadsData.map(lead => lead._id);
-            setSelectedProfiles(leadsToSelect);
-          }
-        } catch (error) {
-          console.error('Error fetching leads for selection:', error);
-          // Fallback: select from current leads
-          const selectedLeadsData = leads.slice(0, Math.min(validNumValue, leads.length));
-          const leadsToSelect = selectedLeadsData.map(lead => lead._id);
-          setSelectedProfiles(leadsToSelect);
+    const fetchLeadsForSelection = async () => {
+      if (!token) return;
+      try {
+        const eff = { ...filters };
+        const params = {
+          page: 1,
+          limit: fetchLimit.toString(),
+          ...(isDuplicateMobileFilter(selectedStatusFilter)
+            ? { isDuplicateMobile: true }
+            : selectedStatusFilter
+              ? { status: selectedStatusFilter }
+              : {})
+        };
+        appendLeadFilterParams(params, eff);
+
+        const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
+          headers: { 'x-auth': token },
+          params,
+          signal: controller.signal
+        });
+
+        if (controller.signal.aborted) return;
+        if (response.data.status && response.data.data.leads) {
+          applyBulkSelection(response.data.data.leads);
         }
-      };
+      } catch (error) {
+        if (
+          controller.signal.aborted ||
+          error?.name === 'CanceledError' ||
+          error?.code === 'ERR_CANCELED'
+        ) {
+          return;
+        }
+        console.error('Error fetching leads for selection:', error);
+        applyBulkSelection(leads);
+      }
+    };
 
+    if (fetchLimit > leads.length && fetchLimit > 0) {
       fetchLeadsForSelection();
     } else {
-      // Select from current leads
-      const selectedLeadsData = leads.slice(0, validNumValue);
-      const leadsToSelect = selectedLeadsData.map(lead => lead._id);
-      setSelectedProfiles(leadsToSelect);
+      applyBulkSelection(leads);
     }
-  }, [input1Value, bulkMode, leads, totalLeads, pageSize, statusCounts, duplicateMobileCount, filters, selectedStatusFilter, token]);
+
+    return () => controller.abort();
+  }, [debouncedBulkCount, bulkMode, leads, totalLeads, pageSize, statusCounts, duplicateMobileCount, filters, selectedStatusFilter, token]);
 
   // If Performance tab changes while bulk mode is open, clamp Input 1 to the new tab count
   useEffect(() => {
@@ -2225,6 +2282,7 @@ const B2BSales = () => {
     const maxValue = getBulkSelectableLeadCount();
     const numValue = parseInt(input1Value, 10);
     if (!isNaN(numValue) && numValue > maxValue) {
+      bulkSelectionModeRef.current = 'count';
       setInput1Value(maxValue > 0 ? String(maxValue) : '');
     }
   }, [selectedStatusFilter, pageSize, statusCounts, duplicateMobileCount, totalLeads, bulkMode]);
@@ -4841,6 +4899,28 @@ const B2BSales = () => {
     setBulkMode('');
     setInput1Value('');
     setSelectedProfiles([]);
+    resetBulkSelectionState();
+  };
+
+  const handleBulkCountInputChange = (rawValue) => {
+    const maxValue = getBulkSelectableLeadCount();
+    let inputValue = String(rawValue || '').replace(/[^0-9]/g, '');
+
+    if (inputValue === '') {
+      bulkSelectionModeRef.current = 'count';
+      setInput1Value('');
+      return;
+    }
+
+    const numValue = parseInt(inputValue, 10);
+    if (numValue < 1 || isNaN(numValue)) {
+      inputValue = '1';
+    } else if (numValue > maxValue) {
+      inputValue = maxValue.toString();
+    }
+
+    bulkSelectionModeRef.current = 'count';
+    setInput1Value(inputValue);
   };
 
   const handleBulkWhatsappSend = async () => {
@@ -5507,6 +5587,7 @@ const B2BSales = () => {
       setBulkMode('');
       setInput1Value('');
       setSelectedProfiles([]);
+      resetBulkSelectionState();
     }
     if (showPanel === 'Whatsapp') {
       setWhatsappMessages([]);
@@ -5545,6 +5626,7 @@ const B2BSales = () => {
       setBulkMode('bulkrefer');
       setInput1Value('');
       setSelectedProfiles([]);
+      resetBulkSelectionState();
     } else if (panel === 'Reffer') {
       setShowPanel('Reffer');
     }
@@ -7774,23 +7856,7 @@ const renderWhatsAppPanel = () => {
                             placeholder="Input 1"
                             value={input1Value}
                             onChange={(e) => {
-                              const maxValue = getBulkSelectableLeadCount();
-                              let inputValue = e.target.value.replace(/[^0-9]/g, '');
-
-                              if (inputValue === '') {
-                                setInput1Value('');
-                                return;
-                              }
-
-                              const numValue = parseInt(inputValue, 10);
-
-                              if (numValue < 1 || isNaN(numValue)) {
-                                inputValue = '1';
-                              } else if (numValue > maxValue) {
-                                inputValue = maxValue.toString();
-                              }
-
-                              setInput1Value(inputValue);
+                              handleBulkCountInputChange(e.target.value);
                             }}
                             onKeyDown={(e) => {
                               if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
@@ -7944,6 +8010,8 @@ const renderWhatsAppPanel = () => {
                             setShowBulkInputs(true);
                             setBulkMode('bulkrefer');
                             setInput1Value('');
+                            setSelectedProfiles([]);
+                            resetBulkSelectionState();
                             openRefferPanel(null, 'RefferAllLeads');
                           }}
                         >
@@ -7970,6 +8038,8 @@ const renderWhatsAppPanel = () => {
                             setShowBulkInputs(true);
                             setBulkMode('bulkaction');
                             setInput1Value('');
+                            setSelectedProfiles([]);
+                            resetBulkSelectionState();
                             openEditPanel(null, 'bulkstatuschange');
                           }}
                         >
@@ -7998,6 +8068,7 @@ const renderWhatsAppPanel = () => {
                             setBulkMode('whatsapp');
                             setInput1Value('');
                             setSelectedProfiles([]);
+                            resetBulkSelectionState();
                             if (!whatsappTemplates.length) fetchWhatsappTemplates();
                           }}
                         >
@@ -8196,6 +8267,8 @@ const renderWhatsAppPanel = () => {
                             setShowBulkInputs(true);
                             setBulkMode('bulkrefer');
                             setInput1Value('');
+                            setSelectedProfiles([]);
+                            resetBulkSelectionState();
                             openRefferPanel(null, 'RefferAllLeads');
                           }}
                         >
@@ -8221,6 +8294,8 @@ const renderWhatsAppPanel = () => {
                             setShowBulkInputs(true);
                             setBulkMode('bulkaction');
                             setInput1Value('');
+                            setSelectedProfiles([]);
+                            resetBulkSelectionState();
                             openEditPanel(null, 'bulkstatuschange');
                           }}
                         >
@@ -8240,6 +8315,7 @@ const renderWhatsAppPanel = () => {
                           setBulkMode('whatsapp');
                           setInput1Value('');
                           setSelectedProfiles([]);
+                          resetBulkSelectionState();
                           if (!whatsappTemplates.length) fetchWhatsappTemplates();
                         }}
                       >
@@ -8380,23 +8456,7 @@ const renderWhatsAppPanel = () => {
                               placeholder="Input 1"
                               value={input1Value}
                               onChange={(e) => {
-                                const maxValue = getBulkSelectableLeadCount();
-                                let inputValue = e.target.value.replace(/[^0-9]/g, '');
-
-                                if (inputValue === '') {
-                                  setInput1Value('');
-                                  return;
-                                }
-
-                                const numValue = parseInt(inputValue, 10);
-
-                                if (numValue < 1 || isNaN(numValue)) {
-                                  inputValue = '1';
-                                } else if (numValue > maxValue) {
-                                  inputValue = maxValue.toString();
-                                }
-
-                                setInput1Value(inputValue);
+                                handleBulkCountInputChange(e.target.value);
                               }}
                               onKeyDown={(e) => {
                                 if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
@@ -9179,6 +9239,22 @@ const renderWhatsAppPanel = () => {
 
                                   return (
                                     <div className="lhm__name" title={title || lead.businessName || ''}>
+                                  {showBulkInputs && (bulkMode === 'whatsapp' || bulkMode === 'bulkrefer' || bulkMode === 'bulkaction') && (
+                                  <div
+                                    className="lead-bulk-check lhm__bulk-check"
+                                    onClick={(e) => e.stopPropagation()}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                  >
+                                    <input
+                                      className="form-check-input lead-bulk-check__input"
+                                      type="checkbox"
+                                      checked={isLeadBulkSelected(lead._id)}
+                                      onChange={(e) => handleLeadBulkCheckboxChange(lead, e.target.checked)}
+                                      aria-label={`Select ${lead.concernPersonName || lead.businessName || 'lead'}`}
+                                      title="Select lead"
+                                    />
+                                  </div>
+                                  )}
                                   {canEditLeadDetails(lead) && (
                                     <button
                                       type="button"
@@ -9497,6 +9573,22 @@ const renderWhatsAppPanel = () => {
                             </div>
                           ) : (
                             <div className="lead-header-v2__row">
+                              {showBulkInputs && (bulkMode === 'whatsapp' || bulkMode === 'bulkrefer' || bulkMode === 'bulkaction') && (
+                              <div
+                                className="lead-bulk-check"
+                                onClick={(e) => e.stopPropagation()}
+                                onMouseDown={(e) => e.stopPropagation()}
+                              >
+                                <input
+                                  className="form-check-input lead-bulk-check__input"
+                                  type="checkbox"
+                                  checked={isLeadBulkSelected(lead._id)}
+                                  onChange={(e) => handleLeadBulkCheckboxChange(lead, e.target.checked)}
+                                  aria-label={`Select ${lead.concernPersonName || lead.businessName || 'lead'}`}
+                                  title="Select lead"
+                                />
+                              </div>
+                              )}
                               <div className="lead-header-v2__left">
                                 {canEditLeadDetails(lead) && (
                                   <button
@@ -12355,6 +12447,31 @@ const renderWhatsAppPanel = () => {
     box-shadow: 0 8px 25px rgba(13, 110, 253, 0.25);
   }
 
+  /* B2C-style select checkbox on lead cards (minimal add-on) */
+  .lead-bulk-check {
+    display: flex;
+    align-items: flex-start;
+    flex-shrink: 0;
+    padding-top: 2px;
+    margin-right: 8px;
+  }
+
+  .lead-bulk-check__input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    cursor: pointer;
+    accent-color: #0d6efd;
+    border: 1.5px solid rgba(255, 255, 255, 0.9);
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  }
+
+  .lead-header-v2__row > .lead-bulk-check {
+    align-self: center;
+    padding-top: 0;
+  }
+
   /* Header Section */
   .lead-header {
     color: white;
@@ -13159,6 +13276,19 @@ position: absolute;
     top: -6px;
     left: -6px;
     z-index: 3;
+  }
+
+  .lhm__bulk-check {
+    position: absolute;
+    top: 10px;
+    left: 8px;
+    margin: 0;
+    padding: 0;
+    z-index: 2;
+  }
+
+  .lhm__name:has(.lhm__bulk-check) {
+    padding-left: 34px;
   }
 
   .lhm__name-icon{
