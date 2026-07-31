@@ -1749,6 +1749,10 @@ router.route('/parser')
 
 router.post("/career", async (req, res) => {
 	try {
+		console.log("CareerApplication API hitting");
+		console.log("CareerApplication Form Data:", req.body);
+		console.log("CareerApplication files:", req.files ? Object.keys(req.files) : []);
+
 		const fullName = (req.body.fullName || req.body.name || "").trim();
 		const email = (req.body.email || "").trim().toLowerCase();
 		const mobileRaw = (req.body.mobile || req.body.number || "").trim();
@@ -1791,7 +1795,15 @@ router.post("/career", async (req, res) => {
 			});
 		}
 
-		const cvFile = req.files?.resume || req.files?.cv || (req.files && Object.values(req.files)[0]);
+		const fileCandidates = [];
+		if (req.files?.resume) fileCandidates.push(req.files.resume);
+		if (req.files?.cv) fileCandidates.push(req.files.cv);
+		if (req.files) fileCandidates.push(...Object.values(req.files));
+		const flatFiles = fileCandidates.flat().filter(Boolean);
+		const cvFile =
+			flatFiles.find((f) => (f.size && f.size > 0) || (f.data && f.data.length) || f.tempFilePath) ||
+			flatFiles[0];
+
 		if (!cvFile) {
 			return res.status(400).json({
 				status: "error",
@@ -1824,9 +1836,6 @@ router.post("/career", async (req, res) => {
 			});
 		}
 
-		const cvKey = await uploadSinglefile(cvFile);
-		const resumeUrl = resolvePublicUrl(cvKey);
-
 		const capitalizeWords = (str) => {
 			if (!str) return "";
 			return str
@@ -1835,6 +1844,21 @@ router.post("/career", async (req, res) => {
 				.join(" ");
 		};
 
+		let resumeUrl = "";
+		try {
+			const cvKey = await uploadSinglefile(cvFile);
+			resumeUrl = resolvePublicUrl(cvKey);
+			console.log("CareerApplication CV uploaded:", resumeUrl);
+		} catch (uploadErr) {
+			console.error("CareerApplication CV upload failed:", uploadErr);
+			return res.status(500).json({
+				status: "error",
+				message: "CV upload failed",
+				error: uploadErr.message,
+			});
+		}
+
+		console.log("CareerApplication saving to DB...");
 		const savedApplication = await CareerApplication.create({
 			fullName: capitalizeWords(fullName),
 			email,
@@ -1844,6 +1868,7 @@ router.post("/career", async (req, res) => {
 			experience,
 			resume: resumeUrl,
 		});
+		console.log("CareerApplication saved:", savedApplication._id);
 
 		const sheetData = [
 			moment(new Date()).utcOffset("+05:30").format("DD/MM/YYYY"),
@@ -1862,36 +1887,6 @@ router.post("/career", async (req, res) => {
 			await updateSpreadSheetCarrerValues(sheetData);
 		} catch (sheetErr) {
 			console.error("Career sheet update skipped:", sheetErr.message);
-		}
-
-		const subject = "New Career Application - Focalyt";
-		const msg = `
-			<html lang="en">
-				<body>
-					<div>
-						<p>You have received a new career application:</p>
-						<ul>
-							<li>Full name: ${capitalizeWords(fullName)} (${mobile})</li>
-							<li>Email: ${email}</li>
-							<li>City: ${city}</li>
-							<li>Applying for: ${applyingFor}</li>
-							<li>Experience: ${experience}</li>
-							<li>Resume: ${resumeUrl}</li>
-						</ul>
-					</div>
-				</body>
-			</html>
-		`;
-
-		try {
-			await sendMail(subject, msg, "hrm@focalyt.com", [
-				{
-					filename: cvFile.name,
-					path: resumeUrl,
-				},
-			]);
-		} catch (mailErr) {
-			console.error("Career email skipped:", mailErr.message);
 		}
 
 		return res.status(201).json({

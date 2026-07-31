@@ -73,28 +73,37 @@ module.exports.uploadSingleImage = async (req, res) => {
   } catch (err) { return req.errFunc(err); }
 };
 module.exports.uploadSinglefile = async (file, folder = "cv") => {
-
- 
     console.log('api hiting upload file')
-    const { name, mimetype: ContentType, data } = file;
-    const ext = name.split('.').pop().toLowerCase();
+    if (!file) throw new Error("No file provided for upload");
 
-    if (!mimetypes.includes(ext)) {
+    const name = file.name || "resume.pdf";
+    const ContentType = file.mimetype || "application/octet-stream";
+    let data = file.data;
+
+    // express-fileupload may use temp files instead of in-memory buffers
+    if ((!data || !data.length) && file.tempFilePath) {
+      data = fs.readFileSync(file.tempFilePath);
+    }
+    if (!data || !data.length) {
+      throw new Error("Uploaded file is empty or could not be read");
+    }
+
+    const ext = name.split('.').pop().toLowerCase();
+    const allowed = String(mimetypes || "")
+      .split(/[\s,]+/)
+      .filter(Boolean)
+      .map((x) => x.toLowerCase());
+    if (allowed.length && !allowed.includes(ext)) {
       throw new Error("File type not supported!");
     }
 
-
     const key = `uploads/${folder}/${uuid()}.${ext}`;
-
-    
     const params = {
       Bucket: bucketName, Body: data, Key: key, ContentType,
     };
 
-    const result = await s3.upload(params).promise(); // 👈 using promise
-  return result.Key;
-
-  
+    const result = await s3.upload(params).promise();
+    return result.Key;
 };
 
 
