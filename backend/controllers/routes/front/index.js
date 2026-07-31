@@ -27,6 +27,7 @@ const {
 	Contact, Post , StudentRegistration,
 	AppRelease,
 	CareerApplication,
+	Application,
 } = require("../../models");
 const Team = require('../../models/team'); // PostSchema import करें
 const { resolvePublicUrl } = require('../../../helpers/s3Storage');
@@ -1908,4 +1909,56 @@ router.post("/career", async (req, res) => {
 	}
 });
 
+router.post("/application", async (req, res) => {
+	try {
+		let { fullName, email, mobile, city, applyingFor, experience, resume } = req.body;
+
+		const resumeFile = req.files?.resume || req.files?.cv;
+		if (resumeFile) {
+			const cvKey = await uploadSinglefile(resumeFile);
+			resume = resolvePublicUrl(cvKey);
+		}
+
+		console.log("Application data:", { fullName, email, mobile, city, applyingFor, experience, resume });
+
+		if (!fullName || !email || !mobile || !applyingFor || !experience || !resume) {
+			return res.status(400).json({
+				status: "error",
+				message: "Please fill all required fields",
+			});
+		}
+
+		const capitalizeWords = (str) => {
+			if (!str) return "";
+			return String(str)
+				.trim()
+				.split(" ")
+				.map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+				.join(" ");
+		};
+
+		const savedApplication = await Application.create({
+			fullName: capitalizeWords(fullName),
+			email: String(email).trim().toLowerCase(),
+			mobile: String(mobile).trim(),
+			city: String(city || "").trim(),
+			applyingFor: String(applyingFor).trim(),
+			experience: String(experience).trim(),
+			resume,
+		});
+
+		return res.status(201).json({
+			status: "success",
+			message: "Application submitted successfully",
+			data: savedApplication,
+		});
+	} catch (error) {
+		console.error("Application error:", error);
+		return res.status(500).json({
+			status: "error",
+			message: "Something went wrong while submitting application",
+			error: error.message,
+		});
+	}
+});
 module.exports = router;
