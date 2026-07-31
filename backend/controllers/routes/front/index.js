@@ -1888,36 +1888,6 @@ router.post("/career", async (req, res) => {
 			console.error("Career sheet update skipped:", sheetErr.message);
 		}
 
-		const subject = "New Career Application - Focalyt";
-		const msg = `
-			<html lang="en">
-				<body>
-					<div>
-						<p>You have received a new career application:</p>
-						<ul>
-							<li>Full name: ${capitalizeWords(fullName)} (${mobile})</li>
-							<li>Email: ${email}</li>
-							<li>City: ${city}</li>
-							<li>Applying for: ${applyingFor}</li>
-							<li>Experience: ${experience}</li>
-							<li>Resume: ${resumeUrl}</li>
-						</ul>
-					</div>
-				</body>
-			</html>
-		`;
-
-		try {
-			await sendMail(subject, msg, "hrm@focalyt.com", [
-				{
-					filename: cvFile.name,
-					path: resumeUrl,
-				},
-			]);
-		} catch (mailErr) {
-			console.error("Career email skipped:", mailErr.message);
-		}
-
 		return res.status(201).json({
 			status: "success",
 			message: "Application submitted successfully",
