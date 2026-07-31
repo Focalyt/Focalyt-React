@@ -127,9 +127,7 @@ function Marketing() {
         submissionData.append("city", formData.city.trim());
         submissionData.append("applyingFor", formData.applyingFor.trim());
         submissionData.append("experience", formData.experience.trim());
-        // Primary field for new API + alias for older production handlers
         submissionData.append("resume", formData.resume);
-        submissionData.append("cv", formData.resume);
 
         await axios.post(`${backendUrl}/career`, submissionData);
         alert("Application submitted successfully!");
