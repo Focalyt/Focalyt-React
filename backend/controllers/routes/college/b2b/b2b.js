@@ -111,8 +111,11 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 		const legacyTypePattern = isVisit ? '^visit$' : '^call$';
 		const now = new Date();
 
-		// Done = leads with ≥1 completed followup of this type (same as card followupStats),
-		// not only when the *current* slot is still Completed.
+		const typeMatchExpr = isVisit
+			? { $eq: [{ $toLower: { $ifNull: ['$followUpType', ''] } }, 'visit'] }
+			: { $ne: [{ $toLower: { $ifNull: ['$followUpType', ''] } }, 'visit'] };
+
+		// Done = leads with ≥1 completed followup of this type
 		if (b === 'done') {
 			const completedRows = await FollowUp.aggregate([
 				{
@@ -120,9 +123,7 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 						$expr: {
 							$and: [
 								{ $eq: [{ $toLower: { $ifNull: ['$status', ''] } }, 'completed'] },
-								isVisit
-									? { $eq: [{ $toLower: { $ifNull: ['$followUpType', ''] } }, 'visit'] }
-									: { $ne: [{ $toLower: { $ifNull: ['$followUpType', ''] } }, 'visit'] }
+								typeMatchExpr
 							]
 						}
 					}
@@ -141,20 +142,109 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 			return { _id: { $in: doneIds } };
 		}
 
-		const bucketExpr = (prefix) => {
+		// Missed = historical Missed OR current overdue Pending slot
+		if (b === 'missed') {
+			const historicalMissedRows = await FollowUp.aggregate([
+				{
+					$match: {
+						$expr: {
+							$and: [
+								{ $eq: [{ $toLower: { $ifNull: ['$status', ''] } }, 'missed'] },
+								typeMatchExpr
+							]
+						}
+					}
+				},
+				{ $group: { _id: '$leadId' } }
+			]);
+
+			const overdueExpr = (prefix) => {
+				const statusLower = { $toLower: { $ifNull: [`${prefix}.status`, ''] } };
+				const sched = `${prefix}.scheduledDate`;
+				return {
+					$and: [
+						{ $not: { $in: [statusLower, ['completed', 'missed', 'rescheduled']] } },
+						{ $ne: [sched, null] },
+						{ $ne: [{ $type: sched }, 'missing'] },
+						{ $lt: [sched, now] }
+					]
+				};
+			};
+
+			const slotPipeline = [
+				{ $match: { [slotField]: { $exists: true, $ne: null } } },
+				{
+					$lookup: {
+						from: 'followups',
+						localField: slotField,
+						foreignField: '_id',
+						as: 'fuArr'
+					}
+				},
+				{ $unwind: '$fuArr' },
+				{ $match: { $expr: overdueExpr('$fuArr') } },
+				{ $project: { _id: 1 } }
+			];
+
+			const legacyPipeline = [
+				{
+					$match: {
+						followUp: { $exists: true, $ne: null },
+						$or: [{ [slotField]: null }, { [slotField]: { $exists: false } }]
+					}
+				},
+				{
+					$lookup: {
+						from: 'followups',
+						localField: 'followUp',
+						foreignField: '_id',
+						as: 'fuArr'
+					}
+				},
+				{ $unwind: '$fuArr' },
+				{
+					$match: {
+						$expr: {
+							$and: [
+								{ $regexMatch: { input: { $toLower: '$fuArr.followUpType' }, regex: legacyTypePattern, options: 'i' } },
+								overdueExpr('$fuArr')
+							]
+						}
+					}
+				},
+				{ $project: { _id: 1 } }
+			];
+
+			const [slotLeads, legacyLeads] = await Promise.all([
+				Lead.aggregate(slotPipeline),
+				Lead.aggregate(legacyPipeline)
+			]);
+
+			const ids = [
+				...new Set(
+					[
+						...(historicalMissedRows || []).map((row) => String(row._id || '')),
+						...(slotLeads || []).map((row) => String(row._id || '')),
+						...(legacyLeads || []).map((row) => String(row._id || ''))
+					].filter((id) => id && mongoose.Types.ObjectId.isValid(id))
+				)
+			].map((id) => new mongoose.Types.ObjectId(id));
+
+			return { _id: { $in: ids } };
+		}
+
+		// Planned = open current slot with future date
+		const plannedExpr = (prefix) => {
 			const statusLower = { $toLower: { $ifNull: [`${prefix}.status`, ''] } };
 			const sched = `${prefix}.scheduledDate`;
-			const hasSched = {
+			return {
 				$and: [
+					{ $not: { $in: [statusLower, ['completed', 'missed', 'rescheduled']] } },
 					{ $ne: [sched, null] },
-					{ $ne: [{ $type: sched }, 'missing'] }
+					{ $ne: [{ $type: sched }, 'missing'] },
+					{ $gte: [sched, now] }
 				]
 			};
-			const notDone = { $ne: [statusLower, 'completed'] };
-			if (b === 'planned') {
-				return { $and: [notDone, hasSched, { $gte: [sched, now] }] };
-			}
-			return { $and: [notDone, hasSched, { $lt: [sched, now] }] };
 		};
 
 		const slotPipeline = [
@@ -168,7 +258,7 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 				}
 			},
 			{ $unwind: '$fuArr' },
-			{ $match: { $expr: bucketExpr('$fuArr') } },
+			{ $match: { $expr: plannedExpr('$fuArr') } },
 			{ $project: { _id: 1 } }
 		];
 
@@ -193,7 +283,7 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 					$expr: {
 						$and: [
 							{ $regexMatch: { input: { $toLower: '$fuArr.followUpType' }, regex: legacyTypePattern, options: 'i' } },
-							bucketExpr('$fuArr')
+							plannedExpr('$fuArr')
 						]
 					}
 				}
@@ -260,22 +350,43 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 		return bounds;
 	};
 
-	const completeCurrentFollowupForType = async (lead, followUpType) => {
+	/**
+	 * Close current Call/Visit follow-up before replace/clear.
+	 * - mode 'replace': overdue → Missed (keep history), still-future → Rescheduled
+	 * - mode 'done': Completed (status change without new follow-up)
+	 * - forceMissed: always Missed on replace
+	 */
+	const completeCurrentFollowupForType = async (lead, followUpType, options = {}) => {
 		if (!lead) return;
+		const mode = options.mode === 'done' ? 'done' : 'replace';
+		const forceMissed = Boolean(options.forceMissed);
 		const normalizedType = String(followUpType || 'Call').trim().toLowerCase();
-		const currentFollowUpId = normalizedType === 'visit' ? lead.followUpVisit : lead.followUpCall;
+		const rawId = normalizedType === 'visit' ? lead.followUpVisit : lead.followUpCall;
+		const currentFollowUpId = rawId?._id || rawId;
 		if (!currentFollowUpId) return;
 
-		await FollowUp.findOneAndUpdate(
-			{
-				_id: currentFollowUpId,
-				status: { $ne: 'Completed' }
-			},
-			{
-				status: 'Completed',
-				completedDate: new Date()
+		const current = await FollowUp.findById(currentFollowUpId).select('status scheduledDate');
+		if (!current) return;
+		const statusLower = String(current.status || '').trim().toLowerCase();
+		if (statusLower === 'completed' || statusLower === 'missed' || statusLower === 'rescheduled') {
+			return;
+		}
+
+		let nextStatus = 'Completed';
+		if (mode === 'replace') {
+			if (forceMissed) {
+				nextStatus = 'Missed';
+			} else {
+				const sched = current.scheduledDate ? new Date(current.scheduledDate) : null;
+				const stillPlanned = sched && !Number.isNaN(sched.getTime()) && sched.getTime() > Date.now();
+				nextStatus = stillPlanned ? 'Rescheduled' : 'Missed';
 			}
-		);
+		}
+
+		await FollowUp.findByIdAndUpdate(currentFollowUpId, {
+			status: nextStatus,
+			completedDate: new Date()
+		});
 	};
 
 	const attachFollowupStats = async (leads) => {
@@ -291,7 +402,10 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 				$match: {
 					leadId: { $in: leadIds },
 					$expr: {
-						$eq: [{ $toLower: '$status' }, 'completed']
+						$in: [
+							{ $toLower: { $ifNull: ['$status', ''] } },
+							['completed', 'missed']
+						]
 					}
 				}
 			},
@@ -307,7 +421,24 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 							]
 						}
 					},
-					done: { $sum: 1 }
+					done: {
+						$sum: {
+							$cond: [
+								{ $eq: [{ $toLower: { $ifNull: ['$status', ''] } }, 'completed'] },
+								1,
+								0
+							]
+						}
+					},
+					missed: {
+						$sum: {
+							$cond: [
+								{ $eq: [{ $toLower: { $ifNull: ['$status', ''] } }, 'missed'] },
+								1,
+								0
+							]
+						}
+					}
 				}
 			}
 		]);
@@ -319,11 +450,12 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 			if (!leadId) return;
 			if (!statsByLead[leadId]) {
 				statsByLead[leadId] = {
-					call: { done: 0 },
-					visit: { done: 0 }
+					call: { done: 0, missed: 0 },
+					visit: { done: 0, missed: 0 }
 				};
 			}
 			statsByLead[leadId][type].done = row.done || 0;
+			statsByLead[leadId][type].missed = row.missed || 0;
 		});
 
 		return list.map((lead) => {
@@ -331,8 +463,8 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 			return {
 				...obj,
 				followupStats: statsByLead[String(obj?._id || '')] || {
-					call: { done: 0 },
-					visit: { done: 0 }
+					call: { done: 0, missed: 0 },
+					visit: { done: 0, missed: 0 }
 				}
 			};
 		});
@@ -4075,7 +4207,8 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			followUpDate,
 			followUpTime,
 			followUpType = 'Call',
-			googleCalendarEvent = false
+			googleCalendarEvent = false,
+			previousWasMissed = false
 		} = req.body;
 		// console.log('[B2B Update Status] Step 2: Params & body', {
 		// 	leadId: id,
@@ -4236,7 +4369,9 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 				addedBy: req.user._id
 			});
 			await savedFollowUp.save();
-			await completeCurrentFollowupForType(lead, normalizedType);
+			await completeCurrentFollowupForType(lead, normalizedType, {
+				forceMissed: Boolean(previousWasMissed)
+			});
 
 			lead.followUp = savedFollowUp._id;
 			if (normalizedType.toLowerCase() === 'visit') {
@@ -4255,8 +4390,8 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			// No new follow-up date → mark previous Call/Visit follow-ups as Done
 			const hadCall = Boolean(lead.followUpCall);
 			const hadVisit = Boolean(lead.followUpVisit);
-			await completeCurrentFollowupForType(lead, 'Call');
-			await completeCurrentFollowupForType(lead, 'Visit');
+			await completeCurrentFollowupForType(lead, 'Call', { mode: 'done' });
+			await completeCurrentFollowupForType(lead, 'Visit', { mode: 'done' });
 			if (hadCall || hadVisit) {
 				lead.logs.push({
 					user: req.user._id,
@@ -4933,7 +5068,8 @@ router.post('/leads/:id/followup', isCollege, async (req, res) => {
 			scheduledDate,
 			scheduledTime,
 			remarks,
-			googleCalendarEvent = false
+			googleCalendarEvent = false,
+			previousWasMissed = false
 		} = req.body;
 
 		if (!scheduledDate || !scheduledTime) {
@@ -4977,7 +5113,9 @@ router.post('/leads/:id/followup', isCollege, async (req, res) => {
 		});
 
 		const savedFollowUp = await newFollowUp.save();
-		await completeCurrentFollowupForType(lead, normalizedType);
+		await completeCurrentFollowupForType(lead, normalizedType, {
+			forceMissed: Boolean(previousWasMissed)
+		});
 
 		// Update lead with follow-up reference and add to logs
 		lead.followUp = savedFollowUp._id; // keep legacy "last follow-up"

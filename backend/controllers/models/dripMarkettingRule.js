@@ -40,6 +40,10 @@ const DripMarketingRuleSchema = new mongoose.Schema({
     type: Date,
     required: true
   },
+  endDate: {
+    type: Date,
+    required: false
+  },
   
   
   // IF CONDITIONS

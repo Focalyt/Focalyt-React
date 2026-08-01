@@ -1141,6 +1141,9 @@ const B2BSales = () => {
           statusData.followUpDate = followupDateValue;
           statusData.followUpTime = followupFormData.followupTime;
           statusData.googleCalendarEvent = true;
+          statusData.followUpType = followupFormData.followUpType || 'Call';
+          statusData.previousWasMissed =
+            getLeadFollowupBucket(selectedProfile, statusData.followUpType) === 'missed';
         }
 
         await updateLeadStatus(selectedProfile._id, statusData);
@@ -1154,17 +1157,19 @@ const B2BSales = () => {
 
       // 2) Standalone follow-up panel: create follow-up (and Google Calendar event) via B2B follow-up API
       if (showPanel === 'followUp' && selectedProfile && hasFollowupData) {
+        const followUpType = followupFormData.followUpType || 'Call';
         await axios.post(
           `${backendUrl}/college/b2b/leads/${selectedProfile._id}/followup`,
           {
-            followUpType: followupFormData.followUpType || 'Call',
+            followUpType,
             description:
               followupFormData.description ||
-              getFollowupDescription(followupFormData.followUpType),
+              getFollowupDescription(followUpType),
             scheduledDate: followupDateValue,
             scheduledTime: followupFormData.followupTime,
             remarks: followupFormData.remarks || '',
-            googleCalendarEvent: true
+            googleCalendarEvent: true,
+            previousWasMissed: getLeadFollowupBucket(selectedProfile, followUpType) === 'missed'
           },
           {
             headers: { 'x-auth': token }
@@ -1221,6 +1226,7 @@ const B2BSales = () => {
     if (!followUpLike) return null;
     const status = String(followUpLike?.status || '').trim().toLowerCase();
     if (status === 'completed') return 'done';
+    if (status === 'missed' || status === 'rescheduled') return null;
 
     const dt = followUpLike?.scheduledDate ? new Date(followUpLike.scheduledDate) : null;
     if (!dt || Number.isNaN(dt.getTime())) return null;
@@ -1251,8 +1257,19 @@ const B2BSales = () => {
     return getLeadFollowupBucket(lead, type) === 'done' ? 1 : 0;
   };
 
+  /** Historical Missed (DB) + current overdue Pending */
+  const getLeadFollowupMissedCount = (lead, type) => {
+    const t = String(type || '').toLowerCase() === 'visit' ? 'visit' : 'call';
+    const historical = Number(lead?.followupStats?.[t]?.missed);
+    const hist = Number.isFinite(historical) && historical > 0 ? historical : 0;
+    const currentOpenMissed = getLeadFollowupBucket(lead, type) === 'missed' ? 1 : 0;
+    return hist + currentOpenMissed;
+  };
+
   const leadHasFollowup = (lead, type) => (
-    Boolean(getLeadFollowupBucket(lead, type)) || getLeadFollowupDoneCount(lead, type) > 0
+    Boolean(getLeadFollowupBucket(lead, type))
+    || getLeadFollowupDoneCount(lead, type) > 0
+    || getLeadFollowupMissedCount(lead, type) > 0
   );
 
   // Light-red empty style only when neither Call nor Visit followup exists
@@ -9503,7 +9520,7 @@ const renderWhatsAppPanel = () => {
                                       return [
                                         { label: 'Done', value: getLeadFollowupDoneCount(lead, 'Call'), bg: 'rgb(18, 179, 255)' },
                                         { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: 'rgb(12, 125, 180)' },
-                                        { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: 'rgb(8, 80, 120)' },
+                                        { label: 'Missed', value: getLeadFollowupMissedCount(lead, 'Call'), bg: 'rgb(8, 80, 120)' },
                                       ];
                                     })().map((s) => (
                                       <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
@@ -9536,7 +9553,7 @@ const renderWhatsAppPanel = () => {
                                       return [
                                         { label: 'Done', value: getLeadFollowupDoneCount(lead, 'Visit'), bg: 'rgb(75, 85, 99)' },
                                         { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: 'rgb(55, 65, 81)' },
-                                        { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: 'rgb(35, 42, 52)' },
+                                        { label: 'Missed', value: getLeadFollowupMissedCount(lead, 'Visit'), bg: 'rgb(35, 42, 52)' },
                                       ];
                                     })().map((s) => (
                                       <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
@@ -9878,7 +9895,7 @@ const renderWhatsAppPanel = () => {
                                           return [
                                             { key: 'fc-done', label: 'Done', value: getLeadFollowupDoneCount(lead, 'Call'), bg: 'rgb(18, 179, 255)' },
                                             { key: 'fc-planned', label: 'Planned', value: b === 'planned' ? 1 : 0, bg: 'rgb(12, 125, 180)' },
-                                            { key: 'fc-missed', label: 'Missed', value: b === 'missed' ? 1 : 0, bg: 'rgb(8, 80, 120)' },
+                                            { key: 'fc-missed', label: 'Missed', value: getLeadFollowupMissedCount(lead, 'Call'), bg: 'rgb(8, 80, 120)' },
                                           ];
                                         })().map((row) => (
                                           <div
@@ -9917,7 +9934,7 @@ const renderWhatsAppPanel = () => {
                                           return [
                                             { key: 'fv-done', label: 'Done', value: getLeadFollowupDoneCount(lead, 'Visit'), bg: 'rgb(75, 85, 99)' },
                                             { key: 'fv-planned', label: 'Planned', value: b === 'planned' ? 1 : 0, bg: 'rgb(55, 65, 81)' },
-                                            { key: 'fv-missed', label: 'Missed', value: b === 'missed' ? 1 : 0, bg: 'rgb(35, 42, 52)' },
+                                            { key: 'fv-missed', label: 'Missed', value: getLeadFollowupMissedCount(lead, 'Visit'), bg: 'rgb(35, 42, 52)' },
                                           ];
                                         })().map((row) => (
                                           <div

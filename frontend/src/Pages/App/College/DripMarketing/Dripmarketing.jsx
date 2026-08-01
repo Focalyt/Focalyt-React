@@ -197,6 +197,7 @@ const DripMarketing = () => {
         {
             _id: null,
             startDate: '',
+            endDate: '',
             startTime: '',
             endTime: '',
             name: '',
@@ -229,6 +230,7 @@ const DripMarketing = () => {
             {
                 _id: null,
                 startDate: '',
+                endDate: '',
                 startTime: '',
                 endTime: '',
                 name: '',
@@ -600,7 +602,9 @@ const DripMarketing = () => {
             const requestData = {
                 name: ruleData.name,
                 startDate: ruleData.startDate,
+                endDate: ruleData.endDate,
                 startTime: ruleData.startTime,
+                endTime: ruleData.endTime,
                 conditionBlocks: ruleData.conditionBlocks.map(block => ({
                     conditions: block.conditions.filter(condition =>
                         condition.activityType && condition.operator && condition.values.length > 0
@@ -651,7 +655,9 @@ const DripMarketing = () => {
                 alert('Rule created successfully!');
                 setRuleData({
                     startDate: '',
+                    endDate: '',
                     startTime: '',
+                    endTime: '',
                     name: '',
                     conditionBlocks: [],
                     interBlockLogicOperator: 'and',
@@ -728,7 +734,9 @@ const DripMarketing = () => {
             const updateData = {
                 name: ruleData.name,
                 startDate: ruleData.startDate,
+                endDate: ruleData.endDate,
                 startTime: ruleData.startTime,
+                endTime: ruleData.endTime,
                 conditionBlocks: ruleData.conditionBlocks.map(block => ({
                     conditions: block.conditions.filter(condition =>
                         condition.activityType && condition.operator && condition.values.length > 0
@@ -834,28 +842,32 @@ const DripMarketing = () => {
 
         if (ruleToEdit) {
             // Convert 12-hour format to 24-hour format for time input
-            let timeForInput = ruleToEdit.startTime || '';
-            if (timeForInput && timeForInput.includes(' ')) {
-                const [time, ampm] = timeForInput.split(' ');
-                const [hours, minutes] = time.split(':');
-                let hour24 = parseInt(hours);
+            const to24Hour = (timeStr) => {
+                let timeForInput = timeStr || '';
+                if (timeForInput && timeForInput.includes(' ')) {
+                    const [time, ampm] = timeForInput.split(' ');
+                    const [hours, minutes] = time.split(':');
+                    let hour24 = parseInt(hours);
 
-                if (ampm === 'PM' && hour24 !== 12) {
-                    hour24 += 12;
-                } else if (ampm === 'AM' && hour24 === 12) {
-                    hour24 = 0;
+                    if (ampm === 'PM' && hour24 !== 12) {
+                        hour24 += 12;
+                    } else if (ampm === 'AM' && hour24 === 12) {
+                        hour24 = 0;
+                    }
+
+                    timeForInput = `${hour24.toString().padStart(2, '0')}:${minutes}`;
                 }
-
-                timeForInput = `${hour24.toString().padStart(2, '0')}:${minutes}`;
-            }
+                return timeForInput;
+            };
 
             setRuleData({
                 _id: ruleToEdit._id || null,
                 name: ruleToEdit.name || '',
                 description: ruleToEdit.description || '',
                 startDate: ruleToEdit.startDate ? new Date(ruleToEdit.startDate) : '',
-                startTime: timeForInput,
-                endTime: ruleToEdit.endTime || '',
+                endDate: ruleToEdit.endDate ? new Date(ruleToEdit.endDate) : '',
+                startTime: to24Hour(ruleToEdit.startTime),
+                endTime: to24Hour(ruleToEdit.endTime),
                 // conditionBlocks: ruleToEdit.conditionBlocks || [],
                 // conditionBlock: ruleToEdit.conditionBlocks.map
                 conditionBlocks: (ruleToEdit.conditionBlocks || []).map(block => ({
@@ -1339,6 +1351,7 @@ const DripMarketing = () => {
         // Reset ruleData to initial state
         setRuleData({
             startDate: '',
+            endDate: '',
             startTime: '',
             endTime: '',
             description: '',
@@ -2066,7 +2079,7 @@ const DripMarketing = () => {
                                         Created On
                                     </td>
                                     <td width={200}>
-                                        Start Time
+                                        Schedule
                                     </td>
                                     <td width={100}>
                                         Active
@@ -2093,7 +2106,10 @@ const DripMarketing = () => {
                                             {new Date(rule.createdAt).toLocaleDateString("en-GB")}
                                         </td>
                                         <td>
-                                            {new Date(rule.startDate).toLocaleDateString("en-GB")} &nbsp; {rule.startTime}
+                                            {new Date(rule.startDate).toLocaleDateString("en-GB")} {rule.startTime}
+                                            {rule.endDate && (
+                                                <> — {new Date(rule.endDate).toLocaleDateString("en-GB")} {rule.endTime}</>
+                                            )}
                                         </td>
                                         <td>
                                             <div className="form-check form-switch">
@@ -2125,25 +2141,30 @@ const DripMarketing = () => {
                                                             setModalMode('edit');
 
                                                             // Convert 12-hour format to 24-hour format for time input
-                                                            let timeForInput = rule.startTime || '';
-                                                            if (timeForInput && timeForInput.includes(' ')) {
-                                                                const [time, ampm] = timeForInput.split(' ');
-                                                                const [hours, minutes] = time.split(':');
-                                                                let hour24 = parseInt(hours);
+                                                            const to24Hour = (timeStr) => {
+                                                                let timeForInput = timeStr || '';
+                                                                if (timeForInput && timeForInput.includes(' ')) {
+                                                                    const [time, ampm] = timeForInput.split(' ');
+                                                                    const [hours, minutes] = time.split(':');
+                                                                    let hour24 = parseInt(hours);
 
-                                                                if (ampm === 'PM' && hour24 !== 12) {
-                                                                    hour24 += 12;
-                                                                } else if (ampm === 'AM' && hour24 === 12) {
-                                                                    hour24 = 0;
+                                                                    if (ampm === 'PM' && hour24 !== 12) {
+                                                                        hour24 += 12;
+                                                                    } else if (ampm === 'AM' && hour24 === 12) {
+                                                                        hour24 = 0;
+                                                                    }
+
+                                                                    timeForInput = `${hour24.toString().padStart(2, '0')}:${minutes}`;
                                                                 }
-
-                                                                timeForInput = `${hour24.toString().padStart(2, '0')}:${minutes}`;
-                                                            }
+                                                                return timeForInput;
+                                                            };
 
                                                             setRuleData({
                                                                 ...rule,
                                                                 startDate: rule.startDate ? new Date(rule.startDate) : '',
-                                                                startTime: timeForInput
+                                                                endDate: rule.endDate ? new Date(rule.endDate) : '',
+                                                                startTime: to24Hour(rule.startTime),
+                                                                endTime: to24Hour(rule.endTime)
                                                             });
                                                             setShowPopup(false);
                                                             setPopupIndex(null);
@@ -2187,8 +2208,9 @@ const DripMarketing = () => {
                                 <div className="row">
                                     <div className="col-12">
                                         <p className='ruleInfo'>{modalMode === 'edit' ? 'Do you want to update the rule?' : 'A new rule can be added using this dialog, you need to select Rules and actions to be performed based on the Rules'}</p>
-                                        <div className="row">
-                                            <div className="col-md-6 col-12">
+                                        <div className="ruleFormHeader ruleFormHeaderInline">
+                                            <div className="ruleNameField">
+                                                <label className="ruleFieldLabel">Rule Name</label>
                                                 <input
                                                     type="text"
                                                     name='ruleName'
@@ -2197,32 +2219,56 @@ const DripMarketing = () => {
                                                     onChange={(e) => setRuleData(prev => ({ ...prev, name: e.target.value }))}
                                                 />
                                             </div>
-                                            <div className="col-md-6 col-12">
-                                                <div className="row">
-                                                    <div className="col-6">
-                                                        <div className="datePickerSection">
-                                                            <DatePicker
-                                                                className={`form-control border-0 bgcolor `}
-                                                                name="startDate"
-                                                                format="dd/MM/yyyy"
-                                                                value={ruleData.startDate}
-                                                                onChange={(date) => setRuleData(prev => ({ ...prev, startDate: date }))}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    <div className="col-6">
-                                                        <div className="timePickerSection">
-                                                            <input
-                                                                name="startTime"
-                                                                type="time"
-                                                                className={`form-control border-0 bgcolor`}
-                                                                id="actionTime"
-                                                                style={{ backgroundColor: '#f1f2f6', height: '42px', paddingInline: '10px' }}
-                                                                value={ruleData.startTime}
-                                                                onChange={(e) => setRuleData(prev => ({ ...prev, startTime: e.target.value }))}
-                                                            />
-                                                        </div>
-                                                    </div>
+                                            <div className="ruleScheduleField">
+                                                <label className="ruleFieldLabel">Start Date</label>
+                                                <div className="datePickerSection">
+                                                    <DatePicker
+                                                        className="ruleDatePicker"
+                                                        name="startDate"
+                                                        format="dd/MM/yyyy"
+                                                        value={ruleData.startDate}
+                                                        onChange={(date) => setRuleData(prev => ({ ...prev, startDate: date }))}
+                                                        clearIcon={null}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="ruleScheduleField">
+                                                <label className="ruleFieldLabel">Start Time</label>
+                                                <div className="timePickerSection">
+                                                    <input
+                                                        name="startTime"
+                                                        type="time"
+                                                        className="ruleTimeInput"
+                                                        id="actionStartTime"
+                                                        value={ruleData.startTime}
+                                                        onChange={(e) => setRuleData(prev => ({ ...prev, startTime: e.target.value }))}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="ruleScheduleField">
+                                                <label className="ruleFieldLabel">End Date</label>
+                                                <div className="datePickerSection">
+                                                    <DatePicker
+                                                        className="ruleDatePicker"
+                                                        name="endDate"
+                                                        format="dd/MM/yyyy"
+                                                        value={ruleData.endDate}
+                                                        onChange={(date) => setRuleData(prev => ({ ...prev, endDate: date }))}
+                                                        clearIcon={null}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="ruleScheduleField">
+                                                <label className="ruleFieldLabel">End Time</label>
+                                                <div className="timePickerSection">
+                                                    <input
+                                                        name="endTime"
+                                                        type="time"
+                                                        className="ruleTimeInput"
+                                                        id="actionEndTime"
+                                                        value={ruleData.endTime}
+                                                        onChange={(e) => setRuleData(prev => ({ ...prev, endTime: e.target.value }))}
+                                                    />
                                                 </div>
                                             </div>
                                         </div>
@@ -3053,7 +3099,7 @@ const DripMarketing = () => {
 #staticBackdropRuleModel input[type="text"]:focus {
     outline: none;
     border-color: #fc2b5a;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    box-shadow: 0 0 0 3px rgba(252, 43, 90, 0.12);
 }
 
 #staticBackdropRuleModel input[type="text"]::placeholder {
@@ -3061,37 +3107,161 @@ const DripMarketing = () => {
     font-style: italic;
 }
 
-/* Date and time picker styling */
-#staticBackdropRuleModel .datePickerSection,
-#staticBackdropRuleModel .timePickerSection {
-    margin-bottom: 15px;
+/* Rule header: name + schedule in one line */
+#staticBackdropRuleModel .ruleFormHeader {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 8px;
 }
 
-#staticBackdropRuleModel .datePickerSection .react-date-picker,
-#staticBackdropRuleModel input[type="time"] {
+#staticBackdropRuleModel .ruleFormHeaderInline {
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 12px;
+    flex-wrap: nowrap;
+    position: relative;
+    z-index: 20;
+}
+
+#staticBackdropRuleModel .ruleNameField {
+    flex: 1.4;
+    min-width: 0;
+}
+
+#staticBackdropRuleModel .ruleFormHeaderInline .ruleScheduleField {
+    flex: 1;
+    min-width: 0;
+}
+
+#staticBackdropRuleModel .ruleNameField input[type="text"] {
+    margin-bottom: 0;
+    border-radius: 8px;
+    height: 42px;
+    background: #fff;
+}
+
+#staticBackdropRuleModel .ruleFieldLabel {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #8a8f98;
+    margin-bottom: 6px;
+    white-space: nowrap;
+}
+
+#staticBackdropRuleModel .datePickerSection,
+#staticBackdropRuleModel .timePickerSection {
+    margin-bottom: 0;
+}
+
+#staticBackdropRuleModel .datePickerSection {
+    position: relative;
+    z-index: 21;
+}
+
+#staticBackdropRuleModel .ruleDatePicker.react-date-picker,
+#staticBackdropRuleModel .ruleTimeInput {
     width: 100%;
-    height: 40px;
+    height: 42px;
     border: 1px solid #e0e0e0;
     border-radius: 8px;
-    background: transparent;
-    padding: 0 15px;
+    background: #fff;
     transition: all 0.3s ease;
 }
+
+#staticBackdropRuleModel .ruleDatePicker .react-date-picker__wrapper {
+    height: 100%;
+    border: none !important;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+#staticBackdropRuleModel .ruleDatePicker .react-date-picker__inputGroup {
+    min-width: 0;
+    flex: 1;
+}
+
+#staticBackdropRuleModel .ruleDatePicker .react-date-picker__inputGroup__input {
+    outline: none;
+    color: #333;
+}
+
+#staticBackdropRuleModel .ruleDatePicker .react-date-picker__button {
+    padding: 0 2px;
+    margin: 0;
+}
+
+#staticBackdropRuleModel .ruleDatePicker .react-date-picker__button svg {
+    width: 16px;
+    height: 16px;
+    stroke: #8a8f98;
+}
+
+#staticBackdropRuleModel .ruleTimeInput {
+    padding: 0 12px;
+    font-size: 0.95rem;
+    color: #333;
+    box-shadow: none;
+}
+
+#staticBackdropRuleModel .ruleDatePicker.react-date-picker:focus-within,
+#staticBackdropRuleModel .ruleTimeInput:focus {
+    outline: none;
+    border-color: #fc2b5a;
+    box-shadow: 0 0 0 3px rgba(252, 43, 90, 0.12);
+}
+
 .react-date-picker__wrapper{
 height: 100%;
 }
 .react-calendar{
 width: 250px!important;
 }
+
+/* Keep date calendar above And/Or toggles */
+#staticBackdropRuleModel .react-date-picker__calendar,
+.react-date-picker__calendar {
+    z-index: 9999 !important;
+}
+
+#staticBackdropRuleModel .react-date-picker__calendar .react-calendar,
+.react-date-picker__calendar .react-calendar {
+    z-index: 9999 !important;
+    position: relative;
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+}
+
+/* Date and time picker styling (legacy fallback) */
+#staticBackdropRuleModel .datePickerSection .react-date-picker,
+#staticBackdropRuleModel input[type="time"] {
+    width: 100%;
+    height: 42px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: #fff;
+    padding: 0 12px;
+    transition: all 0.3s ease;
+}
+
 #staticBackdropRuleModel .datePickerSection .react-date-picker:focus-within,
 #staticBackdropRuleModel input[type="time"]:focus {
     border-color: #fc2b5a;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    box-shadow: 0 0 0 3px rgba(252, 43, 90, 0.12);
 }
 
 /* Tab styling */
 #staticBackdropRuleModel .tab_add_segment {
     margin: 25px 0;
+    position: relative;
+    z-index: 1;
 }
 
 #staticBackdropRuleModel .nav-tabs {
@@ -3494,13 +3664,32 @@ padding-left:5px;
     /* Date and time picker mobile */
     #staticBackdropRuleModel .datePickerSection,
     #staticBackdropRuleModel .timePickerSection {
-        margin-bottom: 10px;
+        margin-bottom: 0;
     }
-    
+
+    #staticBackdropRuleModel .ruleFormHeaderInline {
+        flex-wrap: wrap;
+        align-items: flex-end;
+    }
+
+    #staticBackdropRuleModel .ruleFormHeaderInline .ruleNameField {
+        flex: 1 1 100%;
+    }
+
+    #staticBackdropRuleModel .ruleFormHeaderInline .ruleScheduleField {
+        flex: 1 1 calc(50% - 6px);
+    }
+
+    #staticBackdropRuleModel .ruleDatePicker.react-date-picker,
+    #staticBackdropRuleModel .ruleTimeInput,
     #staticBackdropRuleModel .datePickerSection .react-date-picker,
     #staticBackdropRuleModel input[type="time"] {
         height: 38px;
         font-size: 14px;
+    }
+
+    #staticBackdropRuleModel .ruleNameField input[type="text"] {
+        height: 38px;
     }
     
     /* Tab navigation mobile */

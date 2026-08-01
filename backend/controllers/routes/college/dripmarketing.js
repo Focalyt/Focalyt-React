@@ -361,7 +361,7 @@ router.get('/leadowner', [isCollege], async (req, res) => {
 
 router.post('/create-dripmarketing-rule', [isCollege], async (req, res) => {
 	try {
-		let {name, startDate, startTime, conditionBlocks, interBlockLogicOperator, primaryAction, additionalActions, communication ,uiState, leadType} = req.body;
+		let {name, startDate, startTime, endDate, endTime, conditionBlocks, interBlockLogicOperator, primaryAction, additionalActions, communication ,uiState, leadType} = req.body;
 		
 		if(!name  || !startDate || !startTime || !conditionBlocks || !interBlockLogicOperator || !primaryAction || !additionalActions || !communication) {
 			return res.status(400).json({ success: false, message: 'All fields are required' });
@@ -374,9 +374,15 @@ router.post('/create-dripmarketing-rule', [isCollege], async (req, res) => {
 		const resolvedLeadType = leadType === 'b2b' ? 'b2b' : 'b2c';
 
 
-		const datePart = startDate.split("T")[0];  // "2025-09-20"
+		const datePart = (typeof startDate === 'string' ? startDate : new Date(startDate).toISOString()).split("T")[0];
 	const startDateTimeString = `${datePart}T${startTime}`;
 	const startDateTime = new Date(startDateTimeString);
+
+	let endDateTime = null;
+	if (endDate && endTime) {
+		const endDatePart = (typeof endDate === 'string' ? endDate : new Date(endDate).toISOString()).split("T")[0];
+		endDateTime = new Date(`${endDatePart}T${endTime}`);
+	}
 
 
 
@@ -384,6 +390,7 @@ router.post('/create-dripmarketing-rule', [isCollege], async (req, res) => {
 			name,
 			leadType: resolvedLeadType,
 			startDate: startDateTime,
+			...(endDateTime && { endDate: endDateTime }),
 			
 			conditionBlocks,
 			interBlockLogicOperator,
@@ -439,7 +446,7 @@ router.put('/status-update/:id', [isCollege], async (req, res) => {
 
 router.put('/update-dripmarketing-rule/:id', [isCollege], async (req, res) => {
 try{
-	let {name, startDate, startTime,  conditionBlocks, interBlockLogicOperator, primaryAction, additionalActions, communication ,uiState, leadType} = req.body;
+	let {name, startDate, startTime, endDate, endTime, conditionBlocks, interBlockLogicOperator, primaryAction, additionalActions, communication ,uiState, leadType} = req.body;
 
 	// console.log("req.body",req.body)
 	const collegeId = req.user.college._id;
@@ -449,13 +456,20 @@ try{
 	
 
 	
-	const datePart = startDate.split("T")[0];  // "2025-09-20"
+	const datePart = (typeof startDate === 'string' ? startDate : new Date(startDate).toISOString()).split("T")[0];
 	const startDateTimeString = `${datePart}T${startTime}`;
 	const startDateTime = new Date(startDateTimeString);
+
+	let endDateTime = null;
+	if (endDate && endTime) {
+		const endDatePart = (typeof endDate === 'string' ? endDate : new Date(endDate).toISOString()).split("T")[0];
+		endDateTime = new Date(`${endDatePart}T${endTime}`);
+	}
 
 	const updatePayload = {
 		name,
 		startDate: startDateTime,
+		endDate: endDateTime,
 		conditionBlocks,
 		interBlockLogicOperator,
 		primaryAction,
@@ -493,20 +507,32 @@ router.get('/get-dripmarketing-rule', [isCollege], async (req, res) => {
 		const dripMarketingRule = await DripMarketingRule.find(filter).populate('createdBy');
 		
 		// Format the data to separate date and time for frontend
+		const formatDateTime = (dateValue) => {
+			const date = new Date(dateValue);
+			const hours = date.getHours();
+			const minutes = date.getMinutes();
+			const ampm = hours >= 12 ? 'PM' : 'AM';
+			const displayHours = hours % 12 || 12;
+			return {
+				date: date.toISOString().split('T')[0],
+				time: `${displayHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${ampm}`
+			};
+		};
+
 		const formattedRules = dripMarketingRule.map(rule => {
 			const ruleObj = rule.toObject();
 			
 			
 			if (ruleObj.startDate) {
-				const startDate = new Date(ruleObj.startDate);
-				ruleObj.startDate = startDate.toISOString().split('T')[0]; // YYYY-MM-DD format
-				
-				
-				const hours = startDate.getHours();
-				const minutes = startDate.getMinutes();
-				const ampm = hours >= 12 ? 'PM' : 'AM';
-				const displayHours = hours % 12 || 12; 
-				ruleObj.startTime = `${displayHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+				const formatted = formatDateTime(ruleObj.startDate);
+				ruleObj.startDate = formatted.date;
+				ruleObj.startTime = formatted.time;
+			}
+
+			if (ruleObj.endDate) {
+				const formatted = formatDateTime(ruleObj.endDate);
+				ruleObj.endDate = formatted.date;
+				ruleObj.endTime = formatted.time;
 			}
 			
 			return ruleObj;

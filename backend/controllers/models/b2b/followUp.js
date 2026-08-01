@@ -5,7 +5,7 @@ const FollowUpSchema = new mongoose.Schema({
   leadId: { type: ObjectId, ref: 'B2BLead', required: true },
   followUpType: { type: String, required: true }, // Call, Email, Meeting, WhatsApp
   description: { type: String, required: true },
-  status: { type: String, required: true, default: 'Pending' }, // Pending, Completed, Rescheduled
+  status: { type: String, required: true, default: 'Pending' }, // Pending, Completed, Missed, Rescheduled
   scheduledDate: { type: Date },
   completedDate: { type: Date },
   addedBy: { type: ObjectId, ref: 'User', required: true }
