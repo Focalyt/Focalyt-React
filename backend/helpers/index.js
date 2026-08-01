@@ -504,14 +504,18 @@ module.exports.sendMail = async (subject, message, email) => {
     html: message,
   };
 
-  transporter.sendMail(mailOptions, async function (error, info) {
-    if (error) {
-      console.log(error);
-    } else {
-      console.log(info);
-      // res.redirect("/forgetpassword");
-      // return res.send({status:1})
-    }
+  console.log("[sendMail] Attempting send →", email, "| subject:", subject);
+
+  return new Promise((resolve, reject) => {
+    transporter.sendMail(mailOptions, function (error, info) {
+      if (error) {
+        console.error("[sendMail] FAILED →", email, "|", error.message || error);
+        reject(error);
+        return;
+      }
+      console.log("[sendMail] SUCCESS →", email, "|", info.response || info.messageId || "sent");
+      resolve(info);
+    });
   });
 };
 

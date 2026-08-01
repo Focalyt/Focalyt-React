@@ -1,15 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Check, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
 import axios from "axios";
 import FrontLayout from "../../../Component/Layouts/Front";
-
-const BENEFITS = [
-  "Career growth and practical learning",
-  "Supportive and collaborative team",
-  "Competitive salary and incentives",
-];
-
-const FILTER_TAGS = ["Location", "Full-time", "Salary range"];
 
 const APPLYING_FOR_OPTIONS = [
   "Graphic Designer Intern",
@@ -168,32 +160,11 @@ function Marketing() {
             <p className="mkt-sub">
               Join Focalyt and work on meaningful projects with real opportunities to learn and grow.
             </p>
-            <div className="mkt-tags" aria-label="Role highlights">
-              {FILTER_TAGS.map((tag) => (
-                <span key={tag} className="mkt-tag">
-                  {tag}
-                </span>
-              ))}
-            </div>
           </div>
         </section>
 
         <section className="mkt-body">
-          <div className="mkt-container mkt-body-grid">
-            <div className="mkt-why">
-              <h2 className="mkt-why-title">Why join Focalyt?</h2>
-              <ul className="mkt-benefits">
-                {BENEFITS.map((item) => (
-                  <li key={item}>
-                    <span className="mkt-check" aria-hidden>
-                      <Check size={14} strokeWidth={3} />
-                    </span>
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
+          <div className="mkt-container">
             <div className="mkt-form-card">
               <form className="mkt-form" onSubmit={handleSubmit} noValidate>
                 <div className="mkt-fields">
@@ -362,18 +333,19 @@ function Marketing() {
   background: var(--mkt-surface);
   color: var(--mkt-text);
   min-height: 100%;
-  padding-top: 88px;
+  padding-top: 72px;
   overflow-x: hidden;
 }
 .foc-marketing-page .mkt-container {
   width: 100%;
-  max-width: 720px;
+  max-width: 640px;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 16px;
 }
 .foc-marketing-page .mkt-hero {
   background: var(--mkt-purple-bg);
-  padding: 36px 0 40px;
+  padding: 28px 0 32px;
+  text-align: left;
 }
 .foc-marketing-page .mkt-badge {
   display: inline-flex;
@@ -386,96 +358,40 @@ function Marketing() {
   text-transform: uppercase;
   padding: 7px 12px;
   border-radius: 999px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 .foc-marketing-page .mkt-title {
   margin: 0;
-  font-size: clamp(1.75rem, 5vw, 2.35rem);
+  font-size: clamp(1.55rem, 6.2vw, 2.35rem);
   font-weight: 800;
   line-height: 1.2;
   letter-spacing: -0.02em;
   color: var(--mkt-text);
-  max-width: 18ch;
+  max-width: 20ch;
 }
 .foc-marketing-page .mkt-sub {
-  margin: 14px 0 0;
-  font-size: 15px;
+  margin: 12px 0 0;
+  font-size: clamp(14px, 3.8vw, 16px);
   line-height: 1.65;
   color: var(--mkt-muted);
   max-width: 42ch;
 }
-.foc-marketing-page .mkt-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 22px;
-}
-.foc-marketing-page .mkt-tag {
-  display: inline-flex;
-  align-items: center;
-  background: var(--mkt-surface);
-  border: 1px solid var(--mkt-border);
-  color: var(--mkt-text);
-  font-size: 13px;
-  font-weight: 500;
-  padding: 9px 14px;
-  border-radius: 10px;
-}
 .foc-marketing-page .mkt-body {
-  padding: 36px 0 28px;
+  padding: 24px 0 20px;
   background: var(--mkt-surface);
-}
-.foc-marketing-page .mkt-body-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 28px;
-}
-.foc-marketing-page .mkt-why-title {
-  margin: 0 0 18px;
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: var(--mkt-text);
-}
-.foc-marketing-page .mkt-benefits {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.foc-marketing-page .mkt-benefits li {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  font-size: 15px;
-  line-height: 1.45;
-  color: var(--mkt-text);
-  font-weight: 500;
-}
-.foc-marketing-page .mkt-check {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--mkt-purple);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 1px;
 }
 .foc-marketing-page .mkt-form-card {
+  width: 100%;
   background: var(--mkt-surface);
   border: 1px solid var(--mkt-border);
   border-radius: var(--mkt-radius);
-  padding: 22px 18px 20px;
+  padding: 18px 14px 16px;
   box-shadow: 0 8px 28px rgba(26, 29, 46, 0.04);
 }
 .foc-marketing-page .mkt-fields {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 16px;
+  gap: 14px;
 }
 .foc-marketing-page .mkt-field label {
   display: block;
@@ -503,13 +419,14 @@ function Marketing() {
 .foc-marketing-page .mkt-field input,
 .foc-marketing-page .mkt-field select {
   width: 100%;
+  max-width: 100%;
   appearance: none;
   -webkit-appearance: none;
   border: 1px solid var(--mkt-border);
   border-radius: var(--mkt-radius-sm);
   background: #fafafa;
   color: var(--mkt-text);
-  font-size: 15px;
+  font-size: 16px;
   font-family: inherit;
   padding: 12px 14px;
   transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
@@ -545,8 +462,8 @@ function Marketing() {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  min-height: 108px;
-  padding: 20px 16px;
+  min-height: 100px;
+  padding: 18px 14px;
   border: 1.5px dashed #d1d5db;
   border-radius: var(--mkt-radius-sm);
   background: #fafafa;
@@ -564,13 +481,15 @@ function Marketing() {
   margin-bottom: 4px;
 }
 .foc-marketing-page .mkt-upload-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
   letter-spacing: .04em;
   text-transform: uppercase;
   color: var(--mkt-purple);
   word-break: break-word;
+  overflow-wrap: anywhere;
   max-width: 100%;
+  text-align: center;
 }
 .foc-marketing-page .mkt-upload-hint {
   font-size: 12px;
@@ -578,19 +497,20 @@ function Marketing() {
 }
 .foc-marketing-page .mkt-submit {
   width: 100%;
-  margin-top: 18px;
+  margin-top: 16px;
   border: none;
   border-radius: var(--mkt-radius-sm);
   background: var(--mkt-purple);
   color: #fff;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
   letter-spacing: .06em;
   text-transform: uppercase;
-  padding: 14px 18px;
+  padding: 14px 16px;
   cursor: pointer;
   transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 .foc-marketing-page .mkt-submit:hover:not(:disabled) {
   transform: translateY(-1px);
@@ -605,21 +525,37 @@ function Marketing() {
   text-align: center;
   font-size: 12px;
   color: var(--mkt-muted);
+  line-height: 1.4;
+  padding: 0 4px;
 }
 .foc-marketing-page .mkt-page-footer {
   border-top: 1px solid var(--mkt-border);
-  padding: 18px 0 28px;
+  padding: 16px 0 28px;
   text-align: center;
 }
 .foc-marketing-page .mkt-page-footer p {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--mkt-muted);
+  line-height: 1.4;
+}
+
+@media (min-width: 480px) {
+  .foc-marketing-page .mkt-container {
+    padding: 0 20px;
+  }
+  .foc-marketing-page .mkt-form-card {
+    padding: 22px 18px 20px;
+  }
 }
 
 @media (min-width: 640px) {
+  .foc-marketing-page {
+    padding-top: 80px;
+  }
   .foc-marketing-page .mkt-container {
     padding: 0 28px;
+    max-width: 720px;
   }
   .foc-marketing-page .mkt-hero {
     padding: 48px 0 52px;
@@ -627,53 +563,55 @@ function Marketing() {
   .foc-marketing-page .mkt-title {
     max-width: none;
   }
+  .foc-marketing-page .mkt-body {
+    padding: 36px 0 28px;
+  }
   .foc-marketing-page .mkt-form-card {
     padding: 28px 26px 24px;
   }
   .foc-marketing-page .mkt-fields {
     grid-template-columns: 1fr 1fr;
+    gap: 16px;
   }
   .foc-marketing-page .mkt-field--full {
     grid-column: 1 / -1;
+  }
+  .foc-marketing-page .mkt-field input,
+  .foc-marketing-page .mkt-field select {
+    font-size: 15px;
+  }
+  .foc-marketing-page .mkt-submit {
+    font-size: 14px;
+    padding: 14px 18px;
   }
 }
 
 @media (min-width: 900px) {
   .foc-marketing-page .mkt-container {
-    max-width: 980px;
+    max-width: 760px;
   }
   .foc-marketing-page .mkt-body {
     padding: 48px 0 40px;
   }
-  .foc-marketing-page .mkt-body-grid {
-    grid-template-columns: minmax(240px, 0.9fr) minmax(320px, 1.1fr);
-    gap: 40px;
-    align-items: start;
-  }
-  .foc-marketing-page .mkt-why {
-    padding-top: 8px;
-  }
-  .foc-marketing-page .mkt-why-title {
-    font-size: 1.4rem;
-  }
-  .foc-marketing-page .mkt-form-card {
-    max-width: 560px;
-    margin-left: auto;
-  }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 379px) {
   .foc-marketing-page {
-    padding-top: 72px;
+    padding-top: 64px;
   }
   .foc-marketing-page .mkt-hero {
-    padding: 28px 0 32px;
+    padding: 22px 0 26px;
   }
   .foc-marketing-page .mkt-container {
-    padding: 0 16px;
+    padding: 0 12px;
   }
   .foc-marketing-page .mkt-form-card {
-    padding: 18px 14px 16px;
+    padding: 14px 12px 14px;
+    border-radius: 10px;
+  }
+  .foc-marketing-page .mkt-submit {
+    letter-spacing: .04em;
+    font-size: 12px;
   }
 }
       `}</style>
