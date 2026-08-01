@@ -11,6 +11,16 @@ const BENEFITS = [
 
 const FILTER_TAGS = ["Location", "Full-time", "Salary range"];
 
+const APPLYING_FOR_OPTIONS = [
+  "Graphic Designer Intern",
+  "Field Sales Executive",
+  "Solar Panel Trainer Installation Technician",
+  "Agriculture Trainer Extension Promoter",
+  "AI Trainer",
+  "Industry Trainer for Home Service Appliance",
+  "Electrical/Electronics Engineer for Telecom Training",
+];
+
 const MAX_CV_BYTES = 5 * 1024 * 1024;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MOBILE_RE = /^[6-9]\d{9}$/;
@@ -127,9 +137,7 @@ function Marketing() {
         submissionData.append("city", formData.city.trim());
         submissionData.append("applyingFor", formData.applyingFor.trim());
         submissionData.append("experience", formData.experience.trim());
-        // Primary field for new API + alias for older production handlers
         submissionData.append("resume", formData.resume);
-        submissionData.append("cv", formData.resume);
 
         await axios.post(`${backendUrl}/career`, submissionData);
         alert("Application submitted successfully!");
@@ -258,15 +266,22 @@ function Marketing() {
                     <label htmlFor="mkt-role">
                       Applying for <span className="mkt-req" aria-hidden>*</span>
                     </label>
-                    <input
+                    <select
                       id="mkt-role"
                       name="applyingFor"
-                      type="text"
                       required
-                      placeholder="Enter job role"
                       value={formData.applyingFor}
                       onChange={handleChange}
-                    />
+                    >
+                      <option value="" disabled>
+                        Select job role
+                      </option>
+                      {APPLYING_FOR_OPTIONS.map((role) => (
+                        <option key={role} value={role}>
+                          {role}
+                        </option>
+                      ))}
+                    </select>
                     {errors.applyingFor ? <p className="mkt-error">{errors.applyingFor}</p> : null}
                   </div>
 
@@ -481,10 +496,12 @@ function Marketing() {
   line-height: 1.35;
 }
 .foc-marketing-page .mkt-field.has-error input,
+.foc-marketing-page .mkt-field.has-error select,
 .foc-marketing-page .mkt-field.has-error .mkt-upload {
   border-color: rgba(225, 29, 72, 0.55);
 }
-.foc-marketing-page .mkt-field input {
+.foc-marketing-page .mkt-field input,
+.foc-marketing-page .mkt-field select {
   width: 100%;
   appearance: none;
   -webkit-appearance: none;
@@ -497,12 +514,27 @@ function Marketing() {
   padding: 12px 14px;
   transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
 }
+.foc-marketing-page .mkt-field select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 40px;
+  cursor: pointer;
+}
+.foc-marketing-page .mkt-field select:invalid,
+.foc-marketing-page .mkt-field select option[value=""] {
+  color: #9ca3af;
+}
+.foc-marketing-page .mkt-field select option {
+  color: var(--mkt-text);
+}
 .foc-marketing-page .mkt-field input::placeholder {
   color: #9ca3af;
 }
-.foc-marketing-page .mkt-field input:focus {
+.foc-marketing-page .mkt-field input:focus,
+.foc-marketing-page .mkt-field select:focus {
   outline: none;
-  background: #fff;
+  background-color: #fff;
   border-color: rgba(107, 78, 255, 0.45);
   box-shadow: 0 0 0 3px rgba(107, 78, 255, 0.12);
 }

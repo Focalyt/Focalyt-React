@@ -228,7 +228,6 @@ const Layout = () => {
         <Route exact path="/joblisting" element={<Jobs />} />
         <Route exact path="/jobdetailsmore/:jobId" element={<JobDetails />} />
         <Route exact path="/contact" element={<Contact />} />
-        <Route exact path="/careers" element={<Marketing />} />
         <Route exact path="/marketing" element={<Marketing />} />
         <Route exact path="/coursedetails/:courseId" element={<CourseDetails />} />
         <Route exact path="/cmp/login" element={<CompanyLogin />} />
