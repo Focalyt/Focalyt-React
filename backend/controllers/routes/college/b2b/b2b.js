@@ -606,6 +606,12 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 	 * Email both lead owner and co-owner when a B2B lead is updated.
 	 * Failures are logged only — they must not block the API response.
 	 */
+	const loadLeadForEmailNotify = (leadId) =>
+		Lead.findById(leadId)
+			.select('businessName concernPersonName mobile email leadOwner leadCoOwner')
+			.populate('leadOwner', 'name email')
+			.populate('leadCoOwner', 'name email');
+
 	const notifyLeadOwnerAndCoOwner = async ({ lead, changedBy, changeType, changeDetails }) => {
 		try {
 			if (!lead) return;
@@ -4086,6 +4092,15 @@ router.put('/leads/:id/approval', isCollege, async (req, res) => {
 			.populate('leadOwner', 'name email')
 			.populate('leadCoOwner', 'name email');
 
+		notifyLeadOwnerAndCoOwner({
+			lead: updatedLead,
+			changedBy: req.user,
+			changeType: 'Lead approval updated',
+			changeDetails: normalized === 'REJECTED'
+				? `Lead approval set to REJECTED${lead.approval?.rejectionReason ? ` | Reason: ${lead.approval.rejectionReason}` : ''}`
+				: 'Lead approval set to APPROVED',
+		});
+
 		return res.json({ status: true, data: updatedLead, message: 'Lead approval updated successfully' });
 	} catch (error) {
 		console.error('Error updating lead approval:', error);
@@ -4138,6 +4153,14 @@ router.post('/leads/:id/documents', isCollege, async (req, res) => {
 		});
 
 		await lead.save();
+
+		const notifyLead = await loadLeadForEmailNotify(lead._id);
+		notifyLeadOwnerAndCoOwner({
+			lead: notifyLead || lead,
+			changedBy: req.user,
+			changeType: 'Document uploaded',
+			changeDetails: `Document uploaded${doc.docType ? ` (${doc.docType})` : ''}: ${doc.name || 'document'}`,
+		});
 
 		return res.status(201).json({
 			status: true,
@@ -4192,6 +4215,15 @@ router.put('/leads/:id/documents/:docId/status', isCollege, async (req, res) => 
 		});
 
 		await lead.save();
+
+		const notifyLead = await loadLeadForEmailNotify(lead._id);
+		notifyLeadOwnerAndCoOwner({
+			lead: notifyLead || lead,
+			changedBy: req.user,
+			changeType: 'Document status updated',
+			changeDetails: `Document status set to ${normalized}${doc.docType ? ` (${doc.docType})` : ''}: ${doc.name || 'document'}`,
+		});
+
 		return res.json({ status: true, data: doc, message: 'Document status updated successfully' });
 	} catch (error) {
 		console.error('Error updating document status:', error);
@@ -5197,6 +5229,15 @@ router.post('/leads/:id/followup', isCollege, async (req, res) => {
 
 		await savedFollowUp.populate('addedBy', 'name email');
 
+		const notifyLead = await loadLeadForEmailNotify(req.params.id);
+		const followupDateLabel = scheduledDateTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+		notifyLeadOwnerAndCoOwner({
+			lead: notifyLead || lead,
+			changedBy: req.user,
+			changeType: 'Follow-up scheduled',
+			changeDetails: `${normalizedType} follow-up scheduled for ${followupDateLabel}${remarks ? ` | Remarks: ${remarks}` : ''}`,
+		});
+
 		res.status(201).json({
 			status: true,
 			data: {
@@ -5246,6 +5287,15 @@ router.put('/leads/:id/followup/:followUpId', isCollege, async (req, res) => {
 				message: 'Follow-up not found'
 			});
 		}
+
+		const notifyLead = await loadLeadForEmailNotify(req.params.id);
+		const followupType = updatedFollowUp.followUpType || 'Follow-up';
+		notifyLeadOwnerAndCoOwner({
+			lead: notifyLead || lead,
+			changedBy: req.user,
+			changeType: 'Follow-up status updated',
+			changeDetails: `${followupType} follow-up status set to ${status || 'updated'}`,
+		});
 
 		res.json({
 			status: true,
@@ -6755,6 +6805,14 @@ router.post('/refer-lead', isCollege, async (req, res) => {
 			return res.status(404).json({ status: false, message: 'Lead not found' });
 		}
 
+		const notifyLead = await loadLeadForEmailNotify(leadId);
+		notifyLeadOwnerAndCoOwner({
+			lead: notifyLead,
+			changedBy: user,
+			changeType: 'Lead referred',
+			changeDetails: `Lead referred from ${oldName} to ${newName}`,
+		});
+
 		return res.status(200).json({
 			status: true,
 			message: 'Lead referred successfully'
@@ -6849,6 +6907,24 @@ router.post('/refer-leads', isCollege, async (req, res) => {
 		const result = await Lead.bulkWrite(ops, { ordered: false });
 		const matched = result?.matchedCount ?? 0;
 		const modified = result?.modifiedCount ?? 0;
+
+		// Notify owner/co-owner for each referred lead (fire-and-forget per lead)
+		Promise.all(
+			leads.map(async (leadItem) => {
+				const notifyLead = await loadLeadForEmailNotify(leadItem._id);
+				const oldName = leadItem.leadOwner
+					? (oldOwnerNameById.get(String(leadItem.leadOwner)) || 'Unknown')
+					: 'Unassigned';
+				return notifyLeadOwnerAndCoOwner({
+					lead: notifyLead,
+					changedBy: user,
+					changeType: 'Lead referred',
+					changeDetails: `Lead referred from ${oldName} to ${newName}`,
+				});
+			})
+		).catch((err) => {
+			console.error('[B2B Email Notify] Bulk refer notify error:', err?.message || err);
+		});
 
 		return res.status(200).json({
 			status: true,
