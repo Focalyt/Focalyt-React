@@ -419,27 +419,29 @@ const FrontHeader = () => {
 
           </div>
 
-          <div className="container">
-            <nav className="front-subtabs" aria-label="Homepage sections">
-              <div className="front-subtabs__scroller">
-                {SUB_TABS.map((tab) => {
-                  const Icon = tab.icon;
-                  return (
-                    <a
-                      key={tab.label}
-                      href={`/#${tab.sectionId}`}
-                      className="front-subtabs__tab"
-                      onClick={(e) => handleSubTabClick(e, tab)}
-                      aria-label={tab.label}
-                    >
-                      <Icon className="front-subtabs__icon" aria-hidden="true" size={14} strokeWidth={2.1} />
-                      <span>{tab.label}</span>
-                    </a>
-                  );
-                })}
-              </div>
-            </nav>
-          </div>
+          {isHomePage() ? (
+            <div className="container front-subtabs-wrap">
+              <nav className="front-subtabs" aria-label="Homepage sections">
+                <div className="front-subtabs__scroller">
+                  {SUB_TABS.map((tab) => {
+                    const Icon = tab.icon;
+                    return (
+                      <a
+                        key={tab.label}
+                        href={`/#${tab.sectionId}`}
+                        className="front-subtabs__tab"
+                        onClick={(e) => handleSubTabClick(e, tab)}
+                        aria-label={tab.label}
+                      >
+                        <Icon className="front-subtabs__icon" aria-hidden="true" size={14} strokeWidth={2.1} />
+                        <span>{tab.label}</span>
+                      </a>
+                    );
+                  })}
+                </div>
+              </nav>
+            </div>
+          ) : null}
         </header>
         {/* Floating side tabs — hidden for now
         <nav className="floating-side-tabs" aria-label="Quick links">

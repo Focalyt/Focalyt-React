@@ -595,6 +595,123 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 		return College.findOne({ '_concernPerson._id': userId });
 	};
 
+	const escapeHtml = (value) =>
+		String(value ?? '')
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;');
+
+	/**
+	 * Email both lead owner and co-owner when a B2B lead is updated.
+	 * Failures are logged only — they must not block the API response.
+	 */
+	const notifyLeadOwnerAndCoOwner = async ({ lead, changedBy, changeType, changeDetails }) => {
+		try {
+			if (!lead) return;
+
+			const resolveUser = async (ref) => {
+				if (!ref) return null;
+				if (typeof ref === 'object' && (ref.email || ref.name)) {
+					return { name: ref.name || 'User', email: ref.email || '' };
+				}
+				const id = typeof ref === 'object' ? ref._id : ref;
+				if (!id || !mongoose.Types.ObjectId.isValid(String(id))) return null;
+				const user = await User.findById(id).select('name email').lean();
+				return user ? { name: user.name || 'User', email: user.email || '' } : null;
+			};
+
+			const [owner, coOwner] = await Promise.all([
+				resolveUser(lead.leadOwner),
+				resolveUser(lead.leadCoOwner),
+			]);
+
+			const recipientMap = new Map();
+			for (const person of [owner, coOwner]) {
+				const email = String(person?.email || '').trim().toLowerCase();
+				if (email) recipientMap.set(email, person.email.trim());
+			}
+
+			const recipients = [...recipientMap.values()];
+			if (!recipients.length) return;
+
+			const businessName = lead.businessName || 'B2B Lead';
+			const changedByName = changedBy?.name || 'A user';
+			const subject = `B2B Lead Updated: ${businessName}`;
+			const detailsText = changeDetails || changeType || 'Lead details were updated';
+
+			const message = `
+				<div style="font-family: Arial, sans-serif; color: #222; line-height: 1.5;">
+					<p>Hello,</p>
+					<p>
+						<strong>${escapeHtml(changedByName)}</strong> updated a B2B lead
+						<strong>${escapeHtml(businessName)}</strong>.
+					</p>
+					<p><strong>Change:</strong> ${escapeHtml(detailsText)}</p>
+					<ul>
+						<li><strong>Concern Person:</strong> ${escapeHtml(lead.concernPersonName || 'N/A')}</li>
+						<li><strong>Mobile:</strong> ${escapeHtml(lead.mobile || 'N/A')}</li>
+						<li><strong>Email:</strong> ${escapeHtml(lead.email || 'N/A')}</li>
+						<li><strong>Owner:</strong> ${escapeHtml(owner?.name || 'N/A')}</li>
+						<li><strong>Co-owner:</strong> ${escapeHtml(coOwner?.name || 'N/A')}</li>
+					</ul>
+					<p style="color:#666;font-size:12px;">This is an automated notification from Focalyt Portal.</p>
+				</div>
+			`;
+
+			await Promise.all(
+				recipients.map((email) =>
+					Promise.resolve(sendMail(subject, message, email)).catch((err) => {
+						console.error('[B2B] Failed to notify owner/co-owner:', email, err?.message || err);
+					})
+				)
+			);
+		} catch (error) {
+			console.error('[B2B] notifyLeadOwnerAndCoOwner error:', error?.message || error);
+		}
+	};
+
+	const buildLeadFieldChangeSummary = (existingLead, updatePayload) => {
+		const fieldLabels = {
+			leadCategory: 'Lead Category',
+			leadRanking: 'Lead Ranking',
+			b2bProject: 'B2B Project',
+			b2bDepartment: 'B2B Department',
+			typeOfB2B: 'Type of B2B',
+			businessName: 'Business Name',
+			address: 'Address',
+			city: 'City',
+			state: 'State',
+			concernPersonName: 'Concern Person',
+			designation: 'Designation',
+			email: 'Email',
+			mobile: 'Mobile',
+			whatsapp: 'WhatsApp',
+			leadOwner: 'Lead Owner',
+			leadCoOwner: 'Lead Co-owner',
+			landlineNumber: 'Landline',
+			remark: 'Remark',
+		};
+
+		const changed = [];
+		for (const [key, label] of Object.entries(fieldLabels)) {
+			if (updatePayload[key] === undefined) continue;
+			const oldVal = existingLead?.[key];
+			const newVal = updatePayload[key];
+			const oldCmp = oldVal == null ? '' : String(oldVal);
+			const newCmp = newVal == null ? '' : String(newVal);
+			if (oldCmp !== newCmp) changed.push(label);
+		}
+
+		if (updatePayload.coordinates !== undefined) {
+			const oldCoords = JSON.stringify(existingLead?.coordinates || null);
+			const newCoords = JSON.stringify(updatePayload.coordinates || null);
+			if (oldCoords !== newCoords) changed.push('Coordinates');
+		}
+
+		return changed.length ? `Updated fields: ${changed.join(', ')}` : 'Lead details were updated';
+	};
+
 	const tryFindStatusByTitleOrMilestone = async ({ collegeId, title, milestone }) => {
 		const query = {
 			$or: [
@@ -4320,6 +4437,17 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			.populate('leadOwner', 'name email')
 			.populate('leadCoOwner', 'name email');
 
+		const statusChangeDetails = statusChanged
+			? `Status changed from ${oldStatusName} (${oldSubStatusName}) to ${newStatusName} (${newSubStatusName})`
+			: (remarks ? `Remarks updated for ${newStatusName} (${newSubStatusName})` : `Status update on ${newStatusName}`);
+
+		notifyLeadOwnerAndCoOwner({
+			lead: updatedLead,
+			changedBy: req.user,
+			changeType: 'Lead status updated',
+			changeDetails: statusChangeDetails,
+		});
+
 		console.log('[B2B Update Status] Step 10: Success - sending response');
 		res.json({
 			status: true,
@@ -4802,6 +4930,7 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 		}
 
 		// Update lead
+		const changeSummary = buildLeadFieldChangeSummary(existingLead, updatePayload);
 		const updatedLead = await Lead.findByIdAndUpdate(
 			req.params.id,
 			updatePayload,
@@ -4816,6 +4945,13 @@ router.put('/leads/:id', isCollege, async (req, res) => {
 			{ path: 'leadOwner', select: 'name email' },
 			{ path: 'leadCoOwner', select: 'name email' },
 		]);
+
+		notifyLeadOwnerAndCoOwner({
+			lead: updatedLead,
+			changedBy: req.user,
+			changeType: 'Lead details updated',
+			changeDetails: changeSummary,
+		});
 
 		res.json({
 			status: true,
