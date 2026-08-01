@@ -626,6 +626,14 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 				resolveUser(lead.leadCoOwner),
 			]);
 
+			console.log('[B2B Email Notify] ========== START ==========');
+			console.log('[B2B Email Notify] Lead:', lead.businessName || lead._id);
+			console.log('[B2B Email Notify] Lead ID:', String(lead._id || ''));
+			console.log('[B2B Email Notify] Changed by:', changedBy?.name || changedBy?._id || 'Unknown');
+			console.log('[B2B Email Notify] Change:', changeDetails || changeType || 'Lead updated');
+			console.log('[B2B Email Notify] Owner:', owner ? `${owner.name} <${owner.email || 'NO EMAIL'}>` : 'N/A');
+			console.log('[B2B Email Notify] Co-owner:', coOwner ? `${coOwner.name} <${coOwner.email || 'NO EMAIL'}>` : 'N/A');
+
 			const recipientMap = new Map();
 			for (const person of [owner, coOwner]) {
 				const email = String(person?.email || '').trim().toLowerCase();
@@ -633,7 +641,13 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 			}
 
 			const recipients = [...recipientMap.values()];
-			if (!recipients.length) return;
+			if (!recipients.length) {
+				console.log('[B2B Email Notify] SKIPPED — no owner/co-owner email found');
+				console.log('[B2B Email Notify] ========== END ==========');
+				return;
+			}
+
+			console.log('[B2B Email Notify] Recipients:', recipients.join(', '));
 
 			const businessName = lead.businessName || 'B2B Lead';
 			const changedByName = changedBy?.name || 'A user';
@@ -660,14 +674,19 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 			`;
 
 			await Promise.all(
-				recipients.map((email) =>
-					Promise.resolve(sendMail(subject, message, email)).catch((err) => {
-						console.error('[B2B] Failed to notify owner/co-owner:', email, err?.message || err);
-					})
-				)
+				recipients.map(async (email) => {
+					try {
+						console.log('[B2B Email Notify] Sending to:', email);
+						await sendMail(subject, message, email);
+						console.log('[B2B Email Notify] Sent OK to:', email);
+					} catch (err) {
+						console.error('[B2B Email Notify] FAILED for:', email, err?.message || err);
+					}
+				})
 			);
+			console.log('[B2B Email Notify] ========== END ==========');
 		} catch (error) {
-			console.error('[B2B] notifyLeadOwnerAndCoOwner error:', error?.message || error);
+			console.error('[B2B Email Notify] ERROR:', error?.message || error);
 		}
 	};
 
