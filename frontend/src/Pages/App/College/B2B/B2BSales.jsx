@@ -9325,6 +9325,19 @@ const renderWhatsAppPanel = () => {
                                 <div className="lhm__pills">
                                   <button
                                     type="button"
+                                    className={`lead-meta-v2__pill${leadDetailsVisible === leadIndex ? ' is-open' : ''}`}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      toggleLeadDetails(leadIndex);
+                                    }}
+                                    title={leadDetailsVisible === leadIndex ? 'Close' : 'Open'}
+                                    aria-label={leadDetailsVisible === leadIndex ? 'Close lead details' : 'Open lead details'}
+                                  >
+                                    <i className={leadDetailsVisible === leadIndex ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
+                                  </button>
+                                  <button
+                                    type="button"
                                     className="lead-meta-v2__pill"
                                     onClick={() => openRefferPanel(lead, 'Reffer')}
                                     title="Refer"
@@ -10209,6 +10222,23 @@ const renderWhatsAppPanel = () => {
                 </div>
                 <div className="modal-body p-3">
                   <div className="d-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <button
+                      type="button"
+                      className="lead-meta-v2__action-btn"
+                      onClick={() => {
+                        const l = mobileMoreLead;
+                        setMobileMoreLead(null);
+                        const idx = leadDisplayGroups.findIndex((g) =>
+                          (g.leads || []).some((item) => String(item._id) === String(l?._id))
+                        );
+                        if (idx >= 0) toggleLeadDetails(idx);
+                      }}
+                      title="Open lead details"
+                    >
+                      <i className="fas fa-folder-open"></i>
+                      Open
+                    </button>
+
                     <button
                       type="button"
                       className="lead-meta-v2__action-btn"
@@ -12575,7 +12605,13 @@ const renderWhatsAppPanel = () => {
       display: none;
     }
     .lead-header-v2__float-wa{
-      right: 10px; /* expand is hidden on mobile */
+      right: 10px;
+      top: -17px;
+    }
+    .lhm__pills .lead-meta-v2__pill.is-open{
+      background: rgba(255,255,255,0.95);
+      color: #0b5ed7;
+      border-color: rgba(255,255,255,0.95);
     }
   }
 

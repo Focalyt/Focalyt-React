@@ -5,7 +5,7 @@ import DatePicker from 'react-date-picker';
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
-
+import { resolveMediaUrl } from '../../../../../utils/resolveMediaUrl';
 import Student from '../../../../Layouts/App/College/ProjectManagement/Student';
 const useNavHeight = (dependencies = []) => {
   const navRef = useRef(null);
@@ -1575,6 +1575,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     });
   };
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
+  const getDocFileUrl = (fileUrl) => resolveMediaUrl(bucketUrl, fileUrl);
 
 
   const [user, setUser] = useState({
@@ -2588,7 +2589,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                             <input className="form-check-input" type="checkbox" />
                                           </div>
                                           <div className="me-3">
-                                            <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
+                                            <div className="circular-progress-container" data-percent={profile.docCounts?.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
                                               <svg width="40" height="40">
                                                 <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
                                                 <circle className="circle-progress" cx="20" cy="20" r="16"></circle>
@@ -3209,7 +3210,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                                 <div className="resume-profile-section">
                                                   {user?.image ? (
                                                     <img
-                                                      src={`${bucketUrl}/${user.image}`}
+                                                      src={resolveMediaUrl(bucketUrl, user.image)}
                                                       alt="Profile"
                                                       className="resume-profile-image"
                                                     />
@@ -3761,7 +3762,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                                             {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
                                                               <>
                                                                 {(() => {
-                                                                  const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
+                                                                  const fileUrl = getDocFileUrl(latestUpload?.fileUrl || doc.fileUrl);
                                                                   const fileType = getFileType(fileUrl);
 
                                                                   if (fileType === 'image') {

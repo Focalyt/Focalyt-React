@@ -14798,20 +14798,19 @@ useEffect(() => {
               margin-top: 0 !important;
               padding-top: 8px !important;
             }
-            .adm-cycle-toolbar__outer,
-            .adm-cycle-toolbar__inner,
-            .adm-cycle-toolbar__actions{
-              width: auto;
-            }
             .adm-cycle-toolbar__outer{
-              flex-direction: row !important;
-              flex-wrap: nowrap !important;
-              align-items: center !important;
+              width: 100%;
+              flex-direction: column !important;
+              flex-wrap: wrap !important;
+              align-items: stretch !important;
               gap: 8px !important;
             }
             .adm-cycle-toolbar__actions{
               display: flex !important;
-              flex: 1 1 auto !important;
+              width: auto !important;
+              max-width: 100%;
+              align-self: flex-start !important;
+              flex: 0 0 auto !important;
               flex-wrap: nowrap !important;
               overflow-x: auto;
               overflow-y: hidden;
@@ -14824,44 +14823,55 @@ useEffect(() => {
               display: none;
             }
             .adm-cycle-toolbar__actions .btn{
-              flex: 0 0 auto;
+              flex: 0 0 auto !important;
+              width: auto !important;
+              max-width: none !important;
+              white-space: nowrap;
             }
             .adm-cycle-toolbar__inner{
-              display: flex !important;
+              display: grid !important;
+              grid-template-columns: 1fr auto auto;
               flex: 0 0 auto !important;
               flex-wrap: nowrap !important;
               align-items: center;
               gap: 8px !important;
               margin-left: 0 !important;
+              width: 100% !important;
             }
             .adm-cycle-search{
-              width: auto;
-              min-width: 0;
+              width: 100% !important;
+              min-width: 0 !important;
             }
             .adm-cycle-search .form-control{
-              width: 120px !important;
-              min-width: 100px !important;
+              width: 100% !important;
+              min-width: 0 !important;
               height: 38px;
               font-size: 13px !important;
             }
             .adm-cycle-action-btn{
-              width: auto;
+              width: auto !important;
               min-width: 82px;
               min-height: 38px;
               padding: 8px 10px !important;
               border-radius: 8px !important;
               font-size: 12px !important;
               font-weight: 700 !important;
+              white-space: nowrap;
             }
             .adm-cycle-action-btn i{
               margin-right: 0 !important;
             }
-            @media (max-width: 360px){
+            @media (max-width: 400px){
               .adm-cycle-toolbar__inner{
+                grid-template-columns: 1fr 1fr;
                 gap: 6px !important;
               }
+              .adm-cycle-search{
+                grid-column: 1 / -1;
+              }
               .adm-cycle-action-btn{
-                min-width: 74px;
+                width: 100% !important;
+                min-width: 0;
                 padding-inline: 8px !important;
                 font-size: 11px !important;
               }
@@ -14946,7 +14956,7 @@ useEffect(() => {
                   </div>
 
                   <div className="col-12 mt-1 pt-1 border-top adm-cycle-toolbar" style={{ borderColor: '#eee' }}>
-                    <div className="adm-cycle-toolbar__outer d-flex flex-nowrap gap-2 align-items-center justify-content-between">
+                    <div className="adm-cycle-toolbar__outer d-flex gap-2 align-items-center justify-content-between">
                       <div className="adm-cycle-toolbar__actions d-flex flex-nowrap gap-2 align-items-center">
                         {showBulkInputs ? (
                           <div style={{
@@ -15147,7 +15157,7 @@ useEffect(() => {
                           </>
                         )}
                       </div>
-                      <div className="adm-cycle-toolbar__inner d-flex align-items-center gap-2 flex-nowrap">
+                      <div className="adm-cycle-toolbar__inner d-flex align-items-center gap-2">
                             <div className="position-relative adm-cycle-search">
                               <input
                                 type="text"
@@ -15161,7 +15171,7 @@ useEffect(() => {
                                 }}
                                 style={{
                                   width: isMobile ? '100%' : '200px',
-                                  minWidth: '140px',
+                                  minWidth: isMobile ? 0 : '140px',
                                   paddingRight: '30px',
                                   paddingLeft: '12px',
                                   paddingTop: '8px',
@@ -16317,7 +16327,7 @@ useEffect(() => {
                                           />
                                         </label>
                                         <div className="lhm__doc" title="Docs completion">
-                                          <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
+                                          <div className="circular-progress-container" data-percent={profile.docCounts?.totalRequired > 0 ? profile.docCounts?.uploadPercentage : 'NA'}>
                                             <svg width="34" height="34">
                                               <circle className="circle-bg" cx="17" cy="17" r="14"></circle>
                                               <circle className="circle-progress" cx="17" cy="17" r="14"></circle>
@@ -16634,7 +16644,7 @@ useEffect(() => {
                                                 {profile._candidate?.name || 'N/A'}
                                               </div>
                                               <div className="lead-strip-v3__doc" title="Docs completion">
-                                                <div className="circular-progress-container" data-percent={profile.docCounts?.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
+                                                <div className="circular-progress-container" data-percent={profile.docCounts?.totalRequired > 0 ? profile.docCounts?.uploadPercentage : 'NA'}>
                                                   <svg width="28" height="28">
                                                     <circle className="circle-bg" cx="14" cy="14" r="11"></circle>
                                                     <circle className="circle-progress" cx="14" cy="14" r="11"></circle>

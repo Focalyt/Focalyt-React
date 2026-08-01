@@ -28,6 +28,7 @@ import MyAchievement from './Pages/App/Candidate/Earning/MyAchievement';
 
 import "./App.css";
 // import CompanyLogin from './Component/Layouts/App/Company/CompanyLogin';
+import Whatsapp from './Pages/App/College/B2B/WhatsApp';
 import Community from './Pages/Front/Community/Community';
 import CandidateLayout from './Component/Layouts/App/Candidates';
 import CandidateDashboard from './Pages/App/Candidate/Dashboard/CandidateDashboard';
@@ -313,6 +314,7 @@ const Layout = () => {
           <Route path='registrationold' element={<Registrations/>}/>
           <Route path='admissionpost' element={<AdmissionPost/>}/>
           {/* <Route path='editcourse' element={<EditCourse/>}/> */}
+          <Route path='whatsapp' element={<Whatsapp/>}/>
           <Route path="institute/courses/edit/:id" element={<EditCourse />} />
           <Route path="courses/edit/:id" element={<EditCourse />} />
           <Route path='accessManagement' element={<AccessManagement/>}/>
