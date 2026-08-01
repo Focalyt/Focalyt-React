@@ -363,28 +363,20 @@ router.post('/create-dripmarketing-rule', [isCollege], async (req, res) => {
 	try {
 		let {name, startDate, startTime, endDate, endTime, conditionBlocks, interBlockLogicOperator, primaryAction, additionalActions, communication ,uiState, leadType} = req.body;
 		
-		if(!name  || !startDate || !startTime || !conditionBlocks || !interBlockLogicOperator || !primaryAction || !additionalActions || !communication) {
+		const resolvedLeadType = leadType === 'b2b' ? 'b2b' : 'b2c';
+		const missingBase = !name || !startDate || !startTime || !conditionBlocks || !interBlockLogicOperator || !communication;
+		// B2B: IF + communication only (no field-update THEN actions)
+		const missingActions = resolvedLeadType !== 'b2b' && (!primaryAction || !additionalActions);
+		if (missingBase || missingActions) {
 			return res.status(400).json({ success: false, message: 'All fields are required' });
 		}
-		
-
 
 		const collegeId = req.user.college._id;
 		const user = req.user;
-		const resolvedLeadType = leadType === 'b2b' ? 'b2b' : 'b2c';
-
 
 		const datePart = (typeof startDate === 'string' ? startDate : new Date(startDate).toISOString()).split("T")[0];
 	const startDateTimeString = `${datePart}T${startTime}`;
 	const startDateTime = new Date(startDateTimeString);
-
-	let endDateTime = null;
-	if (endDate && endTime) {
-		const endDatePart = (typeof endDate === 'string' ? endDate : new Date(endDate).toISOString()).split("T")[0];
-		endDateTime = new Date(`${endDatePart}T${endTime}`);
-	}
-
-
 
 		const dripMarketingRule = new DripMarketingRule({
 			name,
@@ -394,8 +386,8 @@ router.post('/create-dripmarketing-rule', [isCollege], async (req, res) => {
 			
 			conditionBlocks,
 			interBlockLogicOperator,
-			primaryAction,
-			additionalActions,
+			primaryAction: resolvedLeadType === 'b2b' ? undefined : primaryAction,
+			additionalActions: resolvedLeadType === 'b2b' ? [] : (additionalActions || []),
 			communication,
 			collegeId: collegeId,
 			uiState,
@@ -460,28 +452,31 @@ try{
 	const startDateTimeString = `${datePart}T${startTime}`;
 	const startDateTime = new Date(startDateTimeString);
 
-	let endDateTime = null;
-	if (endDate && endTime) {
-		const endDatePart = (typeof endDate === 'string' ? endDate : new Date(endDate).toISOString()).split("T")[0];
-		endDateTime = new Date(`${endDatePart}T${endTime}`);
-	}
-
-	const updatePayload = {
+	const setPayload = {
 		name,
 		startDate: startDateTime,
 		endDate: endDateTime,
 		conditionBlocks,
 		interBlockLogicOperator,
-		primaryAction,
-		additionalActions,
 		communication,
 		uiState,
 		collegeId: collegeId,
 		updatedBy: user._id
 	};
-	if (resolvedLeadType) updatePayload.leadType = resolvedLeadType;
+	if (resolvedLeadType) setPayload.leadType = resolvedLeadType;
 
-	const dripMarketingRule = await DripMarketingRule.findByIdAndUpdate(req.params.id, updatePayload, {new: true});
+	let updateQuery;
+	// B2B: clear field-update THEN actions; keep communication only
+	if (resolvedLeadType === 'b2b') {
+		setPayload.additionalActions = [];
+		updateQuery = { $set: setPayload, $unset: { primaryAction: 1 } };
+	} else {
+		setPayload.primaryAction = primaryAction;
+		setPayload.additionalActions = additionalActions;
+		updateQuery = { $set: setPayload };
+	}
+
+	const dripMarketingRule = await DripMarketingRule.findByIdAndUpdate(req.params.id, updateQuery, {new: true});
 	console.log("dripMarketingRule",dripMarketingRule)
 
 	return res.status(200).json({ success: true, message: 'Drip Marketing Rule updated successfully', data: dripMarketingRule });

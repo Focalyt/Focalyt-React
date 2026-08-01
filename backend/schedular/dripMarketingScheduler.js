@@ -618,7 +618,10 @@ async function processRule(rule) {
     if (await alreadyExecutedForLead(rule, lead._id)) continue;
 
     const started = Date.now();
-    const actionsPerformed = await applyActions(lead, rule);
+    // B2B: IF + communication only — do not update lead fields
+    const actionsPerformed = isB2BRule(rule)
+      ? { primaryAction: null, additionalActions: [] }
+      : await applyActions(lead, rule);
     const jobs = await enqueueCommunications(lead, rule, now);
     const contact = getLeadContact(lead, leadType);
 

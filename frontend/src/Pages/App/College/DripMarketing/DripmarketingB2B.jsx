@@ -525,18 +525,9 @@ const DripMarketingB2B = () => {
                     intraBlockLogicOperator: block.intraBlockLogicOperator || 'and',
                 })).filter(block => block.conditions.length > 0),
                 interBlockLogicOperator: ruleData.interBlockLogicOperator || 'and',
-
-                primaryAction: {
-                    activityType: ruleData.primaryAction.activityType,
-                    values: ruleData.primaryAction.values,
-                },
-                additionalActions: ruleData.additionalActions.filter(action =>
-                    action.activityType && action.values.length > 0
-                ).map(action => ({
-                    activityType: action.activityType,
-                    values: action.values,
-                }))
-                ,
+                // B2B drip: THEN is communication-only (no lead field updates)
+                primaryAction: null,
+                additionalActions: [],
                 communication: {
                     executionType: ruleData.communication.executionType,
                     mode: ruleData.communication.mode,
@@ -658,18 +649,9 @@ const DripMarketingB2B = () => {
                     intraBlockLogicOperator: block.intraBlockLogicOperator || 'and',
                 })).filter(block => block.conditions.length > 0),
                 interBlockLogicOperator: ruleData.interBlockLogicOperator || 'and',
-
-                primaryAction: {
-                    activityType: ruleData.primaryAction.activityType,
-                    values: ruleData.primaryAction.values,
-                },
-                additionalActions: ruleData.additionalActions.filter(action =>
-                    action.activityType && action.values.length > 0
-                ).map(action => ({
-                    activityType: action.activityType,
-                    values: action.values,
-                }))
-                ,
+                // B2B drip: THEN is communication-only (no lead field updates)
+                primaryAction: null,
+                additionalActions: [],
                 communication: {
                     executionType: ruleData.communication.executionType,
                     mode: ruleData.communication.mode,
@@ -2406,159 +2388,6 @@ const DripMarketingB2B = () => {
                                                 <div className="tab-pane active" id="then">
                                                     <div className="lead-attribute-body">
                                                         <div className="thenBlock">
-                                                            <div className="row my-3 border p-3">
-                                                                <div className="col-10">
-                                                                    <div className="row">
-
-
-
-                                                                        <div className="col-4">
-                                                                            <select className='form-select' value={ruleData.primaryAction.activityType || ''} onChange={(e) => {
-                                                                                setRuleData(prev => ({
-                                                                                    ...prev,
-                                                                                    primaryAction: {
-                                                                                        ...prev.primaryAction,
-                                                                                        activityType: e.target.value,
-                                                                                        values: []
-                                                                                    }
-                                                                                }));
-                                                                            }}>
-                                                                                                                                                                <option value="">Activity Type</option>
-                                                                                <option value="state">State</option>
-                                                                                <option value="status">Status</option>
-                                                                                <option value="subStatus">Sub Status</option>
-                                                                                <option value="leadOwner">Lead Owner</option>
-                                                                                <option value="leadCoOwner">Lead Co-Owner</option>
-                                                                                <option value="leadAddedBy">Lead Added By</option>
-                                                                                <option value="b2bProject">B2B Project</option>
-                                                                                <option value="b2bDepartment">B2B Department</option>
-                                                                                <option value="typeOfB2B">Type of B2B</option>
-                                                                                <option value="leadCategory">Lead Category</option>
-                                                                                <option value="leadRanking">Lead Ranking</option>
-                                                                            </select>
-                                                                        </div>
-                                                                        {ruleData.primaryAction.activityType !== '' && (
-                                                                            <div className="col-6">
-                                                                                <div className="d-flex align-items-center">
-                                                                                    <label className="me-2">Should be</label>
-                                                                                    <div className="flex-grow-1">
-                                                                                        <MultiselectDropdown
-                                                                                            options={getThenValueOptions(ruleData.primaryAction.activityType)}
-                                                                                            value={Array.isArray(ruleData.primaryAction.values) ? ruleData.primaryAction.values : (ruleData.primaryAction.values ? [ruleData.primaryAction.values] : [])}
-                                                                                            onChange={(values) => setRuleData(prev => ({
-                                                                                                ...prev,
-                                                                                                primaryAction: {
-                                                                                                    ...prev.primaryAction,
-                                                                                                    values: values
-                                                                                                }
-                                                                                            }))}
-                                                                                            placeholder="Select options"
-                                                                                        />
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-
-                                                                </div>
-                                                                <div className="col-2">
-                                                                    <div className='d-flex gap-2'>
-                                                                        <button
-                                                                            onClick={() => handleAddThenCondition()}
-                                                                            className="btn btn-outline-success btn-sm"
-                                                                            title="Add new condition"
-                                                                        >
-                                                                            <i className="fa-solid fa-plus"></i>
-                                                                        </button>
-
-                                                                        {/* <button
-                                                                            onClick={() => handleRemoveThenCondition(index)}
-                                                                            className="btn btn-outline-danger btn-sm"
-                                                                            title="Remove condition"
-                                                                        >
-                                                                            <i className="fa-solid fa-trash"></i>
-                                                                        </button> */}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-
-                                                            {ruleData.additionalActions && ruleData.additionalActions.length > 0 ? (
-                                                                ruleData.additionalActions.map((action, index) => (
-                                                                    <div className="row my-3 border p-3" key={`then-${index}`}>
-                                                                        <div className="col-10">
-                                                                            <div className="row">
-                                                                                <div className="col-4">
-                                                                                    <select
-                                                                                        className='form-select'
-                                                                                        value={action.activityType || ''}
-                                                                                        onChange={(e) => {
-                                                                                            handleThenConditionChange(index, 'activityType', e.target.value);
-                                                                                            handleThenConditionChange(index, 'values', []); // Clear values when activity type changes
-                                                                                        }}
-                                                                                    >
-                                                                                                                                                                        <option value="">Activity Type</option>
-                                                                                <option value="state">State</option>
-                                                                                <option value="status">Status</option>
-                                                                                <option value="subStatus">Sub Status</option>
-                                                                                <option value="leadOwner">Lead Owner</option>
-                                                                                <option value="leadCoOwner">Lead Co-Owner</option>
-                                                                                <option value="leadAddedBy">Lead Added By</option>
-                                                                                <option value="b2bProject">B2B Project</option>
-                                                                                <option value="b2bDepartment">B2B Department</option>
-                                                                                <option value="typeOfB2B">Type of B2B</option>
-                                                                                <option value="leadCategory">Lead Category</option>
-                                                                                <option value="leadRanking">Lead Ranking</option>
-                                                                                    </select>
-                                                                                </div>
-                                                                                {action.activityType && (
-                                                                                    <div className="col-6">
-                                                                                        <div className="d-flex align-items-center">
-                                                                                            <label className="me-2">Should be</label>
-                                                                                            <div className="flex-grow-1">
-                                                                                                <MultiselectDropdown
-                                                                                                    options={getThenValueOptions(action.activityType)}
-                                                                                                    value={Array.isArray(action.values) ? action.values : (action.values ? [action.values] : [])}
-                                                                                                    onChange={(values) => handleThenConditionChange(index, 'values', values)}
-                                                                                                    placeholder="Select options"
-                                                                                                />
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                        <div className="col-2">
-                                                                            <div className='d-flex gap-2'>
-                                                                                <button
-                                                                                    onClick={() => handleAddThenCondition()}
-                                                                                    className="btn btn-outline-success btn-sm"
-                                                                                    title="Add new condition"
-                                                                                >
-                                                                                    <i className="fa-solid fa-plus"></i>
-                                                                                </button>
-
-                                                                                <button
-                                                                                    onClick={() => handleRemoveThenCondition(index)}
-                                                                                    className="btn btn-outline-danger btn-sm"
-                                                                                    title="Remove condition"
-                                                                                >
-                                                                                    <i className="fa-solid fa-trash"></i>
-                                                                                </button>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                ))
-                                                            ) : (
-                                                                ''
-                                                            )}
-
-
-                                                            <div className="toggle-container-then my-3" id="toggleButtonthen">
-
-                                                                <div className="toggle-option active" data-value="and">And</div>
-
-                                                            </div>
                                                             <div className="row my-3 border p-3">
                                                                 <div className="col-10">
                                                                     <div className="row">

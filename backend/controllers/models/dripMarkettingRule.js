@@ -81,17 +81,16 @@ const DripMarketingRuleSchema = new mongoose.Schema({
     default: 'and'
   },
 
-  // THEN ACTIONS
+  // THEN ACTIONS (optional for B2B — B2B uses communication only)
   // First action (thenFirst + thenShouldBe)
   primaryAction: {
     activityType: {
       type: String,
-      required: true,
       enum: DRIP_ACTIVITY_TYPES
     },
     values: {
       type: [mongoose.Schema.Types.Mixed],
-      required: true
+      default: []
     }
   },
 
@@ -361,9 +360,11 @@ DripMarketingRuleSchema.pre('save', function(next) {
     }
   }
   
-  // Validate primary action
-  if (!this.primaryAction || !this.primaryAction.activityType) {
-    return next(new Error('Primary action is required'));
+  // Validate primary action (B2C only — B2B THEN is communication-only)
+  if (this.leadType !== 'b2b') {
+    if (!this.primaryAction || !this.primaryAction.activityType) {
+      return next(new Error('Primary action is required'));
+    }
   }
   
   // Communication validation
