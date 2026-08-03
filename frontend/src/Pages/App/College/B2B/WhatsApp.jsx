@@ -1221,14 +1221,12 @@ const WhatsApp = () => {
     if (!followUpLike) return null;
     const status = String(followUpLike?.status || '').trim().toLowerCase();
     if (status === 'completed') return 'done';
-    // Closed slots that were replaced — not the active current bucket
-    if (status === 'missed' || status === 'rescheduled') return null;
+    // Missed is set by midnight cron only — not live via date < now
+    if (status === 'missed') return 'missed';
+    if (status === 'rescheduled') return null;
 
     const dt = followUpLike?.scheduledDate ? new Date(followUpLike.scheduledDate) : null;
     if (!dt || Number.isNaN(dt.getTime())) return null;
-
-    const now = Date.now();
-    if (dt.getTime() < now) return 'missed';
     return 'planned';
   };
 
@@ -1253,13 +1251,13 @@ const WhatsApp = () => {
     return getLeadFollowupBucket(lead, type) === 'done' ? 1 : 0;
   };
 
-  /** Cumulative missed (history) + current overdue Pending slot */
+  /** Missed count from DB status (cron); avoid double-counting current slot */
   const getLeadFollowupMissedCount = (lead, type) => {
     const t = String(type || '').toLowerCase() === 'visit' ? 'visit' : 'call';
     const historical = Number(lead?.followupStats?.[t]?.missed);
     const hist = Number.isFinite(historical) && historical > 0 ? historical : 0;
-    const currentOpenMissed = getLeadFollowupBucket(lead, type) === 'missed' ? 1 : 0;
-    return hist + currentOpenMissed;
+    if (hist > 0) return hist;
+    return getLeadFollowupBucket(lead, type) === 'missed' ? 1 : 0;
   };
 
   const leadHasFollowup = (lead, type) => (

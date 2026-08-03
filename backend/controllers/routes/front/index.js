@@ -1804,38 +1804,6 @@ router.post("/career", async (req, res) => {
 			flatFiles.find((f) => (f.size && f.size > 0) || (f.data && f.data.length) || f.tempFilePath) ||
 			flatFiles[0];
 
-		if (!cvFile) {
-			return res.status(400).json({
-				status: "error",
-				message: "CV file missing",
-				receivedFields: {
-					body: Object.keys(req.body || {}),
-					files: req.files ? Object.keys(req.files) : [],
-				},
-			});
-		}
-
-		const resumeName = String(cvFile.name || "").toLowerCase();
-		const resumeMime = String(cvFile.mimetype || "").toLowerCase();
-		const allowedMime = [
-			"application/pdf",
-			"application/msword",
-			"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-		];
-		const allowedExt = /\.(pdf|doc|docx)$/;
-		if (!allowedMime.includes(resumeMime) && !allowedExt.test(resumeName)) {
-			return res.status(400).json({
-				status: "error",
-				message: "Resume must be a PDF or DOC file",
-			});
-		}
-		if (cvFile.size && cvFile.size > 5 * 1024 * 1024) {
-			return res.status(400).json({
-				status: "error",
-				message: "CV must be 5 MB or smaller",
-			});
-		}
-
 		const capitalizeWords = (str) => {
 			if (!str) return "";
 			return str
@@ -1845,17 +1813,40 @@ router.post("/career", async (req, res) => {
 		};
 
 		let resumeUrl = "";
-		try {
-			const cvKey = await uploadSinglefile(cvFile);
-			resumeUrl = resolvePublicUrl(cvKey);
-			console.log("CareerApplication CV uploaded:", resumeUrl);
-		} catch (uploadErr) {
-			console.error("CareerApplication CV upload failed:", uploadErr);
-			return res.status(500).json({
-				status: "error",
-				message: "CV upload failed",
-				error: uploadErr.message,
-			});
+		if (cvFile) {
+			const resumeName = String(cvFile.name || "").toLowerCase();
+			const resumeMime = String(cvFile.mimetype || "").toLowerCase();
+			const allowedMime = [
+				"application/pdf",
+				"application/msword",
+				"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+			];
+			const allowedExt = /\.(pdf|doc|docx)$/;
+			if (!allowedMime.includes(resumeMime) && !allowedExt.test(resumeName)) {
+				return res.status(400).json({
+					status: "error",
+					message: "Resume must be a PDF or DOC file",
+				});
+			}
+			if (cvFile.size && cvFile.size > 5 * 1024 * 1024) {
+				return res.status(400).json({
+					status: "error",
+					message: "CV must be 5 MB or smaller",
+				});
+			}
+
+			try {
+				const cvKey = await uploadSinglefile(cvFile);
+				resumeUrl = resolvePublicUrl(cvKey);
+				console.log("CareerApplication CV uploaded:", resumeUrl);
+			} catch (uploadErr) {
+				console.error("CareerApplication CV upload failed:", uploadErr);
+				return res.status(500).json({
+					status: "error",
+					message: "CV upload failed",
+					error: uploadErr.message,
+				});
+			}
 		}
 
 		console.log("CareerApplication saving to DB...");

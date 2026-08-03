@@ -109,7 +109,6 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 		const isVisit = String(type || '').toLowerCase() === 'visit';
 		const slotField = isVisit ? 'followUpVisit' : 'followUpCall';
 		const legacyTypePattern = isVisit ? '^visit$' : '^call$';
-		const now = new Date();
 
 		const typeMatchExpr = isVisit
 			? { $eq: [{ $toLower: { $ifNull: ['$followUpType', ''] } }, 'visit'] }
@@ -142,7 +141,7 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 			return { _id: { $in: doneIds } };
 		}
 
-		// Missed = historical Missed OR current overdue Pending slot
+		// Missed = status Missed only (set by midnight cron — no live overdue)
 		if (b === 'missed') {
 			const historicalMissedRows = await FollowUp.aggregate([
 				{
@@ -158,82 +157,18 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 				{ $group: { _id: '$leadId' } }
 			]);
 
-			const overdueExpr = (prefix) => {
-				const statusLower = { $toLower: { $ifNull: [`${prefix}.status`, ''] } };
-				const sched = `${prefix}.scheduledDate`;
-				return {
-					$and: [
-						{ $not: { $in: [statusLower, ['completed', 'missed', 'rescheduled']] } },
-						{ $ne: [sched, null] },
-						{ $ne: [{ $type: sched }, 'missing'] },
-						{ $lt: [sched, now] }
-					]
-				};
-			};
-
-			const slotPipeline = [
-				{ $match: { [slotField]: { $exists: true, $ne: null } } },
-				{
-					$lookup: {
-						from: 'followups',
-						localField: slotField,
-						foreignField: '_id',
-						as: 'fuArr'
-					}
-				},
-				{ $unwind: '$fuArr' },
-				{ $match: { $expr: overdueExpr('$fuArr') } },
-				{ $project: { _id: 1 } }
-			];
-
-			const legacyPipeline = [
-				{
-					$match: {
-						followUp: { $exists: true, $ne: null },
-						$or: [{ [slotField]: null }, { [slotField]: { $exists: false } }]
-					}
-				},
-				{
-					$lookup: {
-						from: 'followups',
-						localField: 'followUp',
-						foreignField: '_id',
-						as: 'fuArr'
-					}
-				},
-				{ $unwind: '$fuArr' },
-				{
-					$match: {
-						$expr: {
-							$and: [
-								{ $regexMatch: { input: { $toLower: '$fuArr.followUpType' }, regex: legacyTypePattern, options: 'i' } },
-								overdueExpr('$fuArr')
-							]
-						}
-					}
-				},
-				{ $project: { _id: 1 } }
-			];
-
-			const [slotLeads, legacyLeads] = await Promise.all([
-				Lead.aggregate(slotPipeline),
-				Lead.aggregate(legacyPipeline)
-			]);
-
 			const ids = [
 				...new Set(
-					[
-						...(historicalMissedRows || []).map((row) => String(row._id || '')),
-						...(slotLeads || []).map((row) => String(row._id || '')),
-						...(legacyLeads || []).map((row) => String(row._id || ''))
-					].filter((id) => id && mongoose.Types.ObjectId.isValid(id))
+					(historicalMissedRows || [])
+						.map((row) => String(row._id || ''))
+						.filter((id) => id && mongoose.Types.ObjectId.isValid(id))
 				)
 			].map((id) => new mongoose.Types.ObjectId(id));
 
 			return { _id: { $in: ids } };
 		}
 
-		// Planned = open current slot with future date
+		// Planned = open current slot (Pending) until cron marks it Missed
 		const plannedExpr = (prefix) => {
 			const statusLower = { $toLower: { $ifNull: [`${prefix}.status`, ''] } };
 			const sched = `${prefix}.scheduledDate`;
@@ -241,8 +176,7 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 				$and: [
 					{ $not: { $in: [statusLower, ['completed', 'missed', 'rescheduled']] } },
 					{ $ne: [sched, null] },
-					{ $ne: [{ $type: sched }, 'missing'] },
-					{ $gte: [sched, now] }
+					{ $ne: [{ $type: sched }, 'missing'] }
 				]
 			};
 		};

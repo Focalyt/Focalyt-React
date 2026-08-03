@@ -1,6 +1,7 @@
 const cron = require("node-cron");
 const axios = require("axios");
 const b2cFollowup = require("../controllers/models/b2cFollowup");
+const FollowUp = require("../controllers/models/b2b/followUp");
 const { User, WhatsAppTemplate, AppliedCourses } = require("../controllers/models");
 
 // WhatsApp API configuration
@@ -125,11 +126,38 @@ async function sendWhatsAppTemplateMessage(to, templateName, collegeId, variable
   }
 }
 
+async function markB2bMissedFollowups(startOfTodayIST) {
+  // B2B: only persist Missed status via cron (no live overdue→missed, no WhatsApp)
+  const result = await FollowUp.updateMany(
+    {
+      scheduledDate: { $lt: startOfTodayIST, $ne: null },
+      status: { $not: { $regex: /^(completed|missed|rescheduled)$/i } }
+    },
+    {
+      $set: {
+        status: 'Missed',
+        completedDate: new Date()
+      }
+    }
+  );
+
+  console.log(
+    `[Cron][B2B] Marked ${result.modifiedCount} pending followup(s) as Missed (before ${startOfTodayIST.toISOString()})`
+  );
+  return result;
+}
+
 function missedFollowupSchedular() {
   // Every day at 12:00 AM IST — mark yesterday's (and older) planned followups as missed
   cron.schedule("0 0 * * *", async () => {
     try {
       const startOfTodayIST = getStartOfTodayIST();
+
+      try {
+        await markB2bMissedFollowups(startOfTodayIST);
+      } catch (b2bErr) {
+        console.error("[Cron][B2B] Error updating missed followups:", b2bErr);
+      }
 
       const followups = await b2cFollowup.find({
         status: "planned",

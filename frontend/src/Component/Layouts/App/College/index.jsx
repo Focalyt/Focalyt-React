@@ -1974,38 +1974,87 @@ function CollegeLayout({ children }) {
   font-weight: 600;
 }
 
-.nav-item.has-sub.dropdown-settings .menu-content {
-  background-color: #f3f4f6 !important;
-  border-left: 2px solid #6b7280;
+/* Settings children: indented + grouped so they read as nested, not top-level */
+.nav-item.has-sub.dropdown-settings > .menu-content {
+  background-color: #f9fafb !important;
+  border-left: 2px solid #9ca3af;
+  margin-left: 14px !important; 
+  width: calc(100% - 14px) !important;
+  padding: 4px 0 6px;
+  position: relative;
 }
 
-.nav-item.has-sub.dropdown-settings .menu-content .nav-item > a {
-  background-color: #f3f4f6 !important;
+.nav-item.has-sub.dropdown-settings > .menu-content::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: #d1d5db;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.nav-item.has-sub.dropdown-settings > .menu-content > .nav-item > a {
+  background-color: transparent !important;
   color: #555 !important;
+  padding-left: 28px !important;
+  padding-right: 10px !important;
+  font-size: 0.92em;
+  font-weight: 400;
+  border-left: 2px solid transparent;
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
 }
 
-.nav-item.has-sub.dropdown-settings .menu-content .nav-item > a:hover {
+.nav-item.has-sub.dropdown-settings > .menu-content > .nav-item > a svg,
+.nav-item.has-sub.dropdown-settings > .menu-content > .nav-item > a .svg-inline--fa {
+  font-size: 0.85em;
+  opacity: 0.8;
+  width: 1em;
+  flex-shrink: 0;
+}
+
+.nav-item.has-sub.dropdown-settings > .menu-content > .nav-item > a .menu-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-item.has-sub.dropdown-settings > .menu-content > .nav-item > a:hover {
   background-color: #e5e7eb !important;
-  color: #6b7280 !important;
+  color: #4b5563 !important;
 }
 
-.nav-item.has-sub.dropdown-settings .menu-content .nav-item.active > a {
+.nav-item.has-sub.dropdown-settings > .menu-content > .nav-item.active > a {
   background-color: #ff3366 !important;
   color: #fff !important;
 }
 
-/* Nested dropdown inside settings */
-.nav-item.has-sub.dropdown-settings .menu-content .nav-item.has-sub > a {
-  background-color: #f3f4f6 !important;
-  border-left: 3px solid #6b7280;
+.nav-item.has-sub.dropdown-settings > .menu-content > .nav-item.active > a svg,
+.nav-item.has-sub.dropdown-settings > .menu-content > .nav-item.active > a .svg-inline--fa {
+  opacity: 1;
+  color: #fff !important;
 }
 
-.nav-item.has-sub.dropdown-settings .menu-content .nav-item.has-sub > a:hover {
+/* Nested dropdown inside settings (e.g. B2B Setting) */
+.nav-item.has-sub.dropdown-settings > .menu-content > .nav-item.has-sub > a {
+  background-color: #f3f4f6 !important;
+  border-left: 2px solid #6b7280;
+  padding-left: 28px !important;
+}
+
+.nav-item.has-sub.dropdown-settings > .menu-content > .nav-item.has-sub > a:hover {
   background-color: #e5e7eb !important;
   border-left-color: #4b5563;
 }
 
-.nav-item.has-sub.dropdown-settings .menu-content .nav-item.has-sub.open > a {
+.nav-item.has-sub.dropdown-settings > .menu-content > .nav-item.has-sub.open > a {
   background-color: #e5e7eb !important;
   border-left-color: #4b5563;
   color: #374151 !important;
@@ -2014,14 +2063,18 @@ function CollegeLayout({ children }) {
 .nav-item.has-sub.dropdown-settings .menu-content .menu-content,
 .nav-item.has-sub.dropdown-settings .menu-content .b2b-settings-submenu {
   background-color: #f3f4f6 !important;
-  border-left: 2px solid #6b7280;
+  border-left: 2px solid #9ca3af;
+  margin-left: 18px !important;
+  width: calc(100% - 18px) !important;
   overflow-y: auto !important;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
 
 .nav-item.has-sub.dropdown-settings .menu-content .menu-content .nav-item > a {
-  background-color: #f3f4f6 !important;
+  background-color: transparent !important;
+  padding-left: 22px !important;
+  font-size: 0.9em;
 }
 
 .nav-item.has-sub.dropdown-settings .menu-content .menu-content .nav-item > a:hover {

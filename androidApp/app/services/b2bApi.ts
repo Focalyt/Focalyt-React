@@ -705,9 +705,12 @@ function followupBucket(
   if (!slot) return null;
   const status = String(slot.status || '').toLowerCase();
   if (status === 'completed') return 'done';
+  // Missed is set by midnight cron only — not live via date < now
+  if (status === 'missed') return 'missed';
+  if (status === 'rescheduled') return null;
   const dt = slot.scheduledDate ? new Date(slot.scheduledDate) : null;
   if (!dt || isNaN(dt.getTime())) return null;
-  return dt.getTime() < Date.now() ? 'missed' : 'planned';
+  return 'planned';
 }
 
 export function getLeadFollowupBucket(

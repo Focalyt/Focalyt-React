@@ -35,7 +35,7 @@ const careerApplicationSchema = new Schema(
     },
     resume: {
       type: String,
-      required: true,
+      default: '',
     },
     status: {
       type: Boolean,

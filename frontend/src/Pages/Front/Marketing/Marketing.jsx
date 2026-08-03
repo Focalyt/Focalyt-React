@@ -48,12 +48,13 @@ function validateCareerForm(formData) {
   if (!MOBILE_RE.test(mobile)) return "Please enter a valid 10-digit mobile number";
   if (!applyingFor) return "Applying for is required";
   if (!experience) return "Experience is required";
-  if (!formData.resume) return "Please upload your CV";
-  if (formData.resume.size > MAX_CV_BYTES) return "CV must be 5 MB or smaller";
-  const typeOk =
-    ALLOWED_RESUME_TYPES.includes(formData.resume.type) ||
-    ALLOWED_RESUME_EXT.test(formData.resume.name || "");
-  if (!typeOk) return "Resume must be a PDF or DOC file";
+  if (formData.resume) {
+    if (formData.resume.size > MAX_CV_BYTES) return "CV must be 5 MB or smaller";
+    const typeOk =
+      ALLOWED_RESUME_TYPES.includes(formData.resume.type) ||
+      ALLOWED_RESUME_EXT.test(formData.resume.name || "");
+    if (!typeOk) return "Resume must be a PDF or DOC file";
+  }
   return null;
 }
 
@@ -113,7 +114,15 @@ function Marketing() {
         else if (!MOBILE_RE.test(mobile)) nextErrors.mobile = "Please enter a valid 10-digit mobile number";
         if (!formData.applyingFor.trim()) nextErrors.applyingFor = "Applying for is required";
         if (!formData.experience.trim()) nextErrors.experience = "Experience is required";
-        if (!formData.resume) nextErrors.resume = "Please upload your CV";
+        if (formData.resume) {
+          if (formData.resume.size > MAX_CV_BYTES) nextErrors.resume = "CV must be 5 MB or smaller";
+          else {
+            const typeOk =
+              ALLOWED_RESUME_TYPES.includes(formData.resume.type) ||
+              ALLOWED_RESUME_EXT.test(formData.resume.name || "");
+            if (!typeOk) nextErrors.resume = "Resume must be a PDF or DOC file";
+          }
+        }
         setErrors(nextErrors);
         alert(validationMsg);
         return;
@@ -129,7 +138,7 @@ function Marketing() {
         submissionData.append("city", formData.city.trim());
         submissionData.append("applyingFor", formData.applyingFor.trim());
         submissionData.append("experience", formData.experience.trim());
-        submissionData.append("resume", formData.resume);
+        if (formData.resume) submissionData.append("resume", formData.resume);
 
         await axios.post(`${backendUrl}/career`, submissionData);
         alert("Application submitted successfully!");
@@ -273,9 +282,7 @@ function Marketing() {
                   </div>
 
                   <div className={`mkt-field mkt-field--full ${errors.resume ? "has-error" : ""}`}>
-                    <label htmlFor="mkt-cv">
-                      Resume / CV <span className="mkt-req" aria-hidden>*</span>
-                    </label>
+                    <label htmlFor="mkt-cv">Resume / CV</label>
                     <button
                       type="button"
                       className={`mkt-upload ${formData.resume ? "is-filled" : ""}`}
