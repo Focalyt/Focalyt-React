@@ -4,13 +4,31 @@ const moment = require('moment');
 const { isCollege } = require('../../../helpers');
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
 	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, DripMarketingRule, DripMarketingJob } = require("../../models");
-const { runDripMarketingTick } = require("../../../schedular/dripMarketingScheduler");
+const { runDripMarketingTick, countMatchingLeads } = require("../../../schedular/dripMarketingScheduler");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
 let path = require("path");
 
 const axios = require("axios");
 const mongoose = require('mongoose');
+
+/** Calendar date in IST (YYYY-MM-DD). Avoids UTC day-shift from toISOString(). */
+function getISTDatePart(dateVal) {
+	if (!dateVal) return '';
+	if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal.trim())) {
+		return dateVal.trim();
+	}
+	return moment(dateVal).utcOffset('+05:30').format('YYYY-MM-DD');
+}
+
+/** Parse end/start date + HH:mm as IST wall-clock time → Date */
+function parseDateTimeIST(dateVal, timeStr) {
+	const datePart = getISTDatePart(dateVal);
+	if (!datePart || !timeStr) return null;
+	const parsed = moment(`${datePart} ${timeStr}`, ['YYYY-MM-DD HH:mm', 'YYYY-MM-DD H:mm'], true);
+	if (!parsed.isValid()) return null;
+	return parsed.utcOffset('+05:30', true);
+}
 
 router.get('/getVerticals', [isCollege], async (req, res) => {
 
@@ -364,19 +382,36 @@ router.post('/create-dripmarketing-rule', [isCollege], async (req, res) => {
 		let {name, startDate, startTime, endDate, endTime, conditionBlocks, interBlockLogicOperator, primaryAction, additionalActions, communication ,uiState, leadType} = req.body;
 		
 		const resolvedLeadType = leadType === 'b2b' ? 'b2b' : 'b2c';
-		const missingBase = !name || !startDate || !startTime || !conditionBlocks || !interBlockLogicOperator || !communication;
-		// B2B: IF + communication only (no field-update THEN actions)
-		const missingActions = resolvedLeadType !== 'b2b' && (!primaryAction || !additionalActions);
-		if (missingBase || missingActions) {
+		// IF + communication only (no field-update THEN actions) for B2B and B2C
+		if (!name || !startDate || !startTime || !conditionBlocks || !interBlockLogicOperator || !communication) {
 			return res.status(400).json({ success: false, message: 'All fields are required' });
 		}
 
 		const collegeId = req.user.college._id;
 		const user = req.user;
 
-		const datePart = (typeof startDate === 'string' ? startDate : new Date(startDate).toISOString()).split("T")[0];
-	const startDateTimeString = `${datePart}T${startTime}`;
-	const startDateTime = new Date(startDateTimeString);
+		const startMoment = parseDateTimeIST(startDate, startTime);
+		const startDateTime = startMoment ? startMoment.toDate() : new Date(`${getISTDatePart(startDate)}T${startTime}`);
+
+		let endDateTime;
+		if (endDate && endTime) {
+			const endMoment = parseDateTimeIST(endDate, endTime);
+			const nowIST = moment().utcOffset('+05:30');
+			console.log('[Drip] endDate check (create)', {
+				rawEndDate: endDate,
+				rawEndTime: endTime,
+				parsedIST: endMoment ? endMoment.format('YYYY-MM-DD HH:mm Z') : null,
+				nowIST: nowIST.format('YYYY-MM-DD HH:mm Z'),
+				isAfter: endMoment ? endMoment.isAfter(nowIST) : false
+			});
+			if (!endMoment || !endMoment.isAfter(nowIST)) {
+				return res.status(400).json({
+					success: false,
+					message: 'End date/time must be greater than current Indian Standard Time'
+				});
+			}
+			endDateTime = endMoment.toDate();
+		}
 
 		const dripMarketingRule = new DripMarketingRule({
 			name,
@@ -386,8 +421,7 @@ router.post('/create-dripmarketing-rule', [isCollege], async (req, res) => {
 			
 			conditionBlocks,
 			interBlockLogicOperator,
-			primaryAction: resolvedLeadType === 'b2b' ? undefined : primaryAction,
-			additionalActions: resolvedLeadType === 'b2b' ? [] : (additionalActions || []),
+			additionalActions: [],
 			communication,
 			collegeId: collegeId,
 			uiState,
@@ -420,6 +454,22 @@ router.put('/status-update/:id', [isCollege], async (req, res) => {
 
 		const collegeId = req.user.college._id;
 		const user = req.user._id;
+		const wantsActive = status === true || status === 'true';
+
+		if (wantsActive) {
+			const rule = await DripMarketingRule.findOne({ _id: id, collegeId });
+			if (!rule) {
+				return res.status(404).json({ success: false, message: 'Rule not found' });
+			}
+			const nowIST = moment().utcOffset('+05:30');
+			if (!rule.endDate || !moment(rule.endDate).isAfter(nowIST)) {
+				return res.status(400).json({
+					success: false,
+					code: 'END_DATE_PASSED',
+					message: 'End date/time must be greater than current Indian Standard Time. Please update end date and end time before activating.'
+				});
+			}
+		}
 
 		const updateRule = await DripMarketingRule.findByIdAndUpdate(id, {isActive: status , updatedBy: user}, {new: true});
 
@@ -448,14 +498,33 @@ try{
 	
 
 	
-	const datePart = (typeof startDate === 'string' ? startDate : new Date(startDate).toISOString()).split("T")[0];
-	const startDateTimeString = `${datePart}T${startTime}`;
-	const startDateTime = new Date(startDateTimeString);
+	const startMoment = parseDateTimeIST(startDate, startTime);
+	const startDateTime = startMoment ? startMoment.toDate() : new Date(`${getISTDatePart(startDate)}T${startTime}`);
+
+	let endDateTime;
+	if (endDate && endTime) {
+		const endMoment = parseDateTimeIST(endDate, endTime);
+		const nowIST = moment().utcOffset('+05:30');
+		console.log('[Drip] endDate check (update)', {
+			rawEndDate: endDate,
+			rawEndTime: endTime,
+			parsedIST: endMoment ? endMoment.format('YYYY-MM-DD HH:mm Z') : null,
+			nowIST: nowIST.format('YYYY-MM-DD HH:mm Z'),
+			isAfter: endMoment ? endMoment.isAfter(nowIST) : false
+		});
+		if (!endMoment || !endMoment.isAfter(nowIST)) {
+			return res.status(400).json({
+				success: false,
+				message: 'End date/time must be greater than current Indian Standard Time'
+			});
+		}
+		endDateTime = endMoment.toDate();
+	}
 
 	const setPayload = {
 		name,
 		startDate: startDateTime,
-		endDate: endDateTime,
+		...(endDateTime && { endDate: endDateTime }),
 		conditionBlocks,
 		interBlockLogicOperator,
 		communication,
@@ -465,16 +534,9 @@ try{
 	};
 	if (resolvedLeadType) setPayload.leadType = resolvedLeadType;
 
-	let updateQuery;
-	// B2B: clear field-update THEN actions; keep communication only
-	if (resolvedLeadType === 'b2b') {
-		setPayload.additionalActions = [];
-		updateQuery = { $set: setPayload, $unset: { primaryAction: 1 } };
-	} else {
-		setPayload.primaryAction = primaryAction;
-		setPayload.additionalActions = additionalActions;
-		updateQuery = { $set: setPayload };
-	}
+	// IF + communication only — clear field-update THEN actions for B2B and B2C
+	setPayload.additionalActions = [];
+	const updateQuery = { $set: setPayload, $unset: { primaryAction: 1 } };
 
 	const dripMarketingRule = await DripMarketingRule.findByIdAndUpdate(req.params.id, updateQuery, {new: true});
 	console.log("dripMarketingRule",dripMarketingRule)
@@ -501,15 +563,15 @@ router.get('/get-dripmarketing-rule', [isCollege], async (req, res) => {
 		}
 		const dripMarketingRule = await DripMarketingRule.find(filter).populate('createdBy');
 		
-		// Format the data to separate date and time for frontend
+		// Format the data to separate date and time for frontend (IST)
 		const formatDateTime = (dateValue) => {
-			const date = new Date(dateValue);
-			const hours = date.getHours();
-			const minutes = date.getMinutes();
+			const m = moment(dateValue).utcOffset('+05:30');
+			const hours = m.hours();
+			const minutes = m.minutes();
 			const ampm = hours >= 12 ? 'PM' : 'AM';
 			const displayHours = hours % 12 || 12;
 			return {
-				date: date.toISOString().split('T')[0],
+				date: m.format('YYYY-MM-DD'),
 				time: `${displayHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${ampm}`
 			};
 		};
@@ -539,6 +601,34 @@ router.get('/get-dripmarketing-rule', [isCollege], async (req, res) => {
 	catch (error) {
 		console.error('Error fetching drip marketing rule:', error);
 		res.status(500).json({ success: false, message: 'Server error' });
+	}
+});
+
+/** Preview how many people match current IF conditions (no send) */
+router.post('/preview-match-count', [isCollege], async (req, res) => {
+	try {
+		const collegeId = req.user.college._id;
+		const { leadType, conditionBlocks, interBlockLogicOperator } = req.body || {};
+
+		const result = await countMatchingLeads({
+			collegeId,
+			leadType: leadType === 'b2b' ? 'b2b' : 'b2c',
+			conditionBlocks: conditionBlocks || [],
+			interBlockLogicOperator: interBlockLogicOperator || 'and'
+		});
+
+		return res.status(200).json({
+			success: true,
+			count: result.count,
+			scanned: result.scanned,
+			capped: result.capped,
+			message: result.capped
+				? `Showing matches within first ${result.scanned} scanned leads`
+				: undefined
+		});
+	} catch (error) {
+		console.error('Error previewing drip match count:', error);
+		return res.status(500).json({ success: false, message: error.message || 'Server error' });
 	}
 });
 

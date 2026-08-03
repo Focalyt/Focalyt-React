@@ -599,7 +599,12 @@ function getLeadContact(lead, leadType) {
 async function processRule(rule) {
   const now = new Date();
   if (rule.startDate && new Date(rule.startDate) > now) {
+    console.log(`[Drip] Rule "${rule.name}" (${rule._id}) not started yet — startDate=${rule.startDate}`);
     return { matched: 0, skipped: 'not_started' };
+  }
+  if (rule.endDate && new Date(rule.endDate) < now) {
+    console.log(`[Drip] Rule "${rule.name}" (${rule._id}) STOPPED — endDate=${rule.endDate} has passed`);
+    return { matched: 0, skipped: 'ended' };
   }
 
   const leadType = isB2BRule(rule) ? 'b2b' : 'b2c';
@@ -618,10 +623,8 @@ async function processRule(rule) {
     if (await alreadyExecutedForLead(rule, lead._id)) continue;
 
     const started = Date.now();
-    // B2B: IF + communication only — do not update lead fields
-    const actionsPerformed = isB2BRule(rule)
-      ? { primaryAction: null, additionalActions: [] }
-      : await applyActions(lead, rule);
+    // IF + communication only — do not update lead/candidate fields (B2B and B2C)
+    const actionsPerformed = { primaryAction: null, additionalActions: [] };
     const jobs = await enqueueCommunications(lead, rule, now);
     const contact = getLeadContact(lead, leadType);
 
@@ -743,9 +746,15 @@ async function cancelJobsForInactiveRules() {
   const ruleIds = await DripMarketingJob.distinct('ruleId', pendingFilter);
   if (!ruleIds.length) return 0;
 
+  const now = new Date();
   const activeIds = await DripMarketingRule.distinct('_id', {
     _id: { $in: ruleIds },
-    isActive: true
+    isActive: true,
+    $or: [
+      { endDate: { $exists: false } },
+      { endDate: null },
+      { endDate: { $gte: now } }
+    ]
   });
   const activeSet = new Set(activeIds.map(toIdString));
   const staleIds = ruleIds.filter((id) => !activeSet.has(toIdString(id)));
@@ -753,12 +762,14 @@ async function cancelJobsForInactiveRules() {
 
   const result = await DripMarketingJob.updateMany(
     { ...pendingFilter, ruleId: { $in: staleIds } },
-    { $set: { status: 'skipped', error: 'Rule is inactive or deleted' } }
+    { $set: { status: 'skipped', error: 'Rule is inactive, deleted, or ended' } }
   );
 
   const cancelled = result.modifiedCount || 0;
   if (cancelled) {
-    console.log(`[Drip] Cancelled ${cancelled} queued job(s) from ${staleIds.length} inactive/deleted rule(s)`);
+    console.log(
+      `[Drip] STOPPED sending — cancelled ${cancelled} queued job(s) for ${staleIds.length} inactive/deleted/ended rule(s): ${staleIds.map(toIdString).join(', ')}`
+    );
   }
   return cancelled;
 }
@@ -858,16 +869,44 @@ async function runDripMarketingTick() {
   const started = Date.now();
 
   try {
+    const now = new Date();
     const rules = await DripMarketingRule.find({
       isActive: true,
-      startDate: { $lte: new Date() }
+      startDate: { $lte: now },
+      $or: [
+        { endDate: { $exists: false } },
+        { endDate: null },
+        { endDate: { $gte: now } }
+      ]
     }).lean();
+
+    const endedRules = await DripMarketingRule.find({
+      isActive: true,
+      endDate: { $ne: null, $lt: now }
+    }).select('_id name endDate leadType').lean();
+
+    if (endedRules.length) {
+      const endedIds = endedRules.map((r) => r._id);
+      const deactivateResult = await DripMarketingRule.updateMany(
+        { _id: { $in: endedIds }, isActive: true },
+        { $set: { isActive: false } }
+      );
+      console.log(
+        `[Drip] ${endedRules.length} rule(s) STOPPED by endDate — set isActive=false (modified=${deactivateResult.modifiedCount}): ` +
+        endedRules.map((r) => `"${r.name}" (${r._id}) endDate=${r.endDate}`).join(' | ')
+      );
+    } else {
+      console.log('[Drip] No rules stopped by endDate this tick');
+    }
 
     let totalMatched = 0;
     for (const rule of rules) {
       try {
         const result = await processRule(rule);
         totalMatched += result.matched || 0;
+        if (result.skipped) {
+          console.log(`[Drip] Rule "${rule.name}" (${rule._id}) skipped: ${result.skipped}`);
+        }
       } catch (err) {
         console.error(`[Drip] Error processing rule ${rule._id}:`, err.message);
       }
@@ -876,7 +915,7 @@ async function runDripMarketingTick() {
     const jobResult = await processDueJobs();
 
     console.log(
-      `[Drip] Tick done in ${Date.now() - started}ms — rules=${rules.length} matched=${totalMatched} jobsSent=${jobResult.sent} jobsFailed=${jobResult.failed} jobsCancelled=${jobResult.cancelled}`
+      `[Drip] Tick done in ${Date.now() - started}ms — activeRules=${rules.length} stoppedByEndDate=${endedRules.length} matched=${totalMatched} jobsSent=${jobResult.sent} jobsFailed=${jobResult.failed} jobsCancelled=${jobResult.cancelled}`
     );
 
     return { rules: rules.length, matched: totalMatched, ...jobResult };
@@ -898,5 +937,52 @@ function dripMarketingScheduler() {
   console.log('[Drip] Marketing scheduler started (every 30 minutes)');
 }
 
+/**
+ * Dry-run: count leads matching IF conditions (no WhatsApp / no field updates).
+ * Used by rule builder preview so colleges know audience size while adding filters.
+ */
+async function countMatchingLeads({ collegeId, leadType, conditionBlocks, interBlockLogicOperator }) {
+  const rule = {
+    collegeId,
+    leadType: leadType === 'b2b' ? 'b2b' : 'b2c',
+    conditionBlocks: conditionBlocks || [],
+    interBlockLogicOperator: interBlockLogicOperator || 'and'
+  };
+
+  const hasCondition = (rule.conditionBlocks || []).some((block) =>
+    (block.conditions || []).some(
+      (c) => c?.activityType && c?.operator && normalizeValues(c.values).length > 0
+    )
+  );
+  if (!hasCondition) {
+    return { count: 0, scanned: 0, capped: false };
+  }
+
+  const leads = rule.leadType === 'b2b'
+    ? await findB2BLeads(rule, [])
+    : await findCandidateLeads(rule, []);
+
+  let count = 0;
+  for (const lead of leads) {
+    const { overallResult } = evaluateConditionBlocks(lead, rule);
+    if (overallResult) count += 1;
+  }
+
+  console.log('[Drip] preview-match-count', {
+    leadType: rule.leadType,
+    collegeId: String(collegeId),
+    conditions: rule.conditionBlocks,
+    scanned: leads.length,
+    matched: count
+  });
+
+  return {
+    count,
+    scanned: leads.length,
+    capped: leads.length >= LEAD_SCAN_LIMIT
+  };
+}
+
 module.exports = dripMarketingScheduler;
 module.exports.runDripMarketingTick = runDripMarketingTick;
+module.exports.countMatchingLeads = countMatchingLeads;

@@ -8,6 +8,13 @@ import 'react-calendar/dist/Calendar.css';
 
 // Add CSS styles for multiselect
 const multiselectStyles = `
+    .multiselect-dropdown {
+        position: relative;
+        z-index: 1;
+    }
+    .multiselect-dropdown.is-open {
+        z-index: 1055;
+    }
     .multiselect-dropdown .dropdown-arrow {
         transition: transform 0.2s ease;
         font-size: 12px;
@@ -21,6 +28,19 @@ const multiselectStyles = `
     .multiselect-options {
         max-height: 200px;
         overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        z-index: 1056 !important;
+        left: 0;
+        right: 0;
+    }
+    .multiselect-options.open-down {
+        top: calc(100% + 2px);
+        bottom: auto;
+    }
+    .multiselect-options.open-up {
+        bottom: calc(100% + 2px);
+        top: auto;
     }
 `;
 
@@ -35,8 +55,10 @@ if (typeof document !== 'undefined') {
 // Multiselect Component
 const MultiselectDropdown = ({ options, value, onChange, placeholder = "Select options" }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [openUp, setOpenUp] = useState(false);
     const [selectedValues, setSelectedValues] = useState(value || []);
     const dropdownRef = useRef(null);
+    const optionsRef = useRef(null);
 
     useEffect(() => {
         setSelectedValues(value || []);
@@ -59,6 +81,28 @@ const MultiselectDropdown = ({ options, value, onChange, placeholder = "Select o
         };
     }, [isOpen]);
 
+    // Keep option list scroll inside the panel (don't trap modal scroll)
+    useEffect(() => {
+        if (!isOpen || !dropdownRef.current) return;
+        const trigger = dropdownRef.current.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - trigger.bottom;
+        const spaceAbove = trigger.top;
+        setOpenUp(spaceBelow < 220 && spaceAbove > spaceBelow);
+
+        const el = optionsRef.current;
+        if (!el) return;
+        const onWheel = (e) => {
+            const atTop = el.scrollTop <= 0;
+            const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+            if ((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom)) {
+                e.preventDefault();
+            }
+            e.stopPropagation();
+        };
+        el.addEventListener('wheel', onWheel, { passive: false });
+        return () => el.removeEventListener('wheel', onWheel);
+    }, [isOpen]);
+
     const handleToggle = (optionValue) => {
         const newValues = selectedValues.includes(optionValue)
             ? selectedValues.filter(val => val !== optionValue)
@@ -70,13 +114,13 @@ const MultiselectDropdown = ({ options, value, onChange, placeholder = "Select o
 
     const getSelectedLabels = () => {
         return selectedValues.map(val => {
-            const option = options.find(opt => opt.value === val);
+            const option = options.find(opt => String(opt.value) === String(val));
             return option ? option.label : val;
         });
     };
 
     return (
-        <div className="multiselect-dropdown position-relative" ref={dropdownRef}>
+        <div className={`multiselect-dropdown position-relative${isOpen ? ' is-open' : ''}`} ref={dropdownRef}>
             <div
                 className="form-select d-flex align-items-center justify-content-between"
                 style={{ cursor: 'pointer' }}
@@ -94,7 +138,10 @@ const MultiselectDropdown = ({ options, value, onChange, placeholder = "Select o
             </div>
 
             {isOpen && (
-                <div className="multiselect-options position-absolute w-100 bg-white border rounded shadow" style={{ zIndex: 10, top: '100%' }}>
+                <div
+                    ref={optionsRef}
+                    className={`multiselect-options position-absolute w-100 bg-white border rounded shadow ${openUp ? 'open-up' : 'open-down'}`}
+                >
                     {options?.length > 0 &&
                         options?.map((option) => (
                             <div
@@ -105,7 +152,7 @@ const MultiselectDropdown = ({ options, value, onChange, placeholder = "Select o
                             >
                                 <input
                                     type="checkbox"
-                                    checked={selectedValues.includes(option.value)}
+                                    checked={selectedValues.some((v) => String(v) === String(option.value))}
                                     onChange={() => { }}
                                     className="me-2"
                                 />
@@ -142,6 +189,57 @@ const DripMarketingB2B = () => {
     const [modalMode, setModalMode] = useState('add');
     const [isEditing, setIsEditing] = useState(false);
     const [editRule, setEditRule] = useState({});
+    const [pendingActivateRuleId, setPendingActivateRuleId] = useState(null);
+    const [matchCount, setMatchCount] = useState(0);
+    const [matchCountLoading, setMatchCountLoading] = useState(false);
+    const [matchCountCapped, setMatchCountCapped] = useState(false);
+
+    const to24HourTime = (timeStr) => {
+        let timeForInput = timeStr || '';
+        if (timeForInput && timeForInput.includes(' ')) {
+            const [time, ampm] = timeForInput.split(' ');
+            const [hours, minutes] = time.split(':');
+            let hour24 = parseInt(hours, 10);
+            if (ampm === 'PM' && hour24 !== 12) hour24 += 12;
+            else if (ampm === 'AM' && hour24 === 12) hour24 = 0;
+            timeForInput = `${hour24.toString().padStart(2, '0')}:${minutes}`;
+        }
+        return timeForInput;
+    };
+
+    const getDatePartIST = (dateVal) => {
+        if (!dateVal) return '';
+        // Only treat plain YYYY-MM-DD as calendar date; ISO timestamps must use IST zone
+        if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal.trim())) {
+            return dateVal.trim();
+        }
+        return new Date(dateVal).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    };
+
+    const buildISTDateTime = (dateVal, timeStr) => {
+        const datePart = getDatePartIST(dateVal);
+        const time24 = to24HourTime(timeStr);
+        if (!datePart || !time24) return null;
+        const [y, m, d] = datePart.split('-').map(Number);
+        const [hh, mm] = time24.split(':').map(Number);
+        return new Date(Date.UTC(y, m - 1, d, hh - 5, mm - 30, 0, 0));
+    };
+
+    const isEndDateTimeAfterNowIST = (dateVal, timeStr) => {
+        const end = buildISTDateTime(dateVal, timeStr);
+        return !!(end && end.getTime() > Date.now());
+    };
+
+    const openRuleEditScreen = (ruleId) => {
+        setModalMode('edit');
+        loadRuleForEdit(ruleId);
+        setTimeout(() => {
+            const el = document.getElementById('staticBackdropRuleModel');
+            if (el && window.bootstrap?.Modal) {
+                window.bootstrap.Modal.getOrCreateInstance(el).show();
+            }
+        }, 50);
+    };
 
 
     const [statuses, setStatuses] = useState([]);
@@ -213,6 +311,70 @@ const DripMarketingB2B = () => {
                 recipient: '',
             },
         });
+
+    // Serialize so nested condition edits (activity/operator/values) retrigger count
+    const matchCountKey = JSON.stringify({
+        blocks: ruleData.conditionBlocks,
+        inter: ruleData.interBlockLogicOperator || 'and',
+    });
+
+    useEffect(() => {
+        const conditionBlocks = (ruleData.conditionBlocks || []).map((block) => ({
+            conditions: (block.conditions || [])
+                .filter((c) => c.activityType && c.operator && Array.isArray(c.values) && c.values.length > 0)
+                .map((c) => ({
+                    activityType: c.activityType,
+                    operator: c.operator,
+                    values: c.values,
+                })),
+            intraBlockLogicOperator: block.intraBlockLogicOperator || 'and',
+        })).filter((block) => block.conditions.length > 0);
+
+        if (!conditionBlocks.length) {
+            setMatchCount(0);
+            setMatchCountCapped(false);
+            setMatchCountLoading(false);
+            return;
+        }
+
+        let cancelled = false;
+        setMatchCountLoading(true);
+        const timer = setTimeout(async () => {
+            try {
+                const response = await axios.post(
+                    `${backendUrl}/college/dripmarketing/preview-match-count`,
+                    {
+                        leadType: 'b2b',
+                        conditionBlocks,
+                        interBlockLogicOperator: ruleData.interBlockLogicOperator || 'and',
+                    },
+                    { headers: { 'x-auth': token } }
+                );
+                if (cancelled) return;
+                if (response.data?.success) {
+                    setMatchCount(response.data.count || 0);
+                    setMatchCountCapped(!!response.data.capped);
+                } else {
+                    setMatchCount(0);
+                    setMatchCountCapped(false);
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    console.error('Error fetching match count:', err);
+                    setMatchCount(0);
+                    setMatchCountCapped(false);
+                }
+            } finally {
+                if (!cancelled) setMatchCountLoading(false);
+            }
+        }, 500);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [matchCountKey, backendUrl, token]);
 
     const clearRuleData = () => {
         setRuleData(
@@ -507,11 +669,19 @@ const DripMarketingB2B = () => {
 
     const handleAddRule = async () => {
         try {
+            if (!ruleData.endDate || !ruleData.endTime) {
+                alert('Please set end date and end time');
+                return;
+            }
+            if (!isEndDateTimeAfterNowIST(ruleData.endDate, ruleData.endTime)) {
+                alert('End date/time must be greater than current Indian Standard Time');
+                return;
+            }
 
             const requestData = {
                 name: ruleData.name,
-                startDate: ruleData.startDate,
-                endDate: ruleData.endDate,
+                startDate: getDatePartIST(ruleData.startDate),
+                endDate: getDatePartIST(ruleData.endDate),
                 startTime: ruleData.startTime,
                 endTime: ruleData.endTime,
                 conditionBlocks: ruleData.conditionBlocks.map(block => ({
@@ -632,10 +802,19 @@ const DripMarketingB2B = () => {
     const handleUpdateRule = async (ruleId) => {
         let updatedRules = [...rules];
         try {
+            if (!ruleData.endDate || !ruleData.endTime) {
+                alert('Please set end date and end time');
+                return;
+            }
+            if (!isEndDateTimeAfterNowIST(ruleData.endDate, ruleData.endTime)) {
+                alert('End date/time must be greater than current Indian Standard Time');
+                return;
+            }
+
             const updateData = {
                 name: ruleData.name,
-                startDate: ruleData.startDate,
-                endDate: ruleData.endDate,
+                startDate: getDatePartIST(ruleData.startDate),
+                endDate: getDatePartIST(ruleData.endDate),
                 startTime: ruleData.startTime,
                 endTime: ruleData.endTime,
                 conditionBlocks: ruleData.conditionBlocks.map(block => ({
@@ -677,20 +856,39 @@ const DripMarketingB2B = () => {
                 clearRuleData();
 
                 const UpdatedRuleData = response.data.data;
-                
-              
-                alert('Rule updated successfully');
+                const shouldActivate = pendingActivateRuleId && pendingActivateRuleId === ruleData._id;
+
                 setIsEditing(false);
                 setModalMode('');
                 setEditRule({});
-
-                // Close the modal
                 closeModal();
+
+                if (shouldActivate) {
+                    setPendingActivateRuleId(null);
+                    try {
+                        const activateRes = await axios.put(
+                            `${backendUrl}/college/dripmarketing/status-update/${ruleData._id}`,
+                            { status: true },
+                            { headers: { 'x-auth': token } }
+                        );
+                        if (activateRes.data.success) {
+                            alert('Rule updated and activated successfully');
+                        } else {
+                            alert('Rule updated, but activation failed. Please try the toggle again.');
+                        }
+                    } catch (activateErr) {
+                        console.error('Error activating rule after update:', activateErr);
+                        alert(activateErr.response?.data?.message || 'Rule updated, but activation failed. Please try the toggle again.');
+                    }
+                } else {
+                    alert('Rule updated successfully');
+                }
 
             }
             // console.log('response', response)
         } catch (err) {
             console.error('Error updating rule:', err);
+            alert(err.response?.data?.message || 'Error updating rule. Please try again.');
             setError('Error updating rule. Please try again.');
         }
         finally{
@@ -701,6 +899,16 @@ const DripMarketingB2B = () => {
 
     const handleStatusUpdate = async (ruleId, status) => {
         try {
+            if (status === true) {
+                const rule = rules.find((r) => r._id === ruleId);
+                if (!rule || !isEndDateTimeAfterNowIST(rule.endDate, rule.endTime)) {
+                    alert('End date/time has passed or is missing. Please update end date and end time (must be greater than current IST) to activate this rule.');
+                    setPendingActivateRuleId(ruleId);
+                    openRuleEditScreen(ruleId);
+                    return;
+                }
+            }
+
             const response = await axios.put(`${backendUrl}/college/dripmarketing/status-update/${ruleId}`, { status }, {
                 headers: { 'x-auth': token }
             });
@@ -721,10 +929,16 @@ const DripMarketingB2B = () => {
                 alert('Rule status updated successfully');
             }
             else {
-                alert('Error updating rule status. Please try again.');
+                alert(response.data.message || 'Error updating rule status. Please try again.');
             }
         } catch (err) {
             console.error('Error updating rule status:', err);
+            if (status === true && (err.response?.data?.code === 'END_DATE_PASSED' || err.response?.status === 400)) {
+                alert(err.response?.data?.message || 'Please update end date and end time before activating.');
+                setPendingActivateRuleId(ruleId);
+                openRuleEditScreen(ruleId);
+                return;
+            }
             setError('Error updating rule status. Please try again.');
         }
     }
@@ -2198,6 +2412,24 @@ const DripMarketingB2B = () => {
                                                                 </div>
                                                             </div>
                                                         </div>
+                                                        <div className="col-auto ms-auto d-flex align-items-center">
+                                                            <span
+                                                                className="badge rounded-pill"
+                                                                style={{
+                                                                    backgroundColor: '#e8f5e9',
+                                                                    color: '#1b5e20',
+                                                                    fontSize: '0.85rem',
+                                                                    fontWeight: 600,
+                                                                    padding: '0.45rem 0.85rem',
+                                                                    border: '1px solid #a5d6a7'
+                                                                }}
+                                                                title="People who currently match these IF conditions"
+                                                            >
+                                                                {matchCountLoading
+                                                                    ? 'Counting people…'
+                                                                    : `${matchCount}${matchCountCapped ? '+' : ''} people match`}
+                                                            </span>
+                                                        </div>
                                                     </div>
 
                                                     {condition.map((_, index) => (
@@ -2748,13 +2980,19 @@ const DripMarketingB2B = () => {
     max-width: 70%;
     width: 70%;
     margin: 1.75rem auto;
+    max-height: calc(100vh - 2rem);
 }
 
+#staticBackdropRuleModel.modal-dialog-scrollable .modal-content,
+#staticBackdropRuleModel .modal-dialog.modal-dialog-scrollable .modal-content,
 #staticBackdropRuleModel .modal-content {
     border-radius: 12px;
     border: none;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
     overflow: hidden;
+    max-height: calc(100vh - 2rem);
+    display: flex;
+    flex-direction: column;
 }
 
 #staticBackdropRuleModel .modal-header {
@@ -2790,6 +3028,13 @@ const DripMarketingB2B = () => {
 #staticBackdropRuleModel .modal-body {
     padding: 30px;
     background: #f8f9fa;
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
 }
 
 #staticBackdropRuleModel .ruleInfo {
@@ -3041,8 +3286,16 @@ width: 250px!important;
 #staticBackdropRuleModel .tab-content {
     background: white;
     padding: 25px;
+    padding-bottom: 80px;
     border-radius: 0 0 8px 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    overflow: visible;
+}
+
+#staticBackdropRuleModel .tab-pane#if,
+#staticBackdropRuleModel .tab-pane#then {
+    overflow: visible;
+    min-height: 0;
 }
 
 /* Buttons in IF tab */
@@ -3118,6 +3371,24 @@ background-color: #ff6b35;
     border-radius: 8px;
     border: 1px solid #e8eaed;
     margin-top: 20px;
+    overflow: visible;
+    position: relative;
+}
+
+#staticBackdropRuleModel .ifBlock .row {
+    overflow: visible;
+    position: relative;
+}
+
+#staticBackdropRuleModel .ifBlock .row.mb-3 {
+    margin-bottom: 1.25rem !important;
+}
+
+#staticBackdropRuleModel .ifBlock .col-4,
+#staticBackdropRuleModel .ifBlock .col-10,
+#staticBackdropRuleModel .ifBlock .col-2 {
+    overflow: visible;
+    position: relative;
 }
 
 #staticBackdropRuleModel .addMore {
