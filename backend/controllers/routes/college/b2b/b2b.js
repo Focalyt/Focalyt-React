@@ -389,6 +389,37 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 		});
 	};
 
+
+	const flushMissedSlotOnLead = async (lead, slotField) => {
+		if (!lead) return { cleared: false, deleteId: null };
+		const rawId = lead[slotField];
+		const followUpId = rawId?._id || rawId;
+		if (!followUpId) return { cleared: false, deleteId: null };
+
+		const current = await FollowUp.findById(followUpId).select('status scheduledDate');
+		if (!current) {
+			lead[slotField] = null;
+			return { cleared: true, deleteId: null };
+		}
+
+		const statusLower = String(current.status || '').trim().toLowerCase();
+		if (statusLower === 'completed' || statusLower === 'rescheduled') {
+			return { cleared: false, deleteId: null };
+		}
+
+		if (statusLower === 'missed') {
+			lead[slotField] = null;
+			return { cleared: true, deleteId: current._id };
+		}
+
+		const sched = current.scheduledDate ? new Date(current.scheduledDate) : null;
+		const isOverdue = sched && !Number.isNaN(sched.getTime()) && sched.getTime() < Date.now();
+		if (!isOverdue) return { cleared: false, deleteId: null };
+
+		lead[slotField] = null;
+		return { cleared: true, deleteId: current._id };
+	};
+
 	const attachFollowupStats = async (leads) => {
 		const list = Array.isArray(leads) ? leads : [];
 		const leadIds = list
@@ -5241,6 +5272,188 @@ router.post('/leads/:id/remarks', isCollege, async (req, res) => {
 		res.status(500).json({
 			status: false,
 			message: 'Failed to add remark',
+			error: error.message
+		});
+	}
+});
+
+// Flush missed follow-ups: delete Missed + overdue-pending FollowUp docs; clear slots
+router.post('/leads/flush-missed-followups', isCollege, async (req, res) => {
+	try {
+		const {
+			b2bDepartment,
+			b2bProject,
+			typeOfB2B,
+			typeOfB2BIn,
+			leadOwner,
+			leadOwnerIn
+		} = req.body || {};
+
+		const isAdmin = () => req.user.permissions?.permission_type === 'Admin';
+
+		let ownershipConditions = [];
+		if (!isAdmin()) {
+			const teamMembers = await getAllTeamMembers(req.user._id);
+			ownershipConditions = teamMembers.map((member) => ({
+				$or: [{ leadAddedBy: member }, { leadOwner: member }, { leadCoOwner: member }]
+			}));
+		}
+
+		const convertToObjectId = (id) => {
+			if (!id) return null;
+			if (mongoose.Types.ObjectId.isValid(id)) return new mongoose.Types.ObjectId(id);
+			return id;
+		};
+		const parseIdList = (csv) =>
+			String(csv || '')
+				.split(',')
+				.map((s) => s.trim())
+				.filter(Boolean)
+				.map((id) => convertToObjectId(id))
+				.filter(Boolean);
+
+		const filterConditions = [];
+		if (b2bDepartment) filterConditions.push({ b2bDepartment: convertToObjectId(b2bDepartment) });
+		if (b2bProject) filterConditions.push({ b2bProject: convertToObjectId(b2bProject) });
+		if (typeOfB2BIn) {
+			const ids = parseIdList(typeOfB2BIn);
+			if (ids.length) filterConditions.push({ typeOfB2B: { $in: ids } });
+		} else if (typeOfB2B) {
+			filterConditions.push({ typeOfB2B: convertToObjectId(typeOfB2B) });
+		}
+		if (leadOwnerIn) {
+			const ids = parseIdList(leadOwnerIn);
+			if (ids.length) {
+				filterConditions.push({
+					$or: [{ leadOwner: { $in: ids } }, { leadAddedBy: { $in: ids } }]
+				});
+			}
+		} else if (leadOwner) {
+			filterConditions.push({
+				$or: [
+					{ leadOwner: convertToObjectId(leadOwner) },
+					{ leadAddedBy: convertToObjectId(leadOwner) }
+				]
+			});
+		}
+
+		const query = {
+			$and: [
+				...(ownershipConditions.length > 0
+					? [{ $or: ownershipConditions.flatMap((c) => c.$or || [c]) }]
+					: []),
+				...filterConditions
+			]
+		};
+		if (query.$and.length === 0) delete query.$and;
+
+		const leads = await Lead.find(query).select('followUpCall followUpVisit followUp logs');
+		const leadIds = leads.map((lead) => lead._id).filter(Boolean);
+		const leadIdStrs = leadIds.map((id) => String(id));
+		const leadIdMatch = {
+			$or: [
+				{ leadId: { $in: leadIds } },
+				{ leadId: { $in: leadIdStrs } }
+			]
+		};
+
+		const idsToDelete = new Set();
+		let flushedLeads = 0;
+		let flushedSlots = 0;
+
+		for (const lead of leads) {
+			const callRes = await flushMissedSlotOnLead(lead, 'followUpCall');
+			const visitRes = await flushMissedSlotOnLead(lead, 'followUpVisit');
+			const legacyRes = await flushMissedSlotOnLead(lead, 'followUp');
+			const clearedCount =
+				Number(callRes.cleared) + Number(visitRes.cleared) + Number(legacyRes.cleared);
+			if (!clearedCount) continue;
+
+			flushedLeads += 1;
+			flushedSlots += clearedCount;
+			[callRes, visitRes, legacyRes].forEach((r) => {
+				if (r.deleteId) idsToDelete.add(String(r.deleteId));
+			});
+
+			lead.logs = Array.isArray(lead.logs) ? lead.logs : [];
+			lead.logs.push({
+				user: req.user._id,
+				timestamp: new Date(),
+				action: 'Flushed missed follow-ups (Missed/overdue deleted; slots cleared)',
+				remarks: ''
+			});
+			await lead.save();
+		}
+
+		const now = new Date();
+		// Catch any remaining overdue Pending (dashboard Missed) for these leads
+		const overdueDocs = leadIds.length
+			? await FollowUp.find({
+				...leadIdMatch,
+				scheduledDate: { $ne: null, $lt: now },
+				status: { $not: { $regex: /^(completed|missed|rescheduled)$/i } }
+			}).select('_id')
+			: [];
+		overdueDocs.forEach((doc) => idsToDelete.add(String(doc._id)));
+
+		// All historical Missed records for these leads
+		const missedDocs = leadIds.length
+			? await FollowUp.find({
+				...leadIdMatch,
+				status: { $regex: /^missed$/i }
+			}).select('_id')
+			: [];
+		missedDocs.forEach((doc) => idsToDelete.add(String(doc._id)));
+
+		const deleteObjectIds = [...idsToDelete]
+			.filter((id) => mongoose.Types.ObjectId.isValid(id))
+			.map((id) => new mongoose.Types.ObjectId(id));
+
+		let deletedMissed = 0;
+		if (deleteObjectIds.length) {
+			const deleteResult = await FollowUp.deleteMany({ _id: { $in: deleteObjectIds } });
+			deletedMissed = deleteResult?.deletedCount || 0;
+
+			// Clear any dangling slot pointers to deleted follow-ups
+			await Lead.updateMany(
+				{ _id: { $in: leadIds }, followUpCall: { $in: deleteObjectIds } },
+				{ $set: { followUpCall: null } }
+			);
+			await Lead.updateMany(
+				{ _id: { $in: leadIds }, followUpVisit: { $in: deleteObjectIds } },
+				{ $set: { followUpVisit: null } }
+			);
+			await Lead.updateMany(
+				{ _id: { $in: leadIds }, followUp: { $in: deleteObjectIds } },
+				{ $set: { followUp: null } }
+			);
+		}
+
+		console.log('[B2B] flush-missed-followups', {
+			userId: String(req.user._id),
+			scannedLeads: leads.length,
+			flushedLeads,
+			flushedSlots,
+			deletedMissed
+		});
+
+		res.json({
+			status: true,
+			data: {
+				flushedLeads,
+				flushedSlots,
+				deletedMissed,
+				scannedLeads: leads.length
+			},
+			message: (flushedLeads || deletedMissed)
+				? `Deleted ${deletedMissed} missed/overdue follow-up(s); cleared slots on ${flushedLeads} lead(s)`
+				: 'No missed follow-ups to flush'
+		});
+	} catch (error) {
+		console.error('Error flushing missed follow-ups:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to flush missed follow-ups',
 			error: error.message
 		});
 	}

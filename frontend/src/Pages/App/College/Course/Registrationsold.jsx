@@ -4217,11 +4217,27 @@ console.log('API Response:', response.data);
     });
   };
 
-  const fetchDashboardCounts = async (filters = filterData) => {
+  const fetchDashboardCounts = async (filters = filterData, cycleOverride = null) => {
     if (!token) return;
     try {
-      const listParts = buildListFilterQueryParts(formDataRef.current || formData);
-      const followupParams = new URLSearchParams({ allTime: 'true', ...listParts });
+      const cycle = cycleOverride || cycleFilters;
+      const listParts = buildListFilterQueryParts(formDataRef.current || formData, cycle);
+      const sharedFilterParts = {
+        ...(filters?.name && { name: filters.name }),
+        ...(filters?.courseType && { courseType: filters.courseType }),
+        ...(filters?.status && filters.status !== 'true' && { status: filters.status }),
+        ...(filters?.leadStatus && { leadStatus: filters.leadStatus }),
+        ...(filters?.sector && { sector: filters.sector }),
+        ...(filters?.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
+        ...(filters?.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
+        ...(filters?.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
+        ...(filters?.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
+        ...(filters?.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
+        ...(filters?.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
+        ...(filters?.subStatuses && { subStatuses: filters.subStatuses }),
+        ...(filters?.approvalStatus && { approvalStatus: filters.approvalStatus }),
+      };
+      const followupParams = new URLSearchParams({ allTime: 'true', ...listParts, ...sharedFilterParts });
       const followupRes = await axios.get(`${backendUrl}/college/followupcounts?${followupParams}`, {
         headers: { 'x-auth': token },
       });
@@ -4246,6 +4262,7 @@ console.log('API Response:', response.data);
           page: '1',
           registeredByMe: userData._id,
           ...listParts,
+          ...sharedFilterParts,
         });
         const referRes = await axios.get(`${backendUrl}/college/appliedCandidates?${referParams}`, {
           headers: { 'x-auth': token },
@@ -4260,6 +4277,7 @@ console.log('API Response:', response.data);
         hasFollowUpCall: 'false',
         hasFollowUpVisit: 'false',
         ...listParts,
+        ...sharedFilterParts,
       });
       const noFollowupRes = await axios.get(`${backendUrl}/college/appliedCandidates?${noFollowupParams}`, {
         headers: { 'x-auth': token },
@@ -4398,7 +4416,7 @@ console.log('API Response:', response.data);
           await fetchMilestoneCounts(filters);
         } else {
           await fetchRegistrationCrmFilterCounts(filters, page, null);
-          await fetchDashboardCounts(filters);
+          await fetchDashboardCounts(filters, cycleOverride || cycleFilters);
           await fetchKycCounts();
           await fetchMilestoneCounts(filters);
         }
@@ -12821,17 +12839,22 @@ useEffect(() => {
     }
 
     setCycleFilters(next);
-    setFormData((fd) => ({
-      ...fd,
-      verticals: { ...fd.verticals, values: next.department ? [next.department] : [] },
-      projects: { ...fd.projects, values: next.project ? [next.project] : [] },
-      course: { ...fd.course, values: next.course ? [next.course] : [] },
-      center: { ...fd.center, values: next.center ? [next.center] : [] },
-      counselor: { ...fd.counselor, values: next.counsellor ? [next.counsellor] : [] },
-    }));
+    setFormData((fd) => {
+      const updated = {
+        ...fd,
+        verticals: { ...fd.verticals, values: next.department ? [next.department] : [] },
+        projects: { ...fd.projects, values: next.project ? [next.project] : [] },
+        course: { ...fd.course, values: next.course ? [next.course] : [] },
+        center: { ...fd.center, values: next.center ? [next.center] : [] },
+        counselor: { ...fd.counselor, values: next.counsellor ? [next.counsellor] : [] },
+      };
+      formDataRef.current = updated;
+      return updated;
+    });
     setCurrentPage(1);
     fetchProfileData(filterData, 1, next);
     fetchRegistrationCrmFilterCounts(filterData, 1, null);
+    fetchDashboardCounts(filterData, next);
   };
 
   useEffect(() => {
@@ -13520,9 +13543,11 @@ useEffect(() => {
               fontWeight: 600,
               borderRadius: '999px',
               cursor: 'pointer',
-              color: leadViewTab === 'noFollowup' ? '#fff' : 'rgb(250, 85, 121)',
-              backgroundColor: leadViewTab === 'noFollowup' ? 'rgb(250, 85, 121)' : '#fff',
-              border: leadViewTab === 'noFollowup' ? 'none' : '1.5px solid rgb(250, 85, 121)',
+              color: '#fff',
+              backgroundColor: 'rgb(250, 85, 121)',
+              border: 'none',
+              outline: leadViewTab === 'noFollowup' ? '2px solid rgba(255,255,255,0.85)' : 'none',
+              outlineOffset: '2px',
             }}
             onClick={() => handleLeadViewTabChange('noFollowup')}
           >

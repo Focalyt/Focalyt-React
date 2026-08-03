@@ -1736,6 +1736,7 @@ const B2BSales = () => {
   const [leadViewTab, setLeadViewTab] = useState('all'); // 'all' | 'myRefer' | 'noFollowup'
   const [myReferLeadsCount, setMyReferLeadsCount] = useState(0);
   const [noFollowupLeadsCount, setNoFollowupLeadsCount] = useState(0);
+  const [flushingMissedFollowups, setFlushingMissedFollowups] = useState(false);
 
   const [aiLeadIntelById, setAiLeadIntelById] = useState({});
   const [aiLeadIntelLoading, setAiLeadIntelLoading] = useState(false);
@@ -1875,17 +1876,87 @@ const B2BSales = () => {
     }
   };
 
-  const fetchNoFollowupLeadsCount = async () => {
+  const fetchNoFollowupLeadsCount = async (filterOverrides = {}) => {
     try {
+      const eff = stripDashboardSubFilters({ ...filtersRef.current, ...filterOverrides });
+      const params = {};
+      appendLeadFilterParams(params, eff);
+      params.hasFollowUpCall = false;
+      params.hasFollowUpVisit = false;
       const response = await axios.get(`${backendUrl}/college/b2b/leads/status-count`, {
         headers: { 'x-auth': token },
-        params: { hasFollowUpCall: false, hasFollowUpVisit: false }
+        params
       });
       if (response.data.status) {
         setNoFollowupLeadsCount(response.data.data?.totalLeads ?? 0);
       }
     } catch (error) {
       console.error('Error fetching no-followup leads count:', error);
+    }
+  };
+
+  const flushMissedFollowups = async () => {
+    if (flushingMissedFollowups) return;
+    const confirmed = window.confirm(
+      'Flush missed follow-ups?\n\nDeletes Missed AND overdue Pending follow-ups only (Done / future Planned stay). Missed count should become 0. Current filters apply.'
+    );
+    if (!confirmed) return;
+
+    try {
+      setFlushingMissedFollowups(true);
+      const eff = stripDashboardSubFilters({ ...filtersRef.current });
+      const body = {};
+      if (eff.b2bDepartment) body.b2bDepartment = eff.b2bDepartment;
+      if (eff.b2bProject) body.b2bProject = eff.b2bProject;
+      if (Array.isArray(eff.typeOfB2B) && eff.typeOfB2B.length) {
+        body.typeOfB2BIn = eff.typeOfB2B.filter(Boolean).join(',');
+      }
+      if (Array.isArray(eff.leadOwner) && eff.leadOwner.length) {
+        body.leadOwnerIn = eff.leadOwner.filter(Boolean).join(',');
+      }
+
+      const response = await axios.post(
+        `${backendUrl}/college/b2b/leads/flush-missed-followups`,
+        body,
+        { headers: { 'x-auth': token } }
+      );
+
+      if (!response.data?.status) {
+        alert(response.data?.message || 'Failed to flush missed follow-ups');
+        return;
+      }
+
+      const {
+        flushedLeads = 0,
+        flushedSlots = 0,
+        deletedMissed = 0
+      } = response.data.data || {};
+      alert(
+        (flushedLeads || deletedMissed)
+          ? `Deleted ${deletedMissed} missed follow-up(s). Cleared ${flushedSlots} slot(s) on ${flushedLeads} lead(s).`
+          : (response.data.message || 'No missed follow-ups to flush.')
+      );
+
+      window.dispatchEvent(new CustomEvent('b2b-followup-updated'));
+      // Clear Call/Visit missed drill-down so dashboard totals refresh cleanly
+      if (filtersRef.current.followUpCallBucket || filtersRef.current.followUpVisitBucket) {
+        const next = getDashSubFiltersCleared();
+        syncFiltersRef(next);
+        setFilters(next);
+        setSelectedStatusFilter(null);
+      }
+      fetchNoFollowupLeadsCount();
+      fetchStatusCounts();
+      fetchLeads(
+        null,
+        1,
+        getLeadFetchOverrides()
+      );
+    } catch (error) {
+      console.error('Error flushing missed follow-ups:', error);
+      alert(error.response?.data?.message || 'Failed to flush missed follow-ups');
+    } finally {
+      setFlushingMissedFollowups(false);
     }
   };
 
@@ -2426,6 +2497,7 @@ const B2BSales = () => {
     fetchLeads(null, 1, { ...cleared, approvalStatus: null });
     fetchStatusCounts(cleared);
     fetchApprovalCounts(cleared);
+    fetchNoFollowupLeadsCount(cleared);
   };
 
   const clearFollowupDashFilters = () => {
@@ -2438,6 +2510,7 @@ const B2BSales = () => {
     fetchLeads(null, 1, getLeadFetchOverrides({ ...next, approvalStatus: null }));
     fetchStatusCounts(next);
     fetchApprovalCounts(next);
+    fetchNoFollowupLeadsCount(next);
   };
 
   // Handle total card click (show all leads for current header filters)
@@ -2547,6 +2620,7 @@ const B2BSales = () => {
     setFilters(syncFiltersRef(next));
     setCurrentPage(1);
     fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides(next));
+    fetchNoFollowupLeadsCount(next);
     if (leadViewTab === 'all') {
       fetchStatusCounts(next);
       fetchApprovalCounts(next);
@@ -2663,6 +2737,7 @@ const B2BSales = () => {
     setFilters(next);
     setCurrentPage(1);
     fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides(next));
+    fetchNoFollowupLeadsCount(next);
     if (leadViewTab === 'all') {
       fetchStatusCounts(next);
       fetchApprovalCounts(next);
@@ -2678,6 +2753,7 @@ const B2BSales = () => {
     setFilters(next);
     setCurrentPage(1);
     fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides(next));
+    fetchNoFollowupLeadsCount(next);
     if (leadViewTab === 'all') {
       fetchStatusCounts(next);
       fetchApprovalCounts(next);
@@ -2852,6 +2928,7 @@ const B2BSales = () => {
     const merged = syncFiltersRef({ ...filtersRef.current, ...filterOverrides });
     setCurrentPage(1);
     fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides(merged));
+    fetchNoFollowupLeadsCount(merged);
     if (leadViewTab === 'all') {
       fetchStatusCounts(merged);
       fetchApprovalCounts(merged);
@@ -2891,6 +2968,7 @@ const B2BSales = () => {
     setFilters(cleared);
     setCurrentPage(1);
     fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides(cleared));
+    fetchNoFollowupLeadsCount(cleared);
     if (leadViewTab === 'all') {
       fetchStatusCounts(cleared);
       fetchApprovalCounts(cleared);
@@ -8620,14 +8698,46 @@ const renderWhatsAppPanel = () => {
                             fontWeight: 600,
                             borderRadius: '999px',
                             cursor: 'pointer',
-                            color: leadViewTab === 'noFollowup' ? '#fff' : 'rgb(250, 85, 121)',
-                            backgroundColor: leadViewTab === 'noFollowup' ? 'rgb(250, 85, 121)' : '#fff',
-                            border: leadViewTab === 'noFollowup' ? 'none' : '1.5px solid rgb(250, 85, 121)'
+                            color: '#fff',
+                            backgroundColor: 'rgb(250, 85, 121)',
+                            border: 'none',
+                            outline: leadViewTab === 'noFollowup' ? '2px solid rgba(255,255,255,0.85)' : 'none',
+                            outlineOffset: '2px',
                           }}
                           onClick={() => handleLeadViewTabChange('noFollowup')}
                         >
                           No Followup ({noFollowupLeadsCount})
                         </button>
+                        {/* <button
+                          type="button"
+                          className="b2b-perf-chip"
+                          disabled={flushingMissedFollowups}
+                          title="Delete Missed follow-ups only (Done/Planned stay). Missed counts become 0."
+                          style={{
+                            padding: '6px 14px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            borderRadius: '999px',
+                            cursor: flushingMissedFollowups ? 'wait' : 'pointer',
+                            color: '#fff',
+                            backgroundColor: flushingMissedFollowups ? '#9ca3af' : 'rgb(8, 80, 120)',
+                            border: 'none',
+                            opacity: flushingMissedFollowups ? 0.8 : 1
+                          }}
+                          onClick={flushMissedFollowups}
+                        >
+                          {flushingMissedFollowups ? (
+                            <>
+                              <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true" />
+                              Flushing…
+                            </>
+                          ) : (
+                            <>
+                              <i className="fas fa-broom me-1" aria-hidden="true" />
+                              Flush Missed Followup
+                            </>
+                          )}
+                        </button> */}
                       </div>
                     </div>
 
