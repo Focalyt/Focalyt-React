@@ -6,7 +6,7 @@ const Anthropic = require("@anthropic-ai/sdk");
 require("dotenv").config({
   path: path.resolve(__dirname, "../.env"),
 });
-
+ 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
