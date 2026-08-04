@@ -657,6 +657,54 @@ async function processRule(rule) {
   return { matched };
 }
 
+/** Build Meta template components for header/carousel media stored on WhatsAppTemplate */
+function buildTemplateMediaComponents(template) {
+  const components = [];
+
+  if (template.headerMedia?.s3Url) {
+    const mediaType = String(template.headerMedia.mediaType || 'IMAGE').toLowerCase();
+    components.push({
+      type: 'header',
+      parameters: [{
+        type: mediaType,
+        [mediaType]: { link: template.headerMedia.s3Url }
+      }]
+    });
+  } else if (template.headerMedia?.mediaType) {
+    throw new Error(
+      `Template "${template.templateName}" requires ${template.headerMedia.mediaType} header media, but no s3Url is saved`
+    );
+  }
+
+  if (template.carouselMedia?.length) {
+    const carouselCards = template.carouselMedia.map((card, index) => {
+      if (!card.s3Url || !card.mediaType) {
+        throw new Error(
+          `Template "${template.templateName}" carousel card ${index} is missing media`
+        );
+      }
+      const mediaType = String(card.mediaType).toLowerCase();
+      return {
+        card_index: card.cardIndex ?? index,
+        components: [{
+          type: 'header',
+          parameters: [{
+            type: mediaType,
+            [mediaType]: { link: card.s3Url }
+          }]
+        }]
+      };
+    });
+
+    components.push({
+      type: 'carousel',
+      cards: carouselCards
+    });
+  }
+
+  return components;
+}
+
 async function sendWhatsAppTemplate(to, templateName, collegeId) {
   if (!WHATSAPP_ACCESS_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
     throw new Error('WhatsApp credentials missing');
@@ -676,6 +724,8 @@ async function sendWhatsAppTemplate(to, templateName, collegeId) {
     throw new Error(`Template "${templateName}" not found`);
   }
 
+  const components = buildTemplateMediaComponents(template);
+
   const url = `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
   const payload = {
     messaging_product: 'whatsapp',
@@ -684,7 +734,8 @@ async function sendWhatsAppTemplate(to, templateName, collegeId) {
     type: 'template',
     template: {
       name: template.templateName,
-      language: { code: template.language || 'en' }
+      language: { code: template.language || 'en' },
+      ...(components.length ? { components } : {})
     }
   };
 
