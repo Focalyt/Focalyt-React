@@ -11,6 +11,7 @@ const {
   Lead,
   College
 } = require('../controllers/models');
+const { resolvePublicUrl } = require('../helpers/s3Storage');
 
 const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v21.0';
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_ID;
@@ -663,11 +664,17 @@ function buildTemplateMediaComponents(template) {
 
   if (template.headerMedia?.s3Url) {
     const mediaType = String(template.headerMedia.mediaType || 'IMAGE').toLowerCase();
+    const mediaLink = resolvePublicUrl(template.headerMedia.s3Url || template.headerMedia.s3Key);
+    if (!mediaLink || !/^https?:\/\//i.test(mediaLink)) {
+      throw new Error(
+        `Template "${template.templateName}" header media link is not a valid public URL (got: ${mediaLink || 'empty'}). Check MIPIE_BUCKET_URL.`
+      );
+    }
     components.push({
       type: 'header',
       parameters: [{
         type: mediaType,
-        [mediaType]: { link: template.headerMedia.s3Url }
+        [mediaType]: { link: mediaLink }
       }]
     });
   } else if (template.headerMedia?.mediaType) {
@@ -684,13 +691,19 @@ function buildTemplateMediaComponents(template) {
         );
       }
       const mediaType = String(card.mediaType).toLowerCase();
+      const mediaLink = resolvePublicUrl(card.s3Url || card.s3Key);
+      if (!mediaLink || !/^https?:\/\//i.test(mediaLink)) {
+        throw new Error(
+          `Template "${template.templateName}" carousel card ${index} media link is not a valid public URL. Check MIPIE_BUCKET_URL.`
+        );
+      }
       return {
         card_index: card.cardIndex ?? index,
         components: [{
           type: 'header',
           parameters: [{
             type: mediaType,
-            [mediaType]: { link: card.s3Url }
+            [mediaType]: { link: mediaLink }
           }]
         }]
       };

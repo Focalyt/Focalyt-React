@@ -82,6 +82,38 @@ router.get('/templates', [isCollege], async (req, res) => {
 					
 					if (dbTemplate) {
 						console.log(`Found database media for template: ${template.name}`);
+
+						// Sync Meta status/category/id into local DB when webhook missed an update
+						const metaStatus = template.status ? String(template.status).toUpperCase() : null;
+						const metaCategory = template.category ? String(template.category).toUpperCase() : null;
+						const allowedStatuses = ['PENDING', 'APPROVED', 'REJECTED', 'PAUSED'];
+						const allowedCategories = ['UTILITY', 'MARKETING', 'AUTHENTICATION'];
+						const syncUpdate = {};
+
+						if (metaStatus && allowedStatuses.includes(metaStatus) && dbTemplate.status !== metaStatus) {
+							syncUpdate.status = metaStatus;
+						}
+						if (metaCategory && allowedCategories.includes(metaCategory) && dbTemplate.category !== metaCategory) {
+							syncUpdate.category = metaCategory;
+						}
+						if (template.id && dbTemplate.templateId !== String(template.id)) {
+							syncUpdate.templateId = String(template.id);
+						}
+						if (template.language && dbTemplate.language !== template.language) {
+							syncUpdate.language = template.language;
+						}
+						if (metaStatus === 'REJECTED' && template.rejected_reason) {
+							syncUpdate.rejectionReason = template.rejected_reason;
+						}
+
+						if (Object.keys(syncUpdate).length > 0) {
+							syncUpdate.updatedAt = new Date();
+							await WhatsAppTemplate.updateOne(
+								{ _id: dbTemplate._id },
+								{ $set: syncUpdate }
+							);
+							console.log(`  - Synced Meta fields to DB for ${template.name}:`, syncUpdate);
+						}
 						
 						// Add variable mappings to template
 						if (dbTemplate.variableMappings && dbTemplate.variableMappings.length > 0) {
@@ -618,11 +650,15 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 			
 			// Handle BUTTONS component - ensure proper structure
 			if (component.type === 'BUTTONS' && component.buttons) {
-				processedComponent.buttons = component.buttons.map(button => ({
-					type: button.type,
-					text: button.text,
-					...(button.url && { url: button.url })
-				}));
+				processedComponent.buttons = component.buttons.map(button => {
+					const phoneNumber = button.phone_number || button.phoneNumber;
+					return {
+						type: button.type,
+						text: button.text,
+						...(button.url && { url: button.url }),
+						...(phoneNumber && { phone_number: phoneNumber })
+					};
+				});
 			}
 			
 			// Remove example property if it's empty or undefined (but keep valid examples)
