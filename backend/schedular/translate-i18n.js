@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const Anthropic = require("@anthropic-ai/sdk");
 
-// Load ANTHROPIC_API_KEY from backend/.env
+// Load ANTHROPIC_API_KEY from backend/.envs
 require("dotenv").config({
   path: path.resolve(__dirname, "../.env"),
 });
