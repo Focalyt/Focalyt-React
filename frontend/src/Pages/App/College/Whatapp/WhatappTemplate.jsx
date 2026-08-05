@@ -1496,7 +1496,7 @@ const WhatsAppTemplate = () => {
 
   // Function to save template
 
-  const handleCloneTemplate = (template) => {
+  const handleCloneTemplate = async (template) => {
 
     setEditingTemplate(template);
 
@@ -1627,6 +1627,50 @@ const WhatsAppTemplate = () => {
 
 
 
+    // Meta header_handle is NOT a usable image/video file. Prefer DB-stored Hostinger media.
+    const loadStoredHeaderMediaAsDataUrl = async (media) => {
+      if (!media?.s3Url && !media?.s3Key) return null;
+      const key = media.s3Key || media.s3Url;
+      const mediaUrl = String(key).startsWith('http')
+        ? key
+        : `${backendUrl}/upload/${key}`;
+      try {
+        const res = await fetch(mediaUrl);
+        if (!res.ok) throw new Error(`Failed to fetch header media (${res.status})`);
+        const blob = await res.blob();
+        if (!blob || blob.size < 200) {
+          throw new Error(`Header media too small (${blob?.size || 0} bytes)`);
+        }
+        return await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } catch (err) {
+        console.warn('Clone: could not load stored header media, re-upload required:', err.message);
+        return null;
+      }
+    };
+
+    const dbHeaderMedia = template.headerMedia || templateData.headerMedia || null;
+    let clonedHeaderImage = null;
+    let clonedHeaderVideo = null;
+    let clonedHeaderDocument = null;
+
+    if (headerType === 'IMAGE') {
+      clonedHeaderImage = await loadStoredHeaderMediaAsDataUrl(dbHeaderMedia);
+    } else if (headerType === 'VIDEO') {
+      clonedHeaderVideo = await loadStoredHeaderMediaAsDataUrl(dbHeaderMedia);
+    } else if (headerType === 'DOCUMENT') {
+      clonedHeaderDocument = await loadStoredHeaderMediaAsDataUrl(dbHeaderMedia);
+    }
+
+    if ((headerType === 'IMAGE' || headerType === 'VIDEO' || headerType === 'DOCUMENT') &&
+      !clonedHeaderImage && !clonedHeaderVideo && !clonedHeaderDocument) {
+      alert('Cloned template needs the header media re-uploaded. Meta media handles cannot be reused.');
+    }
+
     // Clone the template with all data
 
     setEditForm({
@@ -1645,11 +1689,11 @@ const WhatsAppTemplate = () => {
 
       headerType: headerType,
 
-      headerImage: headerComponent?.format === 'IMAGE' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+      headerImage: clonedHeaderImage,
 
-      headerVideo: headerComponent?.format === 'VIDEO' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+      headerVideo: clonedHeaderVideo,
 
-      headerDocument: headerComponent?.format === 'DOCUMENT' ? (headerComponent?.example?.header_handle?.[0] || null) : null,
+      headerDocument: clonedHeaderDocument,
 
       buttons: buttonsComponent?.buttons || [],
 
@@ -2183,7 +2227,8 @@ const WhatsAppTemplate = () => {
         // Extract file name from the file or use a default name
         const fileName = file.name || defaultName;
 
-        // If file is a File object, convert to base64
+        // Only accept real files / data URLs. Never treat Meta header_handle as base64
+        // (that produced ~78-byte fake PNGs and WhatsApp "Media upload error").
         if (file instanceof File) {
           const base64String = await new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -2199,16 +2244,19 @@ const WhatsAppTemplate = () => {
         } else if (typeof file === 'string' && file.startsWith('data:')) {
           // If it's already a data URL, extract the base64 part
           const base64String = file.split(',')[1];
+          if (!base64String || base64String.length < 200) {
+            alert('Header media looks invalid. Please re-upload the image/video/document.');
+            setIsCreatingTemplate(false);
+            return;
+          }
           templateData.base64File = {
             name: fileName,
             body: base64String
           };
-        } else if (typeof file === 'string') {
-          // If it's already a base64 string
-          templateData.base64File = {
-            name: fileName,
-            body: file
-          };
+        } else {
+          alert('Please upload a valid header media file before creating this template.');
+          setIsCreatingTemplate(false);
+          return;
         }
       }
 
