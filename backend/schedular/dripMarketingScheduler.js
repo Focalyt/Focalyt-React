@@ -11,7 +11,6 @@ const {
   Lead,
   College
 } = require('../controllers/models');
-const { resolvePublicUrl } = require('../helpers/s3Storage');
 
 const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v21.0';
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_ID;
@@ -659,22 +658,19 @@ async function processRule(rule) {
 }
 
 /** Build Meta template components for header/carousel media stored on WhatsAppTemplate */
-function buildTemplateMediaComponents(template) {
+async function buildTemplateMediaComponents(template) {
+  const { uploadStorageKeyToWhatsApp } = require('../helpers/whatsappMediaUpload');
   const components = [];
 
-  if (template.headerMedia?.s3Url) {
+  if (template.headerMedia?.s3Url || template.headerMedia?.s3Key) {
     const mediaType = String(template.headerMedia.mediaType || 'IMAGE').toLowerCase();
-    const mediaLink = resolvePublicUrl(template.headerMedia.s3Url || template.headerMedia.s3Key);
-    if (!mediaLink || !/^https?:\/\//i.test(mediaLink)) {
-      throw new Error(
-        `Template "${template.templateName}" header media link is not a valid public URL (got: ${mediaLink || 'empty'}). Check MIPIE_BUCKET_URL.`
-      );
-    }
+    const storageKey = template.headerMedia.s3Key || template.headerMedia.s3Url;
+    const mediaId = await uploadStorageKeyToWhatsApp(storageKey, template.headerMedia.fileName);
     components.push({
       type: 'header',
       parameters: [{
         type: mediaType,
-        [mediaType]: { link: mediaLink }
+        [mediaType]: { id: mediaId }
       }]
     });
   } else if (template.headerMedia?.mediaType) {
@@ -684,30 +680,28 @@ function buildTemplateMediaComponents(template) {
   }
 
   if (template.carouselMedia?.length) {
-    const carouselCards = template.carouselMedia.map((card, index) => {
-      if (!card.s3Url || !card.mediaType) {
+    const carouselCards = [];
+    for (let index = 0; index < template.carouselMedia.length; index++) {
+      const card = template.carouselMedia[index];
+      if (!(card.s3Url || card.s3Key) || !card.mediaType) {
         throw new Error(
           `Template "${template.templateName}" carousel card ${index} is missing media`
         );
       }
       const mediaType = String(card.mediaType).toLowerCase();
-      const mediaLink = resolvePublicUrl(card.s3Url || card.s3Key);
-      if (!mediaLink || !/^https?:\/\//i.test(mediaLink)) {
-        throw new Error(
-          `Template "${template.templateName}" carousel card ${index} media link is not a valid public URL. Check MIPIE_BUCKET_URL.`
-        );
-      }
-      return {
+      const storageKey = card.s3Key || card.s3Url;
+      const mediaId = await uploadStorageKeyToWhatsApp(storageKey, card.fileName);
+      carouselCards.push({
         card_index: card.cardIndex ?? index,
         components: [{
           type: 'header',
           parameters: [{
             type: mediaType,
-            [mediaType]: { link: mediaLink }
+            [mediaType]: { id: mediaId }
           }]
         }]
-      };
-    });
+      });
+    }
 
     components.push({
       type: 'carousel',
@@ -737,7 +731,7 @@ async function sendWhatsAppTemplate(to, templateName, collegeId) {
     throw new Error(`Template "${templateName}" not found`);
   }
 
-  const components = buildTemplateMediaComponents(template);
+  const components = await buildTemplateMediaComponents(template);
 
   const url = `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
   const payload = {
