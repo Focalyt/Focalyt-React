@@ -1871,6 +1871,70 @@ function getMediaUrl(s3Url) {
   return publicUrl || null;
 }
 
+function mimeTypeFromName(fileNameOrKey) {
+	const ext = String(fileNameOrKey || '').split('.').pop().toLowerCase();
+	const map = {
+		png: 'image/png',
+		jpg: 'image/jpeg',
+		jpeg: 'image/jpeg',
+		webp: 'image/webp',
+		gif: 'image/gif',
+		mp4: 'video/mp4',
+		'3gpp': 'video/3gpp',
+		pdf: 'application/pdf',
+	};
+	return map[ext] || 'application/octet-stream';
+}
+
+/**
+ * Upload a local/Hostinger storage object to WhatsApp Media API.
+ * Prefer media id over public link — Meta often cannot fetch Hostinger/self-hosted URLs.
+ */
+async function uploadStorageKeyToWhatsApp(storageKey, fileName) {
+	const key = normalizeStorageKey(storageKey);
+	if (!key) {
+		throw new Error('Missing storage key for WhatsApp media upload');
+	}
+
+	const obj = await s3.getObject({ Key: key }).promise();
+	const buffer = obj.Body;
+	if (!buffer || !buffer.length) {
+		throw new Error(`Empty media file for key: ${key}`);
+	}
+
+	const uploadName = fileName || key.split('/').pop() || 'media.bin';
+	const mimeType = mimeTypeFromName(uploadName);
+
+	const formData = new FormData();
+	formData.append('messaging_product', 'whatsapp');
+	formData.append('type', mimeType);
+	formData.append('file', buffer, {
+		filename: uploadName,
+		contentType: mimeType,
+		knownLength: buffer.length,
+	});
+
+	const response = await axios.post(
+		`${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/media`,
+		formData,
+		{
+			headers: {
+				Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+				...formData.getHeaders(),
+			},
+			maxBodyLength: Infinity,
+			maxContentLength: Infinity,
+		}
+	);
+
+	if (!response.data?.id) {
+		throw new Error('WhatsApp media upload returned no id');
+	}
+
+	console.log(`✓ Uploaded ${uploadName} to WhatsApp media id=${response.data.id}`);
+	return response.data.id;
+}
+
 /**
  * Convert Facebook handle to WhatsApp media URL
  */
@@ -2128,37 +2192,91 @@ async function sendWhatsAppMessage(to, template, mediaUrls = {}, candidateData =
   }
 
   // Handle regular header media (IMAGE/VIDEO/DOCUMENT)
-  if (template.headerMedia && template.headerMedia.mediaType && mediaUrls.headerUrl) {
-    components.push({
-      type: 'header',
-      parameters: [{
-        type: template.headerMedia.mediaType.toLowerCase(),
-        [template.headerMedia.mediaType.toLowerCase()]: {
-          link: mediaUrls.headerUrl
+  // Prefer WhatsApp media id (upload from local disk) over public link
+  if (template.headerMedia && template.headerMedia.mediaType) {
+    const mediaType = template.headerMedia.mediaType.toLowerCase();
+    const storageKey = template.headerMedia.s3Key || template.headerMedia.s3Url;
+    let mediaRef = null;
+
+    if (storageKey) {
+      try {
+        const mediaId = await uploadStorageKeyToWhatsApp(storageKey, template.headerMedia.fileName);
+        mediaRef = { id: mediaId };
+      } catch (uploadErr) {
+        console.error(
+          'WhatsApp media id upload failed, falling back to link:',
+          uploadErr.response?.data || uploadErr.message
+        );
+        if (mediaUrls.headerUrl) {
+          mediaRef = { link: mediaUrls.headerUrl };
+        } else {
+          throw uploadErr;
         }
-      }]
-    });
+      }
+    } else if (mediaUrls.headerUrl) {
+      mediaRef = { link: mediaUrls.headerUrl };
+    }
+
+    if (mediaRef) {
+      components.push({
+        type: 'header',
+        parameters: [{
+          type: mediaType,
+          [mediaType]: mediaRef
+        }]
+      });
+    }
   }
 
   // Handle carousel media
-  if (template.carouselMedia && template.carouselMedia.length > 0 && mediaUrls.carouselUrls) {
-    const carouselCards = template.carouselMedia.map((card, index) => ({
-      card_index: card.cardIndex,
-      components: [{
-        type: 'header',
-        parameters: [{
-          type: card.mediaType.toLowerCase(),
-          [card.mediaType.toLowerCase()]: {
-            link: mediaUrls.carouselUrls[index]
-          }
-        }]
-      }]
-    }));
+  if (template.carouselMedia && template.carouselMedia.length > 0) {
+    const carouselCards = [];
 
-    components.push({
-      type: 'carousel',
-      cards: carouselCards
-    });
+    for (let index = 0; index < template.carouselMedia.length; index++) {
+      const card = template.carouselMedia[index];
+      const mediaType = (card.mediaType || 'IMAGE').toLowerCase();
+      const storageKey = card.s3Key || card.s3Url;
+      let mediaRef = null;
+
+      if (storageKey) {
+        try {
+          const mediaId = await uploadStorageKeyToWhatsApp(storageKey, card.fileName);
+          mediaRef = { id: mediaId };
+        } catch (uploadErr) {
+          console.error(
+            `Carousel card ${card.cardIndex} media upload failed, falling back to link:`,
+            uploadErr.response?.data || uploadErr.message
+          );
+          if (mediaUrls.carouselUrls?.[index]) {
+            mediaRef = { link: mediaUrls.carouselUrls[index] };
+          } else {
+            throw uploadErr;
+          }
+        }
+      } else if (mediaUrls.carouselUrls?.[index]) {
+        mediaRef = { link: mediaUrls.carouselUrls[index] };
+      }
+
+      if (mediaRef) {
+        carouselCards.push({
+          card_index: card.cardIndex,
+          components: [{
+            type: 'header',
+            parameters: [{
+              type: mediaType,
+              [mediaType]: mediaRef
+            }]
+          }]
+        });
+      }
+    }
+
+    if (carouselCards.length > 0) {
+      components.push({
+        type: 'carousel',
+        cards: carouselCards
+      });
+    }
   }
 
   // Add components to payload if any exist
