@@ -55,6 +55,12 @@ async function uploadStorageKeyToWhatsApp(storageKey, fileName) {
 	if (!stat.size) {
 		throw new Error(`Empty media file for key: ${key}`);
 	}
+	// Cloned Meta handles saved as "images" are ~78 bytes and Meta rejects them
+	if (stat.size < 200) {
+		throw new Error(
+			`Media file too small (${stat.size} bytes) for key: ${key}. Re-upload a real image/video for this template.`
+		);
+	}
 
 	const uploadName = fileName || path.basename(key) || 'media.bin';
 	const mimeType = mimeTypeFromName(uploadName);

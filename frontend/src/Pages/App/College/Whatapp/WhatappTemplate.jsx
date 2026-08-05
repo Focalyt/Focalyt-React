@@ -1566,18 +1566,14 @@ const WhatsAppTemplate = () => {
       if (carouselComponent && carouselComponent.cards) {
         carouselCards = carouselComponent.cards.map((card, index) => {
           const headerComponent = card.components?.find(comp => comp.type === 'header' || comp.type === 'HEADER');
-          const headerImage = (headerComponent?.format === 'IMAGE' || headerComponent?.format === 'image') ? headerComponent?.example?.header_handle?.[0] : '';
-          const headerVideo = (headerComponent?.format === 'VIDEO' || headerComponent?.format === 'video') ? headerComponent?.example?.header_handle?.[0] : '';
-
-
-
+          // Do NOT copy Meta header_handle / S3 key strings — those are not usable files
           return {
             id: Date.now() + index,
             bodyText: card.components?.find(comp => comp.type === 'body' || comp.type === 'BODY')?.text || '',
             buttons: card.components?.find(comp => comp.type === 'buttons' || comp.type === 'BUTTONS')?.buttons || [],
             headerType: headerComponent?.format || 'None',
-            headerImage: headerImage,
-            headerVideo: headerVideo
+            headerImage: null,
+            headerVideo: null
           };
         });
       }
@@ -1669,6 +1665,31 @@ const WhatsAppTemplate = () => {
     if ((headerType === 'IMAGE' || headerType === 'VIDEO' || headerType === 'DOCUMENT') &&
       !clonedHeaderImage && !clonedHeaderVideo && !clonedHeaderDocument) {
       alert('Cloned template needs the header media re-uploaded. Meta media handles cannot be reused.');
+    }
+
+    // Load carousel card media from DB (same as header — never reuse Meta handles)
+    const dbCarouselMedia = template.carouselMedia || templateData.carouselMedia || [];
+    if (templateType === 'Carousel' && carouselCards.length > 0) {
+      carouselCards = await Promise.all(carouselCards.map(async (card, index) => {
+        const cardMedia = dbCarouselMedia[index] || null;
+        const format = String(card.headerType || '').toUpperCase();
+        const dataUrl = await loadStoredHeaderMediaAsDataUrl(cardMedia);
+        return {
+          ...card,
+          headerImage: format === 'IMAGE' ? dataUrl : null,
+          headerVideo: format === 'VIDEO' ? dataUrl : null
+        };
+      }));
+
+      const missingCarouselMedia = carouselCards.some((card) => {
+        const format = String(card.headerType || '').toUpperCase();
+        if (format === 'IMAGE') return !card.headerImage;
+        if (format === 'VIDEO') return !card.headerVideo;
+        return false;
+      });
+      if (missingCarouselMedia) {
+        alert('Cloned carousel needs card media re-uploaded. Meta media handles cannot be reused.');
+      }
     }
 
     // Clone the template with all data
@@ -2297,17 +2318,20 @@ const WhatsAppTemplate = () => {
               });
             } else if (typeof file === 'string' && file.startsWith('data:')) {
               const base64String = file.split(',')[1];
+              if (!base64String || base64String.length < 200) {
+                alert(`Carousel card ${i + 1} media looks invalid. Please re-upload the image/video.`);
+                setIsCreatingTemplate(false);
+                return;
+              }
               carouselFiles.push({
                 name: fileName,
                 body: base64String,
                 cardIndex: i
               });
-            } else if (typeof file === 'string') {
-              carouselFiles.push({
-                name: fileName,
-                body: file,
-                cardIndex: i
-              });
+            } else {
+              alert(`Please upload a valid media file for carousel card ${i + 1} before creating this template.`);
+              setIsCreatingTemplate(false);
+              return;
             }
           }
         }

@@ -125,6 +125,14 @@ router.get('/templates', [isCollege], async (req, res) => {
 							template.variableMappings = dbTemplate.variableMappings;
 							console.log(`  - Added variable mappings:`, dbTemplate.variableMappings);
 						}
+
+						// Expose stored media so clone/drip can load real files (not Meta handles)
+						if (dbTemplate.headerMedia) {
+							template.headerMedia = dbTemplate.headerMedia;
+						}
+						if (dbTemplate.carouselMedia?.length) {
+							template.carouselMedia = dbTemplate.carouselMedia;
+						}
 						
 						// Replace Facebook handles with S3 URLs in components
 						if (template.components) {
@@ -390,6 +398,12 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 			// Convert base64 to buffer
 			const base64Data = base64File.body.replace(/^data:[^;]+;base64,/, '');
 			const buffer = Buffer.from(base64Data, 'base64');
+			// Meta header_handle / storage keys decoded as base64 produce ~78-byte fake files
+			if (!buffer.length || buffer.length < 200) {
+				throw new Error(
+					`Header media is too small (${buffer.length} bytes). Re-upload a real image/video instead of cloning Meta media handles.`
+				);
+			}
 
 			// Determine content type based on file extension
 			let contentType = `image/${ext}`;
@@ -463,7 +477,13 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 				const { name: fileName, body: base64Data, cardIndex } = carouselFile;
 				
 				// Convert base64 to buffer
-				const buffer = Buffer.from(base64Data, 'base64');
+				const cleanBase64 = String(base64Data || '').replace(/^data:[^;]+;base64,/, '');
+				const buffer = Buffer.from(cleanBase64, 'base64');
+				if (!buffer.length || buffer.length < 200) {
+					throw new Error(
+						`Carousel card ${cardIndex} media is too small (${buffer.length} bytes). Re-upload a real image/video instead of cloning Meta media handles.`
+					);
+				}
 				
 				// Determine content type based on file extension
 				const ext = fileName.split('.').pop().toLowerCase();
@@ -708,6 +728,11 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 			// Clean base64 data
 			const base64Clean = base64Data.replace(/^data:[^;]+;base64,/, '');
 			const buffer = Buffer.from(base64Clean, 'base64');
+			if (!buffer.length || buffer.length < 200) {
+				throw new Error(
+					`Header media is too small (${buffer.length} bytes). Re-upload a real image/video instead of cloning Meta media handles.`
+				);
+			}
 			
 			// Determine file extension and content type
 			const ext = fileName.split('.').pop().toLowerCase();
