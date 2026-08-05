@@ -886,19 +886,23 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 		console.error('Error creating WhatsApp template:', error);
 		console.error('Facebook Error Response:', JSON.stringify(error.response?.data, null, 2));
 		
-		// Handle specific error cases
+		// Prefer Meta's user-facing message when available
+		const fbError = error.response?.data?.error;
 		let errorMessage = 'Failed to create template';
-		if (error.response?.data?.error?.message) {
-			errorMessage = error.response.data.error.message;
+		if (fbError?.error_user_msg) {
+			errorMessage = fbError.error_user_msg;
+		} else if (fbError?.message) {
+			errorMessage = fbError.message;
 		} else if (error.response?.data?.message) {
 			errorMessage = error.response.data.message;
-		} else if (error.response?.data?.error) {
-			errorMessage = error.response.data.error;
+		} else if (typeof error.message === 'string' && error.message) {
+			errorMessage = error.message;
 		}
 
 		res.status(500).json({ 
 			success: false, 
 			message: errorMessage,
+			detail: fbError?.error_user_msg || fbError?.message || errorMessage,
 			error: error.response?.data || error.message
 		});
 	}

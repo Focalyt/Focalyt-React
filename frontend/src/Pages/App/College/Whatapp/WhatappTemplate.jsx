@@ -2361,28 +2361,23 @@ const WhatsAppTemplate = () => {
 
 
 
-      // Extract detailed error message
+      // Extract detailed error message (Meta nests as data.error.error.*)
 
       let errorMessage = 'Error creating template. Please try again.';
 
+      const apiData = error.response?.data;
+      const nestedFbError = apiData?.error?.error || apiData?.error;
 
-
-      if (error.response?.data?.error?.error_user_msg) {
-
-        errorMessage = error.response.data.error.error_user_msg;
-
-      } else if (error.response?.data?.detail) {
-
-        errorMessage = error.response.data.detail;
-
-      } else if (error.response?.data?.message) {
-
-        errorMessage = error.response.data.message;
-
+      if (apiData?.detail) {
+        errorMessage = apiData.detail;
+      } else if (nestedFbError?.error_user_msg) {
+        errorMessage = nestedFbError.error_user_msg;
+      } else if (nestedFbError?.message) {
+        errorMessage = nestedFbError.message;
+      } else if (apiData?.message) {
+        errorMessage = apiData.message;
       } else if (error.message) {
-
         errorMessage = error.message;
-
       }
 
 
