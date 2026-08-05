@@ -4,6 +4,8 @@ const axios = require('axios');
 const uuid = require('uuid/v1');
 const multer = require('multer');
 const FormData = require('form-data');
+const fs = require('fs');
+const path = require('path');
 const { College, WhatsAppMessage, WhatsAppTemplate, Candidate, CandidateProfile, AppliedCourses, Courses, DripMarketingJob, Lead } = require('../../models');
 const { isCollege } = require('../../../helpers');
 const {
@@ -1817,8 +1819,14 @@ npm install express axios mongoose dotenv
 
 // WhatsApp Configuration
 const WHATSAPP_API_URL =  'https://graph.facebook.com/v23.0';
-const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_ID;
-const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
+
+function getWhatsAppPhoneNumberId() {
+	return process.env.WHATSAPP_PHONE_ID || process.env.WHATSAPP_PHONE_NUMBER_ID;
+}
+
+function getWhatsAppAccessToken() {
+	return process.env.WHATSAPP_ACCESS_TOKEN || process.env.WHATSAPP_API_TOKEN;
+}
 
 /**
  * Format phone number - add +91 if not present
@@ -1896,43 +1904,69 @@ async function uploadStorageKeyToWhatsApp(storageKey, fileName) {
 		throw new Error('Missing storage key for WhatsApp media upload');
 	}
 
-	const obj = await s3.getObject({ Key: key }).promise();
-	const buffer = obj.Body;
-	if (!buffer || !buffer.length) {
+	const phoneNumberId = getWhatsAppPhoneNumberId();
+	const accessToken = getWhatsAppAccessToken();
+	if (!phoneNumberId || !accessToken) {
+		throw new Error('WhatsApp phone number id or access token not configured');
+	}
+
+	const filePath = path.join(s3.getUploadDir(), key);
+	if (!fs.existsSync(filePath)) {
+		throw new Error(`Media file not found on disk: ${key}`);
+	}
+
+	const stat = fs.statSync(filePath);
+	if (!stat.size) {
 		throw new Error(`Empty media file for key: ${key}`);
 	}
 
-	const uploadName = fileName || key.split('/').pop() || 'media.bin';
+	const uploadName = fileName || path.basename(key) || 'media.bin';
 	const mimeType = mimeTypeFromName(uploadName);
+	const fileStream = fs.createReadStream(filePath);
 
 	const formData = new FormData();
 	formData.append('messaging_product', 'whatsapp');
 	formData.append('type', mimeType);
-	formData.append('file', buffer, {
+	formData.append('file', fileStream, {
 		filename: uploadName,
 		contentType: mimeType,
-		knownLength: buffer.length,
+		knownLength: stat.size,
 	});
 
-	const response = await axios.post(
-		`${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/media`,
-		formData,
-		{
-			headers: {
-				Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
-				...formData.getHeaders(),
-			},
-			maxBodyLength: Infinity,
-			maxContentLength: Infinity,
+	console.log(`📤 Uploading media to WhatsApp: ${uploadName} (${mimeType}, ${stat.size} bytes) → ${phoneNumberId}/media`);
+
+	try {
+		const response = await axios.post(
+			`${WHATSAPP_API_URL}/${phoneNumberId}/media`,
+			formData,
+			{
+				headers: {
+					Authorization: `Bearer ${accessToken}`,
+					...formData.getHeaders(),
+				},
+				maxBodyLength: Infinity,
+				maxContentLength: Infinity,
+				transformRequest: [(data) => data],
+			}
+		);
+
+		if (!response.data?.id) {
+			throw new Error('WhatsApp media upload returned no id');
 		}
-	);
 
-	if (!response.data?.id) {
-		throw new Error('WhatsApp media upload returned no id');
+		console.log(`✓ Uploaded ${uploadName} to WhatsApp media id=${response.data.id}`);
+		return response.data.id;
+	} catch (error) {
+		console.error(
+			'❌ WhatsApp /media upload failed:',
+			JSON.stringify(error.response?.data || error.message, null, 2)
+		);
+		throw new Error(
+			error.response?.data?.error?.message ||
+			error.message ||
+			'Failed to upload media to WhatsApp'
+		);
 	}
-
-	console.log(`✓ Uploaded ${uploadName} to WhatsApp media id=${response.data.id}`);
-	return response.data.id;
 }
 
 /**
@@ -1974,7 +2008,7 @@ async function fetchTemplateFromFacebook(templateName) {
     
     const response = await axios.get(url, {
       headers: {
-        'Authorization': `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+        'Authorization': `Bearer ${getWhatsAppAccessToken()}`,
       },
       params: {
         name: templateName,
@@ -2037,7 +2071,9 @@ async function saveMessageToDatabase(messageData) {
  * Send WhatsApp message with template
  */
 async function sendWhatsAppMessage(to, template, mediaUrls = {}, candidateData = null, variableValues = null) {
-  const url = `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+  const phoneNumberId = getWhatsAppPhoneNumberId();
+  const accessToken = getWhatsAppAccessToken();
+  const url = `${WHATSAPP_API_URL}/${phoneNumberId}/messages`;
   const { getVariablesInText, replaceVariables } = require('../../../helpers/whatsappVariableMapper');
   
   // Fetch template from Facebook to verify language and status
@@ -2192,40 +2228,24 @@ async function sendWhatsAppMessage(to, template, mediaUrls = {}, candidateData =
   }
 
   // Handle regular header media (IMAGE/VIDEO/DOCUMENT)
-  // Prefer WhatsApp media id (upload from local disk) over public link
+  // Upload from local/Hostinger disk to WhatsApp Media API — do not use public link
+  // (Meta often fails fetching self-hosted Hostinger URLs → "Media upload error")
   if (template.headerMedia && template.headerMedia.mediaType) {
     const mediaType = template.headerMedia.mediaType.toLowerCase();
     const storageKey = template.headerMedia.s3Key || template.headerMedia.s3Url;
-    let mediaRef = null;
 
-    if (storageKey) {
-      try {
-        const mediaId = await uploadStorageKeyToWhatsApp(storageKey, template.headerMedia.fileName);
-        mediaRef = { id: mediaId };
-      } catch (uploadErr) {
-        console.error(
-          'WhatsApp media id upload failed, falling back to link:',
-          uploadErr.response?.data || uploadErr.message
-        );
-        if (mediaUrls.headerUrl) {
-          mediaRef = { link: mediaUrls.headerUrl };
-        } else {
-          throw uploadErr;
-        }
-      }
-    } else if (mediaUrls.headerUrl) {
-      mediaRef = { link: mediaUrls.headerUrl };
+    if (!storageKey) {
+      throw new Error('Template has IMAGE/VIDEO/DOCUMENT header but no headerMedia storage key');
     }
 
-    if (mediaRef) {
-      components.push({
-        type: 'header',
-        parameters: [{
-          type: mediaType,
-          [mediaType]: mediaRef
-        }]
-      });
-    }
+    const mediaId = await uploadStorageKeyToWhatsApp(storageKey, template.headerMedia.fileName);
+    components.push({
+      type: 'header',
+      parameters: [{
+        type: mediaType,
+        [mediaType]: { id: mediaId }
+      }]
+    });
   }
 
   // Handle carousel media
@@ -2236,39 +2256,22 @@ async function sendWhatsAppMessage(to, template, mediaUrls = {}, candidateData =
       const card = template.carouselMedia[index];
       const mediaType = (card.mediaType || 'IMAGE').toLowerCase();
       const storageKey = card.s3Key || card.s3Url;
-      let mediaRef = null;
 
-      if (storageKey) {
-        try {
-          const mediaId = await uploadStorageKeyToWhatsApp(storageKey, card.fileName);
-          mediaRef = { id: mediaId };
-        } catch (uploadErr) {
-          console.error(
-            `Carousel card ${card.cardIndex} media upload failed, falling back to link:`,
-            uploadErr.response?.data || uploadErr.message
-          );
-          if (mediaUrls.carouselUrls?.[index]) {
-            mediaRef = { link: mediaUrls.carouselUrls[index] };
-          } else {
-            throw uploadErr;
-          }
-        }
-      } else if (mediaUrls.carouselUrls?.[index]) {
-        mediaRef = { link: mediaUrls.carouselUrls[index] };
+      if (!storageKey) {
+        throw new Error(`Carousel card ${card.cardIndex ?? index} missing media storage key`);
       }
 
-      if (mediaRef) {
-        carouselCards.push({
-          card_index: card.cardIndex,
-          components: [{
-            type: 'header',
-            parameters: [{
-              type: mediaType,
-              [mediaType]: mediaRef
-            }]
+      const mediaId = await uploadStorageKeyToWhatsApp(storageKey, card.fileName);
+      carouselCards.push({
+        card_index: card.cardIndex,
+        components: [{
+          type: 'header',
+          parameters: [{
+            type: mediaType,
+            [mediaType]: { id: mediaId }
           }]
-        });
-      }
+        }]
+      });
     }
 
     if (carouselCards.length > 0) {
@@ -2290,7 +2293,7 @@ async function sendWhatsAppMessage(to, template, mediaUrls = {}, candidateData =
   try {
     const response = await axios.post(url, messagePayload, {
       headers: {
-        'Authorization': `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
       }
     });
@@ -3079,7 +3082,7 @@ router.post('/send-message', isCollege, async (req, res) => {
 		}
 
 		// Send message via WhatsApp API
-		const url = `${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/messages`;
+		const url = `${WHATSAPP_API_URL}/${getWhatsAppPhoneNumberId()}/messages`;
 		
 		const messageData = {
 			messaging_product: 'whatsapp',
@@ -3094,7 +3097,7 @@ router.post('/send-message', isCollege, async (req, res) => {
 
 		const response = await axios.post(url, messageData, {
 			headers: {
-				'Authorization': `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+				'Authorization': `Bearer ${getWhatsAppAccessToken()}`,
 				'Content-Type': 'application/json'
 			}
 		});
