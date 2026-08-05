@@ -20,7 +20,8 @@ const whatsappMessageSchema = new mongoose.Schema({
   },
   messageType: {
     type: String,
-    enum: ['text', 'template', 'image', 'video', 'document', 'audio', 'voice', 'sticker', 'location', 'contacts'],
+    // button = template Quick Reply (Yes/No); interactive = button_reply / list_reply
+    enum: ['text', 'template', 'image', 'video', 'document', 'audio', 'voice', 'sticker', 'location', 'contacts', 'button', 'interactive'],
     default: 'text'
   },
   templateName: {

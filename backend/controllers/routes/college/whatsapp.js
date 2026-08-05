@@ -3752,6 +3752,26 @@ async function handleIncomingMessages(messages, metadata) {
 				case 'contacts':
 					messageText = '[Contact Card]';
 					break;
+
+				// Template Quick Reply buttons (Yes / No) — Meta sends type "button"
+				case 'button':
+					messageText = message.button?.text || message.button?.payload || '[Button reply]';
+					break;
+
+				// Interactive reply (button_reply / list_reply)
+				case 'interactive':
+					if (message.interactive?.type === 'button_reply') {
+						messageText = message.interactive.button_reply?.title
+							|| message.interactive.button_reply?.id
+							|| '[Button reply]';
+					} else if (message.interactive?.type === 'list_reply') {
+						messageText = message.interactive.list_reply?.title
+							|| message.interactive.list_reply?.id
+							|| '[List reply]';
+					} else {
+						messageText = '[Interactive reply]';
+					}
+					break;
 					
 				default:
 					messageText = `[Unsupported message type: ${messageType}]`;
