@@ -3246,7 +3246,7 @@ const B2BSales = () => {
     try {
       const res = await axios.put(
         `${backendUrl}/college/b2b/leads/${lead._id}/approval`,
-        { status: 'APPROVED', moveToProspect: true },
+        { status: 'APPROVED' },
         { headers: { 'x-auth': token } }
       );
       if (res?.data?.status) {

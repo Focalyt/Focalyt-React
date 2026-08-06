@@ -4111,14 +4111,15 @@ router.post('/add-lead', isCollege, async (req, res) => {
 });
 
 // Lead Approval (Approve / Reject)
-// Body: { status: "APPROVED"|"REJECTED", rejectionReason?, moveToProspect?: boolean }
+// Body: { status: "APPROVED"|"REJECTED", rejectionReason? }
+// Does not modify lead status / subStatus.
 router.put('/leads/:id/approval', isCollege, async (req, res) => {
 	try {
 		if (!isAdminUser(req)) {
 			return res.status(403).json({ status: false, message: 'Only Admin can approve/reject leads' });
 		}
 
-		const { status, rejectionReason, moveToProspect = true } = req.body || {};
+		const { status, rejectionReason } = req.body || {};
 		const normalized = String(status || '').toUpperCase();
 		if (!['APPROVED', 'REJECTED'].includes(normalized)) {
 			return res.status(400).json({ status: false, message: 'status must be APPROVED or REJECTED' });
@@ -4151,27 +4152,8 @@ router.put('/leads/:id/approval', isCollege, async (req, res) => {
 			};
 		}
 
-		// Optional: auto move approved leads into Performance/Prospect status
-		if (normalized === 'APPROVED' && moveToProspect) {
-			const college = await getCollegeForUser(req.user._id);
-			if (college?._id) {
-				const statusDoc =
-					(await tryFindStatusByTitleOrMilestone({ collegeId: college._id, title: 'Prospect' })) ||
-					(await tryFindStatusByTitleOrMilestone({ collegeId: college._id, milestone: 'Performance' })) ||
-					null;
-
-				if (statusDoc?._id) {
-					lead.status = statusDoc._id;
-					const sub = Array.isArray(statusDoc.substatuses)
-						? statusDoc.substatuses.find((s) => {
-							const t = String(s?.title || '').trim().toLowerCase();
-							return t === 'untouch leads' || t === 'untouch leads' || t === 'untouch';
-						})
-						: null;
-					if (sub?._id) lead.subStatus = sub._id;
-				}
-			}
-		}
+		// Approval only — do not change lead status / subStatus on approve or reject.
+		// (moveToProspect is ignored intentionally so existing pipeline fields stay as-is.)
 
 		lead.updatedBy = req.user._id;
 		lead.logs.push({
