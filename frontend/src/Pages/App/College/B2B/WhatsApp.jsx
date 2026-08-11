@@ -3159,6 +3159,15 @@ const WhatsApp = () => {
     }
   };
 
+  const applyApprovalResponseToLead = (leadId, updatedLead) => {
+    if (!updatedLead?._id) return;
+    setLeads((prev) =>
+      Array.isArray(prev)
+        ? prev.map((l) => (l?._id === leadId ? { ...l, ...updatedLead, status: updatedLead.status ?? l.status, subStatus: updatedLead.subStatus ?? l.subStatus } : l))
+        : prev
+    );
+  };
+
   const approveLead = async (lead) => {
     try {
       const res = await axios.put(
@@ -3169,6 +3178,7 @@ const WhatsApp = () => {
       if (res?.data?.status) {
         setApprovalEditLeadId(null);
         setCrossSaleCache({});
+        applyApprovalResponseToLead(lead._id, res.data.data);
         await fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
         await fetchStatusCounts();
         await fetchApprovalCounts();
@@ -3192,6 +3202,7 @@ const WhatsApp = () => {
       if (res?.data?.status) {
         setApprovalEditLeadId(null);
         setCrossSaleCache({});
+        applyApprovalResponseToLead(lead._id, res.data.data);
         await fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides());
         await fetchStatusCounts();
         await fetchApprovalCounts();

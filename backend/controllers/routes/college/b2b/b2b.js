@@ -4112,7 +4112,7 @@ router.post('/add-lead', isCollege, async (req, res) => {
 
 // Lead Approval (Approve / Reject)
 // Body: { status: "APPROVED"|"REJECTED", rejectionReason? }
-// Does not modify lead status / subStatus.
+// Atomic $set on approval fields only — never touches lead.status / lead.subStatus (Performance).
 router.put('/leads/:id/approval', isCollege, async (req, res) => {
 	try {
 		if (!isAdminUser(req)) {
@@ -4125,58 +4125,100 @@ router.put('/leads/:id/approval', isCollege, async (req, res) => {
 			return res.status(400).json({ status: false, message: 'status must be APPROVED or REJECTED' });
 		}
 
-		const lead = await Lead.findById(req.params.id);
-		if (!lead) return res.status(404).json({ status: false, message: 'Lead not found' });
+		const leadId = req.params.id;
+		const existing = await Lead.findById(leadId).select('status subStatus approval').lean();
+		if (!existing) return res.status(404).json({ status: false, message: 'Lead not found' });
 
 		const now = new Date();
+		const approvalUpdate =
+			normalized === 'APPROVED'
+				? {
+						status: 'APPROVED',
+						approvedBy: req.user._id,
+						approvedAt: now,
+						rejectedBy: null,
+						rejectedAt: null,
+						rejectionReason: '',
+					}
+				: {
+						status: 'REJECTED',
+						rejectedBy: req.user._id,
+						rejectedAt: now,
+						rejectionReason: rejectionReason ? String(rejectionReason).trim() : '',
+						approvedBy: null,
+						approvedAt: null,
+					};
 
-		if (normalized === 'APPROVED') {
-			lead.approval = {
-				...(lead.approval || {}),
-				status: 'APPROVED',
-				approvedBy: req.user._id,
-				approvedAt: now,
-				rejectedBy: undefined,
-				rejectedAt: undefined,
-				rejectionReason: undefined,
-			};
-		} else {
-			lead.approval = {
-				...(lead.approval || {}),
-				status: 'REJECTED',
-				rejectedBy: req.user._id,
-				rejectedAt: now,
-				rejectionReason: rejectionReason ? String(rejectionReason).trim() : '',
-				approvedBy: undefined,
-				approvedAt: undefined,
-			};
-		}
-
-		// Approval only — do not change lead status / subStatus on approve or reject.
-		// (moveToProspect is ignored intentionally so existing pipeline fields stay as-is.)
-
-		lead.updatedBy = req.user._id;
-		lead.logs.push({
+		const logEntry = {
 			user: req.user._id,
 			timestamp: now,
-			action: `Lead approval set to ${lead.approval.status}`,
-			remarks: normalized === 'REJECTED' ? (lead.approval.rejectionReason || '') : '',
-		});
+			action: `Lead approval set to ${normalized}`,
+			remarks: normalized === 'REJECTED' ? (approvalUpdate.rejectionReason || '') : '',
+		};
 
-		await lead.save();
+		// Only approval + audit fields — status/subStatus intentionally omitted so Performance cannot change.
+		await Lead.updateOne(
+			{ _id: leadId },
+			{
+				$set: {
+					approval: approvalUpdate,
+					updatedBy: req.user._id,
+				},
+				$push: { logs: logEntry },
+			}
+		);
 
-		const updatedLead = await applyLeadCorePopulates(Lead.findById(lead._id))
+		const updatedLead = await applyLeadCorePopulates(Lead.findById(leadId))
 			.populate('status', 'name title substatuses')
 			.populate('leadAddedBy', 'name email')
 			.populate('leadOwner', 'name email')
 			.populate('leadCoOwner', 'name email');
+
+		const beforeStatus = String(existing.status || '');
+		const afterStatus = String(updatedLead?.status?._id || updatedLead?.status || '');
+		const beforeSub = String(existing.subStatus || '');
+		const afterSub = String(updatedLead?.subStatus?._id || updatedLead?.subStatus || '');
+		if (beforeStatus !== afterStatus || beforeSub !== afterSub) {
+			console.error('[B2B Approval] Performance status changed unexpectedly — restoring', {
+				leadId,
+				beforeStatus,
+				afterStatus,
+				beforeSub,
+				afterSub,
+			});
+			await Lead.updateOne(
+				{ _id: leadId },
+				{ $set: { status: existing.status, subStatus: existing.subStatus } }
+			);
+			const restored = await applyLeadCorePopulates(Lead.findById(leadId))
+				.populate('status', 'name title substatuses')
+				.populate('leadAddedBy', 'name email')
+				.populate('leadOwner', 'name email')
+				.populate('leadCoOwner', 'name email');
+			notifyLeadOwnerAndCoOwner({
+				lead: restored,
+				changedBy: req.user,
+				changeType: 'Lead approval updated',
+				changeDetails: normalized === 'REJECTED'
+					? `Lead approval set to REJECTED${approvalUpdate.rejectionReason ? ` | Reason: ${approvalUpdate.rejectionReason}` : ''}`
+					: 'Lead approval set to APPROVED',
+			});
+			return res.json({ status: true, data: restored, message: 'Lead approval updated successfully' });
+		}
+
+		console.log('[B2B Approval] OK — Performance unchanged', {
+			leadId,
+			approval: normalized,
+			status: updatedLead?.status?.title || updatedLead?.status?.name || beforeStatus,
+			subStatus: beforeSub,
+		});
 
 		notifyLeadOwnerAndCoOwner({
 			lead: updatedLead,
 			changedBy: req.user,
 			changeType: 'Lead approval updated',
 			changeDetails: normalized === 'REJECTED'
-				? `Lead approval set to REJECTED${lead.approval?.rejectionReason ? ` | Reason: ${lead.approval.rejectionReason}` : ''}`
+				? `Lead approval set to REJECTED${approvalUpdate.rejectionReason ? ` | Reason: ${approvalUpdate.rejectionReason}` : ''}`
 				: 'Lead approval set to APPROVED',
 		});
 

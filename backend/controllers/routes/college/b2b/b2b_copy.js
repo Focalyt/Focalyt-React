@@ -3168,72 +3168,55 @@ router.put('/leads/:id/approval', isCollege, async (req, res) => {
 			return res.status(403).json({ status: false, message: 'Only Admin can approve/reject leads' });
 		}
 
-		const { status, rejectionReason, moveToProspect = true } = req.body || {};
+		const { status, rejectionReason } = req.body || {};
 		const normalized = String(status || '').toUpperCase();
 		if (!['APPROVED', 'REJECTED'].includes(normalized)) {
 			return res.status(400).json({ status: false, message: 'status must be APPROVED or REJECTED' });
 		}
 
-		const lead = await Lead.findById(req.params.id);
-		if (!lead) return res.status(404).json({ status: false, message: 'Lead not found' });
+		const leadId = req.params.id;
+		const existing = await Lead.findById(leadId).select('_id').lean();
+		if (!existing) return res.status(404).json({ status: false, message: 'Lead not found' });
 
 		const now = new Date();
+		const approvalUpdate =
+			normalized === 'APPROVED'
+				? {
+						status: 'APPROVED',
+						approvedBy: req.user._id,
+						approvedAt: now,
+						rejectedBy: null,
+						rejectedAt: null,
+						rejectionReason: '',
+					}
+				: {
+						status: 'REJECTED',
+						rejectedBy: req.user._id,
+						rejectedAt: now,
+						rejectionReason: rejectionReason ? String(rejectionReason).trim() : '',
+						approvedBy: null,
+						approvedAt: null,
+					};
 
-		if (normalized === 'APPROVED') {
-			lead.approval = {
-				...(lead.approval || {}),
-				status: 'APPROVED',
-				approvedBy: req.user._id,
-				approvedAt: now,
-				rejectedBy: undefined,
-				rejectedAt: undefined,
-				rejectionReason: undefined,
-			};
-		} else {
-			lead.approval = {
-				...(lead.approval || {}),
-				status: 'REJECTED',
-				rejectedBy: req.user._id,
-				rejectedAt: now,
-				rejectionReason: rejectionReason ? String(rejectionReason).trim() : '',
-				approvedBy: undefined,
-				approvedAt: undefined,
-			};
-		}
-
-		// Optional: auto move approved leads into Performance/Prospect status
-		if (normalized === 'APPROVED' && moveToProspect) {
-			const college = await getCollegeForUser(req.user._id);
-			if (college?._id) {
-				const statusDoc =
-					(await tryFindStatusByTitleOrMilestone({ collegeId: college._id, title: 'Prospect' })) ||
-					(await tryFindStatusByTitleOrMilestone({ collegeId: college._id, milestone: 'Performance' })) ||
-					null;
-
-				if (statusDoc?._id) {
-					lead.status = statusDoc._id;
-					const sub = Array.isArray(statusDoc.substatuses)
-						? statusDoc.substatuses.find((s) => {
-							const t = String(s?.title || '').trim().toLowerCase();
-							return t === 'untouch leads' || t === 'untouch leads' || t === 'untouch';
-						})
-						: null;
-					if (sub?._id) lead.subStatus = sub._id;
-				}
+		await Lead.updateOne(
+			{ _id: leadId },
+			{
+				$set: {
+					approval: approvalUpdate,
+					updatedBy: req.user._id,
+				},
+				$push: {
+					logs: {
+						user: req.user._id,
+						timestamp: now,
+						action: `Lead approval set to ${normalized}`,
+						remarks: normalized === 'REJECTED' ? (approvalUpdate.rejectionReason || '') : '',
+					},
+				},
 			}
-		}
+		);
 
-		lead.updatedBy = req.user._id;
-		lead.logs.push({
-			user: req.user._id,
-			timestamp: now,
-			action: `Lead approval set to ${lead.approval.status}`,
-			remarks: normalized === 'REJECTED' ? (lead.approval.rejectionReason || '') : '',
-		});
-
-		await lead.save();
-
-		const updatedLead = await applyLeadCorePopulates(Lead.findById(lead._id))
+		const updatedLead = await applyLeadCorePopulates(Lead.findById(leadId))
 			.populate('status', 'name title substatuses')
 			.populate('leadAddedBy', 'name email')
 			.populate('leadOwner', 'name email');
