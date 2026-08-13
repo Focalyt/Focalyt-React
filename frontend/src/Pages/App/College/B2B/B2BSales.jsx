@@ -1059,6 +1059,11 @@ const B2BSales = () => {
       const hasFollowupData =
         hasFollowup && followupFormData.followupDate && followupFormData.followupTime;
 
+      if (showPanel === 'followUp' && !hasFollowupData) {
+        alert('Follow-up date and time are mandatory. Please select both date and time.');
+        return;
+      }
+
       const toYmdLocal = (d) => {
         const dt = d instanceof Date ? d : new Date(d);
         if (Number.isNaN(dt.getTime())) return '';
@@ -1185,11 +1190,10 @@ const B2BSales = () => {
       }
 
       window.dispatchEvent(new CustomEvent('b2b-followup-updated'));
+      closePanel();
     } catch (error) {
       console.error('❌ Error in addFollowUpToGoogleCalendar:', error);
-      alert('❌ Error processing request');
-    } finally {
-      closePanel();
+      alert(error?.response?.data?.message || 'Error processing request');
     }
   };
 
@@ -1265,15 +1269,17 @@ const B2BSales = () => {
     return getLeadFollowupBucket(lead, type) === 'missed' ? 1 : 0;
   };
 
-  const leadHasFollowup = (lead, type) => (
-    Boolean(getLeadFollowupBucket(lead, type))
-    || getLeadFollowupDoneCount(lead, type) > 0
-    || getLeadFollowupMissedCount(lead, type) > 0
-  );
+  // No red when planned or already done (NA date after done is fine).
+  // Red only when never set, or missed.
+  const leadHasUpcomingFollowup = (lead, type) => {
+    const bucket = getLeadFollowupBucket(lead, type);
+    if (bucket === 'missed') return false;
+    if (bucket === 'planned' || bucket === 'done') return true;
+    return getLeadFollowupDoneCount(lead, type) > 0;
+  };
 
-  // Light-red empty style only when neither Call nor Visit followup exists
   const leadHasAnyFollowup = (lead) => (
-    leadHasFollowup(lead, 'Call') || leadHasFollowup(lead, 'Visit')
+    leadHasUpcomingFollowup(lead, 'Call') || leadHasUpcomingFollowup(lead, 'Visit')
   );
 
   const getLeadDocumentsBucket = (lead) => {
@@ -6027,8 +6033,11 @@ const B2BSales = () => {
                       </label>
                       <DatePicker
                         className="form-control border-0 bgcolor small-date"
-                        onChange={(date) => setFollowupFormData(prev => ({ ...prev, followupDate: date }))}
-                        value={followupFormData.followupDate}
+                        onChange={(date) => {
+                          if (!date) return;
+                          setFollowupFormData(prev => ({ ...prev, followupDate: date }));
+                        }}
+                        value={followupFormData.followupDate || null}
                         format="dd/MM/yyyy"
                         minDate={today}
                       />
@@ -6200,8 +6209,11 @@ const B2BSales = () => {
                   </label>
                   <DatePicker
                     className="form-control border-0 bgcolor"
-                    onChange={(date) => setFollowupFormData(prev => ({ ...prev, followupDate: date }))}
-                    value={followupFormData.followupDate}
+                    onChange={(date) => {
+                      if (!date) return;
+                      setFollowupFormData(prev => ({ ...prev, followupDate: date }));
+                    }}
+                    value={followupFormData.followupDate || null}
                     format="dd/MM/yyyy"
                     minDate={today}
                     style={{
@@ -9623,7 +9635,7 @@ const renderWhatsAppPanel = () => {
                               </div>
                               <div className="lhm__row3">
                                 {/* Followup Calling */}
-                                <div className={`lhm__followup-box${!leadHasAnyFollowup(lead) ? ' lhm__followup-box--empty' : ''}`}>
+                                <div className={`lhm__followup-box${!leadHasUpcomingFollowup(lead, 'Call') ? ' lhm__followup-box--empty' : ''}`}>
                                   <span className="lhm__followup-title">Followup Calling</span>
                                   <button
                                     type="button"
@@ -9656,7 +9668,7 @@ const renderWhatsAppPanel = () => {
                                 </div>
 
                                 {/* Followup Visit */}
-                                <div className={`lhm__followup-box${!leadHasAnyFollowup(lead) ? ' lhm__followup-box--empty' : ''}`}>
+                                <div className={`lhm__followup-box${!leadHasUpcomingFollowup(lead, 'Visit') ? ' lhm__followup-box--empty' : ''}`}>
                                   <span className="lhm__followup-title">Followup Visit</span>
                                   <button
                                     type="button"
@@ -9998,7 +10010,7 @@ const renderWhatsAppPanel = () => {
                                 {/* Followup Calling & Visit — Done/Planned/Missed with distinct colours */}
                                 <div className="lead-header-v2__dash">
                                   <div className="lead-header-v2__dash-col">
-                                    <div className={`b2b-dash-section h-100${!leadHasAnyFollowup(lead) ? ' b2b-dash-section--no-followup' : ''}`}>
+                                    <div className={`b2b-dash-section h-100${!leadHasUpcomingFollowup(lead, 'Call') ? ' b2b-dash-section--no-followup' : ''}`}>
                                       <span className="b2b-dash-section__label">Followup Calling</span>
                                       <button
                                         type="button"
@@ -10037,7 +10049,7 @@ const renderWhatsAppPanel = () => {
                                     </div>
                                   </div>
                                   <div className="lead-header-v2__dash-col">
-                                    <div className={`b2b-dash-section h-100${!leadHasAnyFollowup(lead) ? ' b2b-dash-section--no-followup' : ''}`}>
+                                    <div className={`b2b-dash-section h-100${!leadHasUpcomingFollowup(lead, 'Visit') ? ' b2b-dash-section--no-followup' : ''}`}>
                                       <span className="b2b-dash-section__label">Followup Visit</span>
                                       <button
                                         type="button"

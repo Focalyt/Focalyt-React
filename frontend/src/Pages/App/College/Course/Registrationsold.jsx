@@ -4093,13 +4093,6 @@ console.log('API Response:', response.data);
     finally {
       if (shouldClosePanel) {
         closePanel();
-      } else {
-        setSelectedStatus('');
-        setSelectedSubStatus(null);
-        setFollowupDate(null);
-        setFollowupTime('');
-        setFollowUpType('Call');
-        setRemarks('');
       }
 
       // Refresh data and close panel
@@ -5403,12 +5396,17 @@ console.log('API Response:', response.data);
     return getProfileFollowupBucket(profile, type) === 'done' ? 1 : 0;
   };
 
-  const profileHasFollowup = (profile, type) => (
-    Boolean(getProfileFollowupBucket(profile, type)) || getProfileFollowupDoneCount(profile, type) > 0
-  );
+  // No red when planned or already done (NA date after done is fine).
+  // Red only when never set, or missed.
+  const profileHasUpcomingFollowup = (profile, type) => {
+    const bucket = getProfileFollowupBucket(profile, type);
+    if (bucket === 'missed') return false;
+    if (bucket === 'planned' || bucket === 'done') return true;
+    return getProfileFollowupDoneCount(profile, type) > 0;
+  };
 
   const profileHasAnyFollowup = (profile) => (
-    profileHasFollowup(profile, 'Call') || profileHasFollowup(profile, 'Visit')
+    profileHasUpcomingFollowup(profile, 'Call') || profileHasUpcomingFollowup(profile, 'Visit')
   );
 
   const formatProfileNextActionDate = (profile, type = 'Call') => {
@@ -16906,7 +16904,7 @@ useEffect(() => {
                                     </div>
 
                                     <div className="lhm__row3">
-                                      <div className={`lhm__followup-box${!profileHasAnyFollowup(profile) ? ' lhm__followup-box--empty' : ''}`}>
+                                      <div className={`lhm__followup-box${!profileHasUpcomingFollowup(profile, 'Call') ? ' lhm__followup-box--empty' : ''}`}>
                                         <span className="lhm__followup-title">Followup Calling</span>
                                         <button
                                           type="button"
@@ -16939,7 +16937,7 @@ useEffect(() => {
                                         </div>
                                       </div>
 
-                                      <div className={`lhm__followup-box${!profileHasAnyFollowup(profile) ? ' lhm__followup-box--empty' : ''}`}>
+                                      <div className={`lhm__followup-box${!profileHasUpcomingFollowup(profile, 'Visit') ? ' lhm__followup-box--empty' : ''}`}>
                                         <span className="lhm__followup-title">Followup Visit</span>
                                         <button
                                           type="button"
@@ -17270,7 +17268,7 @@ useEffect(() => {
                                           </div>
                                         </div>
 
-                                        <div className={`lead-strip-v3__panel lead-strip-v3__panel--followup-call${!profileHasAnyFollowup(profile) ? ' lead-strip-v3__panel--no-followup' : ''}`}>
+                                        <div className={`lead-strip-v3__panel lead-strip-v3__panel--followup-call${!profileHasUpcomingFollowup(profile, 'Call') ? ' lead-strip-v3__panel--no-followup' : ''}`}>
                                           <div className="lead-strip-v3__panel-head">
                                             <span className="lead-strip-v3__panel-title">
                                               <i className="fas fa-phone-alt" aria-hidden="true"></i> Followup Calling
@@ -17298,7 +17296,7 @@ useEffect(() => {
                                           </div>
                                         </div>
 
-                                        <div className={`lead-strip-v3__panel lead-strip-v3__panel--followup-visit${!profileHasAnyFollowup(profile) ? ' lead-strip-v3__panel--no-followup' : ''}`}>
+                                        <div className={`lead-strip-v3__panel lead-strip-v3__panel--followup-visit${!profileHasUpcomingFollowup(profile, 'Visit') ? ' lead-strip-v3__panel--no-followup' : ''}`}>
                                           <div className="lead-strip-v3__panel-head">
                                             <span className="lead-strip-v3__panel-title">
                                               <i className="fas fa-user-check" aria-hidden="true"></i> Followup Visit
