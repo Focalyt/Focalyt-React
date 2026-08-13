@@ -45,6 +45,8 @@ export function B2CAddLeadModal({ visible, onClose, onSaved }: Props) {
   const [courseId, setCourseId] = React.useState('');
   const [centerId, setCenterId] = React.useState('');
   const [counselorId, setCounselorId] = React.useState('');
+  const [leadCoOwnerId, setLeadCoOwnerId] = React.useState('');
+  const [leadCoOwner2Id, setLeadCoOwner2Id] = React.useState('');
   const [name, setName] = React.useState('');
   const [mobile, setMobile] = React.useState('');
   const [whatsapp, setWhatsapp] = React.useState('');
@@ -78,6 +80,8 @@ export function B2CAddLeadModal({ visible, onClose, onSaved }: Props) {
       setCourseId('');
       setCenterId('');
       setCounselorId('');
+      setLeadCoOwnerId('');
+      setLeadCoOwner2Id('');
       setName('');
       setMobile('');
       setWhatsapp('');
@@ -119,6 +123,8 @@ export function B2CAddLeadModal({ visible, onClose, onSaved }: Props) {
         centerId,
         counselorId,
         registeredBy: counselorId,
+        ...(leadCoOwnerId ? { leadCoOwner: leadCoOwnerId } : {}),
+        ...(leadCoOwner2Id ? { leadCoOwner2: leadCoOwner2Id } : {}),
         candidateData: {
           name: name.trim(),
           mobile: mobile.trim(),
@@ -174,6 +180,18 @@ export function B2CAddLeadModal({ visible, onClose, onSaved }: Props) {
                   value={counselorId}
                   options={toOptions(counselors)}
                   onChange={setCounselorId}
+                />
+                <B2BFilterSelect
+                  label="Co-owner 1"
+                  value={leadCoOwnerId}
+                  options={[{ value: '', label: 'No co-owner' }, ...toOptions(counselors)]}
+                  onChange={setLeadCoOwnerId}
+                />
+                <B2BFilterSelect
+                  label="Co-owner 2"
+                  value={leadCoOwner2Id}
+                  options={[{ value: '', label: 'No co-owner' }, ...toOptions(counselors)]}
+                  onChange={setLeadCoOwner2Id}
                 />
               </View>
 

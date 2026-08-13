@@ -1384,7 +1384,7 @@ router.post('/addleadsb2c', isCollege, async (req, res) => {
 	try {
 		const user = req.user;
 		// console.log("API hitting....");
-		const { courseId, candidateData, centerId, counselorId, registeredBy } = req.body;
+		const { courseId, candidateData, centerId, counselorId, registeredBy, leadCoOwner, leadCoOwner2 } = req.body;
 
 		const existingUser = await User.find({ mobile: candidateData.mobile, role: 3 });
 		if (!existingUser) {
@@ -1411,7 +1411,43 @@ router.post('/addleadsb2c', isCollege, async (req, res) => {
 		// console.log("candidate", candidate)
 
 		const counselor = await User.findById(counselorId);
-		const appliedCourse = await AppliedCourses.create({
+		if (!counselor) {
+			return res.status(404).json({
+				status: false,
+				message: "Counselor not found"
+			});
+		}
+
+		const resolveOptionalCoOwner = async (rawValue, label) => {
+			const coOwnerRaw = rawValue != null ? String(rawValue).trim() : '';
+			if (!coOwnerRaw) return null;
+			if (!mongoose.Types.ObjectId.isValid(coOwnerRaw)) {
+				const err = new Error(`Invalid ${label}`);
+				err.statusCode = 400;
+				throw err;
+			}
+			const coOwnerUser = await User.findById(coOwnerRaw).select('_id').lean();
+			if (!coOwnerUser) {
+				const err = new Error(`${label} not found`);
+				err.statusCode = 404;
+				throw err;
+			}
+			return coOwnerUser._id;
+		};
+
+		let leadCoOwnerId = null;
+		let leadCoOwner2Id = null;
+		try {
+			leadCoOwnerId = await resolveOptionalCoOwner(leadCoOwner, 'Lead co-owner 1');
+			leadCoOwner2Id = await resolveOptionalCoOwner(leadCoOwner2, 'Lead co-owner 2');
+		} catch (coOwnerErr) {
+			return res.status(coOwnerErr.statusCode || 400).json({
+				status: false,
+				message: coOwnerErr.message || 'Invalid co-owner'
+			});
+		}
+
+		const appliedCoursePayload = {
 			_candidate: candidate._id,
 			_course: courseId,
 			_center: centerId,
@@ -1423,7 +1459,15 @@ router.post('/addleadsb2c', isCollege, async (req, res) => {
 				assignDate: new Date(),
 				assignedBy: user._id
 			}]
-		});
+		};
+		if (leadCoOwnerId) {
+			appliedCoursePayload.leadCoOwner = leadCoOwnerId;
+		}
+		if (leadCoOwner2Id) {
+			appliedCoursePayload.leadCoOwner2 = leadCoOwner2Id;
+		}
+
+		const appliedCourse = await AppliedCourses.create(appliedCoursePayload);
 
 		// console.log("appliedCourse", appliedCourse)
 

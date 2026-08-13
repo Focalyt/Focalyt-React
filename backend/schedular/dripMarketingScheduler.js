@@ -431,6 +431,8 @@ const B2C_QUERY_FIELDS = {
   center: '_center',
   batch: 'batch',
   leadOwner: 'counsellor',
+  leadCoOwner: 'leadCoOwner',
+  leadCoOwner2: 'leadCoOwner2',
   registeredBy: 'registeredBy'
 };
 

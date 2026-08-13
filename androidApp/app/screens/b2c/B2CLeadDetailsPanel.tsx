@@ -19,6 +19,8 @@ import {
   fetchB2CPreVerification,
   fetchB2CProfileDetails,
   getProfileLeadOwnerLabel,
+  getProfileLeadCoOwnerLabel,
+  getProfileLeadCoOwner2Label,
 } from '../../services/b2cApi';
 import { college } from '../../theme/college';
 
@@ -101,6 +103,8 @@ function LeadDetailsTab({ profile }: { profile: B2CProfile }) {
         <InfoRow label="COURSE / JOB NAME" value={profile._course?.name || 'N/A'} />
         <InfoRow label="LEAD MODIFICATION DATE" value={formatDateTime(profile.updatedAt)} />
         <InfoRow label="LEAD OWNER" value={getProfileLeadOwnerLabel(profile)} />
+        <InfoRow label="LEAD CO-OWNER 1" value={getProfileLeadCoOwnerLabel(profile)} />
+        <InfoRow label="LEAD CO-OWNER 2" value={getProfileLeadCoOwner2Label(profile)} />
         <InfoRow label="TYPE OF PROJECT" value={profile._course?.typeOfProject || 'N/A'} />
         <InfoRow label="BRANCH NAME" value={profile._center?.name || 'N/A'} />
         <InfoRow label="BATCH NAME" value={profile._course?.batchName || 'N/A'} />

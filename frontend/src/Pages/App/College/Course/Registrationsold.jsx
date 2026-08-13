@@ -2226,13 +2226,21 @@ const CRMDashboard = () => {
   const qualificationDropdownRef = useRef(null);
   const [isCounselorDropdownOpen, setIsCounselorDropdownOpen] = useState(false);
   const counselorDropdownRef = useRef(null);
+  const [isCoOwnerDropdownOpen, setIsCoOwnerDropdownOpen] = useState(false);
+  const coOwnerDropdownRef = useRef(null);
+  const [isCoOwner2DropdownOpen, setIsCoOwner2DropdownOpen] = useState(false);
+  const coOwner2DropdownRef = useRef(null);
   const [selectSearch, setSelectSearch] = useState({
     course: '',
     center: '',
     qualification: '',
     counselor: '',
+    coOwner: '',
+    coOwner2: '',
   });
   const [counselorId, setCounselorId] = useState('');
+  const [leadCoOwnerId, setLeadCoOwnerId] = useState('');
+  const [leadCoOwner2Id, setLeadCoOwner2Id] = useState('');
   const [registeredBy, setRegisteredBy] = useState('');
 
   const [candidateFormData, setCandidateFormData] = useState({
@@ -2303,6 +2311,20 @@ const CRMDashboard = () => {
       .filter((counselor) => !query || (counselor?.label || '').toLowerCase().includes(query));
   }, [counselorOptions, selectSearch.counselor]);
 
+  const filteredSortedCoOwners = useMemo(() => {
+    const query = selectSearch.coOwner.trim().toLowerCase();
+    return [...counselorOptions]
+      .sort((a, b) => (a?.label || '').localeCompare((b?.label || ''), undefined, { sensitivity: 'base' }))
+      .filter((counselor) => !query || (counselor?.label || '').toLowerCase().includes(query));
+  }, [counselorOptions, selectSearch.coOwner]);
+
+  const filteredSortedCoOwners2 = useMemo(() => {
+    const query = selectSearch.coOwner2.trim().toLowerCase();
+    return [...counselorOptions]
+      .sort((a, b) => (a?.label || '').localeCompare((b?.label || ''), undefined, { sensitivity: 'base' }))
+      .filter((counselor) => !query || (counselor?.label || '').toLowerCase().includes(query));
+  }, [counselorOptions, selectSearch.coOwner2]);
+
   useEffect(() => {
     const handleOutsideClick = (event) => {
       if (courseDropdownRef.current && !courseDropdownRef.current.contains(event.target)) {
@@ -2316,6 +2338,12 @@ const CRMDashboard = () => {
       }
       if (counselorDropdownRef.current && !counselorDropdownRef.current.contains(event.target)) {
         setIsCounselorDropdownOpen(false);
+      }
+      if (coOwnerDropdownRef.current && !coOwnerDropdownRef.current.contains(event.target)) {
+        setIsCoOwnerDropdownOpen(false);
+      }
+      if (coOwner2DropdownRef.current && !coOwner2DropdownRef.current.contains(event.target)) {
+        setIsCoOwner2DropdownOpen(false);
       }
     };
 
@@ -2523,6 +2551,8 @@ const CRMDashboard = () => {
           }
         },
         registeredBy,
+        ...(leadCoOwnerId ? { leadCoOwner: leadCoOwnerId } : {}),
+        ...(leadCoOwner2Id ? { leadCoOwner2: leadCoOwner2Id } : {}),
       };
 
 
@@ -2576,9 +2606,13 @@ const CRMDashboard = () => {
         setIsCenterDropdownOpen(false);
         setIsQualificationDropdownOpen(false);
         setIsCounselorDropdownOpen(false);
-        setSelectSearch({ course: '', center: '', qualification: '', counselor: '' });
+        setIsCoOwnerDropdownOpen(false);
+        setIsCoOwner2DropdownOpen(false);
+        setSelectSearch({ course: '', center: '', qualification: '', counselor: '', coOwner: '', coOwner2: '' });
         setCenterId('');
         setCounselorId('');
+        setLeadCoOwnerId('');
+        setLeadCoOwner2Id('');
         setRegisteredBy('');
 
         // After adding, refresh list from first page so the new lead is visible immediately
@@ -5423,13 +5457,187 @@ console.log('API Response:', response.data);
     return 'Pending';
   };
 
+  const getProfileLeadOwnerId = (profile) => {
+    if (profile?.counsellor?._id) return String(profile.counsellor._id);
+    if (profile?.counsellor && typeof profile.counsellor !== 'object') return String(profile.counsellor);
+    const latest = Array.isArray(profile?.leadAssignment) && profile.leadAssignment.length > 0
+      ? profile.leadAssignment[profile.leadAssignment.length - 1]
+      : null;
+    if (latest?._counsellor) return String(latest._counsellor);
+    return '';
+  };
+
   const getProfileLeadOwnerLabel = (profile) => (
-    profile?.registeredBy?.name || profile?._registeredBy?.name || 'Self Registerd'
+    profile?.counsellor?.name
+    || (Array.isArray(profile?.leadAssignment) && profile.leadAssignment.length > 0
+      ? profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName
+      : null)
+    || profile?.registeredBy?.name
+    || profile?._registeredBy?.name
+    || 'Unassigned'
   );
+
+  const getProfileLeadCoOwnerLabel = (profile) => (
+    profile?.leadCoOwner?.name || '—'
+  );
+
+  const getProfileLeadCoOwner2Label = (profile) => (
+    profile?.leadCoOwner2?.name || '—'
+  );
+
+  const handleUpdateLeadOwner = async (profile, newOwnerId) => {
+    if (!profile?._id || !token) return;
+    const currentId = getProfileLeadOwnerId(profile);
+    const nextId = String(newOwnerId || '');
+    if (currentId === nextId) return;
+    if (!nextId) {
+      alert('Please select a lead owner (counsellor)');
+      return;
+    }
+
+    try {
+      const response = await axios.put(
+        `${backendUrl}/college/update/${profile._id}`,
+        { counsellor: nextId },
+        {
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.data?.success) {
+        alert(response.data?.message || 'Failed to update lead owner');
+        return;
+      }
+
+      const selectedOpt = counselorOptions.find((o) => String(o.value) === nextId);
+      const nextOwner = { _id: nextId, name: selectedOpt?.label || 'Counselor' };
+      const assignmentEntry = {
+        _counsellor: nextId,
+        counsellorName: nextOwner.name,
+        assignDate: new Date().toISOString(),
+      };
+
+      setAllProfiles((prev) => prev.map((p) => {
+        if (p._id !== profile._id) return p;
+        const prevAssignments = Array.isArray(p.leadAssignment) ? p.leadAssignment : [];
+        return {
+          ...p,
+          counsellor: nextOwner,
+          leadAssignment: [...prevAssignments, assignmentEntry],
+        };
+      }));
+      setSelectedProfile((prev) => {
+        if (prev?._id !== profile._id) return prev;
+        const prevAssignments = Array.isArray(prev.leadAssignment) ? prev.leadAssignment : [];
+        return {
+          ...prev,
+          counsellor: nextOwner,
+          leadAssignment: [...prevAssignments, assignmentEntry],
+        };
+      });
+      toast.success('Lead owner updated');
+    } catch (error) {
+      console.error('Error updating B2C lead owner:', error);
+      alert(error?.response?.data?.message || 'Failed to update lead owner');
+    }
+  };
+
+  const handleUpdateLeadCoOwnerField = async (profile, field, newCoOwnerId) => {
+    if (!profile?._id || !token) return;
+    if (field !== 'leadCoOwner' && field !== 'leadCoOwner2') return;
+
+    const currentId = String(profile?.[field]?._id || profile?.[field] || '');
+    const nextId = String(newCoOwnerId || '');
+    if (currentId === nextId) return;
+
+    try {
+      const response = await axios.put(
+        `${backendUrl}/college/update/${profile._id}`,
+        { [field]: nextId || null },
+        {
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.data?.success) {
+        alert(response.data?.message || 'Failed to update co-owner');
+        return;
+      }
+
+      const selectedOpt = counselorOptions.find((o) => String(o.value) === nextId);
+      const nextCoOwner = nextId
+        ? { _id: nextId, name: selectedOpt?.label || 'Co-owner' }
+        : null;
+
+      setAllProfiles((prev) => prev.map((p) => (
+        p._id === profile._id ? { ...p, [field]: nextCoOwner } : p
+      )));
+      setSelectedProfile((prev) => (
+        prev?._id === profile._id ? { ...prev, [field]: nextCoOwner } : prev
+      ));
+      toast.success(field === 'leadCoOwner2' ? 'Co-owner 2 updated' : 'Co-owner 1 updated');
+    } catch (error) {
+      console.error('Error updating B2C co-owner:', error);
+      alert(error?.response?.data?.message || 'Failed to update co-owner');
+    }
+  };
+
+  const handleUpdateLeadCoOwner = (profile, newCoOwnerId) =>
+    handleUpdateLeadCoOwnerField(profile, 'leadCoOwner', newCoOwnerId);
+
+  const handleUpdateLeadCoOwner2 = (profile, newCoOwnerId) =>
+    handleUpdateLeadCoOwnerField(profile, 'leadCoOwner2', newCoOwnerId);
 
   const canEditLeadsPermission =
     (permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') ||
     permissions?.permission_type === 'Admin';
+
+  const renderOwnerSelect = (profile, {
+    field,
+    value,
+    onChange,
+    allowEmpty = true,
+    emptyLabel = 'No co-owner',
+  }) => {
+    if (!canEditLeadsPermission) {
+      return (
+        <span className="lead-strip-v3__owner-val">
+          {field === 'counsellor'
+            ? getProfileLeadOwnerLabel(profile)
+            : field === 'leadCoOwner2'
+              ? getProfileLeadCoOwner2Label(profile)
+              : getProfileLeadCoOwnerLabel(profile)}
+        </span>
+      );
+    }
+
+    return (
+      <select
+        className="form-select form-select-sm lead-strip-v3__owner-select"
+        value={value}
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onChange={(e) => {
+          e.stopPropagation();
+          onChange(profile, e.target.value);
+        }}
+      >
+        {allowEmpty && <option value="">{emptyLabel}</option>}
+        {!allowEmpty && !value && <option value="">Select owner</option>}
+        {counselorOptions.map((opt) => (
+          <option key={`${field}-${profile._id}-${opt.value}`} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    );
+  };
 
   const canApproveLeadsPermission =
     permissions?.permission_type === 'Admin' ||
@@ -5934,6 +6142,8 @@ console.log('API Response:', response.data);
     setIsCenterDropdownOpen(false);
     setIsQualificationDropdownOpen(false);
     setIsCounselorDropdownOpen(false);
+    setIsCoOwnerDropdownOpen(false);
+    setIsCoOwner2DropdownOpen(false);
     setShowPanel('');
     setShowPopup(null);
     setSelectedConcernPerson(null);
@@ -6032,6 +6242,11 @@ console.log('API Response:', response.data);
 
   const handleReferLead = async (type) => {
     try {
+      if (!selectedConcernPerson) {
+        alert('Please select a counselor');
+        return;
+      }
+
       const response = await axios.post(`${backendUrl}/college/refer-leads`, {
         counselorId: selectedConcernPerson,
         appliedCourseId: type === 'RefferSingleLead' ? selectedProfile._id : selectedProfiles,
@@ -6042,23 +6257,16 @@ console.log('API Response:', response.data);
         },
       });
 
-      if (response.data.status) {
-        const message = alert('Lead referred successfully!');
-        if (message) {
-
-
-        }
+      if (response.data.success || response.data.status) {
+        alert(response.data.message || 'Lead referred successfully!');
+        await fetchProfileData();
+        closePanel();
       } else {
         alert(response.data.message || 'Failed to refer lead');
       }
-      await fetchProfileData();
-      closePanel();
-
-
-
     } catch (error) {
       console.error('Error referring lead:', error);
-      alert('Failed to refer lead');
+      alert(error?.response?.data?.message || 'Failed to refer lead');
     }
   }
 
@@ -9961,6 +10169,205 @@ useEffect(() => {
                   )}
                 </div>
               </div>
+
+              <div className="mb-3">
+                <label className="form-label fw-semibold text-dark mb-2">
+                  Co-owner 1
+                </label>
+                <div className="position-relative" ref={coOwnerDropdownRef}>
+                  <input
+                    type="text"
+                    id="leadCoOwnerName"
+                    className="form-control border-0 shadow-sm"
+                    placeholder="Select / Search co-owner 1 (optional)..."
+                    value={selectSearch.coOwner}
+                    onFocus={() => setIsCoOwnerDropdownOpen(true)}
+                    onClick={() => setIsCoOwnerDropdownOpen(true)}
+                    onChange={(e) => {
+                      updateSelectSearch('coOwner', e.target.value);
+                      setLeadCoOwnerId('');
+                      setIsCoOwnerDropdownOpen(true);
+                    }}
+                    style={{
+                      height: '48px',
+                      padding: '12px 16px',
+                      backgroundColor: '#f8f9fa',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      transition: 'all 0.3s ease',
+                      border: '1px solid #e9ecef'
+                    }}
+                  />
+
+                  {isCoOwnerDropdownOpen && (
+                    <div
+                      className="shadow-sm"
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 1000,
+                        backgroundColor: '#fff',
+                        border: '1px solid #e9ecef',
+                        borderRadius: '8px',
+                        marginTop: '6px',
+                        maxHeight: '220px',
+                        overflowY: 'auto'
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLeadCoOwnerId('');
+                          updateSelectSearch('coOwner', '');
+                          setIsCoOwnerDropdownOpen(false);
+                        }}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          border: 'none',
+                          background: 'transparent',
+                          padding: '10px 12px',
+                          fontSize: '14px',
+                          cursor: 'pointer',
+                          color: '#666'
+                        }}
+                      >
+                        No co-owner
+                      </button>
+                      {filteredSortedCoOwners.length ? (
+                        filteredSortedCoOwners.map((counselor) => (
+                          <button
+                            key={`co-${counselor.value}`}
+                            type="button"
+                            onClick={() => {
+                              setLeadCoOwnerId(counselor.value);
+                              updateSelectSearch('coOwner', counselor.label || '');
+                              setIsCoOwnerDropdownOpen(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              border: 'none',
+                              background: 'transparent',
+                              padding: '10px 12px',
+                              fontSize: '14px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {counselor.label}
+                          </button>
+                        ))
+                      ) : (
+                        <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>
+                          No user found
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label fw-semibold text-dark mb-2">
+                  Co-owner 2
+                </label>
+                <div className="position-relative" ref={coOwner2DropdownRef}>
+                  <input
+                    type="text"
+                    id="leadCoOwner2Name"
+                    className="form-control border-0 shadow-sm"
+                    placeholder="Select / Search co-owner 2 (optional)..."
+                    value={selectSearch.coOwner2}
+                    onFocus={() => setIsCoOwner2DropdownOpen(true)}
+                    onClick={() => setIsCoOwner2DropdownOpen(true)}
+                    onChange={(e) => {
+                      updateSelectSearch('coOwner2', e.target.value);
+                      setLeadCoOwner2Id('');
+                      setIsCoOwner2DropdownOpen(true);
+                    }}
+                    style={{
+                      height: '48px',
+                      padding: '12px 16px',
+                      backgroundColor: '#f8f9fa',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      transition: 'all 0.3s ease',
+                      border: '1px solid #e9ecef'
+                    }}
+                  />
+
+                  {isCoOwner2DropdownOpen && (
+                    <div
+                      className="shadow-sm"
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        zIndex: 1000,
+                        backgroundColor: '#fff',
+                        border: '1px solid #e9ecef',
+                        borderRadius: '8px',
+                        marginTop: '6px',
+                        maxHeight: '220px',
+                        overflowY: 'auto'
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLeadCoOwner2Id('');
+                          updateSelectSearch('coOwner2', '');
+                          setIsCoOwner2DropdownOpen(false);
+                        }}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          border: 'none',
+                          background: 'transparent',
+                          padding: '10px 12px',
+                          fontSize: '14px',
+                          cursor: 'pointer',
+                          color: '#666'
+                        }}
+                      >
+                        No co-owner
+                      </button>
+                      {filteredSortedCoOwners2.length ? (
+                        filteredSortedCoOwners2.map((counselor) => (
+                          <button
+                            key={`co2-${counselor.value}`}
+                            type="button"
+                            onClick={() => {
+                              setLeadCoOwner2Id(counselor.value);
+                              updateSelectSearch('coOwner2', counselor.label || '');
+                              setIsCoOwner2DropdownOpen(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              border: 'none',
+                              background: 'transparent',
+                              padding: '10px 12px',
+                              fontSize: '14px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {counselor.label}
+                          </button>
+                        ))
+                      ) : (
+                        <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>
+                          No user found
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="mb-3">
                 <label>
                   Source <span className="mandatory">*</span>
@@ -16701,9 +17108,36 @@ useEffect(() => {
                                                 <i className="fas fa-envelope" aria-hidden="true"></i>
                                                 <span>{profile._candidate?.email || 'N/A'}</span>
                                               </div>
-                                              <div className="lead-strip-v3__owner-line" title={getProfileLeadOwnerLabel(profile)}>
-                                                <span className="lead-strip-v3__owner-label">Lead Owner:</span>
-                                                <span className="lead-strip-v3__owner-val">{getProfileLeadOwnerLabel(profile)}</span>
+                                              <div className="lead-strip-v3__owners">
+                                                <div className="lead-strip-v3__owner-line lead-strip-v3__owner-line--owner">
+                                                  <span className="lead-strip-v3__owner-label">Owner</span>
+                                                  {renderOwnerSelect(profile, {
+                                                    field: 'counsellor',
+                                                    value: getProfileLeadOwnerId(profile),
+                                                    onChange: handleUpdateLeadOwner,
+                                                    allowEmpty: false,
+                                                  })}
+                                                </div>
+                                                <div className="lead-strip-v3__owners-row">
+                                                  <div className="lead-strip-v3__owner-line">
+                                                    <span className="lead-strip-v3__owner-label">Co-1</span>
+                                                    {renderOwnerSelect(profile, {
+                                                      field: 'leadCoOwner',
+                                                      value: String(profile?.leadCoOwner?._id || profile?.leadCoOwner || ''),
+                                                      onChange: handleUpdateLeadCoOwner,
+                                                      emptyLabel: 'None',
+                                                    })}
+                                                  </div>
+                                                  <div className="lead-strip-v3__owner-line">
+                                                    <span className="lead-strip-v3__owner-label">Co-2</span>
+                                                    {renderOwnerSelect(profile, {
+                                                      field: 'leadCoOwner2',
+                                                      value: String(profile?.leadCoOwner2?._id || profile?.leadCoOwner2 || ''),
+                                                      onChange: handleUpdateLeadCoOwner2,
+                                                      emptyLabel: 'None',
+                                                    })}
+                                                  </div>
+                                                </div>
                                               </div>
                                             </div>
                                           </div>
@@ -17410,7 +17844,66 @@ useEffect(() => {
                                               </div>
                                               <div className="info-group">
                                                 <div className="info-label">LEAD OWNER</div>
-                                                <div className="info-value">{getProfileLeadOwnerLabel(profile)}</div>
+                                                <div className="info-value">
+                                                  {canEditLeadsPermission ? (
+                                                    <select
+                                                      className="form-select form-select-sm"
+                                                      value={getProfileLeadOwnerId(profile)}
+                                                      onChange={(e) => handleUpdateLeadOwner(profile, e.target.value)}
+                                                    >
+                                                      {!getProfileLeadOwnerId(profile) && <option value="">Select owner</option>}
+                                                      {counselorOptions.map((opt) => (
+                                                        <option key={`owner-edit-${opt.value}`} value={opt.value}>
+                                                          {opt.label}
+                                                        </option>
+                                                      ))}
+                                                    </select>
+                                                  ) : (
+                                                    getProfileLeadOwnerLabel(profile)
+                                                  )}
+                                                </div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD CO-OWNER 1</div>
+                                                <div className="info-value">
+                                                  {canEditLeadsPermission ? (
+                                                    <select
+                                                      className="form-select form-select-sm"
+                                                      value={String(profile?.leadCoOwner?._id || profile?.leadCoOwner || '')}
+                                                      onChange={(e) => handleUpdateLeadCoOwner(profile, e.target.value)}
+                                                    >
+                                                      <option value="">No co-owner</option>
+                                                      {counselorOptions.map((opt) => (
+                                                        <option key={`co-edit-${opt.value}`} value={opt.value}>
+                                                          {opt.label}
+                                                        </option>
+                                                      ))}
+                                                    </select>
+                                                  ) : (
+                                                    getProfileLeadCoOwnerLabel(profile)
+                                                  )}
+                                                </div>
+                                              </div>
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD CO-OWNER 2</div>
+                                                <div className="info-value">
+                                                  {canEditLeadsPermission ? (
+                                                    <select
+                                                      className="form-select form-select-sm"
+                                                      value={String(profile?.leadCoOwner2?._id || profile?.leadCoOwner2 || '')}
+                                                      onChange={(e) => handleUpdateLeadCoOwner2(profile, e.target.value)}
+                                                    >
+                                                      <option value="">No co-owner</option>
+                                                      {counselorOptions.map((opt) => (
+                                                        <option key={`co2-edit-${opt.value}`} value={opt.value}>
+                                                          {opt.label}
+                                                        </option>
+                                                      ))}
+                                                    </select>
+                                                  ) : (
+                                                    getProfileLeadCoOwner2Label(profile)
+                                                  )}
+                                                </div>
                                               </div>
                                             </div>
 
@@ -17451,7 +17944,66 @@ useEffect(() => {
                                                     </div>
                                                     <div className="info-group">
                                                       <div className="info-label">Lead Owner</div>
-                                                      <div className="info-value">{getProfileLeadOwnerLabel(profile)}</div>
+                                                      <div className="info-value">
+                                                        {canEditLeadsPermission ? (
+                                                          <select
+                                                            className="form-select form-select-sm"
+                                                            value={getProfileLeadOwnerId(profile)}
+                                                            onChange={(e) => handleUpdateLeadOwner(profile, e.target.value)}
+                                                          >
+                                                            {!getProfileLeadOwnerId(profile) && <option value="">Select owner</option>}
+                                                            {counselorOptions.map((opt) => (
+                                                              <option key={`owner-desk-${opt.value}`} value={opt.value}>
+                                                                {opt.label}
+                                                              </option>
+                                                            ))}
+                                                          </select>
+                                                        ) : (
+                                                          getProfileLeadOwnerLabel(profile)
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">Lead Co-owner 1</div>
+                                                      <div className="info-value">
+                                                        {canEditLeadsPermission ? (
+                                                          <select
+                                                            className="form-select form-select-sm"
+                                                            value={String(profile?.leadCoOwner?._id || profile?.leadCoOwner || '')}
+                                                            onChange={(e) => handleUpdateLeadCoOwner(profile, e.target.value)}
+                                                          >
+                                                            <option value="">No co-owner</option>
+                                                            {counselorOptions.map((opt) => (
+                                                              <option key={`co-desk-${opt.value}`} value={opt.value}>
+                                                                {opt.label}
+                                                              </option>
+                                                            ))}
+                                                          </select>
+                                                        ) : (
+                                                          getProfileLeadCoOwnerLabel(profile)
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">Lead Co-owner 2</div>
+                                                      <div className="info-value">
+                                                        {canEditLeadsPermission ? (
+                                                          <select
+                                                            className="form-select form-select-sm"
+                                                            value={String(profile?.leadCoOwner2?._id || profile?.leadCoOwner2 || '')}
+                                                            onChange={(e) => handleUpdateLeadCoOwner2(profile, e.target.value)}
+                                                          >
+                                                            <option value="">No co-owner</option>
+                                                            {counselorOptions.map((opt) => (
+                                                              <option key={`co2-desk-${opt.value}`} value={opt.value}>
+                                                                {opt.label}
+                                                              </option>
+                                                            ))}
+                                                          </select>
+                                                        ) : (
+                                                          getProfileLeadCoOwner2Label(profile)
+                                                        )}
+                                                      </div>
                                                     </div>
                                                     <div className="info-group">
                                                       <div className="info-label">COURSE / JOB NAME</div>
@@ -17648,9 +18200,72 @@ useEffect(() => {
                                                   <div className="col-xl- col-3">
                                                     <div className="info-group">
                                                       <div className="info-label">LEAD OWNER</div>
-                                                      <div className="info-value">{getProfileLeadOwnerLabel(profile)}</div>
+                                                      <div className="info-value">
+                                                        {canEditLeadsPermission ? (
+                                                          <select
+                                                            className="form-select form-select-sm"
+                                                            value={getProfileLeadOwnerId(profile)}
+                                                            onChange={(e) => handleUpdateLeadOwner(profile, e.target.value)}
+                                                          >
+                                                            {!getProfileLeadOwnerId(profile) && <option value="">Select owner</option>}
+                                                            {counselorOptions.map((opt) => (
+                                                              <option key={`owner-sum-${opt.value}`} value={opt.value}>
+                                                                {opt.label}
+                                                              </option>
+                                                            ))}
+                                                          </select>
+                                                        ) : (
+                                                          getProfileLeadOwnerLabel(profile)
+                                                        )}
+                                                      </div>
                                                     </div>
 
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD CO-OWNER 1</div>
+                                                      <div className="info-value">
+                                                        {canEditLeadsPermission ? (
+                                                          <select
+                                                            className="form-select form-select-sm"
+                                                            value={String(profile?.leadCoOwner?._id || profile?.leadCoOwner || '')}
+                                                            onChange={(e) => handleUpdateLeadCoOwner(profile, e.target.value)}
+                                                          >
+                                                            <option value="">No co-owner</option>
+                                                            {counselorOptions.map((opt) => (
+                                                              <option key={`co-sum-${opt.value}`} value={opt.value}>
+                                                                {opt.label}
+                                                              </option>
+                                                            ))}
+                                                          </select>
+                                                        ) : (
+                                                          getProfileLeadCoOwnerLabel(profile)
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD CO-OWNER 2</div>
+                                                      <div className="info-value">
+                                                        {canEditLeadsPermission ? (
+                                                          <select
+                                                            className="form-select form-select-sm"
+                                                            value={String(profile?.leadCoOwner2?._id || profile?.leadCoOwner2 || '')}
+                                                            onChange={(e) => handleUpdateLeadCoOwner2(profile, e.target.value)}
+                                                          >
+                                                            <option value="">No co-owner</option>
+                                                            {counselorOptions.map((opt) => (
+                                                              <option key={`co2-sum-${opt.value}`} value={opt.value}>
+                                                                {opt.label}
+                                                              </option>
+                                                            ))}
+                                                          </select>
+                                                        ) : (
+                                                          getProfileLeadCoOwner2Label(profile)
+                                                        )}
+                                                      </div>
+                                                    </div>
                                                   </div>
                                                   {/* <div className="col-xl- col-3">
                                                     <div className="info-group">
@@ -27846,8 +28461,8 @@ max-width: 600px;
 
         .lead-strip-v3__profile{
           position: relative;
-          flex: 0 1 clamp(280px, 22vw, 380px);
-          min-width: 280px;
+          flex: 0 1 clamp(260px, 20vw, 340px);
+          min-width: 250px;
           align-self: stretch;
           display: flex;
           flex-direction: column;
@@ -27855,7 +28470,7 @@ max-width: 600px;
           border: 1px solid #d7dee8;
           border-top: 3px solid #2563eb;
           border-radius: 14px;
-          padding: 10px 10px 8px;
+          padding: 8px 8px 6px;
           color: #0f172a;
           box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
           overflow: hidden;
@@ -27938,7 +28553,8 @@ max-width: 600px;
 
         .lead-strip-v3__phone-line,
         .lead-strip-v3__owner-line,
-        .lead-strip-v3__email-line{
+        .lead-strip-v3__email-line,
+        .lead-strip-v3__owners{
           box-sizing: border-box;
           width: 100%;
           min-width: 0;
@@ -27947,21 +28563,21 @@ max-width: 600px;
         .lead-strip-v3__phone-line{
           display: flex;
           align-items: center;
-          gap: 8px;
-          font-size: 13px;
+          gap: 6px;
+          font-size: 12px;
           font-weight: 700;
           color: #334155;
           background: #f8fafc;
           border: 1px solid #e2e8f0;
-          border-radius: 8px;
-          padding: 6px 8px;
+          border-radius: 6px;
+          padding: 4px 6px;
         }
 
         .lead-strip-v3__phone-line i{
-          width: 14px;
+          width: 12px;
           text-align: center;
           color: #2563eb;
-          font-size: 11px;
+          font-size: 10px;
           flex-shrink: 0;
         }
 
@@ -27971,50 +28587,83 @@ max-width: 600px;
           white-space: nowrap;
         }
 
-        .lead-strip-v3__owner-line{
+        .lead-strip-v3__owners{
           display: flex;
-          align-items: flex-start;
-          flex-wrap: wrap;
-          gap: 4px 6px;
-          font-size: 12px;
+          flex-direction: column;
+          gap: 3px;
+          margin-top: 2px;
+        }
+
+        .lead-strip-v3__owners-row{
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 3px;
+          min-width: 0;
+        }
+
+        .lead-strip-v3__owner-line{
+          display: grid;
+          grid-template-columns: 34px minmax(0, 1fr);
+          align-items: center;
+          gap: 4px;
+          font-size: 10px;
           background: #eff6ff;
-          border: 1px solid #bfdbfe;
-          border-radius: 8px;
-          padding: 6px 8px;
-          line-height: 1.35;
+          border: 1px solid #dbeafe;
+          border-radius: 5px;
+          padding: 2px 4px;
+          line-height: 1.2;
+          min-width: 0;
+        }
+
+        .lead-strip-v3__owner-line--owner{
+          grid-template-columns: 40px minmax(0, 1fr);
         }
 
         .lead-strip-v3__owner-label{
-          font-size: 11px;
+          font-size: 9px;
           font-weight: 800;
           color: #64748b;
           flex-shrink: 0;
           text-transform: uppercase;
-          letter-spacing: 0.02em;
+          letter-spacing: 0.01em;
+          white-space: nowrap;
         }
 
         .lead-strip-v3__owner-val{
-          font-size: 13px;
-          font-weight: 800;
+          font-size: 11px;
+          font-weight: 700;
           color: #1d4ed8;
-          flex: 1;
           min-width: 0;
-          white-space: normal;
-          word-break: break-word;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .lead-strip-v3__owner-select{
+          width: 100%;
+          min-width: 0;
+          height: 22px;
+          padding: 0 4px;
+          font-size: 10px;
+          font-weight: 700;
+          color: #1d4ed8;
+          border-color: #93c5fd;
+          background-color: #fff;
+          line-height: 1.2;
         }
 
         .lead-strip-v3__email-line{
           display: flex;
           align-items: flex-start;
-          gap: 8px;
-          font-size: 12px;
+          gap: 6px;
+          font-size: 11px;
           font-weight: 600;
           color: #334155;
           background: #f8fafc;
           border: 1px solid #e2e8f0;
-          border-radius: 8px;
-          padding: 6px 8px;
-          line-height: 1.35;
+          border-radius: 6px;
+          padding: 4px 6px;
+          line-height: 1.25;
         }
 
         .lead-strip-v3__email-line i{

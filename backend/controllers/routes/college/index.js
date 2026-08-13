@@ -3,7 +3,7 @@ const uuid = require('uuid/v1');
 const cron = require('node-cron');
 const { Parser } = require("json2csv");
 
-const { isCollege, isTrainer, auth1, authenti, getAllTeamMembers } = require("../../../helpers");
+const { isCollege, isTrainer, auth1, authenti, getAllTeamMembers, sendMail } = require("../../../helpers");
 const { extraEdgeAuthToken, extraEdgeUrl, env, baseUrl } = require("../../../config");
 const axios = require("axios");
 const mongoose = require('mongoose');
@@ -100,6 +100,115 @@ const createB2cGoogleCalendarFollowup = async ({ reqUser, appliedCourseId, follo
 		user: reqUser,
 		event
 	});
+};
+
+/**
+ * Email B2C lead owner (counsellor) and up to 2 optional co-owners when a lead is updated.
+ * Failures are logged only — they must not block the API response.
+ */
+const escapeHtmlB2cNotify = (value) =>
+	String(value ?? '')
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;');
+
+const loadB2cLeadForEmailNotify = (leadId) =>
+	AppliedCourses.findById(leadId)
+		.select('counsellor leadCoOwner leadCoOwner2 _candidate _course')
+		.populate('counsellor', 'name email')
+		.populate('leadCoOwner', 'name email')
+		.populate('leadCoOwner2', 'name email')
+		.populate('_candidate', 'name mobile email')
+		.populate('_course', 'name');
+
+const notifyB2cLeadOwnerAndCoOwner = async ({ lead, changedBy, changeType, changeDetails }) => {
+	try {
+		if (!lead) return;
+
+		const resolveUser = async (ref) => {
+			if (!ref) return null;
+			if (typeof ref === 'object' && (ref.email || ref.name)) {
+				return { name: ref.name || 'User', email: ref.email || '' };
+			}
+			const id = typeof ref === 'object' ? ref._id : ref;
+			if (!id || !mongoose.Types.ObjectId.isValid(String(id))) return null;
+			const user = await User.findById(id).select('name email').lean();
+			return user ? { name: user.name || 'User', email: user.email || '' } : null;
+		};
+
+		const [owner, coOwner1, coOwner2] = await Promise.all([
+			resolveUser(lead.counsellor),
+			resolveUser(lead.leadCoOwner),
+			resolveUser(lead.leadCoOwner2),
+		]);
+
+		console.log('[B2C Email Notify] ========== START ==========');
+		console.log('[B2C Email Notify] Lead ID:', String(lead._id || ''));
+		console.log('[B2C Email Notify] Candidate:', lead._candidate?.name || 'N/A');
+		console.log('[B2C Email Notify] Course:', lead._course?.name || 'N/A');
+		console.log('[B2C Email Notify] Changed by:', changedBy?.name || changedBy?._id || 'Unknown');
+		console.log('[B2C Email Notify] Change:', changeDetails || changeType || 'Lead updated');
+		console.log('[B2C Email Notify] Owner (counsellor):', owner ? `${owner.name} <${owner.email || 'NO EMAIL'}>` : 'N/A');
+		console.log('[B2C Email Notify] Co-owner 1:', coOwner1 ? `${coOwner1.name} <${coOwner1.email || 'NO EMAIL'}>` : 'N/A');
+		console.log('[B2C Email Notify] Co-owner 2:', coOwner2 ? `${coOwner2.name} <${coOwner2.email || 'NO EMAIL'}>` : 'N/A');
+
+		const recipientMap = new Map();
+		for (const person of [owner, coOwner1, coOwner2]) {
+			const email = String(person?.email || '').trim().toLowerCase();
+			if (email) recipientMap.set(email, person.email.trim());
+		}
+
+		const recipients = [...recipientMap.values()];
+		if (!recipients.length) {
+			console.log('[B2C Email Notify] SKIPPED — no owner/co-owner email found');
+			console.log('[B2C Email Notify] ========== END ==========');
+			return;
+		}
+
+		console.log('[B2C Email Notify] Recipients:', recipients.join(', '));
+
+		const candidateName = lead._candidate?.name || 'B2C Lead';
+		const courseName = lead._course?.name || 'N/A';
+		const changedByName = changedBy?.name || 'A user';
+		const subject = `B2C Lead Updated: ${candidateName}`;
+		const detailsText = changeDetails || changeType || 'Lead details were updated';
+
+		const message = `
+			<div style="font-family: Arial, sans-serif; color: #222; line-height: 1.5;">
+				<p>Hello,</p>
+				<p>
+					<strong>${escapeHtmlB2cNotify(changedByName)}</strong> updated a B2C lead
+					<strong>${escapeHtmlB2cNotify(candidateName)}</strong>.
+				</p>
+				<p><strong>Change:</strong> ${escapeHtmlB2cNotify(detailsText)}</p>
+				<ul>
+					<li><strong>Course:</strong> ${escapeHtmlB2cNotify(courseName)}</li>
+					<li><strong>Mobile:</strong> ${escapeHtmlB2cNotify(lead._candidate?.mobile || 'N/A')}</li>
+					<li><strong>Email:</strong> ${escapeHtmlB2cNotify(lead._candidate?.email || 'N/A')}</li>
+					<li><strong>Owner (Counsellor):</strong> ${escapeHtmlB2cNotify(owner?.name || 'N/A')}</li>
+					<li><strong>Co-owner 1:</strong> ${escapeHtmlB2cNotify(coOwner1?.name || 'N/A')}</li>
+					<li><strong>Co-owner 2:</strong> ${escapeHtmlB2cNotify(coOwner2?.name || 'N/A')}</li>
+				</ul>
+				<p style="color:#666;font-size:12px;">This is an automated notification from Focalyt Portal.</p>
+			</div>
+		`;
+
+		await Promise.all(
+			recipients.map(async (email) => {
+				try {
+					console.log('[B2C Email Notify] Sending to:', email);
+					await sendMail(subject, message, email);
+					console.log('[B2C Email Notify] Sent OK to:', email);
+				} catch (err) {
+					console.error('[B2C Email Notify] FAILED for:', email, err?.message || err);
+				}
+			})
+		);
+		console.log('[B2C Email Notify] ========== END ==========');
+	} catch (error) {
+		console.error('[B2C Email Notify] ERROR:', error?.message || error);
+	}
 };
 
 router.use("/b2b", isCollege, leadRankingRoutes);
@@ -1606,6 +1715,28 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 			},
 			{ $unwind: { path: '$counsellor', preserveNullAndEmptyArrays: true } },
 
+			// Lead Co-owner lookup
+			{
+				$lookup: {
+					from: 'users',
+					localField: 'leadCoOwner',
+					foreignField: '_id',
+					as: 'leadCoOwner'
+				}
+			},
+			{ $unwind: { path: '$leadCoOwner', preserveNullAndEmptyArrays: true } },
+
+			// Lead Co-owner 2 lookup
+			{
+				$lookup: {
+					from: 'users',
+					localField: 'leadCoOwner2',
+					foreignField: '_id',
+					as: 'leadCoOwner2'
+				}
+			},
+			{ $unwind: { path: '$leadCoOwner2', preserveNullAndEmptyArrays: true } },
+
 			// Center lookup
 			{
 				$lookup: {
@@ -2295,6 +2426,27 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				approval: doc.approval,
 				leadAssignment: doc.leadAssignment,
 				remarks: doc.remarks,
+				counsellor: doc.counsellor
+					? {
+						_id: doc.counsellor._id || doc.counsellor,
+						name: doc.counsellor.name || null,
+						email: doc.counsellor.email || null,
+					}
+					: null,
+				leadCoOwner: doc.leadCoOwner
+					? {
+						_id: doc.leadCoOwner._id || doc.leadCoOwner,
+						name: doc.leadCoOwner.name || null,
+						email: doc.leadCoOwner.email || null,
+					}
+					: null,
+				leadCoOwner2: doc.leadCoOwner2
+					? {
+						_id: doc.leadCoOwner2._id || doc.leadCoOwner2,
+						name: doc.leadCoOwner2.name || null,
+						email: doc.leadCoOwner2.email || null,
+					}
+					: null,
 			};
 		});
 
@@ -2390,6 +2542,16 @@ router.put('/appliedCandidates/:id/approval', isCollege, async (req, res) => {
 		});
 
 		await appliedCourse.save();
+
+		const notifyLead = await loadB2cLeadForEmailNotify(id);
+		notifyB2cLeadOwnerAndCoOwner({
+			lead: notifyLead || appliedCourse,
+			changedBy: req.user,
+			changeType: 'Lead approval updated',
+			changeDetails: normalized === 'REJECTED'
+				? `Lead approval set to REJECTED${appliedCourse.approval.rejectionReason ? ` | Reason: ${appliedCourse.approval.rejectionReason}` : ''}`
+				: 'Lead approval set to APPROVED',
+		});
 
 		return res.status(200).json({
 			success: true,
@@ -3067,7 +3229,9 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 	} else if (teamMemberIds && teamMemberIds.length > 0) {
 		baseMatch.$or = [
 			{ registeredBy: { $in: teamMemberIds } },
-			{ counsellor: { $in: teamMemberIds } }
+			{ counsellor: { $in: teamMemberIds } },
+			{ leadCoOwner: { $in: teamMemberIds } },
+			{ leadCoOwner2: { $in: teamMemberIds } }
 		];
 	}
 
@@ -3234,7 +3398,40 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 				pipeline: [{ $project: { name: 1 } }]
 			}
 		},
-		{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } }
+		{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
+
+		{
+			$lookup: {
+				from: 'users',
+				localField: 'counsellor',
+				foreignField: '_id',
+				as: 'counsellor',
+				pipeline: [{ $project: { name: 1, email: 1 } }]
+			}
+		},
+		{ $unwind: { path: '$counsellor', preserveNullAndEmptyArrays: true } },
+
+		{
+			$lookup: {
+				from: 'users',
+				localField: 'leadCoOwner',
+				foreignField: '_id',
+				as: 'leadCoOwner',
+				pipeline: [{ $project: { name: 1, email: 1 } }]
+			}
+		},
+		{ $unwind: { path: '$leadCoOwner', preserveNullAndEmptyArrays: true } },
+
+		{
+			$lookup: {
+				from: 'users',
+				localField: 'leadCoOwner2',
+				foreignField: '_id',
+				as: 'leadCoOwner2',
+				pipeline: [{ $project: { name: 1, email: 1 } }]
+			}
+		},
+		{ $unwind: { path: '$leadCoOwner2', preserveNullAndEmptyArrays: true } }
 	);
 
 	// Apply additional filters
@@ -3290,6 +3487,9 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 			updatedAt: 1,
 			approval: 1,
 			leadAssignment: 1,
+			counsellor: 1,
+			leadCoOwner: 1,
+			leadCoOwner2: 1,
 			remarks: 1,
 			followup: 1,
 			followUpCall: 1,
@@ -3335,7 +3535,9 @@ function buildSimplifiedPipelineWithWhatsApp({ teamMemberIds, college, filters, 
 	} else if (teamMemberIds && teamMemberIds.length > 0) {
 		baseMatch.$or = [
 			{ registeredBy: { $in: teamMemberIds } },
-			{ counsellor: { $in: teamMemberIds } }
+			{ counsellor: { $in: teamMemberIds } },
+			{ leadCoOwner: { $in: teamMemberIds } },
+			{ leadCoOwner2: { $in: teamMemberIds } }
 		];
 	}
 
@@ -3849,7 +4051,9 @@ function downloadPipeline({ teamMemberIds, college, filters }) {
 	} else if (teamMemberIds && teamMemberIds.length > 0) {
 		baseMatch.$or = [
 			{ registeredBy: { $in: teamMemberIds } },
-			{ counsellor: { $in: teamMemberIds } }
+			{ counsellor: { $in: teamMemberIds } },
+			{ leadCoOwner: { $in: teamMemberIds } },
+			{ leadCoOwner2: { $in: teamMemberIds } }
 		];
 	}
 
@@ -7572,6 +7776,14 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 			_subStatusId: _leadSubStatus,
 		});
 
+		const notifyLead = await loadB2cLeadForEmailNotify(id);
+		notifyB2cLeadOwnerAndCoOwner({
+			lead: notifyLead || doc,
+			changedBy: req.user,
+			changeType: 'Lead status updated',
+			changeDetails: actionParts.join('; '),
+		});
+
 		return res.json({ success: true, data: doc });
 	} catch (error) {
 		return res.status(500).json({ success: false, message: 'Internal Server Error' });
@@ -7662,6 +7874,14 @@ router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 
 			// Save the updated document
 			const newDocDetails = await doc.save();
+
+			const notifyLead = await loadB2cLeadForEmailNotify(id);
+			notifyB2cLeadOwnerAndCoOwner({
+				lead: notifyLead || newDocDetails || doc,
+				changedBy: req.user,
+				changeType: 'Lead status updated',
+				changeDetails: actionParts.join('; '),
+			});
 		});
 
 		// Wait for all updates to complete
@@ -7868,6 +8088,62 @@ router.put('/update/:id', isCollege, async (req, res) => {
 			return res.status(404).json({ success: false, message: "Applied course not found" });
 		}
 
+		const resolveUpdateCoOwner = async (rawValue, label) => {
+			const coOwnerRaw = rawValue != null ? String(rawValue).trim() : '';
+			if (!coOwnerRaw) return null;
+			if (!mongoose.Types.ObjectId.isValid(coOwnerRaw)) {
+				const err = new Error(`Invalid ${label}`);
+				err.statusCode = 400;
+				throw err;
+			}
+			const coOwnerUser = await User.findById(coOwnerRaw).select('_id').lean();
+			if (!coOwnerUser) {
+				const err = new Error(`${label} not found`);
+				err.statusCode = 404;
+				throw err;
+			}
+			return coOwnerUser._id;
+		};
+
+		try {
+			if (Object.prototype.hasOwnProperty.call(updateData, 'counsellor')) {
+				const counsellorRaw = updateData.counsellor != null ? String(updateData.counsellor).trim() : '';
+				if (!counsellorRaw) {
+					return res.status(400).json({ success: false, message: 'Lead owner (counsellor) is required' });
+				}
+				if (!mongoose.Types.ObjectId.isValid(counsellorRaw)) {
+					return res.status(400).json({ success: false, message: 'Invalid lead owner' });
+				}
+				const counsellorUser = await User.findById(counsellorRaw).select('_id name').lean();
+				if (!counsellorUser) {
+					return res.status(404).json({ success: false, message: 'Lead owner not found' });
+				}
+				updateData.counsellor = counsellorUser._id;
+				const oldCounsellorId = appliedCourse.counsellor ? String(appliedCourse.counsellor) : '';
+				if (oldCounsellorId !== String(counsellorUser._id)) {
+					appliedCourse.leadAssignment = Array.isArray(appliedCourse.leadAssignment)
+						? appliedCourse.leadAssignment
+						: [];
+					appliedCourse.leadAssignment.push({
+						_counsellor: counsellorUser._id,
+						counsellorName: counsellorUser.name || 'Counselor',
+						assignDate: new Date(),
+						assignedBy: user._id,
+					});
+				}
+			}
+			if (Object.prototype.hasOwnProperty.call(updateData, 'leadCoOwner')) {
+				updateData.leadCoOwner = await resolveUpdateCoOwner(updateData.leadCoOwner, 'lead co-owner 1');
+			}
+			if (Object.prototype.hasOwnProperty.call(updateData, 'leadCoOwner2')) {
+				updateData.leadCoOwner2 = await resolveUpdateCoOwner(updateData.leadCoOwner2, 'lead co-owner 2');
+			}
+		} catch (coOwnerErr) {
+			return res.status(coOwnerErr.statusCode || 400).json({
+				success: false,
+				message: coOwnerErr.message || 'Invalid co-owner',
+			});
+		}
 
 		// Update fields
 		Object.keys(updateData).forEach(key => {
@@ -7917,6 +8193,18 @@ router.put('/update/:id', isCollege, async (req, res) => {
 		}
 
 		await appliedCourse.save();
+
+		const notifyLead = await loadB2cLeadForEmailNotify(id);
+		const updateKeys = Object.keys(updateData || {}).filter((k) => k !== 'logs');
+		notifyB2cLeadOwnerAndCoOwner({
+			lead: notifyLead || appliedCourse,
+			changedBy: user,
+			changeType: 'Lead details updated',
+			changeDetails: updateKeys.length
+				? `Updated fields: ${updateKeys.join(', ')}`
+				: 'Lead details were updated',
+		});
+
 		return res.json({ success: true, message: "Profile updated successfully" });
 	} catch (err) {
 		console.error("Error updating profile:", err);
@@ -7966,6 +8254,14 @@ router.post('/mark_complete_followup/:id', isCollege, async (req, res) => {
 		// const newStatusLogs = await statusLogHelper(id, {
 		// 	followupCompleted: true
 		// });
+
+		const notifyLead = await loadB2cLeadForEmailNotify(b2cFollowup.appliedCourseId);
+		notifyB2cLeadOwnerAndCoOwner({
+			lead: notifyLead || appliedcourse,
+			changedBy: user,
+			changeType: 'Follow-up completed',
+			changeDetails: 'Followup marked complete',
+		});
 
 		return res.json({
 			success: true,
@@ -10322,6 +10618,14 @@ router.put("/upload_docs/:id", isCollege, async (req, res) => {
 
 		await appliedCourse.save();
 
+		const notifyLead = await loadB2cLeadForEmailNotify(id);
+		notifyB2cLeadOwnerAndCoOwner({
+			lead: notifyLead || appliedCourse,
+			changedBy: user,
+			changeType: 'Document uploaded',
+			changeDetails: `Document uploaded: ${docName}`,
+		});
+
 		return res.status(200).json({
 			status: true,
 			message: "Document uploaded successfully",
@@ -10457,6 +10761,14 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 				return res.status(400).json({ status: false, message: "Applied course remarks not updated" });
 			}
 
+			const notifyLead = await loadB2cLeadForEmailNotify(appliedCourseId);
+			notifyB2cLeadOwnerAndCoOwner({
+				lead: notifyLead || updateAppliedRemarks,
+				changedBy: user,
+				changeType: 'Follow-up scheduled',
+				changeDetails: actionParts.join('; '),
+			});
+
 			const slots = await loadSlotsForCourse(appliedCourseId);
 			return res.status(200).json({
 				status: true,
@@ -10533,6 +10845,14 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 					$push: { logs: newLogEntry }
 				}
 			);
+
+			const notifyLead = await loadB2cLeadForEmailNotify(appliedCourseId);
+			notifyB2cLeadOwnerAndCoOwner({
+				lead: notifyLead,
+				changedBy: user,
+				changeType: 'Follow-up updated',
+				changeDetails: actionParts.join('; '),
+			});
 
 			const slots = await loadSlotsForCourse(appliedCourseId);
 			return res.status(200).json({
@@ -11266,6 +11586,15 @@ router.post("/kycDone/:profileId", isCollege, async (req, res) => {
 		appliedCourse.kycDoneAt = new Date();
 		appliedCourse.kycDoneBy = userId;
 		await appliedCourse.save();
+
+		const notifyLead = await loadB2cLeadForEmailNotify(profileId);
+		notifyB2cLeadOwnerAndCoOwner({
+			lead: notifyLead || appliedCourse,
+			changedBy: req.user,
+			changeType: 'KYC done',
+			changeDetails: 'KYC marked as done',
+		});
+
 		return res.json({
 			success: true,
 			message: "KYC marked as done",
@@ -14526,42 +14855,176 @@ router.route('/refer-leads')
 		try {
 			const user = req.user;
 			let { counselorId, appliedCourseId, type } = req.body;
+
+			if (!counselorId || !mongoose.Types.ObjectId.isValid(String(counselorId))) {
+				return res.status(400).json({
+					success: false,
+					status: false,
+					message: 'Valid counselorId is required',
+				});
+			}
+
 			counselorId = new mongoose.Types.ObjectId(counselorId);
 
 			// If appliedCourseId is not an array, convert it to an array
 			if (!Array.isArray(appliedCourseId)) {
 				appliedCourseId = [appliedCourseId];
 			}
-			for (const id of appliedCourseId) {
-				const counselor = await User.findById(counselorId);
-				if (!counselor) {
-					return res.status(404).json({ status: false, message: 'Counselor not found' });
-				}
 
+			const counselor = await User.findById(counselorId).select('name').lean();
+			if (!counselor) {
+				return res.status(404).json({
+					success: false,
+					status: false,
+					message: 'Counselor not found',
+				});
+			}
+
+			const sameId = (a, b) => {
+				if (a == null || b == null || a === '' || b === '') return false;
+				return String(a._id || a) === String(b._id || b);
+			};
+
+			const toObjectId = (value) => {
+				if (!value) return null;
+				const raw = value._id || value;
+				if (!mongoose.Types.ObjectId.isValid(String(raw))) return null;
+				return new mongoose.Types.ObjectId(String(raw));
+			};
+
+			for (const id of appliedCourseId) {
+				if (!id || !mongoose.Types.ObjectId.isValid(String(id))) {
+					return res.status(400).json({
+						success: false,
+						status: false,
+						message: 'Invalid lead id',
+					});
+				}
 
 				const appliedCourse = await AppliedCourses.findById(id);
 				if (!appliedCourse) {
-					return res.status(404).json({ status: false, message: 'Applied course not found' });
+					return res.status(404).json({
+						success: false,
+						status: false,
+						message: 'Applied course not found',
+					});
 				}
-				const updateData = {
+
+				if (sameId(appliedCourse.counsellor, counselorId)) {
+					return res.status(400).json({
+						success: false,
+						status: false,
+						message: 'Lead is already owned by the selected counselor',
+					});
+				}
+
+				// Previous owner loses ownership and should become co-owner
+				let previousOwnerId = toObjectId(appliedCourse.counsellor);
+				if (
+					!previousOwnerId &&
+					Array.isArray(appliedCourse.leadAssignment) &&
+					appliedCourse.leadAssignment.length > 0
+				) {
+					const lastAssignment =
+						appliedCourse.leadAssignment[appliedCourse.leadAssignment.length - 1];
+					previousOwnerId = toObjectId(lastAssignment?._counsellor);
+				}
+				const oldCounsellor = previousOwnerId
+					? await User.findById(previousOwnerId).select('name').lean()
+					: null;
+				const oldName = oldCounsellor?.name?.trim() || 'Unassigned';
+				const newName = counselor.name?.trim() || 'Unknown';
+
+				let nextCo1 = toObjectId(appliedCourse.leadCoOwner);
+				let nextCo2 = toObjectId(appliedCourse.leadCoOwner2);
+
+				// If new owner was already a co-owner, free that slot
+				if (sameId(nextCo1, counselorId)) nextCo1 = null;
+				if (sameId(nextCo2, counselorId)) nextCo2 = null;
+
+				// Move previous owner into first free co-owner slot
+				if (previousOwnerId && !sameId(previousOwnerId, counselorId)) {
+					const alreadyCoOwner =
+						sameId(nextCo1, previousOwnerId) || sameId(nextCo2, previousOwnerId);
+
+					if (!alreadyCoOwner) {
+						if (nextCo1 && nextCo2) {
+							return res.status(400).json({
+								success: false,
+								status: false,
+								message:
+									'Already has two co-owners. Please remove 1 co-owner first so the referring person can become a co-owner.',
+							});
+						}
+
+						if (!nextCo1) {
+							nextCo1 = previousOwnerId;
+						} else if (!nextCo2) {
+							nextCo2 = previousOwnerId;
+						}
+					}
+				}
+
+				const assignmentEntry = {
 					_counsellor: counselorId,
 					counsellorName: counselor.name,
 					assignDate: new Date(),
-					assignedBy: new mongoose.Types.ObjectId(user._id)
-				}
-				appliedCourse.leadAssignment.push(updateData);
-				appliedCourse.counsellor = counselorId;
-				await appliedCourse.save();
+					assignedBy: toObjectId(user._id),
+				};
+
+				const logEntry = {
+					user: user._id,
+					timestamp: new Date(),
+					action: `Lead referred from ${oldName} to ${newName}`,
+					remarks: previousOwnerId
+						? `Previous owner set as co-owner (${nextCo1 && sameId(nextCo1, previousOwnerId) ? 'Co-1' : nextCo2 && sameId(nextCo2, previousOwnerId) ? 'Co-2' : 'already co-owner'})`
+						: 'No previous owner to set as co-owner',
+				};
+
+				const updatedLead = await AppliedCourses.findByIdAndUpdate(
+					id,
+					{
+						$set: {
+							counsellor: counselorId,
+							leadCoOwner: nextCo1,
+							leadCoOwner2: nextCo2,
+						},
+						$push: {
+							leadAssignment: assignmentEntry,
+							logs: logEntry,
+						},
+					},
+					{ new: true }
+				)
+					.populate('counsellor', 'name email')
+					.populate('leadCoOwner', 'name email')
+					.populate('leadCoOwner2', 'name email');
+
+				console.log('[B2C Refer] Lead:', String(id));
+				console.log('[B2C Refer] New owner:', updatedLead?.counsellor?.name || counselorId);
+				console.log('[B2C Refer] Co-1:', updatedLead?.leadCoOwner?.name || 'None');
+				console.log('[B2C Refer] Co-2:', updatedLead?.leadCoOwner2?.name || 'None');
+
+				const notifyLead = await loadB2cLeadForEmailNotify(id);
+				notifyB2cLeadOwnerAndCoOwner({
+					lead: notifyLead || updatedLead,
+					changedBy: user,
+					changeType: 'Lead referred',
+					changeDetails: `Lead referred from ${oldName} to ${newName}`,
+				});
 			}
+
 			res.status(200).json({
 				success: true,
-				message: 'Lead referred successfully'
+				status: true,
+				message: 'Lead referred successfully',
 			});
 		} catch (err) {
-			console.error(err);
+			console.error('[B2C Refer] Error:', err);
 			res.status(500).json({
 				success: false,
-				message: "Server Error"
+				status: false,
+				message: 'Server Error',
 			});
 		}
 	})

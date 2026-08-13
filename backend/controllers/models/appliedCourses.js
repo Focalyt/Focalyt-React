@@ -173,6 +173,15 @@ const appliedCoursesSchema = new Schema(
       type: ObjectId,
       ref: "User",
     },
+    // Optional co-owners (in addition to counsellor as lead owner)
+    leadCoOwner: {
+      type: ObjectId,
+      ref: "User",
+    },
+    leadCoOwner2: {
+      type: ObjectId,
+      ref: "User",
+    },
     leadAssignment: [{
       _counsellor: {
         type: ObjectId,

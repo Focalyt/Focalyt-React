@@ -109,6 +109,8 @@ export type B2CProfile = {
   followup?: B2CFollowUpSlot | null;
   registeredBy?: { name?: string };
   counsellor?: { name?: string };
+  leadCoOwner?: { _id?: string; name?: string };
+  leadCoOwner2?: { _id?: string; name?: string };
   leadAssignment?: Array<{ counsellorName?: string; name?: string }>;
   logs?: Array<{ user?: { name?: string } }>;
   uploadedDocs?: B2CUploadedDoc[];
@@ -589,6 +591,8 @@ export type B2CCreateLeadBody = {
   centerId: string;
   counselorId: string;
   registeredBy: string;
+  leadCoOwner?: string;
+  leadCoOwner2?: string;
   candidateData: {
     name: string;
     mobile: string;
@@ -819,6 +823,14 @@ export function getProfileLeadOwnerLabel(profile: B2CProfile): string {
     profile.registeredBy?.name ||
     'Self Registered'
   );
+}
+
+export function getProfileLeadCoOwnerLabel(profile: B2CProfile): string {
+  return profile.leadCoOwner?.name || '—';
+}
+
+export function getProfileLeadCoOwner2Label(profile: B2CProfile): string {
+  return profile.leadCoOwner2?.name || '—';
 }
 
 export async function fetchB2CProfileDetails(
