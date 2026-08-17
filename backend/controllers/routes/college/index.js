@@ -678,7 +678,15 @@ router.route('/permission')
 		try {
 			const user = req.user;
 			const permissions = user.permissions;
-			return res.send({ status: true, message: "Permission fetched successfully", permissions: permissions });
+			const departments_access = user.departments_access || [];
+			const projects_access = user.projects_access || [];
+			return res.send({
+				status: true,
+				message: "Permission fetched successfully",
+				permissions,
+				departments_access,
+				projects_access
+			});
 		} catch (err) {
 			return res.send({ status: false, error: err.message });
 		}

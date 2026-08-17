@@ -1142,6 +1142,41 @@ router.delete('/type-of-b2b/:id', isCollege, async (req, res) => {
 
 // ==================== B2B PROJECT ROUTES ====================
 
+const projectPopulate = [
+	{ path: 'department', select: 'name isActive' },
+	{ path: 'departments', select: 'name isActive' },
+	{ path: 'addedBy', select: 'name email' },
+];
+
+const normalizeProjectDepartmentIds = (body = {}, current = null) => {
+	let ids = [];
+	if (Array.isArray(body.departments)) {
+		ids = body.departments;
+	} else if (body.department) {
+		ids = [body.department];
+	} else if (current) {
+		if (Array.isArray(current.departments) && current.departments.length) {
+			ids = current.departments;
+		} else if (current.department) {
+			ids = [current.department];
+		}
+	}
+	return [...new Set(
+		ids
+			.map((id) => (id && id._id ? String(id._id) : String(id || '')))
+			.filter((id) => mongoose.Types.ObjectId.isValid(id))
+	)];
+};
+
+const primaryDepartmentId = (project) => {
+	if (!project) return null;
+	if (Array.isArray(project.departments) && project.departments.length) {
+		const first = project.departments[0];
+		return first?._id || first || null;
+	}
+	return project.department?._id || project.department || null;
+};
+
 router.get('/b2b-projects', isCollege, async (req, res) => {
 	try {
 		const { status, department } = req.query;
@@ -1150,11 +1185,13 @@ router.get('/b2b-projects', isCollege, async (req, res) => {
 			query.isActive = status === 'true' || status === true;
 		}
 		if (department && mongoose.Types.ObjectId.isValid(department)) {
-			query.department = department;
+			query.$or = [
+				{ department },
+				{ departments: department },
+			];
 		}
 		const projects = await B2BProject.find(query)
-			.populate('department', 'name isActive')
-			.populate('addedBy', 'name email')
+			.populate(projectPopulate)
 			.sort({ createdAt: -1 });
 
 		res.json({
@@ -1175,8 +1212,7 @@ router.get('/b2b-projects', isCollege, async (req, res) => {
 router.get('/b2b-projects/:id', isCollege, async (req, res) => {
 	try {
 		const project = await B2BProject.findById(req.params.id)
-			.populate('department', 'name isActive')
-			.populate('addedBy', 'name email');
+			.populate(projectPopulate);
 
 		if (!project) {
 			return res.status(404).json({
@@ -1202,7 +1238,8 @@ router.get('/b2b-projects/:id', isCollege, async (req, res) => {
 
 router.post('/b2b-projects', isCollege, async (req, res) => {
 	try {
-		const { name, description, department } = req.body;
+		const { name, description } = req.body;
+		const departmentIds = normalizeProjectDepartmentIds(req.body);
 
 		if (!name || !String(name).trim()) {
 			return res.status(400).json({
@@ -1211,42 +1248,40 @@ router.post('/b2b-projects', isCollege, async (req, res) => {
 			});
 		}
 
-		if (!department || !mongoose.Types.ObjectId.isValid(department)) {
+		if (!departmentIds.length) {
 			return res.status(400).json({
 				status: false,
-				message: 'Valid B2B department is required'
+				message: 'Select at least one B2B department'
 			});
 		}
 
-		const departmentDoc = await B2BDepartment.findById(department);
-		if (!departmentDoc) {
+		const departmentDocs = await B2BDepartment.find({ _id: { $in: departmentIds } });
+		if (departmentDocs.length !== departmentIds.length) {
 			return res.status(400).json({
 				status: false,
-				message: 'B2B department not found'
+				message: 'One or more B2B departments were not found'
 			});
 		}
 
 		const trimmedName = String(name).trim();
-		const existingProject = await B2BProject.findOne({ name: trimmedName, department });
+		const existingProject = await B2BProject.findOne({ name: trimmedName });
 		if (existingProject) {
 			return res.status(400).json({
 				status: false,
-				message: 'B2B project with this name already exists for the selected department'
+				message: 'B2B project with this name already exists'
 			});
 		}
 
 		const newProject = new B2BProject({
 			name: trimmedName,
 			description,
-			department,
+			departments: departmentIds,
+			department: departmentIds[0],
 			addedBy: req.user._id
 		});
 
 		const savedProject = await newProject.save();
-		await savedProject.populate([
-			{ path: 'department', select: 'name isActive' },
-			{ path: 'addedBy', select: 'name email' }
-		]);
+		await savedProject.populate(projectPopulate);
 
 		res.status(201).json({
 			status: true,
@@ -1265,7 +1300,7 @@ router.post('/b2b-projects', isCollege, async (req, res) => {
 
 router.put('/b2b-projects/:id', isCollege, async (req, res) => {
 	try {
-		const { name, description, isActive, department } = req.body;
+		const { name, description, isActive } = req.body;
 		const projectId = req.params.id;
 
 		const currentProject = await B2BProject.findById(projectId);
@@ -1276,21 +1311,25 @@ router.put('/b2b-projects/:id', isCollege, async (req, res) => {
 			});
 		}
 
-		const departmentId = department || currentProject.department;
+		const hasDepartmentUpdate =
+			req.body.departments !== undefined || req.body.department !== undefined;
+		const departmentIds = hasDepartmentUpdate
+			? normalizeProjectDepartmentIds(req.body, currentProject)
+			: normalizeProjectDepartmentIds({}, currentProject);
 
-		if (department && !mongoose.Types.ObjectId.isValid(department)) {
+		if (hasDepartmentUpdate && !departmentIds.length) {
 			return res.status(400).json({
 				status: false,
-				message: 'Valid B2B department is required'
+				message: 'Select at least one B2B department'
 			});
 		}
 
-		if (department) {
-			const departmentDoc = await B2BDepartment.findById(department);
-			if (!departmentDoc) {
+		if (hasDepartmentUpdate) {
+			const departmentDocs = await B2BDepartment.find({ _id: { $in: departmentIds } });
+			if (departmentDocs.length !== departmentIds.length) {
 				return res.status(400).json({
 					status: false,
-					message: 'B2B department not found'
+					message: 'One or more B2B departments were not found'
 				});
 			}
 		}
@@ -1299,13 +1338,12 @@ router.put('/b2b-projects/:id', isCollege, async (req, res) => {
 			const trimmedName = String(name).trim();
 			const existingProject = await B2BProject.findOne({
 				name: trimmedName,
-				department: departmentId,
 				_id: { $ne: projectId }
 			});
 			if (existingProject) {
 				return res.status(400).json({
 					status: false,
-					message: 'B2B project with this name already exists for the selected department'
+					message: 'B2B project with this name already exists'
 				});
 			}
 		}
@@ -1314,16 +1352,16 @@ router.put('/b2b-projects/:id', isCollege, async (req, res) => {
 		if (name !== undefined) updatePayload.name = String(name).trim();
 		if (description !== undefined) updatePayload.description = description;
 		if (isActive !== undefined) updatePayload.isActive = isActive;
-		if (department !== undefined) updatePayload.department = department;
+		if (hasDepartmentUpdate) {
+			updatePayload.departments = departmentIds;
+			updatePayload.department = departmentIds[0];
+		}
 
 		const updatedProject = await B2BProject.findByIdAndUpdate(
 			projectId,
 			updatePayload,
 			{ new: true, runValidators: true }
-		).populate([
-			{ path: 'department', select: 'name isActive' },
-			{ path: 'addedBy', select: 'name email' }
-		]);
+		).populate(projectPopulate);
 
 		if (!updatedProject) {
 			return res.status(404).json({
@@ -1350,18 +1388,19 @@ router.put('/b2b-projects/:id', isCollege, async (req, res) => {
 router.get('/b2b-projects/:id/delete-impact', isCollege, async (req, res) => {
 	try {
 		const projectId = req.params.id;
-		const projectDoc = await B2BProject.findById(projectId).select('name department');
+		const projectDoc = await B2BProject.findById(projectId).select('name department departments');
 		if (!projectDoc) {
 			return res.status(404).json({ status: false, message: 'B2B project not found' });
 		}
 		const leads = await Lead.countDocuments({ b2bProject: projectId });
+		const deptId = primaryDepartmentId(projectDoc);
 		res.json({
 			status: true,
 			data: {
 				entityType: 'project',
 				entityId: projectId,
 				entityName: projectDoc.name,
-				departmentId: projectDoc.department ? String(projectDoc.department) : null,
+				departmentId: deptId ? String(deptId) : null,
 				leads,
 				projects: 0,
 				types: 0,
@@ -1398,7 +1437,7 @@ router.delete('/b2b-projects/:id', isCollege, async (req, res) => {
 				{
 					$set: {
 						b2bProject: targetProject._id,
-						b2bDepartment: targetProject.department || null
+						b2bDepartment: primaryDepartmentId(targetProject) || null
 					}
 				}
 			);

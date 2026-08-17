@@ -89,7 +89,11 @@ const WhatsAppTemplate = () => {
 
     // Variables configuration fields
 
-    variables: []
+    variables: [],
+
+    // Department-wise template
+
+    b2bDepartment: ''
 
   });
 
@@ -105,6 +109,8 @@ const WhatsAppTemplate = () => {
   const [showCardVariableDropdown, setShowCardVariableDropdown] = useState(null); // for card-specific dropdown
   const variableDropdownRef = useRef(null);
   const carouselVariableDropdownRef = useRef(null);
+  const [b2bDepartments, setB2bDepartments] = useState([]);
+  const [departmentFilter, setDepartmentFilter] = useState('');
 
   // Predefined variables list
   const predefinedVariables = [
@@ -183,6 +189,26 @@ const WhatsAppTemplate = () => {
   const token = userData.token;
 
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
+  const fetchB2bDepartments = async () => {
+    try {
+      if (!token) return;
+      const response = await axios.get(`${backendUrl}/college/b2b/b2b-departments?status=true`, {
+        headers: { 'x-auth': token }
+      });
+      if (response.data?.status) {
+        setB2bDepartments((response.data.data || []).filter((d) => d.isActive !== false));
+      }
+    } catch (error) {
+      console.error('Error fetching B2B departments:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (token) {
+      fetchB2bDepartments();
+    }
+  }, [token, backendUrl]);
 
 
 
@@ -448,7 +474,9 @@ const WhatsAppTemplate = () => {
 
       // Variables configuration fields
 
-      variables: []
+      variables: [],
+
+      b2bDepartment: editForm.b2bDepartment || ''
 
     };
 
@@ -556,7 +584,15 @@ const WhatsAppTemplate = () => {
 
       carouselCards: [],
 
-      orderButtonText: 'Review and Pay'
+      carouselVariables: [],
+
+      orderButtonText: 'Review and Pay',
+
+      orderStatusButtons: ['Track Order', 'Cancel Order'],
+
+      variables: [],
+
+      b2bDepartment: ''
 
     });
 
@@ -1262,7 +1298,9 @@ const WhatsAppTemplate = () => {
 
           orderStatusButtons: ['Track Order', 'Cancel Order'],
 
-          variables: []
+          variables: [],
+
+          b2bDepartment: ''
 
         });
 
@@ -1470,10 +1508,12 @@ const WhatsAppTemplate = () => {
 
   const filteredTemplates = templates.filter(template => {
     const templateData = template.template || template;
-    return (
+    const matchesSearch =
       templateData.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      templateData.subject?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+      templateData.subject?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesDepartment = !departmentFilter
+      || String(templateData.b2bDepartment || '') === String(departmentFilter);
+    return matchesSearch && matchesDepartment;
   });
 
 
@@ -1752,7 +1792,13 @@ const WhatsAppTemplate = () => {
 
       // Variables configuration fields
 
-      variables: variables
+      variables: variables,
+
+      b2bDepartment: template.b2bDepartment
+        ? String(template.b2bDepartment._id || template.b2bDepartment)
+        : (templateData.b2bDepartment
+          ? String(templateData.b2bDepartment._id || templateData.b2bDepartment)
+          : '')
 
     });
 
@@ -1966,6 +2012,11 @@ const WhatsAppTemplate = () => {
 
       }
 
+      if (!editForm.b2bDepartment) {
+        alert('Please select a Department for this template.');
+        return;
+      }
+
 
 
       // Validate body text length (WhatsApp has a limit of 1024 characters)
@@ -2015,6 +2066,8 @@ const WhatsAppTemplate = () => {
         language: editForm.language,
 
         category: editForm.category,
+
+        b2bDepartment: editForm.b2bDepartment,
 
         components: [
 
@@ -2409,7 +2462,9 @@ const WhatsAppTemplate = () => {
 
           orderStatusButtons: ['Track Order', 'Cancel Order'],
 
-          variables: []
+          variables: [],
+
+          b2bDepartment: ''
 
         });
 
@@ -3190,6 +3245,20 @@ const WhatsAppTemplate = () => {
 
           </div>
 
+          <div className="input-group" style={{ width: '220px' }}>
+            <select
+              className="form-select"
+              value={departmentFilter}
+              onChange={(e) => setDepartmentFilter(e.target.value)}
+              style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
+            >
+              <option value="">All Departments</option>
+              {b2bDepartments.map((dept) => (
+                <option key={dept._id} value={dept._id}>{dept.name}</option>
+              ))}
+            </select>
+          </div>
+
           <div className="input-group" style={{ width: '250px' }}>
 
             <input
@@ -3241,6 +3310,12 @@ const WhatsAppTemplate = () => {
 
                 <th className="fw-semibold text-muted py-3" style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
 
+                  DEPARTMENT
+
+                </th>
+
+                <th className="fw-semibold text-muted py-3" style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+
                   MESSAGE
 
                 </th>
@@ -3283,6 +3358,14 @@ const WhatsAppTemplate = () => {
 
                     </div>
 
+                  </td>
+
+                  <td className="py-3">
+                    <span className="text-muted">
+                      {(template?.template || template)?.b2bDepartmentName
+                        || b2bDepartments.find((d) => String(d._id) === String((template?.template || template)?.b2bDepartment))?.name
+                        || '—'}
+                    </span>
                   </td>
 
                   <td className="py-3" style={{ maxWidth: '200px' }}>
@@ -4114,6 +4197,38 @@ const WhatsAppTemplate = () => {
 
 
                       <div className="row">
+
+                        <div className="col-md-6 mb-3">
+
+                          <label className="form-label fw-medium" style={{ fontSize: '14px' }}>
+
+                            Department <span className="text-danger">*</span>
+
+                          </label>
+
+                          <select
+
+                            className="form-select"
+
+                            value={editForm.b2bDepartment || ''}
+
+                            onChange={(e) => setEditForm({ ...editForm, b2bDepartment: e.target.value })}
+
+                            style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
+
+                          >
+
+                            <option value="">Select Department</option>
+
+                            {b2bDepartments.map((dept) => (
+
+                              <option key={dept._id} value={dept._id}>{dept.name}</option>
+
+                            ))}
+
+                          </select>
+
+                        </div>
 
                         <div className="col-md-6 mb-3">
 

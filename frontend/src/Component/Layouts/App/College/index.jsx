@@ -347,13 +347,15 @@ function CollegeLayout({ children }) {
   };
 
   const updatedPermission = async () => {
-
-    const respose = await axios.get(`${backendUrl}/college/permission`, {
-      headers: { 'x-auth': token }
-    });
-    if (respose.data.status) {
-
-      setPermissions(respose.data.permissions);
+    try {
+      const respose = await axios.get(`${backendUrl}/college/permission`, {
+        headers: { 'x-auth': token }
+      });
+      if (respose.data.status) {
+        setPermissions(respose.data.permissions);
+      }
+    } catch (error) {
+      console.error('Error fetching permissions:', error);
     }
   }
 

@@ -1,6 +1,149 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import B2BDeleteMoveModal from '../components/B2BDeleteMoveModal';
 import { useB2bDeleteWithMove } from '../hooks/useB2bDeleteWithMove';
+
+function DepartmentMultiSelect({
+    options,
+    selectedValues,
+    onChange,
+    disabled,
+}) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [query, setQuery] = useState('');
+    const containerRef = useRef(null);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleClickOutside = (event) => {
+            if (containerRef.current && !containerRef.current.contains(event.target)) {
+                setIsOpen(false);
+            }
+        };
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') setIsOpen(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside, true);
+        document.addEventListener('keydown', handleKeyDown, true);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside, true);
+            document.removeEventListener('keydown', handleKeyDown, true);
+        };
+    }, [isOpen]);
+
+    const filteredOptions = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        const list = Array.isArray(options) ? options : [];
+        if (!q) return list;
+        return list.filter((o) => String(o.label || '').toLowerCase().includes(q));
+    }, [options, query]);
+
+    const toggleValue = (value) => {
+        if (disabled) return;
+        const next = selectedValues.includes(value)
+            ? selectedValues.filter((v) => v !== value)
+            : [...selectedValues, value];
+        onChange(next);
+    };
+
+    const removeValue = (value) => {
+        if (disabled) return;
+        onChange(selectedValues.filter((v) => v !== value));
+    };
+
+    const displayText = (() => {
+        if (!selectedValues.length) return 'Select Departments';
+        if (selectedValues.length === 1) {
+            const opt = options.find((o) => o.value === selectedValues[0]);
+            return opt?.label || '1 selected';
+        }
+        if (selectedValues.length === 2) {
+            return selectedValues
+                .map((id) => options.find((o) => o.value === id)?.label || id)
+                .join(', ');
+        }
+        return `${selectedValues.length} departments selected`;
+    })();
+
+    return (
+        <div className="dept-multi-select" ref={containerRef}>
+            <button
+                type="button"
+                className={`form-control dept-multi-trigger ${isOpen ? 'open' : ''}`}
+                onClick={() => !disabled && setIsOpen((v) => !v)}
+                disabled={disabled}
+            >
+                <span className="dept-multi-trigger-text">{displayText}</span>
+                <i className={`fas fa-chevron-${isOpen ? 'up' : 'down'}`}></i>
+            </button>
+
+            {isOpen && (
+                <div className="dept-multi-dropdown">
+                    <div className="dept-multi-search">
+                        <input
+                            type="text"
+                            className="form-control form-control-sm"
+                            placeholder="Search departments..."
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
+                    <div className="dept-multi-options">
+                        {filteredOptions.length === 0 ? (
+                            <div className="dept-multi-empty">No departments found</div>
+                        ) : (
+                            filteredOptions.map((option) => {
+                                const checked = selectedValues.includes(option.value);
+                                return (
+                                    <label key={option.value} className="dept-multi-option">
+                                        <input
+                                            type="checkbox"
+                                            className="form-check-input"
+                                            checked={checked}
+                                            onChange={() => toggleValue(option.value)}
+                                        />
+                                        <span>{option.label}</span>
+                                        {checked && <i className="fas fa-check text-success ms-auto"></i>}
+                                    </label>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {selectedValues.length > 0 && (
+                <div className="dept-chips">
+                    {selectedValues.map((id) => {
+                        const opt = options.find((o) => o.value === id);
+                        return (
+                            <span key={id} className="dept-chip">
+                                {opt?.label || id}
+                                <button
+                                    type="button"
+                                    className="dept-chip-remove"
+                                    onClick={() => removeValue(id)}
+                                    disabled={disabled}
+                                    aria-label="Remove department"
+                                >
+                                    ×
+                                </button>
+                            </span>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function getProjectDepartments(project) {
+    if (Array.isArray(project?.departments) && project.departments.length) {
+        return project.departments;
+    }
+    if (project?.department) return [project.department];
+    return [];
+}
 
 function B2BProject() {
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -14,7 +157,7 @@ function B2BProject() {
     const [formData, setFormData] = useState({
         name: '',
         description: '',
-        department: ''
+        departments: []
     });
     const [loading, setLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -25,6 +168,15 @@ function B2BProject() {
         fetchB2bDepartments();
         fetchAllProjects();
     }, []);
+
+    const departmentOptions = useMemo(
+        () =>
+            (b2bDepartments || []).map((dept) => ({
+                value: dept._id,
+                label: `${dept.name}${dept.isActive === false ? ' (Inactive)' : ''}`,
+            })),
+        [b2bDepartments]
+    );
 
     const fetchAllProjects = async () => {
         try {
@@ -120,8 +272,8 @@ function B2BProject() {
             return;
         }
 
-        if (!formData.department) {
-            showAlert('Please select a B2B department', 'error');
+        if (!formData.departments.length) {
+            showAlert('Please select at least one B2B department', 'error');
             return;
         }
 
@@ -140,7 +292,12 @@ function B2BProject() {
                     'x-auth': token,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(formData)
+                body: JSON.stringify({
+                    name: formData.name,
+                    description: formData.description,
+                    departments: formData.departments,
+                    department: formData.departments[0],
+                })
             });
 
             const data = await response.json();
@@ -152,6 +309,7 @@ function B2BProject() {
                 );
                 resetForm();
                 fetchB2bProjects(filterDepartment);
+                fetchAllProjects();
             } else {
                 showAlert(data.message || 'Operation failed', 'error');
             }
@@ -201,17 +359,18 @@ function B2BProject() {
     };
 
     const handleEdit = (project) => {
+        const depts = getProjectDepartments(project);
         setFormData({
             name: project.name,
             description: project.description || '',
-            department: project.department?._id || project.department || ''
+            departments: depts.map((d) => d?._id || d).filter(Boolean),
         });
         setIsEditing(true);
         setEditingId(project._id);
     };
 
     const resetForm = () => {
-        setFormData({ name: '', description: '', department: '' });
+        setFormData({ name: '', description: '', departments: [] });
         setIsEditing(false);
         setEditingId(null);
     };
@@ -274,24 +433,17 @@ function B2BProject() {
                                             <div className="row">
                                                 <div className="col-xl-8 mb-1">
                                                     <label>
-                                                        Select B2B Department
+                                                        Select B2B Departments
                                                         <span className="asterisk" style={{ color: 'red' }}>*</span>
                                                     </label>
-                                                    <select
-                                                        className="form-control"
-                                                        name="department"
-                                                        value={formData.department}
-                                                        onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                                                    <DepartmentMultiSelect
+                                                        options={departmentOptions}
+                                                        selectedValues={formData.departments}
+                                                        onChange={(departments) =>
+                                                            setFormData({ ...formData, departments })
+                                                        }
                                                         disabled={loading}
-                                                        required
-                                                    >
-                                                        <option value="">Select Department</option>
-                                                        {b2bDepartments.map((dept) => (
-                                                            <option key={dept._id} value={dept._id}>
-                                                                {dept.name}{dept.isActive === false ? ' (Inactive)' : ''}
-                                                            </option>
-                                                        ))}
-                                                    </select>
+                                                    />
                                                     {b2bDepartments.length === 0 && (
                                                         <small className="text-danger">
                                                             No departments found. Please add a B2B department first.
@@ -337,7 +489,7 @@ function B2BProject() {
                                                         type="button"
                                                         className="btn btn-success font-small-3"
                                                         onClick={handleSubmit}
-                                                        disabled={loading || !formData.name.trim() || !formData.department}
+                                                        disabled={loading || !formData.name.trim() || !formData.departments.length}
                                                     >
                                                         {loading ? (
                                                             <>
@@ -407,7 +559,7 @@ function B2BProject() {
                                                 <thead>
                                                     <tr>
                                                         <th>B2B Project</th>
-                                                        <th>Department</th>
+                                                        <th>Departments</th>
                                                         <th>Description</th>
                                                         <th>Status</th>
                                                         <th>Action</th>
@@ -415,49 +567,67 @@ function B2BProject() {
                                                 </thead>
                                                 <tbody>
                                                     {b2bProjects.length > 0 ? (
-                                                        b2bProjects.map((project) => (
-                                                            <tr key={project._id}>
-                                                                <td>{project.name}</td>
-                                                                <td>{project.department?.name || '—'}</td>
-                                                                <td>
-                                                                    <span className="text-muted">
-                                                                        {project.description || 'No description'}
-                                                                    </span>
-                                                                </td>
-                                                                <td>
-                                                                    <div className="form-check form-switch">
-                                                                        <input
-                                                                            className="form-check-input"
-                                                                            type="checkbox"
-                                                                            checked={project.isActive}
-                                                                            onChange={() => handleStatusToggle(project._id, project.isActive)}
-                                                                        />
-                                                                    </div>
-                                                                </td>
-                                                                <td>
-                                                                    <div className="d-flex gap-2">
-                                                                        <button
-                                                                            className="btn btn-sm btn-outline-primary"
-                                                                            onClick={() => handleEdit(project)}
-                                                                            title="Edit B2B Project"
-                                                                            disabled={loading}
-                                                                        >
-                                                                            <i className="fas fa-edit me-1"></i>
-                                                                            Edit
-                                                                        </button>
-                                                                        <button
-                                                                            className="btn btn-sm btn-outline-danger"
-                                                                            onClick={() => handleDelete(project)}
-                                                                            title="Delete B2B Project"
-                                                                            disabled={loading || deleteLoading}
-                                                                        >
-                                                                            <i className="fas fa-trash me-1"></i>
-                                                                            Delete
-                                                                        </button>
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        ))
+                                                        b2bProjects.map((project) => {
+                                                            const depts = getProjectDepartments(project);
+                                                            return (
+                                                                <tr key={project._id}>
+                                                                    <td>{project.name}</td>
+                                                                    <td>
+                                                                        <div className="dept-table-chips">
+                                                                            {depts.length ? (
+                                                                                depts.map((d) => (
+                                                                                    <span
+                                                                                        key={d?._id || d}
+                                                                                        className="dept-chip dept-chip-table"
+                                                                                    >
+                                                                                        {d?.name || '—'}
+                                                                                    </span>
+                                                                                ))
+                                                                            ) : (
+                                                                                '—'
+                                                                            )}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td>
+                                                                        <span className="text-muted">
+                                                                            {project.description || 'No description'}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td>
+                                                                        <div className="form-check form-switch">
+                                                                            <input
+                                                                                className="form-check-input"
+                                                                                type="checkbox"
+                                                                                checked={project.isActive}
+                                                                                onChange={() => handleStatusToggle(project._id, project.isActive)}
+                                                                            />
+                                                                        </div>
+                                                                    </td>
+                                                                    <td>
+                                                                        <div className="d-flex gap-2">
+                                                                            <button
+                                                                                className="btn btn-sm btn-outline-primary"
+                                                                                onClick={() => handleEdit(project)}
+                                                                                title="Edit B2B Project"
+                                                                                disabled={loading}
+                                                                            >
+                                                                                <i className="fas fa-edit me-1"></i>
+                                                                                Edit
+                                                                            </button>
+                                                                            <button
+                                                                                className="btn btn-sm btn-outline-danger"
+                                                                                onClick={() => handleDelete(project)}
+                                                                                title="Delete B2B Project"
+                                                                                disabled={loading || deleteLoading}
+                                                                            >
+                                                                                <i className="fas fa-trash me-1"></i>
+                                                                                Delete
+                                                                            </button>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })
                                                     ) : (
                                                         <tr>
                                                             <td colSpan="5" className="text-center">
@@ -592,6 +762,104 @@ function B2BProject() {
         
         .font-small-3 {
           font-size: 0.875rem;
+        }
+
+        .dept-multi-select {
+          position: relative;
+        }
+        .dept-multi-trigger {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          text-align: left;
+          background: #fff;
+          cursor: pointer;
+        }
+        .dept-multi-trigger.open {
+          border-color: #28a745;
+        }
+        .dept-multi-trigger-text {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          padding-right: 8px;
+        }
+        .dept-multi-dropdown {
+          position: absolute;
+          z-index: 20;
+          left: 0;
+          right: 0;
+          margin-top: 4px;
+          background: #fff;
+          border: 1px solid #ced4da;
+          border-radius: 6px;
+          box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+          max-height: 260px;
+          display: flex;
+          flex-direction: column;
+        }
+        .dept-multi-search {
+          padding: 8px;
+          border-bottom: 1px solid #eee;
+        }
+        .dept-multi-options {
+          overflow-y: auto;
+          padding: 4px 0;
+        }
+        .dept-multi-option {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          margin: 0;
+          cursor: pointer;
+          font-size: 0.85rem;
+          text-transform: none;
+        }
+        .dept-multi-option:hover {
+          background: #f8f9fa;
+        }
+        .dept-multi-empty {
+          padding: 12px;
+          color: #888;
+          font-size: 0.8rem;
+        }
+        .dept-chips,
+        .dept-table-chips {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-top: 8px;
+        }
+        .dept-table-chips {
+          margin-top: 0;
+        }
+        .dept-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          background: #eef6ff;
+          color: #1a5fb4;
+          border: 1px solid #cfe2ff;
+          border-radius: 999px;
+          padding: 2px 8px;
+          font-size: 0.72rem;
+          line-height: 1.4;
+          text-transform: none;
+        }
+        .dept-chip-table {
+          background: #f3f4f6;
+          color: #374151;
+          border-color: #e5e7eb;
+        }
+        .dept-chip-remove {
+          border: none;
+          background: transparent;
+          color: inherit;
+          font-size: 0.95rem;
+          line-height: 1;
+          padding: 0 0 0 2px;
+          cursor: pointer;
         }
         
         @media (max-width: 768px) {

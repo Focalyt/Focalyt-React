@@ -25,6 +25,13 @@ const WhatsAppTemplateSchema = new mongoose.Schema({
 		enum: ['UTILITY', 'MARKETING', 'AUTHENTICATION'],
 		required: true
 	},
+	// B2B department this template belongs to (department-wise templates)
+	b2bDepartment: {
+		type: mongoose.Schema.Types.ObjectId,
+		ref: 'B2BDepartment',
+		default: null,
+		index: true
+	},
 	status: {
 		type: String,
 		enum: ['PENDING', 'APPROVED', 'REJECTED', 'PAUSED'],
@@ -87,6 +94,7 @@ const WhatsAppTemplateSchema = new mongoose.Schema({
 
 // Index for faster lookups
 WhatsAppTemplateSchema.index({ collegeId: 1, templateName: 1 });
+WhatsAppTemplateSchema.index({ collegeId: 1, b2bDepartment: 1 });
 
 module.exports = mongoose.model('WhatsAppTemplate', WhatsAppTemplateSchema);
 
