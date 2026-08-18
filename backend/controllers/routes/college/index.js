@@ -55,6 +55,61 @@ const placementRoutes = require("./placement");
 const router = express.Router();
 const moment = require('moment')
 
+function toAccessIdString(value) {
+	if (value == null) return '';
+	if (typeof value === 'object') return String(value._id || value.id || '');
+	return String(value);
+}
+
+function getB2cAccessScope(user) {
+	const isAdmin = user?.permissions?.permission_type === 'Admin';
+	const verticalIds = (user?.verticals_access || []).map(toAccessIdString).filter(Boolean);
+	const projectIds = (user?.b2c_projects_access || []).map(toAccessIdString).filter(Boolean);
+	return {
+		isAdmin,
+		verticalIds: isAdmin && verticalIds.length === 0 ? [] : verticalIds,
+		projectIds: isAdmin && projectIds.length === 0 ? [] : projectIds,
+	};
+}
+
+function applyB2cAccessToFilters(user, verticalsArray = [], projectsArray = []) {
+	const access = getB2cAccessScope(user);
+	let nextVerticals = Array.isArray(verticalsArray) ? [...verticalsArray] : [];
+	let nextProjects = Array.isArray(projectsArray) ? [...projectsArray] : [];
+
+	if (access.verticalIds.length) {
+		if (!nextVerticals.length) {
+			nextVerticals = [...access.verticalIds];
+		} else {
+			nextVerticals = nextVerticals.filter((id) => access.verticalIds.includes(String(id)));
+			if (!nextVerticals.length) nextVerticals = [...access.verticalIds];
+		}
+	}
+	if (access.projectIds.length) {
+		if (!nextProjects.length) {
+			nextProjects = [...access.projectIds];
+		} else {
+			nextProjects = nextProjects.filter((id) => access.projectIds.includes(String(id)));
+			if (!nextProjects.length) nextProjects = [...access.projectIds];
+		}
+	}
+	return { verticalsArray: nextVerticals, projectsArray: nextProjects };
+}
+
+async function resolveB2cOwnershipTeamMembers(user, counselorArray = []) {
+	if (Array.isArray(counselorArray) && counselorArray.length > 0) {
+		return counselorArray;
+	}
+	if (user?.permissions?.permission_type === 'Admin') {
+		return [];
+	}
+	const teamMembers = await getAllTeamMembers(user._id);
+	if (Array.isArray(teamMembers) && teamMembers.length > 0) {
+		return teamMembers;
+	}
+	return user?._id ? [user._id] : [];
+}
+
 const createB2cGoogleCalendarFollowup = async ({ reqUser, appliedCourseId, followupDate, remarks }) => {
 	const { createGoogleCalendarEvent } = require('../services/googleservice');
 	const appliedCourse = await AppliedCourses.findById(appliedCourseId)
@@ -680,12 +735,16 @@ router.route('/permission')
 			const permissions = user.permissions;
 			const departments_access = user.departments_access || [];
 			const projects_access = user.projects_access || [];
+			const verticals_access = user.verticals_access || [];
+			const b2c_projects_access = user.b2c_projects_access || [];
 			return res.send({
 				status: true,
 				message: "Permission fetched successfully",
 				permissions,
 				departments_access,
-				projects_access
+				projects_access,
+				verticals_access,
+				b2c_projects_access
 			});
 		} catch (err) {
 			return res.send({ status: false, error: err.message });
@@ -2197,34 +2256,10 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 
-		// Get team members
-		let teamMembers = [req.user._id];
+		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
-		if (projectsArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (verticalsArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (courseArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (centerArray.length > 0) {
-			teamMembers = [];
-		}
-		if (batchArray.length > 0) {
-			teamMembers = [];
-		}
-		if (name && name.trim() !== '') {
-			teamMembers = [];
-		}
-		if (counselorArray.length > 0) {
-			teamMembers = counselorArray;
-		}
-
+		// Same as B2B: Admin sees all leads in assigned scope; custom users keep owner/team scope
+		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray);
 
 		let teamMemberIds = [];
 		if (teamMembers?.length > 0) {
@@ -2888,31 +2923,10 @@ router.route("/appliedCandidatesWithWhatsApp").get(isCollege, async (req, res) =
 			console.error('Error parsing filter arrays:', parseError);
 		}
 
-		// Get team members
-		let teamMembers = [req.user._id];
+		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
-		if (projectsArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (verticalsArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (courseArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (centerArray.length > 0) {
-			teamMembers = [];
-		}
-		if (name && name.trim() !== '') {
-			teamMembers = [];
-		}
-		if (counselorArray.length > 0) {
-			teamMembers = counselorArray;
-		}
-
+		// Same as B2B: Admin sees all leads in assigned scope; custom users keep owner/team scope
+		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray);
 
 		let teamMemberIds = [];
 		if (teamMembers?.length > 0) {
@@ -3938,31 +3952,10 @@ router.route("/downloadleads").get(isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 
-		// Get team members
-		let teamMembers = [req.user._id];
+		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
-		if (projectsArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (verticalsArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (courseArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (centerArray.length > 0) {
-			teamMembers = [];
-		}
-		if (name && name.trim() !== '') {
-			teamMembers = [];
-		}
-		if (counselorArray.length > 0) {
-			teamMembers = counselorArray;
-		}
-
+		// Same as B2B: Admin sees all leads in assigned scope; custom users keep owner/team scope
+		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray);
 
 		let teamMemberIds = [];
 		if (teamMembers?.length > 0) {
@@ -4367,7 +4360,6 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 	try {
 
 		const user = req.user;
-		let teamMembers = [user._id];
 		const collegeId = user.college._id;
 		const {
 			name, courseType, status, leadStatus,
@@ -4395,6 +4387,10 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			console.error('Error parsing filter arrays:', parseError);
 		}
 
+		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
+
+		const teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray);
+
 		const appliedFilters = {
 			name, courseType, status, leadStatus,
 			createdFromDate, createdToDate,
@@ -4402,31 +4398,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			nextActionFromDate, nextActionToDate,
 			projectsArray, verticalsArray, courseArray, centerArray,
 			subStatuses
-		}
-
-
-		if (appliedFilters.projectsArray?.length > 0) {
-
-			teamMembers = [];
-
-		}
-		if (appliedFilters.verticalsArray?.length > 0) {
-			teamMembers = [];
-		}
-		if (appliedFilters.courseArray?.length > 0) {
-			teamMembers = [];
-		}
-		if (appliedFilters.centerArray?.length > 0) {
-			teamMembers = [];
-		}
-
-		if (name && name.trim() !== '') {
-			teamMembers = [];
-		}
-
-		if (counselorArray.length > 0) {
-			teamMembers = counselorArray;
-		}
+		};
 
 		let teamMemberIds = [];
 		if (teamMembers?.length > 0) {
@@ -8387,6 +8359,8 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 
+		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
+
 		let aggregate = [];
 		let baseMatch = {
 			...buildFollowupCounselorMatch(user, counselorArray),
@@ -9526,33 +9500,9 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 
-		if (projectsArray.length > 0) {
+		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
-			teamMembers = [];
-		}
-
-		if (verticalsArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (courseArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (centerArray.length > 0) {
-			teamMembers = [];
-		}
-
-
-
-		if (counselorArray.length > 0) {
-			teamMembers = counselorArray;
-		}
-
-		if (name && name.trim() !== '') {
-
-			teamMembers = [];
-		}
+		teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray);
 
 		// Build aggregation pipeline
 		let aggregationPipeline = [];
@@ -11009,6 +10959,8 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 
+		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
+
 		let baseMatch = buildFollowupCounselorMatch(user, counselorArray);
 
 		const dateMatch = buildFollowupDateMatch(from, to, { useActivityFilter });
@@ -11669,35 +11621,9 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 
-		if (projectsArray.length > 0) {
-			teamMembers = [];
-		}
+		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
-		if (verticalsArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (courseArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (centerArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (batchArray.length > 0) {
-			teamMembers = [];
-		}
-
-		if (name && name.trim() !== '') {
-			teamMembers = [];
-		}
-
-
-
-		if (counselorArray.length > 0) {
-			teamMembers = counselorArray;
-		}
+		teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray);
 
 		let teamMemberIds = [];
 		if (teamMembers?.length > 0) {
@@ -13106,7 +13032,6 @@ router.get("/generate-application-form/:id", async (req, res) => {
 router.get('/dashbord-data', isCollege, async (req, res) => {
 	try {
 		const user = req.user;
-		let teamMembers = await getAllTeamMembers(user._id);
 		const college = await College.findOne({
 			'_concernPerson._id': user._id
 		});
@@ -13151,10 +13076,9 @@ router.get('/dashbord-data', isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 
-		// If counselor filter is applied, override teamMembers
-		if (counselorArray.length > 0) {
-			teamMembers = counselorArray;
-		}
+		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
+
+		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray);
 
 		// Build date filter
 		let dateFilter = {};
@@ -13593,10 +13517,20 @@ router.get('/filters-data', [isCollege], async (req, res) => {
 		});
 
 
+		const access = getB2cAccessScope(user);
+		let verticals = Array.from(verticalSet.values());
+		let projects = Array.from(projectSet.values());
+		if (access.verticalIds.length) {
+			verticals = verticals.filter((v) => access.verticalIds.includes(String(v._id)));
+		}
+		if (access.projectIds.length) {
+			projects = projects.filter((p) => access.projectIds.includes(String(p._id)));
+		}
+
 		res.json({
 			status: true,
-			verticals: Array.from(verticalSet.values()),
-			projects: Array.from(projectSet.values()),
+			verticals,
+			projects,
 			courses: Array.from(courseSet.values()),
 			centers: Array.from(centerSet.values()),
 			counselors
@@ -15634,6 +15568,8 @@ router.get('/counselor-performance-matrix', isCollege, async (req, res) => {
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
+
+		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(req.user, verticalsArray, projectsArray));
 
 		// First, find the college's untouch status ID
 		const untouchStatus = await Status.findOne({

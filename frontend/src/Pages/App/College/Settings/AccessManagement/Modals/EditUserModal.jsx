@@ -14,7 +14,10 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
   const user = JSON.parse(sessionStorage.getItem('user'));
   const [b2bDepartments, setB2bDepartments] = useState([]);
   const [b2bProjects, setB2bProjects] = useState([]);
+  const [b2cVerticals, setB2cVerticals] = useState([]);
+  const [b2cProjects, setB2cProjects] = useState([]);
   const [departmentsLoading, setDepartmentsLoading] = useState(false);
+  const [b2cAccessLoading, setB2cAccessLoading] = useState(false);
   // useEffect(() => {
   //   setUserForm({
   //     name: editUser?.name || '',
@@ -56,6 +59,12 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
       const savedProjects = (response.data.data.projects_access || []).map((p) =>
         typeof p === 'object' && p !== null ? p._id : p
       );
+      const savedVerticals = (response.data.data.verticals_access || []).map((v) =>
+        typeof v === 'object' && v !== null ? v._id : v
+      );
+      const savedB2cProjects = (response.data.data.b2c_projects_access || []).map((p) =>
+        typeof p === 'object' && p !== null ? p._id : p
+      );
       setUserForm((prev) => ({
         name: response.data.data.name,
         email: response.data.data.email,
@@ -67,6 +76,8 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
         centers_access: response.data.data.centers_access,
         departments_access: savedDepartments,
         projects_access: savedProjects,
+        verticals_access: savedVerticals,
+        b2c_projects_access: savedB2cProjects,
         permissions: {
           ...prev.permissions,
           ...savedPermissions,
@@ -107,6 +118,11 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
       getProjectDepartmentIds(project).includes(String(departmentId))
     );
 
+  const getB2cProjectsForVertical = (verticalId) =>
+    b2cProjects.filter((project) =>
+      String(project?.vertical?._id || project?.vertical) === String(verticalId)
+    );
+
   useEffect(() => {
     const fetchB2bDepartments = async () => {
       try {
@@ -137,6 +153,34 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
     }
   }, [backendUrl, token]);
 
+  useEffect(() => {
+    const fetchB2cAccessOptions = async () => {
+      try {
+        setB2cAccessLoading(true);
+        const [verticalRes, projectRes] = await Promise.all([
+          axios.get(`${backendUrl}/college/getVerticals`, {
+            headers: { 'x-auth': token }
+          }),
+          axios.get(`${backendUrl}/college/list_all_projects`, {
+            headers: { 'x-auth': token }
+          })
+        ]);
+        const verticalData = verticalRes.data?.data || [];
+        const projectData = projectRes.data?.data || [];
+        setB2cVerticals(verticalData.filter((v) => v.status !== false));
+        setB2cProjects(projectData.filter((p) => p.status === 'active' || p.status === true));
+      } catch (error) {
+        console.error('Error fetching B2C verticals/projects:', error);
+      } finally {
+        setB2cAccessLoading(false);
+      }
+    };
+
+    if (token) {
+      fetchB2cAccessOptions();
+    }
+  }, [backendUrl, token]);
+
   const [userForm, setUserForm] = useState({
     name: '',
     email: '',
@@ -149,6 +193,8 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
     centers_access: '',
     departments_access: [],
     projects_access: [],
+    verticals_access: [],
+    b2c_projects_access: [],
     permissions: {
       // Lead Management (B2B)
       can_view_leads_b2b: false,
@@ -314,7 +360,13 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
         : (level === 'custom' ? prev.departments_access : []),
       projects_access: level === 'admin'
         ? b2bProjects.map((p) => p._id)
-        : (level === 'custom' ? prev.projects_access : [])
+        : (level === 'custom' ? prev.projects_access : []),
+      verticals_access: level === 'admin'
+        ? b2cVerticals.map((v) => v._id)
+        : (level === 'custom' ? prev.verticals_access : []),
+      b2c_projects_access: level === 'admin'
+        ? b2cProjects.map((p) => p._id)
+        : (level === 'custom' ? prev.b2c_projects_access : [])
     }));
   };
 
@@ -351,6 +403,42 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
         ? [...(prev.projects_access || []), projectId]
         : (prev.projects_access || []).filter((id) => String(id) !== String(projectId));
       return { ...prev, projects_access: updated };
+    });
+  };
+
+  const handleB2cVerticalAccessChange = (verticalId, isChecked) => {
+    setUserForm((prev) => {
+      const updatedVerticals = isChecked
+        ? [...(prev.verticals_access || []), verticalId]
+        : (prev.verticals_access || []).filter((id) => String(id) !== String(verticalId));
+
+      const verticalProjectIds = getB2cProjectsForVertical(verticalId).map((p) => p._id);
+      let updatedProjects = prev.b2c_projects_access || [];
+      if (isChecked) {
+        const existing = new Set(updatedProjects.map((id) => String(id)));
+        verticalProjectIds.forEach((pid) => {
+          if (!existing.has(String(pid))) updatedProjects.push(pid);
+        });
+      } else {
+        updatedProjects = updatedProjects.filter(
+          (id) => !verticalProjectIds.some((pid) => String(pid) === String(id))
+        );
+      }
+
+      return {
+        ...prev,
+        verticals_access: updatedVerticals,
+        b2c_projects_access: updatedProjects
+      };
+    });
+  };
+
+  const handleB2cProjectAccessChange = (projectId, isChecked) => {
+    setUserForm((prev) => {
+      const updated = isChecked
+        ? [...(prev.b2c_projects_access || []), projectId]
+        : (prev.b2c_projects_access || []).filter((id) => String(id) !== String(projectId));
+      return { ...prev, b2c_projects_access: updated };
     });
   };
 
@@ -881,10 +969,10 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
                 </div>
               </div>
 
-              {/* Lead Management */}
+              {/* Lead Management (B2C) */}
               <div className="card mb-3">
                 <div className="card-header bg-primary text-white">
-                  <h6 className="mb-0">🎯 Lead Management</h6>
+                  <h6 className="mb-0">🎯 Lead Management (B2C)</h6>
                 </div>
                 <div className="card-body">
                   <div className="row g-2">
@@ -913,6 +1001,108 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
                       </div>
                     ))}
                   </div>
+                </div>
+              </div>
+
+              {/* B2C Department Access - with nested project access */}
+              <div className="card mb-3">
+                <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                  <h6 className="mb-0">🏢 B2C Department Access</h6>
+                  {b2cVerticals.length > 0 && (
+                    <div>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-light me-2"
+                        onClick={() => {
+                          setUserForm((prev) => ({
+                            ...prev,
+                            verticals_access: b2cVerticals.map((v) => v._id),
+                            b2c_projects_access: b2cProjects.map((p) => p._id)
+                          }));
+                        }}
+                      >
+                        Select All
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-light"
+                        onClick={() => {
+                          setUserForm((prev) => ({
+                            ...prev,
+                            verticals_access: [],
+                            b2c_projects_access: []
+                          }));
+                        }}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="card-body">
+                  {b2cAccessLoading ? (
+                    <div className="text-muted small">Loading departments...</div>
+                  ) : b2cVerticals.length === 0 ? (
+                    <div className="text-muted small">
+                      No B2C departments found. Add verticals from Settings first.
+                    </div>
+                  ) : (
+                    <div className="row g-2">
+                      {b2cVerticals.map((vertical) => {
+                        const verticalId = vertical._id;
+                        const isSelected = (userForm.verticals_access || []).some(
+                          (id) => String(id) === String(verticalId)
+                        );
+                        const verticalProjects = getB2cProjectsForVertical(verticalId);
+                        return (
+                          <div key={verticalId} className="col-md-6">
+                            <div className="form-check">
+                              <input
+                                className="form-check-input"
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => handleB2cVerticalAccessChange(verticalId, e.target.checked)}
+                                id={`edit_b2c_vert_${verticalId}`}
+                              />
+                              <label className="form-check-label" htmlFor={`edit_b2c_vert_${verticalId}`}>
+                                🏢 {vertical.name}
+                              </label>
+                            </div>
+                            {isSelected && (
+                              <div className="ms-4 mt-1 ps-2 border-start">
+                                {verticalProjects.length === 0 ? (
+                                  <small className="text-muted">No projects in this department</small>
+                                ) : (
+                                  verticalProjects.map((project) => {
+                                    const projectId = project._id;
+                                    const isProjectSelected = (userForm.b2c_projects_access || []).some(
+                                      (id) => String(id) === String(projectId)
+                                    );
+                                    return (
+                                      <div key={projectId} className="form-check">
+                                        <input
+                                          className="form-check-input"
+                                          type="checkbox"
+                                          checked={isProjectSelected}
+                                          onChange={(e) =>
+                                            handleB2cProjectAccessChange(projectId, e.target.checked)
+                                          }
+                                          id={`edit_b2c_proj_${projectId}`}
+                                        />
+                                        <label className="form-check-label" htmlFor={`edit_b2c_proj_${projectId}`}>
+                                          📋 {project.name}
+                                        </label>
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1062,6 +1252,8 @@ const EditUserModal = ({ onClose, onEditUser, users = [], entities = {}, editUse
               <strong>Total Permissions:</strong> {Object.values(userForm.permissions).filter(Boolean).length}<br />
               <strong>Departments:</strong> {userForm.departments_access.length} selected<br />
               <strong>Projects:</strong> {(userForm.projects_access || []).length} selected<br />
+              <strong>B2C Departments:</strong> {(userForm.verticals_access || []).length} selected<br />
+              <strong>B2C Projects:</strong> {(userForm.b2c_projects_access || []).length} selected<br />
               <strong>Reporting Managers:</strong> {userForm.reporting_managers.length} selected
             </div>
           </div>
