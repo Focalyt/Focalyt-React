@@ -2113,6 +2113,8 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 			nextActionToDate,
 			leadOwner,
 			leadOwnerIn,
+			leadCoOwner,
+			leadCoOwnerIn,
 			statusIn,
 			hasFollowUpCall,
 			hasFollowUpVisit,
@@ -2251,6 +2253,13 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 					{ leadAddedBy: convertToObjectId(leadOwner) }
 				]
 			});
+		}
+
+		if (leadCoOwnerIn) {
+			const ids = parseIdList(leadCoOwnerIn);
+			if (ids.length) filterConditions.push({ leadCoOwner: { $in: ids } });
+		} else if (leadCoOwner) {
+			filterConditions.push({ leadCoOwner: convertToObjectId(leadCoOwner) });
 		}
 
 		// Approval filter (PENDING / APPROVED / REJECTED)
@@ -2433,6 +2442,8 @@ const generateSupervisionReportData = async (req) => {
 		leadCategoryIn,
 		leadOwner,
 		leadOwnerIn,
+		leadCoOwner,
+		leadCoOwnerIn,
 		approvalStatus,
 		search,
 		subStatus,
@@ -2512,6 +2523,13 @@ const generateSupervisionReportData = async (req) => {
 		if (ids.length) filterAnd.push({ leadOwner: { $in: ids } });
 	} else if (leadOwner) {
 		filterAnd.push({ leadOwner: convertToObjectId(leadOwner) });
+	}
+
+	if (leadCoOwnerIn) {
+		const ids = parseIdList(leadCoOwnerIn);
+		if (ids.length) filterAnd.push({ leadCoOwner: { $in: ids } });
+	} else if (leadCoOwner) {
+		filterAnd.push({ leadCoOwner: convertToObjectId(leadCoOwner) });
 	}
 
 	if (approvalStatus) {
@@ -2829,6 +2847,8 @@ const generateSupervisionReportData = async (req) => {
 			leadCategoryIn: leadCategoryIn || null,
 			leadOwner: leadOwner || null,
 			leadOwnerIn: leadOwnerIn || null,
+			leadCoOwner: leadCoOwner || null,
+			leadCoOwnerIn: leadCoOwnerIn || null,
 			approvalStatus: approvalStatus || null
 		},
 		overall,
@@ -2985,6 +3005,8 @@ router.get('/leads', isCollege, async (req, res) => {
 			nextActionToDate,
 			leadOwner,
 			leadOwnerIn,
+			leadCoOwner,
+			leadCoOwnerIn,
 			hasFollowUpCall,
 			hasFollowUpVisit,
 			followUpCallBucket,
@@ -3122,6 +3144,8 @@ router.get('/leads', isCollege, async (req, res) => {
 					{ leadAddedBy: convertToObjectId(leadOwner) }
 				]
 			}] : []),
+			...(leadCoOwnerIn ? [{ leadCoOwner: { $in: parseIdList(leadCoOwnerIn) } }] : []),
+			...(!leadCoOwnerIn && leadCoOwner ? [{ leadCoOwner: convertToObjectId(leadCoOwner) }] : []),
 			// Approval status filter
 			...(approvalStatus ? [{ 'approval.status': String(approvalStatus).toUpperCase() }] : []),
 
@@ -5244,7 +5268,9 @@ router.post('/leads/flush-missed-followups', isCollege, async (req, res) => {
 			typeOfB2B,
 			typeOfB2BIn,
 			leadOwner,
-			leadOwnerIn
+			leadOwnerIn,
+			leadCoOwner,
+			leadCoOwnerIn
 		} = req.body || {};
 
 		const isAdmin = () => req.user.permissions?.permission_type === 'Admin';
@@ -5293,6 +5319,12 @@ router.post('/leads/flush-missed-followups', isCollege, async (req, res) => {
 					{ leadAddedBy: convertToObjectId(leadOwner) }
 				]
 			});
+		}
+		if (leadCoOwnerIn) {
+			const ids = parseIdList(leadCoOwnerIn);
+			if (ids.length) filterConditions.push({ leadCoOwner: { $in: ids } });
+		} else if (leadCoOwner) {
+			filterConditions.push({ leadCoOwner: convertToObjectId(leadCoOwner) });
 		}
 
 		const query = {
