@@ -991,8 +991,8 @@ const CRMDashboard = () => {
     const permissionType = permissions?.permission_type || userData?.permissions?.permission_type;
     const verticalIds = (verticalsAccess || []).map((id) => String(id?._id || id)).filter(Boolean);
     const projectIds = (b2cProjectsAccess || []).map((id) => String(id?._id || id)).filter(Boolean);
-    const restrictVerticals = !(permissionType === 'Admin' && verticalIds.length === 0) && verticalIds.length > 0;
-    const restrictProjects = !(permissionType === 'Admin' && projectIds.length === 0) && projectIds.length > 0;
+    const restrictVerticals = permissionType !== 'Admin' && verticalIds.length > 0;
+    const restrictProjects = permissionType !== 'Admin' && projectIds.length > 0;
 
     const selectedVerticals = fd?.verticals?.values?.length
       ? fd.verticals.values

@@ -54,8 +54,8 @@ function getB2cAccessScope(user) {
 	const projectIds = (user?.b2c_projects_access || []).map(toIdString).filter(Boolean);
 	return {
 		isAdmin,
-		verticalIds: isAdmin && verticalIds.length === 0 ? [] : verticalIds,
-		projectIds: isAdmin && projectIds.length === 0 ? [] : projectIds,
+		verticalIds: !isAdmin && verticalIds.length ? verticalIds : [],
+		projectIds: !isAdmin && projectIds.length ? projectIds : [],
 	};
 }
 

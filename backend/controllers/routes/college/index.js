@@ -67,8 +67,9 @@ function getB2cAccessScope(user) {
 	const projectIds = (user?.b2c_projects_access || []).map(toAccessIdString).filter(Boolean);
 	return {
 		isAdmin,
-		verticalIds: isAdmin && verticalIds.length === 0 ? [] : verticalIds,
-		projectIds: isAdmin && projectIds.length === 0 ? [] : projectIds,
+		// Admin is never scoped by assigned B2C access (old B2C admin: own/associated leads, full filter lists)
+		verticalIds: !isAdmin && verticalIds.length ? verticalIds : [],
+		projectIds: !isAdmin && projectIds.length ? projectIds : [],
 	};
 }
 
@@ -96,18 +97,43 @@ function applyB2cAccessToFilters(user, verticalsArray = [], projectsArray = []) 
 	return { verticalsArray: nextVerticals, projectsArray: nextProjects };
 }
 
-async function resolveB2cOwnershipTeamMembers(user, counselorArray = []) {
+async function resolveB2cOwnershipTeamMembers(user, counselorArray = [], options = {}) {
 	if (Array.isArray(counselorArray) && counselorArray.length > 0) {
 		return counselorArray;
 	}
-	if (user?.permissions?.permission_type === 'Admin') {
-		return [];
+
+	const isAdmin = user?.permissions?.permission_type === 'Admin';
+	// Old B2C admin: own/associated leads by default. All leads only if they picked a filter.
+	if (isAdmin) {
+		if (options.userSelectedWideningFilter) {
+			return [];
+		}
+		return user?._id ? [user._id] : [];
 	}
+
 	const teamMembers = await getAllTeamMembers(user._id);
 	if (Array.isArray(teamMembers) && teamMembers.length > 0) {
 		return teamMembers;
 	}
 	return user?._id ? [user._id] : [];
+}
+
+function hasB2cUserSelectedWideningFilter({
+	projectsArray,
+	verticalsArray,
+	courseArray,
+	centerArray,
+	batchArray,
+	name,
+} = {}) {
+	return Boolean(
+		(Array.isArray(projectsArray) && projectsArray.length) ||
+		(Array.isArray(verticalsArray) && verticalsArray.length) ||
+		(Array.isArray(courseArray) && courseArray.length) ||
+		(Array.isArray(centerArray) && centerArray.length) ||
+		(Array.isArray(batchArray) && batchArray.length) ||
+		(name && String(name).trim())
+	);
 }
 
 const createB2cGoogleCalendarFollowup = async ({ reqUser, appliedCourseId, followupDate, remarks }) => {
@@ -2256,10 +2282,12 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 
+		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+			projectsArray, verticalsArray, courseArray, centerArray, batchArray, name
+		});
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
-		// Same as B2B: Admin sees all leads in assigned scope; custom users keep owner/team scope
-		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray);
+		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, { userSelectedWideningFilter });
 
 		let teamMemberIds = [];
 		if (teamMembers?.length > 0) {
@@ -2923,10 +2951,12 @@ router.route("/appliedCandidatesWithWhatsApp").get(isCollege, async (req, res) =
 			console.error('Error parsing filter arrays:', parseError);
 		}
 
+		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+			projectsArray, verticalsArray, courseArray, centerArray, name
+		});
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
-		// Same as B2B: Admin sees all leads in assigned scope; custom users keep owner/team scope
-		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray);
+		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, { userSelectedWideningFilter });
 
 		let teamMemberIds = [];
 		if (teamMembers?.length > 0) {
@@ -3952,10 +3982,12 @@ router.route("/downloadleads").get(isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 
+		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+			projectsArray, verticalsArray, courseArray, centerArray, name
+		});
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
-		// Same as B2B: Admin sees all leads in assigned scope; custom users keep owner/team scope
-		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray);
+		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, { userSelectedWideningFilter });
 
 		let teamMemberIds = [];
 		if (teamMembers?.length > 0) {
@@ -4387,9 +4419,12 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			console.error('Error parsing filter arrays:', parseError);
 		}
 
+		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+			projectsArray, verticalsArray, courseArray, centerArray, name
+		});
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
-		const teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray);
+		const teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, { userSelectedWideningFilter });
 
 		const appliedFilters = {
 			name, courseType, status, leadStatus,
@@ -9500,9 +9535,12 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 
+		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+			projectsArray, verticalsArray, courseArray, centerArray, name
+		});
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
-		teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray);
+		teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, { userSelectedWideningFilter });
 
 		// Build aggregation pipeline
 		let aggregationPipeline = [];
@@ -11621,9 +11659,12 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 
+		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+			projectsArray, verticalsArray, courseArray, centerArray, batchArray, name
+		});
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
-		teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray);
+		teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, { userSelectedWideningFilter });
 
 		let teamMemberIds = [];
 		if (teamMembers?.length > 0) {
@@ -13076,9 +13117,12 @@ router.get('/dashbord-data', isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 
+		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+			projectsArray, verticalsArray, courseArray, centerArray, name
+		});
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
-		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray);
+		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, { userSelectedWideningFilter });
 
 		// Build date filter
 		let dateFilter = {};
