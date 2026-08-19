@@ -400,6 +400,7 @@ const MultiSelectCheckbox = ({
 const useNavHeight = (dependencies = []) => {
   const navRef = useRef(null);
   const [navHeight, setNavHeight] = useState(50); // Default fallback
+  const [navTop, setNavTop] = useState(0);
   const widthRef = useRef(null);
   const [width, setWidth] = useState(0);
   const [leftOffset, setLeftOffset] = useState(0);
@@ -407,7 +408,9 @@ const useNavHeight = (dependencies = []) => {
   const calculateHeight = useCallback(() => {
     if (navRef.current) {
       const height = navRef.current.offsetHeight;
+      const top = navRef.current.getBoundingClientRect().top;
       setNavHeight(height);
+      setNavTop(Math.max(0, Math.round(top)));
     }
   }, []);
 
@@ -459,7 +462,7 @@ const useNavHeight = (dependencies = []) => {
     setTimeout(calculateWidth, 50);
   }, dependencies);
 
-  return { navRef, navHeight, calculateHeight, width, leftOffset };
+  return { navRef, navHeight, navTop, calculateHeight, width, leftOffset };
 };
 const useMainWidth = (dependencies = []) => {// Default fallback
   const widthRef = useRef(null);
@@ -1902,6 +1905,7 @@ const B2BSales = () => {
     b2bDepartment: '',
     typeOfB2B: [],
     leadOwner: [],
+    leadCoOwner: [],
     hasFollowUpCall: '', // '' | true | false
     hasFollowUpVisit: '', // '' | true | false
     followUpCallBucket: '', // '' | 'done' | 'planned' | 'missed'
@@ -2042,6 +2046,9 @@ const B2BSales = () => {
       }
       if (Array.isArray(eff.leadOwner) && eff.leadOwner.length) {
         body.leadOwnerIn = eff.leadOwner.filter(Boolean).join(',');
+      }
+      if (Array.isArray(eff.leadCoOwner) && eff.leadCoOwner.length) {
+        body.leadCoOwnerIn = eff.leadCoOwner.filter(Boolean).join(',');
       }
 
       const response = await axios.post(
@@ -2541,6 +2548,7 @@ const B2BSales = () => {
       || (Array.isArray(f.leadCategory) && f.leadCategory.length)
       || (Array.isArray(f.typeOfB2B) && f.typeOfB2B.length)
       || (Array.isArray(f.leadOwner) && f.leadOwner.length)
+      || (Array.isArray(f.leadCoOwner) && f.leadCoOwner.length)
       || f.followUpCallBucket
       || f.followUpVisitBucket
       || f.hasFollowUpCall === true
@@ -2616,6 +2624,7 @@ const B2BSales = () => {
       b2bDepartment: defaultDept,
       typeOfB2B: [],
       leadOwner: [],
+      leadCoOwner: [],
       hasFollowUpCall: '',
       hasFollowUpVisit: '',
       followUpCallBucket: '',
@@ -2700,6 +2709,9 @@ const B2BSales = () => {
     if (Array.isArray(eff.leadOwner) && eff.leadOwner.length) {
       params.leadOwnerIn = toCsv(eff.leadOwner);
     }
+    if (Array.isArray(eff.leadCoOwner) && eff.leadCoOwner.length) {
+      params.leadCoOwnerIn = toCsv(eff.leadCoOwner);
+    }
     if (eff.dateRange?.start) params.startDate = eff.dateRange.start;
     if (eff.dateRange?.end) params.endDate = eff.dateRange.end;
     if (eff.modifiedDateRange?.start) params.modifiedFromDate = eff.modifiedDateRange.start;
@@ -2761,6 +2773,8 @@ const B2BSales = () => {
       next.typeOfB2B = value ? [value] : [];
     } else if (key === 'leadOwner') {
       next.leadOwner = value ? [value] : [];
+    } else if (key === 'leadCoOwner') {
+      next.leadCoOwner = value ? [value] : [];
     }
     setFilters(syncFiltersRef(next));
     setCurrentPage(1);
@@ -2861,6 +2875,22 @@ const B2BSales = () => {
         >
           <option value="">All</option>
           {(accessibleCounsellors || []).map((u) => (
+            <option key={u._id} value={u._id}>{u.name || u.email || 'User'}</option>
+          ))}
+        </select>
+      </div>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="cycle-filter-coowner">
+          <i className="fas fa-user-friends" aria-hidden="true" /> Co-owner
+        </label>
+        <select
+          id="cycle-filter-coowner"
+          className="b2b-cycle-filters__select"
+          value={(filters.leadCoOwner && filters.leadCoOwner[0]) || ''}
+          onChange={(e) => handleCycleFilterChange('leadCoOwner', e.target.value)}
+        >
+          <option value="">All</option>
+          {(users || []).map((u) => (
             <option key={u._id} value={u._id}>{u.name || u.email || 'User'}</option>
           ))}
         </select>
@@ -3116,6 +3146,7 @@ const B2BSales = () => {
       b2bDepartment: '',
       typeOfB2B: [],
       leadOwner: [],
+      leadCoOwner: [],
       hasFollowUpCall: '',
       hasFollowUpVisit: '',
       followUpCallBucket: '',
@@ -4386,7 +4417,7 @@ const B2BSales = () => {
 
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
 
-  const { navRef, navHeight } = useNavHeight([isFilterCollapsed, crmFilters]);
+  const { navRef, navHeight, navTop } = useNavHeight([isFilterCollapsed, crmFilters]);
   const { widthRef, width, leftOffset } = useMainWidth([isFilterCollapsed, crmFilters, mainContentClass]);
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
   const blurIntensity = Math.min(scrollY / 10, 15);
@@ -10509,10 +10540,10 @@ const renderWhatsAppPanel = () => {
           !isMobile && showPanel && (
             <div className="col-4" style={{
               position: 'fixed',
-              top: `${navHeight + 10}px`,
+              top: `${navTop}px`,
               right: '0',
               width: `${panelWidthPx}px`,
-              maxHeight: `calc(100vh - ${navHeight + 15}px)`,
+              maxHeight: `calc(100vh - ${navTop}px)`,
               overflowY: 'auto',
               backgroundColor: 'white',
               zIndex: 1000,
@@ -10767,6 +10798,18 @@ const renderWhatsAppPanel = () => {
                       onChange={(vals) => handleFilterChange('leadOwner', vals)}
                       isOpen={openModalId === 'leadOwner'}
                       onToggle={() => setOpenModalId((prev) => (prev === 'leadOwner' ? null : 'leadOwner'))}
+                      onClose={() => setOpenModalId(null)}
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <MultiSelectCheckbox
+                      title="Co-owner"
+                      icon="fas fa-user-friends"
+                      options={(users || []).map((u) => ({ value: u._id, label: u.name || u.email || 'User' }))}
+                      selectedValues={filters.leadCoOwner || []}
+                      onChange={(vals) => handleFilterChange('leadCoOwner', vals)}
+                      isOpen={openModalId === 'leadCoOwner'}
+                      onToggle={() => setOpenModalId((prev) => (prev === 'leadCoOwner' ? null : 'leadCoOwner'))}
                       onClose={() => setOpenModalId(null)}
                     />
                   </div>
@@ -12431,17 +12474,22 @@ const renderWhatsAppPanel = () => {
   /* B2B Cycle header filters (top row, right aligned) */
   .b2b-cycle-filters{
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: flex-end;
     justify-content: flex-end;
-    gap: 8px 12px;
+    gap: 8px;
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
     max-width: 100%;
   }
   .b2b-cycle-filters__item{
     display: flex;
     flex-direction: column;
     gap: 3px;
+    flex: 1 1 0;
     min-width: 0;
+    max-width: 150px;
   }
   .b2b-cycle-filters__label{
     font-size: 10px;
@@ -12452,6 +12500,8 @@ const renderWhatsAppPanel = () => {
     margin: 0;
     line-height: 1.2;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .b2b-cycle-filters__label i{
     margin-right: 4px;
@@ -12462,10 +12512,11 @@ const renderWhatsAppPanel = () => {
     font-size: 12px;
     font-weight: 500;
     line-height: 1.3;
-    padding: 6px 28px 6px 10px;
+    padding: 6px 24px 6px 8px;
     height: 34px;
-    min-width: 120px;
-    max-width: 155px;
+    width: 100%;
+    min-width: 0;
+    text-overflow: ellipsis;
     border: 1.5px solid #e8eaed;
     border-radius: 8px;
     background-color: #f9fafb;
@@ -12501,15 +12552,27 @@ const renderWhatsAppPanel = () => {
   }
   .b2b-cycle-filters--mobile .b2b-cycle-filters__item{
     flex: 0 0 auto;
+    max-width: none;
   }
   .b2b-cycle-filters--mobile .b2b-cycle-filters__select{
+    width: auto;
     min-width: 108px;
     max-width: 130px;
   }
   @media (max-width: 1399px){
-    .b2b-cycle-filters__select{
-      min-width: 108px;
+    .b2b-cycle-filters{
+      gap: 6px;
+    }
+    .b2b-cycle-filters__item{
       max-width: 132px;
+    }
+    .b2b-cycle-filters__select{
+      font-size: 11px;
+      padding: 6px 22px 6px 7px;
+      background-position: right 6px center;
+    }
+    .b2b-cycle-filters__label{
+      font-size: 9px;
     }
   }
 
