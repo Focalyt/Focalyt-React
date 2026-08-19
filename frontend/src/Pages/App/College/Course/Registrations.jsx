@@ -905,6 +905,8 @@ const CRMDashboard = () => {
   // const permissions = userData.permissions
 
   const [permissions, setPermissions] = useState();
+  const [verticalsAccess, setVerticalsAccess] = useState([]);
+  const [b2cProjectsAccess, setB2cProjectsAccess] = useState([]);
 
   const handleGoogleLogin = async () => {
     try {
@@ -971,15 +973,39 @@ const CRMDashboard = () => {
   }, [])
 
   const updatedPermission = async () => {
-
-    const respose = await axios.get(`${backendUrl}/college/permission`, {
-      headers: { 'x-auth': token }
-    });
-    if (respose.data.status) {
-
-      setPermissions(respose.data.permissions);
+    try {
+      const respose = await axios.get(`${backendUrl}/college/permission`, {
+        headers: { 'x-auth': token }
+      });
+      if (respose.data.status) {
+        setPermissions(respose.data.permissions);
+        setVerticalsAccess(respose.data.verticals_access || []);
+        setB2cProjectsAccess(respose.data.b2c_projects_access || []);
+      }
+    } catch (error) {
+      console.error('Error fetching permissions:', error);
     }
   }
+
+  const getB2cAccessFilterParams = (fd) => {
+    const permissionType = permissions?.permission_type || userData?.permissions?.permission_type;
+    const verticalIds = (verticalsAccess || []).map((id) => String(id?._id || id)).filter(Boolean);
+    const projectIds = (b2cProjectsAccess || []).map((id) => String(id?._id || id)).filter(Boolean);
+    const restrictVerticals = permissionType !== 'Admin' && verticalIds.length > 0;
+    const restrictProjects = permissionType !== 'Admin' && projectIds.length > 0;
+
+    const selectedVerticals = fd?.verticals?.values?.length
+      ? fd.verticals.values
+      : (restrictVerticals ? verticalIds : []);
+    const selectedProjects = fd?.projects?.values?.length
+      ? fd.projects.values
+      : (restrictProjects ? projectIds : []);
+
+    return {
+      ...(selectedProjects.length > 0 && { projects: JSON.stringify(selectedProjects) }),
+      ...(selectedVerticals.length > 0 && { verticals: JSON.stringify(selectedVerticals) }),
+    };
+  };
 
   const [openModalId, setOpenModalId] = useState(null);
   const [showBranchModal, setShowBranchModal] = useState(false);
@@ -3242,8 +3268,7 @@ console.log('API Response:', response.data);
       ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       // Multi-select filters
-      ...(fd.projects.values.length > 0 && { projects: JSON.stringify(fd.projects.values) }),
-      ...(fd.verticals.values.length > 0 && { verticals: JSON.stringify(fd.verticals.values) }),
+      ...getB2cAccessFilterParams(fd),
       ...(fd.course.values.length > 0 && { course: JSON.stringify(fd.course.values) }),
       ...(fd.center.values.length > 0 && { center: JSON.stringify(fd.center.values) }),
       ...(fd.counselor.values.length > 0 && { counselor: JSON.stringify(fd.counselor.values) })
@@ -3583,8 +3608,7 @@ console.log('API Response:', response.data);
       ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       // Multi-select filters
-      ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
-      ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+      ...getB2cAccessFilterParams(formData),
       ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
       ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
       ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
@@ -3639,8 +3663,7 @@ console.log('API Response:', response.data);
       ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       // Multi-select filters
-      ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
-      ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+      ...getB2cAccessFilterParams(formData),
       ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
       ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
       ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
@@ -3898,8 +3921,7 @@ console.log('API Response:', response.data);
             ...(filterData.nextActionFromDate && { nextActionFromDate: filterData.nextActionFromDate.toISOString() }),
             ...(filterData.nextActionToDate && { nextActionToDate: filterData.nextActionToDate.toISOString() }),
             ...(filterData.subStatuses && { subStatuses: filterData.subStatuses }),
-            ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
-            ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+            ...getB2cAccessFilterParams(formData),
             ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
             ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
             ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })
@@ -6486,8 +6508,7 @@ console.log('API Response:', response.data);
         ...(filterData.nextActionFromDate && { nextActionFromDate: filterData.nextActionFromDate.toISOString() }),
         ...(filterData.nextActionToDate && { nextActionToDate: filterData.nextActionToDate.toISOString() }),
         ...(filterData.subStatuses && { subStatuses: filterData.subStatuses }),
-        ...(formData.projects.values.length > 0 && { projects: JSON.stringify(formData.projects.values) }),
-        ...(formData.verticals.values.length > 0 && { verticals: JSON.stringify(formData.verticals.values) }),
+        ...getB2cAccessFilterParams(formData),
         ...(formData.course.values.length > 0 && { course: JSON.stringify(formData.course.values) }),
         ...(formData.center.values.length > 0 && { center: JSON.stringify(formData.center.values) }),
         ...(formData.counselor.values.length > 0 && { counselor: JSON.stringify(formData.counselor.values) })

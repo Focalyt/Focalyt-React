@@ -30,6 +30,191 @@ function parseDateTimeIST(dateVal, timeStr) {
 	return parsed.utcOffset('+05:30', true);
 }
 
+function toIdString(value) {
+	if (value == null) return '';
+	if (typeof value === 'object') return String(value._id || value.id || '');
+	return String(value);
+}
+
+function getB2bAccessScope(user) {
+	const permissionType = user?.permissions?.permission_type;
+	const isAdmin = permissionType === 'Admin';
+	const deptIds = (user?.departments_access || []).map(toIdString).filter(Boolean);
+	const projectIds = (user?.projects_access || []).map(toIdString).filter(Boolean);
+	return {
+		isAdmin,
+		deptIds: !isAdmin && deptIds.length ? deptIds : [],
+		projectIds: !isAdmin && projectIds.length ? projectIds : [],
+	};
+}
+
+function getB2cAccessScope(user) {
+	const isAdmin = user?.permissions?.permission_type === 'Admin';
+	const verticalIds = (user?.verticals_access || []).map(toIdString).filter(Boolean);
+	const projectIds = (user?.b2c_projects_access || []).map(toIdString).filter(Boolean);
+	return {
+		isAdmin,
+		verticalIds: !isAdmin && verticalIds.length ? verticalIds : [],
+		projectIds: !isAdmin && projectIds.length ? projectIds : [],
+	};
+}
+
+function enforceB2bConditionAccess(conditionBlocks, access) {
+	if (!access || access.isAdmin || (!access.deptIds.length && !access.projectIds.length)) {
+		return { ok: true, conditionBlocks };
+	}
+
+	const blocks = Array.isArray(conditionBlocks)
+		? JSON.parse(JSON.stringify(conditionBlocks))
+		: [];
+
+	for (const block of blocks) {
+		for (const condition of (block.conditions || [])) {
+			const type = condition.activityType;
+			const values = (condition.values || []).map(toIdString).filter(Boolean);
+
+			if (type === 'b2bDepartment' && access.deptIds.length) {
+				if (condition.operator === 'not_equals') {
+					return { ok: false, message: 'You can only create rules for your assigned departments' };
+				}
+				const outside = values.filter((id) => !access.deptIds.includes(id));
+				if (outside.length) {
+					return { ok: false, message: 'You cannot create a rule for departments outside your access' };
+				}
+				condition.operator = 'equals';
+				condition.values = values.length ? values.filter((id) => access.deptIds.includes(id)) : [...access.deptIds];
+			}
+
+			if ((type === 'b2bProject' || type === 'project') && access.projectIds.length) {
+				if (condition.operator === 'not_equals') {
+					return { ok: false, message: 'You can only create rules for your assigned projects' };
+				}
+				const outside = values.filter((id) => !access.projectIds.includes(id));
+				if (outside.length) {
+					return { ok: false, message: 'You cannot create a rule for projects outside your access' };
+				}
+				condition.operator = 'equals';
+				condition.values = values.length ? values.filter((id) => access.projectIds.includes(id)) : [...access.projectIds];
+			}
+		}
+	}
+
+	const hasDeptEquals = blocks.some((block) =>
+		(block.conditions || []).some((c) =>
+			c.activityType === 'b2bDepartment' && c.operator === 'equals' && (c.values || []).length > 0
+		)
+	);
+	const hasProjectEquals = blocks.some((block) =>
+		(block.conditions || []).some((c) =>
+			(c.activityType === 'b2bProject' || c.activityType === 'project') &&
+			c.operator === 'equals' &&
+			(c.values || []).length > 0
+		)
+	);
+
+	const toInject = [];
+	if (access.deptIds.length && !hasDeptEquals) {
+		toInject.push({
+			activityType: 'b2bDepartment',
+			operator: 'equals',
+			values: [...access.deptIds],
+		});
+	}
+	if (access.projectIds.length && !hasProjectEquals) {
+		toInject.push({
+			activityType: 'b2bProject',
+			operator: 'equals',
+			values: [...access.projectIds],
+		});
+	}
+	if (toInject.length) {
+		if (!blocks.length) {
+			blocks.push({ conditions: toInject, intraBlockLogicOperator: 'and' });
+		} else {
+			blocks[0].conditions = [...toInject, ...(blocks[0].conditions || [])];
+		}
+	}
+
+	return { ok: true, conditionBlocks: blocks };
+}
+
+function enforceB2cConditionAccess(conditionBlocks, access) {
+	if (!access || access.isAdmin || (!access.verticalIds.length && !access.projectIds.length)) {
+		return { ok: true, conditionBlocks };
+	}
+
+	const blocks = Array.isArray(conditionBlocks)
+		? JSON.parse(JSON.stringify(conditionBlocks))
+		: [];
+
+	for (const block of blocks) {
+		for (const condition of (block.conditions || [])) {
+			const type = condition.activityType;
+			const values = (condition.values || []).map(toIdString).filter(Boolean);
+
+			if (type === 'vertical' && access.verticalIds.length) {
+				if (condition.operator === 'not_equals') {
+					return { ok: false, message: 'You can only create rules for your assigned departments' };
+				}
+				const outside = values.filter((id) => !access.verticalIds.includes(id));
+				if (outside.length) {
+					return { ok: false, message: 'You cannot create a rule for departments outside your access' };
+				}
+				condition.operator = 'equals';
+				condition.values = values.length ? values.filter((id) => access.verticalIds.includes(id)) : [...access.verticalIds];
+			}
+
+			if (type === 'project' && access.projectIds.length) {
+				if (condition.operator === 'not_equals') {
+					return { ok: false, message: 'You can only create rules for your assigned projects' };
+				}
+				const outside = values.filter((id) => !access.projectIds.includes(id));
+				if (outside.length) {
+					return { ok: false, message: 'You cannot create a rule for projects outside your access' };
+				}
+				condition.operator = 'equals';
+				condition.values = values.length ? values.filter((id) => access.projectIds.includes(id)) : [...access.projectIds];
+			}
+		}
+	}
+
+	const hasVerticalEquals = blocks.some((block) =>
+		(block.conditions || []).some((c) =>
+			c.activityType === 'vertical' && c.operator === 'equals' && (c.values || []).length > 0
+		)
+	);
+	const hasProjectEquals = blocks.some((block) =>
+		(block.conditions || []).some((c) =>
+			c.activityType === 'project' && c.operator === 'equals' && (c.values || []).length > 0
+		)
+	);
+
+	const toInject = [];
+	if (access.verticalIds.length && !hasVerticalEquals) {
+		toInject.push({
+			activityType: 'vertical',
+			operator: 'equals',
+			values: [...access.verticalIds],
+		});
+	}
+	if (access.projectIds.length && !hasProjectEquals) {
+		toInject.push({
+			activityType: 'project',
+			operator: 'equals',
+			values: [...access.projectIds],
+		});
+	}
+	if (toInject.length) {
+		if (!blocks.length) {
+			blocks.push({ conditions: toInject, intraBlockLogicOperator: 'and' });
+		} else {
+			blocks[0].conditions = [...toInject, ...(blocks[0].conditions || [])];
+		}
+	}
+
+	return { ok: true, conditionBlocks: blocks };
+}
+
 router.get('/getVerticals', [isCollege], async (req, res) => {
 
 	try {
@@ -44,11 +229,15 @@ router.get('/getVerticals', [isCollege], async (req, res) => {
 		if (typeof collegeId !== 'string') { collegeId = new mongoose.Types.ObjectId(collegeId); }
 
 		const verticals = await Vertical.find({ college: collegeId }).sort({ createdAt: -1 });
+		const access = getB2cAccessScope(req.user);
+		const scopedVerticals = access.verticalIds.length
+			? verticals.filter((v) => access.verticalIds.includes(String(v._id)))
+			: verticals;
 
 		return res.json({
 			status: true,
 			message: "Verticals fetched successfully",
-			data: verticals
+			data: scopedVerticals
 		});
 	} catch (err) {
 		console.error("❌ Get Verticals Error:", err.message);
@@ -73,8 +262,12 @@ router.get('/list-projects', [isCollege], async (req, res) => {
 		filter.college = collegeId;
 		
 		const projects = await Project.find(filter).sort({ createdAt: -1 });
+		const access = getB2cAccessScope(req.user);
+		const scopedProjects = access.projectIds.length
+			? projects.filter((p) => access.projectIds.includes(String(p._id)))
+			: projects;
 		
-		res.json({ success: true, data: projects });
+		res.json({ success: true, data: scopedProjects });
 	} catch (error) {
 		console.error('Error fetching projects:', error);
 		res.status(500).json({ success: false, message: 'Server error' });
@@ -87,8 +280,12 @@ router.get('/list_all_projects', [isCollege], async (req, res) => {
 
 
 		const projects = await Project.find({ status: 'active', college: collegeId }).sort({ createdAt: -1 });
+		const access = getB2cAccessScope(req.user);
+		const scopedProjects = access.projectIds.length
+			? projects.filter((p) => access.projectIds.includes(String(p._id)))
+			: projects;
 		
-		res.json({ success: true, data: projects });
+		res.json({ success: true, data: scopedProjects });
 	} catch (error) {
 		console.error('Error fetching projects:', error);
 		res.status(500).json({ success: false, message: 'Server error' });
@@ -390,6 +587,23 @@ router.post('/create-dripmarketing-rule', [isCollege], async (req, res) => {
 		const collegeId = req.user.college._id;
 		const user = req.user;
 
+		let scopedConditionBlocks = conditionBlocks;
+		if (resolvedLeadType === 'b2b') {
+			const access = getB2bAccessScope(user);
+			const enforced = enforceB2bConditionAccess(conditionBlocks, access);
+			if (!enforced.ok) {
+				return res.status(403).json({ success: false, message: enforced.message });
+			}
+			scopedConditionBlocks = enforced.conditionBlocks;
+		} else {
+			const access = getB2cAccessScope(user);
+			const enforced = enforceB2cConditionAccess(conditionBlocks, access);
+			if (!enforced.ok) {
+				return res.status(403).json({ success: false, message: enforced.message });
+			}
+			scopedConditionBlocks = enforced.conditionBlocks;
+		}
+
 		const startMoment = parseDateTimeIST(startDate, startTime);
 		const startDateTime = startMoment ? startMoment.toDate() : new Date(`${getISTDatePart(startDate)}T${startTime}`);
 
@@ -419,7 +633,7 @@ router.post('/create-dripmarketing-rule', [isCollege], async (req, res) => {
 			startDate: startDateTime,
 			...(endDateTime && { endDate: endDateTime }),
 			
-			conditionBlocks,
+			conditionBlocks: scopedConditionBlocks,
 			interBlockLogicOperator,
 			additionalActions: [],
 			communication,
@@ -495,6 +709,23 @@ try{
 	const user = req.user;
 	const resolvedLeadType = leadType === 'b2b' ? 'b2b' : (leadType === 'b2c' ? 'b2c' : undefined);
 
+	let scopedConditionBlocks = conditionBlocks;
+	if (resolvedLeadType === 'b2b' || (!resolvedLeadType && req.body?.leadType === 'b2b')) {
+		const access = getB2bAccessScope(user);
+		const enforced = enforceB2bConditionAccess(conditionBlocks, access);
+		if (!enforced.ok) {
+			return res.status(403).json({ success: false, message: enforced.message });
+		}
+		scopedConditionBlocks = enforced.conditionBlocks;
+	} else {
+		const access = getB2cAccessScope(user);
+		const enforced = enforceB2cConditionAccess(conditionBlocks, access);
+		if (!enforced.ok) {
+			return res.status(403).json({ success: false, message: enforced.message });
+		}
+		scopedConditionBlocks = enforced.conditionBlocks;
+	}
+
 	
 
 	
@@ -525,7 +756,7 @@ try{
 		name,
 		startDate: startDateTime,
 		...(endDateTime && { endDate: endDateTime }),
-		conditionBlocks,
+		conditionBlocks: scopedConditionBlocks,
 		interBlockLogicOperator,
 		communication,
 		uiState,
@@ -609,11 +840,29 @@ router.post('/preview-match-count', [isCollege], async (req, res) => {
 	try {
 		const collegeId = req.user.college._id;
 		const { leadType, conditionBlocks, interBlockLogicOperator } = req.body || {};
+		const resolvedLeadType = leadType === 'b2b' ? 'b2b' : 'b2c';
+
+		let scopedConditionBlocks = conditionBlocks || [];
+		if (resolvedLeadType === 'b2b') {
+			const access = getB2bAccessScope(req.user);
+			const enforced = enforceB2bConditionAccess(scopedConditionBlocks, access);
+			if (!enforced.ok) {
+				return res.status(403).json({ success: false, message: enforced.message });
+			}
+			scopedConditionBlocks = enforced.conditionBlocks;
+		} else {
+			const access = getB2cAccessScope(req.user);
+			const enforced = enforceB2cConditionAccess(scopedConditionBlocks, access);
+			if (!enforced.ok) {
+				return res.status(403).json({ success: false, message: enforced.message });
+			}
+			scopedConditionBlocks = enforced.conditionBlocks;
+		}
 
 		const result = await countMatchingLeads({
 			collegeId,
-			leadType: leadType === 'b2b' ? 'b2b' : 'b2c',
-			conditionBlocks: conditionBlocks || [],
+			leadType: resolvedLeadType,
+			conditionBlocks: scopedConditionBlocks,
 			interBlockLogicOperator: interBlockLogicOperator || 'and'
 		});
 

@@ -4,7 +4,9 @@ const axios = require('axios');
 const uuid = require('uuid/v1');
 const multer = require('multer');
 const { College, WhatsAppMessage, WhatsAppTemplate, Candidate, CandidateProfile, AppliedCourses, Courses, DripMarketingJob, Lead } = require('../../models');
+const B2BDepartment = require('../../models/b2b/b2bDepartment');
 const { isCollege } = require('../../../helpers');
+const mongoose = require('mongoose');
 const {
 	bucketName,
 } = require("../../../config");
@@ -133,6 +135,18 @@ router.get('/templates', [isCollege], async (req, res) => {
 						if (dbTemplate.carouselMedia?.length) {
 							template.carouselMedia = dbTemplate.carouselMedia;
 						}
+
+						// Department-wise metadata from local DB
+						if (dbTemplate.b2bDepartment) {
+							template.b2bDepartment = dbTemplate.b2bDepartment;
+							try {
+								const dept = await B2BDepartment.findById(dbTemplate.b2bDepartment).select('name isActive').lean();
+								if (dept) {
+									template.b2bDepartmentName = dept.name;
+									template.b2bDepartmentDetails = dept;
+								}
+							} catch (_) { /* ignore */ }
+						}
 						
 						// Replace Facebook handles with S3 URLs in components
 						if (template.components) {
@@ -179,10 +193,17 @@ router.get('/templates', [isCollege], async (req, res) => {
 			console.log(`Template: ${template.name}, Language: ${template.language}, Status: ${template.status}`);
 		});
 
+		let data = templatesWithMedia;
+		const departmentFilter = req.query.b2bDepartment || req.query.department;
+		if (departmentFilter && mongoose.Types.ObjectId.isValid(departmentFilter)) {
+			const deptId = String(departmentFilter);
+			data = templatesWithMedia.filter((t) => String(t.b2bDepartment || '') === deptId);
+		}
+
 		res.json({
 			success: true,
 			message: 'Templates fetched successfully',
-			data: templatesWithMedia
+			data
 		});
 	} catch (err) {
 		console.error('Error fetching whatsapp templates:', err);
@@ -258,7 +279,7 @@ router.post('/sync-templates', isCollege, async (req, res) => {
 // Create WhatsApp template
 router.post('/create-template', isCollege, upload.array('file', 5), async (req, res) => {
 	try {
-		const { name, language, category, components, base64File, carouselFiles } = req.body;
+		const { name, language, category, components, base64File, carouselFiles, b2bDepartment } = req.body;
 
    
 	
@@ -268,6 +289,21 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 			return res.status(400).json({ 
 				success: false, 
 				message: 'Name, language, category, and components are required' 
+			});
+		}
+
+		if (!b2bDepartment || !mongoose.Types.ObjectId.isValid(b2bDepartment)) {
+			return res.status(400).json({
+				success: false,
+				message: 'Valid B2B department is required'
+			});
+		}
+
+		const departmentDoc = await B2BDepartment.findById(b2bDepartment).select('_id name isActive');
+		if (!departmentDoc || departmentDoc.isActive === false) {
+			return res.status(400).json({
+				success: false,
+				message: 'B2B department not found or inactive'
 			});
 		}
 
@@ -851,7 +887,7 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 			const collegeId = req.collegeId || req.college?._id || req.user?.college?._id;
 			
 			if (collegeId && WhatsAppTemplate && typeof WhatsAppTemplate.create === 'function') {
-				const templateDoc = await WhatsAppTemplate.create({
+				const templatePayload = {
 					collegeId: collegeId,
 					templateId: response.data?.id,
 					templateName: name,
@@ -860,10 +896,17 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 					status: response.data?.status || 'PENDING',
 					carouselMedia: savedCarouselMedia,
 					headerMedia: savedHeaderMedia, // Save header media
-					variableMappings: variableMappings // Save variable mappings
-				});
+					variableMappings: variableMappings, // Save variable mappings
+					b2bDepartment: departmentDoc._id,
+				};
+
+				const templateDoc = await WhatsAppTemplate.findOneAndUpdate(
+					{ collegeId, templateName: name },
+					{ $set: templatePayload },
+					{ upsert: true, new: true, setDefaultsOnInsert: true }
+				);
 				
-				console.log(`✓ Template metadata saved to database: ${templateDoc._id}`);
+				console.log(`✓ Template metadata saved to database: ${templateDoc._id} (department: ${departmentDoc.name})`);
 				if (savedHeaderMedia) {
 					console.log(`  - Header media: ${savedHeaderMedia.mediaType} at ${savedHeaderMedia.s3Url}`);
 				}

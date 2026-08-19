@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import DatePicker from 'react-date-picker';
 import axios from 'axios';
 // import * as bootstrap from 'bootstrap';
@@ -257,11 +257,212 @@ const DripMarketingB2B = () => {
     const [leadRankings, setLeadRankings] = useState([]);
     const [leadOwner, setLeadOwner] = useState([]);
     const [registeredBy, setRegisteredBy] = useState([]);
+    const [permissions, setPermissions] = useState(null);
+    const [departmentsAccess, setDepartmentsAccess] = useState([]);
+    const [projectsAccess, setProjectsAccess] = useState([]);
 
     const [whatappTemplateField, setWhatappTemplateField] = useState(false);
     const [whatsappTemplates, setWhatsappTemplates] = useState([]);
 
+    // Admin + empty departments_access → all; otherwise only assigned departments
+    const hasRestrictedDepartmentAccess = useMemo(() => {
+        const accessIds = (departmentsAccess || []).map((id) => String(id?._id || id)).filter(Boolean);
+        const permissionType = permissions?.permission_type || userData?.permissions?.permission_type;
+        if (permissionType === 'Admin' && accessIds.length === 0) return false;
+        return accessIds.length > 0;
+    }, [departmentsAccess, permissions, userData]);
+
+    const accessibleDepartments = useMemo(() => {
+        const permissionType = permissions?.permission_type || userData?.permissions?.permission_type;
+        const accessIds = (departmentsAccess || []).map((id) => String(id?._id || id)).filter(Boolean);
+
+        if (permissionType === 'Admin' && accessIds.length === 0) {
+            return departments;
+        }
+        if (accessIds.length === 0) {
+            return [];
+        }
+        return departments.filter((dept) => accessIds.includes(String(dept._id)));
+    }, [departments, departmentsAccess, permissions, userData]);
+
+    const accessibleDepartmentIds = useMemo(
+        () => accessibleDepartments.map((d) => String(d._id)),
+        [accessibleDepartments]
+    );
+
+    const projectBelongsToAccessibleDept = (project) => {
+        if (!hasRestrictedDepartmentAccess) return true;
+        const ids = [];
+        if (Array.isArray(project?.departments)) {
+            project.departments.forEach((d) => ids.push(String(d?._id || d)));
+        }
+        if (project?.department) {
+            ids.push(String(project.department?._id || project.department));
+        }
+        return ids.some((id) => accessibleDepartmentIds.includes(id));
+    };
+
+    const accessibleProjectIds = useMemo(() => {
+        const accessIds = (projectsAccess || []).map((id) => String(id?._id || id)).filter(Boolean);
+        const permissionType = permissions?.permission_type || userData?.permissions?.permission_type;
+        if (permissionType === 'Admin' && accessIds.length === 0) return [];
+        return accessIds;
+    }, [projectsAccess, permissions, userData]);
+
+    const hasRestrictedProjectAccess = useMemo(
+        () => accessibleProjectIds.length > 0,
+        [accessibleProjectIds]
+    );
+
+    const accessibleProjects = useMemo(
+        () => {
+            let list = (projects || []).filter(projectBelongsToAccessibleDept);
+            if (hasRestrictedProjectAccess) {
+                list = list.filter((p) => accessibleProjectIds.includes(String(p._id)));
+            }
+            return list;
+        },
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [projects, hasRestrictedDepartmentAccess, accessibleDepartmentIds, hasRestrictedProjectAccess, accessibleProjectIds]
+    );
+
+    const accessibleTypeOfB2B = useMemo(() => {
+        if (!hasRestrictedDepartmentAccess) return typeOfB2BList;
+        return (typeOfB2BList || []).filter((t) => {
+            const deptId = String(t?.department?._id || t?.department || '');
+            return accessibleDepartmentIds.includes(deptId);
+        });
+    }, [typeOfB2BList, hasRestrictedDepartmentAccess, accessibleDepartmentIds]);
+
+    const accessibleLeadUsers = useMemo(() => {
+        const list = leadOwner || [];
+        if (!hasRestrictedDepartmentAccess) return list;
+        return list.filter((u) => {
+            if (u.permission_type === 'Admin') return true;
+            const userDepts = (u.departments_access || []).map((id) => String(id?._id || id));
+            return userDepts.some((d) => accessibleDepartmentIds.includes(d));
+        });
+    }, [leadOwner, hasRestrictedDepartmentAccess, accessibleDepartmentIds]);
+
+    const isAdminUser = useMemo(() => {
+        const permissionType = permissions?.permission_type || userData?.permissions?.permission_type;
+        return permissionType === 'Admin';
+    }, [permissions, userData]);
+
+    // Custom users with department/project access: pre-fill IF conditions. Admin keeps an empty form.
+    const getAccessScopedConditionState = () => {
+        if (isAdminUser) return null;
+
+        const conditions = [];
+        if (hasRestrictedDepartmentAccess && accessibleDepartmentIds.length > 0) {
+            conditions.push({
+                activityType: 'b2bDepartment',
+                operator: 'equals',
+                values: [...accessibleDepartmentIds],
+            });
+        }
+        if (hasRestrictedProjectAccess && accessibleProjectIds.length > 0) {
+            conditions.push({
+                activityType: 'b2bProject',
+                operator: 'equals',
+                values: [...accessibleProjectIds],
+            });
+        }
+        if (conditions.length === 0) return null;
+
+        return {
+            condition: [{}],
+            conditions: [conditions.map(() => ({}))],
+            conditionSelections: [conditions.map((c) => c.activityType)],
+            conditionOperators: [conditions.map((c) => c.operator)],
+            conditionValues: [conditions.map((c) => c.values)],
+            subConditionSelections: [conditions.length > 1 ? conditions.map(() => []) : []],
+            conditionBlocks: [{
+                conditions,
+                intraBlockLogicOperator: 'and',
+            }],
+        };
+    };
+
+    const isAccessLockedActivity = (activityType) => {
+        if (isAdminUser) return false;
+        if (activityType === 'b2bDepartment' && hasRestrictedDepartmentAccess) return true;
+        if ((activityType === 'b2bProject' || activityType === 'project') && hasRestrictedProjectAccess) return true;
+        return false;
+    };
+
+    const clampAccessValues = (activityType, values) => {
+        const raw = Array.isArray(values) ? values : (values ? [values] : []);
+        const ids = raw.map((v) => String(v?._id || v)).filter(Boolean);
+        if (activityType === 'b2bDepartment' && hasRestrictedDepartmentAccess) {
+            const allowed = ids.filter((id) => accessibleDepartmentIds.includes(id));
+            return allowed.length > 0 ? allowed : [...accessibleDepartmentIds];
+        }
+        if ((activityType === 'b2bProject' || activityType === 'project') && hasRestrictedProjectAccess) {
+            const allowed = ids.filter((id) => accessibleProjectIds.includes(id));
+            return allowed.length > 0 ? allowed : [...accessibleProjectIds];
+        }
+        return ids;
+    };
+
+    const applyAccessScopeToBlocks = (blocks = []) => {
+        if (isAdminUser) return Array.isArray(blocks) ? blocks : [];
+
+        const next = (Array.isArray(blocks) ? blocks : []).map((block) => ({
+            ...block,
+            conditions: (block.conditions || []).map((c) => {
+                if (!isAccessLockedActivity(c.activityType)) return { ...c };
+                return {
+                    ...c,
+                    operator: 'equals',
+                    values: clampAccessValues(c.activityType, c.values),
+                };
+            }),
+        }));
+
+        const hasDeptEquals = next.some((b) =>
+            (b.conditions || []).some((c) =>
+                c.activityType === 'b2bDepartment' && c.operator === 'equals' && (c.values || []).length > 0
+            )
+        );
+        const hasProjectEquals = next.some((b) =>
+            (b.conditions || []).some((c) =>
+                (c.activityType === 'b2bProject' || c.activityType === 'project') &&
+                c.operator === 'equals' &&
+                (c.values || []).length > 0
+            )
+        );
+
+        const toInject = [];
+        if (hasRestrictedDepartmentAccess && accessibleDepartmentIds.length > 0 && !hasDeptEquals) {
+            toInject.push({
+                activityType: 'b2bDepartment',
+                operator: 'equals',
+                values: [...accessibleDepartmentIds],
+            });
+        }
+        if (hasRestrictedProjectAccess && accessibleProjectIds.length > 0 && !hasProjectEquals) {
+            toInject.push({
+                activityType: 'b2bProject',
+                operator: 'equals',
+                values: [...accessibleProjectIds],
+            });
+        }
+        if (toInject.length > 0) {
+            if (next.length === 0) {
+                next.push({ conditions: toInject, intraBlockLogicOperator: 'and' });
+            } else {
+                next[0] = {
+                    ...next[0],
+                    conditions: [...toInject, ...(next[0].conditions || [])],
+                };
+            }
+        }
+        return next;
+    };
+
     useEffect(() => {
+        fetchPermissions();
         fetchRules();
         fetchStatuses();
         fetchDepartments();
@@ -319,7 +520,7 @@ const DripMarketingB2B = () => {
     });
 
     useEffect(() => {
-        const conditionBlocks = (ruleData.conditionBlocks || []).map((block) => ({
+        const conditionBlocks = applyAccessScopeToBlocks(ruleData.conditionBlocks || []).map((block) => ({
             conditions: (block.conditions || [])
                 .filter((c) => c.activityType && c.operator && Array.isArray(c.values) && c.values.length > 0)
                 .map((c) => ({
@@ -412,7 +613,15 @@ const DripMarketingB2B = () => {
 
 
     const handleDepartmentChange = (departmentId) => {
-        const selected = departments.find(d => d._id === departmentId || d.id === departmentId);
+        if (
+            hasRestrictedDepartmentAccess &&
+            departmentId &&
+            !accessibleDepartmentIds.includes(String(departmentId))
+        ) {
+            return;
+        }
+        const selected = accessibleDepartments.find(d => d._id === departmentId || d.id === departmentId)
+            || departments.find(d => d._id === departmentId || d.id === departmentId);
         setSelectedDepartment(selected || null);
         fetchProjects(departmentId);
         fetchTypeOfB2B(departmentId);
@@ -420,6 +629,7 @@ const DripMarketingB2B = () => {
 
     const clearDepartmentSelection = () => {
         setSelectedDepartment(null);
+        // Restricted users: reload options without a single dept; client still filters to assigned depts
         fetchProjects();
         fetchTypeOfB2B();
     };
@@ -460,6 +670,22 @@ const DripMarketingB2B = () => {
         }));
     };
 
+
+    const fetchPermissions = async () => {
+        try {
+            if (!token) return;
+            const response = await axios.get(`${backendUrl}/college/permission`, {
+                headers: { 'x-auth': token }
+            });
+            if (response.data?.status) {
+                setPermissions(response.data.permissions || null);
+                setDepartmentsAccess(response.data.departments_access || []);
+                setProjectsAccess(response.data.projects_access || []);
+            }
+        } catch (error) {
+            console.error('Error fetching permissions:', error);
+        }
+    };
 
     const fetchDepartments = async () => {
         try {
@@ -684,7 +910,7 @@ const DripMarketingB2B = () => {
                 endDate: getDatePartIST(ruleData.endDate),
                 startTime: ruleData.startTime,
                 endTime: ruleData.endTime,
-                conditionBlocks: ruleData.conditionBlocks.map(block => ({
+                conditionBlocks: applyAccessScopeToBlocks(ruleData.conditionBlocks).map(block => ({
                     conditions: block.conditions.filter(condition =>
                         condition.activityType && condition.operator && condition.values.length > 0
                     ).map(condition => ({
@@ -769,7 +995,9 @@ const DripMarketingB2B = () => {
         }
         catch (error) {
             console.error('Error adding rule:', error);
-            setError('Error creating rule. Please try again.');
+            const message = error.response?.data?.message || 'Error creating rule. Please try again.';
+            alert(message);
+            setError(message);
         }
         finally {
             fetchRules();
@@ -817,7 +1045,7 @@ const DripMarketingB2B = () => {
                 endDate: getDatePartIST(ruleData.endDate),
                 startTime: ruleData.startTime,
                 endTime: ruleData.endTime,
-                conditionBlocks: ruleData.conditionBlocks.map(block => ({
+                conditionBlocks: applyAccessScopeToBlocks(ruleData.conditionBlocks).map(block => ({
                     conditions: block.conditions.filter(condition =>
                         condition.activityType && condition.operator && condition.values.length > 0
                     ).map(condition => ({
@@ -967,6 +1195,16 @@ const DripMarketingB2B = () => {
                 return timeForInput;
             };
 
+            const scopedBlocks = applyAccessScopeToBlocks((ruleToEdit.conditionBlocks || []).map(block => ({
+                ...block,
+                conditions: (block.conditions || []).map(condition => ({
+                    activityType: condition.activityType || '',
+                    operator: condition.operator || '',
+                    values: condition.values || [],
+                })),
+                intraBlockLogicOperator: block.intraBlockLogicOperator || 'and',
+            })));
+
             setRuleData({
                 _id: ruleToEdit._id || null,
                 name: ruleToEdit.name || '',
@@ -975,17 +1213,7 @@ const DripMarketingB2B = () => {
                 endDate: ruleToEdit.endDate ? new Date(ruleToEdit.endDate) : '',
                 startTime: to24Hour(ruleToEdit.startTime),
                 endTime: to24Hour(ruleToEdit.endTime),
-                // conditionBlocks: ruleToEdit.conditionBlocks || [],
-                // conditionBlock: ruleToEdit.conditionBlocks.map
-                conditionBlocks: (ruleToEdit.conditionBlocks || []).map(block => ({
-                    ...block,
-                    conditions: (block.conditions || []).map(condition => ({
-                        activityType: condition.activityType || '',
-                        operator: condition.operator || '',
-                        values: condition.values || [],
-                    })),
-                    intraBlockLogicOperator: block.intraBlockLogicOperator || 'and',
-                })),
+                conditionBlocks: scopedBlocks,
                 interBlockLogicOperator: ruleToEdit.interBlockLogicOperator || 'and',
                 primaryAction: ruleToEdit.primaryAction || { activityType: '', values: [] },
                 additionalActions: ruleToEdit.additionalActions || [],
@@ -1003,7 +1231,7 @@ const DripMarketingB2B = () => {
             });
 
 
-            if (ruleToEdit.conditionBlocks && ruleToEdit.conditionBlocks.length > 0) {
+            if (scopedBlocks && scopedBlocks.length > 0) {
 
                 const conditionArray = [];
                 const conditionsArray = [];
@@ -1013,7 +1241,7 @@ const DripMarketingB2B = () => {
                 const subConditionSelectionsArray = [];
 
 
-                ruleToEdit.conditionBlocks.forEach((block, blockIndex) => {
+                scopedBlocks.forEach((block, blockIndex) => {
 
                     conditionArray.push({
                         blockIndex: blockIndex,
@@ -1178,17 +1406,17 @@ const DripMarketingB2B = () => {
                 label: subStatus.title
             }));
         } else if (activityType === 'b2bDepartment') {
-            return departments.map(d => ({
+            return accessibleDepartments.map(d => ({
                 value: d._id,
                 label: d.name
             }));
         } else if (activityType === 'b2bProject' || activityType === 'project') {
-            return projects.map(project => ({
+            return accessibleProjects.map(project => ({
                 value: project._id,
                 label: project.name
             }));
         } else if (activityType === 'typeOfB2B') {
-            return typeOfB2BList.map(t => ({
+            return accessibleTypeOfB2B.map(t => ({
                 value: t._id,
                 label: t.name
             }));
@@ -1203,12 +1431,12 @@ const DripMarketingB2B = () => {
                 label: r.name
             }));
         } else if (activityType === 'leadOwner' || activityType === 'leadCoOwner') {
-            return leadOwner.map(owner => ({
+            return accessibleLeadUsers.map(owner => ({
                 value: owner._id,
                 label: owner.name
             }));
         } else if (activityType === 'leadAddedBy' || activityType === 'registeredBy') {
-            return registeredBy.map(user => ({
+            return accessibleLeadUsers.map(user => ({
                 value: user._id,
                 label: user.name
             }));
@@ -1284,17 +1512,17 @@ const DripMarketingB2B = () => {
                 label: subStatus.title
             }));
         } else if (activityType === 'b2bDepartment') {
-            return departments.map(d => ({
+            return accessibleDepartments.map(d => ({
                 value: d._id,
                 label: d.name
             }));
         } else if (activityType === 'b2bProject' || activityType === 'project') {
-            return projects.map(project => ({
+            return accessibleProjects.map(project => ({
                 value: project._id,
                 label: project.name
             }));
         } else if (activityType === 'typeOfB2B') {
-            return typeOfB2BList.map(t => ({
+            return accessibleTypeOfB2B.map(t => ({
                 value: t._id,
                 label: t.name
             }));
@@ -1309,12 +1537,12 @@ const DripMarketingB2B = () => {
                 label: r.name
             }));
         } else if (activityType === 'leadOwner' || activityType === 'leadCoOwner') {
-            return leadOwner.map(owner => ({
+            return accessibleLeadUsers.map(owner => ({
                 value: owner._id,
                 label: owner.name
             }));
         } else if (activityType === 'leadAddedBy' || activityType === 'registeredBy') {
-            return registeredBy.map(user => ({
+            return accessibleLeadUsers.map(user => ({
                 value: user._id,
                 label: user.name
             }));
@@ -1388,17 +1616,17 @@ const DripMarketingB2B = () => {
                 label: subStatus.title
             }));
         } else if (activityType === 'b2bDepartment') {
-            return departments.map(d => ({
+            return accessibleDepartments.map(d => ({
                 value: d._id,
                 label: d.name
             }));
         } else if (activityType === 'b2bProject' || activityType === 'project') {
-            return projects.map(project => ({
+            return accessibleProjects.map(project => ({
                 value: project._id,
                 label: project.name
             }));
         } else if (activityType === 'typeOfB2B') {
-            return typeOfB2BList.map(t => ({
+            return accessibleTypeOfB2B.map(t => ({
                 value: t._id,
                 label: t.name
             }));
@@ -1413,12 +1641,12 @@ const DripMarketingB2B = () => {
                 label: r.name
             }));
         } else if (activityType === 'leadOwner' || activityType === 'leadCoOwner') {
-            return leadOwner.map(owner => ({
+            return accessibleLeadUsers.map(owner => ({
                 value: owner._id,
                 label: owner.name
             }));
         } else if (activityType === 'leadAddedBy' || activityType === 'registeredBy') {
-            return registeredBy.map(user => ({
+            return accessibleLeadUsers.map(user => ({
                 value: user._id,
                 label: user.name
             }));
@@ -1441,7 +1669,9 @@ const DripMarketingB2B = () => {
     };
 
     const resetFormData = () => {
-        // Reset ruleData to initial state
+        const accessState = getAccessScopedConditionState();
+
+        // Reset ruleData to initial state (pre-select assigned departments/projects for custom users)
         setRuleData({
             startDate: '',
             endDate: '',
@@ -1449,7 +1679,7 @@ const DripMarketingB2B = () => {
             endTime: '',
             description: '',
             name: '',
-            conditionBlocks: [],
+            conditionBlocks: accessState?.conditionBlocks || [],
             interBlockLogicOperator: 'and',
             primaryAction: {
                 activityType: '',
@@ -1472,12 +1702,21 @@ const DripMarketingB2B = () => {
         });
 
         // Reset all condition-related state
-        setCondition([]);
-        setConditions([]);
-        setConditionSelections([]);
-        setConditionOperators([]);
-        setConditionValues([]);
-        setSubConditionSelections([]);
+        if (accessState) {
+            setCondition(accessState.condition);
+            setConditions(accessState.conditions);
+            setConditionSelections(accessState.conditionSelections);
+            setConditionOperators(accessState.conditionOperators);
+            setConditionValues(accessState.conditionValues);
+            setSubConditionSelections(accessState.subConditionSelections);
+        } else {
+            setCondition([]);
+            setConditions([]);
+            setConditionSelections([]);
+            setConditionOperators([]);
+            setConditionValues([]);
+            setSubConditionSelections([]);
+        }
         setSubConditionOperators([]);
         setSubConditionValues([]);
 
@@ -1562,6 +1801,10 @@ const DripMarketingB2B = () => {
     }
 
     const handleRemoveCondition = (indexToRemove) => {
+        const blockTypes = conditionSelections[indexToRemove] || [];
+        if (blockTypes.some((type) => isAccessLockedActivity(type))) {
+            return;
+        }
         setCondition(prev => prev.filter((_, i) => i !== indexToRemove));
         setConditions(prev => prev.filter((_, i) => i !== indexToRemove));
         setConditionSelections(prev => prev.filter((_, i) => i !== indexToRemove));
@@ -1626,6 +1869,10 @@ const DripMarketingB2B = () => {
     };
 
     const handleRemoveSubCondition = (blockIndex, subIndex) => {
+        const rowType = (conditionSelections[blockIndex] || [])[subIndex];
+        if (isAccessLockedActivity(rowType)) {
+            return;
+        }
         // Remove from conditions (account for first main item at index 0)
         setConditions(prev => {
             const next = [...prev];
@@ -1681,6 +1928,13 @@ const DripMarketingB2B = () => {
 
 
     const handleSelectChange = (blockIndex, selectIndex, value) => {
+        const currentType = (conditionSelections[blockIndex] || [])[selectIndex];
+        if (isAccessLockedActivity(currentType)) {
+            return;
+        }
+        if (isAccessLockedActivity(value) && currentType !== value) {
+            return;
+        }
         setConditionSelections(prev => {
             const next = [...prev];
             const current = [...(next[blockIndex] || [''])];
@@ -1745,6 +1999,10 @@ const DripMarketingB2B = () => {
     };
 
     const handleOperatorChange = (blockIndex, selectIndex, value) => {
+        const activityType = (conditionSelections[blockIndex] || [])[selectIndex];
+        if (isAccessLockedActivity(activityType) && value !== 'equals') {
+            return;
+        }
         setConditionOperators(prev => {
             const next = [...prev];
             const current = [...(next[blockIndex] || [''])];
@@ -1804,6 +2062,11 @@ const DripMarketingB2B = () => {
     };
 
     const handleValueChange = (blockIndex, selectIndex, value) => {
+        const activityType = (conditionSelections[blockIndex] || [])[selectIndex];
+        const nextValue = isAccessLockedActivity(activityType)
+            ? clampAccessValues(activityType, value)
+            : value;
+
         setConditionValues(prev => {
             const next = [...prev];
             const current = [...(next[blockIndex] || [''])];
@@ -1814,7 +2077,7 @@ const DripMarketingB2B = () => {
             }
 
             // Handle both single values and arrays (for multiselect)
-            current[selectIndex] = value;
+            current[selectIndex] = nextValue;
 
             // Don't automatically add new values - only update the current one
             // New values will be added only when + button is clicked
@@ -1843,38 +2106,25 @@ const DripMarketingB2B = () => {
             }
 
             // Update the specific condition
-            newRuleData.conditionBlocks[blockIndex].conditions[selectIndex].values = Array.isArray(value) ? value : [value];
+            newRuleData.conditionBlocks[blockIndex].conditions[selectIndex].values = Array.isArray(nextValue) ? nextValue : [nextValue];
 
             return newRuleData;
         });
 
-        // Check if this is a status value selection and fetch sub-statuses
-        const activityType = (conditionSelections[blockIndex] || [''])[0];
-
-
         // Check if this is a vertical value selection
-        if (activityType === 'b2bDepartment' && value) {
-            if (Array.isArray(value)) {
-                // Handle multiselect for vertical
-                if (value.includes('all') || value.length === 0) {
-                    // If "All Verticals" is selected or no selection, clear vertical selection and fetch all projects
+        if (activityType === 'b2bDepartment' && nextValue) {
+            if (Array.isArray(nextValue)) {
+                if (nextValue.includes('all') || nextValue.length === 0) {
                     clearDepartmentSelection();
-                } else if (value.length === 1) {
-                    // If only one vertical is selected, use that vertical
-                    handleDepartmentChange(value[0]);
+                } else if (nextValue.length === 1) {
+                    handleDepartmentChange(nextValue[0]);
                 } else {
-                    // If multiple verticals are selected, clear selection and fetch all projects
                     clearDepartmentSelection();
                 }
+            } else if (nextValue === 'all') {
+                clearDepartmentSelection();
             } else {
-                // Handle single select for vertical
-                if (value === 'all') {
-                    // If "All Verticals" is selected, clear vertical selection and fetch all projects
-                    clearDepartmentSelection();
-                } else {
-                    // If a specific vertical is selected, update vertical selection and fetch its projects
-                    handleDepartmentChange(value);
-                }
+                handleDepartmentChange(nextValue);
             }
         }
     };
@@ -2495,7 +2745,13 @@ const DripMarketingB2B = () => {
 
 
                                                                 {/* Render all conditions for this block */}
-                                                                {(conditionSelections[index] || []).map((_, conditionIdx) => (
+                                                                {(conditionSelections[index] || []).map((_, conditionIdx) => {
+                                                                    const activityType = (conditionSelections[index] || [''])[conditionIdx] || '';
+                                                                    const isLockedRow = isAccessLockedActivity(activityType);
+                                                                    const blockHasLocked = (conditionSelections[index] || []).some((type) => isAccessLockedActivity(type));
+                                                                    const showDepartmentOption = !hasRestrictedDepartmentAccess || activityType === 'b2bDepartment';
+                                                                    const showProjectOption = !hasRestrictedProjectAccess || activityType === 'b2bProject' || activityType === 'project';
+                                                                    return (
                                                                     <div key={`condition-${index}-${conditionIdx}`} className="row mb-3 pb-3">
                                                                         <div className="col-10">
                                                                             <div className="row">
@@ -2503,18 +2759,19 @@ const DripMarketingB2B = () => {
                                                                                 <div className="col-4">
                                                                                     <select
                                                                                         className='form-select'
-                                                                                        value={(conditionSelections[index] || [''])[conditionIdx] || ''}
+                                                                                        value={activityType}
+                                                                                        disabled={isLockedRow}
                                                                                         onChange={(e) => handleSelectChange(index, conditionIdx, e.target.value)}
                                                                                     >
-                                                                                                                                                                                <option value="">Activity type</option>
+                                                                                        <option value="">Activity type</option>
                                                                                         <option value="state">State</option>
                                                                                         <option value="status">Status</option>
                                                                                         <option value="subStatus">Sub Status</option>
                                                                                         <option value="leadOwner">Lead Owner</option>
                                                                                         <option value="leadCoOwner">Lead Co-Owner</option>
                                                                                         <option value="leadAddedBy">Lead Added By</option>
-                                                                                        <option value="b2bProject">B2B Project</option>
-                                                                                        <option value="b2bDepartment">B2B Department</option>
+                                                                                        {showProjectOption && <option value="b2bProject">B2B Project</option>}
+                                                                                        {showDepartmentOption && <option value="b2bDepartment">B2B Department</option>}
                                                                                         <option value="typeOfB2B">Type of B2B</option>
                                                                                         <option value="leadCategory">Lead Category</option>
                                                                                         <option value="leadRanking">Lead Ranking</option>
@@ -2522,26 +2779,26 @@ const DripMarketingB2B = () => {
                                                                                 </div>
 
                                                                                 {/* Operator Dropdown - Only show if Activity Type is selected */}
-                                                                                {(conditionSelections[index] || [''])[conditionIdx] && (
+                                                                                {activityType && (
                                                                                     <div className="col-4">
                                                                                         <select
                                                                                             className='form-select'
                                                                                             value={(conditionOperators[index] || [''])[conditionIdx] || ''}
+                                                                                            disabled={isLockedRow}
                                                                                             onChange={(e) => handleOperatorChange(index, conditionIdx, e.target.value)}
                                                                                         >
                                                                                             <option value="">Select Operator</option>
                                                                                             <option value="equals">Equals</option>
-                                                                                            <option value="not_equals">Not Equals</option>
+                                                                                            {!isLockedRow && <option value="not_equals">Not Equals</option>}
                                                                                         </select>
                                                                                     </div>
                                                                                 )}
 
                                                                                 {/* Value Dropdown - Only show if Operator is selected */}
-                                                                                {(conditionOperators[index] || [''])[conditionIdx] && (conditionSelections[index] || [''])[conditionIdx] && (
+                                                                                {(conditionOperators[index] || [''])[conditionIdx] && activityType && (
                                                                                     <div className="col-4">
                                                                                         {(() => {
                                                                                             const multiValues = ['all', 'status', 'subStatus', 'vertical', 'project']
-                                                                                            const activityType = (conditionSelections[index] || [''])[conditionIdx] || '';
                                                                                             const isMultiselect = multiValues.includes('all')
                                                                                                 ? true
                                                                                                 : multiValues.includes(activityType);
@@ -2586,12 +2843,12 @@ const DripMarketingB2B = () => {
                                                                                         <i className="fa-solid fa-plus"></i>
                                                                                     </button>
                                                                                 )}
-                                                                                {(conditionSelections[index] || []).length > 1 && conditionIdx > 0 && (
+                                                                                {(conditionSelections[index] || []).length > 1 && conditionIdx > 0 && !isLockedRow && (
                                                                                     <button onClick={() => handleRemoveSubCondition(index, conditionIdx)}>
                                                                                         <i className="fa-solid fa-xmark"></i>
                                                                                     </button>
                                                                                 )}
-                                                                                {conditionIdx === 0 && (
+                                                                                {conditionIdx === 0 && !blockHasLocked && (
                                                                                     <button onClick={() => handleRemoveCondition(index)}>
                                                                                         <i className="fa-solid fa-xmark"></i>
                                                                                     </button>
@@ -2599,7 +2856,8 @@ const DripMarketingB2B = () => {
                                                                             </div>
                                                                         </div>
                                                                     </div>
-                                                                ))}
+                                                                    );
+                                                                })}
 
 
 

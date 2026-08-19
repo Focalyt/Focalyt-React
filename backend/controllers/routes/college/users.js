@@ -22,6 +22,8 @@ const Qualification = require('../../models/qualification');
 const AppliedCourses = require('../../models/appliedCourses');
 const Source = require('../../models/source');
 const Partner = require('../../models/partners');
+const B2BDepartment = require('../../models/b2b/b2bDepartment');
+const B2BProject = require('../../models/b2b/b2bProject');
 
 // Permission Checker Utility Function
 const hasPermission = (user, permission) => {
@@ -135,7 +137,11 @@ router.post('/add', [isCollege, checkPermission('can_add_users'), logUserActivit
       description,
       reporting_managers,
       access_level,
-      permissions
+      permissions,
+      departments_access,
+      projects_access,
+      verticals_access,
+      b2c_projects_access
     } = req.body;
 
     const user = req.user
@@ -247,6 +253,58 @@ router.post('/add', [isCollege, checkPermission('can_add_users'), logUserActivit
       }
     }
 
+    // Validate department access IDs if provided
+    let validDepartmentsAccess = [];
+    if (departments_access && Array.isArray(departments_access) && departments_access.length > 0) {
+      const validIds = departments_access.filter((id) => mongoose.Types.ObjectId.isValid(id));
+      if (validIds.length > 0) {
+        const departments = await B2BDepartment.find({
+          _id: { $in: validIds },
+          isActive: true
+        }).select('_id');
+        validDepartmentsAccess = departments.map((d) => d._id);
+      }
+    }
+
+    // Validate project access IDs if provided
+    let validProjectsAccess = [];
+    if (projects_access && Array.isArray(projects_access) && projects_access.length > 0) {
+      const validIds = projects_access.filter((id) => mongoose.Types.ObjectId.isValid(id));
+      if (validIds.length > 0) {
+        const projects = await B2BProject.find({
+          _id: { $in: validIds },
+          isActive: true
+        }).select('_id');
+        validProjectsAccess = projects.map((p) => p._id);
+      }
+    }
+
+    // Validate B2C vertical access IDs if provided
+    let validVerticalsAccess = [];
+    if (verticals_access && Array.isArray(verticals_access) && verticals_access.length > 0) {
+      const validIds = verticals_access.filter((id) => mongoose.Types.ObjectId.isValid(id));
+      if (validIds.length > 0) {
+        const verticals = await Vertical.find({
+          _id: { $in: validIds },
+          status: true
+        }).select('_id');
+        validVerticalsAccess = verticals.map((v) => v._id);
+      }
+    }
+
+    // Validate B2C project access IDs if provided
+    let validB2cProjectsAccess = [];
+    if (b2c_projects_access && Array.isArray(b2c_projects_access) && b2c_projects_access.length > 0) {
+      const validIds = b2c_projects_access.filter((id) => mongoose.Types.ObjectId.isValid(id));
+      if (validIds.length > 0) {
+        const projects = await Project.find({
+          _id: { $in: validIds },
+          status: 'active'
+        }).select('_id');
+        validB2cProjectsAccess = projects.map((p) => p._id);
+      }
+    }
+
     // Generate temporary password
     const currentUserId = req.user ? req.user.id : null;
 
@@ -258,6 +316,10 @@ router.post('/add', [isCollege, checkPermission('can_add_users'), logUserActivit
       designation: role_designation.trim(),
       description: description ? description.trim() : '',
       reporting_managers: validReportingManagers,
+      departments_access: validDepartmentsAccess,
+      projects_access: validProjectsAccess,
+      verticals_access: validVerticalsAccess,
+      b2c_projects_access: validB2cProjectsAccess,
       role: 2, // Always 2 for college users
       permissions: {
         permission_type: permissionType,
@@ -294,6 +356,10 @@ router.post('/add', [isCollege, checkPermission('can_add_users'), logUserActivit
       access_level: access_level,
       permission_type: permissionType,
       reporting_managers: validReportingManagers,
+      departments_access: validDepartmentsAccess,
+      projects_access: validProjectsAccess,
+      verticals_access: validVerticalsAccess,
+      b2c_projects_access: validB2cProjectsAccess,
       status: savedUser.status,
       created_at: savedUser.createdAt
     };
@@ -508,8 +574,77 @@ router.post('/update/:userId', [isCollege, checkPermission('can_update_users'), 
       );
     }
 
+    // Validate / normalize department access if provided
+    if (body.departments_access !== undefined) {
+      if (!Array.isArray(body.departments_access)) {
+        body.departments_access = [];
+      } else {
+        const validIds = body.departments_access.filter((id) => mongoose.Types.ObjectId.isValid(id));
+        if (validIds.length > 0) {
+          const departments = await B2BDepartment.find({
+            _id: { $in: validIds },
+            isActive: true
+          }).select('_id');
+          body.departments_access = departments.map((d) => d._id);
+        } else {
+          body.departments_access = [];
+        }
+      }
+    }
 
+    // Validate / normalize project access if provided
+    if (body.projects_access !== undefined) {
+      if (!Array.isArray(body.projects_access)) {
+        body.projects_access = [];
+      } else {
+        const validIds = body.projects_access.filter((id) => mongoose.Types.ObjectId.isValid(id));
+        if (validIds.length > 0) {
+          const projects = await B2BProject.find({
+            _id: { $in: validIds },
+            isActive: true
+          }).select('_id');
+          body.projects_access = projects.map((p) => p._id);
+        } else {
+          body.projects_access = [];
+        }
+      }
+    }
 
+    // Validate / normalize B2C vertical access if provided
+    if (body.verticals_access !== undefined) {
+      if (!Array.isArray(body.verticals_access)) {
+        body.verticals_access = [];
+      } else {
+        const validIds = body.verticals_access.filter((id) => mongoose.Types.ObjectId.isValid(id));
+        if (validIds.length > 0) {
+          const verticals = await Vertical.find({
+            _id: { $in: validIds },
+            status: true
+          }).select('_id');
+          body.verticals_access = verticals.map((v) => v._id);
+        } else {
+          body.verticals_access = [];
+        }
+      }
+    }
+
+    // Validate / normalize B2C project access if provided
+    if (body.b2c_projects_access !== undefined) {
+      if (!Array.isArray(body.b2c_projects_access)) {
+        body.b2c_projects_access = [];
+      } else {
+        const validIds = body.b2c_projects_access.filter((id) => mongoose.Types.ObjectId.isValid(id));
+        if (validIds.length > 0) {
+          const projects = await Project.find({
+            _id: { $in: validIds },
+            status: 'active'
+          }).select('_id');
+          body.b2c_projects_access = projects.map((p) => p._id);
+        } else {
+          body.b2c_projects_access = [];
+        }
+      }
+    }
 
     // Generate temporary password
     const currentUserId = req.user ? req.user.id : null;
@@ -1038,7 +1173,7 @@ router.get('/b2b-users', isCollege, async (req, res) => {
       _id: { $in: concernPersonIds },
       status: true,
       isDeleted: false
-    }).select('_id name email permissions status').lean();
+    }).select('_id name email permissions status departments_access projects_access').lean();
 
     console.log('📋 [BACKEND] All Concern Persons:', {
       total: allConcernPersons.length,
@@ -1060,7 +1195,10 @@ router.get('/b2b-users', isCollege, async (req, res) => {
       })
       .map(u => ({
         _id: u._id,
-        name: u.name
+        name: u.name,
+        permission_type: u.permissions?.permission_type || 'Custom',
+        departments_access: u.departments_access || [],
+        projects_access: u.projects_access || []
       }));
 
     console.log('✅ [BACKEND] Filtered Users (can_view_leads_b2b OR Admin):', {

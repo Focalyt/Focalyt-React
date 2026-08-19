@@ -35,6 +35,14 @@ const userSchema = new Schema(
 		address: String,
 		reporting_managers: [ObjectId],
 		my_team: [ObjectId],
+		// Selected B2B department IDs the user can access (Access Management)
+		departments_access: [ObjectId],
+		// Selected B2B project IDs the user can access (nested under departments)
+		projects_access: [ObjectId],
+		// Selected B2C vertical IDs the user can access (Access Management)
+		verticals_access: [ObjectId],
+		// Selected B2C project IDs the user can access (nested under verticals)
+		b2c_projects_access: [ObjectId],
 		authTokens: [String],
 		permissions: {
 			permission_type: { type: String, default: 'Admin' },

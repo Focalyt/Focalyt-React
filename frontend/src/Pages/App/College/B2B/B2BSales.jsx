@@ -113,6 +113,32 @@ function getLeadB2bDepartmentName(lead) {
   ) || '—';
 }
 
+/** Project may belong to multiple departments (`departments[]`); fall back to legacy `department`. */
+function getProjectDepartmentIds(project) {
+  const ids = [];
+  if (Array.isArray(project?.departments)) {
+    project.departments.forEach((d) => {
+      const id = d?._id || d;
+      if (id) ids.push(String(id));
+    });
+  }
+  if (project?.department) {
+    ids.push(String(project.department?._id || project.department));
+  }
+  return [...new Set(ids.filter(Boolean))];
+}
+
+function projectBelongsToDepartment(project, departmentId) {
+  if (!departmentId) return true;
+  return getProjectDepartmentIds(project).includes(String(departmentId));
+}
+
+function projectBelongsToAnyDepartment(project, departmentIds = []) {
+  if (!departmentIds.length) return true;
+  const ids = getProjectDepartmentIds(project);
+  return ids.some((id) => departmentIds.includes(id));
+}
+
 function getLeadAddressLine(lead) {
   const parts = [
     pickFirstNonEmpty(lead?.address, lead?.businessAddress),
@@ -374,6 +400,7 @@ const MultiSelectCheckbox = ({
 const useNavHeight = (dependencies = []) => {
   const navRef = useRef(null);
   const [navHeight, setNavHeight] = useState(50); // Default fallback
+  const [navTop, setNavTop] = useState(0);
   const widthRef = useRef(null);
   const [width, setWidth] = useState(0);
   const [leftOffset, setLeftOffset] = useState(0);
@@ -381,7 +408,9 @@ const useNavHeight = (dependencies = []) => {
   const calculateHeight = useCallback(() => {
     if (navRef.current) {
       const height = navRef.current.offsetHeight;
+      const top = navRef.current.getBoundingClientRect().top;
       setNavHeight(height);
+      setNavTop(Math.max(0, Math.round(top)));
     }
   }, []);
 
@@ -433,7 +462,7 @@ const useNavHeight = (dependencies = []) => {
     setTimeout(calculateWidth, 50);
   }, dependencies);
 
-  return { navRef, navHeight, calculateHeight, width, leftOffset };
+  return { navRef, navHeight, navTop, calculateHeight, width, leftOffset };
 };
 const useMainWidth = (dependencies = []) => {// Default fallback
   const widthRef = useRef(null);
@@ -552,6 +581,8 @@ const B2BSales = () => {
   const token = userData.token;
   // const permissions = userData.permissions
   const [permissions, setPermissions] = useState();
+  const [departmentsAccess, setDepartmentsAccess] = useState([]);
+  const [projectsAccess, setProjectsAccess] = useState([]);
   const canEditLeadsB2B =
     permissions?.permission_type === 'Admin' ||
     (permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_edit_leads_b2b);
@@ -615,13 +646,17 @@ const B2BSales = () => {
   }, [permissions, userData]);
 
   const updatedPermission = async () => {
-
-    const respose = await axios.get(`${backendUrl}/college/permission`, {
-      headers: { 'x-auth': token }
-    });
-    if (respose.data.status) {
-
-      setPermissions(respose.data.permissions);
+    try {
+      const respose = await axios.get(`${backendUrl}/college/permission`, {
+        headers: { 'x-auth': token }
+      });
+      if (respose.data.status) {
+        setPermissions(respose.data.permissions);
+        setDepartmentsAccess(respose.data.departments_access || []);
+        setProjectsAccess(respose.data.projects_access || []);
+      }
+    } catch (error) {
+      console.error('Error fetching permissions:', error);
     }
   }
 
@@ -896,12 +931,85 @@ const B2BSales = () => {
   const [allB2bDepartments, setAllB2bDepartments] = useState([]);
   const [allTypeOfB2BRaw, setAllTypeOfB2BRaw] = useState([]);
 
+  // Only departments assigned to the logged-in user (Admin with empty list → all)
+  const accessibleB2bDepartments = useMemo(() => {
+    const permissionType = permissions?.permission_type || userData?.permissions?.permission_type;
+    const accessIds = (departmentsAccess || []).map((id) => String(id?._id || id));
+
+    if (permissionType === 'Admin' && accessIds.length === 0) {
+      return allB2bDepartments;
+    }
+    if (accessIds.length === 0) {
+      return [];
+    }
+    return allB2bDepartments.filter((dept) => accessIds.includes(String(dept._id)));
+  }, [allB2bDepartments, departmentsAccess, permissions, userData]);
+
+  // When user has assigned departments, hide "All" and only show those departments
+  const hasRestrictedDepartmentAccess = useMemo(() => {
+    const accessIds = (departmentsAccess || []).map((id) => String(id?._id || id)).filter(Boolean);
+    const permissionType = permissions?.permission_type || userData?.permissions?.permission_type;
+    // Admin with no assignments keeps full "All" access; otherwise restrict to assigned list
+    if (permissionType === 'Admin' && accessIds.length === 0) return false;
+    return accessIds.length > 0;
+  }, [departmentsAccess, permissions, userData]);
+
+  const accessibleDepartmentIds = useMemo(
+    () => accessibleB2bDepartments.map((d) => String(d._id)),
+    [accessibleB2bDepartments]
+  );
+
+  const accessibleProjectIds = useMemo(() => {
+    const accessIds = (projectsAccess || []).map((id) => String(id?._id || id)).filter(Boolean);
+    const permissionType = permissions?.permission_type || userData?.permissions?.permission_type;
+    if (permissionType === 'Admin' && accessIds.length === 0) return [];
+    return accessIds;
+  }, [projectsAccess, permissions, userData]);
+
+  const hasRestrictedProjectAccess = useMemo(
+    () => accessibleProjectIds.length > 0,
+    [accessibleProjectIds]
+  );
+
+  // Admins always listed; Custom users only if attached to scoped department (and project, if given)
+  const getCounsellorsForDepartment = useCallback((departmentId, projectId) => {
+    const list = users || [];
+    let scopeDeptIds = null;
+    if (departmentId) {
+      scopeDeptIds = [String(departmentId)];
+    } else if (hasRestrictedDepartmentAccess) {
+      scopeDeptIds = accessibleDepartmentIds;
+    }
+
+    // No department scope (Admin viewing All) → all B2B users
+    if (!scopeDeptIds || scopeDeptIds.length === 0) {
+      return list;
+    }
+
+    return list.filter((u) => {
+      if (u.permission_type === 'Admin') return true;
+      const userDepts = (u.departments_access || []).map((id) => String(id?._id || id));
+      if (!userDepts.some((d) => scopeDeptIds.includes(d))) return false;
+      if (projectId) {
+        const userProjects = (u.projects_access || []).map((id) => String(id?._id || id)).filter(Boolean);
+        if (userProjects.length > 0 && !userProjects.includes(String(projectId))) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [users, hasRestrictedDepartmentAccess, accessibleDepartmentIds]);
+
   const addLeadProjects = useMemo(() => {
     if (!leadFormData.b2bDepartment) return [];
-    return allB2bProjects.filter(
-      (proj) => String(proj.department?._id || proj.department) === String(leadFormData.b2bDepartment)
+    let list = allB2bProjects.filter((proj) =>
+      projectBelongsToDepartment(proj, leadFormData.b2bDepartment)
     );
-  }, [allB2bProjects, leadFormData.b2bDepartment]);
+    if (hasRestrictedProjectAccess) {
+      list = list.filter((proj) => accessibleProjectIds.includes(String(proj._id)));
+    }
+    return list;
+  }, [allB2bProjects, leadFormData.b2bDepartment, hasRestrictedProjectAccess, accessibleProjectIds]);
 
   const typeOfB2BOptions = useMemo(() => (
     allTypeOfB2BRaw.map((type) => ({
@@ -1614,13 +1722,15 @@ const B2BSales = () => {
         ...prev,
         b2bDepartment: value,
         b2bProject: '',
-        typeOfB2B: ''
+        typeOfB2B: '',
+        leadCoOwner: ''
       }));
     } else if (name === 'b2bProject') {
       setLeadFormData(prev => ({
         ...prev,
         b2bProject: value,
-        typeOfB2B: ''
+        typeOfB2B: '',
+        leadCoOwner: ''
       }));
     } else {
       setLeadFormData(prev => ({
@@ -1844,11 +1954,23 @@ const B2BSales = () => {
   selectedApprovalStatusRef.current = selectedApprovalStatus;
 
   const cycleProjectOptions = useMemo(() => {
-    if (!filters.b2bDepartment) return allB2bProjects;
-    return allB2bProjects.filter(
-      (proj) => String(proj.department?._id || proj.department) === String(filters.b2bDepartment)
-    );
-  }, [allB2bProjects, filters.b2bDepartment]);
+    let list;
+    if (filters.b2bDepartment) {
+      list = allB2bProjects.filter((proj) =>
+        projectBelongsToDepartment(proj, filters.b2bDepartment)
+      );
+    } else if (hasRestrictedDepartmentAccess) {
+      list = allB2bProjects.filter((proj) =>
+        projectBelongsToAnyDepartment(proj, accessibleDepartmentIds)
+      );
+    } else {
+      list = allB2bProjects;
+    }
+    if (hasRestrictedProjectAccess) {
+      list = list.filter((proj) => accessibleProjectIds.includes(String(proj._id)));
+    }
+    return list;
+  }, [allB2bProjects, filters.b2bDepartment, hasRestrictedDepartmentAccess, accessibleDepartmentIds, hasRestrictedProjectAccess, accessibleProjectIds]);
 
   const cycleTypeOfB2BOptions = useMemo(() => {
     let types = allTypeOfB2BRaw;
@@ -1859,14 +1981,19 @@ const B2BSales = () => {
     } else if (filters.b2bProject) {
       const project = allB2bProjects.find((p) => String(p._id) === String(filters.b2bProject));
       if (project) {
-        const deptId = String(project.department?._id || project.department);
-        types = types.filter(
-          (type) => String(type.department?._id || type.department) === deptId
-        );
+        const projectDeptIds = getProjectDepartmentIds(project);
+        types = types.filter((type) => {
+          const deptId = String(type.department?._id || type.department);
+          return projectDeptIds.includes(deptId);
+        });
       }
+    } else if (hasRestrictedDepartmentAccess) {
+      types = types.filter((type) =>
+        accessibleDepartmentIds.includes(String(type.department?._id || type.department))
+      );
     }
     return types;
-  }, [allTypeOfB2BRaw, filters.b2bDepartment, filters.b2bProject, allB2bProjects]);
+  }, [allTypeOfB2BRaw, filters.b2bDepartment, filters.b2bProject, allB2bProjects, hasRestrictedDepartmentAccess, accessibleDepartmentIds]);
 
   const fetchMyReferLeadsCount = async () => {
     try {
@@ -2067,10 +2194,14 @@ const B2BSales = () => {
 
   const crossSaleProjectOptions = useMemo(() => {
     if (!crossSaleForm.b2bDepartment) return [];
-    return allB2bProjects.filter(
-      (proj) => String(proj.department?._id || proj.department) === String(crossSaleForm.b2bDepartment)
+    let list = allB2bProjects.filter((proj) =>
+      projectBelongsToDepartment(proj, crossSaleForm.b2bDepartment)
     );
-  }, [allB2bProjects, crossSaleForm.b2bDepartment]);
+    if (hasRestrictedProjectAccess) {
+      list = list.filter((proj) => accessibleProjectIds.includes(String(proj._id)));
+    }
+    return list;
+  }, [allB2bProjects, crossSaleForm.b2bDepartment, hasRestrictedProjectAccess, accessibleProjectIds]);
 
   const crossSaleTypeOptions = useMemo(() => {
     if (!crossSaleForm.b2bDepartment) return [];
@@ -2483,11 +2614,14 @@ const B2BSales = () => {
     setSelectedStatusFilter(null);
     setSelectedApprovalStatus(null);
     resetHeaderDateFilterState();
+    const defaultDept = hasRestrictedDepartmentAccess && accessibleB2bDepartments[0]
+      ? String(accessibleB2bDepartments[0]._id)
+      : '';
     const cleared = {
       search: '',
       leadCategory: [],
       b2bProject: '',
-      b2bDepartment: '',
+      b2bDepartment: defaultDept,
       typeOfB2B: [],
       leadOwner: [],
       leadCoOwner: [],
@@ -2558,8 +2692,17 @@ const B2BSales = () => {
     if (Array.isArray(eff.leadCategory) && eff.leadCategory.length) {
       params.leadCategoryIn = toCsv(eff.leadCategory);
     }
-    if (eff.b2bProject) params.b2bProject = eff.b2bProject;
-    if (eff.b2bDepartment) params.b2bDepartment = eff.b2bDepartment;
+    if (eff.b2bProject) {
+      params.b2bProject = eff.b2bProject;
+    } else if (hasRestrictedProjectAccess && accessibleProjectIds.length > 0) {
+      params.b2bProjectIn = accessibleProjectIds.join(',');
+    }
+    if (eff.b2bDepartment) {
+      params.b2bDepartment = eff.b2bDepartment;
+    } else if (hasRestrictedDepartmentAccess && accessibleDepartmentIds.length > 0) {
+      // No single dept selected → still limit to assigned departments only
+      params.b2bDepartmentIn = accessibleDepartmentIds.join(',');
+    }
     if (Array.isArray(eff.typeOfB2B) && eff.typeOfB2B.length) {
       params.typeOfB2BIn = toCsv(eff.typeOfB2B);
     }
@@ -2643,6 +2786,33 @@ const B2BSales = () => {
     }
   };
 
+  const accessibleCounsellors = useMemo(
+    () => getCounsellorsForDepartment(filters?.b2bDepartment),
+    [getCounsellorsForDepartment, filters?.b2bDepartment]
+  );
+
+  // Restricted users: never keep "All"/empty — pick first assigned department if needed
+  useEffect(() => {
+    if (!hasRestrictedDepartmentAccess || accessibleB2bDepartments.length === 0) return;
+    const current = String(filters.b2bDepartment || '');
+    const isValid = current && accessibleDepartmentIds.includes(current);
+    if (isValid) return;
+
+    const firstDeptId = String(accessibleB2bDepartments[0]._id);
+    handleCycleFilterChange('b2bDepartment', firstDeptId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasRestrictedDepartmentAccess, accessibleB2bDepartments, accessibleDepartmentIds]);
+
+  // Clear counsellor filter if selected counsellor is not in accessible list for current department
+  useEffect(() => {
+    const selectedOwner = filters?.leadOwner?.[0];
+    if (!selectedOwner) return;
+    const stillValid = accessibleCounsellors.some((u) => String(u._id) === String(selectedOwner));
+    if (stillValid) return;
+    handleCycleFilterChange('leadOwner', '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessibleCounsellors, filters?.b2bDepartment]);
+
   const renderCycleFilterDropdowns = (mobile = false) => (
     <div className={`b2b-cycle-filters${mobile ? ' b2b-cycle-filters--mobile' : ''}`}>
       <div className="b2b-cycle-filters__item">
@@ -2655,8 +2825,8 @@ const B2BSales = () => {
           value={filters.b2bDepartment || ''}
           onChange={(e) => handleCycleFilterChange('b2bDepartment', e.target.value)}
         >
-          <option value="">All</option>
-          {allB2bDepartments.map((dept) => (
+          {!hasRestrictedDepartmentAccess && <option value="">All</option>}
+          {accessibleB2bDepartments.map((dept) => (
             <option key={dept._id} value={dept._id}>{dept.name}</option>
           ))}
         </select>
@@ -2704,7 +2874,7 @@ const B2BSales = () => {
           onChange={(e) => handleCycleFilterChange('leadOwner', e.target.value)}
         >
           <option value="">All</option>
-          {(users || []).map((u) => (
+          {(accessibleCounsellors || []).map((u) => (
             <option key={u._id} value={u._id}>{u.name || u.email || 'User'}</option>
           ))}
         </select>
@@ -3854,10 +4024,14 @@ const B2BSales = () => {
 
   const bulkUploadProjectOptions = useMemo(() => {
     if (!bulkUploadFormData.b2bDepartment) return [];
-    return allB2bProjects.filter(
-      (proj) => String(proj.department?._id || proj.department) === String(bulkUploadFormData.b2bDepartment)
+    let list = allB2bProjects.filter((proj) =>
+      projectBelongsToDepartment(proj, bulkUploadFormData.b2bDepartment)
     );
-  }, [allB2bProjects, bulkUploadFormData.b2bDepartment]);
+    if (hasRestrictedProjectAccess) {
+      list = list.filter((proj) => accessibleProjectIds.includes(String(proj._id)));
+    }
+    return list;
+  }, [allB2bProjects, bulkUploadFormData.b2bDepartment, hasRestrictedProjectAccess, accessibleProjectIds]);
 
   const bulkUploadTypeOptions = useMemo(() => {
     if (!bulkUploadFormData.b2bDepartment) return [];
@@ -3876,9 +4050,10 @@ const B2BSales = () => {
         b2bDepartment: value,
         b2bProject: '',
         typeOfB2B: '',
+        leadCoOwner: '',
       }));
     } else if (name === 'b2bProject') {
-      setBulkUploadFormData((prev) => ({ ...prev, b2bProject: value, typeOfB2B: '' }));
+      setBulkUploadFormData((prev) => ({ ...prev, b2bProject: value, typeOfB2B: '', leadCoOwner: '' }));
     } else {
       setBulkUploadFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -4242,7 +4417,7 @@ const B2BSales = () => {
 
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
 
-  const { navRef, navHeight } = useNavHeight([isFilterCollapsed, crmFilters]);
+  const { navRef, navHeight, navTop } = useNavHeight([isFilterCollapsed, crmFilters]);
   const { widthRef, width, leftOffset } = useMainWidth([isFilterCollapsed, crmFilters, mainContentClass]);
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
   const blurIntensity = Math.min(scrollY / 10, 15);
@@ -4292,8 +4467,15 @@ const B2BSales = () => {
   }, []);
 
   useEffect(() => {
-    if (seletectedStatus || filters.status) {
-      fetchSubStatus()
+    const panelStatusId = typeof seletectedStatus === 'string' ? seletectedStatus.trim() : '';
+    const filterStatusIds = Array.isArray(filters.status)
+      ? filters.status.filter(Boolean)
+      : (filters.status ? [filters.status] : []);
+
+    if (panelStatusId || filterStatusIds.length > 0) {
+      fetchSubStatus();
+    } else {
+      setSubStatuses([]);
     }
   }, [seletectedStatus, filters.status]);
 
@@ -4347,8 +4529,13 @@ const B2BSales = () => {
     setSelectedSubStatus(selectedSubStatusObject || null);
   };
 
-  const fetchStatus = async () => {
+  const fetchStatus = async (retryCount = 0) => {
     try {
+      if (!backendUrl) {
+        console.error('Error fetching B2B statuses: REACT_APP_MIPIE_BACKEND_URL is missing');
+        return;
+      }
+
       const response = await axios.get(`${backendUrl}/college/statusB2b`, {
         headers: { 'x-auth': token }
       });
@@ -4378,34 +4565,58 @@ const B2BSales = () => {
         alert('Failed to fetch Status: ' + (response.data.message || 'Unknown error'));
       }
     } catch (error) {
+      const isNetworkError = !error.response && (error.code === 'ERR_NETWORK' || error.message === 'Network Error');
       console.error('Error fetching B2B statuses:', error);
       console.error('Error details:', error.response?.data || error.message);
-      alert('Failed to fetch Status: ' + (error.response?.data?.message || error.message));
+
+      // Transient local-dev drops (reload / busy backend) — retry once, don't spam alert
+      if (isNetworkError && retryCount < 1) {
+        setTimeout(() => fetchStatus(retryCount + 1), 800);
+        return;
+      }
+
+      if (!isNetworkError) {
+        alert('Failed to fetch Status: ' + (error.response?.data?.message || error.message));
+      }
     }
   };
 
   const fetchSubStatus = async () => {
     try {
-      const status = seletectedStatus || filters.status;
-      if (!status) {
-        alert('Please select a status');
+      // Prefer panel status (single id). Filters.status is a multi-select array.
+      const panelStatusId = typeof seletectedStatus === 'string' ? seletectedStatus.trim() : '';
+      const filterStatusIds = Array.isArray(filters.status)
+        ? filters.status.filter(Boolean)
+        : (filters.status ? [filters.status] : []);
+      const statusIds = panelStatusId ? [panelStatusId] : filterStatusIds;
+
+      if (statusIds.length === 0) {
+        setSubStatuses([]);
         return;
       }
-      const response = await axios.get(`${backendUrl}/college/statusB2b/${status}/substatus`, {
-        headers: { 'x-auth': token }
-      });
 
+      const results = await Promise.all(
+        statusIds.map((statusId) =>
+          axios.get(`${backendUrl}/college/statusB2b/${statusId}/substatus`, {
+            headers: { 'x-auth': token },
+          })
+        )
+      );
 
-      if (response.data.success) {
-        const status = response.data.data;
-
-
-        setSubStatuses(response.data.data);
-
-
+      const merged = [];
+      const seen = new Set();
+      for (const response of results) {
+        if (!response.data?.success || !Array.isArray(response.data.data)) continue;
+        for (const sub of response.data.data) {
+          const id = String(sub?._id || '');
+          if (!id || seen.has(id)) continue;
+          seen.add(id);
+          merged.push(sub);
+        }
       }
+      setSubStatuses(merged);
     } catch (error) {
-      console.error('Error fetching roles:', error);
+      console.error('Error fetching sub statuses:', error);
       alert('Failed to fetch SubStatus');
     }
   };
@@ -6518,7 +6729,7 @@ const B2BSales = () => {
                       onChange={handleConcernPersonChange}
                     >
                       <option value="">Select Counselor</option>
-                      {users.map((counselor, index) => (
+                      {accessibleCounsellors.map((counselor, index) => (
                         <option key={index} value={counselor._id}>{counselor.name}</option>))}
                     </select>
                   </div>
@@ -10329,10 +10540,10 @@ const renderWhatsAppPanel = () => {
           !isMobile && showPanel && (
             <div className="col-4" style={{
               position: 'fixed',
-              top: `${navHeight + 10}px`,
+              top: `${navTop}px`,
               right: '0',
               width: `${panelWidthPx}px`,
-              maxHeight: `calc(100vh - ${navHeight + 15}px)`,
+              maxHeight: `calc(100vh - ${navTop}px)`,
               overflowY: 'auto',
               backgroundColor: 'white',
               zIndex: 1000,
@@ -10582,7 +10793,7 @@ const renderWhatsAppPanel = () => {
                     <MultiSelectCheckbox
                       title="Lead Owner"
                       icon="fas fa-user"
-                      options={(users || []).map((u) => ({ value: u._id, label: u.name || u.email || 'User' }))}
+                      options={(accessibleCounsellors || []).map((u) => ({ value: u._id, label: u.name || u.email || 'User' }))}
                       selectedValues={filters.leadOwner || []}
                       onChange={(vals) => handleFilterChange('leadOwner', vals)}
                       isOpen={openModalId === 'leadOwner'}
@@ -11124,7 +11335,7 @@ const renderWhatsAppPanel = () => {
                         onChange={handleLeadInputChange}
                       >
                         <option value="">Select B2B Department</option>
-                        {allB2bDepartments.map((dept) => (
+                        {accessibleB2bDepartments.map((dept) => (
                           <option key={dept._id} value={dept._id}>
                             {dept.name}
                           </option>
@@ -11424,12 +11635,12 @@ const renderWhatsAppPanel = () => {
                       >
                         <option value="">Select Lead Owner</option>
                         {userData?._id &&
-                          !users?.some((u) => String(u?._id) === String(userData._id)) && (
+                          !getCounsellorsForDepartment(leadFormData.b2bDepartment)?.some((u) => String(u?._id) === String(userData._id)) && (
                             <option key={`me-${userData._id}`} value={String(userData._id)}>
                               {userData.name || 'Me'}
                             </option>
                           )}
-                        {users?.map(user => (
+                        {getCounsellorsForDepartment(leadFormData.b2bDepartment)?.map(user => (
                           <option key={user?._id} value={user?._id}>
                             {user?.name}
                           </option>
@@ -11448,19 +11659,28 @@ const renderWhatsAppPanel = () => {
                         name="leadCoOwner"
                         value={leadFormData.leadCoOwner}
                         onChange={handleLeadInputChange}
+                        disabled={!leadFormData.b2bDepartment || !leadFormData.b2bProject}
                       >
-                        <option value="">Select Co-owner</option>
-                        {userData?._id &&
-                          !users?.some((u) => String(u?._id) === String(userData._id)) && (
-                            <option key={`co-me-${userData._id}`} value={String(userData._id)}>
-                              {userData.name || 'Me'}
-                            </option>
-                          )}
-                        {users?.map(user => (
-                          <option key={`co-${user?._id}`} value={user?._id}>
-                            {user?.name}
-                          </option>
-                        ))}
+                        <option value="">
+                          {!leadFormData.b2bDepartment || !leadFormData.b2bProject
+                            ? 'Select department and project first'
+                            : 'Select Co-owner'}
+                        </option>
+                        {leadFormData.b2bDepartment && leadFormData.b2bProject && (
+                          <>
+                            {userData?._id &&
+                              !getCounsellorsForDepartment(leadFormData.b2bDepartment, leadFormData.b2bProject)?.some((u) => String(u?._id) === String(userData._id)) && (
+                                <option key={`co-me-${userData._id}`} value={String(userData._id)}>
+                                  {userData.name || 'Me'}
+                                </option>
+                              )}
+                            {getCounsellorsForDepartment(leadFormData.b2bDepartment, leadFormData.b2bProject)?.map(user => (
+                              <option key={`co-${user?._id}`} value={user?._id}>
+                                {user?.name}
+                              </option>
+                            ))}
+                          </>
+                        )}
                       </select>
                     </div>
 
@@ -11696,7 +11916,7 @@ const renderWhatsAppPanel = () => {
                       disabled={bulkUploadLoading}
                     >
                       <option value="">Select B2B Department</option>
-                      {allB2bDepartments.map((dept) => (
+                      {accessibleB2bDepartments.map((dept) => (
                         <option key={dept._id} value={dept._id}>{dept.name}</option>
                       ))}
                     </select>
@@ -11834,12 +12054,12 @@ const renderWhatsAppPanel = () => {
                     >
                       <option value="">Select Counsellor</option>
                       {userData?._id &&
-                        !users?.some((u) => String(u?._id) === String(userData._id)) && (
+                        !getCounsellorsForDepartment(bulkUploadFormData.b2bDepartment)?.some((u) => String(u?._id) === String(userData._id)) && (
                           <option key={`bulk-me-${userData._id}`} value={String(userData._id)}>
                             {userData.name || 'Me'}
                           </option>
                         )}
-                      {users?.map((user) => (
+                      {getCounsellorsForDepartment(bulkUploadFormData.b2bDepartment)?.map((user) => (
                         <option key={user?._id} value={user?._id}>
                           {user?.name}
                         </option>
@@ -11856,20 +12076,28 @@ const renderWhatsAppPanel = () => {
                       name="leadCoOwner"
                       value={bulkUploadFormData.leadCoOwner}
                       onChange={handleBulkUploadInputChange}
-                      disabled={bulkUploadLoading}
+                      disabled={bulkUploadLoading || !bulkUploadFormData.b2bDepartment || !bulkUploadFormData.b2bProject}
                     >
-                      <option value="">Select Co-owner</option>
-                      {userData?._id &&
-                        !users?.some((u) => String(u?._id) === String(userData._id)) && (
-                          <option key={`bulk-co-me-${userData._id}`} value={String(userData._id)}>
-                            {userData.name || 'Me'}
-                          </option>
-                        )}
-                      {users?.map((user) => (
-                        <option key={`bulk-co-${user?._id}`} value={user?._id}>
-                          {user?.name}
-                        </option>
-                      ))}
+                      <option value="">
+                        {!bulkUploadFormData.b2bDepartment || !bulkUploadFormData.b2bProject
+                          ? 'Select department and project first'
+                          : 'Select Co-owner'}
+                      </option>
+                      {bulkUploadFormData.b2bDepartment && bulkUploadFormData.b2bProject && (
+                        <>
+                          {userData?._id &&
+                            !getCounsellorsForDepartment(bulkUploadFormData.b2bDepartment, bulkUploadFormData.b2bProject)?.some((u) => String(u?._id) === String(userData._id)) && (
+                              <option key={`bulk-co-me-${userData._id}`} value={String(userData._id)}>
+                                {userData.name || 'Me'}
+                              </option>
+                            )}
+                          {getCounsellorsForDepartment(bulkUploadFormData.b2bDepartment, bulkUploadFormData.b2bProject)?.map((user) => (
+                            <option key={`bulk-co-${user?._id}`} value={user?._id}>
+                              {user?.name}
+                            </option>
+                          ))}
+                        </>
+                      )}
                     </select>
                   </div>
                   <div className="col-md-6">
@@ -15472,7 +15700,7 @@ position: absolute;
                     disabled={crossSaleLoading}
                   >
                     <option value="">Select Department</option>
-                    {allB2bDepartments.map((dept) => (
+                    {accessibleB2bDepartments.map((dept) => (
                       <option key={dept._id} value={dept._id}>{dept.name}</option>
                     ))}
                   </select>
@@ -15522,12 +15750,12 @@ position: absolute;
                   >
                     <option value="">Select Counsellor</option>
                     {userData?._id &&
-                      !(users || []).some((u) => String(u?._id) === String(userData._id)) && (
+                      !getCounsellorsForDepartment(crossSaleForm.b2bDepartment)?.some((u) => String(u?._id) === String(userData._id)) && (
                         <option value={String(userData._id)}>
                           {userData.name || 'Me'}
                         </option>
                       )}
-                    {(users || []).map((user) => (
+                    {getCounsellorsForDepartment(crossSaleForm.b2bDepartment)?.map((user) => (
                       <option key={user._id} value={user._id}>
                         {user.name || user.email || 'User'}
                       </option>
