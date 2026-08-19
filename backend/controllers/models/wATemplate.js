@@ -32,6 +32,13 @@ const WhatsAppTemplateSchema = new mongoose.Schema({
 		default: null,
 		index: true
 	},
+	// B2C vertical this template belongs to (mutually exclusive with b2bDepartment)
+	vertical: {
+		type: mongoose.Schema.Types.ObjectId,
+		ref: 'Vertical',
+		default: null,
+		index: true
+	},
 	status: {
 		type: String,
 		enum: ['PENDING', 'APPROVED', 'REJECTED', 'PAUSED'],
@@ -95,6 +102,7 @@ const WhatsAppTemplateSchema = new mongoose.Schema({
 // Index for faster lookups
 WhatsAppTemplateSchema.index({ collegeId: 1, templateName: 1 });
 WhatsAppTemplateSchema.index({ collegeId: 1, b2bDepartment: 1 });
+WhatsAppTemplateSchema.index({ collegeId: 1, vertical: 1 });
 
 module.exports = mongoose.model('WhatsAppTemplate', WhatsAppTemplateSchema);
 
