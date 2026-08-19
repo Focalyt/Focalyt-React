@@ -400,6 +400,7 @@ const MultiSelectCheckbox = ({
 const useNavHeight = (dependencies = []) => {
   const navRef = useRef(null);
   const [navHeight, setNavHeight] = useState(50); // Default fallback
+  const [navTop, setNavTop] = useState(0);
   const widthRef = useRef(null);
   const [width, setWidth] = useState(0);
   const [leftOffset, setLeftOffset] = useState(0);
@@ -407,7 +408,9 @@ const useNavHeight = (dependencies = []) => {
   const calculateHeight = useCallback(() => {
     if (navRef.current) {
       const height = navRef.current.offsetHeight;
+      const top = navRef.current.getBoundingClientRect().top;
       setNavHeight(height);
+      setNavTop(Math.max(0, Math.round(top)));
     }
   }, []);
 
@@ -459,7 +462,7 @@ const useNavHeight = (dependencies = []) => {
     setTimeout(calculateWidth, 50);
   }, dependencies);
 
-  return { navRef, navHeight, calculateHeight, width, leftOffset };
+  return { navRef, navHeight, navTop, calculateHeight, width, leftOffset };
 };
 const useMainWidth = (dependencies = []) => {// Default fallback
   const widthRef = useRef(null);
@@ -4386,7 +4389,7 @@ const B2BSales = () => {
 
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
 
-  const { navRef, navHeight } = useNavHeight([isFilterCollapsed, crmFilters]);
+  const { navRef, navHeight, navTop } = useNavHeight([isFilterCollapsed, crmFilters]);
   const { widthRef, width, leftOffset } = useMainWidth([isFilterCollapsed, crmFilters, mainContentClass]);
   const { isScrolled, scrollY, contentRef } = useScrollBlur(navHeight);
   const blurIntensity = Math.min(scrollY / 10, 15);
@@ -10509,10 +10512,10 @@ const renderWhatsAppPanel = () => {
           !isMobile && showPanel && (
             <div className="col-4" style={{
               position: 'fixed',
-              top: `${navHeight + 10}px`,
+              top: `${navTop}px`,
               right: '0',
               width: `${panelWidthPx}px`,
-              maxHeight: `calc(100vh - ${navHeight + 15}px)`,
+              maxHeight: `calc(100vh - ${navTop}px)`,
               overflowY: 'auto',
               backgroundColor: 'white',
               zIndex: 1000,
