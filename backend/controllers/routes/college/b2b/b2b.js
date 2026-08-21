@@ -88,6 +88,30 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 	const isReferredByMeQuery = (value) =>
 		value === true || value === 'true' || value === '1';
 
+	const isNoFollowupTabQuery = (value) =>
+		value === true || value === 'true' || value === '1';
+
+	const FOLLOWUP_HISTORY_LOG_RE = /follow-?up|status changed/i;
+
+	/** Exclude leads that already had a follow-up or status-change (same as red-card history). */
+	const getNoFollowupHistoryExclusion = async () => {
+		const historyLeadIds = (await FollowUp.distinct('leadId')).filter(
+			(id) => id && mongoose.Types.ObjectId.isValid(String(id))
+		);
+		const conditions = [
+			{
+				$nor: [
+					{ 'logs.action': { $regex: FOLLOWUP_HISTORY_LOG_RE } },
+					{ 'logs.remarks': { $regex: FOLLOWUP_HISTORY_LOG_RE } }
+				]
+			}
+		];
+		if (historyLeadIds.length) {
+			conditions.push({ _id: { $nin: historyLeadIds } });
+		}
+		return conditions;
+	};
+
 	const getReferredByMeFilter = (userId) => ({
 		logs: {
 			$elemMatch: {
@@ -2161,7 +2185,8 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 			followUpVisitBucket,
 			documentsStatusIn,
 			approvalStatus,
-			referredByMe
+			referredByMe,
+			noFollowupTab
 		} = req.query;
 
 		const referredByMeActive = isReferredByMeQuery(referredByMe);
@@ -2332,6 +2357,10 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 					{ followUpVisit: null }
 				]
 			});
+		}
+
+		if (isNoFollowupTabQuery(noFollowupTab)) {
+			filterConditions.push(...(await getNoFollowupHistoryExclusion()));
 		}
 
 		// Documents status filter (done/pending)
@@ -3053,7 +3082,8 @@ router.get('/leads', isCollege, async (req, res) => {
 			documentsStatusIn,
 			approvalStatus,
 			referredByMe,
-			isDuplicateMobile
+			isDuplicateMobile,
+			noFollowupTab
 		} = req.query;
 
 		const referredByMeActive = isReferredByMeQuery(referredByMe);
@@ -3199,6 +3229,7 @@ router.get('/leads', isCollege, async (req, res) => {
 				: String(hasFollowUpVisit).toLowerCase() === 'false'
 					? [{ $or: [{ followUpVisit: { $exists: false } }, { followUpVisit: null }] }]
 					: []),
+			...(isNoFollowupTabQuery(noFollowupTab) ? await getNoFollowupHistoryExclusion() : []),
 		]
 	};
 
@@ -4571,6 +4602,10 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 
 		let savedFollowUp = null;
 		let scheduledDateTime = null;
+		if(statusChanged){
+			await completeCurrentFollowupForType(lead, 'Call', { mode: 'done' });
+			await completeCurrentFollowupForType(lead, 'Visit', { mode: 'done' });	
+		}
 		if (followUpDate && followUpTime) {
 			const [hours, minutes] = String(followUpTime).split(':');
 			scheduledDateTime = /^\d{4}-\d{2}-\d{2}$/.test(String(followUpDate))
