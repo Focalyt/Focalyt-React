@@ -10,6 +10,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/googleOAuth';
 
 import CandidateProfile from '../CandidateProfile/CandidateProfile';
+import { useWhatsAppContext } from '../../../../contexts/WhatsAppContext';
 
 
 // Google Maps API styles
@@ -550,6 +551,8 @@ const WhatsApp = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const [userData, setUserData] = useState(JSON.parse(sessionStorage.getItem("user") || "{}"));
   const token = userData.token;
+  const whatsAppContext = useWhatsAppContext();
+  const onWhatsappMessage = whatsAppContext?.onMessage || null;
   // const permissions = userData.permissions
   const [permissions, setPermissions] = useState();
   const canEditLeadsB2B =
@@ -882,6 +885,9 @@ const WhatsApp = () => {
   const [showPanel, setShowPanel] = useState('')
   const showPanelRef = useRef('');
   showPanelRef.current = showPanel;
+  const selectedProfileRef = useRef(null);
+  selectedProfileRef.current = selectedProfile;
+  const processedInboxMessageIds = useRef(new Set());
 
   // Mobile "More actions" modal (per lead)
   const [mobileMoreLead, setMobileMoreLead] = useState(null);
@@ -4154,6 +4160,10 @@ const WhatsApp = () => {
   const [isLoadingChatHistory, setIsLoadingChatHistory] = useState(false);
   const [chatListSearch, setChatListSearch] = useState('');
   const [chatListFilter, setChatListFilter] = useState('all'); // all | unread | favourites | groups
+  const [chatConversations, setChatConversations] = useState([]);
+  const [loadingConversations, setLoadingConversations] = useState(false);
+  const [conversationPage, setConversationPage] = useState(1);
+  const [conversationTotalPages, setConversationTotalPages] = useState(1);
   const [sessionWindow, setSessionWindow] = useState({
     isOpen: false,
     openedAt: null,
@@ -4877,6 +4887,26 @@ const WhatsApp = () => {
     return raw.replace(/\D/g, '') || raw;
   };
 
+  const normalizeChatPhone = (raw) => {
+    const digits = String(raw || '').replace(/\D/g, '');
+    return digits.length >= 10 ? digits.slice(-10) : digits;
+  };
+
+  const formatChatPreview = (message) => {
+    if (!message) return '';
+    const type = String(message.messageType || message.type || '').toLowerCase();
+    const text = String(message.text || message.message || message.rawText || '').trim();
+    if (type === 'image') return 'Photo';
+    if (type === 'video') return 'Video';
+    if (type === 'audio' || type === 'voice') return 'Voice message';
+    if (type === 'document') return 'Document';
+    if (type === 'sticker') return 'Sticker';
+    if (type === 'location') return 'Location';
+    if (type === 'contacts') return 'Contact';
+    if (type === 'template') return text || 'Template message';
+    return text || 'Message';
+  };
+
   const getLeadContactName = (lead) =>
     lead?.concernPersonName || lead?.businessName || 'Lead';
 
@@ -5158,6 +5188,142 @@ const WhatsApp = () => {
     }
   };
 
+  const profileFromConversation = (conversation) => {
+    if (conversation?.lead?._id) return conversation.lead;
+    const phone = conversation?.phone || '';
+    return {
+      _id: conversation?.lead?._id || `phone_${phone}`,
+      mobile: conversation?.lead?.mobile || phone,
+      whatsapp: conversation?.lead?.whatsapp || phone,
+      concernPersonName: conversation?.lead?.concernPersonName || phone,
+      businessName: conversation?.lead?.businessName || ''
+    };
+  };
+
+  const upsertChatToTop = useCallback((incoming) => {
+    const phone = normalizeChatPhone(incoming?.phone);
+    if (!phone) return;
+    setChatConversations((prev) => {
+      const existing = (prev || []).find((item) => normalizeChatPhone(item.phone) === phone);
+      let unreadCount = incoming.unreadCount;
+      if (unreadCount == null) {
+        if (incoming.incrementUnread) unreadCount = (existing?.unreadCount || 0) + 1;
+        else unreadCount = existing?.unreadCount || 0;
+      }
+      const nextItem = {
+        phone,
+        unreadCount,
+        lastMessageAt: incoming.lastMessageAt || incoming.lastMessage?.sentAt || new Date().toISOString(),
+        lastMessage: incoming.lastMessage || existing?.lastMessage || null,
+        lead: incoming.lead || existing?.lead || null
+      };
+      const rest = (prev || []).filter((item) => normalizeChatPhone(item.phone) !== phone);
+      return [nextItem, ...rest];
+    });
+  }, []);
+
+  const fetchWhatsappConversations = useCallback(async (page = 1, search = '', silent = false) => {
+    if (!token) return;
+    try {
+      if (!silent) setLoadingConversations(true);
+      const response = await axios.get(`${backendUrl}/college/whatsapp/conversations`, {
+        headers: { 'x-auth': token },
+        params: {
+          page,
+          limit: 80,
+          search: search || undefined
+        }
+      });
+      if (response.data?.success) {
+        setChatConversations(response.data.data || []);
+        setConversationPage(response.data.pagination?.currentPage || page);
+        setConversationTotalPages(response.data.pagination?.totalPages || 1);
+      }
+    } catch (error) {
+      console.error('Failed to fetch WhatsApp conversations:', error.response?.data || error.message);
+    } finally {
+      if (!silent) setLoadingConversations(false);
+    }
+  }, [backendUrl, token]);
+
+  const markWhatsappConversationRead = async (phone) => {
+    const phoneKey = normalizeChatPhone(phone);
+    if (!phoneKey || !token) return;
+    setChatConversations((prev) =>
+      (prev || []).map((item) =>
+        normalizeChatPhone(item.phone) === phoneKey ? { ...item, unreadCount: 0 } : item
+      )
+    );
+    try {
+      await axios.put(`${backendUrl}/college/whatsapp/mark-read/${phoneKey}`, {}, {
+        headers: { 'x-auth': token }
+      });
+    } catch (error) {
+      console.error('Failed to mark WhatsApp conversation read:', error.response?.data || error.message);
+    }
+  };
+
+  const handleInboxIncomingMessage = useCallback((data) => {
+    if (!data) return;
+    const messageId = data.whatsappMessageId || data.messageId || data.id || `${data.from}-${data.sentAt || Date.now()}`;
+    if (processedInboxMessageIds.current.has(messageId)) return;
+    processedInboxMessageIds.current.add(messageId);
+
+    const phone = normalizeChatPhone(data.from);
+    if (!phone) return;
+
+    const currentLead = selectedProfileRef.current;
+    const currentPhone = normalizeChatPhone(getLeadWhatsappPhone(currentLead));
+    const isOpenChat = showPanelRef.current === 'Whatsapp' && currentPhone && currentPhone === phone;
+    const previewText = formatChatPreview({
+      text: data.message,
+      messageType: data.messageType
+    });
+
+    upsertChatToTop({
+      phone,
+      unreadCount: isOpenChat ? 0 : undefined,
+      incrementUnread: !isOpenChat,
+      lastMessageAt: data.sentAt || new Date().toISOString(),
+      lastMessage: {
+        text: previewText,
+        direction: 'incoming',
+        messageType: data.messageType || 'text',
+        sentAt: data.sentAt || new Date().toISOString(),
+        status: 'received'
+      },
+      lead: currentLead && currentPhone === phone ? currentLead : null
+    });
+
+    if (isOpenChat) {
+      setWhatsappMessages((prev) => {
+        const exists = (prev || []).some((msg) =>
+          msg.id === messageId || msg.whatsappMessageId === messageId || msg.wamid === messageId
+        );
+        if (exists) return prev;
+        return [
+          ...(prev || []),
+          {
+            id: messageId,
+            wamid: data.whatsappMessageId || data.messageId,
+            whatsappMessageId: data.whatsappMessageId || data.messageId,
+            text: data.message,
+            sender: 'user',
+            time: new Date(data.sentAt || Date.now()).toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit'
+            }),
+            type: data.messageType || 'text',
+            mediaUrl: data.mediaUrl,
+            status: 'received'
+          }
+        ];
+      });
+      markWhatsappConversationRead(phone);
+      if (currentPhone) checkSessionWindow(currentPhone);
+    }
+  }, [upsertChatToTop]);
+
   const openWhatsappPanel = async (profile = null) => {
     const lead = profile || selectedProfile;
     if (!lead) {
@@ -5188,6 +5354,7 @@ const WhatsApp = () => {
 
     await fetchWhatsappHistory(phone);
     await checkSessionWindow(phone);
+    await markWhatsappConversationRead(phone);
   };
 
   const handleWhatsappSendMessage = async () => {
@@ -5250,6 +5417,19 @@ const WhatsApp = () => {
               : msg
           )
         );
+        upsertChatToTop({
+          phone,
+          unreadCount: 0,
+          lastMessageAt: new Date().toISOString(),
+          lastMessage: {
+            text: messageText,
+            direction: 'outgoing',
+            messageType: 'text',
+            sentAt: new Date().toISOString(),
+            status: 'sent'
+          },
+          lead: selectedProfile
+        });
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -5346,6 +5526,19 @@ const WhatsApp = () => {
               : msg
           )
         );
+        upsertChatToTop({
+          phone,
+          unreadCount: 0,
+          lastMessageAt: new Date().toISOString(),
+          lastMessage: {
+            text: file.name,
+            direction: 'outgoing',
+            messageType: fileType,
+            sentAt: new Date().toISOString(),
+            status: 'sent'
+          },
+          lead: selectedProfile
+        });
       }
     } catch (error) {
       console.error(`Error sending ${fileType}:`, error);
@@ -5473,6 +5666,19 @@ const WhatsApp = () => {
         setWhatsappMessages(prev => [...prev, templateMessage]);
         setSelectedWhatsappTemplate(null);
         setHasActiveSession(true);
+        upsertChatToTop({
+          phone,
+          unreadCount: 0,
+          lastMessageAt: new Date().toISOString(),
+          lastMessage: {
+            text: filledMessage || selectedWhatsappTemplate.name,
+            direction: 'outgoing',
+            messageType: 'template',
+            sentAt: new Date().toISOString(),
+            status: 'sent'
+          },
+          lead: selectedProfile
+        });
       } else {
         throw new Error(response.data.message || 'Failed to send template');
       }
@@ -5540,6 +5746,31 @@ const WhatsApp = () => {
       whatsappMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [showPanel, whatsappMessages, selectedWhatsappTemplate]);
+
+  useEffect(() => {
+    fetchWhatsappConversations(1, '');
+  }, [fetchWhatsappConversations]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchWhatsappConversations(conversationPage, chatListSearch, true);
+      }
+    }, 12000);
+    return () => clearInterval(timer);
+  }, [fetchWhatsappConversations, conversationPage, chatListSearch]);
+
+  useEffect(() => {
+    if (!onWhatsappMessage) return undefined;
+    const unsubscribe = onWhatsappMessage((message) => {
+      if (message && (message.direction === 'incoming' || message.from)) {
+        handleInboxIncomingMessage(message);
+      }
+    });
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [onWhatsappMessage, handleInboxIncomingMessage]);
 
   const openEditPanel = async (profile = null, panel, followUpType = null) => {
     // Check permission before opening panel
@@ -6958,7 +7189,7 @@ const renderWhatsAppPanel = () => {
                                                 fontWeight: '500'
                                               }}
                                             >
-                                              {btn.type === 'QUICK_REPLY' && 'Ã¢â€ Â©Ã¯Â¸Â '}
+                                              {btn.type === 'QUICK_REPLY' && ' '}
                                               {btn.text}
                                             </div>
                                           ))}
@@ -7185,9 +7416,9 @@ const renderWhatsAppPanel = () => {
                                     cursor: 'default'
                                   }}
                                 >
-                                  {button.type === 'QUICK_REPLY' && 'Ã¢â€ Â©Ã¯Â¸Â '}
-                                  {button.type === 'URL' && 'Ã°Å¸â€N/A '}
-                                  {button.type === 'PHONE_NUMBER' && 'Ã°Å¸â€œÅ¾ '}
+                                  {button.type === 'QUICK_REPLY' && ' '}
+                                  {button.type === 'URL' && ' '}
+                                  {button.type === 'PHONE_NUMBER' && ' '}
                                   {button.text}
                                 </div>
                               ))}
@@ -7772,20 +8003,25 @@ const renderWhatsAppPanel = () => {
     return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
-  const filteredChatLeads = (leads || []).filter((lead) => {
+  const filteredChatConversations = (chatConversations || []).filter((conv) => {
     const q = String(chatListSearch || '').trim().toLowerCase();
+    const lead = conv?.lead;
+    const phone = String(conv?.phone || '');
     if (q) {
       const name = String(getLeadContactName(lead) || '').toLowerCase();
       const biz = String(lead?.businessName || '').toLowerCase();
-      const phone = String(getLeadWhatsappPhone(lead) || '');
+      const preview = String(conv?.lastMessage?.text || '').toLowerCase();
       const qDigits = q.replace(/\D/g, '');
-      if (!(name.includes(q) || biz.includes(q) || (qDigits && phone.includes(qDigits)))) return false;
+      if (!(name.includes(q) || biz.includes(q) || preview.includes(q) || (qDigits && phone.includes(qDigits)))) {
+        return false;
+      }
     }
-    if (chatListFilter === 'unread') return Boolean(lead?.hasUnreadWhatsapp || lead?.whatsappUnread);
+    if (chatListFilter === 'unread') return Number(conv?.unreadCount || 0) > 0;
     if (chatListFilter === 'favourites') return Boolean(lead?.isFavourite || lead?.favourite);
     if (chatListFilter === 'groups') return Boolean(lead?.isGroup);
     return true;
   });
+  const unreadChatCount = (chatConversations || []).reduce((sum, conv) => sum + (Number(conv?.unreadCount || 0) > 0 ? 1 : 0), 0);
 
   const filterChips = [
     { id: 'all', label: 'All' },
@@ -7802,8 +8038,8 @@ const renderWhatsAppPanel = () => {
           <aside className="wa-nav-rail">
             <button type="button" className="wa-nav-btn wa-nav-btn--active" title="Chats">
               <i className="fas fa-comment-dots" />
-              {(totalLeads || 0) > 0 && (
-                <span className="wa-nav-badge">{Math.min(totalLeads, 99)}</span>
+              {(unreadChatCount || 0) > 0 && (
+                <span className="wa-nav-badge">{Math.min(unreadChatCount, 99)}</span>
               )}
             </button>
           </aside>
@@ -7821,9 +8057,9 @@ const renderWhatsAppPanel = () => {
                 type="button"
                 className="wa-icon-btn"
                 title="Refresh chats"
-                onClick={() => fetchLeads(selectedStatusFilter, currentPage, getLeadFetchOverrides())}
+                onClick={() => fetchWhatsappConversations(conversationPage, chatListSearch)}
               >
-                <i className={'fas fa-sync-alt' + (loadingLeads ? ' fa-spin' : '')} />
+                <i className={'fas fa-sync-alt' + (loadingConversations ? ' fa-spin' : '')} />
               </button>
               <button type="button" className="wa-icon-btn" title="New chat" disabled>
                 <i className="fas fa-edit" />
@@ -7844,9 +8080,7 @@ const renderWhatsAppPanel = () => {
               onChange={(e) => setChatListSearch(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
-                  const q = chatListSearch.trim();
-                  setFilters((prev) => ({ ...prev, search: q }));
-                  fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides({ search: q }));
+                  fetchWhatsappConversations(1, chatListSearch.trim());
                 }
               }}
             />
@@ -7856,8 +8090,7 @@ const renderWhatsAppPanel = () => {
                 className="wa-search-clear"
                 onClick={() => {
                   setChatListSearch('');
-                  setFilters((prev) => ({ ...prev, search: '' }));
-                  fetchLeads(selectedStatusFilter, 1, getLeadFetchOverrides({ search: '' }));
+                  fetchWhatsappConversations(1, '');
                 }}
               >
                 <i className="fas fa-times" />
@@ -7882,14 +8115,14 @@ const renderWhatsAppPanel = () => {
           </div>
 
           <div className="wa-chat-scroll">
-            {loadingLeads && !filteredChatLeads.length ? (
+            {loadingConversations && !filteredChatConversations.length ? (
               <div className="wa-empty-list">
                 <div className="spinner-border text-success mb-2" role="status" />
                 <div>Loading chats...</div>
               </div>
             ) : null}
 
-            {!loadingLeads && !filteredChatLeads.length ? (
+            {!loadingConversations && !filteredChatConversations.length ? (
               <div className="wa-empty-list">
                 <i className="fab fa-whatsapp" />
                 <div className="fw-semibold">No chats found</div>
@@ -7897,21 +8130,19 @@ const renderWhatsAppPanel = () => {
               </div>
             ) : null}
 
-            {filteredChatLeads.map((lead) => {
-              const isActive = String(selectedProfile?._id) === String(lead._id) && showPanel === 'Whatsapp';
-              const phone = getLeadWhatsappPhone(lead);
-              const name = getLeadContactName(lead);
-              const preview =
-                lead?.businessName && lead.businessName !== name
-                  ? lead.businessName
-                  : phone
-                    ? `+91 ${phone.slice(-10)}`
-                    : 'No number';
+            {filteredChatConversations.map((conv) => {
+              const lead = profileFromConversation(conv);
+              const phone = conv.phone || getLeadWhatsappPhone(lead);
+              const name = getLeadContactName(lead) || phone;
+              const isIncoming = conv.lastMessage?.direction === 'incoming';
+              const isUnread = Number(conv.unreadCount || 0) > 0;
+              const isActive = showPanel === 'Whatsapp' && normalizeChatPhone(getLeadWhatsappPhone(selectedProfile)) === normalizeChatPhone(phone);
+              const preview = formatChatPreview(conv.lastMessage) || (phone ? `+91 ${String(phone).slice(-10)}` : 'No messages yet');
               return (
                 <button
-                  key={lead._id}
+                  key={phone || lead._id}
                   type="button"
-                  className={'wa-chat-item' + (isActive ? ' is-active' : '')}
+                  className={'wa-chat-item' + (isActive ? ' is-active' : '') + (isUnread ? ' is-unread' : '')}
                   onClick={() => openWhatsappPanel(lead)}
                 >
                   <div
@@ -7923,13 +8154,26 @@ const renderWhatsAppPanel = () => {
                   <div className="wa-chat-item__body">
                     <div className="wa-chat-item__top">
                       <span className="wa-chat-item__name">{name}</span>
-                      <span className="wa-chat-item__time">{formatChatListTime(lead?.updatedAt || lead?.createdAt)}</span>
+                      <span className={'wa-chat-item__time' + (isUnread ? ' is-unread' : '')}>
+                        {formatChatListTime(conv.lastMessageAt || conv.lastMessage?.sentAt)}
+                      </span>
                     </div>
                     <div className="wa-chat-item__bottom">
-                      <span className="wa-chat-item__preview">
-                        <i className="fas fa-check-double me-1" style={{ color: '#53bdeb', fontSize: 11 }} />
+                      <span className={'wa-chat-item__preview' + (isUnread ? ' is-unread' : '')}>
+                        {!isIncoming && (
+                          <i
+                            className="fas fa-check-double me-1"
+                            style={{
+                              color: conv.lastMessage?.status === 'read' ? '#53bdeb' : '#8696a0',
+                              fontSize: 11
+                            }}
+                          />
+                        )}
                         {preview}
                       </span>
+                      {isUnread ? (
+                        <span className="wa-unread-badge">{conv.unreadCount > 99 ? '99+' : conv.unreadCount}</span>
+                      ) : null}
                     </div>
                   </div>
                 </button>
@@ -7937,20 +8181,20 @@ const renderWhatsAppPanel = () => {
             })}
           </div>
 
-          {totalPages > 1 ? (
+          {conversationTotalPages > 1 ? (
             <div className="wa-pager">
               <button
                 type="button"
-                disabled={currentPage <= 1 || loadingLeads}
-                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={conversationPage <= 1 || loadingConversations}
+                onClick={() => fetchWhatsappConversations(conversationPage - 1, chatListSearch)}
               >
                 <i className="fas fa-chevron-left" />
               </button>
-              <span>{currentPage} / {totalPages}</span>
+              <span>{conversationPage} / {conversationTotalPages}</span>
               <button
                 type="button"
-                disabled={currentPage >= totalPages || loadingLeads}
-                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={conversationPage >= conversationTotalPages || loadingConversations}
+                onClick={() => fetchWhatsappConversations(conversationPage + 1, chatListSearch)}
               >
                 <i className="fas fa-chevron-right" />
               </button>
@@ -7981,9 +8225,9 @@ const renderWhatsAppPanel = () => {
                   type="button"
                   className="wa-welcome-btn"
                   onClick={() => {
-                    if (filteredChatLeads[0]) openWhatsappPanel(filteredChatLeads[0]);
+                    if (filteredChatConversations[0]) openWhatsappPanel(profileFromConversation(filteredChatConversations[0]));
                   }}
-                  disabled={!filteredChatLeads.length}
+                  disabled={!filteredChatConversations.length}
                 >
                   Start chatting
                 </button>
@@ -8217,7 +8461,9 @@ const renderWhatsAppPanel = () => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.wa-chat-item.is-unread .wa-chat-item__name { font-weight: 700; }
 .wa-chat-item__time { font-size: 12px; color: #667781; flex-shrink: 0; }
+.wa-chat-item__time.is-unread { color: #25d366; font-weight: 600; }
 .wa-chat-item__preview {
   font-size: 13px;
   color: #667781;
@@ -8225,6 +8471,21 @@ const renderWhatsAppPanel = () => {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
+}
+.wa-chat-item__preview.is-unread { color: #111b21; font-weight: 600; }
+.wa-unread-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #25d366;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 .wa-pager {
   display: flex;

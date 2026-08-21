@@ -10908,7 +10908,7 @@ useEffect(() => {
                                                   fontWeight: '500'
                                                 }}
                                               >
-                                                {btn.type === 'QUICK_REPLY' && 'Ã¢â€ Â©Ã¯Â¸Â '}
+                                                {btn.type === 'QUICK_REPLY' && ' '}
                                                 {btn.text}
                                               </div>
                                             ))}
@@ -11135,9 +11135,9 @@ useEffect(() => {
                                       cursor: 'default'
                                     }}
                                   >
-                                    {button.type === 'QUICK_REPLY' && 'Ã¢â€ Â©Ã¯Â¸Â '}
-                                    {button.type === 'URL' && 'Ã°Å¸â€N/A '}
-                                    {button.type === 'PHONE_NUMBER' && 'Ã°Å¸â€œÅ¾ '}
+                                    {button.type === 'QUICK_REPLY' && ' '}
+                                    {button.type === 'URL' && ' '}
+                                    {button.type === 'PHONE_NUMBER' && ' '}
                                     {button.text}
                                   </div>
                                 ))}
@@ -12134,7 +12134,7 @@ useEffect(() => {
   //                                                 fontWeight: '500'
   //                                               }}
   //                                             >
-  //                                               {btn.type === 'QUICK_REPLY' && 'Ã¢â€ Â©Ã¯Â¸Â '}
+  //                                               {btn.type === 'QUICK_REPLY' && ' '}
   //                                               {btn.text}
   //                                             </div>
   //                                           ))}
@@ -12361,9 +12361,9 @@ useEffect(() => {
   //                                     cursor: 'default'
   //                                   }}
   //                                 >
-  //                                   {button.type === 'QUICK_REPLY' && 'Ã¢â€ Â©Ã¯Â¸Â '}
-  //                                   {button.type === 'URL' && 'Ã°Å¸â€N/A '}
-  //                                   {button.type === 'PHONE_NUMBER' && 'Ã°Å¸â€œÅ¾ '}
+  //                                   {button.type === 'QUICK_REPLY' && ''}
+  //                                   {button.type === 'URL' && ' '}
+  //                                   {button.type === 'PHONE_NUMBER' && ' '}
   //                                   {button.text}
   //                                 </div>
   //                               ))}

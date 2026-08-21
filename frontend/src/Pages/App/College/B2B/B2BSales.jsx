@@ -7312,7 +7312,7 @@ const renderWhatsAppPanel = () => {
                                                 fontWeight: '500'
                                               }}
                                             >
-                                              {btn.type === 'QUICK_REPLY' && 'Ã¢â€ Â©Ã¯Â¸Â '}
+                                              {btn.type === 'QUICK_REPLY' && ' '}
                                               {btn.text}
                                             </div>
                                           ))}
@@ -7360,7 +7360,7 @@ const renderWhatsAppPanel = () => {
                                 backgroundColor: '#e9ecef',
                                 fontSize: '64px'
                               }}>
-                                Ã°Å¸â€“Â¼Ã¯Â¸Â
+                                
                               </div>
                             </div>
                           )}
@@ -7539,9 +7539,9 @@ const renderWhatsAppPanel = () => {
                                     cursor: 'default'
                                   }}
                                 >
-                                  {button.type === 'QUICK_REPLY' && 'Ã¢â€ Â©Ã¯Â¸Â '}
-                                  {button.type === 'URL' && 'Ã°Å¸â€N/A '}
-                                  {button.type === 'PHONE_NUMBER' && 'Ã°Å¸â€œÅ¾ '}
+                                  {button.type === 'QUICK_REPLY' && ' '}
+                                  {button.type === 'URL' && ' '}
+                                  {button.type === 'PHONE_NUMBER' && ' '}
                                   {button.text}
                                 </div>
                               ))}

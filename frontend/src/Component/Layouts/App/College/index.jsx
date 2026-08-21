@@ -994,6 +994,12 @@ function CollegeLayout({ children }) {
                         <span className="menu-title">{t('sales_b2b')}</span>
                       </a>
                     </li>
+                    <li className={`nav-item ${location.pathname === '/institute/whatsapp' ? 'active' : ''}`}>
+                      <a href="/institute/whatsapp" onClick={() => handleSidebarClose()}>
+                        <FontAwesomeIcon icon={faWhatsapp} />
+                        <span className="menu-title">{t('Whatsapp')}</span>
+                      </a>
+                    </li>
                     {/* <li className={`nav-item ${location.pathname === '/institute/myfollowupb2b' ? 'active' : ''}`}>
                       <Link to="/institute/myfollowupb2b" onClick={() => handleSidebarClose()}>
                         <FontAwesomeIcon icon={faBell} />

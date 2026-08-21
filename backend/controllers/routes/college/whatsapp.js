@@ -4610,4 +4610,266 @@ router.post('/send-file', isCollege, upload.single('file'), async (req, res) => 
 	}
 });
 
+function last10PhoneDigits(value) {
+	const digits = String(value || '').replace(/\D/g, '');
+	return digits.length >= 10 ? digits.slice(-10) : digits;
+}
+
+function phoneMatchVariants(phone) {
+	const last10 = last10PhoneDigits(phone);
+	if (!last10) return [];
+	const with91 = `91${last10}`;
+	return [...new Set([
+		last10,
+		with91,
+		`+${with91}`,
+		`+${last10}`,
+		`+91${last10}`,
+		String(phone || '').trim()
+	].filter(Boolean))];
+}
+
+function previewFromWhatsappMessage(msg) {
+	if (!msg) return '';
+	const type = String(msg.messageType || '').toLowerCase();
+	const text = String(msg.message || '').trim();
+	if (type === 'image') return 'Photo';
+	if (type === 'video') return 'Video';
+	if (type === 'audio' || type === 'voice') return 'Voice message';
+	if (type === 'document') return 'Document';
+	if (type === 'sticker') return 'Sticker';
+	if (type === 'location') return 'Location';
+	if (type === 'contacts') return 'Contact';
+	if (type === 'template') return text || 'Template message';
+	return text || 'Message';
+}
+
+router.get('/conversations', [isCollege], async (req, res) => {
+	try {
+		const collegeId = req.collegeId || req.college?._id || req.user?.college?._id;
+		if (!collegeId) {
+			return res.status(400).json({ success: false, message: 'College ID is required' });
+		}
+
+		const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+		const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 80, 1), 200);
+		const search = String(req.query.search || '').trim();
+		const unreadOnly = String(req.query.unreadOnly || '') === 'true';
+
+		const conversations = await WhatsAppMessage.aggregate([
+			{ $match: { collegeId: new mongoose.Types.ObjectId(collegeId) } },
+			{
+				$addFields: {
+					contactRaw: {
+						$toString: {
+							$cond: [
+								{ $eq: ['$direction', 'incoming'] },
+								{ $ifNull: ['$from', ''] },
+								{ $ifNull: ['$to', ''] }
+							]
+						}
+					}
+				}
+			},
+			{
+				$addFields: {
+					phoneDigits: {
+						$replaceAll: {
+							input: {
+								$replaceAll: {
+									input: {
+										$replaceAll: {
+											input: '$contactRaw',
+											find: '+',
+											replacement: ''
+										}
+									},
+									find: ' ',
+									replacement: ''
+								}
+							},
+							find: '-',
+							replacement: ''
+						}
+					}
+				}
+			},
+			{
+				$addFields: {
+					phoneKey: {
+						$cond: [
+							{ $gte: [{ $strLenCP: '$phoneDigits' }, 10] },
+							{
+								$substrCP: [
+									'$phoneDigits',
+									{ $subtract: [{ $strLenCP: '$phoneDigits' }, 10] },
+									10
+								]
+							},
+							'$phoneDigits'
+						]
+					}
+				}
+			},
+			{ $match: { phoneKey: { $regex: /^\d{10}$/ } } },
+			{ $sort: { sentAt: -1 } },
+			{
+				$group: {
+					_id: '$phoneKey',
+					lastMessage: { $first: '$$ROOT' },
+					lastMessageAt: { $first: '$sentAt' },
+					unreadCount: {
+						$sum: {
+							$cond: [
+								{
+									$and: [
+										{ $eq: ['$direction', 'incoming'] },
+										{
+											$or: [
+												{ $eq: ['$readAt', null] },
+												{ $eq: [{ $type: '$readAt' }, 'missing'] }
+											]
+										}
+									]
+								},
+								1,
+								0
+							]
+						}
+					}
+				}
+			},
+			{ $sort: { lastMessageAt: -1 } }
+		]);
+
+		const phoneKeys = conversations.map((c) => c._id).filter(Boolean);
+		const phoneOr = [];
+		phoneKeys.forEach((phone) => {
+			phoneMatchVariants(phone).forEach((variant) => {
+				phoneOr.push({ mobile: variant });
+				phoneOr.push({ whatsapp: variant });
+			});
+		});
+
+		const leadByPhone = new Map();
+		if (phoneOr.length) {
+			const college = await College.findById(collegeId).select('_concernPerson').lean();
+			const concernIds = (college?._concernPerson || []).map((p) => p?._id).filter(Boolean);
+			const leadQuery = { $or: phoneOr };
+			if (concernIds.length) {
+				leadQuery.$and = [{
+					$or: [
+						{ leadAddedBy: { $in: concernIds } },
+						{ leadOwner: { $in: concernIds } },
+						{ leadCoOwner: { $in: concernIds } }
+					]
+				}];
+			}
+			const leads = await Lead.find(leadQuery)
+				.select('concernPersonName businessName mobile whatsapp email city state designation leadOwner createdAt updatedAt')
+				.sort({ updatedAt: -1 })
+				.lean();
+
+			leads.forEach((lead) => {
+				const keys = [last10PhoneDigits(lead.whatsapp), last10PhoneDigits(lead.mobile)].filter(Boolean);
+				keys.forEach((key) => {
+					if (!leadByPhone.has(key)) leadByPhone.set(key, lead);
+				});
+			});
+		}
+
+		let rows = conversations.map((conv) => {
+			const phone = conv._id;
+			const last = conv.lastMessage || {};
+			const lead = leadByPhone.get(phone) || null;
+			return {
+				phone,
+				unreadCount: conv.unreadCount || 0,
+				lastMessageAt: conv.lastMessageAt,
+				lastMessage: {
+					text: previewFromWhatsappMessage(last),
+					rawText: last.message || '',
+					direction: last.direction || 'outgoing',
+					messageType: last.messageType || 'text',
+					sentAt: last.sentAt || conv.lastMessageAt,
+					status: last.status || (last.direction === 'incoming' ? 'received' : 'sent')
+				},
+				lead
+			};
+		});
+
+		if (unreadOnly) {
+			rows = rows.filter((row) => row.unreadCount > 0);
+		}
+
+		if (search) {
+			const q = search.toLowerCase();
+			const qDigits = search.replace(/\D/g, '');
+			rows = rows.filter((row) => {
+				const name = String(row.lead?.concernPersonName || '').toLowerCase();
+				const biz = String(row.lead?.businessName || '').toLowerCase();
+				const preview = String(row.lastMessage?.text || '').toLowerCase();
+				const phone = String(row.phone || '');
+				return name.includes(q)
+					|| biz.includes(q)
+					|| preview.includes(q)
+					|| (qDigits && phone.includes(qDigits));
+			});
+		}
+
+		const total = rows.length;
+		const start = (page - 1) * limit;
+		const paged = rows.slice(start, start + limit);
+
+		return res.json({
+			success: true,
+			data: paged,
+			pagination: {
+				currentPage: page,
+				totalPages: Math.max(Math.ceil(total / limit), 1),
+				total,
+				limit
+			}
+		});
+	} catch (error) {
+		console.error('Get WhatsApp conversations error:', error);
+		return res.status(500).json({
+			success: false,
+			message: 'Failed to fetch WhatsApp conversations',
+			error: process.env.NODE_ENV === 'development' ? error.message : undefined
+		});
+	}
+});
+
+router.put('/mark-read/:phone', [isCollege], async (req, res) => {
+	try {
+		const collegeId = req.collegeId || req.college?._id || req.user?.college?._id;
+		const variants = phoneMatchVariants(req.params.phone);
+		if (!collegeId || !variants.length) {
+			return res.status(400).json({ success: false, message: 'Phone number and college ID are required' });
+		}
+
+		const result = await WhatsAppMessage.updateMany(
+			{
+				collegeId,
+				direction: 'incoming',
+				from: { $in: variants },
+				$or: [{ readAt: null }, { readAt: { $exists: false } }]
+			},
+			{ $set: { readAt: new Date(), status: 'read' } }
+		);
+
+		return res.json({
+			success: true,
+			updated: result.modifiedCount || result.nModified || 0
+		});
+	} catch (error) {
+		console.error('Mark WhatsApp read error:', error);
+		return res.status(500).json({
+			success: false,
+			message: 'Failed to mark messages as read'
+		});
+	}
+});
+
 module.exports = router;
