@@ -58,10 +58,7 @@ frontend/.env
 /frontend/src/Pages/Front/HomePage/HomePage copy.css
 /frontend/package.json
 /frontend/package-lock.json
-/package.json
-/package-lock.json
-/backend/package.json
-/backend/package-lock.json
+
 # /frontend/src/Component/Layouts/Front
 # /frontend/src/Pages/Front
 /frontend/src/Pages/App/Trainer/Vertical/Vertical.jsx
