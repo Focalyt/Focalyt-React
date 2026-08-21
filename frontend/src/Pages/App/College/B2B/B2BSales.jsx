@@ -1377,17 +1377,28 @@ const B2BSales = () => {
     return getLeadFollowupBucket(lead, type) === 'missed' ? 1 : 0;
   };
 
-  // No red when planned or already done (NA date after done is fine).
-  // Red only when never set, or missed.
+  // Current slot: planned / done / missed all mean this type was followed up
+  // (date can show NA after done or after midnight cron marks missed).
   const leadHasUpcomingFollowup = (lead, type) => {
     const bucket = getLeadFollowupBucket(lead, type);
-    if (bucket === 'missed') return false;
-    if (bucket === 'planned' || bucket === 'done') return true;
-    return getLeadFollowupDoneCount(lead, type) > 0;
+    if (bucket === 'planned' || bucket === 'done' || bucket === 'missed') return true;
+    return getLeadFollowupDoneCount(lead, type) > 0 || getLeadFollowupMissedCount(lead, type) > 0;
   };
 
+  const leadHasFollowupHistoryFromLogs = (lead) => {
+    const logs = Array.isArray(lead?.logs) ? lead.logs : [];
+    return logs.some((entry) => {
+      const text = `${entry?.action || ''} ${entry?.remarks || ''}`.toLowerCase();
+      return text.includes('follow-up') || text.includes('followup') || text.includes('status changed');
+    });
+  };
+
+  // Lead is red only when it was never followed up (no current slot, no done/missed
+  // history, and no follow-up / status-change logs). Empty sibling Call/Visit is OK.
   const leadHasAnyFollowup = (lead) => (
-    leadHasUpcomingFollowup(lead, 'Call') || leadHasUpcomingFollowup(lead, 'Visit')
+    leadHasUpcomingFollowup(lead, 'Call')
+    || leadHasUpcomingFollowup(lead, 'Visit')
+    || leadHasFollowupHistoryFromLogs(lead)
   );
 
   const getLeadDocumentsBucket = (lead) => {
@@ -2016,6 +2027,7 @@ const B2BSales = () => {
       appendLeadFilterParams(params, eff);
       params.hasFollowUpCall = false;
       params.hasFollowUpVisit = false;
+      params.noFollowupTab = true;
       const response = await axios.get(`${backendUrl}/college/b2b/leads/status-count`, {
         headers: { 'x-auth': token },
         params
@@ -2104,6 +2116,7 @@ const B2BSales = () => {
     if (viewTab === 'noFollowup') {
       overrides.hasFollowUpCall = false;
       overrides.hasFollowUpVisit = false;
+      overrides.noFollowupTab = true;
     }
     return overrides;
   };
@@ -2724,6 +2737,7 @@ const B2BSales = () => {
     else if (eff.hasFollowUpCall === false || eff.hasFollowUpCall === 'no') params.hasFollowUpCall = false;
     if (eff.hasFollowUpVisit === true || eff.hasFollowUpVisit === 'yes') params.hasFollowUpVisit = true;
     else if (eff.hasFollowUpVisit === false || eff.hasFollowUpVisit === 'no') params.hasFollowUpVisit = false;
+    if (eff.noFollowupTab === true || eff.noFollowupTab === 'true') params.noFollowupTab = true;
     if (eff.followUpCallBucket) params.followUpCallBucket = eff.followUpCallBucket;
     if (eff.followUpVisitBucket) params.followUpVisitBucket = eff.followUpVisitBucket;
     if (Array.isArray(eff.documentsStatus) && eff.documentsStatus.length) {
@@ -9874,7 +9888,7 @@ const renderWhatsAppPanel = () => {
                               </div>
                               <div className="lhm__row3">
                                 {/* Followup Calling */}
-                                <div className={`lhm__followup-box${!leadHasUpcomingFollowup(lead, 'Call') ? ' lhm__followup-box--empty' : ''}`}>
+                                <div className={`lhm__followup-box${!leadHasAnyFollowup(lead) ? ' lhm__followup-box--empty' : ''}`}>
                                   <span className="lhm__followup-title">Followup Calling</span>
                                   <button
                                     type="button"
@@ -9907,7 +9921,7 @@ const renderWhatsAppPanel = () => {
                                 </div>
 
                                 {/* Followup Visit */}
-                                <div className={`lhm__followup-box${!leadHasUpcomingFollowup(lead, 'Visit') ? ' lhm__followup-box--empty' : ''}`}>
+                                <div className={`lhm__followup-box${!leadHasAnyFollowup(lead) ? ' lhm__followup-box--empty' : ''}`}>
                                   <span className="lhm__followup-title">Followup Visit</span>
                                   <button
                                     type="button"
@@ -10249,7 +10263,7 @@ const renderWhatsAppPanel = () => {
                                 {/* Followup Calling & Visit — Done/Planned/Missed with distinct colours */}
                                 <div className="lead-header-v2__dash">
                                   <div className="lead-header-v2__dash-col">
-                                    <div className={`b2b-dash-section h-100${!leadHasUpcomingFollowup(lead, 'Call') ? ' b2b-dash-section--no-followup' : ''}`}>
+                                    <div className={`b2b-dash-section h-100${!leadHasAnyFollowup(lead) ? ' b2b-dash-section--no-followup' : ''}`}>
                                       <span className="b2b-dash-section__label">Followup Calling</span>
                                       <button
                                         type="button"
@@ -10288,7 +10302,7 @@ const renderWhatsAppPanel = () => {
                                     </div>
                                   </div>
                                   <div className="lead-header-v2__dash-col">
-                                    <div className={`b2b-dash-section h-100${!leadHasUpcomingFollowup(lead, 'Visit') ? ' b2b-dash-section--no-followup' : ''}`}>
+                                    <div className={`b2b-dash-section h-100${!leadHasAnyFollowup(lead) ? ' b2b-dash-section--no-followup' : ''}`}>
                                       <span className="b2b-dash-section__label">Followup Visit</span>
                                       <button
                                         type="button"

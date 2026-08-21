@@ -3,7 +3,7 @@ const router = express.Router();
 const axios = require('axios');
 const uuid = require('uuid/v1');
 const multer = require('multer');
-const { College, WhatsAppMessage, WhatsAppTemplate, Candidate, CandidateProfile, AppliedCourses, Courses, DripMarketingJob, Lead, Vertical } = require('../../models');
+const { College, WhatsAppMessage, WhatsAppTemplate, Candidate, CandidateProfile, AppliedCourses, Courses, DripMarketingJob, Lead } = require('../../models');
 const B2BDepartment = require('../../models/b2b/b2bDepartment');
 const { isCollege } = require('../../../helpers');
 const mongoose = require('mongoose');
@@ -47,32 +47,6 @@ const upload = multer({
 });
 
 
-
-function toIdString(value) {
-	if (value == null) return '';
-	if (typeof value === 'object') return String(value._id || value.id || '');
-	return String(value);
-}
-
-function getTemplateAccessScope(user) {
-	const isAdmin = user?.permissions?.permission_type === 'Admin';
-	const deptIds = (user?.departments_access || []).map(toIdString).filter(Boolean);
-	const verticalIds = (user?.verticals_access || []).map(toIdString).filter(Boolean);
-	return {
-		isAdmin,
-		deptIds: isAdmin ? [] : deptIds,
-		verticalIds: isAdmin ? [] : verticalIds,
-	};
-}
-
-function canAccessTemplateDepartment(access, { b2bDepartment, vertical } = {}) {
-	if (!access || access.isAdmin) return true;
-	const deptId = toIdString(b2bDepartment);
-	const vertId = toIdString(vertical);
-	if (deptId && access.deptIds.includes(deptId)) return true;
-	if (vertId && access.verticalIds.includes(vertId)) return true;
-	return false;
-}
 
 router.get('/templates', [isCollege], async (req, res) => {
 	try {    
@@ -162,7 +136,7 @@ router.get('/templates', [isCollege], async (req, res) => {
 							template.carouselMedia = dbTemplate.carouselMedia;
 						}
 
-						// Department-wise metadata from local DB (B2B department or B2C vertical)
+						// Department-wise metadata from local DB
 						if (dbTemplate.b2bDepartment) {
 							template.b2bDepartment = dbTemplate.b2bDepartment;
 							try {
@@ -170,21 +144,6 @@ router.get('/templates', [isCollege], async (req, res) => {
 								if (dept) {
 									template.b2bDepartmentName = dept.name;
 									template.b2bDepartmentDetails = dept;
-									template.departmentType = 'b2b';
-								}
-							} catch (_) { /* ignore */ }
-						}
-						if (dbTemplate.vertical) {
-							template.vertical = dbTemplate.vertical;
-							try {
-								const vert = await Vertical.findById(dbTemplate.vertical).select('name status').lean();
-								if (vert) {
-									template.verticalName = vert.name;
-									template.verticalDetails = vert;
-									template.departmentType = 'b2c';
-									if (!template.b2bDepartmentName) {
-										template.b2bDepartmentName = vert.name;
-									}
 								}
 							} catch (_) { /* ignore */ }
 						}
@@ -235,24 +194,10 @@ router.get('/templates', [isCollege], async (req, res) => {
 		});
 
 		let data = templatesWithMedia;
-		const departmentFilter = req.query.b2bDepartment || req.query.vertical || req.query.department;
+		const departmentFilter = req.query.b2bDepartment || req.query.department;
 		if (departmentFilter && mongoose.Types.ObjectId.isValid(departmentFilter)) {
 			const deptId = String(departmentFilter);
-			data = templatesWithMedia.filter((t) =>
-				String(t.b2bDepartment || '') === deptId || String(t.vertical || '') === deptId
-			);
-		}
-
-		const access = getTemplateAccessScope(req.user);
-		if (!access.isAdmin) {
-			data = data.filter((t) => canAccessTemplateDepartment(access, t));
-		}
-
-		const leadType = String(req.query.leadType || req.query.side || '').toLowerCase();
-		if (leadType === 'b2b') {
-			data = data.filter((t) => t.b2bDepartment && !t.vertical);
-		} else if (leadType === 'b2c') {
-			data = data.filter((t) => t.vertical && !t.b2bDepartment);
+			data = templatesWithMedia.filter((t) => String(t.b2bDepartment || '') === deptId);
 		}
 
 		res.json({
@@ -334,7 +279,7 @@ router.post('/sync-templates', isCollege, async (req, res) => {
 // Create WhatsApp template
 router.post('/create-template', isCollege, upload.array('file', 5), async (req, res) => {
 	try {
-		const { name, language, category, components, base64File, carouselFiles, b2bDepartment, vertical } = req.body;
+		const { name, language, category, components, base64File, carouselFiles, b2bDepartment } = req.body;
 
    
 	
@@ -347,49 +292,18 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 			});
 		}
 
-		const hasB2bDepartment = b2bDepartment && mongoose.Types.ObjectId.isValid(b2bDepartment);
-		const hasVertical = vertical && mongoose.Types.ObjectId.isValid(vertical);
-		if (hasB2bDepartment && hasVertical) {
+		if (!b2bDepartment || !mongoose.Types.ObjectId.isValid(b2bDepartment)) {
 			return res.status(400).json({
 				success: false,
-				message: 'Select either a B2B department or a B2C vertical, not both'
-			});
-		}
-		if (!hasB2bDepartment && !hasVertical) {
-			return res.status(400).json({
-				success: false,
-				message: 'Please select a Department (B2B or B2C)'
+				message: 'Valid B2B department is required'
 			});
 		}
 
-		let departmentDoc = null;
-		let verticalDoc = null;
-		if (hasB2bDepartment) {
-			departmentDoc = await B2BDepartment.findById(b2bDepartment).select('_id name isActive');
-			if (!departmentDoc || departmentDoc.isActive === false) {
-				return res.status(400).json({
-					success: false,
-					message: 'B2B department not found or inactive'
-				});
-			}
-		} else {
-			verticalDoc = await Vertical.findById(vertical).select('_id name status');
-			if (!verticalDoc || verticalDoc.status === false) {
-				return res.status(400).json({
-					success: false,
-					message: 'B2C vertical not found or inactive'
-				});
-			}
-		}
-
-		const access = getTemplateAccessScope(req.user);
-		if (!canAccessTemplateDepartment(access, {
-			b2bDepartment: departmentDoc?._id,
-			vertical: verticalDoc?._id,
-		})) {
-			return res.status(403).json({
+		const departmentDoc = await B2BDepartment.findById(b2bDepartment).select('_id name isActive');
+		if (!departmentDoc || departmentDoc.isActive === false) {
+			return res.status(400).json({
 				success: false,
-				message: 'You can only create templates for your assigned departments or verticals'
+				message: 'B2B department not found or inactive'
 			});
 		}
 
@@ -983,8 +897,7 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 					carouselMedia: savedCarouselMedia,
 					headerMedia: savedHeaderMedia, // Save header media
 					variableMappings: variableMappings, // Save variable mappings
-					b2bDepartment: departmentDoc?._id || null,
-					vertical: verticalDoc?._id || null,
+					b2bDepartment: departmentDoc._id,
 				};
 
 				const templateDoc = await WhatsAppTemplate.findOneAndUpdate(
@@ -993,7 +906,7 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 					{ upsert: true, new: true, setDefaultsOnInsert: true }
 				);
 				
-				console.log(`✓ Template metadata saved to database: ${templateDoc._id} (department: ${departmentDoc?.name || verticalDoc?.name})`);
+				console.log(`✓ Template metadata saved to database: ${templateDoc._id} (department: ${departmentDoc.name})`);
 				if (savedHeaderMedia) {
 					console.log(`  - Header media: ${savedHeaderMedia.mediaType} at ${savedHeaderMedia.s3Url}`);
 				}

@@ -6,7 +6,7 @@ let router = express.Router();
 
 // Models
 let Status = require('../../models/status');
-let { StatusLogs, AppliedCourses, CandidateProfile, Courses, Center, User , ReEnquire} = require('../../models');
+let { StatusLogs, AppliedCourses, CandidateProfile, Courses, Center, User, ReEnquire, Source } = require('../../models');
 
 //helpers
 let { statusLogHelper } = require('../../../helpers/college');
@@ -767,6 +767,90 @@ router.get("/sourceLeadsData", async (req, res) => {
 
     }
 })
+
+const DIGITAL_LEAD_REGISTERED_BY = new mongoose.Types.ObjectId('68c16764eeda1e3f36a329d9');
+
+function getTodayIstBounds() {
+    const istDate = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(new Date());
+    return {
+        start: new Date(`${istDate}T00:00:00.000+05:30`),
+        end: new Date(`${istDate}T23:59:59.999+05:30`),
+    };
+}
+
+// Today's Digital Lead B2C leads only: lead_id, name, mobile, email, centre
+router.get("/today", async (req, res) => {
+    try {
+        const { start, end } = getTodayIstBounds();
+        const sourceIds = [DIGITAL_LEAD_REGISTERED_BY];
+        const sourceDoc = await Source.findOne({ name: { $regex: /^digital\s*lead$/i } }).select('_id').lean();
+        if (sourceDoc && !sourceIds.some((id) => id.equals(sourceDoc._id))) {
+            sourceIds.push(sourceDoc._id);
+        }
+
+        const leads = await AppliedCourses.aggregate([
+            {
+                $match: {
+                    createdAt: { $gte: start, $lte: end },
+                },
+            },
+            {
+                $lookup: {
+                    from: CandidateProfile.collection.name,
+                    localField: '_candidate',
+                    foreignField: '_id',
+                    as: 'candidate',
+                },
+            },
+            { $unwind: { path: '$candidate', preserveNullAndEmptyArrays: true } },
+            {
+                $match: {
+                    $or: [
+                        { registeredBy: { $in: sourceIds } },
+                        { 'candidate.source': { $regex: /^digital\s*lead$/i } },
+                    ],
+                },
+            },
+            {
+                $lookup: {
+                    from: Center.collection.name,
+                    localField: '_center',
+                    foreignField: '_id',
+                    as: 'center',
+                },
+            },
+            { $unwind: { path: '$center', preserveNullAndEmptyArrays: true } },
+            { $sort: { createdAt: -1 } },
+            {
+                $project: {
+                    _id: 0,
+                    lead_id: { $toString: '$_id' },
+                    name: { $ifNull: ['$candidate.name', ''] },
+                    mobile: { $ifNull: ['$candidate.mobile', ''] },
+                    email: { $ifNull: ['$candidate.email', ''] },
+                    centre: { $ifNull: ['$center.name', ''] },
+                },
+            },
+        ]);
+
+        return res.json({
+            status: true,
+            count: leads.length,
+            data: leads,
+        });
+    } catch (err) {
+        return res.status(500).json({
+            status: false,
+            msg: "Failed to get today's digital leads",
+            error: err.message,
+        });
+    }
+});
 
 // router.get("/sourceLeads", async (req, res) => {
 //     try {
