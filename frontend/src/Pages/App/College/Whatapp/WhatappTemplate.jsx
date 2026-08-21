@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 
 import axios from 'axios';
 
@@ -110,7 +110,39 @@ const WhatsAppTemplate = () => {
   const variableDropdownRef = useRef(null);
   const carouselVariableDropdownRef = useRef(null);
   const [b2bDepartments, setB2bDepartments] = useState([]);
+  const [b2cVerticals, setB2cVerticals] = useState([]);
+  const [permissions, setPermissions] = useState(null);
+  const [departmentsAccess, setDepartmentsAccess] = useState([]);
+  const [verticalsAccess, setVerticalsAccess] = useState([]);
   const [departmentFilter, setDepartmentFilter] = useState('');
+
+  const toDepartmentKey = (type, id) => (id ? `${type}:${id}` : '');
+  const parseDepartmentKey = (key) => {
+    const value = String(key || '');
+    if (value.startsWith('b2c:')) return { b2bDepartment: '', vertical: value.slice(4) };
+    if (value.startsWith('b2b:')) return { b2bDepartment: value.slice(4), vertical: '' };
+    return { b2bDepartment: value, vertical: '' };
+  };
+  const getTemplateDepartmentKey = (template) => {
+    const data = template?.template || template || {};
+    const verticalId = data.vertical?._id || data.vertical;
+    if (verticalId) return toDepartmentKey('b2c', verticalId);
+    const deptId = data.b2bDepartment?._id || data.b2bDepartment;
+    if (deptId) return toDepartmentKey('b2b', deptId);
+    return '';
+  };
+  const getTemplateDepartmentName = (template) => {
+    const data = template?.template || template || {};
+    if (data.verticalName) return `${data.verticalName} (B2C)`;
+    if (data.b2bDepartmentName && data.departmentType === 'b2c') return `${data.b2bDepartmentName} (B2C)`;
+    if (data.b2bDepartmentName) return data.b2bDepartmentName;
+    const verticalId = String(data.vertical?._id || data.vertical || '');
+    const vertical = b2cVerticals.find((v) => String(v._id) === verticalId);
+    if (vertical) return `${vertical.name} (B2C)`;
+    const deptId = String(data.b2bDepartment?._id || data.b2bDepartment || '');
+    const dept = b2bDepartments.find((d) => String(d._id) === deptId);
+    return dept?.name || '—';
+  };
 
   // Predefined variables list
   const predefinedVariables = [
@@ -190,25 +222,57 @@ const WhatsAppTemplate = () => {
 
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
-  const fetchB2bDepartments = async () => {
+  const fetchDepartmentOptions = async () => {
     try {
       if (!token) return;
-      const response = await axios.get(`${backendUrl}/college/b2b/b2b-departments?status=true`, {
-        headers: { 'x-auth': token }
-      });
-      if (response.data?.status) {
-        setB2bDepartments((response.data.data || []).filter((d) => d.isActive !== false));
+      const [permRes, deptRes, verticalRes] = await Promise.all([
+        axios.get(`${backendUrl}/college/permission`, {
+          headers: { 'x-auth': token }
+        }),
+        axios.get(`${backendUrl}/college/b2b/b2b-departments?status=true`, {
+          headers: { 'x-auth': token }
+        }),
+        axios.get(`${backendUrl}/college/getVerticals`, {
+          headers: { 'x-auth': token }
+        })
+      ]);
+      if (permRes.data?.status) {
+        setPermissions(permRes.data.permissions || null);
+        setDepartmentsAccess(permRes.data.departments_access || []);
+        setVerticalsAccess(permRes.data.verticals_access || []);
+      }
+      if (deptRes.data?.status) {
+        setB2bDepartments((deptRes.data.data || []).filter((d) => d.isActive !== false));
+      }
+      if (verticalRes.data?.status) {
+        setB2cVerticals((verticalRes.data.data || []).filter((v) => v.status !== false));
       }
     } catch (error) {
-      console.error('Error fetching B2B departments:', error);
+      console.error('Error fetching departments/verticals:', error);
     }
   };
 
   useEffect(() => {
     if (token) {
-      fetchB2bDepartments();
+      fetchDepartmentOptions();
     }
   }, [token, backendUrl]);
+
+  const isAdminUser = (permissions?.permission_type || userData?.permissions?.permission_type) === 'Admin';
+
+  const accessibleB2bDepartments = useMemo(() => {
+    if (isAdminUser) return b2bDepartments;
+    const accessIds = (departmentsAccess || []).map((id) => String(id?._id || id)).filter(Boolean);
+    if (!accessIds.length) return [];
+    return b2bDepartments.filter((dept) => accessIds.includes(String(dept._id)));
+  }, [isAdminUser, b2bDepartments, departmentsAccess]);
+
+  const accessibleB2cVerticals = useMemo(() => {
+    if (isAdminUser) return b2cVerticals;
+    const accessIds = (verticalsAccess || []).map((id) => String(id?._id || id)).filter(Boolean);
+    if (!accessIds.length) return [];
+    return b2cVerticals.filter((vert) => accessIds.includes(String(vert._id)));
+  }, [isAdminUser, b2cVerticals, verticalsAccess]);
 
 
 
@@ -1512,8 +1576,16 @@ const WhatsAppTemplate = () => {
       templateData.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       templateData.subject?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDepartment = !departmentFilter
-      || String(templateData.b2bDepartment || '') === String(departmentFilter);
-    return matchesSearch && matchesDepartment;
+      || getTemplateDepartmentKey(templateData) === String(departmentFilter);
+    if (isAdminUser) {
+      return matchesSearch && matchesDepartment;
+    }
+    const parsed = parseDepartmentKey(getTemplateDepartmentKey(templateData));
+    const hasDeptAccess = parsed.b2bDepartment
+      && accessibleB2bDepartments.some((d) => String(d._id) === parsed.b2bDepartment);
+    const hasVerticalAccess = parsed.vertical
+      && accessibleB2cVerticals.some((v) => String(v._id) === parsed.vertical);
+    return matchesSearch && matchesDepartment && (hasDeptAccess || hasVerticalAccess);
   });
 
 
@@ -1794,11 +1866,7 @@ const WhatsAppTemplate = () => {
 
       variables: variables,
 
-      b2bDepartment: template.b2bDepartment
-        ? String(template.b2bDepartment._id || template.b2bDepartment)
-        : (templateData.b2bDepartment
-          ? String(templateData.b2bDepartment._id || templateData.b2bDepartment)
-          : '')
+      b2bDepartment: getTemplateDepartmentKey(template)
 
     });
 
@@ -2059,6 +2127,8 @@ const WhatsAppTemplate = () => {
 
       // Prepare the template data for API
 
+      const selectedDepartment = parseDepartmentKey(editForm.b2bDepartment);
+
       const templateData = {
 
         name: editForm.name,
@@ -2067,7 +2137,9 @@ const WhatsAppTemplate = () => {
 
         category: editForm.category,
 
-        b2bDepartment: editForm.b2bDepartment,
+        b2bDepartment: selectedDepartment.b2bDepartment || undefined,
+
+        vertical: selectedDepartment.vertical || undefined,
 
         components: [
 
@@ -3253,9 +3325,20 @@ const WhatsAppTemplate = () => {
               style={{ borderRadius: '8px', border: '1px solid #ced4da' }}
             >
               <option value="">All Departments</option>
-              {b2bDepartments.map((dept) => (
-                <option key={dept._id} value={dept._id}>{dept.name}</option>
-              ))}
+              {accessibleB2bDepartments.length > 0 && (
+                <optgroup label="B2B Departments">
+                  {accessibleB2bDepartments.map((dept) => (
+                    <option key={`b2b-${dept._id}`} value={toDepartmentKey('b2b', dept._id)}>{dept.name}</option>
+                  ))}
+                </optgroup>
+              )}
+              {accessibleB2cVerticals.length > 0 && (
+                <optgroup label="B2C Verticals">
+                  {accessibleB2cVerticals.map((vert) => (
+                    <option key={`b2c-${vert._id}`} value={toDepartmentKey('b2c', vert._id)}>{vert.name}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </div>
 
@@ -3362,9 +3445,7 @@ const WhatsAppTemplate = () => {
 
                   <td className="py-3">
                     <span className="text-muted">
-                      {(template?.template || template)?.b2bDepartmentName
-                        || b2bDepartments.find((d) => String(d._id) === String((template?.template || template)?.b2bDepartment))?.name
-                        || '—'}
+                      {getTemplateDepartmentName(template)}
                     </span>
                   </td>
 
@@ -4219,12 +4300,20 @@ const WhatsAppTemplate = () => {
                           >
 
                             <option value="">Select Department</option>
-
-                            {b2bDepartments.map((dept) => (
-
-                              <option key={dept._id} value={dept._id}>{dept.name}</option>
-
-                            ))}
+                            {accessibleB2bDepartments.length > 0 && (
+                              <optgroup label="B2B Departments">
+                                {accessibleB2bDepartments.map((dept) => (
+                                  <option key={`b2b-${dept._id}`} value={toDepartmentKey('b2b', dept._id)}>{dept.name}</option>
+                                ))}
+                              </optgroup>
+                            )}
+                            {accessibleB2cVerticals.length > 0 && (
+                              <optgroup label="B2C Verticals">
+                                {accessibleB2cVerticals.map((vert) => (
+                                  <option key={`b2c-${vert._id}`} value={toDepartmentKey('b2c', vert._id)}>{vert.name}</option>
+                                ))}
+                              </optgroup>
+                            )}
 
                           </select>
 

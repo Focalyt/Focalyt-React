@@ -691,14 +691,16 @@ const DripMarketing = () => {
             }
 
             const response = await axios.get(`${backendUrl}/college/whatsapp/templates`, {
-                headers: { 'x-auth': token }
+                headers: { 'x-auth': token },
+                params: { leadType: 'b2c' }
             });
 
             if (response.data.success) {
                 const list = Array.isArray(response.data.data) ? response.data.data : [];
+                const b2cTemplates = list.filter((t) => t.vertical && !t.b2bDepartment);
                 // Prefer APPROVED templates for drip sends; fall back to all if none approved
-                const approved = list.filter((t) => String(t?.status || '').toUpperCase() === 'APPROVED');
-                setWhatsappTemplates(approved.length > 0 ? approved : list);
+                const approved = b2cTemplates.filter((t) => String(t?.status || '').toUpperCase() === 'APPROVED');
+                setWhatsappTemplates(approved.length > 0 ? approved : b2cTemplates);
             } else {
                 console.error('Failed to fetch WhatsApp templates:', response.data.message);
                 setWhatsappTemplates([]);

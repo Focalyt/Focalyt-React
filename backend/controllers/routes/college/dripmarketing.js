@@ -3,7 +3,7 @@ const router = express.Router();
 const moment = require('moment');
 const { isCollege } = require('../../../helpers');
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, DripMarketingRule, DripMarketingJob } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, DripMarketingRule, DripMarketingJob, WhatsAppTemplate } = require("../../models");
 const { runDripMarketingTick, countMatchingLeads } = require("../../../schedular/dripMarketingScheduler");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
@@ -57,6 +57,35 @@ function getB2cAccessScope(user) {
 		verticalIds: !isAdmin && verticalIds.length ? verticalIds : [],
 		projectIds: !isAdmin && projectIds.length ? projectIds : [],
 	};
+}
+
+async function enforceTemplateLeadType(communication, leadType, collegeId) {
+	const names = (communication?.communications || [])
+		.map((c) => String(c?.templateId || '').trim())
+		.filter(Boolean);
+	if (!names.length || !collegeId) return { ok: true };
+
+	const templates = await WhatsAppTemplate.find({
+		collegeId,
+		templateName: { $in: names }
+	}).select('templateName b2bDepartment vertical').lean();
+
+	const byName = new Map(templates.map((t) => [t.templateName, t]));
+
+	for (const name of names) {
+		const template = byName.get(name);
+		if (!template) continue;
+		const isB2bTemplate = Boolean(template.b2bDepartment) && !template.vertical;
+		const isB2cTemplate = Boolean(template.vertical) && !template.b2bDepartment;
+		if (leadType === 'b2b' && !isB2bTemplate) {
+			return { ok: false, message: `Template "${name}" belongs to B2C and cannot be used in B2B drip marketing` };
+		}
+		if (leadType !== 'b2b' && !isB2cTemplate) {
+			return { ok: false, message: `Template "${name}" belongs to B2B and cannot be used in B2C drip marketing` };
+		}
+	}
+
+	return { ok: true };
 }
 
 function enforceB2bConditionAccess(conditionBlocks, access) {
@@ -604,6 +633,11 @@ router.post('/create-dripmarketing-rule', [isCollege], async (req, res) => {
 			scopedConditionBlocks = enforced.conditionBlocks;
 		}
 
+		const templateCheck = await enforceTemplateLeadType(communication, resolvedLeadType, collegeId);
+		if (!templateCheck.ok) {
+			return res.status(400).json({ success: false, message: templateCheck.message });
+		}
+
 		const startMoment = parseDateTimeIST(startDate, startTime);
 		const startDateTime = startMoment ? startMoment.toDate() : new Date(`${getISTDatePart(startDate)}T${startTime}`);
 
@@ -724,6 +758,12 @@ try{
 			return res.status(403).json({ success: false, message: enforced.message });
 		}
 		scopedConditionBlocks = enforced.conditionBlocks;
+	}
+
+	const updateLeadType = resolvedLeadType === 'b2b' ? 'b2b' : 'b2c';
+	const templateCheck = await enforceTemplateLeadType(communication, updateLeadType, collegeId);
+	if (!templateCheck.ok) {
+		return res.status(400).json({ success: false, message: templateCheck.message });
 	}
 
 	
