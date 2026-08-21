@@ -2809,14 +2809,13 @@ const CRMDashboard = () => {
         ...buildListFilterQueryParts(fd, cycleFilters),
       });
 
-      const dashboardRes = await axios.get(`${backendUrl}/college/dashbord-data?${queryParams}`, {
+      const admissionRes = await axios.get(`${backendUrl}/college/admission-list?${queryParams}`, {
         headers: { 'x-auth': token },
       });
 
-      const leads = dashboardRes.data?.success && Array.isArray(dashboardRes.data?.data)
-        ? dashboardRes.data.data
-        : [];
-      const admissionCount = leads.filter((lead) => lead?.admissionDone).length;
+      const admissionCount = admissionRes.data?.success
+        ? (admissionRes.data?.crmFilterCounts?.all ?? 0)
+        : 0;
 
       setMilestoneCounts({ admission: admissionCount });
     } catch (e) {
@@ -4373,22 +4372,6 @@ console.log('API Response:', response.data);
       queryParams.set('kyc', 'true');
     } else if (milestoneFilter === 'admission') {
       listEndpoint = 'admission-list';
-      const hasDateFilter = Boolean(
-        filters.createdFromDate
-        || filters.createdToDate
-        || filters.modifiedFromDate
-        || filters.modifiedToDate
-        || filters.nextActionFromDate
-        || filters.nextActionToDate
-      );
-      if (!hasDateFilter) {
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
-        const todayEnd = new Date();
-        todayEnd.setHours(23, 59, 59, 999);
-        queryParams.set('createdFromDate', todayStart.toISOString());
-        queryParams.set('createdToDate', todayEnd.toISOString());
-      }
     } else if (shouldFetchKycCandidates) {
       listEndpoint = 'kycCandidates';
       const kycFetchParams = activeKycFilter ? getKycDashFetchParams(activeKycFilter) : null;
@@ -5258,7 +5241,7 @@ console.log('API Response:', response.data);
       key: 'milestone-admission',
       milestone: 'admission',
       label: 'Admission',
-      title: 'Admissions matching current filters (same as Dashboard)',
+      title: 'Admissions matching current filters (same as Admission List)',
       valueKey: 'admission',
       bg: '#059669',
     },
