@@ -133,11 +133,12 @@ function isDuplicatePerformanceStatus(status) {
   return /^duplicate$/i.test(String(status?.statusName || status?.name || '').trim());
 }
 
-/** Synthetic Performance filter for duplicate-mobile leads (not a pipeline status id) */
-const DUPLICATE_MOBILE_FILTER = '__duplicate_mobile__';
+/** Synthetic Performance filter for contact (mobile) duplicates — not a pipeline status id */
+const CONTACT_DUPLICATE_FILTER = '__contact_duplicate__';
 
-function isDuplicateMobileFilter(statusFilter) {
-  return String(statusFilter) === DUPLICATE_MOBILE_FILTER;
+function isContactDuplicateFilter(statusFilter) {
+  const value = String(statusFilter || '');
+  return value === CONTACT_DUPLICATE_FILTER || value === '__duplicate_mobile__';
 }
 
 function buildLeadRemarkSuggestion({ leadFormData, leadCategoryOptions, typeOfB2BOptions }) {
@@ -1760,10 +1761,18 @@ const WhatsApp = () => {
 
   const [duplicateMobileCount, setDuplicateMobileCount] = useState(0);
 
-  // Dedicated Duplicate chip — filters by isDuplicateMobile flag (lead keeps its real status)
-  const duplicatePerformanceStatus = useMemo(() => ({
-    statusId: DUPLICATE_MOBILE_FILTER,
-    statusName: 'Duplicate',
+  const duplicatePerformanceStatus = useMemo(() => {
+    const fromCounts = (statusCounts || []).find((s) => isDuplicatePerformanceStatus(s));
+    return {
+      statusId: fromCounts?.statusId || null,
+      statusName: fromCounts?.statusName || 'Duplicate',
+      count: fromCounts?.count ?? 0,
+    };
+  }, [statusCounts]);
+
+  const contactDuplicatePerformanceStatus = useMemo(() => ({
+    statusId: CONTACT_DUPLICATE_FILTER,
+    statusName: 'Contact Duplicate',
     count: duplicateMobileCount,
   }), [duplicateMobileCount]);
 
@@ -2158,7 +2167,7 @@ const WhatsApp = () => {
 
   // Max selectable count for bulk actions = active Performance tab (not overall Total)
   const getBulkSelectableLeadCount = () => {
-    if (isDuplicateMobileFilter(selectedStatusFilter)) {
+    if (isContactDuplicateFilter(selectedStatusFilter)) {
       return pageSize > 0 ? pageSize : (duplicateMobileCount || leads?.length || 0);
     }
     if (selectedStatusFilter) {
@@ -2252,8 +2261,8 @@ const WhatsApp = () => {
         const params = {
           page: 1,
           limit: fetchLimit.toString(),
-          ...(isDuplicateMobileFilter(selectedStatusFilter)
-            ? { isDuplicateMobile: true }
+          ...(isContactDuplicateFilter(selectedStatusFilter)
+            ? { isContactDuplicate: true, isDuplicateMobile: true }
             : selectedStatusFilter
               ? { status: selectedStatusFilter }
               : {})
@@ -2943,7 +2952,8 @@ const WhatsApp = () => {
         limit: 20,
       };
 
-      if (isDuplicateMobileFilter(statusFilter)) {
+      if (isContactDuplicateFilter(statusFilter)) {
+        params.isContactDuplicate = true;
         params.isDuplicateMobile = true;
       } else if (statusFilter) {
         params.status = statusFilter;
@@ -2998,7 +3008,9 @@ const WhatsApp = () => {
       if (response.data.status) {
         setStatusCounts(response.data.data.statusCounts || []);
         setTotalLeads(response.data.data.totalLeads || 0);
-        setDuplicateMobileCount(response.data.data.duplicateMobileCount || 0);
+        setDuplicateMobileCount(
+          response.data.data.contactDuplicateCount ?? response.data.data.duplicateMobileCount ?? 0
+        );
         const fc = response.data.data.followupDashboardCounts;
         if (fc?.call && fc?.visit) {
           setFollowupDashboardCounts(fc);
@@ -3015,23 +3027,23 @@ const WhatsApp = () => {
 
   const getPerformanceExportMeta = () => {
     const count = getBulkSelectableLeadCount();
-    if (isDuplicateMobileFilter(selectedStatusFilter)) {
-      return { label: 'DUPLICATE', count, statusId: null, isDuplicateMobile: true };
+    if (isContactDuplicateFilter(selectedStatusFilter)) {
+      return { label: 'CONTACT_DUPLICATE', count, statusId: null, isContactDuplicate: true };
     }
     if (selectedStatusFilter) {
       const status = (statusCounts || []).find(
         (s) => String(s.statusId) === String(selectedStatusFilter)
       );
       const label = String(status?.statusName || 'Status').toUpperCase().replace(/\s+/g, '_');
-      return { label, count, statusId: selectedStatusFilter, isDuplicateMobile: false };
+      return { label, count, statusId: selectedStatusFilter, isContactDuplicate: false };
     }
-    return { label: 'ALL', count, statusId: null, isDuplicateMobile: false };
+    return { label: 'ALL', count, statusId: null, isContactDuplicate: false };
   };
 
   const downloadPerformanceLeads = async () => {
     if (!token || downloadingPerformanceLeads) return;
 
-    const { label, count, statusId, isDuplicateMobile } = getPerformanceExportMeta();
+    const { label, count, statusId, isContactDuplicate } = getPerformanceExportMeta();
     if (!count || count < 1) {
       alert('No leads available to download for this Performance tab.');
       return;
@@ -3053,8 +3065,10 @@ const WhatsApp = () => {
           sortBy: 'updatedAt',
           sortOrder: 'desc',
         };
-        if (isDuplicateMobile) params.isDuplicateMobile = true;
-        else if (statusId) params.status = statusId;
+        if (isContactDuplicate) {
+          params.isContactDuplicate = true;
+          params.isDuplicateMobile = true;
+        } else if (statusId) params.status = statusId;
         appendLeadFilterParams(params, eff);
 
         const response = await axios.get(`${backendUrl}/college/b2b/leads`, {
@@ -3386,7 +3400,12 @@ const WhatsApp = () => {
             // If user is filtering by a specific status, and the lead moved out of it, remove it.
             const filterId = selectedStatusFilter ? String(selectedStatusFilter) : '';
             const leadStatusId = updatedLead?.status?._id ? String(updatedLead.status._id) : (updatedLead?.status ? String(updatedLead.status) : '');
-            if (filterId && leadStatusId && filterId !== leadStatusId) {
+            if (
+              filterId
+              && leadStatusId
+              && filterId !== leadStatusId
+              && !isContactDuplicateFilter(selectedStatusFilter)
+            ) {
               return next.filter((l) => l?._id !== updatedLead._id);
             }
             return next;
@@ -5011,8 +5030,8 @@ const WhatsApp = () => {
         const params = {
           page: 1,
           limit: String(needed),
-          ...(isDuplicateMobileFilter(selectedStatusFilter)
-            ? { isDuplicateMobile: true }
+          ...(isContactDuplicateFilter(selectedStatusFilter)
+            ? { isContactDuplicate: true, isDuplicateMobile: true }
             : selectedStatusFilter
               ? { status: selectedStatusFilter }
               : {})

@@ -544,6 +544,42 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 		return { $and: [baseQuery, extra] };
 	};
 
+	const normalizeMobileLast10 = (v) => String(v || '').replace(/\D/g, '').slice(-10);
+
+	const isContactDuplicateQuery = (isDuplicateMobile, isContactDuplicate) =>
+		String(isDuplicateMobile).toLowerCase() === 'true'
+		|| String(isContactDuplicate).toLowerCase() === 'true';
+
+	/** Leads whose last-10 mobile digits appear more than once, plus flagged contact duplicates. */
+	const getContactDuplicateMatch = async (baseQuery) => {
+		const docs = await Lead.find(baseQuery || {}).select('_id mobile isDuplicateMobile').lean();
+		const byDigits = new Map();
+		for (const doc of docs || []) {
+			const key = normalizeMobileLast10(doc.mobile);
+			if (key.length !== 10) continue;
+			if (!byDigits.has(key)) byDigits.set(key, []);
+			byDigits.get(key).push(doc._id);
+		}
+		const ids = [];
+		const seen = new Set();
+		const addId = (id) => {
+			const s = String(id || '');
+			if (!s || seen.has(s)) return;
+			seen.add(s);
+			ids.push(id);
+		};
+		for (const group of byDigits.values()) {
+			if (group.length > 1) group.forEach(addId);
+		}
+		for (const doc of docs || []) {
+			if (doc.isDuplicateMobile) addId(doc._id);
+		}
+		return {
+			filter: { _id: { $in: ids } },
+			count: ids.length,
+		};
+	};
+
 	const countLeadsInFollowupBucket = async (baseQuery, type, bucket) => {
 		const bucketFilter = await resolveFollowupBucketLeadFilter(type, bucket);
 		if (!bucketFilter) return 0;
@@ -2429,25 +2465,11 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 		// Get total count
 		const totalLeads = await Lead.countDocuments(baseQuery);
 
-		const duplicateStatusIds = statuses
-			.filter((s) => /^duplicate$/i.test(String(s.title || '').trim()))
-			.map((s) => s._id);
-		const duplicateMobileFilter = duplicateStatusIds.length
-			? {
-					$or: [
-						{ isDuplicateMobile: true },
-						{ status: { $in: duplicateStatusIds } },
-					],
-			  }
-			: { isDuplicateMobile: true };
-		const duplicateMobileCount = await Lead.countDocuments(
-			mergeLeadQuery(baseQuery, duplicateMobileFilter)
-		);
+		const { count: contactDuplicateCount } = await getContactDuplicateMatch(baseQuery);
 
-		// Get count by status (exclude pipeline "Duplicate" — shown via Duplicate chip + flag)
+		// Duplicate pipeline status is counted here; Contact Duplicate is a separate chip
 		const statusCounts = await Promise.all(
 			statuses
-				.filter((status) => !/^duplicate$/i.test(String(status.title || '').trim()))
 				.map(async (status) => {
 				const count = await Lead.countDocuments({
 					...baseQuery,
@@ -2482,7 +2504,8 @@ router.get('/leads/status-count', isCollege, async (req, res) => {
 			data: {
 				statusCounts,
 				totalLeads,
-				duplicateMobileCount,
+				contactDuplicateCount,
+				duplicateMobileCount: contactDuplicateCount,
 				collegeId: college._id,
 				followupDashboardCounts
 			},
@@ -3083,6 +3106,7 @@ router.get('/leads', isCollege, async (req, res) => {
 			approvalStatus,
 			referredByMe,
 			isDuplicateMobile,
+			isContactDuplicate,
 			noFollowupTab
 		} = req.query;
 
@@ -3148,22 +3172,6 @@ router.get('/leads', isCollege, async (req, res) => {
 				.map((id) => convertToObjectId(id))
 				.filter(Boolean);
 
-		let duplicateMobileQuery = null;
-		if (String(isDuplicateMobile).toLowerCase() === 'true') {
-			const College = require('../../../models/college');
-			const collegeDoc = await College.findOne({ '_concernPerson._id': req.user._id }).select('_id');
-			const dupStatuses = await StatusB2b.find({
-				...(collegeDoc?._id ? { college: collegeDoc._id } : {}),
-				title: { $regex: /^Duplicate$/i },
-			})
-				.select('_id')
-				.lean();
-			const dupIds = (dupStatuses || []).map((s) => s._id).filter(Boolean);
-			duplicateMobileQuery = dupIds.length
-				? { $or: [{ isDuplicateMobile: true }, { status: { $in: dupIds } }] }
-				: { isDuplicateMobile: true };
-		}
-
 		// Build the final query
 		const finalQuery = {
 			$and: [
@@ -3175,8 +3183,9 @@ router.get('/leads', isCollege, async (req, res) => {
 				...(search ? [searchConditions] : []),
 				// Other filters - Convert to ObjectId if valid
 				...(statusIn ? [{ status: { $in: parseIdList(statusIn) } }] : []),
-				...(!statusIn && status ? [{ status: convertToObjectId(status) }] : []),
-				...(duplicateMobileQuery ? [duplicateMobileQuery] : []),
+				...(!statusIn && status && !isContactDuplicateQuery(isDuplicateMobile, isContactDuplicate)
+					? [{ status: convertToObjectId(status) }]
+					: []),
 
 				...(leadCategoryIn ? [{ leadCategory: { $in: parseIdList(leadCategoryIn) } }] : []),
 				...(!leadCategoryIn && leadCategory ? [{ leadCategory: convertToObjectId(leadCategory) }] : []),
@@ -3255,6 +3264,12 @@ router.get('/leads', isCollege, async (req, res) => {
 			} else if (wantsPending) {
 				finalQuery.$and.push(pendingCond);
 			}
+		}
+
+		if (isContactDuplicateQuery(isDuplicateMobile, isContactDuplicate)) {
+			const matchQuery = finalQuery.$and.length ? finalQuery : {};
+			const { filter } = await getContactDuplicateMatch(matchQuery);
+			finalQuery.$and.push(filter);
 		}
 
 		// Remove empty $and array if no conditions
