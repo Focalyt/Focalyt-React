@@ -154,10 +154,6 @@ function getLeadGroupRootId(lead) {
   return String(lead.crossSaleRootId || lead.parentLeadId || lead._id || '');
 }
 
-function isDuplicatePerformanceStatus(status) {
-  return /^duplicate$/i.test(String(status?.statusName || status?.name || '').trim());
-}
-
 /** Synthetic Performance filter for contact (mobile) duplicates — not a pipeline status id */
 const CONTACT_DUPLICATE_FILTER = '__contact_duplicate__';
 
@@ -1879,22 +1875,12 @@ const B2BSales = () => {
   });
 
   const sortedPerformanceStatuses = useMemo(() => {
-    const list = [...(statusCounts || [])].filter((s) => !isDuplicatePerformanceStatus(s));
+    const list = [...(statusCounts || [])];
     list.sort((a, b) => (a.statusIndex ?? 9999) - (b.statusIndex ?? 9999));
     return list;
   }, [statusCounts]);
 
   const [duplicateMobileCount, setDuplicateMobileCount] = useState(0);
-
-  // Duplicate chip — pipeline status titled Duplicate
-  const duplicatePerformanceStatus = useMemo(() => {
-    const fromCounts = (statusCounts || []).find((s) => isDuplicatePerformanceStatus(s));
-    return {
-      statusId: fromCounts?.statusId || null,
-      statusName: fromCounts?.statusName || 'Duplicate',
-      count: fromCounts?.count ?? 0,
-    };
-  }, [statusCounts]);
 
   // Contact Duplicate chip — repeated mobile numbers (lead keeps its real status)
   const contactDuplicatePerformanceStatus = useMemo(() => ({
@@ -9109,7 +9095,7 @@ const renderWhatsAppPanel = () => {
                               All ({totalLeads})
                             </button>
                             {sortedPerformanceStatuses.map((status, index) => {
-                              const isSelected = selectedStatusFilter === status.statusId;
+                              const isSelected = String(selectedStatusFilter) === String(status.statusId);
                               return (
                                 <button
                                   key={status.statusId || index}
@@ -9131,31 +9117,6 @@ const renderWhatsAppPanel = () => {
                                 </button>
                               );
                             })}
-                            {duplicatePerformanceStatus && (
-                              <button
-                                key={duplicatePerformanceStatus.statusId || 'duplicate'}
-                                type="button"
-                                className="b2b-perf-chip"
-                                title="Filter leads with Duplicate status"
-                                style={{
-                                  padding: '6px 14px',
-                                  fontSize: '12px',
-                                  fontWeight: 600,
-                                  borderRadius: '999px',
-                                  cursor: 'pointer',
-                                  color: String(selectedStatusFilter) === String(duplicatePerformanceStatus.statusId) && duplicatePerformanceStatus.statusId ? '#fff' : '#6b7280',
-                                  backgroundColor: String(selectedStatusFilter) === String(duplicatePerformanceStatus.statusId) && duplicatePerformanceStatus.statusId ? '#6b7280' : '#fff',
-                                  border: String(selectedStatusFilter) === String(duplicatePerformanceStatus.statusId) && duplicatePerformanceStatus.statusId ? 'none' : '1.5px solid #6b7280'
-                                }}
-                                onClick={() => {
-                                  if (duplicatePerformanceStatus.statusId) {
-                                    handleStatusCardClick(duplicatePerformanceStatus.statusId);
-                                  }
-                                }}
-                              >
-                                DUPLICATE ({duplicatePerformanceStatus.count ?? 0})
-                              </button>
-                            )}
                             {contactDuplicatePerformanceStatus && (
                               <button
                                 key={contactDuplicatePerformanceStatus.statusId || 'contact-duplicate'}
@@ -9164,17 +9125,20 @@ const renderWhatsAppPanel = () => {
                                 title="Filter leads with a duplicate mobile number (also listed under their own status)"
                                 style={{
                                   padding: '6px 14px',
-                                  fontSize: '12px',
+                                  fontSize: isMobile ? '9px' : '12px',
                                   fontWeight: 600,
                                   borderRadius: '999px',
                                   cursor: 'pointer',
                                   color: isContactDuplicateFilter(selectedStatusFilter) ? '#fff' : '#4b5563',
                                   backgroundColor: isContactDuplicateFilter(selectedStatusFilter) ? '#4b5563' : '#fff',
-                                  border: isContactDuplicateFilter(selectedStatusFilter) ? 'none' : '1.5px solid #4b5563'
+                                  border: isContactDuplicateFilter(selectedStatusFilter) ? 'none' : '1.5px solid #4b5563',
+                                  position: 'absolute',
+                                  right: 0,
+                                  top: isMobile ? -17 : -10
                                 }}
                                 onClick={() => handleStatusCardClick(contactDuplicatePerformanceStatus.statusId)}
                               >
-                                CONTACT DUPLICATE ({contactDuplicatePerformanceStatus.count ?? 0})
+                                DUPLICATE No({contactDuplicatePerformanceStatus.count ?? 0})
                               </button>
                             )}
                           </>
