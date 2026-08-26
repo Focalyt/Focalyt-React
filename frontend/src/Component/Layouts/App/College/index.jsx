@@ -423,7 +423,8 @@ function CollegeLayout({ children }) {
     dropdown: false,
     events: false,
     placements: false,
-    trainerManagement: false
+    trainerManagement: false,
+    hr: false
   });
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1199);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1199);
@@ -581,7 +582,8 @@ function CollegeLayout({ children }) {
     dropdown: useRef(null),
     events: useRef(null),
     placements: useRef(null),
-    trainerManagement: useRef(null)
+    trainerManagement: useRef(null),
+    hr: useRef(null)
   };
 
   const handleItemClick = (item) => {
@@ -600,7 +602,8 @@ function CollegeLayout({ children }) {
     dropdown: '0px',
     events: '0px',
     placements: '0px',
-    trainerManagement: '0px'
+    trainerManagement: '0px',
+    hr: '0px'
   });
 
   const B2B_SETTINGS_SUBMENU_MAX = 280;
@@ -1045,6 +1048,41 @@ function CollegeLayout({ children }) {
                   </ul>
                 </li>
               )}
+              <li className={`nav-item has-sub dropdown-hr ${openSubmenu.hr ? 'open' : ''}`}>
+                <a href="#" onClick={() => toggleSubmenu('hr')}>
+                  <FontAwesomeIcon icon={faUserTie} />
+                  <span className="menu-title">HR</span>
+                  <span className="dropdown-arrow">
+                    <FontAwesomeIcon
+                      icon={faCaretDown}
+                      className={`chevron-icon ${openSubmenu.hr ? 'rotate-90' : ''}`}
+                    />
+                  </span>
+                </a>
+                <ul
+                  ref={menuRefs.hr}
+                  className="menu-content"
+                  style={{
+                    maxHeight: submenuMaxHeight.hr,
+                    overflow: 'hidden',
+                    transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out',
+                    opacity: submenuMaxHeight.hr === '0px' ? 0 : 1
+                  }}
+                >
+                  <li className={`nav-item ${location.pathname === '/institute/hr' ? 'active' : ''}`}>
+                    <Link to="/institute/hr" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faUserFriends} />
+                      <span className="menu-title">HR Leads</span>
+                    </Link>
+                  </li>
+                  <li className={`nav-item ${location.pathname === '/institute/statusdesignhr' ? 'active' : ''}`}>
+                    <Link to="/institute/statusdesignhr" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faSitemap} />
+                      <span className="menu-title">HR Status Design</span>
+                    </Link>
+                  </li>
+                </ul>
+              </li>
               <li className={`nav-item has-sub dropdown-placements ${openSubmenu.placements ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('placements')}>
                   <FontAwesomeIcon icon={faHandshake} />

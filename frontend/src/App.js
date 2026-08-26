@@ -114,6 +114,8 @@ import Lrp from './Pages/App/College/LRP/Lrp';
 import LrpView from './Pages/App/College/LRP/LrpView';
 import VideoTimestamp from './Pages/App/College/VideoTimestamp/VideoTimestamp';
 import AcademicCoordinator from './Pages/App/College/Training/AcademicCoordinatorModule';
+import HrLeads from './Pages/App/College/HR/HrLeads';
+import HrStatus from './Pages/App/College/Status/HrStatus';
 import CompanyLayout from './Component/Layouts/App/Company';
 import CompanyLogin from './Pages/App/Company/CompanyLogin/CompanyLogin';
 import CompanyRegister from './Pages/App/Company/CompanyRegister/CompanyRegister';
@@ -361,6 +363,8 @@ const Layout = () => {
           <Route path='training/academic-coordinator' element={<AcademicCoordinatorModule/>}/>
           <Route path='training/senior-trainer' element={<SeniorTrainerModule/>}/>
           <Route path='registration' element={<Regitrationsold/>}/>
+          <Route path='hr' element={<HrLeads/>}/>
+          <Route path='statusdesignhr' element={<HrStatus/>}/>
           <Route path='academicCoordinator' element={<AcademicCoordinator/>}/>
           <Route path='seniorTrainer' element={<SeniorTrainerModule/>}/>
         </Route>

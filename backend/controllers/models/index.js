@@ -88,6 +88,7 @@ module.exports.Roles = require("./roleManagement");
 module.exports.UserActivityLog = require("./userActivityLog");
 module.exports.Status = require("./status");
 module.exports.StatusB2b = require("./statusB2b");
+module.exports.StatusHr = require("./statusHr");
 module.exports.RewardStatus = require("./RewardStatus");
 module.exports.ApprovalRequest = require("./approval");
 module.exports.LeadAssignmentRule = require("./leadAssignmentRule");

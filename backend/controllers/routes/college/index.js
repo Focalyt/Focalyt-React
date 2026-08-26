@@ -44,6 +44,7 @@ const videoTimestampRoutes = require("./videoTimestamp");
 //Trainer route 
 const trainerRoutes = require('./trainer');
 const sessionPlanRoutes = require('./sessionPlan');
+const hrRoutes = require('./hr');
 
 //b2b routes
 const b2bRoutes = require("./b2b/b2b");
@@ -51,6 +52,7 @@ const leadRankingRoutes = require("./b2b/leadRankingRoutes");
 const b2bCopyRoutes = require("./b2b/b2b_copy");
 const androidAppRoutes = require("./androidApp");
 const statusB2bRoutes = require("./b2b/statusB2b");
+const statusHrRoutes = require("./statusHr");
 const placementRoutes = require("./placement");
 const router = express.Router();
 const moment = require('moment')
@@ -296,6 +298,7 @@ router.use("/b2b", isCollege, leadRankingRoutes);
 router.use("/b2b", isCollege, b2bRoutes);
 router.use("/b2b_copy", isCollege, b2bCopyRoutes);
 router.use("/statusB2b", statusB2bRoutes);
+router.use("/statusHr", statusHrRoutes);
 router.use("/placementStatus", placementRoutes);
 router.use("/androidApp", androidAppRoutes);
 
@@ -323,6 +326,7 @@ router.use("/lrp", isCollege, lrpRoutes);
 router.use("/video-timestamp", videoTimestampRoutes);
 router.use("/trainer", trainerRoutes)
 router.use("/session-plans", isCollege, sessionPlanRoutes)
+router.use("/hr", isCollege, hrRoutes)
 const readXlsxFile = require("read-excel-file/node");
 const appliedCourses = require("../../models/appliedCourses");
 

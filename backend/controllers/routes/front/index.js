@@ -28,6 +28,7 @@ const {
 	AppRelease,
 	CareerApplication,
 	Application,
+	StatusHr,
 } = require("../../models");
 const Team = require('../../models/team'); // PostSchema import करें
 const { resolvePublicUrl } = require('../../../helpers/s3Storage');
@@ -1850,6 +1851,18 @@ router.post("/career", async (req, res) => {
 		}
 
 		console.log("CareerApplication saving to DB...");
+		const websiteCollegeId = req.body.college && ObjectId.isValid(req.body.college)
+			? req.body.college
+			: null;
+		let defaultHrStatus = websiteCollegeId
+			? await StatusHr.findOne({ isDeleted: { $ne: true }, college: websiteCollegeId }).sort({ index: 1 })
+			: null;
+		if (!defaultHrStatus) {
+			defaultHrStatus = await StatusHr.findOne({
+				isDeleted: { $ne: true },
+				$or: [{ college: null }, { college: { $exists: false } }],
+			}).sort({ index: 1 });
+		}
 		const savedApplication = await CareerApplication.create({
 			fullName: capitalizeWords(fullName),
 			email,
@@ -1857,7 +1870,17 @@ router.post("/career", async (req, res) => {
 			city,
 			applyingFor,
 			experience,
+			qualification: String(req.body.qualification || '').trim(),
+			dateOfBirth: (() => {
+				if (!req.body.dateOfBirth) return undefined;
+				const d = new Date(req.body.dateOfBirth);
+				return Number.isNaN(d.getTime()) ? undefined : d;
+			})(),
 			resume: resumeUrl,
+			college: websiteCollegeId,
+			leadStatus: defaultHrStatus?._id || null,
+			leadSubstatus: defaultHrStatus?.substatuses?.[0]?._id || null,
+			source: 'website',
 		});
 		console.log("CareerApplication saved:", savedApplication._id);
 
