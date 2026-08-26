@@ -2,6 +2,11 @@ const express = require('express');
 const router = express.Router();
 const moment = require('moment');
 const { isCollege } = require('../../../helpers');
+const {
+	getB2cAccessScope,
+	resolveB2cProjectIds,
+	isIdAllowed,
+} = require('../../../helpers/b2cAccess');
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
 	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, DripMarketingRule, DripMarketingJob, WhatsAppTemplate } = require("../../models");
 const { runDripMarketingTick, countMatchingLeads } = require("../../../schedular/dripMarketingScheduler");
@@ -44,17 +49,6 @@ function getB2bAccessScope(user) {
 	return {
 		isAdmin,
 		deptIds: !isAdmin && deptIds.length ? deptIds : [],
-		projectIds: !isAdmin && projectIds.length ? projectIds : [],
-	};
-}
-
-function getB2cAccessScope(user) {
-	const isAdmin = user?.permissions?.permission_type === 'Admin';
-	const verticalIds = (user?.verticals_access || []).map(toIdString).filter(Boolean);
-	const projectIds = (user?.b2c_projects_access || []).map(toIdString).filter(Boolean);
-	return {
-		isAdmin,
-		verticalIds: !isAdmin && verticalIds.length ? verticalIds : [],
 		projectIds: !isAdmin && projectIds.length ? projectIds : [],
 	};
 }
@@ -329,6 +323,10 @@ router.get('/list-centers', [isCollege], async (req, res) => {
 
 		if (typeof collegeId !== 'string') { collegeId = new mongoose.Types.ObjectId(collegeId); }
 
+		const linked = await resolveB2cProjectIds(req.user);
+		if (linked.scoped && projectId && !isIdAllowed(projectId, linked.projectIds)) {
+			return res.json({ success: true, data: [] });
+		}
 
 		if (projectId) {
 			if (!mongoose.Types.ObjectId.isValid(projectId)) {
@@ -354,7 +352,14 @@ router.get('/list-centers', [isCollege], async (req, res) => {
 			return res.json({ success: true, data: centers });
 		}
 		else {
-			const allCenters = await Center.find({ status: true, college: collegeId }).sort({ createdAt: -1 });
+			const centerFilter = { status: true, college: collegeId };
+			if (linked.scoped) {
+				if (!linked.projectObjectIds.length) {
+					return res.json({ success: true, data: [] });
+				}
+				centerFilter.projects = { $in: linked.projectObjectIds };
+			}
+			const allCenters = await Center.find(centerFilter).sort({ createdAt: -1 });
 			const centers = allCenters.map(center => {
 				const centerObj = center.toObject();
 				return {
@@ -375,8 +380,16 @@ router.get('/list-centers', [isCollege], async (req, res) => {
 router.get('/list_all_centers', [isCollege], async (req, res) => {
 	try {
 		const collegeId = req.user.college._id;
+		const centerFilter = { status: true, college: collegeId };
+		const linked = await resolveB2cProjectIds(req.user);
+		if (linked.scoped) {
+			if (!linked.projectObjectIds.length) {
+				return res.json({ success: true, data: [] });
+			}
+			centerFilter.projects = { $in: linked.projectObjectIds };
+		}
 
-		const allCenters = await Center.find({ status: true, college: collegeId }).sort({ createdAt: -1 });
+		const allCenters = await Center.find(centerFilter).sort({ createdAt: -1 });
 		const centers = allCenters.map(center => {
 			const centerObj = center.toObject();
 			return {
@@ -504,9 +517,17 @@ router.get('/list-centers', [isCollege], async (req, res) => {
 		res.status(500).json({ success: false, message: 'Server error' });
 	}
 });
-router.get('/all_courses', async (req, res) => {
+router.get('/all_courses', isCollege, async (req, res) => {
 	try {
-		const courses = await Courses.find({ status: true }).sort({ createdAt: -1 });
+		const courseFilter = { status: true };
+		const linked = await resolveB2cProjectIds(req.user);
+		if (linked.scoped) {
+			if (!linked.projectObjectIds.length) {
+				return res.json({ success: true, data: [] });
+			}
+			courseFilter.project = { $in: linked.projectObjectIds };
+		}
+		const courses = await Courses.find(courseFilter).sort({ createdAt: -1 });
 
 		res.json({ success: true, data: courses });
 	} catch (error) {
@@ -515,7 +536,7 @@ router.get('/all_courses', async (req, res) => {
 	}
 });
 
-router.get('/get_batches', async (req, res) => {
+router.get('/get_batches', isCollege, async (req, res) => {
 	try {
 		const { centerId, courseId } = req.query;  // Get query params for filtering
 
@@ -527,6 +548,30 @@ router.get('/get_batches', async (req, res) => {
 
 		if (courseId) {
 			filter.courseId = courseId;
+		}
+
+		const linked = await resolveB2cProjectIds(req.user);
+		if (linked.scoped) {
+			if (!linked.projectObjectIds.length) {
+				return res.json({ success: true, data: [] });
+			}
+			const allowedCourses = await Courses.find({ project: { $in: linked.projectObjectIds } }).select('_id').lean();
+			const allowedCourseIds = allowedCourses.map((c) => String(c._id));
+			if (courseId && !allowedCourseIds.includes(String(courseId))) {
+				return res.json({ success: true, data: [] });
+			}
+			if (centerId) {
+				const allowedCenter = await Center.findOne({
+					_id: centerId,
+					projects: { $in: linked.projectObjectIds },
+				}).select('_id').lean();
+				if (!allowedCenter) {
+					return res.json({ success: true, data: [] });
+				}
+			}
+			if (!courseId) {
+				filter.courseId = { $in: allowedCourseIds };
+			}
 		}
 
 		const batches = await Batch.find(filter).sort({ createdAt: -1 });  // Sorting by createdAt

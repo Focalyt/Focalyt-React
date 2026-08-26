@@ -54,48 +54,12 @@ const statusB2bRoutes = require("./b2b/statusB2b");
 const placementRoutes = require("./placement");
 const router = express.Router();
 const moment = require('moment')
-
-function toAccessIdString(value) {
-	if (value == null) return '';
-	if (typeof value === 'object') return String(value._id || value.id || '');
-	return String(value);
-}
-
-function getB2cAccessScope(user) {
-	const isAdmin = user?.permissions?.permission_type === 'Admin';
-	const verticalIds = (user?.verticals_access || []).map(toAccessIdString).filter(Boolean);
-	const projectIds = (user?.b2c_projects_access || []).map(toAccessIdString).filter(Boolean);
-	return {
-		isAdmin,
-		// Admin is never scoped by assigned B2C access (old B2C admin: own/associated leads, full filter lists)
-		verticalIds: !isAdmin && verticalIds.length ? verticalIds : [],
-		projectIds: !isAdmin && projectIds.length ? projectIds : [],
-	};
-}
-
-function applyB2cAccessToFilters(user, verticalsArray = [], projectsArray = []) {
-	const access = getB2cAccessScope(user);
-	let nextVerticals = Array.isArray(verticalsArray) ? [...verticalsArray] : [];
-	let nextProjects = Array.isArray(projectsArray) ? [...projectsArray] : [];
-
-	if (access.verticalIds.length) {
-		if (!nextVerticals.length) {
-			nextVerticals = [...access.verticalIds];
-		} else {
-			nextVerticals = nextVerticals.filter((id) => access.verticalIds.includes(String(id)));
-			if (!nextVerticals.length) nextVerticals = [...access.verticalIds];
-		}
-	}
-	if (access.projectIds.length) {
-		if (!nextProjects.length) {
-			nextProjects = [...access.projectIds];
-		} else {
-			nextProjects = nextProjects.filter((id) => access.projectIds.includes(String(id)));
-			if (!nextProjects.length) nextProjects = [...access.projectIds];
-		}
-	}
-	return { verticalsArray: nextVerticals, projectsArray: nextProjects };
-}
+const {
+	getB2cAccessScope,
+	applyB2cAccessToFilters,
+	resolveB2cProjectIds,
+	isIdAllowed,
+} = require('../../../helpers/b2cAccess');
 
 async function resolveB2cOwnershipTeamMembers(user, counselorArray = [], options = {}) {
 	if (Array.isArray(counselorArray) && counselorArray.length > 0) {
@@ -7089,11 +7053,15 @@ router.get('/getVerticals', [isCollege], async (req, res) => {
 		if (typeof collegeId !== 'string') { collegeId = new mongoose.Types.ObjectId(collegeId); }
 
 		const verticals = await Vertical.find({ college: collegeId }).sort({ createdAt: -1 });
+		const access = getB2cAccessScope(req.user);
+		const scopedVerticals = access.verticalIds.length
+			? verticals.filter((v) => access.verticalIds.includes(String(v._id)))
+			: verticals;
 
 		return res.json({
 			status: true,
 			message: "Verticals fetched successfully",
-			data: verticals
+			data: scopedVerticals
 		});
 	} catch (err) {
 		console.error("❌ Get Verticals Error:", err.message);
@@ -7381,7 +7349,11 @@ router.get('/list-projects', [isCollege], async (req, res) => {
 		filter.college = collegeId;
 
 		const projects = await Project.find(filter).sort({ createdAt: -1 });
-		res.json({ success: true, data: projects });
+		const access = getB2cAccessScope(req.user);
+		const scopedProjects = access.projectIds.length
+			? projects.filter((p) => access.projectIds.includes(String(p._id)))
+			: projects;
+		res.json({ success: true, data: scopedProjects });
 	} catch (error) {
 		console.error('Error fetching projects:', error);
 		res.status(500).json({ success: false, message: 'Server error' });
@@ -7394,7 +7366,11 @@ router.get('/list_all_projects', [isCollege], async (req, res) => {
 
 
 		const projects = await Project.find({ status: 'active', college: collegeId }).sort({ createdAt: -1 });
-		res.json({ success: true, data: projects });
+		const access = getB2cAccessScope(req.user);
+		const scopedProjects = access.projectIds.length
+			? projects.filter((p) => access.projectIds.includes(String(p._id)))
+			: projects;
+		res.json({ success: true, data: scopedProjects });
 	} catch (error) {
 		console.error('Error fetching projects:', error);
 		res.status(500).json({ success: false, message: 'Server error' });
@@ -7578,6 +7554,11 @@ router.get('/list-centers', [isCollege], async (req, res) => {
 		if (typeof collegeId !== 'string') { collegeId = new mongoose.Types.ObjectId(collegeId); }
 
 
+		const linked = await resolveB2cProjectIds(req.user);
+		if (linked.scoped && projectId && !isIdAllowed(projectId, linked.projectIds)) {
+			return res.json({ success: true, data: [] });
+		}
+
 		if (projectId) {
 			if (!mongoose.Types.ObjectId.isValid(projectId)) {
 				return res.status(400).json({ success: false, message: 'Invalid Project ID' });
@@ -7602,7 +7583,14 @@ router.get('/list-centers', [isCollege], async (req, res) => {
 			return res.json({ success: true, data: centers });
 		}
 		else {
-			const allCenters = await Center.find({ status: true, college: collegeId }).sort({ createdAt: -1 });
+			const centerFilter = { status: true, college: collegeId };
+			if (linked.scoped) {
+				if (!linked.projectObjectIds.length) {
+					return res.json({ success: true, data: [] });
+				}
+				centerFilter.projects = { $in: linked.projectObjectIds };
+			}
+			const allCenters = await Center.find(centerFilter).sort({ createdAt: -1 });
 			const centers = allCenters.map(center => {
 				const centerObj = center.toObject();
 				return {
@@ -7623,8 +7611,16 @@ router.get('/list-centers', [isCollege], async (req, res) => {
 router.get('/list_all_centers', [isCollege], async (req, res) => {
 	try {
 		const collegeId = req.user.college._id;
+		const centerFilter = { status: true, college: collegeId };
+		const linked = await resolveB2cProjectIds(req.user);
+		if (linked.scoped) {
+			if (!linked.projectObjectIds.length) {
+				return res.json({ success: true, data: [] });
+			}
+			centerFilter.projects = { $in: linked.projectObjectIds };
+		}
 
-		const allCenters = await Center.find({ status: true, college: collegeId }).sort({ createdAt: -1 });
+		const allCenters = await Center.find(centerFilter).sort({ createdAt: -1 });
 		const centers = allCenters.map(center => {
 			const centerObj = center.toObject();
 			return {
@@ -7915,9 +7911,17 @@ router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 
 ///courses
 
-router.get('/all_courses', async (req, res) => {
+router.get('/all_courses', isCollege, async (req, res) => {
 	try {
-		const courses = await Courses.find({ status: true })
+		const courseFilter = { status: true };
+		const linked = await resolveB2cProjectIds(req.user);
+		if (linked.scoped) {
+			if (!linked.projectObjectIds.length) {
+				return res.json({ success: true, data: [] });
+			}
+			courseFilter.project = { $in: linked.projectObjectIds };
+		}
+		const courses = await Courses.find(courseFilter)
 			.populate('trainers', 'name email mobile')
 			.sort({ createdAt: -1 });
 
@@ -7928,7 +7932,7 @@ router.get('/all_courses', async (req, res) => {
 	}
 });
 
-router.get('/all_courses_centerwise', async (req, res) => {
+router.get('/all_courses_centerwise', isCollege, async (req, res) => {
 	try {
 		const { centerId, projectId } = req.query
 		let filter = {
@@ -7939,6 +7943,10 @@ router.get('/all_courses_centerwise', async (req, res) => {
 		if (!centerId || !projectId) {
 			return res.status(400).json({ success: false, message: 'centerId and projectId are required.' });
 
+		}
+		const linked = await resolveB2cProjectIds(req.user);
+		if (linked.scoped && !isIdAllowed(projectId, linked.projectIds)) {
+			return res.json({ success: true, data: [] });
 		}
 		const courses = await Courses.find(filter)
 			.populate('trainers', 'name email mobile')
@@ -7954,9 +7962,17 @@ router.get('/all_courses_centerwise', async (req, res) => {
 });
 
 /** CoursesCopy list for Academic Coordinator session planning (includes courseStructure) */
-router.get('/all_coursescopy', async (req, res) => {
+router.get('/all_coursescopy', isCollege, async (req, res) => {
 	try {
-		const courses = await CoursesCopy.find({ status: true, isDeleted: { $ne: true } })
+		const courseFilter = { status: true, isDeleted: { $ne: true } };
+		const linked = await resolveB2cProjectIds(req.user);
+		if (linked.scoped) {
+			if (!linked.projectObjectIds.length) {
+				return res.json({ success: true, data: [] });
+			}
+			courseFilter.project = { $in: linked.projectObjectIds };
+		}
+		const courses = await CoursesCopy.find(courseFilter)
 			.populate('trainers', 'name email mobile')
 			.populate('vertical', 'name')
 			.populate('project', 'name')
@@ -7969,11 +7985,15 @@ router.get('/all_coursescopy', async (req, res) => {
 	}
 });
 
-router.get('/all_coursescopy_centerwise', async (req, res) => {
+router.get('/all_coursescopy_centerwise', isCollege, async (req, res) => {
 	try {
 		const { centerId, projectId } = req.query;
 		if (!centerId || !projectId) {
 			return res.status(400).json({ success: false, message: 'centerId and projectId are required.' });
+		}
+		const linked = await resolveB2cProjectIds(req.user);
+		if (linked.scoped && !isIdAllowed(projectId, linked.projectIds)) {
+			return res.json({ success: true, data: [] });
 		}
 
 		const courses = await CoursesCopy.find({
@@ -8058,7 +8078,7 @@ router.post('/add_batch', isCollege, async (req, res) => {
 });
 
 // GET API to fetch batches
-router.get('/get_batches', async (req, res) => {
+router.get('/get_batches', isCollege, async (req, res) => {
 	try {
 		const { centerId, courseId } = req.query;  // Get query params for filtering
 
@@ -8070,6 +8090,30 @@ router.get('/get_batches', async (req, res) => {
 
 		if (courseId) {
 			filter.courseId = courseId;
+		}
+
+		const linked = await resolveB2cProjectIds(req.user);
+		if (linked.scoped) {
+			if (!linked.projectObjectIds.length) {
+				return res.json({ success: true, data: [] });
+			}
+			const allowedCourses = await Courses.find({ project: { $in: linked.projectObjectIds } }).select('_id').lean();
+			const allowedCourseIds = allowedCourses.map((c) => String(c._id));
+			if (courseId && !allowedCourseIds.includes(String(courseId))) {
+				return res.json({ success: true, data: [] });
+			}
+			if (centerId) {
+				const allowedCenter = await Center.findOne({
+					_id: centerId,
+					projects: { $in: linked.projectObjectIds },
+				}).select('_id').lean();
+				if (!allowedCenter) {
+					return res.json({ success: true, data: [] });
+				}
+			}
+			if (!courseId) {
+				filter.courseId = { $in: allowedCourseIds };
+			}
 		}
 
 		const batches = await Batch.find(filter)
@@ -13517,7 +13561,22 @@ router.get('/filters-data', [isCollege], async (req, res) => {
 		const courseSet = new Map();
 		const centerSet = new Map();
 
+		const linked = await resolveB2cProjectIds(user);
+		const allowedProjectIds = new Set(linked.projectIds);
+
 		appliedCourses.forEach(ac => {
+			if (linked.scoped && allowedProjectIds.size) {
+				const recordProjectIds = [];
+				if (ac._course?.project) recordProjectIds.push(String(ac._course.project));
+				if (Array.isArray(ac.projects)) {
+					ac.projects.forEach((p) => {
+						if (p?._id) recordProjectIds.push(String(p._id));
+					});
+				}
+				if (recordProjectIds.length && !recordProjectIds.some((id) => allowedProjectIds.has(id))) {
+					return;
+				}
+			}
 			// Verticals
 			if (Array.isArray(ac.verticals)) {
 				ac.verticals.forEach(v => {

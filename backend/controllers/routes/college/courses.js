@@ -6,6 +6,7 @@ const bcrypt = require("bcryptjs");
 const fs = require('fs');
 const path = require("path");
 const { auth1, isAdmin, isCollege } = require("../../../helpers");
+const { resolveB2cProjectIds } = require("../../../helpers/b2cAccess");
 const moment = require("moment");
 const { Courses, CoursesCopy, College, Country, User, Qualification, CourseSectors, AppliedCourses, Center } = require("../../models");
 const Candidate = require("../../models/candidateProfile");
@@ -145,10 +146,26 @@ router.route("/").get(async (req, res) => {
 		fields["status"] = status;
 		let courses;
 
-		courses = await Courses.find({
+		const courseQuery = {
 			...fields,
 			college: college._id
-		}).populate("sectors");
+		};
+		const linked = await resolveB2cProjectIds(user);
+		if (linked.scoped) {
+			if (!linked.projectObjectIds.length) {
+				return res.json({
+					view,
+					courses: [],
+					isChecked,
+					data,
+					canEdit,
+					status
+				});
+			}
+			courseQuery.project = { $in: linked.projectObjectIds };
+		}
+
+		courses = await Courses.find(courseQuery).populate("sectors");
 
 
 
