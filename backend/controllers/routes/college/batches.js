@@ -6,6 +6,7 @@ const bcrypt = require("bcryptjs");
 const fs = require('fs');
 const path = require("path");
 const { auth1, isAdmin, isCollege } = require("../../../helpers");
+const { resolveB2cProjectIds } = require("../../../helpers/b2cAccess");
 const moment = require("moment");
 const { Courses,Batch, College,Country, Qualification, CourseSectors, AppliedCourses, Center } = require("../../models");
 const Candidate = require("../../models/candidateProfile");
@@ -108,10 +109,25 @@ router.route("/").get(async (req, res) => {
 		}
 
 
-		const batches = await Batch.find({
+		const batchQuery = {
 			status:'active',
 			college:college._id
-		});
+		};
+		const linked = await resolveB2cProjectIds(user);
+		if (linked.scoped) {
+			if (!linked.projectObjectIds.length) {
+				return res.json({
+					batches: []
+				});
+			}
+			const allowedCourses = await Courses.find({
+				project: { $in: linked.projectObjectIds },
+				college: college._id
+			}).select('_id').lean();
+			batchQuery.courseId = { $in: allowedCourses.map((c) => c._id) };
+		}
+
+		const batches = await Batch.find(batchQuery);
 
 		if(!batches){
 			console.log('batches not found')
