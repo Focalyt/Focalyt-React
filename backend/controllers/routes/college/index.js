@@ -61,7 +61,25 @@ const {
 	isIdAllowed,
 } = require('../../../helpers/b2cAccess');
 
+function isB2cQuickSearch(name) {
+	return Boolean(name && String(name).trim());
+}
+
+function applyB2cListAccessFilters(user, verticalsArray = [], projectsArray = [], name) {
+	// Quick search should find matching leads across all departments/projects the college has.
+	if (isB2cQuickSearch(name)) {
+		return { verticalsArray, projectsArray };
+	}
+	return applyB2cAccessToFilters(user, verticalsArray, projectsArray);
+}
+
 async function resolveB2cOwnershipTeamMembers(user, counselorArray = [], options = {}) {
+	// Quick search looks across all B2C leads, not only owned/assigned ones.
+	// Counselor dropdown is ignored for this lookup so a name/mobile/email match can be found.
+	if (options.searchAllLeads) {
+		return [];
+	}
+
 	if (Array.isArray(counselorArray) && counselorArray.length > 0) {
 		return counselorArray;
 	}
@@ -2249,9 +2267,12 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
 			projectsArray, verticalsArray, courseArray, centerArray, batchArray, name
 		});
-		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
+		({ verticalsArray, projectsArray } = applyB2cListAccessFilters(user, verticalsArray, projectsArray, name));
 
-		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, { userSelectedWideningFilter });
+		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, {
+			userSelectedWideningFilter,
+			searchAllLeads: isB2cQuickSearch(name),
+		});
 
 		let teamMemberIds = [];
 		if (teamMembers?.length > 0) {
@@ -2918,9 +2939,12 @@ router.route("/appliedCandidatesWithWhatsApp").get(isCollege, async (req, res) =
 		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
 			projectsArray, verticalsArray, courseArray, centerArray, name
 		});
-		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
+		({ verticalsArray, projectsArray } = applyB2cListAccessFilters(user, verticalsArray, projectsArray, name));
 
-		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, { userSelectedWideningFilter });
+		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, {
+			userSelectedWideningFilter,
+			searchAllLeads: isB2cQuickSearch(name),
+		});
 
 		let teamMemberIds = [];
 		if (teamMembers?.length > 0) {
@@ -3255,8 +3279,10 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 		baseMatch._id = { $in: filters.followupAppliedIds };
 	}
 
+	const applyDateFilters = !isB2cQuickSearch(filters.name);
+
 	// Add date filters
-	if (filters.createdFromDate || filters.createdToDate) {
+	if (applyDateFilters && (filters.createdFromDate || filters.createdToDate)) {
 		baseMatch.createdAt = {};
 		if (filters.createdFromDate) baseMatch.createdAt.$gte = new Date(filters.createdFromDate);
 		if (filters.createdToDate) {
@@ -3269,7 +3295,7 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 		}
 	}
 
-	if (filters.modifiedFromDate || filters.modifiedToDate) {
+	if (applyDateFilters && (filters.modifiedFromDate || filters.modifiedToDate)) {
 		baseMatch.updatedAt = {};
 		if (filters.modifiedFromDate) baseMatch.updatedAt.$gte = new Date(filters.modifiedFromDate);
 		if (filters.modifiedToDate) {
@@ -3280,7 +3306,7 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 		}
 	}
 
-	if (filters.nextActionFromDate || filters.nextActionToDate) {
+	if (applyDateFilters && (filters.nextActionFromDate || filters.nextActionToDate)) {
 		baseMatch.followupDate = {};
 		if (filters.nextActionFromDate) baseMatch.followupDate.$gte = new Date(filters.nextActionFromDate);
 		if (filters.nextActionToDate) {
@@ -3558,8 +3584,10 @@ function buildSimplifiedPipelineWithWhatsApp({ teamMemberIds, college, filters, 
 	}
 
 
+	const applyDateFilters = !isB2cQuickSearch(filters.name);
+
 	// Add date filters
-	if (filters.createdFromDate || filters.createdToDate) {
+	if (applyDateFilters && (filters.createdFromDate || filters.createdToDate)) {
 		baseMatch.createdAt = {};
 		if (filters.createdFromDate) baseMatch.createdAt.$gte = new Date(filters.createdFromDate);
 		if (filters.createdToDate) {
@@ -3572,7 +3600,7 @@ function buildSimplifiedPipelineWithWhatsApp({ teamMemberIds, college, filters, 
 		}
 	}
 
-	if (filters.modifiedFromDate || filters.modifiedToDate) {
+	if (applyDateFilters && (filters.modifiedFromDate || filters.modifiedToDate)) {
 		baseMatch.updatedAt = {};
 		if (filters.modifiedFromDate) baseMatch.updatedAt.$gte = new Date(filters.modifiedFromDate);
 		if (filters.modifiedToDate) {
@@ -3583,7 +3611,7 @@ function buildSimplifiedPipelineWithWhatsApp({ teamMemberIds, college, filters, 
 		}
 	}
 
-	if (filters.nextActionFromDate || filters.nextActionToDate) {
+	if (applyDateFilters && (filters.nextActionFromDate || filters.nextActionToDate)) {
 		baseMatch.followupDate = {};
 		if (filters.nextActionFromDate) baseMatch.followupDate.$gte = new Date(filters.nextActionFromDate);
 		if (filters.nextActionToDate) {
@@ -3949,9 +3977,12 @@ router.route("/downloadleads").get(isCollege, async (req, res) => {
 		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
 			projectsArray, verticalsArray, courseArray, centerArray, name
 		});
-		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
+		({ verticalsArray, projectsArray } = applyB2cListAccessFilters(user, verticalsArray, projectsArray, name));
 
-		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, { userSelectedWideningFilter });
+		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, {
+			userSelectedWideningFilter,
+			searchAllLeads: isB2cQuickSearch(name),
+		});
 
 		let teamMemberIds = [];
 		if (teamMembers?.length > 0) {
@@ -4055,8 +4086,10 @@ function downloadPipeline({ teamMemberIds, college, filters }) {
 	}
 
 
+	const applyDateFilters = !isB2cQuickSearch(filters.name);
+
 	// Add date filters
-	if (filters.createdFromDate || filters.createdToDate) {
+	if (applyDateFilters && (filters.createdFromDate || filters.createdToDate)) {
 		baseMatch.createdAt = {};
 		if (filters.createdFromDate) baseMatch.createdAt.$gte = new Date(filters.createdFromDate);
 		if (filters.createdToDate) {
@@ -4069,7 +4102,7 @@ function downloadPipeline({ teamMemberIds, college, filters }) {
 		}
 	}
 
-	if (filters.modifiedFromDate || filters.modifiedToDate) {
+	if (applyDateFilters && (filters.modifiedFromDate || filters.modifiedToDate)) {
 		baseMatch.updatedAt = {};
 		if (filters.modifiedFromDate) baseMatch.updatedAt.$gte = new Date(filters.modifiedFromDate);
 		if (filters.modifiedToDate) {
@@ -4080,7 +4113,7 @@ function downloadPipeline({ teamMemberIds, college, filters }) {
 		}
 	}
 
-	if (filters.nextActionFromDate || filters.nextActionToDate) {
+	if (applyDateFilters && (filters.nextActionFromDate || filters.nextActionToDate)) {
 		baseMatch.followupDate = {};
 		if (filters.nextActionFromDate) baseMatch.followupDate.$gte = new Date(filters.nextActionFromDate);
 		if (filters.nextActionToDate) {
@@ -4386,9 +4419,12 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
 			projectsArray, verticalsArray, courseArray, centerArray, name
 		});
-		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
+		({ verticalsArray, projectsArray } = applyB2cListAccessFilters(user, verticalsArray, projectsArray, name));
 
-		const teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, { userSelectedWideningFilter });
+		const teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, {
+			userSelectedWideningFilter,
+			searchAllLeads: isB2cQuickSearch(name),
+		});
 
 		const appliedFilters = {
 			name, courseType, status, leadStatus,
@@ -4475,8 +4511,9 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 
 		// Add date filters to base pipeline
 		const dateFilters = {};
+		const applyDateFilters = !isB2cQuickSearch(appliedFilters.name);
 
-		if (appliedFilters.createdFromDate || appliedFilters.createdToDate) {
+		if (applyDateFilters && (appliedFilters.createdFromDate || appliedFilters.createdToDate)) {
 			dateFilters.createdAt = {};
 			if (appliedFilters.createdFromDate) {
 				dateFilters.createdAt.$gte = new Date(appliedFilters.createdFromDate);
@@ -4490,7 +4527,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			}
 		}
 
-		if (appliedFilters.modifiedFromDate || appliedFilters.modifiedToDate) {
+		if (applyDateFilters && (appliedFilters.modifiedFromDate || appliedFilters.modifiedToDate)) {
 			dateFilters.updatedAt = {};
 			if (appliedFilters.modifiedFromDate) {
 				dateFilters.updatedAt.$gte = new Date(appliedFilters.modifiedFromDate);
@@ -4503,7 +4540,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			}
 		}
 
-		if (appliedFilters.nextActionFromDate || appliedFilters.nextActionToDate) {
+		if (applyDateFilters && (appliedFilters.nextActionFromDate || appliedFilters.nextActionToDate)) {
 			dateFilters.followupDate = {};
 			if (appliedFilters.nextActionFromDate) {
 				dateFilters.followupDate.$gte = new Date(appliedFilters.nextActionFromDate);
@@ -9582,9 +9619,12 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
 			projectsArray, verticalsArray, courseArray, centerArray, name
 		});
-		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
+		({ verticalsArray, projectsArray } = applyB2cListAccessFilters(user, verticalsArray, projectsArray, name));
 
-		teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, { userSelectedWideningFilter });
+		teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, {
+			userSelectedWideningFilter,
+			searchAllLeads: isB2cQuickSearch(name),
+		});
 
 		// Build aggregation pipeline
 		let aggregationPipeline = [];
@@ -9611,8 +9651,10 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			];
 		}
 
+		const applyDateFilters = !isB2cQuickSearch(name);
+
 		// Add date filters to base match
-		if (createdFromDate || createdToDate) {
+		if (applyDateFilters && (createdFromDate || createdToDate)) {
 			baseMatchStage.createdAt = {};
 			if (createdFromDate) {
 				baseMatchStage.createdAt.$gte = new Date(createdFromDate);
@@ -9623,7 +9665,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 				baseMatchStage.createdAt.$lte = toDate;
 			}
 		}
-		if (modifiedFromDate || modifiedToDate) {
+		if (applyDateFilters && (modifiedFromDate || modifiedToDate)) {
 			baseMatchStage.updatedAt = {};
 			if (modifiedFromDate) {
 				baseMatchStage.updatedAt.$gte = new Date(modifiedFromDate);
@@ -9635,7 +9677,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			}
 		}
 
-		if (nextActionFromDate || nextActionToDate) {
+		if (applyDateFilters && (nextActionFromDate || nextActionToDate)) {
 			baseMatchStage.followupDate = {};
 			if (nextActionFromDate) {
 				baseMatchStage.followupDate.$gte = new Date(nextActionFromDate);
@@ -11706,9 +11748,12 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
 			projectsArray, verticalsArray, courseArray, centerArray, batchArray, name
 		});
-		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
+		({ verticalsArray, projectsArray } = applyB2cListAccessFilters(user, verticalsArray, projectsArray, name));
 
-		teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, { userSelectedWideningFilter });
+		teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, {
+			userSelectedWideningFilter,
+			searchAllLeads: isB2cQuickSearch(name),
+		});
 
 		let teamMemberIds = [];
 		if (teamMembers?.length > 0) {
@@ -11733,8 +11778,10 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 				{ counsellor: { $in: teamMemberIds } }
 			];
 		}
+		const applyDateFilters = !isB2cQuickSearch(name);
+
 		// Add date filters to base match
-		if (createdFromDate || createdToDate) {
+		if (applyDateFilters && (createdFromDate || createdToDate)) {
 			baseMatchStage.createdAt = {};
 			if (createdFromDate) {
 				baseMatchStage.createdAt.$gte = new Date(createdFromDate);
@@ -11745,7 +11792,7 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 				baseMatchStage.createdAt.$lte = toDate;
 			}
 		}
-		if (modifiedFromDate || modifiedToDate) {
+		if (applyDateFilters && (modifiedFromDate || modifiedToDate)) {
 			baseMatchStage.updatedAt = {};
 			if (modifiedFromDate) {
 				baseMatchStage.updatedAt.$gte = new Date(modifiedFromDate);
@@ -11756,7 +11803,7 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 				baseMatchStage.updatedAt.$lte = toDate;
 			}
 		}
-		if (nextActionFromDate || nextActionToDate) {
+		if (applyDateFilters && (nextActionFromDate || nextActionToDate)) {
 			baseMatchStage.followupDate = {};
 			if (nextActionFromDate) {
 				baseMatchStage.followupDate.$gte = new Date(nextActionFromDate);
@@ -13164,9 +13211,12 @@ router.get('/dashbord-data', isCollege, async (req, res) => {
 		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
 			projectsArray, verticalsArray, courseArray, centerArray, name
 		});
-		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
+		({ verticalsArray, projectsArray } = applyB2cListAccessFilters(user, verticalsArray, projectsArray, name));
 
-		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, { userSelectedWideningFilter });
+		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, {
+			userSelectedWideningFilter,
+			searchAllLeads: isB2cQuickSearch(name),
+		});
 
 		// Build date filter
 		let dateFilter = {};
