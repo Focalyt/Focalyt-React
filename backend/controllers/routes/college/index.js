@@ -21,6 +21,7 @@ let path = require("path");
 const candidateRoutes = require("./candidate");
 const digitalLeadRoutes = require('./digitalLead');
 const leadAssignmentRuleRoutes = require("./leadAssingmentRule");
+const jobAssignmentRuleRoutes = require("./jobAssignmentRule");
 const attendanceRoutes = require("./attendance");
 const classroomMediaRoutes = require("./classroomMedia");
 const whatsappRoutes = require("./whatsapp");
@@ -291,6 +292,7 @@ router.use("/whatsapp", whatsappRoutes);
 
 router.use("/digitalLead", digitalLeadRoutes);
 router.use("/leadAssignmentRule", isCollege, leadAssignmentRuleRoutes);
+router.use("/jobAssignmentRule", isCollege, jobAssignmentRuleRoutes);
 router.use("/users", userRoutes);
 router.use("/batches", isCollege, batchRoutes);
 router.use("/sms", isCollege, smsRoutes);

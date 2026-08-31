@@ -20,6 +20,7 @@ import PermissionAnalysis from './AccessManagement/PermissionAnalysis';
 import RoleManagement from './AccessManagement/RoleManagement';
 import Settings from './AccessManagement/Settings';
 import LeadAssignmentRule from './leadAssignmentRule';
+import JobAssignmentRule from './jobAssignmentRule';
 import EditUserModal from './AccessManagement/Modals/EditUserModal';
 import qs from 'query-string';
 
@@ -39,6 +40,7 @@ const AccessManagement = () => {
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
   const [activeTab, setActiveTab] = useState('users');
+  const [assignmentRuleType, setAssignmentRuleType] = useState('leads');
   const [permissionMode, setPermissionMode] = useState('unified');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -415,11 +417,39 @@ const fetchBatches = async () => {
         );
       case 'assignments':
         return (
-          <LeadAssignmentRule
-            assignmentRules={assignmentRules}            
-            users={users}
-            enhancedEntities={enhancedEntities}
-          />
+          <div>
+            <ul className="nav nav-pills mb-3">
+              <li className="nav-item">
+                <button
+                  type="button"
+                  className={`nav-link ${assignmentRuleType === 'leads' ? 'active' : ''}`}
+                  onClick={() => setAssignmentRuleType('leads')}
+                  style={assignmentRuleType === 'leads' ? { backgroundColor: '#ff6b35', color: '#fff' } : {}}
+                >
+                  Lead Rules
+                </button>
+              </li>
+              <li className="nav-item">
+                <button
+                  type="button"
+                  className={`nav-link ${assignmentRuleType === 'jobs' ? 'active' : ''}`}
+                  onClick={() => setAssignmentRuleType('jobs')}
+                  style={assignmentRuleType === 'jobs' ? { backgroundColor: '#ff6b35', color: '#fff' } : {}}
+                >
+                  Job Rules
+                </button>
+              </li>
+            </ul>
+            {assignmentRuleType === 'leads' ? (
+              <LeadAssignmentRule
+                assignmentRules={assignmentRules}
+                users={users}
+                enhancedEntities={enhancedEntities}
+              />
+            ) : (
+              <JobAssignmentRule users={users} />
+            )}
+          </div>
         );
       case 'analysis':
         return (
