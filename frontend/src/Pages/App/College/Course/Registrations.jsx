@@ -804,6 +804,7 @@ const CRMDashboard = () => {
     course: '',
     batch: '',
     counsellor: '',
+    owner: '',
   });
   const [headerDatePreset, setHeaderDatePreset] = useState('');
   const [headerDateFrom, setHeaderDateFrom] = useState(() => {
@@ -2686,6 +2687,10 @@ const CRMDashboard = () => {
       type: "includes",
       values: []
     },
+    owner: {
+      type: "includes",
+      values: []
+    },
     sector: {
       type: "includes",
       values: []
@@ -2738,6 +2743,7 @@ const CRMDashboard = () => {
     const centerValues = cycle.center ? [cycle.center] : (fd.center?.values || []);
     const batchValues = cycle.batch ? [cycle.batch] : [];
     const counselorValues = cycle.counsellor ? [cycle.counsellor] : (fd.counselor?.values || []);
+    const ownerValues = cycle.owner ? [cycle.owner] : (fd.owner?.values || []);
     return {
       ...(projectsValues.length > 0 && { projects: JSON.stringify(projectsValues) }),
       ...(verticalsValues.length > 0 && { verticals: JSON.stringify(verticalsValues) }),
@@ -2745,6 +2751,7 @@ const CRMDashboard = () => {
       ...(centerValues.length > 0 && { center: JSON.stringify(centerValues) }),
       ...(batchValues.length > 0 && { batch: JSON.stringify(batchValues) }),
       ...(counselorValues.length > 0 && { counselor: JSON.stringify(counselorValues) }),
+      ...(ownerValues.length > 0 && { owner: JSON.stringify(ownerValues) }),
     };
   }, [formData, cycleFilters]);
 
@@ -2830,6 +2837,7 @@ const CRMDashboard = () => {
     course: false,
     center: false,
     counselor: false,
+    owner: false,
     sector: false,
     statuses: false,
     subStatuses: false
@@ -3172,6 +3180,7 @@ const CRMDashboard = () => {
       course: { type: "includes", values: [] },
       center: { type: "includes", values: [] },
       counselor: { type: "includes", values: [] },
+      owner: { type: "includes", values: [] },
       sector: { type: "includes", values: [] },
     });
     setCycleFilters({
@@ -3181,6 +3190,7 @@ const CRMDashboard = () => {
       course: '',
       batch: '',
       counsellor: '',
+      owner: '',
     });
     resetHeaderDateFilterState();
     setLeadViewTab('all');
@@ -13224,6 +13234,8 @@ useEffect(() => {
       next = { ...cycleFilters, batch: value };
     } else if (key === 'counsellor') {
       next = { ...cycleFilters, counsellor: value };
+    } else if (key === 'owner') {
+      next = { ...cycleFilters, owner: value };
     }
 
     setCycleFilters(next);
@@ -13235,6 +13247,7 @@ useEffect(() => {
         course: { ...fd.course, values: next.course ? [next.course] : [] },
         center: { ...fd.center, values: next.center ? [next.center] : [] },
         counselor: { ...fd.counselor, values: next.counsellor ? [next.counsellor] : [] },
+        owner: { ...(fd.owner || { type: 'includes', values: [] }), values: next.owner ? [next.owner] : [] },
       };
       formDataRef.current = updated;
       return updated;
@@ -13431,6 +13444,22 @@ useEffect(() => {
             Clear
           </button>
         )}
+        <label className="adm-header-owner-filter" htmlFor={compact ? 'adm-filter-owner-mobile' : 'adm-filter-owner-header'}>
+          <span className="adm-header-owner-filter__label">
+            <i className="fas fa-user" aria-hidden="true" /> Owner
+          </span>
+          <select
+            id={compact ? 'adm-filter-owner-mobile' : 'adm-filter-owner-header'}
+            className="adm-header-owner-filter__select"
+            value={cycleFilters.owner || ''}
+            onChange={(e) => handleCycleFilterChange('owner', e.target.value)}
+          >
+            <option value="">All</option>
+            {counselorOptions.map((opt) => (
+              <option key={`owner-header-${opt.value}`} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </label>
       </div>
     </div>
   );
@@ -13530,6 +13559,22 @@ useEffect(() => {
           <option value="">All</option>
           {counselorOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="adm-filter-owner">
+          <i className="fas fa-user" aria-hidden="true" /> Owner
+        </label>
+        <select
+          id="adm-filter-owner"
+          className="b2b-cycle-filters__select"
+          value={cycleFilters.owner || ''}
+          onChange={(e) => handleCycleFilterChange('owner', e.target.value)}
+        >
+          <option value="">All</option>
+          {counselorOptions.map((opt) => (
+            <option key={`owner-${opt.value}`} value={opt.value}>{opt.label}</option>
           ))}
         </select>
       </div>
@@ -14786,16 +14831,50 @@ useEffect(() => {
       <div>
       <style>
         {`
+          .adm-header-owner-filter{
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            margin-left: 4px;
+            min-width: 120px;
+          }
+          .adm-header-owner-filter__label{
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #6b7280;
+            line-height: 1.2;
+          }
+          .adm-header-owner-filter__label i{
+            margin-right: 3px;
+            color: rgb(250, 85, 121);
+            font-size: 8px;
+          }
+          .adm-header-owner-filter__select{
+            font-size: 11px;
+            font-weight: 500;
+            height: 28px;
+            min-width: 120px;
+            padding: 2px 22px 2px 8px;
+            border: 1.5px solid #e8eaed;
+            border-radius: 999px;
+            background-color: #fff;
+            color: #1f2937;
+            cursor: pointer;
+          }
+          .adm-header-owner-filter__select:focus{
+            outline: none;
+            border-color: rgb(250, 85, 121);
+          }
           .b2b-cycle-filters{
             display: flex;
-            flex-wrap: nowrap;
+            flex-wrap: wrap;
             align-items: flex-end;
             justify-content: flex-end;
             gap: 6px 8px;
             max-width: 100%;
-            overflow-x: auto;
-            overflow-y: hidden;
-            scrollbar-width: thin;
+            overflow: visible;
           }
           .b2b-cycle-filters__item{
             display: flex;
@@ -14803,7 +14882,7 @@ useEffect(() => {
             gap: 3px;
             min-width: 0;
             flex: 0 0 auto;
-            width: 88px;
+            width: 76px;
           }
           .b2b-cycle-filters__label{
             font-size: 9px;
@@ -15406,7 +15485,7 @@ useEffect(() => {
                     {renderHeaderDateRangeFilter(true)}
                   </div>
 
-                  <div className="col-md-8 col-xl-8 d-none d-md-flex justify-content-end align-items-center">
+                  <div className="col-md-8 col-xl-8 d-none d-md-flex justify-content-end align-items-center flex-wrap">
                     {renderCycleFilterDropdowns()}
                   </div>
 
@@ -16201,6 +16280,17 @@ useEffect(() => {
                           icon="fas fa-user-tie"
                           isOpen={dropdownStates.counselor}
                           onToggle={() => toggleDropdown('counselor')}
+                        />
+                      </div>
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Owner"
+                          options={counselorOptions}
+                          selectedValues={formData.owner?.values || []}
+                          onChange={(values) => handleCriteriaChange('owner', values)}
+                          icon="fas fa-user"
+                          isOpen={dropdownStates.owner}
+                          onToggle={() => toggleDropdown('owner')}
                         />
                       </div>
                     </div>

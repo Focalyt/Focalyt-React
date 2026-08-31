@@ -132,6 +132,8 @@ vacancySchema.methods.assignHr = async function () {
     const User = mongoose.model("User");
 
     const jobCategoryId = this._jobCategory;
+    const vacancyId = this._id;
+    const jobTitle = this.title;
 
     const categoryMatch = [{ "jobCategory.type": "any" }];
     if (jobCategoryId) {
@@ -141,9 +143,32 @@ vacancySchema.methods.assignHr = async function () {
       });
     }
 
+    const jobNameIds = new Set();
+    if (vacancyId) {
+      jobNameIds.add(vacancyId.toString());
+    }
+    if (jobTitle) {
+      const sameNameJobs = await Vacancy.find({ status: true, title: jobTitle }).select("_id").lean();
+      sameNameJobs.forEach((job) => jobNameIds.add(job._id.toString()));
+    }
+
+    const jobNameMatch = [
+      { "jobName.type": "any" },
+      { jobName: { $exists: false } },
+    ];
+    if (jobNameIds.size > 0) {
+      jobNameMatch.push({
+        "jobName.type": "includes",
+        "jobName.values": { $in: [...jobNameIds] },
+      });
+    }
+
     const applicableRules = await JobAssignmentRule.find({
       status: "Active",
-      $or: categoryMatch,
+      $and: [
+        { $or: categoryMatch },
+        { $or: jobNameMatch },
+      ],
     });
 
     let allHrs = [];

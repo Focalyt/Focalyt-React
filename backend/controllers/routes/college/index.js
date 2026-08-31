@@ -103,6 +103,45 @@ async function resolveB2cOwnershipTeamMembers(user, counselorArray = [], options
 	return user?._id ? [user._id] : [];
 }
 
+function parseB2cFilterIdArray(value) {
+	if (!value) return [];
+	try {
+		const parsed = JSON.parse(value);
+		if (Array.isArray(parsed)) return parsed.filter(Boolean);
+	} catch (_) { }
+	if (Array.isArray(value)) return value.filter(Boolean);
+	return String(value).split(',').map((id) => id.trim()).filter(Boolean);
+}
+
+function toB2cObjectIdList(ids = []) {
+	return (ids || [])
+		.filter(Boolean)
+		.map((id) => (id instanceof mongoose.Types.ObjectId ? id : new mongoose.Types.ObjectId(id)));
+}
+
+function applyB2cLeadOwnershipMatch(baseMatch, { teamMemberIds, registeredByMe, ownerIds } = {}) {
+	const ownerObjectIds = toB2cObjectIdList(ownerIds);
+	if (ownerObjectIds.length > 0) {
+		delete baseMatch.$or;
+		baseMatch.counsellor = { $in: ownerObjectIds };
+	}
+	if (registeredByMe) {
+		baseMatch.registeredBy = new mongoose.Types.ObjectId(registeredByMe);
+		return;
+	}
+	if (ownerObjectIds.length > 0) {
+		return;
+	}
+	if (teamMemberIds && teamMemberIds.length > 0) {
+		baseMatch.$or = [
+			{ registeredBy: { $in: teamMemberIds } },
+			{ counsellor: { $in: teamMemberIds } },
+			{ leadCoOwner: { $in: teamMemberIds } },
+			{ leadCoOwner2: { $in: teamMemberIds } }
+		];
+	}
+}
+
 function hasB2cUserSelectedWideningFilter({
 	projectsArray,
 	verticalsArray,
@@ -2245,7 +2284,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			name, courseType, status, leadStatus,
 			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
 			nextActionFromDate, nextActionToDate,
-			projects, verticals, course, center, counselor, subStatuses, batch, registeredByMe,
+			projects, verticals, course, center, counselor, owner, subStatuses, batch, registeredByMe,
 			followupStatus, approvalStatus,
 			hasFollowUpCall, hasFollowUpVisit,
 		} = req.query;
@@ -2257,6 +2296,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		let courseArray = [];
 		let centerArray = [];
 		let counselorArray = [];
+		let ownerArray = [];
 		let batchArray = [];
 
 		try {
@@ -2269,6 +2309,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
+		ownerArray = parseB2cFilterIdArray(owner);
 
 		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
 			projectsArray, verticalsArray, courseArray, centerArray, batchArray, name
@@ -2324,6 +2365,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				nextActionFromDate, nextActionToDate,
 				projectsArray, verticalsArray, courseArray, centerArray, batchArray, subStatuses,
 				registeredByMe: registeredByMe || null,
+				ownerIds: ownerArray,
 				followupAppliedIds,
 				approvalStatus,
 				hasFollowUpCall,
@@ -2922,7 +2964,7 @@ router.route("/appliedCandidatesWithWhatsApp").get(isCollege, async (req, res) =
 			name, courseType, status, leadStatus,
 			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
 			nextActionFromDate, nextActionToDate,
-			projects, verticals, course, center, counselor, subStatuses
+			projects, verticals, course, center, counselor, owner, subStatuses
 		} = req.query;
 
 		// Parse multi-select filters
@@ -2931,6 +2973,7 @@ router.route("/appliedCandidatesWithWhatsApp").get(isCollege, async (req, res) =
 		let courseArray = [];
 		let centerArray = [];
 		let counselorArray = [];
+		let ownerArray = [];
 
 		try {
 			if (projects) projectsArray = JSON.parse(projects);
@@ -2941,6 +2984,7 @@ router.route("/appliedCandidatesWithWhatsApp").get(isCollege, async (req, res) =
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
+		ownerArray = parseB2cFilterIdArray(owner);
 
 		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
 			projectsArray, verticalsArray, courseArray, centerArray, name
@@ -2969,7 +3013,8 @@ router.route("/appliedCandidatesWithWhatsApp").get(isCollege, async (req, res) =
 				createdFromDate, createdToDate,
 				modifiedFromDate, modifiedToDate,
 				nextActionFromDate, nextActionToDate,
-				projectsArray, verticalsArray, courseArray, centerArray, subStatuses
+				projectsArray, verticalsArray, courseArray, centerArray, subStatuses,
+				ownerIds: ownerArray,
 			},
 			pagination: { skip, limit }
 		});
@@ -3270,16 +3315,11 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 		};
 	}
 
-	if (filters.registeredByMe) {
-		baseMatch.registeredBy = new mongoose.Types.ObjectId(filters.registeredByMe);
-	} else if (teamMemberIds && teamMemberIds.length > 0) {
-		baseMatch.$or = [
-			{ registeredBy: { $in: teamMemberIds } },
-			{ counsellor: { $in: teamMemberIds } },
-			{ leadCoOwner: { $in: teamMemberIds } },
-			{ leadCoOwner2: { $in: teamMemberIds } }
-		];
-	}
+	applyB2cLeadOwnershipMatch(baseMatch, {
+		teamMemberIds,
+		registeredByMe: filters.registeredByMe,
+		ownerIds: filters.ownerIds,
+	});
 
 	if (filters.followupAppliedIds && filters.followupAppliedIds.length > 0) {
 		baseMatch._id = { $in: filters.followupAppliedIds };
@@ -3578,16 +3618,11 @@ function buildSimplifiedPipelineWithWhatsApp({ teamMemberIds, college, filters, 
 
 
 
-	if (filters.registeredByMe) {
-		baseMatch.registeredBy = new mongoose.Types.ObjectId(filters.registeredByMe);
-	} else if (teamMemberIds && teamMemberIds.length > 0) {
-		baseMatch.$or = [
-			{ registeredBy: { $in: teamMemberIds } },
-			{ counsellor: { $in: teamMemberIds } },
-			{ leadCoOwner: { $in: teamMemberIds } },
-			{ leadCoOwner2: { $in: teamMemberIds } }
-		];
-	}
+	applyB2cLeadOwnershipMatch(baseMatch, {
+		teamMemberIds,
+		registeredByMe: filters.registeredByMe,
+		ownerIds: filters.ownerIds,
+	});
 
 
 	const applyDateFilters = !isB2cQuickSearch(filters.name);
@@ -3960,7 +3995,7 @@ router.route("/downloadleads").get(isCollege, async (req, res) => {
 			name, courseType, status, leadStatus,
 			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
 			nextActionFromDate, nextActionToDate,
-			projects, verticals, course, center, counselor, subStatuses
+			projects, verticals, course, center, counselor, owner, subStatuses
 		} = req.query;
 
 		// Parse multi-select filters
@@ -3969,6 +4004,7 @@ router.route("/downloadleads").get(isCollege, async (req, res) => {
 		let courseArray = [];
 		let centerArray = [];
 		let counselorArray = [];
+		let ownerArray = [];
 
 		try {
 			if (projects) projectsArray = JSON.parse(projects);
@@ -3979,6 +4015,7 @@ router.route("/downloadleads").get(isCollege, async (req, res) => {
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
+		ownerArray = parseB2cFilterIdArray(owner);
 
 		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
 			projectsArray, verticalsArray, courseArray, centerArray, name
@@ -4007,7 +4044,8 @@ router.route("/downloadleads").get(isCollege, async (req, res) => {
 				createdFromDate, createdToDate,
 				modifiedFromDate, modifiedToDate,
 				nextActionFromDate, nextActionToDate,
-				projectsArray, verticalsArray, courseArray, centerArray, subStatuses
+				projectsArray, verticalsArray, courseArray, centerArray, subStatuses,
+				ownerIds: ownerArray
 			}
 		});
 
@@ -4080,16 +4118,11 @@ function downloadPipeline({ teamMemberIds, college, filters }) {
 
 
 
-	if (filters.registeredByMe) {
-		baseMatch.registeredBy = new mongoose.Types.ObjectId(filters.registeredByMe);
-	} else if (teamMemberIds && teamMemberIds.length > 0) {
-		baseMatch.$or = [
-			{ registeredBy: { $in: teamMemberIds } },
-			{ counsellor: { $in: teamMemberIds } },
-			{ leadCoOwner: { $in: teamMemberIds } },
-			{ leadCoOwner2: { $in: teamMemberIds } }
-		];
-	}
+	applyB2cLeadOwnershipMatch(baseMatch, {
+		teamMemberIds,
+		registeredByMe: filters.registeredByMe,
+		ownerIds: filters.ownerIds,
+	});
 
 
 	const applyDateFilters = !isB2cQuickSearch(filters.name);
@@ -4400,7 +4433,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			name, courseType, status, leadStatus,
 			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
 			nextActionFromDate, nextActionToDate,
-			projects, verticals, course, center, counselor,
+			projects, verticals, course, center, counselor, owner,
 			subStatuses
 		} = req.query;
 
@@ -4411,6 +4444,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 		let courseArray = [];
 		let centerArray = [];
 		let counselorArray = [];
+		let ownerArray = [];
 
 		try {
 			if (projects) projectsArray = JSON.parse(projects);
@@ -4421,6 +4455,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
+		ownerArray = parseB2cFilterIdArray(owner);
 
 		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
 			projectsArray, verticalsArray, courseArray, centerArray, name
@@ -4504,7 +4539,11 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 		// 	basePipeline[0].$match.kycStage = { $in: [true] };
 		// }
 
-		if (teamMemberIds && teamMemberIds.length > 0) {
+		if (ownerArray.length > 0) {
+			const ownerObjectIds = toB2cObjectIdList(ownerArray);
+			basePipeline[0].$match.counsellor = { $in: ownerObjectIds };
+			movedInKYCPipeline[0].$match.counsellor = { $in: ownerObjectIds };
+		} else if (teamMemberIds && teamMemberIds.length > 0) {
 			basePipeline[0].$match.$or = [
 				{ registeredBy: { $in: teamMemberIds } },
 				{ counsellor: { $in: teamMemberIds } }
@@ -9602,7 +9641,8 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			verticals,
 			course,
 			center,
-			counselor
+			counselor,
+			owner
 		} = req.query;
 
 		// Parse multi-select filter values
@@ -9611,6 +9651,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 		let courseArray = [];
 		let centerArray = [];
 		let counselorArray = [];
+		let ownerArray = [];
 
 		try {
 			if (projects) projectsArray = JSON.parse(projects);
@@ -9621,6 +9662,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
+		ownerArray = parseB2cFilterIdArray(owner);
 
 		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
 			projectsArray, verticalsArray, courseArray, centerArray, name
@@ -9649,7 +9691,9 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 
 		};
 
-		if (teamMemberIds && teamMemberIds.length > 0) {
+		if (ownerArray.length > 0) {
+			baseMatchStage.counsellor = { $in: toB2cObjectIdList(ownerArray) };
+		} else if (teamMemberIds && teamMemberIds.length > 0) {
 
 			baseMatchStage.$or = [
 				{ registeredBy: { $in: teamMemberIds } },

@@ -44,10 +44,12 @@ const JobAssignmentRule = ({ users = [] }) => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [jobCategories, setJobCategories] = useState([]);
+  const [jobNames, setJobNames] = useState([]);
 
   const [formData, setFormData] = useState({
     ruleName: '',
     jobCategory: { type: 'includes', values: [] },
+    jobName: { type: 'includes', values: [] },
     assignedHrs: []
   });
 
@@ -74,6 +76,38 @@ const JobAssignmentRule = ({ users = [] }) => {
       })));
     } catch (err) {
       console.error('Error fetching job categories:', err);
+    }
+  }, [backendUrl, token]);
+
+  const fetchJobNames = useCallback(async (categoryCriteria) => {
+    try {
+      const params = {};
+      if (categoryCriteria?.type === 'includes') {
+        const categoryIds = (categoryCriteria.values || [])
+          .map((category) => category.id || category._id || category)
+          .filter(Boolean);
+        if (categoryIds.length === 0) {
+          setJobNames([]);
+          return;
+        }
+        params.categoryIds = categoryIds.join(',');
+      }
+
+      const response = await axios.get(`${backendUrl}/college/jobAssignmentRule/job-names`, {
+        headers: { 'x-auth': token },
+        params
+      });
+      const jobs = response.data.data || [];
+      setJobNames(jobs.map((job) => ({
+        id: job._id || job.id,
+        _id: job._id || job.id,
+        name: job.name || job.title,
+        title: job.title || job.name,
+        _jobCategory: job._jobCategory
+      })));
+    } catch (err) {
+      console.error('Error fetching job names:', err);
+      setJobNames([]);
     }
   }, [backendUrl, token]);
 
@@ -117,6 +151,11 @@ const JobAssignmentRule = ({ users = [] }) => {
     fetchJobCategories();
   }, [fetchJobCategories]);
 
+  useEffect(() => {
+    if (!isModalOpen) return;
+    fetchJobNames(formData.jobCategory);
+  }, [isModalOpen, formData.jobCategory, fetchJobNames]);
+
   const toggleRuleStatus = async (ruleId, currentStatus) => {
     try {
       const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
@@ -151,7 +190,7 @@ const JobAssignmentRule = ({ users = [] }) => {
     const lastInteractedOption = useRef(null);
 
     const filteredOptions = (options || []).filter((option) => {
-      const optionText = typeof option === 'string' ? option : option.name || option.label || option.id || '';
+      const optionText = typeof option === 'string' ? option : option.name || option.title || option.label || option.id || '';
       return optionText.toLowerCase().includes(dropdownSearch.toLowerCase());
     });
 
@@ -214,7 +253,7 @@ const JobAssignmentRule = ({ users = [] }) => {
                 <div className="d-flex flex-wrap gap-1">
                   {selected.slice(0, 2).map((item, index) => (
                     <span key={index} className="badge text-white me-1" style={{ backgroundColor: '#ff6b35' }}>
-                      {typeof item === 'string' ? item : item.name || item.label}
+                      {typeof item === 'string' ? item : item.name || item.title || item.label}
                     </span>
                   ))}
                   {selected.length > 2 && (
@@ -283,7 +322,7 @@ const JobAssignmentRule = ({ users = [] }) => {
                     />
                   </div>
                   <span style={{ pointerEvents: 'none', userSelect: 'none' }}>
-                    {typeof option === 'string' ? option : option.name || option.label}
+                    {typeof option === 'string' ? option : option.name || option.title || option.label}
                   </span>
                 </div>
               ))}
@@ -340,16 +379,39 @@ const JobAssignmentRule = ({ users = [] }) => {
     }));
   }, []);
 
-  const handleCriteriaChange = useCallback((type, values = []) => {
-    setFormData((prev) => ({
-      ...prev,
-      jobCategory: { type, values }
-    }));
+  const handleCriteriaChange = useCallback((criteria, type, values = []) => {
+    setFormData((prev) => {
+      const next = {
+        ...prev,
+        [criteria]: { type, values }
+      };
+      if (criteria === 'jobCategory') {
+        next.jobName = { type: prev.jobName?.type || 'includes', values: [] };
+      }
+      return next;
+    });
   }, []);
+
+  const getFilteredJobNames = useCallback(() => {
+    if (formData.jobCategory.type === 'any') {
+      return jobNames;
+    }
+    if (formData.jobCategory.values.length === 0) {
+      return [];
+    }
+    const selectedCategoryIds = formData.jobCategory.values.map((category) =>
+      String(category.id || category._id || category)
+    );
+    return jobNames.filter((job) => {
+      const categoryId = job._jobCategory?._id || job._jobCategory;
+      return categoryId && selectedCategoryIds.includes(String(categoryId));
+    });
+  }, [jobNames, formData.jobCategory]);
 
   const emptyForm = {
     ruleName: '',
     jobCategory: { type: 'includes', values: [] },
+    jobName: { type: 'includes', values: [] },
     assignedHrs: []
   };
 
@@ -372,6 +434,12 @@ const JobAssignmentRule = ({ users = [] }) => {
           type: formData.jobCategory.type,
           values: formData.jobCategory.type === 'includes'
             ? formData.jobCategory.values.map((category) => category.id || category._id || category)
+            : []
+        },
+        jobName: {
+          type: formData.jobName.type,
+          values: formData.jobName.type === 'includes'
+            ? formData.jobName.values.map((job) => job.id || job._id || job)
             : []
         }
       };
@@ -415,6 +483,14 @@ const JobAssignmentRule = ({ users = [] }) => {
         type: rule.jobCategory?.type || 'includes',
         values: rule.jobCategory?.values || []
       },
+      jobName: {
+        type: rule.jobName?.type || 'includes',
+        values: (rule.jobName?.values || []).filter(Boolean).map((job) => ({
+          ...job,
+          id: job._id || job.id,
+          name: job.name || job.title
+        }))
+      },
       assignedHrs: rule.assignedHrs || []
     });
     setIsModalOpen(true);
@@ -453,7 +529,8 @@ const JobAssignmentRule = ({ users = [] }) => {
 
   const canSubmit = formData.ruleName.trim() &&
     formData.assignedHrs.length > 0 &&
-    (formData.jobCategory.type === 'any' || formData.jobCategory.values.length > 0);
+    (formData.jobCategory.type === 'any' || formData.jobCategory.values.length > 0) &&
+    (formData.jobName.type === 'any' || formData.jobName.values.length > 0);
 
   return (
     <div>
@@ -539,6 +616,7 @@ const JobAssignmentRule = ({ users = [] }) => {
                               Created On {sortConfig.key === 'createdAt' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                             </th>
                             <th className="border-0 px-4 py-3 fw-semibold text-dark">Job Category</th>
+                            <th className="border-0 px-4 py-3 fw-semibold text-dark">Job Name</th>
                             <th className="border-0 px-4 py-3 fw-semibold text-dark">HR</th>
                             <th
                               className="border-0 px-4 py-3 fw-semibold text-dark"
@@ -574,6 +652,22 @@ const JobAssignmentRule = ({ users = [] }) => {
                                     </>
                                   )}
                                 </td>
+                                <td className="px-4 py-3">
+                                  {rule.jobName?.type === 'any' || !rule.jobName?.type ? (
+                                    <span className="badge bg-info text-white">Any Job Name</span>
+                                  ) : (
+                                    <>
+                                      {rule.jobName?.values?.slice(0, 1).map((item, idx) => (
+                                        <span key={idx} className="badge text-white me-1" style={{ backgroundColor: '#ff6b35' }}>
+                                          {item.name || item.title || item}
+                                        </span>
+                                      ))}
+                                      {rule.jobName?.values?.length > 1 && (
+                                        <span className="text-muted small">+{rule.jobName.values.length - 1}</span>
+                                      )}
+                                    </>
+                                  )}
+                                </td>
                                 <td className="px-4 py-3 text-muted">
                                   {rule.assignedHrs?.map((hr) => hr.name || hr).join(', ') || 'N/A'}
                                 </td>
@@ -604,7 +698,7 @@ const JobAssignmentRule = ({ users = [] }) => {
                             ))
                           ) : (
                             <tr>
-                              <td colSpan="6" className="text-center py-4 text-muted">
+                              <td colSpan="7" className="text-center py-4 text-muted">
                                 No rules found matching your criteria
                               </td>
                             </tr>
@@ -660,14 +754,14 @@ const JobAssignmentRule = ({ users = [] }) => {
                     </div>
 
                     <div className="mb-4">
-                      <h6 className="fw-medium text-dark mb-3">Criteria: When &quot;Job Category&quot;</h6>
+                      <h6 className="fw-medium text-dark mb-3">Criteria 1: When &quot;Job Category&quot;</h6>
                       <div className="d-flex gap-4 mb-3">
                         <div className="form-check">
                           <input
                             type="radio"
                             name="jobCategory"
                             checked={formData.jobCategory.type === 'includes'}
-                            onChange={() => handleCriteriaChange('includes', formData.jobCategory.values)}
+                            onChange={() => handleCriteriaChange('jobCategory', 'includes', formData.jobCategory.values)}
                             className="form-check-input"
                             id="jobCategory-includes"
                             style={{ accentColor: '#ff6b35' }}
@@ -681,7 +775,7 @@ const JobAssignmentRule = ({ users = [] }) => {
                             type="radio"
                             name="jobCategory"
                             checked={formData.jobCategory.type === 'any'}
-                            onChange={() => handleCriteriaChange('any', [])}
+                            onChange={() => handleCriteriaChange('jobCategory', 'any', [])}
                             className="form-check-input"
                             id="jobCategory-any"
                             style={{ accentColor: '#ff6b35' }}
@@ -695,9 +789,62 @@ const JobAssignmentRule = ({ users = [] }) => {
                         <MultiSelectDropdown
                           options={jobCategories}
                           selected={formData.jobCategory.values}
-                          onChange={(values) => handleCriteriaChange('includes', values)}
+                          onChange={(values) => handleCriteriaChange('jobCategory', 'includes', values)}
                           placeholder="Select Job Category"
                         />
+                      )}
+                    </div>
+
+                    <div className="text-center my-4">
+                      <span className="badge px-3 py-2 fw-medium" style={{ backgroundColor: '#ff6b35', color: 'white' }}>AND</span>
+                    </div>
+
+                    <div className="mb-4">
+                      <h6 className="fw-medium text-dark mb-3">Criteria 2: When &quot;Job Name&quot;</h6>
+                      <div className="d-flex gap-4 mb-3">
+                        <div className="form-check">
+                          <input
+                            type="radio"
+                            name="jobName"
+                            checked={formData.jobName.type === 'includes'}
+                            onChange={() => handleCriteriaChange('jobName', 'includes', formData.jobName.values)}
+                            className="form-check-input"
+                            id="jobName-includes"
+                            style={{ accentColor: '#ff6b35' }}
+                          />
+                          <label className="form-check-label" htmlFor="jobName-includes">
+                            Includes
+                          </label>
+                        </div>
+                        <div className="form-check">
+                          <input
+                            type="radio"
+                            name="jobName"
+                            checked={formData.jobName.type === 'any'}
+                            onChange={() => handleCriteriaChange('jobName', 'any', [])}
+                            className="form-check-input"
+                            id="jobName-any"
+                            style={{ accentColor: '#ff6b35' }}
+                          />
+                          <label className="form-check-label" htmlFor="jobName-any">
+                            Any Job Name
+                          </label>
+                        </div>
+                      </div>
+                      {formData.jobName.type === 'includes' && (
+                        <>
+                          <MultiSelectDropdown
+                            options={getFilteredJobNames()}
+                            selected={formData.jobName.values}
+                            onChange={(values) => handleCriteriaChange('jobName', 'includes', values)}
+                            placeholder="Select Job Name"
+                          />
+                          {formData.jobCategory.type === 'includes' && formData.jobCategory.values.length === 0 && (
+                            <small className="text-muted fst-italic mt-2 d-block">
+                              Select a job category first to see job names.
+                            </small>
+                          )}
+                        </>
                       )}
                     </div>
 

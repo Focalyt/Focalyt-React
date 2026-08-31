@@ -804,6 +804,7 @@ const CRMDashboard = () => {
     course: '',
     batch: '',
     counsellor: '',
+    owner: '',
   });
   const [headerDatePreset, setHeaderDatePreset] = useState('');
   const [headerDateFrom, setHeaderDateFrom] = useState(() => {
@@ -2686,6 +2687,10 @@ const CRMDashboard = () => {
       type: "includes",
       values: []
     },
+    owner: {
+      type: "includes",
+      values: []
+    },
     sector: {
       type: "includes",
       values: []
@@ -2738,6 +2743,7 @@ const CRMDashboard = () => {
     const centerValues = cycle.center ? [cycle.center] : (fd.center?.values || []);
     const batchValues = cycle.batch ? [cycle.batch] : [];
     const counselorValues = cycle.counsellor ? [cycle.counsellor] : (fd.counselor?.values || []);
+    const ownerValues = cycle.owner ? [cycle.owner] : (fd.owner?.values || []);
     return {
       ...(projectsValues.length > 0 && { projects: JSON.stringify(projectsValues) }),
       ...(verticalsValues.length > 0 && { verticals: JSON.stringify(verticalsValues) }),
@@ -2745,6 +2751,7 @@ const CRMDashboard = () => {
       ...(centerValues.length > 0 && { center: JSON.stringify(centerValues) }),
       ...(batchValues.length > 0 && { batch: JSON.stringify(batchValues) }),
       ...(counselorValues.length > 0 && { counselor: JSON.stringify(counselorValues) }),
+      ...(ownerValues.length > 0 && { owner: JSON.stringify(ownerValues) }),
     };
   }, [formData, cycleFilters]);
 
@@ -2830,6 +2837,7 @@ const CRMDashboard = () => {
     course: false,
     center: false,
     counselor: false,
+    owner: false,
     sector: false,
     statuses: false,
     subStatuses: false
@@ -3172,6 +3180,7 @@ const CRMDashboard = () => {
       course: { type: "includes", values: [] },
       center: { type: "includes", values: [] },
       counselor: { type: "includes", values: [] },
+      owner: { type: "includes", values: [] },
       sector: { type: "includes", values: [] },
     });
     setCycleFilters({
@@ -3181,6 +3190,7 @@ const CRMDashboard = () => {
       course: '',
       batch: '',
       counsellor: '',
+      owner: '',
     });
     resetHeaderDateFilterState();
     setLeadViewTab('all');
@@ -13224,6 +13234,8 @@ useEffect(() => {
       next = { ...cycleFilters, batch: value };
     } else if (key === 'counsellor') {
       next = { ...cycleFilters, counsellor: value };
+    } else if (key === 'owner') {
+      next = { ...cycleFilters, owner: value };
     }
 
     setCycleFilters(next);
@@ -13235,6 +13247,7 @@ useEffect(() => {
         course: { ...fd.course, values: next.course ? [next.course] : [] },
         center: { ...fd.center, values: next.center ? [next.center] : [] },
         counselor: { ...fd.counselor, values: next.counsellor ? [next.counsellor] : [] },
+        owner: { ...(fd.owner || { type: 'includes', values: [] }), values: next.owner ? [next.owner] : [] },
       };
       formDataRef.current = updated;
       return updated;
@@ -13530,6 +13543,22 @@ useEffect(() => {
           <option value="">All</option>
           {counselorOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="b2b-cycle-filters__item">
+        <label className="b2b-cycle-filters__label" htmlFor="adm-filter-owner">
+          <i className="fas fa-user" aria-hidden="true" /> Owner
+        </label>
+        <select
+          id="adm-filter-owner"
+          className="b2b-cycle-filters__select"
+          value={cycleFilters.owner || ''}
+          onChange={(e) => handleCycleFilterChange('owner', e.target.value)}
+        >
+          <option value="">All</option>
+          {counselorOptions.map((opt) => (
+            <option key={`owner-${opt.value}`} value={opt.value}>{opt.label}</option>
           ))}
         </select>
       </div>
@@ -14745,25 +14774,24 @@ useEffect(() => {
             flex-wrap: nowrap;
             align-items: flex-end;
             justify-content: flex-end;
-            gap: 6px 8px;
+            gap: 4px;
+            width: 100%;
             max-width: 100%;
-            overflow-x: auto;
-            overflow-y: hidden;
-            scrollbar-width: thin;
+            overflow: visible;
           }
           .b2b-cycle-filters__item{
             display: flex;
             flex-direction: column;
-            gap: 3px;
+            gap: 2px;
             min-width: 0;
-            flex: 0 0 auto;
-            width: 88px;
+            flex: 1 1 0;
+            max-width: 70px;
           }
           .b2b-cycle-filters__label{
-            font-size: 9px;
+            font-size: 8px;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.04em;
+            letter-spacing: 0.03em;
             color: #6b7280;
             margin: 0;
             line-height: 1.2;
@@ -14772,16 +14800,16 @@ useEffect(() => {
             text-overflow: ellipsis;
           }
           .b2b-cycle-filters__label i{
-            margin-right: 3px;
+            margin-right: 2px;
             color: rgb(250, 85, 121);
-            font-size: 8px;
+            font-size: 7px;
           }
           .b2b-cycle-filters__select{
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 500;
             line-height: 1.3;
-            padding: 5px 22px 5px 8px;
-            height: 32px;
+            padding: 4px 16px 4px 6px;
+            height: 30px;
             width: 100%;
             min-width: 0;
             max-width: 100%;
@@ -14795,8 +14823,8 @@ useEffect(() => {
             appearance: none;
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16'%3E%3Cpath fill='%236b7280' d='M4.427 6.427l3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 6H4.604a.25.25 0 0 0-.177.427z'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
-            background-position: right 7px center;
-            background-size: 11px;
+            background-position: right 5px center;
+            background-size: 10px;
           }
           .b2b-cycle-filters__select:hover{
             border-color: rgba(250, 85, 121, 0.4);
@@ -16155,6 +16183,17 @@ useEffect(() => {
                           icon="fas fa-user-tie"
                           isOpen={dropdownStates.counselor}
                           onToggle={() => toggleDropdown('counselor')}
+                        />
+                      </div>
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Owner"
+                          options={counselorOptions}
+                          selectedValues={formData.owner?.values || []}
+                          onChange={(values) => handleCriteriaChange('owner', values)}
+                          icon="fas fa-user"
+                          isOpen={dropdownStates.owner}
+                          onToggle={() => toggleDropdown('owner')}
                         />
                       </div>
                     </div>

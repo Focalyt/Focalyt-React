@@ -20,6 +20,18 @@ const jobAssignmentRuleSchema = new mongoose.Schema({
     }]
   },
 
+  jobName: {
+    type: {
+      type: String,
+      enum: ['includes', 'any'],
+      default: 'any'
+    },
+    values: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Vacancy'
+    }]
+  },
+
   assignedHrs: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -47,6 +59,7 @@ const jobAssignmentRuleSchema = new mongoose.Schema({
 });
 
 jobAssignmentRuleSchema.index({ status: 1, 'jobCategory.values': 1 });
+jobAssignmentRuleSchema.index({ status: 1, 'jobName.values': 1 });
 jobAssignmentRuleSchema.index({ assignedHrs: 1 });
 
 module.exports = mongoose.model('JobAssignmentRule', jobAssignmentRuleSchema);
