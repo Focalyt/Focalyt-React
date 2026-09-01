@@ -1,29 +1,5 @@
-// const { Schema, model } = require("mongoose");
-
-// const { ObjectId } = Schema.Types;
-
-// const appliedJobsSchema = new Schema(
-// 	{
-//         _candidate: { type: ObjectId, ref: 'Candidate' },
-//         _company: { type: ObjectId, ref: 'Company' },
-//         _job: { type: ObjectId, ref: 'Vacancy' },
-//         coinsDeducted: { type: Number },
-//         isRegisterInterview: {
-//                 type: Boolean,
-//                 default: false
-//         },
-// 	},
-// 	{ timestamps: true }
-// );
-
-
-// module.exports = model("AppliedJobs", appliedJobsSchema);
-
-
-
-
-
 const { Schema, model } = require("mongoose");
+const mongoose = require("mongoose");
 
 const { ObjectId } = Schema.Types;
 
@@ -32,37 +8,103 @@ const appliedJobsSchema = new Schema(
     _candidate: {
       type: ObjectId,
       ref: "CandidateProfile",
-      description: "Reference to the Candidate who applied for the job",
     },
     _company: {
       type: ObjectId,
       ref: "Company",
-      description: "Reference to the Company offering the job",
     },
     _job: {
       type: ObjectId,
       ref: "Vacancy",
-      description: "Reference to the specific job vacancy that the candidate applied to",
     },
+    // Current HR owner — same role as AppliedCourses.counsellor
+    hr: {
+      type: ObjectId,
+      ref: "User",
+    },
+    hrName: {
+      type: String,
+    },
+    assignDate: {
+      type: Date,
+    },
+    hrAssignmentStatus: {
+      type: Number,
+      enum: [0, 1],
+      default: 0,
+    },
+    hrAssignment: [
+      {
+        _hr: { type: ObjectId, ref: "User" },
+        hrName: { type: String },
+        assignDate: { type: Date },
+        assignedBy: { type: ObjectId, ref: "User" },
+      },
+    ],
     coinsDeducted: {
       type: Number,
-      description: "The number of coins deducted for applying to the job",
     },
     isRegisterInterview: {
       type: Boolean,
       default: false,
-      description: "Indicates if the candidate has registered for an interview for the job",
     },
   },
   {
-    timestamps: true, // Automatically adds createdAt and updatedAt fields
+    timestamps: true,
   }
 );
 
-// Attach descriptions for `timestamps`
-appliedJobsSchema.paths.createdAt.options.description = "Timestamp when the document was created";
-appliedJobsSchema.paths.updatedAt.options.description = "Timestamp when the document was last updated";
+appliedJobsSchema.index({ hr: 1, createdAt: -1 });
+appliedJobsSchema.index({ _candidate: 1, _job: 1 });
 
-// Export the model
+// Same idea as AppliedCourses.assignCounselor:
+// job already has HR from Job Rules → that HR becomes owner of this applicant.
+appliedJobsSchema.methods.assignHr = async function () {
+  try {
+    if (this.hr && Array.isArray(this.hrAssignment) && this.hrAssignment.length > 0) {
+      return this.hr;
+    }
+
+    if (!this.hr) {
+      const { resolveJobHrOwner } = require("../../../helpers/resolveJobHrOwner");
+      const jobOwner = await resolveJobHrOwner({ jobId: this._job });
+      if (!jobOwner.hrId) return null;
+      this.hr = new mongoose.Types.ObjectId(jobOwner.hrId);
+      this.hrName = jobOwner.hrName;
+    } else if (!this.hrName) {
+      const User = mongoose.model("User");
+      const hrDetails = await User.findById(this.hr).select("name");
+      this.hrName = hrDetails?.name || "Unknown";
+    }
+
+    this.assignDate = this.assignDate || new Date();
+    this.hrAssignmentStatus = 1;
+    if (!Array.isArray(this.hrAssignment) || this.hrAssignment.length === 0) {
+      this.hrAssignment = [
+        {
+          _hr: this.hr,
+          hrName: this.hrName,
+          assignDate: this.assignDate,
+        },
+      ];
+    }
+
+    return this.hr;
+  } catch (error) {
+    console.error("Error in AppliedJobs.assignHr:", error);
+    throw error;
+  }
+};
+
+appliedJobsSchema.pre("save", async function (next) {
+  try {
+    if (this.isNew && (!this.hrAssignment || this.hrAssignment.length === 0)) {
+      await this.assignHr();
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = model("AppliedJobs", appliedJobsSchema);
-

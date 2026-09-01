@@ -106,6 +106,7 @@ const cashBackLogic = require("../../models/cashBackLogic");
 const { sendNotification } = require('../services/notification');
 const kycDocument = require("../../models/kycDocument");
 const { CandidateValidators } = require('../../../helpers/validators');
+const { resolveJobHrOwner } = require('../../../helpers/resolveJobHrOwner');
 
 
 // Facebook API Configuration
@@ -2452,24 +2453,38 @@ router.post("/job/:jobId/apply", [isCandidate, authenti], async (req, res) => {
       console.log('converting id')
       jobId = new mongoose.Types.ObjectId(jobId);
     }
-    let apply = await Candidate.findOneAndUpdate(
-      { mobile: candidateMobile },
-      {
-        $addToSet: {
-          appliedJobs: { jobId }
-
-        },
-        // $inc: { creditLeft: -coinsDeducted },
-      },
-      { new: true, upsert: true }
-    );
+    const jobOwner = await resolveJobHrOwner({ jobId: vacancy._id || jobId });
     let data = {};
     data["_job"] = jobId;
     data["_candidate"] = candidate._id;
     data["_company"] = vacancy._company;
-    // data["coinsDeducted"] = coinsDeducted
-   
+    if (jobOwner.hrId) {
+      data["hr"] = jobOwner.hrId;
+      data["hrName"] = jobOwner.hrName;
+      data["assignDate"] = new Date();
+      data["hrAssignmentStatus"] = 1;
+      data["hrAssignment"] = [{
+        _hr: jobOwner.hrId,
+        hrName: jobOwner.hrName,
+        assignDate: new Date(),
+      }];
+    }
+
     const appliedData = await AppliedJobs.create(data);
+
+    let apply = await Candidate.findOneAndUpdate(
+      { mobile: candidateMobile },
+      {
+        $addToSet: {
+          appliedJobs: {
+            jobId,
+            hr: appliedData.hr || jobOwner.hrId || undefined,
+            assignDate: appliedData.assignDate || (jobOwner.hrId ? new Date() : undefined),
+          }
+        },
+      },
+      { new: true, upsert: true }
+    );
 
 
     if (referrerId) {

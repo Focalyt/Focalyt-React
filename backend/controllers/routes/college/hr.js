@@ -196,10 +196,17 @@ const applyCollegeScope = (match, collegeId) => {
 
 const exactInsensitive = (value) => new RegExp(`^${String(value).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
 
+const collegeIdFilter = (id) => (
+  id ? [{ college: id }, { college: String(id) }] : []
+);
+
 const firstHrStatus = async (collegeId) => {
   const id = toCollegeObjectId(collegeId);
   if (id) {
-    const owned = await StatusHr.findOne({ isDeleted: { $ne: true }, college: id }).sort({ index: 1 });
+    const owned = await StatusHr.findOne({
+      isDeleted: { $ne: true },
+      $or: collegeIdFilter(id),
+    }).sort({ index: 1 });
     if (owned) return owned;
   }
   return StatusHr.findOne({
@@ -211,19 +218,20 @@ const firstHrStatus = async (collegeId) => {
 // Digital lead payloads send status/sub-status as titles, so resolve them against HR Status Design.
 const resolveHrStatus = async (statusTitle, subStatusTitle, collegeId) => {
   const id = toCollegeObjectId(collegeId);
+  const title = String(statusTitle || '').trim();
   let status = null;
-  if (statusTitle) {
+  if (title) {
     if (id) {
       status = await StatusHr.findOne({
         isDeleted: { $ne: true },
-        title: exactInsensitive(statusTitle),
-        college: id,
+        title: exactInsensitive(title),
+        $or: collegeIdFilter(id),
       });
     }
     if (!status) {
       status = await StatusHr.findOne({
         isDeleted: { $ne: true },
-        title: exactInsensitive(statusTitle),
+        title: exactInsensitive(title),
         $or: [{ college: null }, { college: { $exists: false } }],
       });
     }
@@ -235,9 +243,10 @@ const resolveHrStatus = async (statusTitle, subStatusTitle, collegeId) => {
   if (!status) return { status: null, substatus: null };
 
   let substatus = null;
-  if (subStatusTitle) {
+  const subTitle = String(subStatusTitle || '').trim();
+  if (subTitle) {
     substatus = (status.substatuses || []).find(
-      (item) => String(item.title || '').trim().toLowerCase() === String(subStatusTitle).trim().toLowerCase()
+      (item) => String(item.title || '').trim().toLowerCase() === subTitle.toLowerCase()
     );
     if (!substatus) return { error: 'Substatus not found' };
   } else {
@@ -635,36 +644,40 @@ router.route("/digitalhrleads").post(async (req, res) => {
           });
       }
 
-      // Prefer this college's status; fall back to a global HR Status Design record.
-      let statusDocument = await StatusHr.findOne({
-          isDeleted: { $ne: true },
-          title: exactInsensitive(status),
-          college: collegeId
-      });
-      if (!statusDocument) {
-          statusDocument = await StatusHr.findOne({
-              isDeleted: { $ne: true },
-              title: exactInsensitive(status),
-              $or: [{ college: null }, { college: { $exists: false } }]
+      // Match HR Status Design by title; if the sheet title does not match, use this college's first status.
+      let resolved = await resolveHrStatus(status, subStatus, collegeId);
+      if (resolved.error) {
+          console.log('[DigitalHRLead] status title miss, using first HR status', {
+              status,
+              subStatus,
+              college: String(collegeId),
+              error: resolved.error,
           });
+          const fallback = await firstHrStatus(collegeId);
+          if (!fallback) {
+              return res.status(404).json({
+                  status: false,
+                  msg: resolved.error,
+              });
+          }
+          const fallbackSub = (fallback.substatuses || []).find(
+              (item) => String(item.title || '').trim().toLowerCase() === String(subStatus || '').trim().toLowerCase()
+          ) || fallback.substatuses?.[0] || null;
+          if (!fallbackSub) {
+              return res.status(404).json({
+                  status: false,
+                  msg: 'Substatus not found',
+              });
+          }
+          resolved = { status: fallback, substatus: fallbackSub };
       }
 
-      if (!statusDocument) {
+      const statusDocument = resolved.status;
+      const subStatusDocument = resolved.substatus;
+      if (!statusDocument || !subStatusDocument) {
           return res.status(404).json({
               status: false,
-              msg: "Status not found"
-          });
-      }
-
-      const subStatusDocument = statusDocument.substatuses.find(
-          item =>
-              item.title.toLowerCase() === subStatus.trim().toLowerCase()
-      );
-
-      if (!subStatusDocument) {
-          return res.status(404).json({
-              status: false,
-              msg: "Substatus not found"
+              msg: !statusDocument ? 'Status not found' : 'Substatus not found',
           });
       }
 

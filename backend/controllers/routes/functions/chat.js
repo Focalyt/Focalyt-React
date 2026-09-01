@@ -225,6 +225,8 @@ commonRoutes.post("/applyjob/:id", async (req, res) => {
 			if (alreadyApplied) {
 				return res.send({ status: false, msg: "Already Applied" });
 			};
+			const { resolveJobHrOwner } = require('../../../helpers/resolveJobHrOwner');
+			const jobOwner = await resolveJobHrOwner({ jobId: vacancy._id || jobId });
 			let apply = await Candidate.findOneAndUpdate(
 				{ mobile: candidateMobile },
 				{
@@ -237,6 +239,17 @@ commonRoutes.post("/applyjob/:id", async (req, res) => {
 			data["_job"] = jobId;
 			data["_candidate"] = candidate._id;
 			data["_company"] = vacancy._company;
+			if (jobOwner.hrId) {
+				data["hr"] = jobOwner.hrId;
+				data["hrName"] = jobOwner.hrName;
+				data["assignDate"] = new Date();
+				data["hrAssignmentStatus"] = 1;
+				data["hrAssignment"] = [{
+					_hr: jobOwner.hrId,
+					hrName: jobOwner.hrName,
+					assignDate: new Date(),
+				}];
+			}
 
 			const appliedData = await AppliedJobs.create(data);
 

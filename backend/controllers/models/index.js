@@ -92,6 +92,7 @@ module.exports.StatusHr = require("./statusHr");
 module.exports.RewardStatus = require("./RewardStatus");
 module.exports.ApprovalRequest = require("./approval");
 module.exports.LeadAssignmentRule = require("./leadAssignmentRule");
+module.exports.JobAssignmentRule = require("./jobAssignmentRule");
 module.exports.EventType = require("./eventType");
 module.exports.QuestionAnswer = require("./questionAnswer");
 module.exports.CandidateVisitCalender = require("./candidateVisitCalender");
