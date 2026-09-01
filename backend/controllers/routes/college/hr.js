@@ -6,6 +6,7 @@ const { isCollege } = require('../../../helpers');
 const CareerApplication = require('../../models/careerApplication');
 const StatusHr = require('../../models/statusHr');
 const College = require('../../models/college');
+const { resolveJobHrOwner } = require('../../../helpers/resolveJobHrOwner');
 
 const STATUS_POPULATE = { path: 'leadStatus', select: 'title milestone substatuses' };
 const HR_DOCUMENT_TYPES = [
@@ -537,6 +538,20 @@ router.post('/leads', isCollege, async (req, res) => {
 
     const collegeId = req.user?.college?._id || null;
     const defaultStatus = await firstHrStatus(collegeId);
+    const jobOwner = await resolveJobHrOwner({
+      applyingFor,
+      jobId: req.body.jobId || req.body._job,
+      collegeId,
+    });
+    const ownerLog = jobOwner.hrId
+      ? {
+          user: req.user?._id,
+          action: `Lead owner auto-assigned to ${jobOwner.hrName}`,
+          remarks: jobOwner.jobTitle
+            ? `Matched job "${jobOwner.jobTitle}"`
+            : applyingFor,
+        }
+      : null;
 
     const lead = await CareerApplication.create({
       fullName,
@@ -551,6 +566,8 @@ router.post('/leads', isCollege, async (req, res) => {
       remark,
       source,
       college: collegeId,
+      leadOwner: jobOwner.hrId || undefined,
+      assignedTo: jobOwner.hrId || undefined,
       leadStatus: defaultStatus?._id || null,
       leadSubstatus: defaultStatus?.substatuses?.[0]?._id || null,
       logs: [
@@ -559,6 +576,7 @@ router.post('/leads', isCollege, async (req, res) => {
           action: 'Lead created',
           remarks: source === 'manual' ? 'Added from HR panel' : source,
         },
+        ...(ownerLog ? [ownerLog] : []),
       ],
     });
 
@@ -708,6 +726,24 @@ router.route("/digitalhrleads").post(async (req, res) => {
               remarks: remark || "",
               timestamp: new Date()
           });
+          if (!existingLead.leadOwner && !existingLead.assignedTo) {
+              const jobOwner = await resolveJobHrOwner({
+                  applyingFor,
+                  jobId: req.body.jobId || req.body._job,
+                  collegeId,
+              });
+              if (jobOwner.hrId) {
+                  existingLead.leadOwner = jobOwner.hrId;
+                  existingLead.assignedTo = jobOwner.hrId;
+                  existingLead.logs.push({
+                      action: `Lead owner auto-assigned to ${jobOwner.hrName}`,
+                      remarks: jobOwner.jobTitle
+                          ? `Matched job "${jobOwner.jobTitle}"`
+                          : applyingFor,
+                      timestamp: new Date()
+                  });
+              }
+          }
           await existingLead.save();
 
           console.log("[DigitalHRLead] Re-enquiry logged →", { leadId: existingLead._id.toString(), mobile, applyingFor });
@@ -723,6 +759,21 @@ router.route("/digitalhrleads").post(async (req, res) => {
           });
       }
 
+      const jobOwner = await resolveJobHrOwner({
+          applyingFor,
+          jobId: req.body.jobId || req.body._job,
+          collegeId,
+      });
+      const ownerLog = jobOwner.hrId
+          ? {
+              action: `Lead owner auto-assigned to ${jobOwner.hrName}`,
+              remarks: jobOwner.jobTitle
+                  ? `Matched job "${jobOwner.jobTitle}"`
+                  : applyingFor,
+              timestamp: new Date()
+          }
+          : null;
+
       const lead = await CareerApplication.create({
           fullName: capitalizeWords(fullname),
           email: email.trim().toLowerCase(),
@@ -737,6 +788,8 @@ router.route("/digitalhrleads").post(async (req, res) => {
           remark: remark || "",
           source,
           college: collegeId,
+          leadOwner: jobOwner.hrId || undefined,
+          assignedTo: jobOwner.hrId || undefined,
           leadStatus: statusDocument._id,
           leadSubstatus: subStatusDocument._id,
           logs: [
@@ -744,11 +797,15 @@ router.route("/digitalhrleads").post(async (req, res) => {
                   action: `Lead added with ${statusDocument.title} and ${subStatusDocument.title} from ${source}`,
                   remarks: remark || "",
                   timestamp: new Date()
-              }
+              },
+              ...(ownerLog ? [ownerLog] : [])
           ]
       });
 
-      const createdLead = await CareerApplication.findById(lead._id).populate(STATUS_POPULATE);
+      const createdLead = await CareerApplication.findById(lead._id)
+          .populate(STATUS_POPULATE)
+          .populate('leadOwner', 'name email')
+          .populate('assignedTo', 'name email');
       console.log("[DigitalHRLead] Lead created →", { leadId: lead._id.toString(), mobile, applyingFor });
 
       return res.status(201).json({

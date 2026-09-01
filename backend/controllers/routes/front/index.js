@@ -46,6 +46,7 @@ const s3 = require("../../../helpers/objectStorage");
 const CompanyExecutive = require("../../models/companyExecutive");
 const collegeRepresentative = require("../../models/collegeRepresentative");
 const { generatePassword, sendMail } = require("../../../helpers");
+const { resolveJobHrOwner } = require("../../../helpers/resolveJobHrOwner");
 const { Translate } = require('@google-cloud/translate').v2;
 const { translateProjectId, translateKey } = require('../../../config');
 const { getCourseShareDescription } = require('../ai/courseShareMeta');
@@ -1863,6 +1864,20 @@ router.post("/career", async (req, res) => {
 				$or: [{ college: null }, { college: { $exists: false } }],
 			}).sort({ index: 1 });
 		}
+		const jobOwner = await resolveJobHrOwner({
+			applyingFor,
+			jobId: req.body.jobId || req.body._job,
+			collegeId: websiteCollegeId,
+		});
+		const ownerLog = jobOwner.hrId
+			? {
+				action: `Lead owner auto-assigned to ${jobOwner.hrName}`,
+				remarks: jobOwner.jobTitle
+					? `Matched job "${jobOwner.jobTitle}"`
+					: applyingFor,
+				timestamp: new Date(),
+			}
+			: null;
 		const savedApplication = await CareerApplication.create({
 			fullName: capitalizeWords(fullName),
 			email,
@@ -1878,9 +1893,12 @@ router.post("/career", async (req, res) => {
 			})(),
 			resume: resumeUrl,
 			college: websiteCollegeId,
+			leadOwner: jobOwner.hrId || undefined,
+			assignedTo: jobOwner.hrId || undefined,
 			leadStatus: defaultHrStatus?._id || null,
 			leadSubstatus: defaultHrStatus?.substatuses?.[0]?._id || null,
 			source: 'website',
+			logs: ownerLog ? [ownerLog] : undefined,
 		});
 		console.log("CareerApplication saved:", savedApplication._id);
 

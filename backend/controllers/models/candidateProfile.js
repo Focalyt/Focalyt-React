@@ -152,11 +152,7 @@ const candidateProfileSchema = new Schema(
         ),
       },
     ],
-    appliedJobs: [{
-      jobId: { type: ObjectId, ref: "Vacancy" },
-      hr: { type: ObjectId, ref: "User" },
-      assignDate: { type: Date },
-    }],
+    appliedJobs: [{ jobId: { type: ObjectId, ref: "Vacancy" } }],
     appliedEvents: [{
       EventId: { type: ObjectId, ref: "Event" },
       appliedEventId: { type: ObjectId, ref: "AppliedEvent" }
