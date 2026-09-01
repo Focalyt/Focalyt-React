@@ -11,17 +11,19 @@ const { resolveJobHrOwner } = require('../../../helpers/resolveJobHrOwner');
 const STATUS_POPULATE = { path: 'leadStatus', select: 'title milestone substatuses' };
 const HR_DOCUMENT_TYPES = [
   { key: 'resume', name: 'Resume / CV' },
-  { key: 'photo', name: 'Photograph' },
-  { key: 'aadhaar', name: 'Aadhaar Card' },
-  { key: 'pan', name: 'PAN Card' },
-  { key: 'tenth', name: '10th Marksheet' },
-  { key: 'twelfth', name: '12th Marksheet' },
-  { key: 'graduation', name: 'Graduation Certificate' },
-  { key: 'experienceLetter', name: 'Experience Letter' },
-  { key: 'statusAttachment', name: 'Status Attachment' },
+  { key: 'photo', name: 'Photograph' }
 ];
 const { resolvePublicUrl } = require('../../../helpers/s3Storage');
 const { uploadSinglefile } = require('../functions/images');
+
+const isActualMediaFile = (value) => {
+  const v = String(value || '').trim();
+  if (!v) return false;
+  if (/^(n\/?a|null|undefined|not found|none|-)$/i.test(v)) return false;
+  const path = v.split('?')[0];
+  if (/\.(pdf|png|jpe?g|gif|webp|bmp|doc|docx)$/i.test(path)) return true;
+  return /(?:^|\/)uploads\//i.test(v);
+};
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MOBILE_RE = /^[6-9]\d{9}$/;
@@ -51,8 +53,10 @@ const capitalizeWords = (str) => {
 
 const serializeLead = (doc) => {
   const lead = doc?.toObject ? doc.toObject() : { ...doc };
-  if (lead.resume) {
+  if (isActualMediaFile(lead.resume)) {
     lead.resume = resolvePublicUrl(lead.resume) || lead.resume;
+  } else {
+    lead.resume = '';
   }
   lead.leadOwner = lead.leadOwner || lead.assignedTo || null;
 
@@ -78,9 +82,9 @@ const serializeLead = (doc) => {
 
   const docsByKey = {};
   (lead.documents || []).forEach((item) => {
-    if (item?.key) docsByKey[item.key] = item;
+    if (item?.key && isActualMediaFile(item.fileUrl)) docsByKey[item.key] = item;
   });
-  if (lead.resume && !docsByKey.resume?.fileUrl) {
+  if (isActualMediaFile(lead.resume) && !docsByKey.resume?.fileUrl) {
     docsByKey.resume = {
       key: 'resume',
       name: 'Resume / CV',
@@ -90,12 +94,13 @@ const serializeLead = (doc) => {
   }
   lead.documents = HR_DOCUMENT_TYPES.map((type) => {
     const saved = docsByKey[type.key] || {};
-    const fileUrl = resolvePublicUrl(saved.fileUrl) || saved.fileUrl || (type.key === 'resume' ? lead.resume : '') || '';
+    const raw = saved.fileUrl || (type.key === 'resume' ? lead.resume : '') || '';
+    const fileUrl = isActualMediaFile(raw) ? (resolvePublicUrl(raw) || raw) : '';
     return {
       key: type.key,
       name: type.name,
       fileUrl,
-      uploadedAt: saved.uploadedAt || (fileUrl ? lead.updatedAt : null) || null,
+      uploadedAt: fileUrl ? (saved.uploadedAt || null) : null,
     };
   });
   const summary = buildFollowupSummary(lead.followups);
@@ -192,17 +197,10 @@ const applyCollegeScope = (match, collegeId) => {
 
 const exactInsensitive = (value) => new RegExp(`^${String(value).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
 
-const collegeIdFilter = (id) => (
-  id ? [{ college: id }, { college: String(id) }] : []
-);
-
 const firstHrStatus = async (collegeId) => {
   const id = toCollegeObjectId(collegeId);
   if (id) {
-    const owned = await StatusHr.findOne({
-      isDeleted: { $ne: true },
-      $or: collegeIdFilter(id),
-    }).sort({ index: 1 });
+    const owned = await StatusHr.findOne({ isDeleted: { $ne: true }, college: id }).sort({ index: 1 });
     if (owned) return owned;
   }
   return StatusHr.findOne({
@@ -214,20 +212,19 @@ const firstHrStatus = async (collegeId) => {
 // Digital lead payloads send status/sub-status as titles, so resolve them against HR Status Design.
 const resolveHrStatus = async (statusTitle, subStatusTitle, collegeId) => {
   const id = toCollegeObjectId(collegeId);
-  const title = String(statusTitle || '').trim();
   let status = null;
-  if (title) {
+  if (statusTitle) {
     if (id) {
       status = await StatusHr.findOne({
         isDeleted: { $ne: true },
-        title: exactInsensitive(title),
-        $or: collegeIdFilter(id),
+        title: exactInsensitive(statusTitle),
+        college: id,
       });
     }
     if (!status) {
       status = await StatusHr.findOne({
         isDeleted: { $ne: true },
-        title: exactInsensitive(title),
+        title: exactInsensitive(statusTitle),
         $or: [{ college: null }, { college: { $exists: false } }],
       });
     }
@@ -239,10 +236,9 @@ const resolveHrStatus = async (statusTitle, subStatusTitle, collegeId) => {
   if (!status) return { status: null, substatus: null };
 
   let substatus = null;
-  const subTitle = String(subStatusTitle || '').trim();
-  if (subTitle) {
+  if (subStatusTitle) {
     substatus = (status.substatuses || []).find(
-      (item) => String(item.title || '').trim().toLowerCase() === subTitle.toLowerCase()
+      (item) => String(item.title || '').trim().toLowerCase() === String(subStatusTitle).trim().toLowerCase()
     );
     if (!substatus) return { error: 'Substatus not found' };
   } else {
@@ -562,7 +558,7 @@ router.post('/leads', isCollege, async (req, res) => {
       experience,
       qualification,
       dateOfBirth: dateOfBirth && !Number.isNaN(dateOfBirth.getTime()) ? dateOfBirth : undefined,
-      resume: resumeUrl,
+      resume: isActualMediaFile(resumeUrl) ? resumeUrl : '',
       remark,
       source,
       college: collegeId,
@@ -657,40 +653,36 @@ router.route("/digitalhrleads").post(async (req, res) => {
           });
       }
 
-      // Match HR Status Design by title; if the sheet title does not match, use this college's first status.
-      let resolved = await resolveHrStatus(status, subStatus, collegeId);
-      if (resolved.error) {
-          console.log('[DigitalHRLead] status title miss, using first HR status', {
-              status,
-              subStatus,
-              college: String(collegeId),
-              error: resolved.error,
+      // Prefer this college's status; fall back to a global HR Status Design record.
+      let statusDocument = await StatusHr.findOne({
+          isDeleted: { $ne: true },
+          title: exactInsensitive(status),
+          college: collegeId
+      });
+      if (!statusDocument) {
+          statusDocument = await StatusHr.findOne({
+              isDeleted: { $ne: true },
+              title: exactInsensitive(status),
+              $or: [{ college: null }, { college: { $exists: false } }]
           });
-          const fallback = await firstHrStatus(collegeId);
-          if (!fallback) {
-              return res.status(404).json({
-                  status: false,
-                  msg: resolved.error,
-              });
-          }
-          const fallbackSub = (fallback.substatuses || []).find(
-              (item) => String(item.title || '').trim().toLowerCase() === String(subStatus || '').trim().toLowerCase()
-          ) || fallback.substatuses?.[0] || null;
-          if (!fallbackSub) {
-              return res.status(404).json({
-                  status: false,
-                  msg: 'Substatus not found',
-              });
-          }
-          resolved = { status: fallback, substatus: fallbackSub };
       }
 
-      const statusDocument = resolved.status;
-      const subStatusDocument = resolved.substatus;
-      if (!statusDocument || !subStatusDocument) {
+      if (!statusDocument) {
           return res.status(404).json({
               status: false,
-              msg: !statusDocument ? 'Status not found' : 'Substatus not found',
+              msg: "Status not found"
+          });
+      }
+
+      const subStatusDocument = statusDocument.substatuses.find(
+          item =>
+              item.title.toLowerCase() === subStatus.trim().toLowerCase()
+      );
+
+      if (!subStatusDocument) {
+          return res.status(404).json({
+              status: false,
+              msg: "Substatus not found"
           });
       }
 
@@ -784,7 +776,7 @@ router.route("/digitalhrleads").post(async (req, res) => {
           experience: experience || "",
           qualification: qualification || "",
           dateOfBirth: parsedDob || undefined,
-          resume: resumeUrl,
+          resume: isActualMediaFile(resumeUrl) ? resumeUrl : '',
           remark: remark || "",
           source,
           college: collegeId,

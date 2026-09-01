@@ -3296,7 +3296,7 @@ const SessionCard = ({
 const TrainerModule = () => {
   const [userData, setUserData] = useState(JSON.parse(sessionStorage.getItem('user') || '{}'));
   const token = userData.token;
-  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080';
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
   const [reportDate, setReportDate] = useState(new Date());
   const [filters, setFilters] = useState({

@@ -3592,6 +3592,16 @@
 
 .meta-text { color: #333; }
 
+.verify-btn {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(79, 172, 254, 0.4);
+}
+
+.verify-btn:hover { color: #fff; }
+
+.document-image-container { cursor: pointer; }
+
 @media (max-width: 768px) {
   .hr-doc-stats.stats-grid,
   .stats-grid { grid-template-columns: 1fr 1fr; }
