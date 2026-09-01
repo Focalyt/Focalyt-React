@@ -798,7 +798,13 @@ router.route("/digitalhrleads").post(async (req, res) => {
           .populate(STATUS_POPULATE)
           .populate('leadOwner', 'name email')
           .populate('assignedTo', 'name email');
-      console.log("[DigitalHRLead] Lead created →", { leadId: lead._id.toString(), mobile, applyingFor });
+      console.log("[DigitalHRLead] Lead created →", {
+          leadId: lead._id.toString(),
+          mobile,
+          applyingFor,
+          leadOwner: jobOwner.hrId,
+          matchedJob: jobOwner.jobTitle,
+      });
 
       return res.status(201).json({
           status: true,

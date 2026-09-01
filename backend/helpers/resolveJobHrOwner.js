@@ -13,36 +13,39 @@ const toIdString = (value) => {
   return String(id);
 };
 
-// Job is created after an active Job Rule, so Vacancy.hr is already set.
-// CareerApplication just copies that HR onto leadOwner.
-const resolveJobHrOwner = async ({ applyingFor, jobId, collegeId } = {}) => {
+// Copy Vacancy.hr onto the career lead. Match by job id or exact job title.
+const resolveJobHrOwner = async ({ applyingFor, jobId } = {}) => {
   const Vacancy = mongoose.model('Vacancy');
   const User = mongoose.model('User');
 
   let vacancy = null;
   const id = toIdString(jobId);
   if (id) {
-    vacancy = await Vacancy.findById(id).select('_id title hr');
+    vacancy = await Vacancy.findById(id).select('_id title hr').lean();
   }
 
   const title = String(applyingFor || '').trim();
-  if (!vacancy && title) {
-    const filter = {
+  if ((!vacancy || !vacancy.hr) && title) {
+    const matches = await Vacancy.find({
       title: exactInsensitive(title),
       status: true,
-      hr: { $ne: null },
-    };
-    if (collegeId) {
-      filter.$or = [
-        { collegeAcNo: String(collegeId) },
-        { collegeAcNo: { $exists: false } },
-        { collegeAcNo: { $size: 0 } },
-      ];
-    }
-    vacancy = await Vacancy.findOne(filter).sort({ createdAt: -1 }).select('_id title hr');
+    })
+      .select('_id title hr')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    vacancy = matches.find((job) => job.hr) || matches[0] || null;
   }
 
   const hrId = toIdString(vacancy?.hr);
+  console.log('[JobHrOwner] resolve', {
+    applyingFor: title,
+    jobId: id,
+    matchedJobId: vacancy?._id ? String(vacancy._id) : null,
+    matchedTitle: vacancy?.title || null,
+    hrId,
+  });
+
   if (!hrId) {
     return {
       hrId: null,
@@ -52,7 +55,7 @@ const resolveJobHrOwner = async ({ applyingFor, jobId, collegeId } = {}) => {
     };
   }
 
-  const hrDetails = await User.findById(hrId).select('name');
+  const hrDetails = await User.findById(hrId).select('name').lean();
   return {
     hrId,
     hrName: hrDetails?.name || 'Unknown',

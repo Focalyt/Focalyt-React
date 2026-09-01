@@ -55,46 +55,68 @@ function populateRule(query) {
     .populate('modifiedBy', 'name email');
 }
 
+function toId(value) {
+  if (!value) return null;
+  if (typeof value === 'object') return value._id || value.id || null;
+  return value;
+}
+
 // Job exists first, then the rule is created for that job.
-// assignHr() only ran on vacancy create, so apply HR now to matching jobs that still have no hr.
+// Write the rule's HR directly onto those vacancies.
 async function applyRuleToMatchingVacancies(rule) {
-  if (!rule || rule.status !== 'Active') return;
+  try {
+    if (!rule || rule.status !== 'Active') return;
 
-  const filter = {
-    $or: [{ hr: { $exists: false } }, { hr: null }],
-  };
-  const and = [];
-  const jobNameType = rule.jobName?.type || 'any';
-  const categoryType = rule.jobCategory?.type || 'includes';
-  const jobNameIds = (rule.jobName?.values || []).map((id) => id._id || id).filter(Boolean);
-  const categoryIds = (rule.jobCategory?.values || []).map((id) => id._id || id).filter(Boolean);
-
-  if (jobNameType === 'includes') {
-    if (jobNameIds.length === 0) return;
-    const selectedJobs = await Vacancy.find({ _id: { $in: jobNameIds } }).select('title').lean();
-    const titles = [...new Set(selectedJobs.map((job) => job.title).filter(Boolean))];
-    and.push({
-      $or: [
-        { _id: { $in: jobNameIds } },
-        ...(titles.length ? [{ title: { $in: titles }, status: true }] : []),
-      ],
-    });
-  } else if (categoryType === 'includes') {
-    if (categoryIds.length === 0) return;
-    and.push({ _jobCategory: { $in: categoryIds }, status: true });
-  } else {
-    return;
-  }
-
-  if (and.length) filter.$and = and;
-
-  const vacancies = await Vacancy.find(filter);
-  for (const vacancy of vacancies) {
-    if (vacancy.hr) continue;
-    await vacancy.assignHr();
-    if (vacancy.hr) {
-      await vacancy.save();
+    const hrId = toId(Array.isArray(rule.assignedHrs) ? rule.assignedHrs[0] : null);
+    if (!hrId) {
+      console.log('[JobRule] skip vacancy HR assign — no HR on rule', String(rule._id || ''));
+      return;
     }
+
+    const jobNameType = rule.jobName?.type || 'any';
+    const jobNameIds = (rule.jobName?.values || []).map(toId).filter(Boolean);
+    const categoryIds = (rule.jobCategory?.values || []).map(toId).filter(Boolean);
+
+    const noHr = { $or: [{ hr: { $exists: false } }, { hr: null }] };
+    let vacancyFilter = null;
+
+    if (jobNameType === 'includes') {
+      if (jobNameIds.length === 0) return;
+      vacancyFilter = { _id: { $in: jobNameIds }, ...noHr };
+    } else if (rule.jobCategory?.type === 'includes') {
+      if (categoryIds.length === 0) return;
+      vacancyFilter = { _jobCategory: { $in: categoryIds }, status: true, ...noHr };
+    } else {
+      return;
+    }
+
+    const User = require('../../models/users');
+    const hrDetails = await User.findById(hrId).select('name').lean();
+    const hrName = hrDetails?.name || 'Unknown';
+
+    const result = await Vacancy.updateMany(vacancyFilter, {
+      $set: {
+        hr: hrId,
+        hrAssignmentStatus: 1,
+      },
+      $push: {
+        hrAssignment: {
+          _hr: hrId,
+          hrName,
+          assignDate: new Date(),
+        },
+      },
+    });
+
+    console.log('[JobRule] assigned HR onto vacancies', {
+      ruleId: String(rule._id || ''),
+      hrId: String(hrId),
+      matched: result.matchedCount ?? result.n,
+      modified: result.modifiedCount ?? result.nModified,
+      jobNameIds: jobNameIds.map(String),
+    });
+  } catch (error) {
+    console.error('[JobRule] failed to assign HR onto vacancies:', error);
   }
 }
 
