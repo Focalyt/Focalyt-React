@@ -1616,7 +1616,7 @@ const HrLeads = () => {
                   <div className="col-12 d-md-none mb-1">{renderDatePills(true)}</div>
                   <div className="col-md-8 col-xl-8 d-none d-md-flex justify-content-end align-items-center">
                     <div className="b2b-cycle-filters">
-                      <div className="b2b-cycle-filters__item">
+                      {/* <div className="b2b-cycle-filters__item">
                         <label className="small fw-semibold mb-0">Role</label>
                         <select
                           className="form-select form-select-sm b2b-cycle-filters__select"
@@ -1631,7 +1631,7 @@ const HrLeads = () => {
                             <option key={role} value={role}>{role}</option>
                           ))}
                         </select>
-                      </div>
+                      </div> */}
                     </div>
                   </div>
                   <div className="col-12 mt-1 pt-1 border-top adm-cycle-toolbar" style={{ borderColor: '#eee' }}>
