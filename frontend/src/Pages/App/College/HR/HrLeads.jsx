@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import moment from 'moment';
 import Calendar from 'react-calendar';
@@ -6,20 +7,15 @@ import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import 'react-calendar/dist/Calendar.css';
 import './HrLeads.css';
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 const ACCENT = 'rgb(250, 85, 121)';
 
-const DETAIL_TABS = ['Lead Details', 'Document'];
+const DOC_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
 
-const ROLE_OPTIONS = [
-  'Graphic Designer Intern',
-  'Field Sales Executive',
-  'Solar Panel Trainer Installation Technician',
-  'Agriculture Trainer Extension Promoter',
-  'AI Trainer',
-  'Industry Trainer for Home Service Appliance',
-  'Electrical/Electronics Engineer for Telecom Training',
-];
+const getDocFileUrl = (fileUrl) => resolveMediaUrl(DOC_BUCKET_URL, fileUrl);
+
+const DETAIL_TABS = ['Lead Details', 'Document'];
 
 const EMPTY_FORM = {
   fullName: '',
@@ -36,15 +32,11 @@ const EMPTY_FORM = {
 
 const formatPhone = (mobile) => String(mobile || '').replace(/\D/g, '').slice(-10);
 
-// Approval is derived from the milestone configured against each HR status,
-// so nothing about the status flow stays hardcoded here.
-const APPROVED_MILESTONE_RE = /approv|select|offer|join|hire/i;
-const REJECTED_MILESTONE_RE = /reject|not suitable|lost|drop/i;
-
+// Approval follows the exact milestone set on HR Status Design (Approved / Rejected).
 const approvalFromMilestone = (milestone) => {
-  const value = String(milestone || '');
-  if (APPROVED_MILESTONE_RE.test(value)) return 'approved';
-  if (REJECTED_MILESTONE_RE.test(value)) return 'rejected';
+  const value = String(milestone || '').trim().toLowerCase();
+  if (value === 'approved') return 'approved';
+  if (value === 'rejected') return 'rejected';
   return 'pending';
 };
 
@@ -108,7 +100,7 @@ const getFileType = (url) => {
   return 'file';
 };
 
-const DocumentPreviewModal = ({ document: selectedDocument, onClose }) => {
+const DocumentPreviewModal = ({ previewDoc, onClose }) => {
   const [documentZoom, setDocumentZoom] = useState(1);
   const [documentRotation, setDocumentRotation] = useState(0);
 
@@ -117,28 +109,89 @@ const DocumentPreviewModal = ({ document: selectedDocument, onClose }) => {
     return () => document.body.classList.remove('no-scroll');
   }, []);
 
-  if (!selectedDocument) return null;
+  if (!previewDoc) return null;
 
-  const fileUrl = selectedDocument.fileUrl || '';
+  const fileUrl = getDocFileUrl(previewDoc.fileUrl);
   const fileType = fileUrl ? getFileType(fileUrl) : null;
-  const uploadedAt = selectedDocument.uploadedAt
-    ? new Date(selectedDocument.uploadedAt).toLocaleDateString('en-GB', {
+  const uploadedAt = previewDoc.uploadedAt
+    ? new Date(previewDoc.uploadedAt).toLocaleDateString('en-GB', {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
     })
     : 'N/A';
 
-  return (
-    <div className="document-modal-overlay" onClick={onClose}>
-      <div className="document-modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>{selectedDocument.Name || selectedDocument.name} Preview</h3>
-          <button type="button" className="close-btn" onClick={onClose}>&times;</button>
+  return createPortal(
+    <div
+      className="hr-doc-modal-overlay"
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.72)',
+        zIndex: 100000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+      }}
+    >
+      <div
+        className="hr-doc-modal-content"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: '#fff',
+          borderRadius: 12,
+          width: 'min(1100px, 96vw)',
+          maxHeight: '92vh',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <div
+          style={{
+            padding: '14px 18px',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: '#fff',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <h3 style={{ margin: 0, fontSize: 18, color: '#fff' }}>
+            {previewDoc.Name || previewDoc.name} Preview
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#fff',
+              fontSize: 28,
+              lineHeight: 1,
+              cursor: 'pointer',
+            }}
+          >
+            &times;
+          </button>
         </div>
-        <div className="modal-body">
-          <div className="document-preview-section">
-            <div className="document-preview-container" style={{ height: 'auto' }}>
+        <div style={{ padding: 16, display: 'flex', gap: 16, overflow: 'auto', minHeight: 0 }}>
+          <div style={{ flex: 2, minWidth: 0 }}>
+            <div
+              style={{
+                background: '#f8f9fa',
+                border: '2px dashed #dee2e6',
+                borderRadius: 8,
+                minHeight: 420,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
               {fileUrl ? (
                 <>
                   {fileType === 'image' ? (
@@ -147,95 +200,51 @@ const DocumentPreviewModal = ({ document: selectedDocument, onClose }) => {
                       alt="Document Preview"
                       style={{
                         transform: `scale(${documentZoom}) rotate(${documentRotation}deg)`,
-                        transition: 'transform 0.3s ease',
                         maxWidth: '100%',
+                        maxHeight: '70vh',
                         objectFit: 'contain',
                       }}
                     />
                   ) : fileType === 'pdf' ? (
-                    <div className="pdf-viewer" style={{ width: '100%', height: 780 }}>
-                      <iframe
-                        src={`${fileUrl}#navpanes=0&toolbar=0`}
-                        width="100%"
-                        height="100%"
-                        title="PDF Document"
-                        style={{
-                          border: 'none',
-                          transform: `scale(${documentZoom})`,
-                          transformOrigin: 'top left',
-                          transition: 'transform 0.3s ease',
-                        }}
-                      />
-                    </div>
+                    <iframe
+                      src={`${fileUrl}#navpanes=0&toolbar=0`}
+                      title="PDF Document"
+                      style={{ width: '100%', height: '70vh', border: 'none', background: '#fff' }}
+                    />
                   ) : (
-                    <div className="document-preview" style={{ textAlign: 'center', padding: 40 }}>
-                      <i className="fas fa-file fa-3x text-muted mb-3" />
+                    <div style={{ textAlign: 'center', padding: 40 }}>
                       <h4>Document Preview</h4>
-                      <p>Click download to view this file</p>
                       <a href={fileUrl} className="btn btn-primary" target="_blank" rel="noopener noreferrer">
-                        <i className="fas fa-download me-2" />
-                        Download & View
+                        Open file
                       </a>
                     </div>
                   )}
-                  <div className="preview-controls">
-                    <button type="button" className="control-btn" onClick={() => setDocumentZoom((z) => Math.min(z + 0.1, 2))}>
-                      <i className="fas fa-search-plus" />
-                    </button>
-                    <button type="button" className="control-btn" onClick={() => setDocumentZoom((z) => Math.max(z - 0.1, 0.5))}>
-                      <i className="fas fa-search-minus" />
-                    </button>
-                    <button type="button" className="control-btn" onClick={() => setDocumentRotation((r) => (r + 90) % 360)}>
-                      <i className="fas fa-redo" />
-                    </button>
-                    <button
-                      type="button"
-                      className="control-btn"
-                      onClick={() => {
-                        setDocumentZoom(1);
-                        setDocumentRotation(0);
-                      }}
-                    >
-                      <i className="fas fa-compress" />
-                    </button>
-                  </div>
                 </>
               ) : (
-                <div className="no-document">
-                  <i className="fas fa-file-times fa-3x text-muted mb-3" />
-                  <p>No document uploaded</p>
-                </div>
+                <p style={{ color: '#6c757d' }}>No document uploaded</p>
               )}
             </div>
           </div>
-          <div className="document-modal-info">
-            <div className="info-card">
-              <h4>Document Information</h4>
-              <div className="info-row">
-                <strong>Document Name:</strong> {selectedDocument.Name || selectedDocument.name}
-              </div>
-              <div className="info-row">
-                <strong>Lead:</strong> {selectedDocument.leadName || 'N/A'}
-              </div>
-              <div className="info-row">
-                <strong>Upload Date:</strong> {uploadedAt}
-              </div>
-              <div className="info-row">
-                <strong>Status:</strong>
-                <span className="ms-2">{fileUrl ? 'Uploaded' : 'Not Uploaded'}</span>
-              </div>
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <div style={{ background: '#f8f9fa', border: '1px solid #e9ecef', borderRadius: 8, padding: 16 }}>
+              <h4 style={{ margin: '0 0 12px', borderBottom: '2px solid #667eea', paddingBottom: 8 }}>
+                Document Information
+              </h4>
+              <div className="mb-2"><strong>Document Name:</strong> {previewDoc.Name || previewDoc.name}</div>
+              <div className="mb-2"><strong>Lead:</strong> {previewDoc.leadName || 'N/A'}</div>
+              <div className="mb-2"><strong>Upload Date:</strong> {uploadedAt}</div>
+              <div className="mb-2"><strong>Status:</strong> {fileUrl ? 'Uploaded' : 'Not Uploaded'}</div>
               {fileUrl && (
-                <div className="info-row mt-3">
-                  <a href={fileUrl} className="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">
-                    <i className="fas fa-download me-1" /> Download
-                  </a>
-                </div>
+                <a href={fileUrl} className="btn btn-sm btn-outline-primary mt-2" target="_blank" rel="noopener noreferrer">
+                  Download
+                </a>
               )}
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
@@ -259,7 +268,7 @@ const HrLeads = () => {
     call: EMPTY_FOLLOWUP_BUCKET,
     visit: EMPTY_FOLLOWUP_BUCKET,
   });
-  const [roles, setRoles] = useState(ROLE_OPTIONS);
+  const [roles, setRoles] = useState([]);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [leadStatus, setLeadStatus] = useState('all');
@@ -370,8 +379,7 @@ const HrLeads = () => {
           call: EMPTY_FOLLOWUP_BUCKET,
           visit: EMPTY_FOLLOWUP_BUCKET,
         });
-        const apiRoles = res.data.data.roles || [];
-        setRoles(Array.from(new Set([...ROLE_OPTIONS, ...apiRoles])).sort((a, b) => a.localeCompare(b)));
+        setRoles((res.data.data.roles || []).filter(Boolean));
       }
     } catch (error) {
       console.error('HR counts error:', error);
@@ -547,13 +555,16 @@ const HrLeads = () => {
     document.body.classList.remove('panel-open');
   };
 
-  const openDocumentModal = (doc, lead) => {
-    if (!doc?.fileUrl) return;
+  const openDocumentModal = (e, doc, lead) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    const fileUrl = doc?.fileUrl || lead?.resume;
+    if (!fileUrl) return;
     setSelectedDocument({
       Name: doc.name,
       name: doc.name,
       key: doc.key,
-      fileUrl: doc.fileUrl,
+      fileUrl,
       uploadedAt: doc.uploadedAt,
       leadName: lead?.fullName || '',
     });
@@ -619,7 +630,7 @@ const HrLeads = () => {
   const applyApprovalStatus = async (lead, kind) => {
     const target = findStatusByApproval(kind);
     if (!target) {
-      toast.error(`No status configured with a "${kind}" milestone. Add one in HR Status Design.`);
+      toast.error(`No HR status has milestone "${kind === 'approved' ? 'Approved' : 'Rejected'}". Set it in HR Status Design.`);
       return;
     }
     const sub = target.substatuses?.[0];
@@ -1353,7 +1364,7 @@ const HrLeads = () => {
                 </div>
                 <div className="lead-card-kyc-dash__actions">
                   {hasResume ? (
-                    <a className="lead-card-kyc-dash__btn lead-card-kyc-dash__btn--done" href={lead.resume} target="_blank" rel="noreferrer">
+                    <a className="lead-card-kyc-dash__btn lead-card-kyc-dash__btn--done" href={getDocFileUrl(lead.resume)} target="_blank" rel="noreferrer">
                       View Resume
                     </a>
                   ) : (
@@ -1476,7 +1487,7 @@ const HrLeads = () => {
 
                   <div className="documents-grid-enhanced">
                     {documents.map((doc) => {
-                      const fileUrl = doc.fileUrl || '';
+                      const fileUrl = getDocFileUrl(doc.fileUrl);
                       const fileType = getFileType(fileUrl);
                       const isUploading = uploadingDoc === `${lead._id}:${doc.key}`;
                       return (
@@ -1501,7 +1512,7 @@ const HrLeads = () => {
                                   <button
                                     type="button"
                                     className="preview-btn"
-                                    onClick={() => openDocumentModal(doc, lead)}
+                                    onClick={(e) => openDocumentModal(e, doc, lead)}
                                   >
                                     <i className="fas fa-search-plus" />
                                     Preview
@@ -1523,7 +1534,7 @@ const HrLeads = () => {
                                   <button
                                     type="button"
                                     className="action-btn verify-btn"
-                                    onClick={() => openDocumentModal(doc, lead)}
+                                    onClick={(e) => openDocumentModal(e, doc, lead)}
                                   >
                                     <i className="fas fa-search" />
                                     Preview
@@ -1896,7 +1907,7 @@ const HrLeads = () => {
       </div>
 
       {showDocumentModal && (
-        <DocumentPreviewModal document={selectedDocument} onClose={closeDocumentModal} />
+        <DocumentPreviewModal previewDoc={selectedDocument} onClose={closeDocumentModal} />
       )}
 
       {showAddModal && (

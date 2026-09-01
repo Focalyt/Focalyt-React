@@ -10,17 +10,19 @@ const College = require('../../models/college');
 const STATUS_POPULATE = { path: 'leadStatus', select: 'title milestone substatuses' };
 const HR_DOCUMENT_TYPES = [
   { key: 'resume', name: 'Resume / CV' },
-  { key: 'photo', name: 'Photograph' },
-  { key: 'aadhaar', name: 'Aadhaar Card' },
-  { key: 'pan', name: 'PAN Card' },
-  { key: 'tenth', name: '10th Marksheet' },
-  { key: 'twelfth', name: '12th Marksheet' },
-  { key: 'graduation', name: 'Graduation Certificate' },
-  { key: 'experienceLetter', name: 'Experience Letter' },
-  { key: 'statusAttachment', name: 'Status Attachment' },
+  { key: 'photo', name: 'Photograph' }
 ];
 const { resolvePublicUrl } = require('../../../helpers/s3Storage');
 const { uploadSinglefile } = require('../functions/images');
+
+const isActualMediaFile = (value) => {
+  const v = String(value || '').trim();
+  if (!v) return false;
+  if (/^(n\/?a|null|undefined|not found|none|-)$/i.test(v)) return false;
+  const path = v.split('?')[0];
+  if (/\.(pdf|png|jpe?g|gif|webp|bmp|doc|docx)$/i.test(path)) return true;
+  return /(?:^|\/)uploads\//i.test(v);
+};
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MOBILE_RE = /^[6-9]\d{9}$/;
@@ -50,8 +52,10 @@ const capitalizeWords = (str) => {
 
 const serializeLead = (doc) => {
   const lead = doc?.toObject ? doc.toObject() : { ...doc };
-  if (lead.resume) {
+  if (isActualMediaFile(lead.resume)) {
     lead.resume = resolvePublicUrl(lead.resume) || lead.resume;
+  } else {
+    lead.resume = '';
   }
   lead.leadOwner = lead.leadOwner || lead.assignedTo || null;
 
@@ -77,9 +81,9 @@ const serializeLead = (doc) => {
 
   const docsByKey = {};
   (lead.documents || []).forEach((item) => {
-    if (item?.key) docsByKey[item.key] = item;
+    if (item?.key && isActualMediaFile(item.fileUrl)) docsByKey[item.key] = item;
   });
-  if (lead.resume && !docsByKey.resume?.fileUrl) {
+  if (isActualMediaFile(lead.resume) && !docsByKey.resume?.fileUrl) {
     docsByKey.resume = {
       key: 'resume',
       name: 'Resume / CV',
@@ -89,12 +93,13 @@ const serializeLead = (doc) => {
   }
   lead.documents = HR_DOCUMENT_TYPES.map((type) => {
     const saved = docsByKey[type.key] || {};
-    const fileUrl = resolvePublicUrl(saved.fileUrl) || saved.fileUrl || (type.key === 'resume' ? lead.resume : '') || '';
+    const raw = saved.fileUrl || (type.key === 'resume' ? lead.resume : '') || '';
+    const fileUrl = isActualMediaFile(raw) ? (resolvePublicUrl(raw) || raw) : '';
     return {
       key: type.key,
       name: type.name,
       fileUrl,
-      uploadedAt: saved.uploadedAt || (fileUrl ? lead.updatedAt : null) || null,
+      uploadedAt: fileUrl ? (saved.uploadedAt || null) : null,
     };
   });
   const summary = buildFollowupSummary(lead.followups);
@@ -538,7 +543,7 @@ router.post('/leads', isCollege, async (req, res) => {
       experience,
       qualification,
       dateOfBirth: dateOfBirth && !Number.isNaN(dateOfBirth.getTime()) ? dateOfBirth : undefined,
-      resume: resumeUrl,
+      resume: isActualMediaFile(resumeUrl) ? resumeUrl : '',
       remark,
       source,
       college: collegeId,
@@ -720,7 +725,7 @@ router.route("/digitalhrleads").post(async (req, res) => {
           experience: experience || "",
           qualification: qualification || "",
           dateOfBirth: parsedDob || undefined,
-          resume: resumeUrl,
+          resume: isActualMediaFile(resumeUrl) ? resumeUrl : '',
           remark: remark || "",
           source,
           college: collegeId,
