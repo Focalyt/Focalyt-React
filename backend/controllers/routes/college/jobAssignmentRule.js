@@ -55,6 +55,49 @@ function populateRule(query) {
     .populate('modifiedBy', 'name email');
 }
 
+// Job exists first, then the rule is created for that job.
+// assignHr() only ran on vacancy create, so apply HR now to matching jobs that still have no hr.
+async function applyRuleToMatchingVacancies(rule) {
+  if (!rule || rule.status !== 'Active') return;
+
+  const filter = {
+    $or: [{ hr: { $exists: false } }, { hr: null }],
+  };
+  const and = [];
+  const jobNameType = rule.jobName?.type || 'any';
+  const categoryType = rule.jobCategory?.type || 'includes';
+  const jobNameIds = (rule.jobName?.values || []).map((id) => id._id || id).filter(Boolean);
+  const categoryIds = (rule.jobCategory?.values || []).map((id) => id._id || id).filter(Boolean);
+
+  if (jobNameType === 'includes') {
+    if (jobNameIds.length === 0) return;
+    const selectedJobs = await Vacancy.find({ _id: { $in: jobNameIds } }).select('title').lean();
+    const titles = [...new Set(selectedJobs.map((job) => job.title).filter(Boolean))];
+    and.push({
+      $or: [
+        { _id: { $in: jobNameIds } },
+        ...(titles.length ? [{ title: { $in: titles }, status: true }] : []),
+      ],
+    });
+  } else if (categoryType === 'includes') {
+    if (categoryIds.length === 0) return;
+    and.push({ _jobCategory: { $in: categoryIds }, status: true });
+  } else {
+    return;
+  }
+
+  if (and.length) filter.$and = and;
+
+  const vacancies = await Vacancy.find(filter);
+  for (const vacancy of vacancies) {
+    if (vacancy.hr) continue;
+    await vacancy.assignHr();
+    if (vacancy.hr) {
+      await vacancy.save();
+    }
+  }
+}
+
 router.get('/', isCollege, async (req, res) => {
   try {
     const {
@@ -239,6 +282,7 @@ router.post('/', [validateRule, isCollege], async (req, res) => {
     });
 
     await newRule.save();
+    await applyRuleToMatchingVacancies(newRule);
 
     const populatedRule = await populateRule(JobAssignmentRule.findById(newRule._id));
 
@@ -327,6 +371,8 @@ router.put('/:id', [
       { new: true, runValidators: true }
     ));
 
+    await applyRuleToMatchingVacancies(updatedRule);
+
     res.json({
       status: true,
       message: 'Job assignment rule updated successfully',
@@ -373,6 +419,8 @@ router.patch('/:id/status', [
         message: 'Job assignment rule not found'
       });
     }
+
+    await applyRuleToMatchingVacancies(updatedRule);
 
     res.json({
       status: true,
