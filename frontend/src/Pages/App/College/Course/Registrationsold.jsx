@@ -1249,6 +1249,27 @@ const CRMDashboard = () => {
   const [aiSupervisionActiveLeadId, setAiSupervisionActiveLeadId] = useState(null);
   const [aiSupervisionSearchTerm, setAiSupervisionSearchTerm] = useState('');
   const [aiSupervisionQueueFilter, setAiSupervisionQueueFilter] = useState('all');
+  const [isAiFabOpen, setIsAiFabOpen] = useState(false);
+  const [aiFabSubstatuses, setAiFabSubstatuses] = useState([]);
+  const aiFabWrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!isAiFabOpen) return undefined;
+    const handlePointerDown = (event) => {
+      if (aiFabWrapRef.current && !aiFabWrapRef.current.contains(event.target)) {
+        setIsAiFabOpen(false);
+      }
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setIsAiFabOpen(false);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isAiFabOpen]);
 
  
   const [modalType, setModalType] = useState(null); 
@@ -3273,6 +3294,15 @@ const CRMDashboard = () => {
           name: r.title,
           count: r.count || 0,  // agar backend me count nahi hai to 0
         })));
+
+        const aiStatus = status.find((item) => String(item._id) === '64ab1234abcd5678ef901234');
+        const aiSubstatusIds = ['64ab1234abcd5678ef901235', '6a3f5a53cfccaeeb28a4d1a3'];
+        setAiFabSubstatuses(
+          aiSubstatusIds
+            .map((id) => (aiStatus?.substatuses || []).find((sub) => String(sub._id) === id))
+            .filter(Boolean)
+            .map((sub) => ({ _id: sub._id, title: sub.title }))
+        );
 
 
       }
@@ -14792,9 +14822,180 @@ useEffect(() => {
 
   return (
     <div className="container-fluid">
+      <div
+        className={`crm-ai-fab-wrap${isAiFabOpen ? ' open' : ''}`}
+        id="fabWrap"
+        ref={aiFabWrapRef}
+      >
+          {aiFabSubstatuses.map((substatus, index) => (
+            <button
+              key={substatus._id}
+              type="button"
+              className="crm-ai-fab-sub"
+              title={substatus.title}
+              style={{ transitionDelay: isAiFabOpen ? `${0.06 * (index + 1)}s` : '0s' }}
+              onClick={() => {
+                setIsAiFabOpen(false);
+                toast.info(substatus.title);
+              }}
+            >
+              <i className={
+                String(substatus._id) === '64ab1234abcd5678ef901235'
+                  ? 'fas fa-user-plus'
+                  : 'fas fa-phone-slash'
+              }></i>
+              <span className="crm-ai-fab-tooltip">{substatus.title}</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            className={`crm-ai-fab-main${isAiFabOpen ? ' open' : ''}`}
+            id="fabMain"
+            aria-label={isAiFabOpen ? 'Close AI menu' : 'Open AI menu'}
+            aria-expanded={isAiFabOpen}
+            onClick={() => setIsAiFabOpen((open) => !open)}
+          >
+            <span className="crm-ai-fab-main__art" aria-hidden="true">
+              <svg className="crm-ai-fab-icon" viewBox="0 0 26 24" fill="#fff" xmlns="http://www.w3.org/2000/svg">
+                <g transform="rotate(-22 11 12)">
+                  <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" />
+                </g>
+                <path d="M20.7 3.1l.72 1.9 1.9.72-1.9.72-.72 1.9-.72-1.9-1.9-.72 1.9-.72z" />
+                <path d="M16.85 8.55l.45 1.18 1.18.45-1.18.45-.45 1.18-.45-1.18-1.18-.45 1.18-.45z" />
+                <path d="M21.55 9.15l.32.84.84.32-.84.32-.32.84-.32-.84-.84-.32.84-.32z" />
+              </svg>
+            </span>
+            <span className="crm-ai-fab-badge">AI</span>
+          </button>
+      </div>
       <div>
       <style>
         {`
+          .crm-ai-fab-wrap{
+            position: fixed;
+            right: 28px;
+            bottom: 28px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+            z-index: 1250;
+            pointer-events: none;
+          }
+          .crm-ai-fab-main{
+            position: relative;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            border: 3px solid #111;
+            background: linear-gradient(180deg, #a033ff 0%, #e91e63 100%);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 8px 22px rgba(139, 37, 226, 0.38);
+            transition: transform 0.35s cubic-bezier(.34, 1.56, .64, 1), filter 0.25s ease, box-shadow 0.25s ease;
+            z-index: 2;
+            pointer-events: auto;
+            padding: 0;
+          }
+          .crm-ai-fab-main:hover{
+            filter: brightness(1.06);
+            box-shadow: 0 10px 26px rgba(124, 58, 237, 0.5);
+          }
+          .crm-ai-fab-main.open{
+            transform: scale(1.04);
+          }
+          .crm-ai-fab-main__art{
+            position: relative;
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .crm-ai-fab-icon{
+            width: 34px;
+            height: 34px;
+            display: block;
+            transform: rotate(60deg);
+          }
+          .crm-ai-fab-badge{
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #ff5c8a;
+            color: #fff;
+            font-size: 8px;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 6px rgba(255, 92, 138, 0.45);
+            transition: opacity 0.2s ease;
+          }
+          .crm-ai-fab-sub{
+            position: relative;
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            border: 1px solid #ede9fe;
+            background: #fff;
+            color: #7c3aed;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(79, 70, 229, 0.2);
+            opacity: 0;
+            transform: translateY(16px) scale(0.6);
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.35s cubic-bezier(.34, 1.56, .64, 1), background 0.2s ease;
+            padding: 0;
+          }
+          .crm-ai-fab-sub:hover{
+            background: #f5f3ff;
+            color: #5b21b6;
+          }
+          .crm-ai-fab-wrap.open .crm-ai-fab-sub{
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+          }
+          .crm-ai-fab-tooltip{
+            position: absolute;
+            right: 58px;
+            white-space: nowrap;
+            background: #4c1d95;
+            color: #fff;
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            opacity: 0;
+            transform: translateX(6px);
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            pointer-events: none;
+          }
+          .crm-ai-fab-wrap.open .crm-ai-fab-tooltip{
+            opacity: 1;
+            transform: translateX(0);
+          }
+          @media (max-width: 768px){
+            .crm-ai-fab-wrap{
+              right: 16px;
+              bottom: 20px;
+            }
+            .crm-ai-fab-main{
+              width: 58px;
+              height: 58px;
+            }
+          }
           .b2b-cycle-filters{
             display: flex;
             flex-wrap: nowrap;
