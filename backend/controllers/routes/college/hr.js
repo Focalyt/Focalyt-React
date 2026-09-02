@@ -596,14 +596,16 @@ router.route("/digitalhrleads").post(async (req, res) => {
           fullname: req.body.fullname,
           mobile: req.body.mobile,
           applyingFor: req.body.applyingFor,
+          jobId: req.body.jobId || req.body._job,
           city: req.body.city,
           college: req.body.college,
           source: req.body.source || "Digital Lead"
       });
 
       let { fullname, mobile, email,  gender, city, applyingFor, experience, qualification, dob, source, remark, status, subStatus, college } = req.body;
+      const incomingJobId = req.body.jobId || req.body._job;
 
-      if (!fullname || !mobile || !email || !gender || !city || !applyingFor || !status || !subStatus || !college) {
+      if (!fullname || !mobile || !email || !gender || !city || !status || !subStatus || !college) {
           return res.status(400).json({
               status: false,
               msg: "All required fields must be provided"
@@ -704,6 +706,37 @@ router.route("/digitalhrleads").post(async (req, res) => {
           resumeUrl = resolvePublicUrl(cvKey);
       }
 
+      applyingFor = String(applyingFor || '').trim();
+      const jobOwner = await resolveJobHrOwner({
+          applyingFor,
+          jobId: incomingJobId,
+          collegeId,
+      });
+
+      if (jobOwner.error === 'invalid_job_id') {
+          return res.status(400).json({
+              status: false,
+              msg: "Invalid job id"
+          });
+      }
+      if (jobOwner.error === 'job_not_found') {
+          return res.status(404).json({
+              status: false,
+              msg: "Job not found"
+          });
+      }
+
+      if (incomingJobId) {
+          applyingFor = String(jobOwner.jobTitle || applyingFor).trim();
+      }
+
+      if (!applyingFor) {
+          return res.status(400).json({
+              status: false,
+              msg: "A valid job id or applyingFor is required"
+          });
+      }
+
       // Same mobile applying for the same role at the same college is a re-enquiry, not a new lead.
       const existingLead = await CareerApplication.findOne({
           mobile,
@@ -718,23 +751,16 @@ router.route("/digitalhrleads").post(async (req, res) => {
               remarks: remark || "",
               timestamp: new Date()
           });
-          if (!existingLead.leadOwner && !existingLead.assignedTo) {
-              const jobOwner = await resolveJobHrOwner({
-                  applyingFor,
-                  jobId: req.body.jobId || req.body._job,
-                  collegeId,
+          if (!existingLead.leadOwner && !existingLead.assignedTo && jobOwner.hrId) {
+              existingLead.leadOwner = jobOwner.hrId;
+              existingLead.assignedTo = jobOwner.hrId;
+              existingLead.logs.push({
+                  action: `Lead owner auto-assigned to ${jobOwner.hrName}`,
+                  remarks: jobOwner.jobTitle
+                      ? `Matched job "${jobOwner.jobTitle}"`
+                      : applyingFor,
+                  timestamp: new Date()
               });
-              if (jobOwner.hrId) {
-                  existingLead.leadOwner = jobOwner.hrId;
-                  existingLead.assignedTo = jobOwner.hrId;
-                  existingLead.logs.push({
-                      action: `Lead owner auto-assigned to ${jobOwner.hrName}`,
-                      remarks: jobOwner.jobTitle
-                          ? `Matched job "${jobOwner.jobTitle}"`
-                          : applyingFor,
-                      timestamp: new Date()
-                  });
-              }
           }
           await existingLead.save();
 
@@ -750,12 +776,6 @@ router.route("/digitalhrleads").post(async (req, res) => {
               }
           });
       }
-
-      const jobOwner = await resolveJobHrOwner({
-          applyingFor,
-          jobId: req.body.jobId || req.body._job,
-          collegeId,
-      });
       const ownerLog = jobOwner.hrId
           ? {
               action: `Lead owner auto-assigned to ${jobOwner.hrName}`,

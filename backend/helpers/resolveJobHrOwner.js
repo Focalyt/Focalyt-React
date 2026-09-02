@@ -14,17 +14,40 @@ const toIdString = (value) => {
 };
 
 // Copy Vacancy.hr onto the career lead. Match by job id or exact job title.
+// When jobId is sent, it must exist; applyingFor is then taken from that vacancy title.
 const resolveJobHrOwner = async ({ applyingFor, jobId } = {}) => {
   const Vacancy = mongoose.model('Vacancy');
   const User = mongoose.model('User');
 
+  const rawJobId = jobId != null && String(jobId).trim() !== '' ? String(jobId).trim() : '';
   let vacancy = null;
   const id = toIdString(jobId);
-  if (id) {
+  let jobTitleFromId = null;
+
+  if (rawJobId) {
+    if (!id) {
+      return {
+        error: 'invalid_job_id',
+        hrId: null,
+        hrName: null,
+        jobId: null,
+        jobTitle: null,
+      };
+    }
     vacancy = await Vacancy.findById(id).select('_id title hr').lean();
+    if (!vacancy) {
+      return {
+        error: 'job_not_found',
+        hrId: null,
+        hrName: null,
+        jobId: null,
+        jobTitle: null,
+      };
+    }
+    jobTitleFromId = vacancy.title || null;
   }
 
-  const title = String(applyingFor || '').trim();
+  const title = String(applyingFor || jobTitleFromId || '').trim();
   if ((!vacancy || !vacancy.hr) && title) {
     const matches = await Vacancy.find({
       title: exactInsensitive(title),
@@ -34,7 +57,7 @@ const resolveJobHrOwner = async ({ applyingFor, jobId } = {}) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    vacancy = matches.find((job) => job.hr) || matches[0] || null;
+    vacancy = matches.find((job) => job.hr) || matches[0] || vacancy || null;
   }
 
   const hrId = toIdString(vacancy?.hr);
@@ -46,12 +69,14 @@ const resolveJobHrOwner = async ({ applyingFor, jobId } = {}) => {
     hrId,
   });
 
+  const jobTitle = jobTitleFromId || vacancy?.title || applyingFor || null;
+
   if (!hrId) {
     return {
       hrId: null,
       hrName: null,
       jobId: vacancy?._id || null,
-      jobTitle: vacancy?.title || applyingFor || null,
+      jobTitle,
     };
   }
 
@@ -60,7 +85,7 @@ const resolveJobHrOwner = async ({ applyingFor, jobId } = {}) => {
     hrId,
     hrName: hrDetails?.name || 'Unknown',
     jobId: vacancy._id,
-    jobTitle: vacancy.title || applyingFor || null,
+    jobTitle,
   };
 };
 
