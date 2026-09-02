@@ -12,15 +12,15 @@ const defaultSubstatusId = new mongoose.Types.ObjectId('64ab1234abcd5678ef901235
 
 const defaultStatusData = {
   _id: defaultStatusId,
-  title: 'Untouch Leads',
-  description: 'Default status for Untouch Leads',
+  title: 'Untouch',
+  description: 'Default status for Untouch',
   milestone: '',
   index: 0,
   substatuses: [
     {
       _id: defaultSubstatusId,
-      title: 'Untouch Leads',
-      description: 'Default substatus for Untouch Leads',
+      title: 'New Lead',
+      description: 'Default substatus for New Lead',
       hasRemarks: false,
       hasFollowup: false,
       hasAttachment: false,
