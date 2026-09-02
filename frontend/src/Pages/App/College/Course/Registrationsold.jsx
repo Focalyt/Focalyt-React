@@ -3048,6 +3048,8 @@ const CRMDashboard = () => {
   const [followupTime, setFollowupTime] = useState('');
   const [followUpType, setFollowUpType] = useState('Call');
   const [remarks, setRemarks] = useState('');
+  const [followupFormResetKey, setFollowupFormResetKey] = useState(0);
+  const [reschedulingMissedFollowup, setReschedulingMissedFollowup] = useState(false);
 
 
   const [subStatuses, setSubStatuses] = useState([]);
@@ -4014,7 +4016,8 @@ console.log('API Response:', response.data);
         };
 
         const activeSlot = slotForType(followUpType);
-        const hasExistingFollowup = Boolean(activeSlot?._id);
+        const slotBucket = getFollowupBucket(activeSlot);
+        const hasExistingFollowup = Boolean(activeSlot?._id) && slotBucket === 'planned';
         const payload = hasExistingFollowup
           ? {
             id: activeSlot._id,
@@ -5402,6 +5405,18 @@ console.log('API Response:', response.data);
     profileHasUpcomingFollowup(profile, 'Call') || profileHasUpcomingFollowup(profile, 'Visit')
   );
 
+  const canSetFollowup = (profile, type = 'Call') => {
+    const bucket = getProfileFollowupBucket(profile, type);
+    return bucket == null || bucket === 'missed';
+  };
+
+  const getSetFollowupBlockedReason = (profile, type = 'Call') => {
+    const bucket = getProfileFollowupBucket(profile, type);
+    if (bucket === 'planned') return 'Planned follow-up cannot be edited';
+    if (bucket === 'done') return 'Completed follow-up cannot be edited';
+    return '';
+  };
+
   const formatProfileNextActionDate = (profile, type = 'Call') => {
     const bucket = getProfileFollowupBucket(profile, type);
     if (bucket === 'missed' || bucket === 'done') return 'N/A';
@@ -6045,6 +6060,14 @@ console.log('API Response:', response.data);
 
 
   const openEditPanel = async (profile = null, panel, followUpTypeParam = 'Call') => {
+    if (panel === 'SetFollowup') {
+      const nextFollowUpType = followUpTypeParam === 'Visit' ? 'Visit' : 'Call';
+      if (profile && !canSetFollowup(profile, nextFollowUpType)) {
+        toast.info(getSetFollowupBlockedReason(profile, nextFollowUpType));
+        return;
+      }
+    }
+
     setSelectedProfile(null);
     setShowPanel('');
     setSelectedStatus(null);
@@ -6068,10 +6091,13 @@ console.log('API Response:', response.data);
 
     } else if (panel === 'SetFollowup') {
       const nextFollowUpType = followUpTypeParam === 'Visit' ? 'Visit' : 'Call';
+      const cardBucket = profile ? getProfileFollowupBucket(profile, nextFollowUpType) : null;
       setFollowUpType(nextFollowUpType);
       setFollowupDate(null);
       setFollowupTime('');
       setRemarks('');
+      setReschedulingMissedFollowup(cardBucket === 'missed');
+      setFollowupFormResetKey((key) => key + 1);
 
       if (profile && profile._id) {
         try {
@@ -6086,19 +6112,6 @@ console.log('API Response:', response.data);
           if (response.data.success && response.data.data) {
             const fullProfile = response.data.data;
             setSelectedProfile(fullProfile);
-
-            const existingSlot = getProfileFollowupSlot(fullProfile, nextFollowUpType);
-            const existingDateValue = existingSlot?.followupDate || existingSlot?.scheduledDate;
-            if (existingDateValue) {
-              const existing = new Date(existingDateValue);
-              if (!isNaN(existing.getTime())) {
-                setFollowupDate(existing);
-                const hours = String(existing.getHours()).padStart(2, '0');
-                const minutes = String(existing.getMinutes()).padStart(2, '0');
-                setFollowupTime(`${hours}:${minutes}`);
-              }
-              setRemarks(existingSlot?.remarks || '');
-            }
           }
         } catch (error) {
           console.error('Error fetching lead details for followup:', error);
@@ -6146,6 +6159,7 @@ console.log('API Response:', response.data);
     setFollowupTime('');
     setFollowUpType('Call');
     setRemarks('');
+    setReschedulingMissedFollowup(false);
     if (!isMobile) {
       setMainContentClass('col-12');
     } else {
@@ -9246,11 +9260,15 @@ useEffect(() => {
                     onChange={(e) => setFollowupDate(e.target.value)}
                   /> */}
                     <DatePicker
+                      key={`followup-date-${followupFormResetKey}`}
                       className={`form-control border-0 bgcolor ${getRequiredFieldClass('followup')}`}
                       onChange={setFollowupDate}
                       value={followupDate}
                       format="dd/MM/yyyy"
                       minDate={today}   // Isse past dates disable ho jayengi
+                      dayPlaceholder="dd"
+                      monthPlaceholder="mm"
+                      yearPlaceholder="yyyy"
                       placeholder={(isFieldRequired('followup') || showPanel === 'followUp') ? "Date is mandatory" : "Select date"}
                       style={{position: 'static'}}
                     />
@@ -9266,6 +9284,7 @@ useEffect(() => {
                   </label>
                   <div className="input-group">
                     <input
+                      key={`followup-time-${followupFormResetKey}`}
                       type="time"
                       className={`form-control border-0 bgcolor ${getRequiredFieldClass('followup')}`}
                       id="actionTime"
@@ -9276,6 +9295,11 @@ useEffect(() => {
                     />
                   </div>
                 </div>
+                {showPanel === 'followUp' && reschedulingMissedFollowup && (
+                  <div className="col-12">
+                    <small className="text-danger">This follow-up is missed. Choose a new date and time.</small>
+                  </div>
+                )}
               </div>)}
 
             {(isFieldRequired('remarks') || showPanel === 'followUp') && (
@@ -9516,6 +9540,8 @@ useEffect(() => {
           <button
             type="button"
             className="lead-strip-v3__actions-item"
+            disabled={!canSetFollowup(profile, 'Call')}
+            title={canSetFollowup(profile, 'Call') ? 'Set Followup' : getSetFollowupBlockedReason(profile, 'Call')}
             onClick={() => { openEditPanel(profile, 'SetFollowup'); onClose(); }}
           >
             <i className="fas fa-calendar text-warning" aria-hidden="true"></i>
@@ -16926,13 +16952,15 @@ useEffect(() => {
                                     </div>
 
                                     <div className="lhm__row3">
-                                      <div className={`lhm__followup-box${!profileHasUpcomingFollowup(profile, 'Call') ? ' lhm__followup-box--empty' : ''}`}>
+                                      <div className={`lhm__followup-box${!profileHasAnyFollowup(profile) ? ' lhm__followup-box--empty' : ''}`}>
                                         <span className="lhm__followup-title">Followup Calling</span>
                                         <button
                                           type="button"
                                           className="lhm__editbtn"
-                                          title="Set Followup"
+                                          title={canSetFollowup(profile, 'Call') ? 'Set Followup' : getSetFollowupBlockedReason(profile, 'Call')}
                                           aria-label="Set Followup"
+                                          disabled={!canSetFollowup(profile, 'Call')}
+                                          style={!canSetFollowup(profile, 'Call') ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
                                           onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(profile, 'SetFollowup', 'Call'); }}
                                         >
                                           <i className="fas fa-edit" aria-hidden="true"></i>
@@ -16959,13 +16987,15 @@ useEffect(() => {
                                         </div>
                                       </div>
 
-                                      <div className={`lhm__followup-box${!profileHasUpcomingFollowup(profile, 'Visit') ? ' lhm__followup-box--empty' : ''}`}>
+                                      <div className={`lhm__followup-box${!profileHasAnyFollowup(profile) ? ' lhm__followup-box--empty' : ''}`}>
                                         <span className="lhm__followup-title">Followup Visit</span>
                                         <button
                                           type="button"
                                           className="lhm__editbtn"
-                                          title="Set Followup"
+                                          title={canSetFollowup(profile, 'Visit') ? 'Set Followup' : getSetFollowupBlockedReason(profile, 'Visit')}
                                           aria-label="Set Followup"
+                                          disabled={!canSetFollowup(profile, 'Visit')}
+                                          style={!canSetFollowup(profile, 'Visit') ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
                                           onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(profile, 'SetFollowup', 'Visit'); }}
                                         >
                                           <i className="fas fa-edit" aria-hidden="true"></i>
@@ -17290,7 +17320,7 @@ useEffect(() => {
                                           </div>
                                         </div>
 
-                                        <div className={`lead-strip-v3__panel lead-strip-v3__panel--followup-call${!profileHasUpcomingFollowup(profile, 'Call') ? ' lead-strip-v3__panel--no-followup' : ''}`}>
+                                        <div className={`lead-strip-v3__panel lead-strip-v3__panel--followup-call${!profileHasAnyFollowup(profile) ? ' lead-strip-v3__panel--no-followup' : ''}`}>
                                           <div className="lead-strip-v3__panel-head">
                                             <span className="lead-strip-v3__panel-title">
                                               <i className="fas fa-phone-alt" aria-hidden="true"></i> Followup Calling
@@ -17309,8 +17339,10 @@ useEffect(() => {
                                             <button
                                               type="button"
                                               className="lead-strip-v3__footer-cal"
-                                              title="Set Followup"
+                                              title={canSetFollowup(profile, 'Call') ? 'Set Followup' : getSetFollowupBlockedReason(profile, 'Call')}
                                               aria-label="Set Followup"
+                                              disabled={!canSetFollowup(profile, 'Call')}
+                                              style={!canSetFollowup(profile, 'Call') ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
                                               onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(profile, 'SetFollowup', 'Call'); }}
                                             >
                                               <i className="fas fa-edit" aria-hidden="true"></i>
@@ -17318,7 +17350,7 @@ useEffect(() => {
                                           </div>
                                         </div>
 
-                                        <div className={`lead-strip-v3__panel lead-strip-v3__panel--followup-visit${!profileHasUpcomingFollowup(profile, 'Visit') ? ' lead-strip-v3__panel--no-followup' : ''}`}>
+                                        <div className={`lead-strip-v3__panel lead-strip-v3__panel--followup-visit${!profileHasAnyFollowup(profile) ? ' lead-strip-v3__panel--no-followup' : ''}`}>
                                           <div className="lead-strip-v3__panel-head">
                                             <span className="lead-strip-v3__panel-title">
                                               <i className="fas fa-user-check" aria-hidden="true"></i> Followup Visit
@@ -17337,8 +17369,10 @@ useEffect(() => {
                                             <button
                                               type="button"
                                               className="lead-strip-v3__footer-cal"
-                                              title="Set Followup"
+                                              title={canSetFollowup(profile, 'Visit') ? 'Set Followup' : getSetFollowupBlockedReason(profile, 'Visit')}
                                               aria-label="Set Followup"
+                                              disabled={!canSetFollowup(profile, 'Visit')}
+                                              style={!canSetFollowup(profile, 'Visit') ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
                                               onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditPanel(profile, 'SetFollowup', 'Visit'); }}
                                             >
                                               <i className="fas fa-edit" aria-hidden="true"></i>
@@ -17600,15 +17634,18 @@ useEffect(() => {
 
                                               <button
                                                 className="dropdown-item"
+                                                disabled={!canSetFollowup(profile, 'Call')}
+                                                title={canSetFollowup(profile, 'Call') ? 'Set Followup' : getSetFollowupBlockedReason(profile, 'Call')}
                                                 style={{
                                                   width: "100%",
                                                   padding: "8px 16px",
                                                   border: "none",
                                                   background: "none",
                                                   textAlign: "left",
-                                                  cursor: "pointer",
+                                                  cursor: canSetFollowup(profile, 'Call') ? "pointer" : "not-allowed",
                                                   fontSize: "12px",
-                                                  fontWeight: "600"
+                                                  fontWeight: "600",
+                                                  opacity: canSetFollowup(profile, 'Call') ? 1 : 0.5
                                                 }}
                                                 onClick={() => {
                                                   openEditPanel(profile, 'SetFollowup');

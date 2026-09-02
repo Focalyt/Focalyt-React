@@ -1950,10 +1950,13 @@ const MyFollowups = () => {
   const getFollowupDateFilterBy = (filters = filterData) => {
     const from = formatFollowupFilterDate(filters?.fromDate);
     const to = formatFollowupFilterDate(filters?.toDate || filters?.fromDate);
-    return {
-      ...(from && { fromDate: from }),
-      ...(to && { toDate: to }),
-    };
+    if (from || to) {
+      return {
+        ...(from && { fromDate: from }),
+        ...(to && { toDate: to }),
+      };
+    }
+    return { allTime: 'true' };
   };
 
   const followupCountFilterKey = useMemo(

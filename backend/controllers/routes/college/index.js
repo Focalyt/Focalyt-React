@@ -8473,7 +8473,12 @@ const buildFollowupCounselorMatch = (user, counselorArray) => {
 			],
 		};
 	}
-	return { createdBy: user._id };
+	return {
+		$or: [
+			{ counsellorId: user._id },
+			{ createdBy: user._id },
+		],
+	};
 };
 
 const buildFollowupDateMatch = (from, to, { useAllTime = false, useActivityFilter = false } = {}) => {
@@ -8488,6 +8493,72 @@ const buildFollowupDateMatch = (from, to, { useAllTime = false, useActivityFilte
 		};
 	}
 	return { followupDate: { $gte: from, $lte: to } };
+};
+
+const mergeMatchClauses = (...parts) => {
+	const cleaned = parts.filter((part) => part && typeof part === 'object' && Object.keys(part).length > 0);
+	if (cleaned.length === 0) return {};
+	if (cleaned.length === 1) return cleaned[0];
+	return { $and: cleaned };
+};
+
+const mergeFollowupDateBounds = (...clauses) => {
+	const merged = {};
+	for (const clause of clauses) {
+		if (!clause || typeof clause !== 'object') continue;
+		if (clause.$gte != null && (merged.$gte == null || clause.$gte > merged.$gte)) merged.$gte = clause.$gte;
+		if (clause.$gt != null && (merged.$gt == null || clause.$gt > merged.$gt)) merged.$gt = clause.$gt;
+		if (clause.$lte != null && (merged.$lte == null || clause.$lte < merged.$lte)) merged.$lte = clause.$lte;
+		if (clause.$lt != null && (merged.$lt == null || clause.$lt < merged.$lt)) merged.$lt = clause.$lt;
+	}
+	return Object.keys(merged).length ? merged : null;
+};
+
+// Same rules as Sales B2C dashboard getFollowupBucket: overdue planned = missed.
+const resolveB2cFollowupDisplayBucket = (status, followupDate, now = new Date()) => {
+	const statusKey = String(status || '').trim().toLowerCase();
+	if (statusKey === 'completed' || statusKey === 'done') return 'done';
+	if (statusKey === 'missed') return 'missed';
+	const dt = followupDate ? new Date(followupDate) : null;
+	if (!dt || Number.isNaN(dt.getTime())) return statusKey === 'planned' ? 'planned' : null;
+	if (statusKey === 'planned' || !statusKey) {
+		return dt.getTime() < now.getTime() ? 'missed' : 'planned';
+	}
+	return statusKey;
+};
+
+const buildB2cFollowupStatusMatch = (followupStatus, now = new Date(), dateMatch = {}) => {
+	const status = String(followupStatus || '').trim().toLowerCase();
+	const dateClause = dateMatch?.followupDate || null;
+	const activityMatch = Array.isArray(dateMatch?.$or) ? { $or: dateMatch.$or } : null;
+
+	if (status === 'done' || status === 'completed') {
+		return mergeMatchClauses({ status: { $in: ['done', 'completed'] } }, dateMatch);
+	}
+
+	if (status === 'planned') {
+		const plannedDate = mergeFollowupDateBounds({ $gte: now }, dateClause);
+		const plannedMatch = { status: 'planned' };
+		if (plannedDate) plannedMatch.followupDate = plannedDate;
+		return mergeMatchClauses(plannedMatch, activityMatch);
+	}
+
+	if (status === 'missed') {
+		const overdueDate = mergeFollowupDateBounds({ $lt: now }, dateClause);
+		const overduePlanned = { status: 'planned' };
+		if (overdueDate) overduePlanned.followupDate = overdueDate;
+		return {
+			$or: [
+				mergeMatchClauses({ status: 'missed' }, dateMatch),
+				mergeMatchClauses(overduePlanned, activityMatch),
+			],
+		};
+	}
+
+	if (followupStatus) {
+		return mergeMatchClauses({ status: followupStatus }, dateMatch);
+	}
+	return dateMatch;
 };
 
 router.get('/followupcounts', isCollege, async (req, res) => {
@@ -8523,10 +8594,10 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
 		let aggregate = [];
-		let baseMatch = {
-			...buildFollowupCounselorMatch(user, counselorArray),
-			...buildFollowupDateMatch(rangeFrom, rangeTo, { useAllTime, useActivityFilter }),
-		};
+		let baseMatch = mergeMatchClauses(
+			buildFollowupCounselorMatch(user, counselorArray),
+			buildFollowupDateMatch(rangeFrom, rangeTo, { useAllTime, useActivityFilter }),
+		);
 
 		let group = [{
 			$group: {
@@ -8716,19 +8787,20 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 		let plannedCount = 0
 		let missedCount = 0
 
+		const now = new Date();
 		followupCounts.forEach(item => {
 			const typeKey = String(item.followUpType || 'Call').toLowerCase() === 'visit' ? 'visit' : 'call';
-			const statusKey = String(item.status || '').toLowerCase();
+			const statusKey = resolveB2cFollowupDisplayBucket(item.status, item.followupDate, now);
 			if (statusKey === 'done' || statusKey === 'planned' || statusKey === 'missed') {
 				byType[typeKey][statusKey] += 1;
 			}
-			if (item.status == 'done') {
+			if (statusKey === 'done') {
 				doneCount++
 			}
-			if (item.status == 'planned') {
+			if (statusKey === 'planned') {
 				plannedCount++
 			}
-			if (item.status == 'missed') {
+			if (statusKey === 'missed') {
 				missedCount++
 			}
 		})
@@ -10825,10 +10897,19 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 			});
 
 			if (existingFollowup) {
-				return res.status(400).json({
-					status: false,
-					message: `${normalizedType} followup already exists, Please update the followup`
-				});
+				const existingDate = existingFollowup.followupDate ? new Date(existingFollowup.followupDate) : null;
+				const isOverdue = existingDate && !Number.isNaN(existingDate.getTime()) && existingDate.getTime() < Date.now();
+				if (!isOverdue) {
+					return res.status(400).json({
+						status: false,
+						message: `${normalizedType} followup already exists, Please update the followup`
+					});
+				}
+				existingFollowup.status = 'missed';
+				existingFollowup.updatedBy = user._id;
+				existingFollowup.statusUpdatedAt = new Date();
+				existingFollowup.updatedAt = new Date();
+				await existingFollowup.save();
 			}
 
 			const followup = await B2cFollowup.create({
@@ -10913,13 +10994,20 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 		}
 
 		if (folloupType === 'update') {
-			const existingFollowup = await B2cFollowup.findOne({ _id: id, status: 'planned' });
+			const existingFollowup = await B2cFollowup.findOne({
+				_id: id,
+				status: { $in: ['planned', 'missed'] },
+			});
 
 			if (!existingFollowup) {
 				return res.status(400).json({ status: false, message: "Followup not found" });
 			}
 
-			existingFollowup.status = 'done';
+			// Rescheduling a missed slot must keep the old row as missed.
+			// Updating a planned slot closes it as done, then a new planned row is created.
+			if (existingFollowup.status === 'planned') {
+				existingFollowup.status = 'done';
+			}
 			existingFollowup.updatedBy = user._id;
 			existingFollowup.statusUpdatedAt = new Date();
 			existingFollowup.updatedAt = new Date();
@@ -11108,11 +11196,12 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 	try {
 		const user = req.user;
 		let filter = {};
-		const { fromDate, toDate, page = 1, limit = 10, followupStatus, projects, verticals, course, center, counselor, name: searchName, filterBy } = req.query;
+		const { fromDate, toDate, page = 1, limit = 10, followupStatus, projects, verticals, course, center, counselor, name: searchName, filterBy, allTime } = req.query;
+		const useAllTime = allTime === 'true' || allTime === true;
 		const useActivityFilter = filterBy === 'activity';
 
-		const { from, to } = resolveFollowupDateRange(fromDate, toDate);
-		if (!from || !to) {
+		const { from, to } = resolveFollowupDateRange(fromDate, toDate, { useAllTime });
+		if (!useAllTime && (!from || !to)) {
 			return res.status(400).json({ error: "Invalid fromDate or toDate format" });
 		}
 
@@ -11135,19 +11224,17 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
-		let baseMatch = buildFollowupCounselorMatch(user, counselorArray);
-
-		const dateMatch = buildFollowupDateMatch(from, to, { useActivityFilter });
+		const now = new Date();
+		const dateMatch = buildFollowupDateMatch(from, to, { useAllTime, useActivityFilter });
+		let baseMatch = mergeMatchClauses(
+			buildFollowupCounselorMatch(user, counselorArray),
+			buildB2cFollowupStatusMatch(followupStatus, now, dateMatch),
+		);
 
 
 		const aggregate = [
 			{
-				$match: {
-					...baseMatch,
-					status: followupStatus,
-					...dateMatch,
-
-				}
+				$match: baseMatch
 			},
 			{
 				$lookup: {
@@ -11338,7 +11425,12 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 			return res.status(400).json({ error: "No followups found" });
 		}
 
-		return res.status(200).json({ success: true, data: followups });
+		const data = followups.map((item) => ({
+			...item,
+			status: resolveB2cFollowupDisplayBucket(item.status, item.followupDate, now) || item.status,
+		}));
+
+		return res.status(200).json({ success: true, data });
 
 	} catch (err) {
 		console.error(err);
