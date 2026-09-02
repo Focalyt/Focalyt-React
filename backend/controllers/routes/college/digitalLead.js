@@ -11,6 +11,22 @@ let { StatusLogs, AppliedCourses, CandidateProfile, Courses, Center, User, ReEnq
 //helpers
 let { statusLogHelper } = require('../../../helpers/college');
 
+const UNTOUCH_STATUS_ID = new mongoose.Types.ObjectId('64ab1234abcd5678ef901234');
+const DUPLICATE_SUBSTATUS_ID = new mongoose.Types.ObjectId('6a48e6b7d668a7671542801a');
+
+const markLeadDuplicateOnReapply = async (alreadyApplied, source) => {
+    alreadyApplied._leadStatus = UNTOUCH_STATUS_ID;
+    alreadyApplied._leadSubStatus = DUPLICATE_SUBSTATUS_ID;
+    if (!Array.isArray(alreadyApplied.logs)) alreadyApplied.logs = [];
+    alreadyApplied.logs.push({
+        action: 'Lead marked Duplicate on reapply (same mobile + same course)',
+        remarks: source || 'Digital Lead',
+        timestamp: new Date(),
+    });
+    await alreadyApplied.save();
+    return alreadyApplied;
+};
+
 // ===================================
 // BATCH PROCESSOR CLASS - Queue Logic
 // ===================================
@@ -212,6 +228,7 @@ class BatchProcessor {
                         counselorName: alreadyApplied.counsellor,
                         source: source || 'Digital Lead',
                     });
+                    await markLeadDuplicateOnReapply(alreadyApplied, source);
                     return {
                         status: "already_exists",
                         msg: "Candidate already exists and course already applied",
@@ -513,6 +530,7 @@ router.route("/addleaddandcourseapply")
                         counselorName:  alreadyApplied.counsellor,
                         source: source || 'Digital Lead',
                     });
+                    await markLeadDuplicateOnReapply(alreadyApplied, source);
                     return res.json({
                         status: false,
                         msg: "Candidate already exists and course already applied",
