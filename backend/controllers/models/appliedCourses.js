@@ -63,6 +63,18 @@ const appliedCoursesSchema = new Schema(
       type: ObjectId,
       default: new mongoose.Types.ObjectId('64ab1234abcd5678ef901235')
     },
+    // Testing-only AI copy of lead status. VoiceX writes here while AI_LEAD_STATUS_TESTING is on.
+    // Flip that env to false (or stop using these fields) when AI should own the real status.
+    _aiLeadStatus: {
+      type: ObjectId,
+      ref: "Status",
+      default: new mongoose.Types.ObjectId('64ab1234abcd5678ef901234'),
+      index: true,
+    },
+    _aiLeadSubStatus: {
+      type: ObjectId,
+      default: new mongoose.Types.ObjectId('64ab1234abcd5678ef901235'),
+    },
     
     _initialStatus: {
       type: String,
@@ -234,6 +246,21 @@ const appliedCoursesSchema = new Schema(
     remarks: {
       type: String,
       default: "",
+    },
+    aiVoice: {
+      lastEvent: { type: String, default: "" },
+      lastDisposition: { type: String, default: "" },
+      lastSummary: { type: String, default: "" },
+      lastCallStatus: { type: String, default: "" },
+      lastFailureReason: { type: String, default: "" },
+      lastCallHistoryId: { type: String, default: "" },
+      lastIdempotencyKey: { type: String, default: "" },
+      lastWebhookAt: { type: Date },
+      recordingUrl: { type: String, default: "" },
+      lastMakeCallAt: { type: Date },
+      lastMakeCallStatus: { type: String, default: "" },
+      lastMakeCallError: { type: String, default: "" },
+      lastCancelAt: { type: Date },
     },
     selectedCenter: {
       centerId: { type: ObjectId, ref: "Center" },

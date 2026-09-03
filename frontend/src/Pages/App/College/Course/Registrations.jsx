@@ -1249,6 +1249,27 @@ const CRMDashboard = () => {
   const [aiSupervisionActiveLeadId, setAiSupervisionActiveLeadId] = useState(null);
   const [aiSupervisionSearchTerm, setAiSupervisionSearchTerm] = useState('');
   const [aiSupervisionQueueFilter, setAiSupervisionQueueFilter] = useState('all');
+  const [isAiFabOpen, setIsAiFabOpen] = useState(false);
+  const [aiFabSubstatuses, setAiFabSubstatuses] = useState([]);
+  const aiFabWrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!isAiFabOpen) return undefined;
+    const handlePointerDown = (event) => {
+      if (aiFabWrapRef.current && !aiFabWrapRef.current.contains(event.target)) {
+        setIsAiFabOpen(false);
+      }
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setIsAiFabOpen(false);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isAiFabOpen]);
 
  
   const [modalType, setModalType] = useState(null); 
@@ -2571,8 +2592,10 @@ const CRMDashboard = () => {
 
         // Switch to "All" tab so the newly added lead is visible regardless of leadStatus tab filter
         setActiveCrmFilter(0);
+        setActiveAiPerformanceId(null);
         const newFilterData = { ...(filterData || {}) };
         delete newFilterData.leadStatus;
+        delete newFilterData.aiLeadStatus;
         setFilterData(newFilterData);
 
         // Reset all form fields
@@ -2976,6 +2999,7 @@ const CRMDashboard = () => {
     courseType: '',
     status: 'true',
     leadStatus: '',
+    aiLeadStatus: '',
     sector: '',
     followupStatus: '',
     hasFollowUpCall: '', // '' | true | false
@@ -3035,6 +3059,15 @@ const CRMDashboard = () => {
   const performanceFilters = useMemo(
     () => crmFilters.filter((f) => f._id && f._id !== 'all'),
     [crmFilters]
+  );
+  const [aiStatusCounts, setAiStatusCounts] = useState({});
+  const [activeAiPerformanceId, setActiveAiPerformanceId] = useState(null);
+  const aiPerformanceFilters = useMemo(
+    () => performanceFilters.map((filter) => ({
+      ...filter,
+      count: aiStatusCounts[filter._id]?.count ?? 0,
+    })),
+    [performanceFilters, aiStatusCounts]
   );
   const [statuses, setStatuses] = useState([
     { _id: '', name: '', count: 0 },
@@ -3160,6 +3193,7 @@ const CRMDashboard = () => {
       courseType: '',
       status: 'true',
       leadStatus: '',
+      aiLeadStatus: '',
       sector: '',
       createdFromDate: null,
       createdToDate: null,
@@ -3176,6 +3210,7 @@ const CRMDashboard = () => {
     };
 
     setFilterData(clearedFilters);
+    setActiveAiPerformanceId(null);
     setFormData({
       projects: { type: "includes", values: [] },
       verticals: { type: "includes", values: [] },
@@ -3273,6 +3308,15 @@ const CRMDashboard = () => {
           name: r.title,
           count: r.count || 0,  // agar backend me count nahi hai to 0
         })));
+
+        const aiStatus = status.find((item) => String(item._id) === '64ab1234abcd5678ef901234');
+        const aiSubstatusIds = ['64ab1234abcd5678ef901235', '6a3f5a53cfccaeeb28a4d1a3'];
+        setAiFabSubstatuses(
+          aiSubstatusIds
+            .map((id) => (aiStatus?.substatuses || []).find((sub) => String(sub._id) === id))
+            .filter(Boolean)
+            .map((sub) => ({ _id: sub._id, title: sub.title }))
+        );
 
 
       }
@@ -4198,7 +4242,7 @@ console.log('API Response:', response.data);
   }, [currentPage]);
 
   // Add this function in your component:
-  const updateCrmFiltersFromBackend = (backendCounts, filteredTotalCountFromAPI = null, approvalCountsFromApi = null) => {
+  const updateCrmFiltersFromBackend = (backendCounts, filteredTotalCountFromAPI = null, approvalCountsFromApi = null, aiBackendCounts = null) => {
     // Always calculate "All" count by summing all individual tab counts
     // This ensures "All" tab count remains consistent regardless of which tab is active
     const calculatedFilteredTotal = Object.keys(backendCounts || {})
@@ -4254,6 +4298,9 @@ console.log('API Response:', response.data);
       done: approvalCountsFromApi?.approved ?? 0,
       pending: approvalCountsFromApi?.pending ?? allCount,
     });
+    if (aiBackendCounts) {
+      setAiStatusCounts(aiBackendCounts);
+    }
   };
 
   const fetchDashboardCounts = async (filters = filterData, cycleOverride = null) => {
@@ -4266,6 +4313,7 @@ console.log('API Response:', response.data);
         ...(filters?.courseType && { courseType: filters.courseType }),
         ...(filters?.status && filters.status !== 'true' && { status: filters.status }),
         ...(filters?.leadStatus && { leadStatus: filters.leadStatus }),
+        ...(filters?.aiLeadStatus && { aiLeadStatus: filters.aiLeadStatus }),
         ...(filters?.sector && { sector: filters.sector }),
         ...(filters?.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
         ...(filters?.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
@@ -4368,6 +4416,7 @@ console.log('API Response:', response.data);
       ...(filters.courseType && { courseType: filters.courseType }),
       ...(filters.status && filters.status !== 'true' && { status: filters.status }),
       ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
+      ...(filters.aiLeadStatus && { aiLeadStatus: filters.aiLeadStatus }),
       ...(filters.sector && { sector: filters.sector }),
       ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
       ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
@@ -4581,6 +4630,7 @@ console.log('API Response:', response.data);
       _course: profile?._course,
       _center: profile?._center,
       _leadStatus: profile?._leadStatus,
+      _aiLeadStatus: profile?._aiLeadStatus,
       selectedSubstatus: profile?.selectedSubstatus,
       leadAssignment: profile?.leadAssignment,
       followupDate,
@@ -4628,6 +4678,7 @@ console.log('API Response:', response.data);
       _course: aiProfile._course,
       _center: aiProfile._center,
       _leadStatus: aiProfile._leadStatus,
+      _aiLeadStatus: aiProfile._aiLeadStatus,
       selectedSubstatus: aiProfile.selectedSubstatus,
       followupDate: aiProfile.followupDate,
       followups: aiProfile.followups,
@@ -4763,6 +4814,7 @@ console.log('API Response:', response.data);
     const queryParams = new URLSearchParams({
       page: page.toString(),
       leadStatus: crmFilters[activeCrmFilter]._id,
+      ...(filters.aiLeadStatus && { aiLeadStatus: filters.aiLeadStatus }),
       ...(filters.name && { name: filters.name }),
       ...(filters.courseType && { courseType: filters.courseType }),
       ...(filters.status && filters.status !== 'true' && { status: filters.status }),
@@ -4842,7 +4894,7 @@ console.log('API Response:', response.data);
         const data = response.data;
         // Debug log to verify counts received
        
-        updateCrmFiltersFromBackend(data.crmFilterCount, filteredTotalCount, data.approvalCounts)
+        updateCrmFiltersFromBackend(data.crmFilterCount, filteredTotalCount, data.approvalCounts, data.aiCrmFilterCount)
 
       } else {
         console.error('Failed to fetch crm filter counts', response.data.message);
@@ -5043,10 +5095,12 @@ console.log('API Response:', response.data);
     setSelectedFollowupBucket('');
     setSelectedMilestoneFilter(null);
     setActiveCrmFilter(0);
+    setActiveAiPerformanceId(null);
 
     const newFilterData = { ...filterData };
     delete newFilterData.approvalStatus;
     delete newFilterData.leadStatus;
+    delete newFilterData.aiLeadStatus;
     delete newFilterData.followupStatus;
     if (tab === 'ekyc') {
       newFilterData.kyc = false;
@@ -5132,6 +5186,7 @@ console.log('API Response:', response.data);
 
     const newFilterData = { ...filterData, followupStatus: '' };
     delete newFilterData.leadStatus;
+    delete newFilterData.aiLeadStatus;
     delete newFilterData.kyc;
     if (next) {
       newFilterData.approvalStatus = next.toUpperCase();
@@ -5140,6 +5195,7 @@ console.log('API Response:', response.data);
     }
     setFilterData(newFilterData);
     setActiveCrmFilter(0);
+    setActiveAiPerformanceId(null);
     fetchProfileData(newFilterData, 1);
   };
 
@@ -5156,6 +5212,22 @@ console.log('API Response:', response.data);
     }
   };
 
+  const handleAiPerformanceChipClick = (filterId) => {
+    if (pageMainTab === 'ekyc') return;
+    setActiveAiPerformanceId(filterId || null);
+    setCurrentPage(1);
+    setInput1Value('');
+    setSelectedProfiles([]);
+    const newFilterData = { ...filterData };
+    if (filterId) {
+      newFilterData.aiLeadStatus = filterId;
+    } else {
+      delete newFilterData.aiLeadStatus;
+    }
+    setFilterData(newFilterData);
+    fetchProfileData(newFilterData, 1);
+  };
+
   const handleFollowupDashClick = (type, bucket) => {
     const followupType = String(type || 'Call').toLowerCase();
     const key = `${followupType}:${bucket}`;
@@ -5165,11 +5237,13 @@ console.log('API Response:', response.data);
     setSelectedApprovalFilter(null);
     setSelectedKycFilter(null);
     setSelectedMilestoneFilter(null);
+    setActiveAiPerformanceId(null);
     setCurrentPage(1);
 
     const newFilterData = { ...filterData };
     delete newFilterData.kyc;
     delete newFilterData.leadStatus;
+    delete newFilterData.aiLeadStatus;
     delete newFilterData.approvalStatus;
 
     if (followupType === 'visit') {
@@ -5193,6 +5267,7 @@ console.log('API Response:', response.data);
     const newFilterData = { ...baseFilterData };
     delete newFilterData.followupStatus;
     delete newFilterData.leadStatus;
+    delete newFilterData.aiLeadStatus;
     delete newFilterData.approvalStatus;
     delete newFilterData.kyc;
     delete newFilterData.kycBucket;
@@ -5229,6 +5304,7 @@ console.log('API Response:', response.data);
     setSelectedApprovalFilter(null);
     setSelectedFollowupBucket('');
     setSelectedMilestoneFilter(null);
+    setActiveAiPerformanceId(null);
     setCurrentPage(1);
 
     if (selectedKycFilter === filter) {
@@ -5281,10 +5357,12 @@ console.log('API Response:', response.data);
     const newFilterData = { ...filterData };
     delete newFilterData.followupStatus;
     delete newFilterData.leadStatus;
+    delete newFilterData.aiLeadStatus;
     delete newFilterData.approvalStatus;
     delete newFilterData.kyc;
     setFilterData(newFilterData);
     setActiveCrmFilter(0);
+    setActiveAiPerformanceId(null);
     fetchProfileData(newFilterData, 1, null, null, nextMilestone);
   };
 
@@ -5938,6 +6016,9 @@ console.log('API Response:', response.data);
   const openProfileKycTab = openProfileDocumentsTab;
 
   const performanceTotalCount = approvalCounts.total || crmFilters[0]?.count || 0;
+  const aiPerformanceTotalCount = typeof aiStatusCounts.all === 'number'
+    ? aiStatusCounts.all
+    : performanceTotalCount;
   const activePerformanceId = (() => {
     const id = crmFilters[activeCrmFilter]?._id;
     if (!id || id === 'all') return null;
@@ -5983,6 +6064,7 @@ console.log('API Response:', response.data);
             page: '1',
             limit: validNumValue.toString(),
             leadStatus: crmFilters[activeCrmFilter]?._id || '',
+            ...(filterData.aiLeadStatus && { aiLeadStatus: filterData.aiLeadStatus }),
             ...(filterData.name && { name: filterData.name }),
             ...(filterData.courseType && { courseType: filterData.courseType }),
             ...(filterData.status && filterData.status !== 'true' && { status: filterData.status }),
@@ -8585,6 +8667,7 @@ console.log('API Response:', response.data);
         page: '1',
         limit: '10000', // Fetch up to 10000 profiles
         leadStatus: crmFilters[activeCrmFilter]?._id || '',
+        ...(filterData.aiLeadStatus && { aiLeadStatus: filterData.aiLeadStatus }),
         ...(filterData.name && { name: filterData.name }),
         ...(filterData.courseType && { courseType: filterData.courseType }),
         ...(filterData.status && filterData.status !== 'true' && { status: filterData.status }),
@@ -12170,7 +12253,7 @@ useEffect(() => {
   //                                                 fontWeight: '500'
   //                                               }}
   //                                             >
-  //                                               {btn.type === 'QUICK_REPLY' && ''}
+  //                                               {btn.type === 'QUICK_REPLY' && ' '}
   //                                               {btn.text}
   //                                             </div>
   //                                           ))}
@@ -12397,9 +12480,9 @@ useEffect(() => {
   //                                     cursor: 'default'
   //                                   }}
   //                                 >
-  //                                   {button.type === 'QUICK_REPLY' && ' '}
-  //                                   {button.type === 'URL' && 'Ã°Å¸â€N/A '}
-  //                                   {button.type === 'PHONE_NUMBER' && 'Ã°Å¸â€œÅ¾ '}
+  //                                   {button.type === 'QUICK_REPLY' && ''}
+  //                                   {button.type === 'URL' && ' '}
+  //                                   {button.type === 'PHONE_NUMBER' && ' '}
   //                                   {button.text}
   //                                 </div>
   //                               ))}
@@ -13470,22 +13553,6 @@ useEffect(() => {
             Clear
           </button>
         )}
-        <label className="adm-header-owner-filter" htmlFor={compact ? 'adm-filter-owner-mobile' : 'adm-filter-owner-header'}>
-          <span className="adm-header-owner-filter__label">
-            <i className="fas fa-user" aria-hidden="true" /> Owner
-          </span>
-          <select
-            id={compact ? 'adm-filter-owner-mobile' : 'adm-filter-owner-header'}
-            className="adm-header-owner-filter__select"
-            value={cycleFilters.owner || ''}
-            onChange={(e) => handleCycleFilterChange('owner', e.target.value)}
-          >
-            <option value="">All</option>
-            {counselorOptions.map((opt) => (
-              <option key={`owner-header-${opt.value}`} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </label>
       </div>
     </div>
   );
@@ -14052,7 +14119,6 @@ useEffect(() => {
           })}
         </div>
       </div>
-
       <div className="b2b-dash-section mt-3">
         <span className="b2b-dash-section__label">Ai Performance</span>
         <div className="b2b-mobile-hscroll b2b-mobile-hscroll--chips d-flex gap-2 align-items-center pt-1">
@@ -14065,16 +14131,16 @@ useEffect(() => {
               fontWeight: 600,
               borderRadius: '999px',
               cursor: 'pointer',
-              color: !activePerformanceId ? '#fff' : 'rgb(250, 85, 121)',
-              backgroundColor: !activePerformanceId ? 'rgb(250, 85, 121)' : '#fff',
-              border: !activePerformanceId ? 'none' : '1.5px solid rgb(250, 85, 121)',
+              color: !activeAiPerformanceId ? '#fff' : 'rgb(250, 85, 121)',
+              backgroundColor: !activeAiPerformanceId ? 'rgb(250, 85, 121)' : '#fff',
+              border: !activeAiPerformanceId ? 'none' : '1.5px solid rgb(250, 85, 121)',
             }}
-            onClick={() => handlePerformanceChipClick(null)}
+            onClick={() => handleAiPerformanceChipClick(null)}
           >
-            All ({performanceTotalCount})
+            All ({aiPerformanceTotalCount})
           </button>
-          {performanceFilters.map((filter, index) => {
-            const isSelected = activePerformanceId === filter._id;
+          {aiPerformanceFilters.map((filter, index) => {
+            const isSelected = activeAiPerformanceId === filter._id;
             return (
               <button
                 key={filter._id || index}
@@ -14090,7 +14156,7 @@ useEffect(() => {
                   backgroundColor: isSelected ? 'rgb(250, 85, 121)' : '#fff',
                   border: isSelected ? 'none' : '1.5px solid rgb(250, 85, 121)',
                 }}
-                onClick={() => handlePerformanceChipClick(filter._id)}
+                onClick={() => handleAiPerformanceChipClick(filter._id)}
               >
                 {(filter.name || 'Status').toUpperCase()} ({filter.count ?? 0})
               </button>
@@ -14098,7 +14164,6 @@ useEffect(() => {
           })}
         </div>
       </div>
-
       <div className="b2b-dash-section mt-3">
         <span className="b2b-dash-section__label">Performance</span>
         <div className="b2b-mobile-hscroll b2b-mobile-hscroll--chips d-flex gap-2 align-items-center pt-1">
@@ -14182,11 +14247,13 @@ useEffect(() => {
               setSelectedMilestoneFilter(null);
               const cleared = { ...filterData, followupStatus: '' };
               delete cleared.leadStatus;
+              delete cleared.aiLeadStatus;
               delete cleared.kyc;
               delete cleared.kycBucket;
               delete cleared.approvalStatus;
               setFilterData(cleared);
               setActiveCrmFilter(0);
+              setActiveAiPerformanceId(null);
               fetchProfileData(cleared, 1, null, null, null);
             }}
             style={{ fontSize: '12px', fontWeight: 600, borderRadius: '999px' }}
@@ -14854,67 +14921,203 @@ useEffect(() => {
 
   return (
     <div className="container-fluid">
+      <div
+        className={`crm-ai-fab-wrap${isAiFabOpen ? ' open' : ''}`}
+        id="fabWrap"
+        ref={aiFabWrapRef}
+      >
+          {aiFabSubstatuses.map((substatus, index) => (
+            <button
+              key={substatus._id}
+              type="button"
+              className="crm-ai-fab-sub"
+              title={substatus.title}
+              style={{ transitionDelay: isAiFabOpen ? `${0.06 * (index + 1)}s` : '0s' }}
+              onClick={() => {
+                setIsAiFabOpen(false);
+                toast.info(substatus.title);
+              }}
+            >
+              <i className={
+                String(substatus._id) === '64ab1234abcd5678ef901235'
+                  ? 'fas fa-user-plus'
+                  : 'fas fa-phone-slash'
+              }></i>
+              <span className="crm-ai-fab-tooltip">{substatus.title}</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            className={`crm-ai-fab-main${isAiFabOpen ? ' open' : ''}`}
+            id="fabMain"
+            aria-label={isAiFabOpen ? 'Close AI menu' : 'Open AI menu'}
+            aria-expanded={isAiFabOpen}
+            onClick={() => setIsAiFabOpen((open) => !open)}
+          >
+            <span className="crm-ai-fab-main__art" aria-hidden="true">
+              <svg className="crm-ai-fab-icon" viewBox="0 0 26 24" fill="#fff" xmlns="http://www.w3.org/2000/svg">
+                <g transform="rotate(-22 11 12)">
+                  <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" />
+                </g>
+                <path d="M20.7 3.1l.72 1.9 1.9.72-1.9.72-.72 1.9-.72-1.9-1.9-.72 1.9-.72z" />
+                <path d="M16.85 8.55l.45 1.18 1.18.45-1.18.45-.45 1.18-.45-1.18-1.18-.45 1.18-.45z" />
+                <path d="M21.55 9.15l.32.84.84.32-.84.32-.32.84-.32-.84-.84-.32.84-.32z" />
+              </svg>
+            </span>
+            <span className="crm-ai-fab-badge">AI</span>
+          </button>
+      </div>
       <div>
       <style>
         {`
-          .adm-header-owner-filter{
+          .crm-ai-fab-wrap{
+            position: fixed;
+            right: 28px;
+            bottom: 28px;
             display: flex;
             flex-direction: column;
-            gap: 3px;
-            margin-left: 4px;
-            min-width: 120px;
+            align-items: center;
+            gap: 14px;
+            z-index: 1250;
+            pointer-events: none;
           }
-          .adm-header-owner-filter__label{
-            font-size: 9px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            color: #6b7280;
-            line-height: 1.2;
-          }
-          .adm-header-owner-filter__label i{
-            margin-right: 3px;
-            color: rgb(250, 85, 121);
-            font-size: 8px;
-          }
-          .adm-header-owner-filter__select{
-            font-size: 11px;
-            font-weight: 500;
-            height: 28px;
-            min-width: 120px;
-            padding: 2px 22px 2px 8px;
-            border: 1.5px solid #e8eaed;
-            border-radius: 999px;
-            background-color: #fff;
-            color: #1f2937;
+          .crm-ai-fab-main{
+            position: relative;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            border: 3px solid #111;
+            background: linear-gradient(180deg, #a033ff 0%, #e91e63 100%);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
+            box-shadow: 0 8px 22px rgba(139, 37, 226, 0.38);
+            transition: transform 0.35s cubic-bezier(.34, 1.56, .64, 1), filter 0.25s ease, box-shadow 0.25s ease;
+            z-index: 2;
+            pointer-events: auto;
+            padding: 0;
           }
-          .adm-header-owner-filter__select:focus{
-            outline: none;
-            border-color: rgb(250, 85, 121);
+          .crm-ai-fab-main:hover{
+            filter: brightness(1.06);
+            box-shadow: 0 10px 26px rgba(124, 58, 237, 0.5);
+          }
+          .crm-ai-fab-main.open{
+            transform: scale(1.04);
+          }
+          .crm-ai-fab-main__art{
+            position: relative;
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .crm-ai-fab-icon{
+            width: 34px;
+            height: 34px;
+            display: block;
+            transform: rotate(60deg);
+          }
+          .crm-ai-fab-badge{
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #ff5c8a;
+            color: #fff;
+            font-size: 8px;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 6px rgba(255, 92, 138, 0.45);
+            transition: opacity 0.2s ease;
+          }
+          .crm-ai-fab-sub{
+            position: relative;
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            border: 1px solid #ede9fe;
+            background: #fff;
+            color: #7c3aed;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(79, 70, 229, 0.2);
+            opacity: 0;
+            transform: translateY(16px) scale(0.6);
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.35s cubic-bezier(.34, 1.56, .64, 1), background 0.2s ease;
+            padding: 0;
+          }
+          .crm-ai-fab-sub:hover{
+            background: #f5f3ff;
+            color: #5b21b6;
+          }
+          .crm-ai-fab-wrap.open .crm-ai-fab-sub{
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+          }
+          .crm-ai-fab-tooltip{
+            position: absolute;
+            right: 58px;
+            white-space: nowrap;
+            background: #4c1d95;
+            color: #fff;
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            opacity: 0;
+            transform: translateX(6px);
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            pointer-events: none;
+          }
+          .crm-ai-fab-wrap.open .crm-ai-fab-tooltip{
+            opacity: 1;
+            transform: translateX(0);
+          }
+          @media (max-width: 768px){
+            .crm-ai-fab-wrap{
+              right: 16px;
+              bottom: 20px;
+            }
+            .crm-ai-fab-main{
+              width: 58px;
+              height: 58px;
+            }
           }
           .b2b-cycle-filters{
             display: flex;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             align-items: flex-end;
             justify-content: flex-end;
-            gap: 6px 8px;
+            gap: 4px;
+            width: 100%;
             max-width: 100%;
             overflow: visible;
           }
           .b2b-cycle-filters__item{
             display: flex;
             flex-direction: column;
-            gap: 3px;
+            gap: 2px;
             min-width: 0;
-            flex: 0 0 auto;
-            width: 76px;
+            flex: 1 1 0;
+            max-width: 70px;
           }
           .b2b-cycle-filters__label{
-            font-size: 9px;
+            font-size: 8px;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.04em;
+            letter-spacing: 0.03em;
             color: #6b7280;
             margin: 0;
             line-height: 1.2;
@@ -14923,16 +15126,16 @@ useEffect(() => {
             text-overflow: ellipsis;
           }
           .b2b-cycle-filters__label i{
-            margin-right: 3px;
+            margin-right: 2px;
             color: rgb(250, 85, 121);
-            font-size: 8px;
+            font-size: 7px;
           }
           .b2b-cycle-filters__select{
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 500;
             line-height: 1.3;
-            padding: 5px 22px 5px 8px;
-            height: 32px;
+            padding: 4px 16px 4px 6px;
+            height: 30px;
             width: 100%;
             min-width: 0;
             max-width: 100%;
@@ -14946,8 +15149,8 @@ useEffect(() => {
             appearance: none;
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16'%3E%3Cpath fill='%236b7280' d='M4.427 6.427l3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 6H4.604a.25.25 0 0 0-.177.427z'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
-            background-position: right 7px center;
-            background-size: 11px;
+            background-position: right 5px center;
+            background-size: 10px;
           }
           .b2b-cycle-filters__select:hover{
             border-color: rgba(250, 85, 121, 0.4);
@@ -15511,7 +15714,7 @@ useEffect(() => {
                     {renderHeaderDateRangeFilter(true)}
                   </div>
 
-                  <div className="col-md-8 col-xl-8 d-none d-md-flex justify-content-end align-items-center flex-wrap">
+                  <div className="col-md-8 col-xl-8 d-none d-md-flex justify-content-end align-items-center">
                     {renderCycleFilterDropdowns()}
                   </div>
 
@@ -17027,6 +17230,12 @@ useEffect(() => {
                                           </button>
                                         </div>
                                         <div className="lhm__kv">
+                                          <span className="lhm__kv-label">AI Status</span>
+                                          <span className="lhm__kv-pill" style={{ cursor: 'default' }}>
+                                            {profile._aiLeadStatus?.title || 'Untouch'}
+                                          </span>
+                                        </div>
+                                        <div className="lhm__kv">
                                           <span className="lhm__kv-label">Sub-Status</span>
                                           <button
                                             type="button"
@@ -17309,6 +17518,12 @@ useEffect(() => {
                                                 >
                                                   {profile._leadStatus?.title || 'Untouch Lead'}
                                                 </button>
+                                              </div>
+                                              <div className="lead-strip-v3__kv">
+                                                <span className="lead-strip-v3__kv-label">AI Status</span>
+                                                <span className="lead-strip-v3__kv-pill" style={{ cursor: 'default' }}>
+                                                  {profile._aiLeadStatus?.title || 'Untouch'}
+                                                </span>
                                               </div>
                                               <div className="lead-strip-v3__kv">
                                                 <span className="lead-strip-v3__kv-label">Sub-Status</span>

@@ -1,6 +1,7 @@
 // server.js
 let express = require("express");
 let mongoose = require('mongoose');
+let crypto = require('crypto');
 let cors = require('cors');
 let router = express.Router();
 
@@ -10,9 +11,184 @@ let { StatusLogs, AppliedCourses, CandidateProfile, Courses, Center, User, ReEnq
 
 //helpers
 let { statusLogHelper } = require('../../../helpers/college');
+let { isCollege } = require('../../../helpers');
+let voicex = require('../../../helpers/voicex');
+
+function isVoiceAutoCallEnabled() {
+    return String(process.env.XTREME_AUTO_CALL || 'true').toLowerCase() !== 'false';
+}
+
+function isAiLeadStatusTesting() {
+    const raw = process.env.AI_LEAD_STATUS_TESTING;
+    if (raw == null || String(raw).trim() === '') return true;
+    return !['false', '0', 'off', 'no'].includes(String(raw).trim().toLowerCase());
+}
+
+async function recordVoiceCallAttempt(appliedId, patch, logEntry) {
+    const update = { $set: patch };
+    if (logEntry) update.$push = { logs: logEntry };
+    await AppliedCourses.updateOne({ _id: appliedId }, update);
+}
+
+async function initiateVoiceCallForLead({ applied, candidate, course, center, source, callInitTime } = {}) {
+    if (!applied?._id) {
+        return { skipped: true, reason: 'no_lead' };
+    }
+
+    if (!voicex.isConfigured()) {
+        console.warn('[VoiceX] skip make_call: set XTREME_AUTH_TOKEN in env');
+        return { skipped: true, reason: 'auth_missing' };
+    }
+
+    const customField = voicex.buildCustomField({ applied, candidate, course, center, source });
+    try {
+        const result = await voicex.makeCall({
+            callTo: candidate?.mobile,
+            customField,
+            callInitTime,
+        });
+        await recordVoiceCallAttempt(applied._id, {
+            'aiVoice.lastEvent': 'MAKE_CALL_QUEUED',
+            'aiVoice.lastMakeCallAt': new Date(),
+            'aiVoice.lastMakeCallStatus': 'queued',
+            'aiVoice.lastMakeCallError': '',
+        }, {
+            action: 'AI counselor call initiated',
+            remarks: voicex.toE164(candidate?.mobile),
+            timestamp: new Date(),
+        });
+        return { ok: true, data: result.data };
+    } catch (err) {
+        const message = voicex.axiosErrorMessage(err);
+        console.error('[VoiceX] make_call failed', { leadId: String(applied._id), message });
+        await recordVoiceCallAttempt(applied._id, {
+            'aiVoice.lastEvent': 'MAKE_CALL_FAILED',
+            'aiVoice.lastMakeCallAt': new Date(),
+            'aiVoice.lastMakeCallStatus': 'failed',
+            'aiVoice.lastMakeCallError': message,
+        }, {
+            action: 'AI counselor call failed',
+            remarks: message,
+            timestamp: new Date(),
+        });
+        err.voicexMessage = message;
+        throw err;
+    }
+}
+
+function queueVoiceCallForLead(opts) {
+    if (!isVoiceAutoCallEnabled()) {
+        console.log('[VoiceX] auto call disabled (XTREME_AUTO_CALL=false)');
+        return;
+    }
+    setImmediate(() => {
+        initiateVoiceCallForLead(opts).catch((err) => {
+            console.error('[VoiceX] queued make_call error', err.voicexMessage || err.message);
+        });
+    });
+}
+
+async function cancelVoiceCallForLead({ applied, phoneNumber } = {}) {
+    const phone = phoneNumber || applied?.candidate?.mobile || applied?._candidate?.mobile || '';
+    const result = await voicex.cancelCall({ phoneNumber: voicex.toE164(phone) || phone });
+    if (applied?._id) {
+        await recordVoiceCallAttempt(applied._id, {
+            'aiVoice.lastEvent': 'MAKE_CALL_CANCELLED',
+            'aiVoice.lastCancelAt': new Date(),
+        }, {
+            action: 'AI counselor scheduled call cancelled',
+            remarks: voicex.toE164(phone) || String(phone),
+            timestamp: new Date(),
+        });
+    }
+    return result;
+}
+
+async function loadLeadForVoiceCall(appliedCourseId) {
+    const applied = await AppliedCourses.findById(appliedCourseId)
+        .populate('_candidate')
+        .populate('_course')
+        .populate('_center');
+    if (!applied) return null;
+    return {
+        applied,
+        candidate: applied._candidate,
+        course: applied._course,
+        center: applied._center,
+        source: applied._candidate?.source || 'Digital Lead',
+    };
+}
 
 const UNTOUCH_STATUS_ID = new mongoose.Types.ObjectId('64ab1234abcd5678ef901234');
 const DUPLICATE_SUBSTATUS_ID = new mongoose.Types.ObjectId('6a48e6b7d668a7671542801a');
+const NOT_CONNECTED_SUBSTATUS_ID = new mongoose.Types.ObjectId('6a3f5a53cfccaeeb28a4d1a3');
+
+const B2C_REGISTRATION_MATCH = {
+    kycStage: { $ne: true },
+    kyc: { $ne: true },
+    admissionDone: { $ne: true },
+};
+
+const LEAD_LIST_PROJECT = {
+    _id: 0,
+    lead_id: { $toString: '$_id' },
+    name: { $ifNull: ['$candidate.name', ''] },
+    mobile: { $ifNull: ['$candidate.mobile', ''] },
+    email: { $ifNull: ['$candidate.email', ''] },
+    centre: { $ifNull: ['$center.name', ''] },
+    course_name: { $ifNull: ['$course.name', ''] },
+};
+
+function leadListLookups() {
+    return [
+        {
+            $lookup: {
+                from: CandidateProfile.collection.name,
+                localField: '_candidate',
+                foreignField: '_id',
+                as: 'candidate',
+            },
+        },
+        { $unwind: { path: '$candidate', preserveNullAndEmptyArrays: true } },
+        {
+            $lookup: {
+                from: Center.collection.name,
+                localField: '_center',
+                foreignField: '_id',
+                as: 'center',
+            },
+        },
+        { $unwind: { path: '$center', preserveNullAndEmptyArrays: true } },
+        {
+            $lookup: {
+                from: Courses.collection.name,
+                localField: '_course',
+                foreignField: '_id',
+                as: 'course',
+            },
+        },
+        { $unwind: { path: '$course', preserveNullAndEmptyArrays: true } },
+        { $sort: { createdAt: -1 } },
+        { $project: LEAD_LIST_PROJECT },
+    ];
+}
+
+async function resolveUntouchNotConnectedIds() {
+    const statuses = await Status.find({ title: { $regex: /^untouch$/i } }).select('_id substatuses').lean();
+    const statusIds = [];
+    const subStatusIds = [];
+    for (const status of statuses) {
+        statusIds.push(status._id);
+        for (const sub of status.substatuses || []) {
+            if (/^not\s*connected$/i.test(String(sub.title || '').trim())) {
+                subStatusIds.push(sub._id);
+            }
+        }
+    }
+    if (!statusIds.length) statusIds.push(UNTOUCH_STATUS_ID);
+    if (!subStatusIds.length) subStatusIds.push(NOT_CONNECTED_SUBSTATUS_ID);
+    return { statusIds, subStatusIds };
+}
 
 const markLeadDuplicateOnReapply = async (alreadyApplied, source) => {
     alreadyApplied._leadStatus = UNTOUCH_STATUS_ID;
@@ -254,6 +430,14 @@ class BatchProcessor {
                     });
                     console.log(`   ✅ Updated existing candidate: ${name} (${mobile})`);
 
+                    queueVoiceCallForLead({
+                        applied: appliedCourseEntry,
+                        candidate: existingCandidate,
+                        course,
+                        center: selectedCenterName,
+                        source,
+                    });
+
                     return {
                         status: "updated",
                         msg: "Candidate already exists and course applied successfully",
@@ -311,8 +495,13 @@ class BatchProcessor {
                     counsellorName: appliedCourseEntry.leadAssignment?.[appliedCourseEntry.leadAssignment.length - 1]?.counsellorName
                 });
 
-
-
+                queueVoiceCallForLead({
+                    applied: appliedCourseEntry,
+                    candidate,
+                    course,
+                    center: selectedCenterName,
+                    source,
+                });
 
                 return {
                     status: "created",
@@ -491,6 +680,7 @@ router.route("/addleaddandcourseapply")
             if (dob) dob = new Date(dob);
 
             let appliedData
+            let candidate
 
             
 
@@ -558,6 +748,14 @@ router.route("/addleaddandcourseapply")
                     });
                     console.log(`   ✅ Updated existing candidate: ${name} (${mobile})`);
 
+                    queueVoiceCallForLead({
+                        applied: appliedCourseEntry,
+                        candidate: existingCandidate,
+                        course,
+                        center: selectedCenterName,
+                        source,
+                    });
+
                     return res.json( {
                         status: "updated",
                         msg: "Candidate already exists and course applied successfully",
@@ -586,7 +784,7 @@ router.route("/addleaddandcourseapply")
 
 
                 // Create CandidateProfile
-                let candidate = await CandidateProfile.create(candidateData);
+                candidate = await CandidateProfile.create(candidateData);
                 let user = await User.create({
                     name: candidate.name,
                     email: candidate.email,
@@ -632,7 +830,13 @@ router.route("/addleaddandcourseapply")
             appliedData.logs.push(newLogEntry);
             await appliedData.save();
 
-
+            queueVoiceCallForLead({
+                applied: appliedData,
+                candidate,
+                course,
+                center: selectedCenterName,
+                source,
+            });
 
             // Immediate response - NO DATABASE OPERATIONS HERE!
            
@@ -866,6 +1070,352 @@ router.get("/today", async (req, res) => {
             status: false,
             msg: "Failed to get today's digital leads",
             error: err.message,
+        });
+    }
+});
+
+// All B2C registration leads created today (IST).
+router.get("/b2c-today", async (req, res) => {
+    try {
+        const { start, end } = getTodayIstBounds();
+        const leads = await AppliedCourses.aggregate([
+            {
+                $match: {
+                    ...B2C_REGISTRATION_MATCH,
+                    createdAt: { $gte: start, $lte: end },
+                },
+            },
+            ...leadListLookups(),
+        ]);
+
+        return res.json({
+            status: true,
+            count: leads.length,
+            data: leads,
+        });
+    } catch (err) {
+        return res.status(500).json({
+            status: false,
+            msg: "Failed to get today's B2C leads",
+            error: err.message,
+        });
+    }
+});
+
+// B2C leads currently in Untouch + Not Connected.
+router.get("/untouch-not-connected", async (req, res) => {
+    try {
+        const { statusIds, subStatusIds } = await resolveUntouchNotConnectedIds();
+        const leads = await AppliedCourses.aggregate([
+            {
+                $match: {
+                    ...B2C_REGISTRATION_MATCH,
+                    _leadStatus: { $in: statusIds },
+                    _leadSubStatus: { $in: subStatusIds },
+                },
+            },
+            ...leadListLookups(),
+        ]);
+
+        return res.json({
+            status: true,
+            count: leads.length,
+            data: leads,
+        });
+    } catch (err) {
+        return res.status(500).json({
+            status: false,
+            msg: "Failed to get Untouch / Not Connected leads",
+            error: err.message,
+        });
+    }
+});
+
+// VoiceX webhook: third-party AI pulls GET /today, then POSTs call results here.
+// Docs: https://xtremegenai.com/docs — give them this URL + preferred auth.
+const VOICEX_STATUS_MAP = [
+    { titles: ['HOT'], match: /^(hot|interested|callback\s*now|very interested)$/i },
+    { titles: ['WARM'], match: /^(warm|follow[-\s]?up|call later|callback|interested later)$/i },
+    { titles: ['COLD'], match: /^(cold|not interested|no interest|rejected)$/i },
+    { titles: ['WON'], match: /^(won|enrolled|paid|admitted|converted)$/i },
+    { titles: ['JUNK'], match: /^(junk|wrong number|spam|invalid|dontcall|do not call)$/i },
+    { titles: ['DUPLICATE'], match: /^(duplicate)$/i },
+    { titles: ['PROSPECT'], match: /^(prospect)$/i },
+];
+
+function verifyVoicexWebhook(req) {
+    const secret = process.env.VOICEX_WEBHOOK_SECRET;
+    if (!secret) return true;
+
+    const auth = String(req.headers.authorization || '');
+    const headerKey = req.headers['x-api-key'] || req.headers['x-webhook-secret'] || req.query.apiKey;
+    if (auth === `Bearer ${secret}`) return true;
+    if (auth.toLowerCase().startsWith('basic ') && auth.slice(6) === secret) return true;
+    if (headerKey && String(headerKey) === secret) return true;
+
+    const sig = req.headers['x-hub-signature'] || req.headers['x-signature'] || req.headers['x-voicex-signature'];
+    if (sig) {
+        const raw = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
+        const hmac = crypto.createHmac('sha256', secret).update(raw).digest('hex');
+        if (sig === hmac || sig === `sha256=${hmac}`) return true;
+    }
+    return false;
+}
+
+function extractVoicexLeadId(payload) {
+    return (
+        payload?.scheduleInfo?.customParam?.lead_id ||
+        payload?.customer_crm_data?.lead_id ||
+        payload?.custom_field?.lead_id ||
+        payload?.customParam?.lead_id ||
+        payload?.lead_id ||
+        null
+    );
+}
+
+function extractVoicexPhone(payload) {
+    const raw = payload?.callTo || payload?.phoneNumber || payload?.scheduleInfo?.customParam?.contact_number || '';
+    const digits = String(raw).replace(/\D/g, '');
+    return digits.length >= 10 ? digits.slice(-10) : '';
+}
+
+function mapDispositionToStatusTitle(disposition, callStatus) {
+    const text = String(disposition || '').trim();
+    if (text) {
+        const hit = VOICEX_STATUS_MAP.find((row) => row.match.test(text));
+        if (hit) return hit.titles[0];
+    }
+    if (String(callStatus || '').toUpperCase() === 'DONTCALL') return 'JUNK';
+    return null;
+}
+
+async function findAppliedCourseFromWebhook(payload) {
+    const leadId = extractVoicexLeadId(payload);
+    if (leadId && mongoose.Types.ObjectId.isValid(String(leadId))) {
+        const byId = await AppliedCourses.findById(leadId);
+        if (byId) return byId;
+    }
+
+    const mobile = extractVoicexPhone(payload);
+    if (!mobile) return null;
+    const candidate = await CandidateProfile.findOne({
+        $or: [{ mobile: Number(mobile) }, { mobile: mobile }],
+    }).select('_id');
+    if (!candidate) return null;
+    return AppliedCourses.findOne({ _candidate: candidate._id }).sort({ createdAt: -1 });
+}
+
+async function resolveStatusForCourse(appliedCourse, statusTitle) {
+    const course = await Courses.findById(appliedCourse._course).select('college').lean();
+    const collegeId = course?.college;
+    const titleFilter = { title: { $regex: new RegExp(`^${statusTitle}$`, 'i') } };
+    if (collegeId) {
+        const scoped = await Status.findOne({ ...titleFilter, college: collegeId }).lean();
+        if (scoped) return scoped;
+    }
+    return Status.findOne(titleFilter).lean();
+}
+
+router.post("/voicex-webhook", async (req, res) => {
+    try {
+        if (!verifyVoicexWebhook(req)) {
+            return res.status(401).json({ status: false, msg: "Unauthorized webhook" });
+        }
+
+        const payload = req.body || {};
+        const event = String(payload.event || '').trim();
+        const callHistoryId = payload.callHistory?.id || '';
+        const timestamp = payload.timestamp || '';
+        const idempotencyKey = [event, payload.businessId || '', callHistoryId, timestamp].join('|');
+
+        res.status(200).json({ status: true, received: true, event: event || 'unknown' });
+
+        setImmediate(async () => {
+            try {
+                if (!event) {
+                    console.warn('[VoiceX webhook] missing event', payload);
+                    return;
+                }
+
+                const doc = await findAppliedCourseFromWebhook(payload);
+                if (!doc) {
+                    console.warn('[VoiceX webhook] lead not found', {
+                        event,
+                        lead_id: extractVoicexLeadId(payload),
+                        callTo: payload.callTo,
+                    });
+                    return;
+                }
+
+                if (doc.aiVoice?.lastIdempotencyKey && doc.aiVoice.lastIdempotencyKey === idempotencyKey) {
+                    return;
+                }
+
+                const crm = payload.customer_crm_data || {};
+                const disposition = crm.disposition || payload.disposition || '';
+                const summary = crm.summary || payload.summary || '';
+                const recordingUrl = payload.recording_url || crm.recording_url || '';
+                const callStatus = payload.callStatus || payload.callHistory?.callStatus || '';
+                const failureReason = payload.failureReason || payload.errorMessage || '';
+
+                if (!doc.aiVoice) doc.aiVoice = {};
+                doc.aiVoice.lastEvent = event;
+                doc.aiVoice.lastDisposition = disposition;
+                doc.aiVoice.lastSummary = summary;
+                doc.aiVoice.lastCallStatus = callStatus;
+                doc.aiVoice.lastFailureReason = failureReason;
+                doc.aiVoice.lastCallHistoryId = String(callHistoryId);
+                doc.aiVoice.lastIdempotencyKey = idempotencyKey;
+                doc.aiVoice.lastWebhookAt = new Date();
+                doc.aiVoice.recordingUrl = recordingUrl;
+
+                const statusEvents = ['CALL_COMPLETED', 'CALL_TRANSFERED'];
+                const shouldMapStatus = statusEvents.includes(event)
+                    || (event === 'CALL_FAILED' && String(callStatus).toUpperCase() === 'DONTCALL');
+
+                let action = `AI counselor ${event}`;
+                if (disposition) action += ` disposition "${disposition}"`;
+                if (failureReason) action += ` (${failureReason})`;
+
+                let mappedTitle = null;
+                if (shouldMapStatus) {
+                    mappedTitle = mapDispositionToStatusTitle(disposition, callStatus);
+                    if (mappedTitle) {
+                        const newStatus = await resolveStatusForCourse(doc, mappedTitle);
+                        if (newStatus) {
+                            const testingDummyStatus = isAiLeadStatusTesting();
+                            const statusField = testingDummyStatus ? '_aiLeadStatus' : '_leadStatus';
+                            const subStatusField = testingDummyStatus ? '_aiLeadSubStatus' : '_leadSubStatus';
+                            const oldStatus = doc[statusField]
+                                ? await Status.findById(doc[statusField]).lean()
+                                : null;
+                            const oldTitle = oldStatus?.title || 'Unknown';
+                            if (String(doc[statusField] || '') !== String(newStatus._id)) {
+                                action = testingDummyStatus
+                                    ? `AI counselor (test) changed dummy status from "${oldTitle}" to "${newStatus.title}"`
+                                    : `AI counselor changed status from "${oldTitle}" to "${newStatus.title}"`;
+                                doc[statusField] = newStatus._id;
+                                if (Array.isArray(newStatus.substatuses) && newStatus.substatuses.length) {
+                                    doc[subStatusField] = newStatus.substatuses[0]._id;
+                                }
+                                if (!testingDummyStatus) {
+                                    await statusLogHelper(doc._id, {
+                                        _statusId: newStatus._id,
+                                        _subStatusId: doc._leadSubStatus,
+                                    });
+                                }
+                            }
+                        } else {
+                            console.warn('[VoiceX webhook] Status title not found', { statusTitle: mappedTitle, appliedId: String(doc._id) });
+                        }
+                    }
+                }
+
+                if (summary) {
+                    const aiLine = `[AI Call] ${summary}`;
+                    doc.remarks = doc.remarks ? `${aiLine}\n${doc.remarks}` : aiLine;
+                }
+
+                doc.logs = doc.logs || [];
+                doc.logs.push({
+                    action,
+                    remarks: summary || failureReason || disposition || event,
+                    timestamp: new Date(),
+                });
+
+                await doc.save();
+
+                if (['JUNK', 'WON'].includes(mappedTitle) && voicex.isConfigured()) {
+                    const phone = extractVoicexPhone(payload);
+                    if (phone) {
+                        voicex.cancelCall({ phoneNumber: phone }).catch((err) => {
+                            console.error('[VoiceX] cancel after webhook failed', voicex.axiosErrorMessage(err));
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error('[VoiceX webhook] process error', err);
+            }
+        });
+    } catch (err) {
+        console.error('[VoiceX webhook] error', err);
+        return res.status(200).json({ status: true, received: true });
+    }
+});
+
+router.post("/voicex-make-call", isCollege, async (req, res) => {
+    try {
+        const appliedCourseId = req.body.appliedCourseId || req.body.lead_id || req.body.leadId;
+        const callInitTime = req.body.callInitTime;
+        if (!appliedCourseId || !mongoose.Types.ObjectId.isValid(String(appliedCourseId))) {
+            return res.status(400).json({ status: false, msg: "appliedCourseId is required" });
+        }
+
+        const lead = await loadLeadForVoiceCall(appliedCourseId);
+        if (!lead) {
+            return res.status(404).json({ status: false, msg: "Lead not found" });
+        }
+        if (!lead.candidate?.mobile) {
+            return res.status(400).json({ status: false, msg: "Lead has no mobile number" });
+        }
+
+        const result = await initiateVoiceCallForLead({ ...lead, callInitTime });
+        if (result.skipped) {
+            const msg = result.reason === 'auth_missing'
+                ? "Set XTREME_AUTH_TOKEN in env, then retry"
+                : "VoiceX call was skipped";
+            return res.status(503).json({ status: false, msg, reason: result.reason });
+        }
+
+        return res.json({
+            status: true,
+            msg: "AI call initiated",
+            data: result.data || null,
+        });
+    } catch (err) {
+        return res.status(err.response?.status || 500).json({
+            status: false,
+            msg: err.voicexMessage || err.message || "Failed to initiate AI call",
+        });
+    }
+});
+
+router.post("/voicex-cancel", isCollege, async (req, res) => {
+    try {
+        const appliedCourseId = req.body.appliedCourseId || req.body.lead_id || req.body.leadId;
+        let phoneNumber = req.body.phoneNumber || req.body.callTo;
+
+        if (appliedCourseId) {
+            if (!mongoose.Types.ObjectId.isValid(String(appliedCourseId))) {
+                return res.status(400).json({ status: false, msg: "Invalid appliedCourseId" });
+            }
+            const lead = await loadLeadForVoiceCall(appliedCourseId);
+            if (!lead) {
+                return res.status(404).json({ status: false, msg: "Lead not found" });
+            }
+            phoneNumber = phoneNumber || lead.candidate?.mobile;
+            const result = await cancelVoiceCallForLead({ applied: lead.applied, phoneNumber });
+            return res.json({
+                status: true,
+                msg: "Scheduled AI call cancelled",
+                data: result.data || null,
+            });
+        }
+
+        if (!phoneNumber) {
+            return res.status(400).json({ status: false, msg: "appliedCourseId or phoneNumber is required" });
+        }
+
+        const result = await voicex.cancelCall({ phoneNumber });
+        return res.json({
+            status: true,
+            msg: "Scheduled AI call cancelled",
+            data: result.data || null,
+        });
+    } catch (err) {
+        return res.status(err.response?.status || 500).json({
+            status: false,
+            msg: err.voicexMessage || voicex.axiosErrorMessage(err) || "Failed to cancel AI call",
         });
     }
 });
