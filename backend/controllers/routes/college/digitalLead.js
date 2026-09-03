@@ -15,13 +15,11 @@ let { isCollege } = require('../../../helpers');
 let voicex = require('../../../helpers/voicex');
 
 function isVoiceAutoCallEnabled() {
-    return String(process.env.XTREME_AUTO_CALL || 'true').toLowerCase() !== 'false';
+    return voicex.isAutoCallEnabled();
 }
 
 function isAiLeadStatusTesting() {
-    const raw = process.env.AI_LEAD_STATUS_TESTING;
-    if (raw == null || String(raw).trim() === '') return true;
-    return !['false', '0', 'off', 'no'].includes(String(raw).trim().toLowerCase());
+    return voicex.isLeadStatusTesting();
 }
 
 async function recordVoiceCallAttempt(appliedId, patch, logEntry) {
@@ -36,7 +34,7 @@ async function initiateVoiceCallForLead({ applied, candidate, course, center, so
     }
 
     if (!voicex.isConfigured()) {
-        console.warn('[VoiceX] skip make_call: set XTREME_AUTH_TOKEN in env');
+        console.warn('[VoiceX] skip make_call: set XTRME_GEN_AUTH_TOKEN in env');
         return { skipped: true, reason: 'auth_missing' };
     }
 
@@ -78,7 +76,7 @@ async function initiateVoiceCallForLead({ applied, candidate, course, center, so
 
 function queueVoiceCallForLead(opts) {
     if (!isVoiceAutoCallEnabled()) {
-        console.log('[VoiceX] auto call disabled (XTREME_AUTO_CALL=false)');
+        console.log('[VoiceX] auto call disabled (XTRME_GEN_AUTO_CALL=false)');
         return;
     }
     setImmediate(() => {
@@ -1362,7 +1360,7 @@ router.post("/voicex-make-call", isCollege, async (req, res) => {
         const result = await initiateVoiceCallForLead({ ...lead, callInitTime });
         if (result.skipped) {
             const msg = result.reason === 'auth_missing'
-                ? "Set XTREME_AUTH_TOKEN in env, then retry"
+                ? "Set XTRME_GEN_AUTH_TOKEN in env, then retry"
                 : "VoiceX call was skipped";
             return res.status(503).json({ status: false, msg, reason: result.reason });
         }

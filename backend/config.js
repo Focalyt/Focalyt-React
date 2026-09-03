@@ -37,14 +37,16 @@ module.exports = {
   msg91ProfileStrengthening : process.env.MIPIE_MSG91_PROFILE_STRENGTHENING,
   extraEdgeUrl : process.env.EXTRA_EDGE_API_URL,
   extraEdgeAuthToken : process.env.EXTRA_EDGE_AUTH_TOKEN,
-  xtremeMakeCallUrl: process.env.XTRME_GEN_URL || process.env.XTREME_GEN_URL,
-  xtremeAuthToken: process.env.XTREME_AUTH_TOKEN,
-  xtremeBusinessId: process.env.BUSINESS_ID || process.env.XTREME_BUSINESS_ID,
-  xtremeCampaignId: process.env.CAMPAIGN_ID || process.env.XTREME_CAMPAIGN_ID,
-  xtremeAgentId: process.env.AGENT_ID || process.env.XTREME_AGENT_ID,
-  xtremeCallFrom: process.env.XTREME_CALL_FROM,
+  xtremeMakeCallUrl: process.env.XTRME_GEN_Base_URL,
+  xtremeCancelUrl: process.env.XTRME_GEN_Cancel_URL,
+  xtremeAuthToken: process.env.XTRME_GEN_AUTH_TOKEN,
+  xtremeBusinessId: process.env.XTRME_GEN_BUSINESS_ID,
+  xtremeCampaignId: process.env.XTRME_GEN_CAMPAIGN_ID,
+  xtremeAgentId: process.env.XTRME_GEN_AGENT_ID,
+  xtremeCallFrom: process.env.XTRME_GEN_CALL_FROM,
+  xtremeAutoCall: process.env.XTRME_GEN_AUTO_CALL,
   aiLeadStatusTesting: (() => {
-    const raw = process.env.AI_LEAD_STATUS_TESTING;
+    const raw = process.env.XTRME_GEN_LEAD_STATUS_TESTING;
     if (raw == null || String(raw).trim() === '') return true;
     return !['false', '0', 'off', 'no'].includes(String(raw).trim().toLowerCase());
   })(),

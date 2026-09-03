@@ -1,33 +1,36 @@
 const axios = require('axios');
 
-const DEFAULT_MAKE_CALL_URL = 'https://api-crm-voicex.xtremegenai.com/api/make_call';
-const DEFAULT_CANCEL_URL = 'https://api-crm-voicex.xtremegenai.com/api/delete_call_by_phone_campaign_dashboard';
 const CANCEL_SOURCE = 'Deleted by Client CRM';
 
 function trim(value) {
     return String(value || '').trim();
 }
 
-function getConfig() {
-    const makeCallUrl = trim(process.env.XTRME_GEN_URL || process.env.XTREME_GEN_URL) || DEFAULT_MAKE_CALL_URL;
-    let cancelUrl = trim(process.env.XTREME_CANCEL_URL);
-    if (!cancelUrl) {
-        try {
-            cancelUrl = `${new URL(makeCallUrl).origin}/api/delete_call_by_phone_campaign_dashboard`;
-        } catch (err) {
-            cancelUrl = DEFAULT_CANCEL_URL;
-        }
-    }
+function envFlag(raw, defaultValue = true) {
+    if (raw == null || String(raw).trim() === '') return defaultValue;
+    return !['false', '0', 'off', 'no'].includes(String(raw).trim().toLowerCase());
+}
 
+function getConfig() {
     return {
-        makeCallUrl,
-        cancelUrl,
-        businessId: trim(process.env.BUSINESS_ID || process.env.XTREME_BUSINESS_ID),
-        campaignId: trim(process.env.CAMPAIGN_ID || process.env.XTREME_CAMPAIGN_ID),
-        agentId: trim(process.env.AGENT_ID || process.env.XTREME_AGENT_ID),
-        callFrom: trim(process.env.XTREME_CALL_FROM),
-        authToken: trim(process.env.XTREME_AUTH_TOKEN),
+        makeCallUrl: trim(process.env.XTRME_GEN_Base_URL),
+        cancelUrl: trim(process.env.XTRME_GEN_Cancel_URL),
+        agentId: trim(process.env.XTRME_GEN_AGENT_ID),
+        businessId: trim(process.env.XTRME_GEN_BUSINESS_ID),
+        campaignId: trim(process.env.XTRME_GEN_CAMPAIGN_ID),
+        callFrom: trim(process.env.XTRME_GEN_CALL_FROM),
+        authToken: trim(process.env.XTRME_GEN_AUTH_TOKEN),
+        autoCall: envFlag(process.env.XTRME_GEN_AUTO_CALL, true),
+        leadStatusTesting: envFlag(process.env.XTRME_GEN_LEAD_STATUS_TESTING, true),
     };
+}
+
+function isAutoCallEnabled() {
+    return getConfig().autoCall;
+}
+
+function isLeadStatusTesting() {
+    return getConfig().leadStatusTesting;
 }
 
 function buildAuthHeader(token) {
@@ -53,18 +56,23 @@ function toE164(mobile) {
 
 function isConfigured() {
     const cfg = getConfig();
-    return Boolean(cfg.authToken && cfg.businessId && cfg.campaignId);
+    return Boolean(cfg.authToken && cfg.businessId && cfg.campaignId && cfg.makeCallUrl);
 }
 
 function configError() {
     const cfg = getConfig();
     if (!cfg.authToken) {
-        const err = new Error('XTREME_AUTH_TOKEN is not set');
+        const err = new Error('XTRME_GEN_AUTH_TOKEN is not set');
         err.code = 'VOICEX_AUTH_MISSING';
         return err;
     }
     if (!cfg.businessId || !cfg.campaignId) {
-        const err = new Error('VoiceX BUSINESS_ID or CAMPAIGN_ID is missing');
+        const err = new Error('XTRME_GEN_BUSINESS_ID or XTRME_GEN_CAMPAIGN_ID is missing');
+        err.code = 'VOICEX_CONFIG_MISSING';
+        return err;
+    }
+    if (!cfg.makeCallUrl) {
+        const err = new Error('XTRME_GEN_Base_URL is not set');
         err.code = 'VOICEX_CONFIG_MISSING';
         return err;
     }
@@ -144,6 +152,12 @@ async function cancelCall({ phoneNumber } = {}) {
     if (missing) throw missing;
 
     const cfg = getConfig();
+    if (!cfg.cancelUrl) {
+        const err = new Error('XTRME_GEN_Cancel_URL is not set');
+        err.code = 'VOICEX_CONFIG_MISSING';
+        throw err;
+    }
+
     const phone = toE164(phoneNumber) || trim(phoneNumber);
     if (!phone) {
         const err = new Error('phoneNumber is required');
@@ -173,6 +187,8 @@ module.exports = {
     CANCEL_SOURCE,
     getConfig,
     isConfigured,
+    isAutoCallEnabled,
+    isLeadStatusTesting,
     toE164,
     buildCustomField,
     axiosErrorMessage,
