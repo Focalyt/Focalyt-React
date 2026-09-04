@@ -4488,7 +4488,7 @@ console.log('API Response:', response.data);
         } else if (shouldFetchKycCandidates) {
           await fetchMilestoneCounts(filters);
         } else {
-          await fetchRegistrationCrmFilterCounts(filters, page, null);
+          await fetchRegistrationCrmFilterCounts(filters, page, null, cycleOverride || cycleFilters);
           await fetchDashboardCounts(filters, cycleOverride || cycleFilters);
           await fetchKycCounts();
           await fetchMilestoneCounts(filters);
@@ -4856,13 +4856,16 @@ console.log('API Response:', response.data);
     }
   };
 
-  const fetchRegistrationCrmFilterCounts = async (filters = filterData, page = currentPage, filteredTotalCount = null) => {
+  const fetchRegistrationCrmFilterCounts = async (filters = filterData, page = currentPage, filteredTotalCount = null, cycleOverride = null) => {
 
     if (!token) {
       console.warn('No token found in session storage.');
       setIsLoadingProfiles(false);
       return;
     }
+
+    const cycle = cycleOverride || cycleFilters;
+    const fd = formDataRef.current || formData;
 
     // Prepare query parameters
     const queryParams = new URLSearchParams({
@@ -4881,7 +4884,7 @@ console.log('API Response:', response.data);
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       ...(filters.approvalStatus && { approvalStatus: filters.approvalStatus }),
       // Multi-select filters
-      ...buildListFilterQueryParts(formData, cycleFilters),
+      ...buildListFilterQueryParts(fd, cycle),
     });
 
     try {
@@ -13375,7 +13378,7 @@ useEffect(() => {
     });
     setCurrentPage(1);
     fetchProfileData(filterData, 1, next);
-    fetchRegistrationCrmFilterCounts(filterData, 1, null);
+    fetchRegistrationCrmFilterCounts(filterData, 1, null, next);
     fetchDashboardCounts(filterData, next);
   };
 
