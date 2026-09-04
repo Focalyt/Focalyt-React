@@ -132,7 +132,9 @@ async function makeCall({ callTo, customField, callInitTime, agentId, callFrom }
     };
     const agent = trim(agentId) || cfg.agentId;
     if (agent) payload.agentId = agent;
-    const from = trim(callFrom) || cfg.callFrom;
+    // VoiceX: omit callFrom unless a caller-id is passed explicitly.
+    // Env XTRME_GEN_CALL_FROM was sending the wrong number and calls never initiated.
+    const from = trim(callFrom);
     if (from) payload.callFrom = from;
     if (callInitTime) payload.callInitTime = callInitTime;
 
