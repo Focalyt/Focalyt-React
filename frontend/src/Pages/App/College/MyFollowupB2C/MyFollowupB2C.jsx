@@ -1782,10 +1782,10 @@ const MyFollowups = () => {
         }
       }
 
-      // Prepare the request body
       const data = {
         id: selectedProfile._id,
         appliedCourseId: selectedProfile.appliedCourseId,
+        followUpType: selectedProfile.followUpType || 'Call',
         followupDate: followupDateTime ? followupDateTime.toISOString() : null,
         remarks: remarks || '',
         folloupType: 'update'

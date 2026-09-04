@@ -97,13 +97,109 @@ function applyB2cAccessToFilters(user, verticalsArray = [], projectsArray = []) 
 	return { verticalsArray: nextVerticals, projectsArray: nextProjects };
 }
 
-async function resolveB2cOwnershipTeamMembers(user, counselorArray = []) {
+function parseB2cFilterIdArray(value) {
+	if (!value) return [];
+	try {
+		const parsed = JSON.parse(value);
+		if (Array.isArray(parsed)) return parsed.filter(Boolean);
+	} catch (_) { }
+	if (Array.isArray(value)) return value.filter(Boolean);
+	return String(value).split(',').map((id) => id.trim()).filter(Boolean);
+}
+
+function toB2cObjectIdList(ids = []) {
+	return (ids || [])
+		.filter(Boolean)
+		.map((id) => (id instanceof mongoose.Types.ObjectId ? id : new mongoose.Types.ObjectId(id)));
+}
+
+/**
+ * Owner filter = counsellor field only (not co-owner).
+ * Counsellor filter = owner OR co-owner 1/2.
+ * Without a person filter, team scope keeps registeredBy + owner + co-owners.
+ */
+function applyB2cLeadOwnershipMatch(baseMatch, { teamMemberIds, registeredByMe, ownerIds, counselorIds } = {}) {
+	const ownerObjectIds = toB2cObjectIdList(ownerIds);
+	if (ownerObjectIds.length > 0) {
+		delete baseMatch.$or;
+		baseMatch.counsellor = { $in: ownerObjectIds };
+	}
+	if (registeredByMe) {
+		baseMatch.registeredBy = new mongoose.Types.ObjectId(registeredByMe);
+		return;
+	}
+	if (ownerObjectIds.length > 0) {
+		return;
+	}
+
+	const counselorObjectIds = toB2cObjectIdList(counselorIds);
+	if (counselorObjectIds.length > 0) {
+		delete baseMatch.counsellor;
+		baseMatch.$or = [
+			{ counsellor: { $in: counselorObjectIds } },
+			{ leadCoOwner: { $in: counselorObjectIds } },
+			{ leadCoOwner2: { $in: counselorObjectIds } }
+		];
+		return;
+	}
+
+	if (teamMemberIds && teamMemberIds.length > 0) {
+		baseMatch.$or = [
+			{ registeredBy: { $in: teamMemberIds } },
+			{ counsellor: { $in: teamMemberIds } },
+			{ leadCoOwner: { $in: teamMemberIds } },
+			{ leadCoOwner2: { $in: teamMemberIds } }
+		];
+	}
+}
+
+/** Apply person Owner/Counsellor match on a raw $match object (counts/KYC/admission). */
+function applyB2cLeadOwnershipToMatch(match, { teamMemberIds, ownerIds, counselorIds } = {}) {
+	applyB2cLeadOwnershipMatch(match, { teamMemberIds, ownerIds, counselorIds });
+}
+
+function isB2cQuickSearch(name) {
+	return Boolean(name && String(name).trim());
+}
+
+/** Dept/project/course/center/batch/name selection widens Admin from own leads to all leads. */
+function hasB2cUserSelectedWideningFilter({
+	projectsArray,
+	verticalsArray,
+	courseArray,
+	centerArray,
+	batchArray,
+	name,
+} = {}) {
+	return Boolean(
+		(Array.isArray(projectsArray) && projectsArray.length) ||
+		(Array.isArray(verticalsArray) && verticalsArray.length) ||
+		(Array.isArray(courseArray) && courseArray.length) ||
+		(Array.isArray(centerArray) && centerArray.length) ||
+		(Array.isArray(batchArray) && batchArray.length) ||
+		isB2cQuickSearch(name)
+	);
+}
+
+async function resolveB2cOwnershipTeamMembers(user, counselorArray = [], options = {}) {
+	// Quick search looks across all B2C leads, not only owned/assigned ones.
+	if (options.searchAllLeads) {
+		return [];
+	}
+
 	if (Array.isArray(counselorArray) && counselorArray.length > 0) {
 		return counselorArray;
 	}
-	if (user?.permissions?.permission_type === 'Admin') {
-		return [];
+
+	const isAdmin = user?.permissions?.permission_type === 'Admin';
+	// Admin default: own/associated leads. All leads only if they picked a widening filter.
+	if (isAdmin) {
+		if (options.userSelectedWideningFilter) {
+			return [];
+		}
+		return user?._id ? [user._id] : [];
 	}
+
 	const teamMembers = await getAllTeamMembers(user._id);
 	if (Array.isArray(teamMembers) && teamMembers.length > 0) {
 		return teamMembers;
@@ -2209,6 +2305,48 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 		data.followUpCall = followUpCall;
 		data.followUpVisit = followUpVisit;
 
+		const followupStatRows = await B2cFollowup.aggregate([
+			{ $match: { appliedCourseId: data._id } },
+			{
+				$group: {
+					_id: {
+						$cond: [
+							{ $eq: [{ $toLower: { $ifNull: ['$followUpType', 'Call'] } }, 'visit'] },
+							'visit',
+							'call',
+						],
+					},
+					done: {
+						$sum: {
+							$cond: [{ $eq: [{ $toLower: { $ifNull: ['$status', ''] } }, 'done'] }, 1, 0],
+						},
+					},
+					missed: {
+						$sum: {
+							$cond: [{ $eq: [{ $toLower: { $ifNull: ['$status', ''] } }, 'missed'] }, 1, 0],
+						},
+					},
+					planned: {
+						$sum: {
+							$cond: [{ $eq: [{ $toLower: { $ifNull: ['$status', ''] } }, 'planned'] }, 1, 0],
+						},
+					},
+				},
+			},
+		]);
+		data.followupStats = {
+			call: { done: 0, missed: 0, planned: 0 },
+			visit: { done: 0, missed: 0, planned: 0 },
+		};
+		(followupStatRows || []).forEach((row) => {
+			const type = row?._id === 'visit' ? 'visit' : 'call';
+			data.followupStats[type] = {
+				done: row.done || 0,
+				missed: row.missed || 0,
+				planned: row.planned || 0,
+			};
+		});
+
 		// console.log("data", data)
 
 
@@ -2242,7 +2380,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			name, courseType, status, leadStatus, aiLeadStatus,
 			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
 			nextActionFromDate, nextActionToDate,
-			projects, verticals, course, center, counselor, subStatuses, batch, registeredByMe,
+			projects, verticals, course, center, counselor, owner, subStatuses, batch, registeredByMe,
 			followupStatus, approvalStatus,
 			hasFollowUpCall, hasFollowUpVisit,
 		} = req.query;
@@ -2266,11 +2404,23 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
+		const ownerArray = parseB2cFilterIdArray(owner);
+		const hasPersonFilter = ownerArray.length > 0 || counselorArray.length > 0;
 
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
-		// Same as B2B: Admin sees all leads in assigned scope; custom users keep owner/team scope
-		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray);
+		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+			projectsArray, verticalsArray, courseArray, centerArray, batchArray, name
+		});
+
+		// Person Owner/Counsellor filters use dedicated ownership match.
+		// Admin with no filter: own/co-owned only. Widening filters (or quick search): all leads.
+		let teamMembers = hasPersonFilter
+			? []
+			: await resolveB2cOwnershipTeamMembers(user, counselorArray, {
+				userSelectedWideningFilter,
+				searchAllLeads: isB2cQuickSearch(name),
+			});
 
 		let teamMemberIds = [];
 		if (teamMembers?.length > 0) {
@@ -2282,8 +2432,13 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		let followupAppliedIds = null;
 		if (followupStatus) {
 			const followupMatch = { status: followupStatus };
-			if (counselorArray.length > 0) {
-				followupMatch.createdBy = { $in: counselorArray.map((id) => new mongoose.Types.ObjectId(id)) };
+			const followupPersonIds = ownerArray.length > 0 ? ownerArray : counselorArray;
+			if (followupPersonIds.length > 0) {
+				followupMatch.$or = [
+					{ counsellorId: { $in: toB2cObjectIdList(followupPersonIds) } },
+					{ counsellorId: { $exists: false }, createdBy: { $in: toB2cObjectIdList(followupPersonIds) } },
+					{ counsellorId: null, createdBy: { $in: toB2cObjectIdList(followupPersonIds) } },
+				];
 			} else if (teamMemberIds.length > 0) {
 				followupMatch.createdBy = { $in: teamMemberIds };
 			}
@@ -2316,6 +2471,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				nextActionFromDate, nextActionToDate,
 				projectsArray, verticalsArray, courseArray, centerArray, batchArray, subStatuses,
 				registeredByMe: registeredByMe || null,
+				ownerIds: ownerArray,
+				counselorIds: ownerArray.length > 0 ? [] : counselorArray,
 				followupAppliedIds,
 				approvalStatus,
 				hasFollowUpCall,
@@ -2355,7 +2512,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			followUpType: f.followUpType || 'Call',
 		} : null);
 
-		const [slotDocs, followups] = await Promise.all([
+		const [slotDocs, followups, followupStatRows] = await Promise.all([
 			AppliedCourses.find({ _id: { $in: appliedIds } })
 				.select('followUpCall followUpVisit')
 				.lean(),
@@ -2363,7 +2520,59 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				.find({ appliedCourseId: { $in: appliedIds }, status: 'planned' })
 				.sort({ followupDate: -1, createdAt: -1 })
 				.lean(),
+			appliedIds.length
+				? B2cFollowup.aggregate([
+					{ $match: { appliedCourseId: { $in: appliedIds } } },
+					{
+						$group: {
+							_id: {
+								appliedCourseId: '$appliedCourseId',
+								type: {
+									$cond: [
+										{ $eq: [{ $toLower: { $ifNull: ['$followUpType', 'Call'] } }, 'visit'] },
+										'visit',
+										'call',
+									],
+								},
+							},
+							done: {
+								$sum: {
+									$cond: [{ $eq: [{ $toLower: { $ifNull: ['$status', ''] } }, 'done'] }, 1, 0],
+								},
+							},
+							missed: {
+								$sum: {
+									$cond: [{ $eq: [{ $toLower: { $ifNull: ['$status', ''] } }, 'missed'] }, 1, 0],
+								},
+							},
+							planned: {
+								$sum: {
+									$cond: [{ $eq: [{ $toLower: { $ifNull: ['$status', ''] } }, 'planned'] }, 1, 0],
+								},
+							},
+						},
+					},
+				])
+				: Promise.resolve([]),
 		]);
+
+		const followupStatsByCourse = {};
+		(followupStatRows || []).forEach((row) => {
+			const courseId = String(row?._id?.appliedCourseId || '');
+			const type = row?._id?.type === 'visit' ? 'visit' : 'call';
+			if (!courseId) return;
+			if (!followupStatsByCourse[courseId]) {
+				followupStatsByCourse[courseId] = {
+					call: { done: 0, missed: 0, planned: 0 },
+					visit: { done: 0, missed: 0, planned: 0 },
+				};
+			}
+			followupStatsByCourse[courseId][type] = {
+				done: row.done || 0,
+				missed: row.missed || 0,
+				planned: row.planned || 0,
+			};
+		});
 
 		const slotIdSet = new Set();
 		const courseSlotIds = new Map();
@@ -2479,6 +2688,10 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				followup,
 				followUpCall,
 				followUpVisit,
+				followupStats: followupStatsByCourse[courseKey] || {
+					call: { done: 0, missed: 0, planned: 0 },
+					visit: { done: 0, missed: 0, planned: 0 },
+				},
 				createdAt: doc.createdAt,
 				updatedAt: doc.updatedAt,
 				approval: doc.approval,
@@ -2918,7 +3131,7 @@ router.route("/appliedCandidatesWithWhatsApp").get(isCollege, async (req, res) =
 			name, courseType, status, leadStatus, aiLeadStatus,
 			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
 			nextActionFromDate, nextActionToDate,
-			projects, verticals, course, center, counselor, subStatuses
+			projects, verticals, course, center, counselor, owner, subStatuses
 		} = req.query;
 
 		// Parse multi-select filters
@@ -2937,11 +3150,21 @@ router.route("/appliedCandidatesWithWhatsApp").get(isCollege, async (req, res) =
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
+		const ownerArray = parseB2cFilterIdArray(owner);
+		const hasPersonFilter = ownerArray.length > 0 || counselorArray.length > 0;
 
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
-		// Same as B2B: Admin sees all leads in assigned scope; custom users keep owner/team scope
-		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray);
+		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+			projectsArray, verticalsArray, courseArray, centerArray, name
+		});
+
+		let teamMembers = hasPersonFilter
+			? []
+			: await resolveB2cOwnershipTeamMembers(user, counselorArray, {
+				userSelectedWideningFilter,
+				searchAllLeads: isB2cQuickSearch(name),
+			});
 
 		let teamMemberIds = [];
 		if (teamMembers?.length > 0) {
@@ -2960,7 +3183,9 @@ router.route("/appliedCandidatesWithWhatsApp").get(isCollege, async (req, res) =
 				createdFromDate, createdToDate,
 				modifiedFromDate, modifiedToDate,
 				nextActionFromDate, nextActionToDate,
-				projectsArray, verticalsArray, courseArray, centerArray, subStatuses
+				projectsArray, verticalsArray, courseArray, centerArray, subStatuses,
+				ownerIds: ownerArray,
+				counselorIds: ownerArray.length > 0 ? [] : counselorArray,
 			},
 			pagination: { skip, limit }
 		});
@@ -3273,16 +3498,12 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 		};
 	}
 
-	if (filters.registeredByMe) {
-		baseMatch.registeredBy = new mongoose.Types.ObjectId(filters.registeredByMe);
-	} else if (teamMemberIds && teamMemberIds.length > 0) {
-		baseMatch.$or = [
-			{ registeredBy: { $in: teamMemberIds } },
-			{ counsellor: { $in: teamMemberIds } },
-			{ leadCoOwner: { $in: teamMemberIds } },
-			{ leadCoOwner2: { $in: teamMemberIds } }
-		];
-	}
+	applyB2cLeadOwnershipMatch(baseMatch, {
+		teamMemberIds,
+		registeredByMe: filters.registeredByMe,
+		ownerIds: filters.ownerIds,
+		counselorIds: filters.counselorIds,
+	});
 
 	if (filters.followupAppliedIds && filters.followupAppliedIds.length > 0) {
 		baseMatch._id = { $in: filters.followupAppliedIds };
@@ -3600,17 +3821,12 @@ function buildSimplifiedPipelineWithWhatsApp({ teamMemberIds, college, filters, 
 
 
 
-
-	if (filters.registeredByMe) {
-		baseMatch.registeredBy = new mongoose.Types.ObjectId(filters.registeredByMe);
-	} else if (teamMemberIds && teamMemberIds.length > 0) {
-		baseMatch.$or = [
-			{ registeredBy: { $in: teamMemberIds } },
-			{ counsellor: { $in: teamMemberIds } },
-			{ leadCoOwner: { $in: teamMemberIds } },
-			{ leadCoOwner2: { $in: teamMemberIds } }
-		];
-	}
+	applyB2cLeadOwnershipMatch(baseMatch, {
+		teamMemberIds,
+		registeredByMe: filters.registeredByMe,
+		ownerIds: filters.ownerIds,
+		counselorIds: filters.counselorIds,
+	});
 
 
 	// Add date filters
@@ -3982,7 +4198,7 @@ router.route("/downloadleads").get(isCollege, async (req, res) => {
 			name, courseType, status, leadStatus, aiLeadStatus,
 			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
 			nextActionFromDate, nextActionToDate,
-			projects, verticals, course, center, counselor, subStatuses
+			projects, verticals, course, center, counselor, owner, subStatuses
 		} = req.query;
 
 		// Parse multi-select filters
@@ -4001,11 +4217,21 @@ router.route("/downloadleads").get(isCollege, async (req, res) => {
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
+		const ownerArray = parseB2cFilterIdArray(owner);
+		const hasPersonFilter = ownerArray.length > 0 || counselorArray.length > 0;
 
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
-		// Same as B2B: Admin sees all leads in assigned scope; custom users keep owner/team scope
-		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray);
+		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+			projectsArray, verticalsArray, courseArray, centerArray, name
+		});
+
+		let teamMembers = hasPersonFilter
+			? []
+			: await resolveB2cOwnershipTeamMembers(user, counselorArray, {
+				userSelectedWideningFilter,
+				searchAllLeads: isB2cQuickSearch(name),
+			});
 
 		let teamMemberIds = [];
 		if (teamMembers?.length > 0) {
@@ -4024,7 +4250,9 @@ router.route("/downloadleads").get(isCollege, async (req, res) => {
 				createdFromDate, createdToDate,
 				modifiedFromDate, modifiedToDate,
 				nextActionFromDate, nextActionToDate,
-				projectsArray, verticalsArray, courseArray, centerArray, subStatuses
+				projectsArray, verticalsArray, courseArray, centerArray, subStatuses,
+				ownerIds: ownerArray,
+				counselorIds: ownerArray.length > 0 ? [] : counselorArray,
 			}
 		});
 
@@ -4098,16 +4326,12 @@ function downloadPipeline({ teamMemberIds, college, filters }) {
 
 
 
-	if (filters.registeredByMe) {
-		baseMatch.registeredBy = new mongoose.Types.ObjectId(filters.registeredByMe);
-	} else if (teamMemberIds && teamMemberIds.length > 0) {
-		baseMatch.$or = [
-			{ registeredBy: { $in: teamMemberIds } },
-			{ counsellor: { $in: teamMemberIds } },
-			{ leadCoOwner: { $in: teamMemberIds } },
-			{ leadCoOwner2: { $in: teamMemberIds } }
-		];
-	}
+	applyB2cLeadOwnershipMatch(baseMatch, {
+		teamMemberIds,
+		registeredByMe: filters.registeredByMe,
+		ownerIds: filters.ownerIds,
+		counselorIds: filters.counselorIds,
+	});
 
 
 	// Add date filters
@@ -4434,7 +4658,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			name, courseType, status, leadStatus,
 			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
 			nextActionFromDate, nextActionToDate,
-			projects, verticals, course, center, counselor,
+			projects, verticals, course, center, counselor, owner,
 			subStatuses
 		} = req.query;
 
@@ -4455,10 +4679,21 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
+		const ownerArray = parseB2cFilterIdArray(owner);
+		const hasPersonFilter = ownerArray.length > 0 || counselorArray.length > 0;
 
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
-		const teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray);
+		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+			projectsArray, verticalsArray, courseArray, centerArray, name
+		});
+
+		const teamMembers = hasPersonFilter
+			? []
+			: await resolveB2cOwnershipTeamMembers(user, counselorArray, {
+				userSelectedWideningFilter,
+				searchAllLeads: isB2cQuickSearch(name),
+			});
 
 		const appliedFilters = {
 			name, courseType, status, leadStatus,
@@ -4532,16 +4767,16 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 		// 	basePipeline[0].$match.kycStage = { $in: [true] };
 		// }
 
-		if (teamMemberIds && teamMemberIds.length > 0) {
-			basePipeline[0].$match.$or = [
-				{ registeredBy: { $in: teamMemberIds } },
-				{ counsellor: { $in: teamMemberIds } }
-			];
-			movedInKYCPipeline[0].$match.$or = [
-				{ registeredBy: { $in: teamMemberIds } },
-				{ counsellor: { $in: teamMemberIds } }
-			];
-		}
+		applyB2cLeadOwnershipToMatch(basePipeline[0].$match, {
+			teamMemberIds,
+			ownerIds: ownerArray,
+			counselorIds: ownerArray.length > 0 ? [] : counselorArray,
+		});
+		applyB2cLeadOwnershipToMatch(movedInKYCPipeline[0].$match, {
+			teamMemberIds,
+			ownerIds: ownerArray,
+			counselorIds: ownerArray.length > 0 ? [] : counselorArray,
+		});
 
 		// Add date filters to base pipeline
 		const dateFilters = {};
@@ -7972,6 +8207,183 @@ router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 	}
 });
 
+router.put('/lead/bulk_course_change', [isCollege], async (req, res) => {
+	try {
+		const { selectedProfiles, courseId, centerId, remarks } = req.body;
+		const userId = req.user?._id;
+		const collegeId = req.user?.college?._id;
+
+		if (!Array.isArray(selectedProfiles) || selectedProfiles.length === 0) {
+			return res.status(400).json({
+				success: false,
+				message: 'selectedProfiles is required',
+			});
+		}
+		if (!courseId || !mongoose.Types.ObjectId.isValid(courseId)) {
+			return res.status(400).json({
+				success: false,
+				message: 'Valid courseId is required',
+			});
+		}
+
+		const newCourse = await Courses.findById(courseId).select('name center college').lean();
+		if (!newCourse) {
+			return res.status(404).json({ success: false, message: 'Course not found' });
+		}
+		if (collegeId && newCourse.college && String(newCourse.college) !== String(collegeId)) {
+			return res.status(403).json({ success: false, message: 'Course does not belong to this college' });
+		}
+
+		const courseCenterIds = (newCourse.center || []).map((id) => String(id));
+		let newCenterId = null;
+		let newCenterName = '';
+		if (centerId) {
+			if (!mongoose.Types.ObjectId.isValid(centerId)) {
+				return res.status(400).json({ success: false, message: 'Invalid centerId' });
+			}
+			if (courseCenterIds.length && !courseCenterIds.includes(String(centerId))) {
+				return res.status(400).json({ success: false, message: 'Selected center does not belong to this course' });
+			}
+			const centerDoc = await Center.findById(centerId).select('name').lean();
+			if (!centerDoc) {
+				return res.status(404).json({ success: false, message: 'Center not found' });
+			}
+			newCenterId = centerDoc._id;
+			newCenterName = centerDoc.name || '';
+		}
+
+		const results = { updated: 0, skipped: 0, failed: [] };
+
+		const syncCandidateAppliedCourses = async (candidateId, oldCourseId, nextCourseId, nextCenterId) => {
+			if (!candidateId || !oldCourseId) return;
+			const candidate = await CandidateProfile.findById(candidateId);
+			if (!candidate || !Array.isArray(candidate.appliedCourses)) return;
+
+			let changed = false;
+			candidate.appliedCourses = candidate.appliedCourses.map((item) => {
+				const raw = item?.toObject ? item.toObject() : item;
+				if (!raw?.courseId || String(raw.courseId) !== String(oldCourseId)) return item;
+				changed = true;
+				return {
+					...raw,
+					courseId: nextCourseId,
+					...(nextCenterId ? { centerId: nextCenterId } : {}),
+				};
+			});
+			if (changed) {
+				candidate.markModified('appliedCourses');
+				await candidate.save();
+			}
+		};
+
+		for (const id of selectedProfiles) {
+			try {
+				if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+					results.failed.push({ id, reason: 'Invalid lead id' });
+					continue;
+				}
+
+				const doc = await AppliedCourses.findById(id).populate('_course', 'name').populate('_center', 'name');
+				if (!doc) {
+					results.failed.push({ id, reason: 'Applied course not found' });
+					continue;
+				}
+
+				const oldCourseId = doc._course?._id || doc._course;
+				const oldCourseName = doc._course?.name || 'Unknown';
+				const oldCenterId = doc._center?._id || doc._center;
+				const oldCenterName = doc._center?.name || 'Unknown';
+				const sameCourse = oldCourseId && String(oldCourseId) === String(courseId);
+				const sameCenter = !newCenterId || (oldCenterId && String(oldCenterId) === String(newCenterId));
+
+				if (sameCourse && sameCenter) {
+					results.skipped += 1;
+					continue;
+				}
+
+				if (!sameCourse) {
+					const duplicate = await AppliedCourses.findOne({
+						_id: { $ne: doc._id },
+						_candidate: doc._candidate,
+						_course: courseId,
+					}).select('_id').lean();
+					if (duplicate) {
+						results.failed.push({
+							id,
+							reason: 'Candidate already has this course applied',
+						});
+						continue;
+					}
+				}
+
+				const actionParts = [];
+				if (!sameCourse) {
+					actionParts.push(`Course changed from "${oldCourseName}" to "${newCourse.name}"`);
+					doc._course = courseId;
+				}
+
+				if (newCenterId) {
+					if (!oldCenterId || String(oldCenterId) !== String(newCenterId)) {
+						actionParts.push(`Center changed from "${oldCenterName}" to "${newCenterName || 'Unknown'}"`);
+						doc._center = newCenterId;
+					}
+				} else if (oldCenterId && courseCenterIds.length && !courseCenterIds.includes(String(oldCenterId))) {
+					actionParts.push(`Center "${oldCenterName}" cleared because it is not valid for the new course`);
+					doc._center = null;
+				}
+
+				if (remarks && doc.remarks !== remarks) {
+					actionParts.push('Remarks updated');
+					doc.remarks = remarks;
+				}
+
+				if (actionParts.length === 0) {
+					results.skipped += 1;
+					continue;
+				}
+
+				doc.logs = Array.isArray(doc.logs) ? doc.logs : [];
+				doc.logs.push({
+					user: userId,
+					action: actionParts.join('; '),
+					remarks: remarks || '',
+					timestamp: new Date(),
+				});
+
+				await doc.save();
+				await syncCandidateAppliedCourses(doc._candidate, oldCourseId, courseId, newCenterId || doc._center);
+
+				const notifyLead = await loadB2cLeadForEmailNotify(id);
+				notifyB2cLeadOwnerAndCoOwner({
+					lead: notifyLead || doc,
+					changedBy: req.user,
+					changeType: 'Lead course updated',
+					changeDetails: actionParts.join('; '),
+				});
+
+				results.updated += 1;
+			} catch (leadErr) {
+				results.failed.push({
+					id,
+					reason: leadErr?.message || 'Failed to update course',
+				});
+			}
+		}
+
+		return res.json({
+			success: true,
+			message: `Course updated for ${results.updated} lead(s)`,
+			data: {
+				...results,
+				total: selectedProfiles.length,
+			},
+		});
+	} catch (error) {
+		console.error('[Lead Bulk Course Change] Error:', error);
+		return res.status(500).json({ success: false, message: 'Internal Server Error' });
+	}
+});
+
 
 
 ///courses
@@ -8397,9 +8809,14 @@ const resolveFollowupDateRange = (fromDateInput, toDateInput, { useAllTime = fal
 	return { from, to };
 };
 
-const buildFollowupCounselorMatch = (user, counselorArray) => {
-	if (counselorArray.length > 0) {
-		const ids = counselorArray.map((id) => new mongoose.Types.ObjectId(id));
+const buildFollowupCounselorMatch = (user, counselorArray, ownerArray = []) => {
+	const personIds = [
+		...(Array.isArray(ownerArray) ? ownerArray : []),
+		...(Array.isArray(counselorArray) ? counselorArray : []),
+	].filter(Boolean);
+	const uniqueIds = [...new Set(personIds.map((id) => String(id)))];
+	if (uniqueIds.length > 0) {
+		const ids = toB2cObjectIdList(uniqueIds);
 		return {
 			$or: [
 				{ counsellorId: { $in: ids } },
@@ -8408,7 +8825,13 @@ const buildFollowupCounselorMatch = (user, counselorArray) => {
 			],
 		};
 	}
-	return { createdBy: user._id };
+	// Admin and custom users both default to own follow-ups when no person filter.
+	return {
+		$or: [
+			{ counsellorId: user._id },
+			{ createdBy: user._id },
+		],
+	};
 };
 
 const buildFollowupDateMatch = (from, to, { useAllTime = false, useActivityFilter = false } = {}) => {
@@ -8430,7 +8853,7 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 
 		const user = req.user;
 
-		let { fromDate, toDate, projects, verticals, course, center, counselor, allTime, filterBy } = req.query;
+		let { fromDate, toDate, projects, verticals, course, center, counselor, owner, allTime, filterBy } = req.query;
 		const useAllTime = allTime === 'true' || allTime === true;
 		const useActivityFilter = filterBy === 'activity';
 
@@ -8454,12 +8877,13 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
+		const ownerArray = parseB2cFilterIdArray(owner);
 
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
 		let aggregate = [];
 		let baseMatch = {
-			...buildFollowupCounselorMatch(user, counselorArray),
+			...buildFollowupCounselorMatch(user, counselorArray, ownerArray),
 			...buildFollowupDateMatch(rangeFrom, rangeTo, { useAllTime, useActivityFilter }),
 		};
 
@@ -9576,7 +10000,8 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			verticals,
 			course,
 			center,
-			counselor
+			counselor,
+			owner
 		} = req.query;
 
 		// Parse multi-select filter values
@@ -9595,10 +10020,21 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
+		const ownerArray = parseB2cFilterIdArray(owner);
+		const hasPersonFilter = ownerArray.length > 0 || counselorArray.length > 0;
 
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
-		teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray);
+		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+			projectsArray, verticalsArray, courseArray, centerArray, name
+		});
+
+		teamMembers = hasPersonFilter
+			? []
+			: await resolveB2cOwnershipTeamMembers(user, counselorArray, {
+				userSelectedWideningFilter,
+				searchAllLeads: isB2cQuickSearch(name),
+			});
 
 		// Build aggregation pipeline
 		let aggregationPipeline = [];
@@ -9617,13 +10053,11 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 
 		};
 
-		if (teamMemberIds && teamMemberIds.length > 0) {
-
-			baseMatchStage.$or = [
-				{ registeredBy: { $in: teamMemberIds } },
-				{ counsellor: { $in: teamMemberIds } }
-			];
-		}
+		applyB2cLeadOwnershipToMatch(baseMatchStage, {
+			teamMemberIds,
+			ownerIds: ownerArray,
+			counselorIds: ownerArray.length > 0 ? [] : counselorArray,
+		});
 
 		// Add date filters to base match
 		if (createdFromDate || createdToDate) {
@@ -10739,6 +11173,22 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 			};
 		};
 
+		if (folloupType === 'update') {
+			const plannedById = id
+				? await B2cFollowup.findOne({ _id: id, status: 'planned' }).select('_id').lean()
+				: null;
+			const plannedForLead = !plannedById && appliedCourseId
+				? await B2cFollowup.findOne({
+					appliedCourseId,
+					status: 'planned',
+					followUpType: normalizedType,
+				}).select('_id').lean()
+				: null;
+			if (!plannedById && !plannedForLead) {
+				folloupType = 'new';
+			}
+		}
+
 		if (folloupType === 'new') {
 			const existingFollowup = await B2cFollowup.findOne({
 				appliedCourseId,
@@ -10824,6 +11274,47 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 			});
 
 			const slots = await loadSlotsForCourse(appliedCourseId);
+			const followupStatRows = await B2cFollowup.aggregate([
+				{ $match: { appliedCourseId } },
+				{
+					$group: {
+						_id: {
+							$cond: [
+								{ $eq: [{ $toLower: { $ifNull: ['$followUpType', 'Call'] } }, 'visit'] },
+								'visit',
+								'call',
+							],
+						},
+						done: {
+							$sum: {
+								$cond: [{ $eq: [{ $toLower: { $ifNull: ['$status', ''] } }, 'done'] }, 1, 0],
+							},
+						},
+						missed: {
+							$sum: {
+								$cond: [{ $eq: [{ $toLower: { $ifNull: ['$status', ''] } }, 'missed'] }, 1, 0],
+							},
+						},
+						planned: {
+							$sum: {
+								$cond: [{ $eq: [{ $toLower: { $ifNull: ['$status', ''] } }, 'planned'] }, 1, 0],
+							},
+						},
+					},
+				},
+			]);
+			const followupStats = {
+				call: { done: 0, missed: 0, planned: 0 },
+				visit: { done: 0, missed: 0, planned: 0 },
+			};
+			(followupStatRows || []).forEach((row) => {
+				const type = row?._id === 'visit' ? 'visit' : 'call';
+				followupStats[type] = {
+					done: row.done || 0,
+					missed: row.missed || 0,
+					planned: row.planned || 0,
+				};
+			});
 			return res.status(200).json({
 				status: true,
 				message: `${normalizedType} followup created successfully`,
@@ -10831,11 +11322,23 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 				followup: slots.followup,
 				followUpCall: slots.followUpCall,
 				followUpVisit: slots.followUpVisit,
+				followupStats,
 			});
 		}
 
 		if (folloupType === 'update') {
-			const existingFollowup = await B2cFollowup.findOne({ _id: id, status: 'planned' });
+			let existingFollowup = id
+				? await B2cFollowup.findOne({ _id: id, status: 'planned' })
+				: null;
+
+			// Done/missed rows send that followup's id; use the lead's current planned one instead
+			if (!existingFollowup && appliedCourseId) {
+				existingFollowup = await B2cFollowup.findOne({
+					appliedCourseId,
+					status: 'planned',
+					followUpType: normalizedType,
+				});
+			}
 
 			if (!existingFollowup) {
 				return res.status(400).json({ status: false, message: "Followup not found" });
@@ -10909,6 +11412,47 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 			});
 
 			const slots = await loadSlotsForCourse(appliedCourseId);
+			const followupStatRows = await B2cFollowup.aggregate([
+				{ $match: { appliedCourseId } },
+				{
+					$group: {
+						_id: {
+							$cond: [
+								{ $eq: [{ $toLower: { $ifNull: ['$followUpType', 'Call'] } }, 'visit'] },
+								'visit',
+								'call',
+							],
+						},
+						done: {
+							$sum: {
+								$cond: [{ $eq: [{ $toLower: { $ifNull: ['$status', ''] } }, 'done'] }, 1, 0],
+							},
+						},
+						missed: {
+							$sum: {
+								$cond: [{ $eq: [{ $toLower: { $ifNull: ['$status', ''] } }, 'missed'] }, 1, 0],
+							},
+						},
+						planned: {
+							$sum: {
+								$cond: [{ $eq: [{ $toLower: { $ifNull: ['$status', ''] } }, 'planned'] }, 1, 0],
+							},
+						},
+					},
+				},
+			]);
+			const followupStats = {
+				call: { done: 0, missed: 0, planned: 0 },
+				visit: { done: 0, missed: 0, planned: 0 },
+			};
+			(followupStatRows || []).forEach((row) => {
+				const type = row?._id === 'visit' ? 'visit' : 'call';
+				followupStats[type] = {
+					done: row.done || 0,
+					missed: row.missed || 0,
+					planned: row.planned || 0,
+				};
+			});
 			return res.status(200).json({
 				status: true,
 				message: `${normalizedType} followup updated successfully`,
@@ -10916,6 +11460,7 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 				followup: slots.followup,
 				followUpCall: slots.followUpCall,
 				followUpVisit: slots.followUpVisit,
+				followupStats,
 			});
 		}
 
@@ -11030,7 +11575,7 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 	try {
 		const user = req.user;
 		let filter = {};
-		const { fromDate, toDate, page = 1, limit = 10, followupStatus, projects, verticals, course, center, counselor, name: searchName, filterBy } = req.query;
+		const { fromDate, toDate, page = 1, limit = 10, followupStatus, projects, verticals, course, center, counselor, owner, name: searchName, filterBy } = req.query;
 		const useActivityFilter = filterBy === 'activity';
 
 		const { from, to } = resolveFollowupDateRange(fromDate, toDate);
@@ -11054,10 +11599,11 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
+		const ownerArray = parseB2cFilterIdArray(owner);
 
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
-		let baseMatch = buildFollowupCounselorMatch(user, counselorArray);
+		let baseMatch = buildFollowupCounselorMatch(user, counselorArray, ownerArray);
 
 		const dateMatch = buildFollowupDateMatch(from, to, { useActivityFilter });
 
@@ -11695,6 +12241,7 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			course,
 			center,
 			counselor,
+			owner,
 			batch
 		} = req.query;
 		// Parse multi-select filter values
@@ -11716,10 +12263,21 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
+		const ownerArray = parseB2cFilterIdArray(owner);
+		const hasPersonFilter = ownerArray.length > 0 || counselorArray.length > 0;
 
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
-		teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray);
+		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+			projectsArray, verticalsArray, courseArray, centerArray, batchArray, name
+		});
+
+		teamMembers = hasPersonFilter
+			? []
+			: await resolveB2cOwnershipTeamMembers(user, counselorArray, {
+				userSelectedWideningFilter,
+				searchAllLeads: isB2cQuickSearch(name),
+			});
 
 		let teamMemberIds = [];
 		if (teamMembers?.length > 0) {
@@ -11737,13 +12295,11 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 
 		};
 
-		if (teamMemberIds && teamMemberIds.length > 0) {
-
-			baseMatchStage.$or = [
-				{ registeredBy: { $in: teamMemberIds } },
-				{ counsellor: { $in: teamMemberIds } }
-			];
-		}
+		applyB2cLeadOwnershipToMatch(baseMatchStage, {
+			teamMemberIds,
+			ownerIds: ownerArray,
+			counselorIds: ownerArray.length > 0 ? [] : counselorArray,
+		});
 		// Add date filters to base match
 		if (createdFromDate || createdToDate) {
 			baseMatchStage.createdAt = {};
@@ -13174,7 +13730,14 @@ router.get('/dashbord-data', isCollege, async (req, res) => {
 
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
-		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray);
+		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+			projectsArray, verticalsArray, courseArray, centerArray, name
+		});
+
+		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, {
+			userSelectedWideningFilter,
+			searchAllLeads: isB2cQuickSearch(name),
+		});
 
 		// Build date filter
 		let dateFilter = {};

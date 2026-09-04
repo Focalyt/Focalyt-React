@@ -4114,6 +4114,7 @@ console.log('API Response:', response.data);
                 followup: response.data.followup ?? p.followup,
                 followUpCall: response.data.followUpCall ?? p.followUpCall,
                 followUpVisit: response.data.followUpVisit ?? p.followUpVisit,
+                followupStats: response.data.followupStats ?? p.followupStats,
               }
               : p
           )));
@@ -4487,7 +4488,7 @@ console.log('API Response:', response.data);
         } else if (shouldFetchKycCandidates) {
           await fetchMilestoneCounts(filters);
         } else {
-          await fetchRegistrationCrmFilterCounts(filters, page, null);
+          await fetchRegistrationCrmFilterCounts(filters, page, null, cycleOverride || cycleFilters);
           await fetchDashboardCounts(filters, cycleOverride || cycleFilters);
           await fetchKycCounts();
           await fetchMilestoneCounts(filters);
@@ -4855,13 +4856,16 @@ console.log('API Response:', response.data);
     }
   };
 
-  const fetchRegistrationCrmFilterCounts = async (filters = filterData, page = currentPage, filteredTotalCount = null) => {
+  const fetchRegistrationCrmFilterCounts = async (filters = filterData, page = currentPage, filteredTotalCount = null, cycleOverride = null) => {
 
     if (!token) {
       console.warn('No token found in session storage.');
       setIsLoadingProfiles(false);
       return;
     }
+
+    const cycle = cycleOverride || cycleFilters;
+    const fd = formDataRef.current || formData;
 
     // Prepare query parameters
     const queryParams = new URLSearchParams({
@@ -4880,7 +4884,7 @@ console.log('API Response:', response.data);
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       ...(filters.approvalStatus && { approvalStatus: filters.approvalStatus }),
       // Multi-select filters
-      ...buildListFilterQueryParts(formData, cycleFilters),
+      ...buildListFilterQueryParts(fd, cycle),
     });
 
     try {
@@ -5465,9 +5469,20 @@ console.log('API Response:', response.data);
 
   const getProfileFollowupDoneCount = (profile, type) => {
     const t = String(type || '').toLowerCase() === 'visit' ? 'visit' : 'call';
-    const apiCount = Number(profile?.followupStats?.[t]?.done);
-    if (Number.isFinite(apiCount) && apiCount > 0) return apiCount;
+    if (profile?.followupStats?.[t] != null && profile.followupStats[t].done != null) {
+      const apiCount = Number(profile.followupStats[t].done);
+      if (Number.isFinite(apiCount)) return apiCount;
+    }
     return getProfileFollowupBucket(profile, type) === 'done' ? 1 : 0;
+  };
+
+  const getProfileFollowupMissedCount = (profile, type) => {
+    const t = String(type || '').toLowerCase() === 'visit' ? 'visit' : 'call';
+    if (profile?.followupStats?.[t] != null && profile.followupStats[t].missed != null) {
+      const apiCount = Number(profile.followupStats[t].missed);
+      if (Number.isFinite(apiCount)) return apiCount;
+    }
+    return getProfileFollowupBucket(profile, type) === 'missed' ? 1 : 0;
   };
 
   // No red when planned or already done (NA date after done is fine).
@@ -13363,7 +13378,7 @@ useEffect(() => {
     });
     setCurrentPage(1);
     fetchProfileData(filterData, 1, next);
-    fetchRegistrationCrmFilterCounts(filterData, 1, null);
+    fetchRegistrationCrmFilterCounts(filterData, 1, null, next);
     fetchDashboardCounts(filterData, next);
   };
 
@@ -17277,7 +17292,7 @@ useEffect(() => {
                                             return [
                                               { label: 'Done', value: getProfileFollowupDoneCount(profile, 'Call'), bg: 'rgb(18, 179, 255)' },
                                               { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: 'rgb(12, 125, 180)' },
-                                              { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: 'rgb(8, 80, 120)' },
+                                              { label: 'Missed', value: getProfileFollowupMissedCount(profile, 'Call'), bg: 'rgb(8, 80, 120)' },
                                             ];
                                           })().map((s) => (
                                             <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
@@ -17312,7 +17327,7 @@ useEffect(() => {
                                             return [
                                               { label: 'Done', value: getProfileFollowupDoneCount(profile, 'Visit'), bg: 'rgb(75, 85, 99)' },
                                               { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: 'rgb(55, 65, 81)' },
-                                              { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: 'rgb(35, 42, 52)' },
+                                              { label: 'Missed', value: getProfileFollowupMissedCount(profile, 'Visit'), bg: 'rgb(35, 42, 52)' },
                                             ];
                                           })().map((s) => (
                                             <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
@@ -17641,7 +17656,7 @@ useEffect(() => {
                                           {renderStatGrid([
                                             { key: 'fc-done', label: 'Done', value: getProfileFollowupDoneCount(profile, 'Call'), bg: 'rgb(18, 179, 255)' },
                                             { key: 'fc-planned', label: 'Planned', value: callBucket === 'planned' ? 1 : 0, bg: 'rgb(12, 125, 180)' },
-                                            { key: 'fc-missed', label: 'Missed', value: callBucket === 'missed' ? 1 : 0, bg: 'rgb(8, 80, 120)' },
+                                            { key: 'fc-missed', label: 'Missed', value: getProfileFollowupMissedCount(profile, 'Call'), bg: 'rgb(8, 80, 120)' },
                                           ])}
                                           <div className="lead-strip-v3__footer">
                                             <div className="lead-strip-v3__footer-main">
@@ -17671,7 +17686,7 @@ useEffect(() => {
                                           {renderStatGrid([
                                             { key: 'fv-done', label: 'Done', value: getProfileFollowupDoneCount(profile, 'Visit'), bg: 'rgb(75, 85, 99)' },
                                             { key: 'fv-planned', label: 'Planned', value: visitBucket === 'planned' ? 1 : 0, bg: 'rgb(55, 65, 81)' },
-                                            { key: 'fv-missed', label: 'Missed', value: visitBucket === 'missed' ? 1 : 0, bg: 'rgb(35, 42, 52)' },
+                                            { key: 'fv-missed', label: 'Missed', value: getProfileFollowupMissedCount(profile, 'Visit'), bg: 'rgb(35, 42, 52)' },
                                           ])}
                                           <div className="lead-strip-v3__footer">
                                             <div className="lead-strip-v3__footer-main">

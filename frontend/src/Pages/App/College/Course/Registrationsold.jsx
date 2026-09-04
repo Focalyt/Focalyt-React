@@ -1137,7 +1137,10 @@ const CRMDashboard = () => {
   const [input1Value, setInput1Value] = useState('');
   const skipBulkAutoSelectRef = useRef(false); // when true, Input 1 change came from checkbox sync — don't re-select first N
   const [showBulkInputs, setShowBulkInputs] = useState(false);
-  const [bulkMode, setBulkMode] = useState(null); // 'whatsapp' or 'bulkaction'
+  const [bulkMode, setBulkMode] = useState(null); // 'whatsapp' or 'bulkaction' or 'bulkcourse'
+  const [bulkChangeCourseId, setBulkChangeCourseId] = useState('');
+  const [bulkChangeCenterId, setBulkChangeCenterId] = useState('');
+  const [isBulkCourseUpdating, setIsBulkCourseUpdating] = useState(false);
 
   const [mainContentClass, setMainContentClass] = useState('col-12');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -1607,7 +1610,7 @@ const CRMDashboard = () => {
     setSelectedProfiles(next);
 
     // Keep Input 1 count in sync when user manually checks/unchecks leads
-    if (bulkMode === 'whatsapp' || bulkMode === 'bulkrefer' || bulkMode === 'bulkaction') {
+    if (bulkMode === 'whatsapp' || bulkMode === 'bulkrefer' || bulkMode === 'bulkaction' || bulkMode === 'bulkcourse') {
       skipBulkAutoSelectRef.current = true;
       setInput1Value(next.length > 0 ? String(next.length) : '');
     }
@@ -4142,6 +4145,73 @@ console.log('API Response:', response.data);
     }
   };
 
+  const handleBulkCourseChange = async (e) => {
+    e.preventDefault();
+
+    if (!selectedProfiles || !Array.isArray(selectedProfiles) || selectedProfiles.length === 0) {
+      alert('No profile selected');
+      return;
+    }
+    if (!bulkChangeCourseId) {
+      alert('Please select a course');
+      return;
+    }
+    if (!bulkChangeCenterId) {
+      alert('Please select a center');
+      return;
+    }
+    if (!backendUrl) {
+      alert('Backend URL not configured');
+      return;
+    }
+    if (!token) {
+      alert('Authentication token missing');
+      return;
+    }
+
+    setIsBulkCourseUpdating(true);
+    try {
+      const response = await axios.put(
+        `${backendUrl}/college/lead/bulk_course_change`,
+        {
+          selectedProfiles,
+          courseId: bulkChangeCourseId,
+          centerId: bulkChangeCenterId,
+          remarks: (remarks || '').trim(),
+        },
+        {
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (response.data.success) {
+        const result = response.data.data || {};
+        const failedCount = Array.isArray(result.failed) ? result.failed.length : 0;
+        const failedReasons = Array.isArray(result.failed) && result.failed.length
+          ? `\nFailed: ${result.failed.slice(0, 5).map((item) => item.reason).join('; ')}`
+          : '';
+        alert(
+          `Course updated for ${result.updated || 0} lead(s).\nSkipped: ${result.skipped || 0}.\nFailed: ${failedCount}.${failedReasons}`
+        );
+        setBulkChangeCourseId('');
+        setBulkChangeCenterId('');
+        setRemarks('');
+        await fetchProfileData();
+        closePanel();
+      } else {
+        alert(response.data.message || 'Failed to change course');
+      }
+    } catch (error) {
+      console.error('Bulk course change error:', error);
+      alert(error.response?.data?.message || error.message || 'Failed to change course');
+    } finally {
+      setIsBulkCourseUpdating(false);
+    }
+  };
+
   const getBranches = async (profile) => {
     // Check if profile and course exist
     if (!profile || !profile._course || !profile._course._id) {
@@ -4468,7 +4538,7 @@ console.log('API Response:', response.data);
         } else if (shouldFetchKycCandidates) {
           await fetchMilestoneCounts(filters);
         } else {
-          await fetchRegistrationCrmFilterCounts(filters, page, null);
+          await fetchRegistrationCrmFilterCounts(filters, page, null, cycleOverride || cycleFilters);
           await fetchDashboardCounts(filters, cycleOverride || cycleFilters);
           await fetchKycCounts();
           await fetchMilestoneCounts(filters);
@@ -4833,13 +4903,16 @@ console.log('API Response:', response.data);
     }
   };
 
-  const fetchRegistrationCrmFilterCounts = async (filters = filterData, page = currentPage, filteredTotalCount = null) => {
+  const fetchRegistrationCrmFilterCounts = async (filters = filterData, page = currentPage, filteredTotalCount = null, cycleOverride = null) => {
 
     if (!token) {
       console.warn('No token found in session storage.');
       setIsLoadingProfiles(false);
       return;
     }
+
+    const cycle = cycleOverride || cycleFilters;
+    const fd = formDataRef.current || formData;
 
     // Prepare query parameters
     const queryParams = new URLSearchParams({
@@ -4858,7 +4931,7 @@ console.log('API Response:', response.data);
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       ...(filters.approvalStatus && { approvalStatus: filters.approvalStatus }),
       // Multi-select filters
-      ...buildListFilterQueryParts(formData, cycleFilters),
+      ...buildListFilterQueryParts(fd, cycle),
     });
 
     try {
@@ -5976,7 +6049,7 @@ console.log('API Response:', response.data);
 
   // Auto-select profiles based on Input 1 value (bulk WhatsApp, bulk Refer, bulk Action)
   useEffect(() => {
-    if (bulkMode !== 'whatsapp' && bulkMode !== 'bulkrefer' && bulkMode !== 'bulkaction') {
+    if (bulkMode !== 'whatsapp' && bulkMode !== 'bulkrefer' && bulkMode !== 'bulkaction' && bulkMode !== 'bulkcourse') {
       return;
     }
 
@@ -6155,6 +6228,13 @@ console.log('API Response:', response.data);
     } else if (panel === 'bulkstatuschange') {
       setShowPopup(null);
       setShowPanel('bulkstatuschange');
+    } else if (panel === 'bulkcoursechange') {
+      setShowPopup(null);
+      setBulkChangeCourseId('');
+      setBulkChangeCenterId('');
+      setCenters([]);
+      setRemarks('');
+      setShowPanel('bulkcoursechange');
     }
 
     if (!isMobile) {
@@ -6168,9 +6248,11 @@ console.log('API Response:', response.data);
 
   const closePanel = () => {
     // Hide bulk inputs when bulkstatuschange panel is closed
-    if (showPanel === 'bulkstatuschange') {
+    if (showPanel === 'bulkstatuschange' || showPanel === 'bulkcoursechange') {
       setShowBulkInputs(false);
       setBulkMode(null);
+      setBulkChangeCourseId('');
+      setBulkChangeCenterId('');
     }
     setIsCourseDropdownOpen(false);
     setIsCenterDropdownOpen(false);
@@ -9400,6 +9482,144 @@ useEffect(() => {
 
     return (showPanel === 'editPanel') || (showPanel === 'followUp') || (showPanel === 'bulkstatuschange') ? (
       <div className="col-11 transition-col" id="editFollowupPanel">
+        {panelContent}
+      </div>
+    ) : null;
+  };
+
+  const renderBulkCourseChangePanel = () => {
+    const selectedCount = Array.isArray(selectedProfiles) ? selectedProfiles.length : 0;
+    const panelContent = (
+      <div className="card border-0 shadow-sm">
+        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
+          <div className="d-flex align-items-center">
+            <div className="me-2">
+              <i className="fas fa-exchange-alt text-secondary"></i>
+            </div>
+            <h6 className="mb-0 followUp fw-medium">
+              Bulk Change Course {selectedCount > 0 ? `(${selectedCount})` : ''}
+            </h6>
+          </div>
+          <button className="btn-close" type="button" onClick={closePanel}></button>
+        </div>
+
+        <div className="card-body">
+          <form onSubmit={handleBulkCourseChange}>
+            <div className="mb-1">
+              <label htmlFor="bulkCourse" className="form-label small fw-medium text-dark">
+                Course<span className="text-danger">*</span>
+              </label>
+              <select
+                className="form-select border-0 bgcolor"
+                id="bulkCourse"
+                value={bulkChangeCourseId}
+                disabled={loadingData || isBulkCourseUpdating}
+                style={{
+                  height: '42px',
+                  paddingTop: '8px',
+                  paddingInline: '10px',
+                  width: '100%',
+                  backgroundColor: '#f1f2f6'
+                }}
+                onChange={(e) => {
+                  const nextCourseId = e.target.value;
+                  setBulkChangeCourseId(nextCourseId);
+                  setBulkChangeCenterId('');
+                  fetchCentersByCourse(nextCourseId);
+                }}
+              >
+                <option value="">Select Course</option>
+                {(courses || []).map((course) => (
+                  <option key={course._id} value={course._id}>{course.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mb-1">
+              <label htmlFor="bulkCenter" className="form-label small fw-medium text-dark">
+                Center<span className="text-danger">*</span>
+              </label>
+              <select
+                className="form-select border-0 bgcolor"
+                id="bulkCenter"
+                value={bulkChangeCenterId}
+                disabled={!bulkChangeCourseId || isBulkCourseUpdating}
+                style={{
+                  height: '42px',
+                  paddingTop: '8px',
+                  paddingInline: '10px',
+                  width: '100%',
+                  backgroundColor: '#f1f2f6'
+                }}
+                onChange={(e) => setBulkChangeCenterId(e.target.value)}
+              >
+                <option value="">Select Center</option>
+                {(centers || []).map((center) => (
+                  <option key={center._id} value={center._id}>{center.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mb-1">
+              <label htmlFor="bulkCourseRemark" className="form-label small fw-medium text-dark">
+                Comment
+              </label>
+              <textarea
+                className="form-control border-0 bgcolor"
+                id="bulkCourseRemark"
+                rows="4"
+                value={remarks}
+                disabled={isBulkCourseUpdating}
+                onChange={(e) => setRemarks(e.target.value)}
+                placeholder="Add remarks (optional)"
+                style={{ resize: 'none', backgroundColor: '#f1f2f6' }}
+              ></textarea>
+            </div>
+
+            <div className="d-flex justify-content-end gap-2 mt-4">
+              <button
+                type="button"
+                className="btn"
+                style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
+                onClick={closePanel}
+                disabled={isBulkCourseUpdating}
+              >
+                CLOSE
+              </button>
+              <button
+                type="submit"
+                className="btn text-white"
+                disabled={isBulkCourseUpdating || selectedCount === 0}
+                style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
+              >
+                {isBulkCourseUpdating ? 'UPDATING...' : 'UPDATE COURSE'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+
+    if (isMobile) {
+      return showPanel === 'bulkcoursechange' ? (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closePanel();
+          }}
+        >
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content">
+              {panelContent}
+            </div>
+          </div>
+        </div>
+      ) : null;
+    }
+
+    return showPanel === 'bulkcoursechange' ? (
+      <div className="col-11 transition-col" id="bulkCourseChangePanel">
         {panelContent}
       </div>
     ) : null;
@@ -13310,7 +13530,7 @@ useEffect(() => {
     });
     setCurrentPage(1);
     fetchProfileData(filterData, 1, next);
-    fetchRegistrationCrmFilterCounts(filterData, 1, null);
+    fetchRegistrationCrmFilterCounts(filterData, 1, null, next);
     fetchDashboardCounts(filterData, next);
   };
 
@@ -15643,12 +15863,12 @@ useEffect(() => {
                               placeholder="Input 1"
                               value={input1Value}
                               onFocus={() => {
-                                if (bulkMode === 'whatsapp' || bulkMode === 'bulkaction' || bulkMode === 'bulkrefer') {
+                                if (bulkMode === 'whatsapp' || bulkMode === 'bulkaction' || bulkMode === 'bulkrefer' || bulkMode === 'bulkcourse') {
                                   runAiSupervisionForFirstN();
                                 }
                               }}
                               onClick={() => {
-                                if (bulkMode === 'whatsapp' || bulkMode === 'bulkaction' || bulkMode === 'bulkrefer') {
+                                if (bulkMode === 'whatsapp' || bulkMode === 'bulkaction' || bulkMode === 'bulkrefer' || bulkMode === 'bulkcourse') {
                                   runAiSupervisionForFirstN();
                                 }
                               }}
@@ -15802,6 +16022,27 @@ useEffect(() => {
                                 >
                                   <i className="fas fa-tasks" style={{ fontSize: "10px" }}></i>
                                   Bulk Action
+                                </button>
+                                <button
+                                  className="btn btn-sm btn-outline-secondary"
+                                  disabled={isLoadingProfiles || allProfiles.length === 0}
+                                  style={{
+                                    padding: "6px 12px",
+                                    fontSize: "11px",
+                                    fontWeight: "600",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "4px"
+                                  }}
+                                  onClick={() => {
+                                    setShowBulkInputs(true);
+                                    setBulkMode('bulkcourse');
+                                    setInput1Value('');
+                                    openEditPanel(null, 'bulkcoursechange');
+                                  }}
+                                >
+                                  <i className="fas fa-exchange-alt" style={{ fontSize: "10px" }}></i>
+                                  Change Course
                                 </button>
                               </>
                             )}
@@ -19858,6 +20099,7 @@ useEffect(() => {
               zIndex: '10'
             }}>
               {renderEditPanel()}
+              {renderBulkCourseChangePanel()}
               {renderRefferPanel()}
               {renderWhatsAppPanel()}
               {renderEmailPanel()}
@@ -19870,6 +20112,7 @@ useEffect(() => {
 
         {/* Mobile Modals */}
         {isMobile && renderEditPanel()}
+        {isMobile && renderBulkCourseChangePanel()}
         {isMobile && renderRefferPanel()}
         {isMobile && renderWhatsAppPanel()}
         {isMobile && renderEmailPanel()}
