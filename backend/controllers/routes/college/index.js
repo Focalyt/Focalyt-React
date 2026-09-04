@@ -20,6 +20,7 @@ let fs = require("fs");
 let path = require("path");
 const candidateRoutes = require("./candidate");
 const digitalLeadRoutes = require('./digitalLead');
+const hrRoutes = require("./hr");
 const leadAssignmentRuleRoutes = require("./leadAssingmentRule");
 const attendanceRoutes = require("./attendance");
 const classroomMediaRoutes = require("./classroomMedia");
@@ -279,6 +280,7 @@ router.use("/classroom-media", isCollege, classroomMediaRoutes);
 router.use("/whatsapp", whatsappRoutes);
 
 router.use("/digitalLead", digitalLeadRoutes);
+router.use("/hr", hrRoutes);
 router.use("/leadAssignmentRule", isCollege, leadAssignmentRuleRoutes);
 router.use("/users", userRoutes);
 router.use("/batches", isCollege, batchRoutes);
