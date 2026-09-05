@@ -90,6 +90,7 @@ function buildCustomField({ applied, candidate, course, center, source }) {
     const mobile = String(candidate?.mobile || '').replace(/\D/g, '').slice(-10);
     return {
         lead_id: String(applied?._id || ''),
+        name,
         Name: name,
         full_name: name,
         lead_name: name,
