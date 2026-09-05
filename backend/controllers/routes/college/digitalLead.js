@@ -1250,8 +1250,8 @@ router.post("/voicex-webhook", async (req, res) => {
                 }
 
                 const crm = payload.customer_crm_data || {};
-                const disposition = crm.disposition || payload.disposition || '';
-                const summary = crm.summary || payload.summary || '';
+                const disposition = crm.Dispositions || payload.Dispositions || '';
+                const summary = crm.Summary || payload.Summary || '';
                 const recordingUrl = payload.recording_url || crm.recording_url || '';
                 const callStatus = payload.callStatus || payload.callHistory?.callStatus || '';
                 const failureReason = payload.failureReason || payload.errorMessage || '';
