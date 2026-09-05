@@ -188,6 +188,56 @@ async function resolveUntouchNotConnectedIds() {
     return { statusIds, subStatusIds };
 }
 
+async function fetchB2cTodayLeads() {
+    const { start, end } = getTodayIstBounds();
+    return AppliedCourses.aggregate([
+        {
+            $match: {
+                ...B2C_REGISTRATION_MATCH,
+                createdAt: { $gte: start, $lte: end },
+            },
+        },
+        ...leadListLookups(),
+    ]);
+}
+
+async function fetchUntouchNotConnectedLeads() {
+    const { statusIds, subStatusIds } = await resolveUntouchNotConnectedIds();
+    return AppliedCourses.aggregate([
+        {
+            $match: {
+                ...B2C_REGISTRATION_MATCH,
+                _leadStatus: { $in: statusIds },
+                _leadSubStatus: { $in: subStatusIds },
+            },
+        },
+        ...leadListLookups(),
+    ]);
+}
+
+async function dispatchVoiceCallsForLeads(leads) {
+    const rows = (leads || []).filter((row) => row?.lead_id && row?.mobile);
+    rows.forEach((row, index) => {
+        setTimeout(() => {
+            loadLeadForVoiceCall(row.lead_id)
+                .then((lead) => {
+                    if (!lead) return null;
+                    return initiateVoiceCallForLead(lead);
+                })
+                .catch((err) => {
+                    console.error('[VoiceX] dispatch make_call error', {
+                        leadId: row.lead_id,
+                        message: err.voicexMessage || err.message,
+                    });
+                });
+        }, index * 400);
+    });
+    return {
+        queued: rows.length,
+        skippedNoMobile: (leads || []).length - rows.length,
+    };
+}
+
 const markLeadDuplicateOnReapply = async (alreadyApplied, source) => {
     alreadyApplied._leadStatus = UNTOUCH_STATUS_ID;
     alreadyApplied._leadSubStatus = DUPLICATE_SUBSTATUS_ID;
@@ -1075,16 +1125,7 @@ router.get("/today", async (req, res) => {
 // All B2C registration leads created today (IST).
 router.get("/b2c-today", async (req, res) => {
     try {
-        const { start, end } = getTodayIstBounds();
-        const leads = await AppliedCourses.aggregate([
-            {
-                $match: {
-                    ...B2C_REGISTRATION_MATCH,
-                    createdAt: { $gte: start, $lte: end },
-                },
-            },
-            ...leadListLookups(),
-        ]);
+        const leads = await fetchB2cTodayLeads();
 
         return res.json({
             status: true,
@@ -1103,17 +1144,7 @@ router.get("/b2c-today", async (req, res) => {
 // B2C leads currently in Untouch + Not Connected.
 router.get("/untouch-not-connected", async (req, res) => {
     try {
-        const { statusIds, subStatusIds } = await resolveUntouchNotConnectedIds();
-        const leads = await AppliedCourses.aggregate([
-            {
-                $match: {
-                    ...B2C_REGISTRATION_MATCH,
-                    _leadStatus: { $in: statusIds },
-                    _leadSubStatus: { $in: subStatusIds },
-                },
-            },
-            ...leadListLookups(),
-        ]);
+        const leads = await fetchUntouchNotConnectedLeads();
 
         return res.json({
             status: true,
@@ -1338,6 +1369,38 @@ router.post("/voicex-webhook", async (req, res) => {
     } catch (err) {
         console.error('[VoiceX webhook] error', err);
         return res.status(200).json({ status: true, received: true });
+    }
+});
+
+router.post("/voicex-dispatch", isCollege, async (req, res) => {
+    try {
+        const source = String(req.body.source || req.body.queue || '').trim();
+        let leads = [];
+        if (source === 'b2c-today') {
+            leads = await fetchB2cTodayLeads();
+        } else if (source === 'untouch-not-connected') {
+            leads = await fetchUntouchNotConnectedLeads();
+        } else {
+            return res.status(400).json({
+                status: false,
+                msg: "source must be b2c-today or untouch-not-connected",
+            });
+        }
+
+        const result = await dispatchVoiceCallsForLeads(leads);
+        return res.json({
+            status: true,
+            msg: `${result.queued} AI call(s) queued`,
+            count: leads.length,
+            queued: result.queued,
+            skippedNoMobile: result.skippedNoMobile,
+            source,
+        });
+    } catch (err) {
+        return res.status(500).json({
+            status: false,
+            msg: err.voicexMessage || err.message || "Failed to dispatch AI calls",
+        });
     }
 });
 

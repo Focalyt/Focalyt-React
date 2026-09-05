@@ -1254,7 +1254,61 @@ const CRMDashboard = () => {
   const [aiSupervisionQueueFilter, setAiSupervisionQueueFilter] = useState('all');
   const [isAiFabOpen, setIsAiFabOpen] = useState(false);
   const [aiFabSubstatuses, setAiFabSubstatuses] = useState([]);
+  const [aiFabBusy, setAiFabBusy] = useState(false);
   const aiFabWrapRef = useRef(null);
+  const AI_FAB_NEW_LEAD_ID = '64ab1234abcd5678ef901235';
+  const AI_FAB_NOT_CONNECTED_ID = '6a3f5a53cfccaeeb28a4d1a3';
+
+  const handleAiFabQueue = useCallback(async (substatus) => {
+    const source = String(substatus?._id) === AI_FAB_NEW_LEAD_ID
+      ? 'b2c-today'
+      : String(substatus?._id) === AI_FAB_NOT_CONNECTED_ID
+        ? 'untouch-not-connected'
+        : '';
+    const label = source === 'b2c-today'
+      ? "today's B2C"
+      : source === 'untouch-not-connected'
+        ? 'Untouch / Not Connected'
+        : substatus?.title || 'AI';
+
+    setIsAiFabOpen(false);
+    if (!source) {
+      toast.info(substatus?.title || 'AI');
+      return;
+    }
+    if (aiFabBusy) {
+      toast.info('AI calls are already being queued');
+      return;
+    }
+
+    setAiFabBusy(true);
+    try {
+      const listPath = source === 'b2c-today' ? 'b2c-today' : 'untouch-not-connected';
+      const listRes = await axios.get(`${backendUrl}/college/digitalLead/${listPath}`, {
+        headers: { 'x-auth': token },
+      });
+      const leads = listRes.data?.data || [];
+      if (!leads.length) {
+        toast.info(`No ${label} leads to send to AI`);
+        return;
+      }
+
+      const confirmed = window.confirm(`Send ${leads.length} ${label} lead(s) to AI call?`);
+      if (!confirmed) return;
+
+      const dispatchRes = await axios.post(
+        `${backendUrl}/college/digitalLead/voicex-dispatch`,
+        { source },
+        { headers: { 'x-auth': token } }
+      );
+      const queued = dispatchRes.data?.queued ?? leads.length;
+      toast.success(`${queued} ${label} lead(s) queued for AI call`);
+    } catch (err) {
+      toast.error(err.response?.data?.msg || err.message || 'Failed to start AI calls');
+    } finally {
+      setAiFabBusy(false);
+    }
+  }, [aiFabBusy, backendUrl, token]);
 
   useEffect(() => {
     if (!isAiFabOpen) return undefined;
@@ -15053,14 +15107,12 @@ useEffect(() => {
               type="button"
               className="crm-ai-fab-sub"
               title={substatus.title}
+              disabled={aiFabBusy}
               style={{ transitionDelay: isAiFabOpen ? `${0.06 * (index + 1)}s` : '0s' }}
-              onClick={() => {
-                setIsAiFabOpen(false);
-                toast.info(substatus.title);
-              }}
+              onClick={() => handleAiFabQueue(substatus)}
             >
               <i className={
-                String(substatus._id) === '64ab1234abcd5678ef901235'
+                String(substatus._id) === AI_FAB_NEW_LEAD_ID
                   ? 'fas fa-user-plus'
                   : 'fas fa-phone-slash'
               }></i>
