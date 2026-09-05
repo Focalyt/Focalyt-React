@@ -188,6 +188,56 @@ async function resolveUntouchNotConnectedIds() {
     return { statusIds, subStatusIds };
 }
 
+async function fetchB2cTodayLeads() {
+    const { start, end } = getTodayIstBounds();
+    return AppliedCourses.aggregate([
+        {
+            $match: {
+                ...B2C_REGISTRATION_MATCH,
+                createdAt: { $gte: start, $lte: end },
+            },
+        },
+        ...leadListLookups(),
+    ]);
+}
+
+async function fetchUntouchNotConnectedLeads() {
+    const { statusIds, subStatusIds } = await resolveUntouchNotConnectedIds();
+    return AppliedCourses.aggregate([
+        {
+            $match: {
+                ...B2C_REGISTRATION_MATCH,
+                _leadStatus: { $in: statusIds },
+                _leadSubStatus: { $in: subStatusIds },
+            },
+        },
+        ...leadListLookups(),
+    ]);
+}
+
+async function dispatchVoiceCallsForLeads(leads) {
+    const rows = (leads || []).filter((row) => row?.lead_id && row?.mobile);
+    rows.forEach((row, index) => {
+        setTimeout(() => {
+            loadLeadForVoiceCall(row.lead_id)
+                .then((lead) => {
+                    if (!lead) return null;
+                    return initiateVoiceCallForLead(lead);
+                })
+                .catch((err) => {
+                    console.error('[VoiceX] dispatch make_call error', {
+                        leadId: row.lead_id,
+                        message: err.voicexMessage || err.message,
+                    });
+                });
+        }, index * 400);
+    });
+    return {
+        queued: rows.length,
+        skippedNoMobile: (leads || []).length - rows.length,
+    };
+}
+
 const markLeadDuplicateOnReapply = async (alreadyApplied, source) => {
     alreadyApplied._leadStatus = UNTOUCH_STATUS_ID;
     alreadyApplied._leadSubStatus = DUPLICATE_SUBSTATUS_ID;
@@ -1075,16 +1125,7 @@ router.get("/today", async (req, res) => {
 // All B2C registration leads created today (IST).
 router.get("/b2c-today", async (req, res) => {
     try {
-        const { start, end } = getTodayIstBounds();
-        const leads = await AppliedCourses.aggregate([
-            {
-                $match: {
-                    ...B2C_REGISTRATION_MATCH,
-                    createdAt: { $gte: start, $lte: end },
-                },
-            },
-            ...leadListLookups(),
-        ]);
+        const leads = await fetchB2cTodayLeads();
 
         return res.json({
             status: true,
@@ -1103,17 +1144,7 @@ router.get("/b2c-today", async (req, res) => {
 // B2C leads currently in Untouch + Not Connected.
 router.get("/untouch-not-connected", async (req, res) => {
     try {
-        const { statusIds, subStatusIds } = await resolveUntouchNotConnectedIds();
-        const leads = await AppliedCourses.aggregate([
-            {
-                $match: {
-                    ...B2C_REGISTRATION_MATCH,
-                    _leadStatus: { $in: statusIds },
-                    _leadSubStatus: { $in: subStatusIds },
-                },
-            },
-            ...leadListLookups(),
-        ]);
+        const leads = await fetchUntouchNotConnectedLeads();
 
         return res.json({
             status: true,
@@ -1134,12 +1165,26 @@ router.get("/untouch-not-connected", async (req, res) => {
 const VOICEX_STATUS_MAP = [
     { titles: ['HOT'], match: /^(hot|interested|callback\s*now|very interested)$/i },
     { titles: ['WARM'], match: /^(warm|follow[-\s]?up|call later|callback|interested later)$/i },
-    { titles: ['COLD'], match: /^(cold|not interested|no interest|rejected)$/i },
+    { titles: ['COLD'], match: /^(cold|not[_\s-]*interested|no[_\s-]*interest|rejected)$/i },
     { titles: ['WON'], match: /^(won|enrolled|paid|admitted|converted)$/i },
-    { titles: ['JUNK'], match: /^(junk|wrong number|spam|invalid|dontcall|do not call)$/i },
+    { titles: ['JUNK'], match: /^(junk|wrong[_\s-]*number|spam|invalid|dontcall|do[_\s-]*not[_\s-]*call)$/i },
     { titles: ['DUPLICATE'], match: /^(duplicate)$/i },
     { titles: ['PROSPECT'], match: /^(prospect)$/i },
 ];
+
+function firstCrmValue(obj, keys) {
+    if (!obj || typeof obj !== 'object') return '';
+    const lowerKeyToValue = {};
+    for (const [key, value] of Object.entries(obj)) {
+        if (value == null || value === '') continue;
+        lowerKeyToValue[String(key).toLowerCase()] = value;
+    }
+    for (const key of keys) {
+        const hit = lowerKeyToValue[String(key).toLowerCase()];
+        if (hit != null && String(hit).trim() !== '') return String(hit).trim();
+    }
+    return '';
+}
 
 function verifyVoicexWebhook(req) {
     const secret = process.env.VOICEX_WEBHOOK_SECRET;
@@ -1172,7 +1217,14 @@ function extractVoicexLeadId(payload) {
 }
 
 function extractVoicexPhone(payload) {
-    const raw = payload?.callTo || payload?.phoneNumber || payload?.scheduleInfo?.customParam?.contact_number || '';
+    const crm = payload?.customer_crm_data || {};
+    const custom = payload?.scheduleInfo?.customParam || payload?.custom_field || {};
+    const raw = firstCrmValue(custom, ['contact_number', 'mobile'])
+        || firstCrmValue(crm, ['Mobile', 'mobile', 'contact_number'])
+        || payload?.callFrom
+        || payload?.phoneNumber
+        || payload?.callTo
+        || '';
     const digits = String(raw).replace(/\D/g, '');
     return digits.length >= 10 ? digits.slice(-10) : '';
 }
@@ -1338,6 +1390,38 @@ router.post("/voicex-webhook", async (req, res) => {
     } catch (err) {
         console.error('[VoiceX webhook] error', err);
         return res.status(200).json({ status: true, received: true });
+    }
+});
+
+router.post("/voicex-dispatch", isCollege, async (req, res) => {
+    try {
+        const source = String(req.body.source || req.body.queue || '').trim();
+        let leads = [];
+        if (source === 'b2c-today') {
+            leads = await fetchB2cTodayLeads();
+        } else if (source === 'untouch-not-connected') {
+            leads = await fetchUntouchNotConnectedLeads();
+        } else {
+            return res.status(400).json({
+                status: false,
+                msg: "source must be b2c-today or untouch-not-connected",
+            });
+        }
+
+        const result = await dispatchVoiceCallsForLeads(leads);
+        return res.json({
+            status: true,
+            msg: `${result.queued} AI call(s) queued`,
+            count: leads.length,
+            queued: result.queued,
+            skippedNoMobile: result.skippedNoMobile,
+            source,
+        });
+    } catch (err) {
+        return res.status(500).json({
+            status: false,
+            msg: err.voicexMessage || err.message || "Failed to dispatch AI calls",
+        });
     }
 });
 
