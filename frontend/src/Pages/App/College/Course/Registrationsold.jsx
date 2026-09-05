@@ -1137,7 +1137,7 @@ const CRMDashboard = () => {
   const [input1Value, setInput1Value] = useState('');
   const skipBulkAutoSelectRef = useRef(false); // when true, Input 1 change came from checkbox sync — don't re-select first N
   const [showBulkInputs, setShowBulkInputs] = useState(false);
-  const [bulkMode, setBulkMode] = useState(null); // 'whatsapp' or 'bulkaction' or 'bulkcourse'
+  const [bulkMode, setBulkMode] = useState(null); // 'whatsapp' | 'bulkaction' | 'bulkcourse' | 'bulkrefer' | 'AiCall'
   const [bulkChangeCourseId, setBulkChangeCourseId] = useState('');
   const [bulkChangeCenterId, setBulkChangeCenterId] = useState('');
   const [isBulkCourseUpdating, setIsBulkCourseUpdating] = useState(false);
@@ -1255,9 +1255,21 @@ const CRMDashboard = () => {
   const [isAiFabOpen, setIsAiFabOpen] = useState(false);
   const [aiFabSubstatuses, setAiFabSubstatuses] = useState([]);
   const [aiFabBusy, setAiFabBusy] = useState(false);
+  const [aiCallSource, setAiCallSource] = useState('');
+  const [aiCallTotalCount, setAiCallTotalCount] = useState(0);
+  const [aiCallLabel, setAiCallLabel] = useState('');
   const aiFabWrapRef = useRef(null);
   const AI_FAB_NEW_LEAD_ID = '64ab1234abcd5678ef901235';
   const AI_FAB_NOT_CONNECTED_ID = '6a3f5a53cfccaeeb28a4d1a3';
+
+  const closeAiCallBulk = useCallback(() => {
+    setShowBulkInputs(false);
+    setBulkMode(null);
+    setInput1Value('');
+    setAiCallSource('');
+    setAiCallTotalCount(0);
+    setAiCallLabel('');
+  }, []);
 
   const handleAiFabQueue = useCallback(async (substatus) => {
     const source = String(substatus?._id) === AI_FAB_NEW_LEAD_ID
@@ -1287,28 +1299,67 @@ const CRMDashboard = () => {
       const listRes = await axios.get(`${backendUrl}/college/digitalLead/${listPath}`, {
         headers: { 'x-auth': token },
       });
-      const leads = listRes.data?.data || [];
-      if (!leads.length) {
+      const total = listRes.data?.count ?? (listRes.data?.data || []).length;
+      if (!total) {
         toast.info(`No ${label} leads to send to AI`);
         return;
       }
 
-      const confirmed = window.confirm(`Send ${leads.length} ${label} lead(s) to AI call?`);
-      if (!confirmed) return;
+      setAiCallSource(source);
+      setAiCallTotalCount(total);
+      setAiCallLabel(label);
+      setBulkMode('AiCall');
+      setShowBulkInputs(true);
+      setInput1Value('');
+      toast.info(`Enter how many of ${total} ${label} lead(s) to call`);
+    } catch (err) {
+      toast.error(err.response?.data?.msg || err.message || 'Failed to load AI call leads');
+    } finally {
+      setAiFabBusy(false);
+    }
+  }, [aiFabBusy, backendUrl, token]);
 
+  const handleAiCallDispatch = useCallback(async () => {
+    const maxValue = aiCallTotalCount || 0;
+    const numValue = parseInt(String(input1Value || '').trim(), 10);
+    if (!aiCallSource || !maxValue) {
+      toast.info('Pick New Lead or Not Connected first');
+      return;
+    }
+    if (!numValue || numValue < 1) {
+      toast.info('Enter how many leads to call');
+      return;
+    }
+    if (numValue > maxValue) {
+      toast.info(`Max ${maxValue} ${aiCallLabel} lead(s)`);
+      return;
+    }
+    if (aiFabBusy) {
+      toast.info('AI calls are already being queued');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Send ${numValue} of ${maxValue} ${aiCallLabel} lead(s) to AI call?`
+    );
+    if (!confirmed) return;
+
+    setAiFabBusy(true);
+    try {
       const dispatchRes = await axios.post(
         `${backendUrl}/college/digitalLead/voicex-dispatch`,
-        { source },
+        { source: aiCallSource, limit: numValue },
         { headers: { 'x-auth': token } }
       );
-      const queued = dispatchRes.data?.queued ?? leads.length;
-      toast.success(`${queued} ${label} lead(s) queued for AI call`);
+      const queued = dispatchRes.data?.queued ?? numValue;
+      toast.success(`${queued} ${aiCallLabel} lead(s) queued for AI call`);
+      closeAiCallBulk();
     } catch (err) {
       toast.error(err.response?.data?.msg || err.message || 'Failed to start AI calls');
     } finally {
       setAiFabBusy(false);
     }
-  }, [aiFabBusy, backendUrl, token]);
+  }, [aiCallLabel, aiCallSource, aiCallTotalCount, aiFabBusy, backendUrl, closeAiCallBulk, input1Value, token]);
 
   useEffect(() => {
     if (!isAiFabOpen) return undefined;
@@ -15899,6 +15950,7 @@ useEffect(() => {
                     <div className="adm-cycle-toolbar__outer d-flex gap-2 align-items-center justify-content-between">
                       <div className="adm-cycle-toolbar__actions d-flex flex-nowrap gap-2 align-items-center">
                         {showBulkInputs ? (
+                          <div className="d-flex align-items-center gap-2">
                           <div style={{
                             display: "flex",
                             alignItems: "stretch",
@@ -15912,7 +15964,7 @@ useEffect(() => {
                           }}>
                             <input
                               type="text"
-                              placeholder="Input 1"
+                              placeholder={bulkMode === 'AiCall' ? 'How many' : 'Input 1'}
                               value={input1Value}
                               onFocus={() => {
                                 if (bulkMode === 'whatsapp' || bulkMode === 'bulkaction' || bulkMode === 'bulkrefer' || bulkMode === 'bulkcourse') {
@@ -15928,17 +15980,25 @@ useEffect(() => {
                                 if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
                                   e.preventDefault();
                                 }
+                                const maxValue = bulkMode === 'AiCall'
+                                  ? (aiCallTotalCount || 0)
+                                  : (crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0);
                                 if (e.key === 'Enter' && bulkMode === 'whatsapp' && input1Value) {
                                   e.preventDefault();
                                   const numValue = parseInt(input1Value, 10);
-                                  const maxValue = crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0;
                                   if (numValue >= 1 && numValue <= maxValue) {
                                     setModalType('whatsapp');
                                   }
                                 }
+                                if (e.key === 'Enter' && bulkMode === 'AiCall' && input1Value) {
+                                  e.preventDefault();
+                                  handleAiCallDispatch();
+                                }
                               }}
                               onChange={(e) => {
-                                const maxValue = crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0;
+                                const maxValue = bulkMode === 'AiCall'
+                                  ? (aiCallTotalCount || 0)
+                                  : (crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0);
                                 let inputValue = e.target.value.replace(/[^0-9]/g, '');
                                 if (inputValue === '') {
                                   setInput1Value('');
@@ -15967,8 +16027,9 @@ useEffect(() => {
                             <input
                               type="text"
                               placeholder="Input 2"
-                              value={crmFilters[activeCrmFilter]?.count || 0}
+                              value={bulkMode === 'AiCall' ? (aiCallTotalCount || 0) : (crmFilters[activeCrmFilter]?.count || 0)}
                               readOnly
+                              title={bulkMode === 'AiCall' ? `Total ${aiCallLabel} leads` : 'Total filtered leads'}
                               style={{
                                 width: "50%",
                                 border: "none",
@@ -15981,6 +16042,34 @@ useEffect(() => {
                                 cursor: "default"
                               }}
                             />
+                          </div>
+                          {bulkMode === 'AiCall' && (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-primary"
+                                disabled={aiFabBusy || !input1Value}
+                                onClick={handleAiCallDispatch}
+                                style={{
+                                  padding: '6px 10px',
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                {aiFabBusy ? 'Queuing...' : 'Call AI'}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-secondary"
+                                onClick={closeAiCallBulk}
+                                title="Cancel AI call"
+                                style={{ padding: '6px 8px', fontSize: '11px' }}
+                              >
+                                <i className="fas fa-times"></i>
+                              </button>
+                            </>
+                          )}
                           </div>
                         ) : (
                           <>

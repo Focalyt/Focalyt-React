@@ -1408,11 +1408,19 @@ router.post("/voicex-dispatch", isCollege, async (req, res) => {
             });
         }
 
+        const total = leads.length;
+        const rawLimit = Number(req.body.limit);
+        if (Number.isInteger(rawLimit) && rawLimit > 0) {
+            leads = leads.slice(0, rawLimit);
+        }
+
         const result = await dispatchVoiceCallsForLeads(leads);
         return res.json({
             status: true,
             msg: `${result.queued} AI call(s) queued`,
+            total,
             count: leads.length,
+            limit: Number.isInteger(rawLimit) && rawLimit > 0 ? rawLimit : total,
             queued: result.queued,
             skippedNoMobile: result.skippedNoMobile,
             source,
