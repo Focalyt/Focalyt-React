@@ -28,6 +28,60 @@ async function recordVoiceCallAttempt(appliedId, patch, logEntry) {
     await AppliedCourses.updateOne({ _id: appliedId }, update);
 }
 
+function isAiCallAlreadyAttempted(aiVoice) {
+    const ai = aiVoice || {};
+    if (String(ai.lastMakeCallStatus || '').toLowerCase() === 'queued') return true;
+    if (String(ai.lastCallHistoryId || '').trim()) return true;
+    if (ai.lastWebhookAt) return true;
+    const event = String(ai.lastEvent || '').toUpperCase();
+    return ['MAKE_CALL_QUEUED', 'CALL_COMPLETED', 'CALL_FAILED', 'CALL_TRANSFERED'].includes(event);
+}
+
+function aiCallNotAttemptedMatch() {
+    return {
+        'aiVoice.lastMakeCallStatus': { $ne: 'queued' },
+        $and: [
+            {
+                $or: [
+                    { 'aiVoice.lastCallHistoryId': { $exists: false } },
+                    { 'aiVoice.lastCallHistoryId': '' },
+                    { 'aiVoice.lastCallHistoryId': null },
+                ],
+            },
+            {
+                $or: [
+                    { 'aiVoice.lastWebhookAt': { $exists: false } },
+                    { 'aiVoice.lastWebhookAt': null },
+                ],
+            },
+            {
+                'aiVoice.lastEvent': {
+                    $nin: ['MAKE_CALL_QUEUED', 'CALL_COMPLETED', 'CALL_FAILED', 'CALL_TRANSFERED'],
+                },
+            },
+        ],
+    };
+}
+
+async function markLeadsQueuedForAiCall(leadIds) {
+    const ids = (leadIds || [])
+        .map((id) => String(id || '').trim())
+        .filter((id) => mongoose.Types.ObjectId.isValid(id))
+        .map((id) => new mongoose.Types.ObjectId(id));
+    if (!ids.length) return;
+    await AppliedCourses.updateMany(
+        { _id: { $in: ids } },
+        {
+            $set: {
+                'aiVoice.lastEvent': 'MAKE_CALL_QUEUED',
+                'aiVoice.lastMakeCallAt': new Date(),
+                'aiVoice.lastMakeCallStatus': 'queued',
+                'aiVoice.lastMakeCallError': '',
+            },
+        }
+    );
+}
+
 async function initiateVoiceCallForLead({ applied, candidate, course, center, source, callInitTime } = {}) {
     if (!applied?._id) {
         return { skipped: true, reason: 'no_lead' };
@@ -92,6 +146,7 @@ async function cancelVoiceCallForLead({ applied, phoneNumber } = {}) {
     if (applied?._id) {
         await recordVoiceCallAttempt(applied._id, {
             'aiVoice.lastEvent': 'MAKE_CALL_CANCELLED',
+            'aiVoice.lastMakeCallStatus': 'cancelled',
             'aiVoice.lastCancelAt': new Date(),
         }, {
             action: 'AI counselor scheduled call cancelled',
@@ -195,6 +250,7 @@ async function fetchB2cTodayLeads() {
             $match: {
                 ...B2C_REGISTRATION_MATCH,
                 createdAt: { $gte: start, $lte: end },
+                ...aiCallNotAttemptedMatch(),
             },
         },
         ...leadListLookups(),
@@ -209,15 +265,43 @@ async function fetchUntouchNotConnectedLeads() {
                 ...B2C_REGISTRATION_MATCH,
                 _leadStatus: { $in: statusIds },
                 _leadSubStatus: { $in: subStatusIds },
+                ...aiCallNotAttemptedMatch(),
             },
         },
         ...leadListLookups(),
     ]);
 }
 
+function normalizeDispatchLeadIds(raw) {
+    if (!Array.isArray(raw)) return [];
+    const seen = new Set();
+    const ids = [];
+    for (const value of raw) {
+        const id = String(value || '').trim();
+        if (!id || seen.has(id) || !mongoose.Types.ObjectId.isValid(id)) continue;
+        seen.add(id);
+        ids.push(id);
+    }
+    return ids;
+}
+
 async function dispatchVoiceCallsForLeads(leads) {
-    const rows = (leads || []).filter((row) => row?.lead_id && row?.mobile);
-    rows.forEach((row, index) => {
+    const rows = (leads || []).filter((row) => row?.lead_id);
+    if (!rows.length) {
+        return { queued: 0, skippedNoMobile: 0, skippedAlreadyCalled: 0 };
+    }
+
+    const ids = rows.map((row) => row.lead_id);
+    const docs = await AppliedCourses.find({ _id: { $in: ids } }).select('_id aiVoice').lean();
+    const alreadyCalled = new Set(
+        (docs || [])
+            .filter((doc) => isAiCallAlreadyAttempted(doc.aiVoice))
+            .map((doc) => String(doc._id))
+    );
+    const freshRows = rows.filter((row) => !alreadyCalled.has(String(row.lead_id)));
+    await markLeadsQueuedForAiCall(freshRows.map((row) => row.lead_id));
+
+    freshRows.forEach((row, index) => {
         setTimeout(() => {
             loadLeadForVoiceCall(row.lead_id)
                 .then((lead) => {
@@ -233,8 +317,9 @@ async function dispatchVoiceCallsForLeads(leads) {
         }, index * 400);
     });
     return {
-        queued: rows.length,
+        queued: freshRows.length,
         skippedNoMobile: (leads || []).length - rows.length,
+        skippedAlreadyCalled: alreadyCalled.size,
     };
 }
 
@@ -1396,22 +1481,29 @@ router.post("/voicex-webhook", async (req, res) => {
 router.post("/voicex-dispatch", isCollege, async (req, res) => {
     try {
         const source = String(req.body.source || req.body.queue || '').trim();
-        let leads = [];
+        const selectedLeadIds = normalizeDispatchLeadIds(
+            req.body.leadIds || req.body.appliedCourseIds || req.body.lead_ids
+        );
+        let pool = [];
         if (source === 'b2c-today') {
-            leads = await fetchB2cTodayLeads();
+            pool = await fetchB2cTodayLeads();
         } else if (source === 'untouch-not-connected') {
-            leads = await fetchUntouchNotConnectedLeads();
-        } else {
+            pool = await fetchUntouchNotConnectedLeads();
+        } else if (!selectedLeadIds.length) {
             return res.status(400).json({
                 status: false,
                 msg: "source must be b2c-today or untouch-not-connected",
             });
         }
 
-        const total = leads.length;
+        let leads = pool;
+        const total = selectedLeadIds.length || pool.length;
         const rawLimit = Number(req.body.limit);
-        if (Number.isInteger(rawLimit) && rawLimit > 0) {
-            leads = leads.slice(0, rawLimit);
+        if (selectedLeadIds.length) {
+            const byId = new Map(pool.map((row) => [String(row.lead_id), row]));
+            leads = selectedLeadIds.map((id) => byId.get(id) || { lead_id: id });
+        } else if (Number.isInteger(rawLimit) && rawLimit > 0) {
+            leads = pool.slice(0, rawLimit);
         }
 
         const result = await dispatchVoiceCallsForLeads(leads);
@@ -1420,10 +1512,14 @@ router.post("/voicex-dispatch", isCollege, async (req, res) => {
             msg: `${result.queued} AI call(s) queued`,
             total,
             count: leads.length,
-            limit: Number.isInteger(rawLimit) && rawLimit > 0 ? rawLimit : total,
+            limit: selectedLeadIds.length
+                ? selectedLeadIds.length
+                : (Number.isInteger(rawLimit) && rawLimit > 0 ? rawLimit : total),
             queued: result.queued,
             skippedNoMobile: result.skippedNoMobile,
+            skippedAlreadyCalled: result.skippedAlreadyCalled,
             source,
+            selected: selectedLeadIds.length,
         });
     } catch (err) {
         return res.status(500).json({

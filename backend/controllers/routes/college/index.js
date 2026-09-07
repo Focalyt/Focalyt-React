@@ -2698,6 +2698,12 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				updatedAt: doc.updatedAt,
 				approval: doc.approval,
 				leadAssignment: doc.leadAssignment,
+				aiVoice: {
+					lastEvent: doc.aiVoice?.lastEvent || '',
+					lastMakeCallStatus: doc.aiVoice?.lastMakeCallStatus || '',
+					lastCallHistoryId: doc.aiVoice?.lastCallHistoryId || '',
+					lastWebhookAt: doc.aiVoice?.lastWebhookAt || null,
+				},
 				remarks: doc.remarks,
 				counsellor: doc.counsellor
 					? {

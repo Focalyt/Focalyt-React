@@ -1137,10 +1137,7 @@ const CRMDashboard = () => {
   const [input1Value, setInput1Value] = useState('');
   const skipBulkAutoSelectRef = useRef(false); // when true, Input 1 change came from checkbox sync — don't re-select first N
   const [showBulkInputs, setShowBulkInputs] = useState(false);
-  const [bulkMode, setBulkMode] = useState(null); // 'whatsapp' | 'bulkaction' | 'bulkcourse' | 'bulkrefer' | 'AiCall'
-  const [bulkChangeCourseId, setBulkChangeCourseId] = useState('');
-  const [bulkChangeCenterId, setBulkChangeCenterId] = useState('');
-  const [isBulkCourseUpdating, setIsBulkCourseUpdating] = useState(false);
+  const [bulkMode, setBulkMode] = useState(null); // 'whatsapp' or 'bulkaction'
 
   const [mainContentClass, setMainContentClass] = useState('col-12');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -1254,112 +1251,7 @@ const CRMDashboard = () => {
   const [aiSupervisionQueueFilter, setAiSupervisionQueueFilter] = useState('all');
   const [isAiFabOpen, setIsAiFabOpen] = useState(false);
   const [aiFabSubstatuses, setAiFabSubstatuses] = useState([]);
-  const [aiFabBusy, setAiFabBusy] = useState(false);
-  const [aiCallSource, setAiCallSource] = useState('');
-  const [aiCallTotalCount, setAiCallTotalCount] = useState(0);
-  const [aiCallLabel, setAiCallLabel] = useState('');
   const aiFabWrapRef = useRef(null);
-  const AI_FAB_NEW_LEAD_ID = '64ab1234abcd5678ef901235';
-  const AI_FAB_NOT_CONNECTED_ID = '6a3f5a53cfccaeeb28a4d1a3';
-
-  const closeAiCallBulk = useCallback(() => {
-    setShowBulkInputs(false);
-    setBulkMode(null);
-    setInput1Value('');
-    setAiCallSource('');
-    setAiCallTotalCount(0);
-    setAiCallLabel('');
-  }, []);
-
-  const handleAiFabQueue = useCallback(async (substatus) => {
-    const source = String(substatus?._id) === AI_FAB_NEW_LEAD_ID
-      ? 'b2c-today'
-      : String(substatus?._id) === AI_FAB_NOT_CONNECTED_ID
-        ? 'untouch-not-connected'
-        : '';
-    const label = source === 'b2c-today'
-      ? "today's B2C"
-      : source === 'untouch-not-connected'
-        ? 'Untouch / Not Connected'
-        : substatus?.title || 'AI';
-
-    setIsAiFabOpen(false);
-    if (!source) {
-      toast.info(substatus?.title || 'AI');
-      return;
-    }
-    if (aiFabBusy) {
-      toast.info('AI calls are already being queued');
-      return;
-    }
-
-    setAiFabBusy(true);
-    try {
-      const listPath = source === 'b2c-today' ? 'b2c-today' : 'untouch-not-connected';
-      const listRes = await axios.get(`${backendUrl}/college/digitalLead/${listPath}`, {
-        headers: { 'x-auth': token },
-      });
-      const total = listRes.data?.count ?? (listRes.data?.data || []).length;
-      if (!total) {
-        toast.info(`No ${label} leads to send to AI`);
-        return;
-      }
-
-      setAiCallSource(source);
-      setAiCallTotalCount(total);
-      setAiCallLabel(label);
-      setBulkMode('AiCall');
-      setShowBulkInputs(true);
-      setInput1Value('');
-      toast.info(`Enter how many of ${total} ${label} lead(s) to call`);
-    } catch (err) {
-      toast.error(err.response?.data?.msg || err.message || 'Failed to load AI call leads');
-    } finally {
-      setAiFabBusy(false);
-    }
-  }, [aiFabBusy, backendUrl, token]);
-
-  const handleAiCallDispatch = useCallback(async () => {
-    const maxValue = aiCallTotalCount || 0;
-    const numValue = parseInt(String(input1Value || '').trim(), 10);
-    if (!aiCallSource || !maxValue) {
-      toast.info('Pick New Lead or Not Connected first');
-      return;
-    }
-    if (!numValue || numValue < 1) {
-      toast.info('Enter how many leads to call');
-      return;
-    }
-    if (numValue > maxValue) {
-      toast.info(`Max ${maxValue} ${aiCallLabel} lead(s)`);
-      return;
-    }
-    if (aiFabBusy) {
-      toast.info('AI calls are already being queued');
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Send ${numValue} of ${maxValue} ${aiCallLabel} lead(s) to AI call?`
-    );
-    if (!confirmed) return;
-
-    setAiFabBusy(true);
-    try {
-      const dispatchRes = await axios.post(
-        `${backendUrl}/college/digitalLead/voicex-dispatch`,
-        { source: aiCallSource, limit: numValue },
-        { headers: { 'x-auth': token } }
-      );
-      const queued = dispatchRes.data?.queued ?? numValue;
-      toast.success(`${queued} ${aiCallLabel} lead(s) queued for AI call`);
-      closeAiCallBulk();
-    } catch (err) {
-      toast.error(err.response?.data?.msg || err.message || 'Failed to start AI calls');
-    } finally {
-      setAiFabBusy(false);
-    }
-  }, [aiCallLabel, aiCallSource, aiCallTotalCount, aiFabBusy, backendUrl, closeAiCallBulk, input1Value, token]);
 
   useEffect(() => {
     if (!isAiFabOpen) return undefined;
@@ -1715,7 +1607,7 @@ const CRMDashboard = () => {
     setSelectedProfiles(next);
 
     // Keep Input 1 count in sync when user manually checks/unchecks leads
-    if (bulkMode === 'whatsapp' || bulkMode === 'bulkrefer' || bulkMode === 'bulkaction' || bulkMode === 'bulkcourse') {
+    if (bulkMode === 'whatsapp' || bulkMode === 'bulkrefer' || bulkMode === 'bulkaction') {
       skipBulkAutoSelectRef.current = true;
       setInput1Value(next.length > 0 ? String(next.length) : '');
     }
@@ -4250,73 +4142,6 @@ console.log('API Response:', response.data);
     }
   };
 
-  const handleBulkCourseChange = async (e) => {
-    e.preventDefault();
-
-    if (!selectedProfiles || !Array.isArray(selectedProfiles) || selectedProfiles.length === 0) {
-      alert('No profile selected');
-      return;
-    }
-    if (!bulkChangeCourseId) {
-      alert('Please select a course');
-      return;
-    }
-    if (!bulkChangeCenterId) {
-      alert('Please select a center');
-      return;
-    }
-    if (!backendUrl) {
-      alert('Backend URL not configured');
-      return;
-    }
-    if (!token) {
-      alert('Authentication token missing');
-      return;
-    }
-
-    setIsBulkCourseUpdating(true);
-    try {
-      const response = await axios.put(
-        `${backendUrl}/college/lead/bulk_course_change`,
-        {
-          selectedProfiles,
-          courseId: bulkChangeCourseId,
-          centerId: bulkChangeCenterId,
-          remarks: (remarks || '').trim(),
-        },
-        {
-          headers: {
-            'x-auth': token,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (response.data.success) {
-        const result = response.data.data || {};
-        const failedCount = Array.isArray(result.failed) ? result.failed.length : 0;
-        const failedReasons = Array.isArray(result.failed) && result.failed.length
-          ? `\nFailed: ${result.failed.slice(0, 5).map((item) => item.reason).join('; ')}`
-          : '';
-        alert(
-          `Course updated for ${result.updated || 0} lead(s).\nSkipped: ${result.skipped || 0}.\nFailed: ${failedCount}.${failedReasons}`
-        );
-        setBulkChangeCourseId('');
-        setBulkChangeCenterId('');
-        setRemarks('');
-        await fetchProfileData();
-        closePanel();
-      } else {
-        alert(response.data.message || 'Failed to change course');
-      }
-    } catch (error) {
-      console.error('Bulk course change error:', error);
-      alert(error.response?.data?.message || error.message || 'Failed to change course');
-    } finally {
-      setIsBulkCourseUpdating(false);
-    }
-  };
-
   const getBranches = async (profile) => {
     // Check if profile and course exist
     if (!profile || !profile._course || !profile._course._id) {
@@ -4643,7 +4468,7 @@ console.log('API Response:', response.data);
         } else if (shouldFetchKycCandidates) {
           await fetchMilestoneCounts(filters);
         } else {
-          await fetchRegistrationCrmFilterCounts(filters, page, null, cycleOverride || cycleFilters);
+          await fetchRegistrationCrmFilterCounts(filters, page, null);
           await fetchDashboardCounts(filters, cycleOverride || cycleFilters);
           await fetchKycCounts();
           await fetchMilestoneCounts(filters);
@@ -5008,16 +4833,13 @@ console.log('API Response:', response.data);
     }
   };
 
-  const fetchRegistrationCrmFilterCounts = async (filters = filterData, page = currentPage, filteredTotalCount = null, cycleOverride = null) => {
+  const fetchRegistrationCrmFilterCounts = async (filters = filterData, page = currentPage, filteredTotalCount = null) => {
 
     if (!token) {
       console.warn('No token found in session storage.');
       setIsLoadingProfiles(false);
       return;
     }
-
-    const cycle = cycleOverride || cycleFilters;
-    const fd = formDataRef.current || formData;
 
     // Prepare query parameters
     const queryParams = new URLSearchParams({
@@ -5036,7 +4858,7 @@ console.log('API Response:', response.data);
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       ...(filters.approvalStatus && { approvalStatus: filters.approvalStatus }),
       // Multi-select filters
-      ...buildListFilterQueryParts(fd, cycle),
+      ...buildListFilterQueryParts(formData, cycleFilters),
     });
 
     try {
@@ -6154,7 +5976,7 @@ console.log('API Response:', response.data);
 
   // Auto-select profiles based on Input 1 value (bulk WhatsApp, bulk Refer, bulk Action)
   useEffect(() => {
-    if (bulkMode !== 'whatsapp' && bulkMode !== 'bulkrefer' && bulkMode !== 'bulkaction' && bulkMode !== 'bulkcourse') {
+    if (bulkMode !== 'whatsapp' && bulkMode !== 'bulkrefer' && bulkMode !== 'bulkaction') {
       return;
     }
 
@@ -6333,13 +6155,6 @@ console.log('API Response:', response.data);
     } else if (panel === 'bulkstatuschange') {
       setShowPopup(null);
       setShowPanel('bulkstatuschange');
-    } else if (panel === 'bulkcoursechange') {
-      setShowPopup(null);
-      setBulkChangeCourseId('');
-      setBulkChangeCenterId('');
-      setCenters([]);
-      setRemarks('');
-      setShowPanel('bulkcoursechange');
     }
 
     if (!isMobile) {
@@ -6353,11 +6168,9 @@ console.log('API Response:', response.data);
 
   const closePanel = () => {
     // Hide bulk inputs when bulkstatuschange panel is closed
-    if (showPanel === 'bulkstatuschange' || showPanel === 'bulkcoursechange') {
+    if (showPanel === 'bulkstatuschange') {
       setShowBulkInputs(false);
       setBulkMode(null);
-      setBulkChangeCourseId('');
-      setBulkChangeCenterId('');
     }
     setIsCourseDropdownOpen(false);
     setIsCenterDropdownOpen(false);
@@ -9587,144 +9400,6 @@ useEffect(() => {
 
     return (showPanel === 'editPanel') || (showPanel === 'followUp') || (showPanel === 'bulkstatuschange') ? (
       <div className="col-11 transition-col" id="editFollowupPanel">
-        {panelContent}
-      </div>
-    ) : null;
-  };
-
-  const renderBulkCourseChangePanel = () => {
-    const selectedCount = Array.isArray(selectedProfiles) ? selectedProfiles.length : 0;
-    const panelContent = (
-      <div className="card border-0 shadow-sm">
-        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
-          <div className="d-flex align-items-center">
-            <div className="me-2">
-              <i className="fas fa-exchange-alt text-secondary"></i>
-            </div>
-            <h6 className="mb-0 followUp fw-medium">
-              Bulk Change Course {selectedCount > 0 ? `(${selectedCount})` : ''}
-            </h6>
-          </div>
-          <button className="btn-close" type="button" onClick={closePanel}></button>
-        </div>
-
-        <div className="card-body">
-          <form onSubmit={handleBulkCourseChange}>
-            <div className="mb-1">
-              <label htmlFor="bulkCourse" className="form-label small fw-medium text-dark">
-                Course<span className="text-danger">*</span>
-              </label>
-              <select
-                className="form-select border-0 bgcolor"
-                id="bulkCourse"
-                value={bulkChangeCourseId}
-                disabled={loadingData || isBulkCourseUpdating}
-                style={{
-                  height: '42px',
-                  paddingTop: '8px',
-                  paddingInline: '10px',
-                  width: '100%',
-                  backgroundColor: '#f1f2f6'
-                }}
-                onChange={(e) => {
-                  const nextCourseId = e.target.value;
-                  setBulkChangeCourseId(nextCourseId);
-                  setBulkChangeCenterId('');
-                  fetchCentersByCourse(nextCourseId);
-                }}
-              >
-                <option value="">Select Course</option>
-                {(courses || []).map((course) => (
-                  <option key={course._id} value={course._id}>{course.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="mb-1">
-              <label htmlFor="bulkCenter" className="form-label small fw-medium text-dark">
-                Center<span className="text-danger">*</span>
-              </label>
-              <select
-                className="form-select border-0 bgcolor"
-                id="bulkCenter"
-                value={bulkChangeCenterId}
-                disabled={!bulkChangeCourseId || isBulkCourseUpdating}
-                style={{
-                  height: '42px',
-                  paddingTop: '8px',
-                  paddingInline: '10px',
-                  width: '100%',
-                  backgroundColor: '#f1f2f6'
-                }}
-                onChange={(e) => setBulkChangeCenterId(e.target.value)}
-              >
-                <option value="">Select Center</option>
-                {(centers || []).map((center) => (
-                  <option key={center._id} value={center._id}>{center.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="mb-1">
-              <label htmlFor="bulkCourseRemark" className="form-label small fw-medium text-dark">
-                Comment
-              </label>
-              <textarea
-                className="form-control border-0 bgcolor"
-                id="bulkCourseRemark"
-                rows="4"
-                value={remarks}
-                disabled={isBulkCourseUpdating}
-                onChange={(e) => setRemarks(e.target.value)}
-                placeholder="Add remarks (optional)"
-                style={{ resize: 'none', backgroundColor: '#f1f2f6' }}
-              ></textarea>
-            </div>
-
-            <div className="d-flex justify-content-end gap-2 mt-4">
-              <button
-                type="button"
-                className="btn"
-                style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: '14px' }}
-                onClick={closePanel}
-                disabled={isBulkCourseUpdating}
-              >
-                CLOSE
-              </button>
-              <button
-                type="submit"
-                className="btn text-white"
-                disabled={isBulkCourseUpdating || selectedCount === 0}
-                style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: '14px' }}
-              >
-                {isBulkCourseUpdating ? 'UPDATING...' : 'UPDATE COURSE'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-
-    if (isMobile) {
-      return showPanel === 'bulkcoursechange' ? (
-        <div
-          className="modal show d-block"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closePanel();
-          }}
-        >
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content">
-              {panelContent}
-            </div>
-          </div>
-        </div>
-      ) : null;
-    }
-
-    return showPanel === 'bulkcoursechange' ? (
-      <div className="col-11 transition-col" id="bulkCourseChangePanel">
         {panelContent}
       </div>
     ) : null;
@@ -13635,7 +13310,7 @@ useEffect(() => {
     });
     setCurrentPage(1);
     fetchProfileData(filterData, 1, next);
-    fetchRegistrationCrmFilterCounts(filterData, 1, null, next);
+    fetchRegistrationCrmFilterCounts(filterData, 1, null);
     fetchDashboardCounts(filterData, next);
   };
 
@@ -15158,12 +14833,14 @@ useEffect(() => {
               type="button"
               className="crm-ai-fab-sub"
               title={substatus.title}
-              disabled={aiFabBusy}
               style={{ transitionDelay: isAiFabOpen ? `${0.06 * (index + 1)}s` : '0s' }}
-              onClick={() => handleAiFabQueue(substatus)}
+              onClick={() => {
+                setIsAiFabOpen(false);
+                toast.info(substatus.title);
+              }}
             >
               <i className={
-                String(substatus._id) === AI_FAB_NEW_LEAD_ID
+                String(substatus._id) === '64ab1234abcd5678ef901235'
                   ? 'fas fa-user-plus'
                   : 'fas fa-phone-slash'
               }></i>
@@ -15950,7 +15627,6 @@ useEffect(() => {
                     <div className="adm-cycle-toolbar__outer d-flex gap-2 align-items-center justify-content-between">
                       <div className="adm-cycle-toolbar__actions d-flex flex-nowrap gap-2 align-items-center">
                         {showBulkInputs ? (
-                          <div className="d-flex align-items-center gap-2">
                           <div style={{
                             display: "flex",
                             alignItems: "stretch",
@@ -15964,15 +15640,15 @@ useEffect(() => {
                           }}>
                             <input
                               type="text"
-                              placeholder={bulkMode === 'AiCall' ? 'How many' : 'Input 1'}
+                              placeholder="Input 1"
                               value={input1Value}
                               onFocus={() => {
-                                if (bulkMode === 'whatsapp' || bulkMode === 'bulkaction' || bulkMode === 'bulkrefer' || bulkMode === 'bulkcourse') {
+                                if (bulkMode === 'whatsapp' || bulkMode === 'bulkaction' || bulkMode === 'bulkrefer') {
                                   runAiSupervisionForFirstN();
                                 }
                               }}
                               onClick={() => {
-                                if (bulkMode === 'whatsapp' || bulkMode === 'bulkaction' || bulkMode === 'bulkrefer' || bulkMode === 'bulkcourse') {
+                                if (bulkMode === 'whatsapp' || bulkMode === 'bulkaction' || bulkMode === 'bulkrefer') {
                                   runAiSupervisionForFirstN();
                                 }
                               }}
@@ -15980,25 +15656,17 @@ useEffect(() => {
                                 if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
                                   e.preventDefault();
                                 }
-                                const maxValue = bulkMode === 'AiCall'
-                                  ? (aiCallTotalCount || 0)
-                                  : (crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0);
                                 if (e.key === 'Enter' && bulkMode === 'whatsapp' && input1Value) {
                                   e.preventDefault();
                                   const numValue = parseInt(input1Value, 10);
+                                  const maxValue = crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0;
                                   if (numValue >= 1 && numValue <= maxValue) {
                                     setModalType('whatsapp');
                                   }
                                 }
-                                if (e.key === 'Enter' && bulkMode === 'AiCall' && input1Value) {
-                                  e.preventDefault();
-                                  handleAiCallDispatch();
-                                }
                               }}
                               onChange={(e) => {
-                                const maxValue = bulkMode === 'AiCall'
-                                  ? (aiCallTotalCount || 0)
-                                  : (crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0);
+                                const maxValue = crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0;
                                 let inputValue = e.target.value.replace(/[^0-9]/g, '');
                                 if (inputValue === '') {
                                   setInput1Value('');
@@ -16027,9 +15695,8 @@ useEffect(() => {
                             <input
                               type="text"
                               placeholder="Input 2"
-                              value={bulkMode === 'AiCall' ? (aiCallTotalCount || 0) : (crmFilters[activeCrmFilter]?.count || 0)}
+                              value={crmFilters[activeCrmFilter]?.count || 0}
                               readOnly
-                              title={bulkMode === 'AiCall' ? `Total ${aiCallLabel} leads` : 'Total filtered leads'}
                               style={{
                                 width: "50%",
                                 border: "none",
@@ -16042,34 +15709,6 @@ useEffect(() => {
                                 cursor: "default"
                               }}
                             />
-                          </div>
-                          {bulkMode === 'AiCall' && (
-                            <>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-primary"
-                                disabled={aiFabBusy || !input1Value}
-                                onClick={handleAiCallDispatch}
-                                style={{
-                                  padding: '6px 10px',
-                                  fontSize: '11px',
-                                  fontWeight: 600,
-                                  whiteSpace: 'nowrap'
-                                }}
-                              >
-                                {aiFabBusy ? 'Queuing...' : 'Call AI'}
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-secondary"
-                                onClick={closeAiCallBulk}
-                                title="Cancel AI call"
-                                style={{ padding: '6px 8px', fontSize: '11px' }}
-                              >
-                                <i className="fas fa-times"></i>
-                              </button>
-                            </>
-                          )}
                           </div>
                         ) : (
                           <>
@@ -16163,27 +15802,6 @@ useEffect(() => {
                                 >
                                   <i className="fas fa-tasks" style={{ fontSize: "10px" }}></i>
                                   Bulk Action
-                                </button>
-                                <button
-                                  className="btn btn-sm btn-outline-secondary"
-                                  disabled={isLoadingProfiles || allProfiles.length === 0}
-                                  style={{
-                                    padding: "6px 12px",
-                                    fontSize: "11px",
-                                    fontWeight: "600",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "4px"
-                                  }}
-                                  onClick={() => {
-                                    setShowBulkInputs(true);
-                                    setBulkMode('bulkcourse');
-                                    setInput1Value('');
-                                    openEditPanel(null, 'bulkcoursechange');
-                                  }}
-                                >
-                                  <i className="fas fa-exchange-alt" style={{ fontSize: "10px" }}></i>
-                                  Change Course
                                 </button>
                               </>
                             )}
@@ -20240,7 +19858,6 @@ useEffect(() => {
               zIndex: '10'
             }}>
               {renderEditPanel()}
-              {renderBulkCourseChangePanel()}
               {renderRefferPanel()}
               {renderWhatsAppPanel()}
               {renderEmailPanel()}
@@ -20253,7 +19870,6 @@ useEffect(() => {
 
         {/* Mobile Modals */}
         {isMobile && renderEditPanel()}
-        {isMobile && renderBulkCourseChangePanel()}
         {isMobile && renderRefferPanel()}
         {isMobile && renderWhatsAppPanel()}
         {isMobile && renderEmailPanel()}
