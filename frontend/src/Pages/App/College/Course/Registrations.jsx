@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import DatePicker from 'react-date-picker';
 import Calendar from 'react-calendar';
 import { io } from 'socket.io-client';
@@ -1337,7 +1337,6 @@ const CRMDashboard = () => {
   }, [aiCallSentIds, aiFabBusy, backendUrl, token]);
 
   const handleAiCallDispatch = useCallback(async () => {
-    const maxValue = aiCallTotalCount || 0;
     const selectedIds = [...new Set(
       (Array.isArray(selectedProfiles) ? selectedProfiles : [])
         .map((id) => String(id || '').trim())
@@ -1350,43 +1349,46 @@ const CRMDashboard = () => {
         })
     )];
     const numValue = parseInt(String(input1Value || '').trim(), 10);
-    const sendCount = selectedIds.length || numValue;
-    if (!aiCallSource || !maxValue) {
+    const MAX_AI_CALL_BATCH = 20;
+    if (!aiCallSource) {
       toast.info('Pick New Lead or Not Connected first');
       return;
     }
-    if (!sendCount || sendCount < 1) {
-      toast.info('Type how many leads to call, or select leads');
+    if (!numValue || numValue < 1) {
+      toast.info('Type how many leads to call in the left box');
       return;
     }
-    if (!selectedIds.length && sendCount > maxValue) {
-      toast.info(`Max ${maxValue} ${aiCallLabel} lead(s)`);
+    if (numValue > MAX_AI_CALL_BATCH) {
+      toast.info(`Max ${MAX_AI_CALL_BATCH} leads per click`);
       return;
     }
+    const idsToSend = selectedIds.slice(0, numValue);
     if (aiFabBusy) {
       toast.info('AI calls are already being queued');
       return;
     }
 
     const confirmed = window.confirm(
-      `Send ${sendCount} of ${maxValue} ${aiCallLabel} lead(s) to AI call?`
+      `Send ${idsToSend.length || numValue} lead(s) to AI call?`
     );
     if (!confirmed) return;
 
     setAiFabBusy(true);
     try {
-      const payload = selectedIds.length
-        ? { source: aiCallSource, leadIds: selectedIds }
-        : { source: aiCallSource, limit: sendCount };
+      const payload = {
+        source: aiCallSource,
+        limit: numValue,
+        ...(idsToSend.length ? { leadIds: idsToSend } : {}),
+      };
       const dispatchRes = await axios.post(
         `${backendUrl}/college/digitalLead/voicex-dispatch`,
         payload,
         { headers: { 'x-auth': token } }
       );
-      const queued = dispatchRes.data?.queued ?? sendCount;
-      setAiCallSentIds((prev) => [...new Set([...(prev || []).map(String), ...selectedIds])]);
+      const queued = dispatchRes.data?.queued ?? (idsToSend.length || numValue);
+      setAiCallSentIds((prev) => [...new Set([...(prev || []).map(String), ...idsToSend])]);
       setAllProfiles((prev) => (prev || []).map((profile) => (
-        selectedIds.includes(String(profile._id))
+        idsToSend.includes(String(profile._id))
           ? {
               ...profile,
               aiVoice: {
@@ -1404,7 +1406,7 @@ const CRMDashboard = () => {
     } finally {
       setAiFabBusy(false);
     }
-  }, [aiCallLabel, aiCallLeads, aiCallSentIds, aiCallSource, aiCallTotalCount, aiFabBusy, allProfiles, backendUrl, closeAiCallBulk, hasAiAlreadyGoneThroughLead, input1Value, selectedProfiles, token]);
+  }, [aiCallLabel, aiCallLeads, aiCallSentIds, aiCallSource, aiFabBusy, allProfiles, backendUrl, closeAiCallBulk, hasAiAlreadyGoneThroughLead, input1Value, selectedProfiles, token]);
 
   useEffect(() => {
     if (!isAiFabOpen) return undefined;
@@ -15973,7 +15975,7 @@ useEffect(() => {
                                   e.preventDefault();
                                 }
                                 const maxValue = bulkMode === 'AiCall'
-                                  ? (aiCallTotalCount || 0)
+                                  ? Math.min(20, aiCallTotalCount || 0)
                                   : (crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0);
                                 if (e.key === 'Enter' && bulkMode === 'whatsapp' && input1Value) {
                                   e.preventDefault();
@@ -15989,7 +15991,7 @@ useEffect(() => {
                               }}
                               onChange={(e) => {
                                 const maxValue = bulkMode === 'AiCall'
-                                  ? (aiCallTotalCount || 0)
+                                  ? Math.min(20, aiCallTotalCount || 0)
                                   : (crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0);
                                 let inputValue = e.target.value.replace(/[^0-9]/g, '');
                                 if (inputValue === '') {

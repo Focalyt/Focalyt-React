@@ -7,7 +7,7 @@ let router = express.Router();
 
 // Models
 let Status = require('../../models/status');
-let { StatusLogs, AppliedCourses, CandidateProfile, Courses, Center, User, ReEnquire, Source } = require('../../models');
+let { StatusLogs, AppliedCourses, CandidateProfile, Courses, Center, User, ReEnquire, Source, College } = require('../../models');
 
 //helpers
 let { statusLogHelper } = require('../../../helpers/college');
@@ -243,31 +243,52 @@ async function resolveUntouchNotConnectedIds() {
     return { statusIds, subStatusIds };
 }
 
-async function fetchB2cTodayLeads() {
+const VOICEX_DISPATCH_MAX = 20;
+
+async function resolveCollegeIdFromUser(user) {
+    if (!user?._id) return null;
+    const college = await College.findOne({ '_concernPerson._id': user._id }).select('_id').lean();
+    return college?._id || null;
+}
+
+async function courseIdsForCollege(collegeId) {
+    if (!collegeId) return [];
+    return Courses.find({ college: collegeId }).distinct('_id');
+}
+
+async function fetchB2cTodayLeads(collegeId) {
     const { start, end } = getTodayIstBounds();
+    const match = {
+        ...B2C_REGISTRATION_MATCH,
+        createdAt: { $gte: start, $lte: end },
+        ...aiCallNotAttemptedMatch(),
+    };
+    if (collegeId) {
+        const courseIds = await courseIdsForCollege(collegeId);
+        if (!courseIds.length) return [];
+        match._course = { $in: courseIds };
+    }
     return AppliedCourses.aggregate([
-        {
-            $match: {
-                ...B2C_REGISTRATION_MATCH,
-                createdAt: { $gte: start, $lte: end },
-                ...aiCallNotAttemptedMatch(),
-            },
-        },
+        { $match: match },
         ...leadListLookups(),
     ]);
 }
 
-async function fetchUntouchNotConnectedLeads() {
+async function fetchUntouchNotConnectedLeads(collegeId) {
     const { statusIds, subStatusIds } = await resolveUntouchNotConnectedIds();
+    const match = {
+        ...B2C_REGISTRATION_MATCH,
+        _leadStatus: { $in: statusIds },
+        _leadSubStatus: { $in: subStatusIds },
+        ...aiCallNotAttemptedMatch(),
+    };
+    if (collegeId) {
+        const courseIds = await courseIdsForCollege(collegeId);
+        if (!courseIds.length) return [];
+        match._course = { $in: courseIds };
+    }
     return AppliedCourses.aggregate([
-        {
-            $match: {
-                ...B2C_REGISTRATION_MATCH,
-                _leadStatus: { $in: statusIds },
-                _leadSubStatus: { $in: subStatusIds },
-                ...aiCallNotAttemptedMatch(),
-            },
-        },
+        { $match: match },
         ...leadListLookups(),
     ]);
 }
@@ -1208,9 +1229,10 @@ router.get("/today", async (req, res) => {
 });
 
 // All B2C registration leads created today (IST).
-router.get("/b2c-today", async (req, res) => {
+router.get("/b2c-today", isCollege, async (req, res) => {
     try {
-        const leads = await fetchB2cTodayLeads();
+        const collegeId = await resolveCollegeIdFromUser(req.user);
+        const leads = await fetchB2cTodayLeads(collegeId);
 
         return res.json({
             status: true,
@@ -1227,9 +1249,10 @@ router.get("/b2c-today", async (req, res) => {
 });
 
 // B2C leads currently in Untouch + Not Connected.
-router.get("/untouch-not-connected", async (req, res) => {
+router.get("/untouch-not-connected", isCollege, async (req, res) => {
     try {
-        const leads = await fetchUntouchNotConnectedLeads();
+        const collegeId = await resolveCollegeIdFromUser(req.user);
+        const leads = await fetchUntouchNotConnectedLeads(collegeId);
 
         return res.json({
             status: true,
@@ -1484,11 +1507,21 @@ router.post("/voicex-dispatch", isCollege, async (req, res) => {
         const selectedLeadIds = normalizeDispatchLeadIds(
             req.body.leadIds || req.body.appliedCourseIds || req.body.lead_ids
         );
+        const rawLimit = Number(req.body.limit);
+        const hasLimit = Number.isInteger(rawLimit) && rawLimit > 0;
+        if (!selectedLeadIds.length && !hasLimit) {
+            return res.status(400).json({
+                status: false,
+                msg: "limit or leadIds is required",
+            });
+        }
+
+        const collegeId = await resolveCollegeIdFromUser(req.user);
         let pool = [];
         if (source === 'b2c-today') {
-            pool = await fetchB2cTodayLeads();
+            pool = await fetchB2cTodayLeads(collegeId);
         } else if (source === 'untouch-not-connected') {
-            pool = await fetchUntouchNotConnectedLeads();
+            pool = await fetchUntouchNotConnectedLeads(collegeId);
         } else if (!selectedLeadIds.length) {
             return res.status(400).json({
                 status: false,
@@ -1496,25 +1529,24 @@ router.post("/voicex-dispatch", isCollege, async (req, res) => {
             });
         }
 
-        let leads = pool;
-        const total = selectedLeadIds.length || pool.length;
-        const rawLimit = Number(req.body.limit);
+        const maxSend = Math.min(VOICEX_DISPATCH_MAX, hasLimit ? rawLimit : VOICEX_DISPATCH_MAX);
+        let leads = [];
         if (selectedLeadIds.length) {
             const byId = new Map(pool.map((row) => [String(row.lead_id), row]));
-            leads = selectedLeadIds.map((id) => byId.get(id) || { lead_id: id });
-        } else if (Number.isInteger(rawLimit) && rawLimit > 0) {
-            leads = pool.slice(0, rawLimit);
+            leads = selectedLeadIds
+                .slice(0, maxSend)
+                .map((id) => byId.get(id) || { lead_id: id });
+        } else {
+            leads = pool.slice(0, maxSend);
         }
 
         const result = await dispatchVoiceCallsForLeads(leads);
         return res.json({
             status: true,
             msg: `${result.queued} AI call(s) queued`,
-            total,
+            total: pool.length,
             count: leads.length,
-            limit: selectedLeadIds.length
-                ? selectedLeadIds.length
-                : (Number.isInteger(rawLimit) && rawLimit > 0 ? rawLimit : total),
+            limit: maxSend,
             queued: result.queued,
             skippedNoMobile: result.skippedNoMobile,
             skippedAlreadyCalled: result.skippedAlreadyCalled,
