@@ -4165,6 +4165,8 @@ console.log('API Response:', response.data);
                 followup: fullDetail.followup,
                 followUpCall: fullDetail.followUpCall,
                 followUpVisit: fullDetail.followUpVisit,
+                followupStats: fullDetail.followupStats ?? p.followupStats,
+                followupDate: fullDetail.followupDate ?? null,
               } : p));
             }
           } catch (err) {

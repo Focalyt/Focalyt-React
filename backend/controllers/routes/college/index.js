@@ -2279,8 +2279,13 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 			.populate('followUpVisit')
 			.lean();
 
-		let followUpCall = mapFollowupSlot(courseSlots?.followUpCall);
-		let followUpVisit = mapFollowupSlot(courseSlots?.followUpVisit);
+		const isPlannedSlot = (f) => String(f?.status || '').toLowerCase() === 'planned';
+		let followUpCall = isPlannedSlot(courseSlots?.followUpCall)
+			? mapFollowupSlot(courseSlots.followUpCall)
+			: null;
+		let followUpVisit = isPlannedSlot(courseSlots?.followUpVisit)
+			? mapFollowupSlot(courseSlots.followUpVisit)
+			: null;
 
 		if (!followUpCall || !followUpVisit) {
 			const plannedFollowups = await B2cFollowup.find({
@@ -2297,6 +2302,9 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 				}
 			});
 		}
+
+		if (!followUpCall) followUpCall = mapFollowupSlot(courseSlots?.followUpCall);
+		if (!followUpVisit) followUpVisit = mapFollowupSlot(courseSlots?.followUpVisit);
 
 		const followup = followUpCall || followUpVisit || await B2cFollowup.findOne({
 			appliedCourseId: data._id,
@@ -2627,11 +2635,13 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 			const courseKey = doc._id.toString();
 			const slotIds = courseSlotIds.get(courseKey) || {};
+			const slottedCall = slotIds.callId ? slotById.get(slotIds.callId) : null;
+			const slottedVisit = slotIds.visitId ? slotById.get(slotIds.visitId) : null;
 			const followUpCall = mapFollowupSlot(
-				(slotIds.callId && slotById.get(slotIds.callId)) || callByCourse.get(courseKey) || null
+				callByCourse.get(courseKey) || slottedCall || null
 			);
 			const followUpVisit = mapFollowupSlot(
-				(slotIds.visitId && slotById.get(slotIds.visitId)) || visitByCourse.get(courseKey) || null
+				visitByCourse.get(courseKey) || slottedVisit || null
 			);
 			const followup = followUpCall || followUpVisit || followupByCourse.get(courseKey) || null;
 
@@ -7976,7 +7986,10 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 		} = req.body;
 
 		const userId = req.user._id;
-		const collegeId = req.user.college._id;
+		const collegeId = req.college?._id || req.user?.college?._id;
+		if (!collegeId) {
+			return res.status(400).json({ success: false, message: 'College not found for this user' });
+		}
 
 		// Find the AppliedCourse document by ID
 		const doc = await AppliedCourses.findById(id);
@@ -7994,44 +8007,82 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 		// Fetch the new status document (including sub-statuses)
 		const newStatusDoc = await Status.findById(_leadStatus).lean();
 		const newStatusTitle = newStatusDoc ? newStatusDoc.title : 'Unknown';
-		const newSubStatusTitle = newStatusDoc?.substatuses?.find(s => s._id.toString() === _leadSubStatus)?.title || 'Unknown';
+		const selectedSubstatus = newStatusDoc?.substatuses?.find(s => s._id.toString() === String(_leadSubStatus));
+		const newSubStatusTitle = selectedSubstatus?.title || 'Unknown';
+		const followupNotRequired = selectedSubstatus && selectedSubstatus.hasFollowup === false;
 
 		// If lead sub-status is updated, log the change and update the sub-status
 		// Logging changes
-		if (_leadStatus && doc._leadStatus.toString() !== _leadStatus) {
+		if (_leadStatus && doc._leadStatus?.toString() !== String(_leadStatus)) {
 			actionParts.push(`Lead status changed from "${oldStatusTitle}" to "${newStatusTitle}"`);
 			doc._leadStatus = _leadStatus;
 		}
 
-		if (_leadSubStatus && doc._leadSubStatus.toString() !== _leadSubStatus) {
+		if (_leadSubStatus && doc._leadSubStatus?.toString() !== String(_leadSubStatus)) {
 			actionParts.push(`Lead sub-status changed from "${oldSubStatusTitle}" to "${newSubStatusTitle}"`);
 			doc._leadSubStatus = _leadSubStatus;
 		}
-		// Get the most recent planned followup for this lead, if any
-		let lastFollowup = await B2cFollowup
-			.findOne({ appliedCourseId: doc._id, status: 'planned' })
-			.sort({ followupDate: -1, createdAt: -1 });
-		if (lastFollowup) {
-			lastFollowup.status = 'done';
-			await lastFollowup.save();
-		}
 
-		// If followup date and time is set or updated, log the change and update the followup
+		// Create/replace planned Call followup only when a followup datetime is sent.
+		// Previously every status change marked the last planned followup as done, and
+		// skipped creating a new one when the datetime matched — so counselors with an
+		// existing followup (like Rinki) lost it while others could still add one.
 		let newFollowup = null;
-		if (followup && lastFollowup?.followupDate?.toISOString() !== new Date(followup).toISOString()) {
-			actionParts.push(`Followup updated to ${new Date(followup).toLocaleString()}`);
-			// Push a new followup object
+		if (followup) {
+			const followupDate = new Date(followup);
+			if (Number.isNaN(followupDate.getTime())) {
+				return res.status(400).json({ success: false, message: 'Invalid followup date' });
+			}
+
+			const lastFollowup = await B2cFollowup
+				.findOne({
+					appliedCourseId: doc._id,
+					status: 'planned',
+					$or: [
+						{ followUpType: 'Call' },
+						{ followUpType: { $exists: false } },
+						{ followUpType: null },
+					],
+				})
+				.sort({ followupDate: -1, createdAt: -1 });
+
+			if (lastFollowup) {
+				lastFollowup.status = 'done';
+				lastFollowup.updatedBy = userId;
+				lastFollowup.statusUpdatedAt = new Date();
+				await lastFollowup.save();
+			}
+
 			newFollowup = new B2cFollowup({
 				appliedCourseId: doc._id,
-				followupDate: new Date(followup),
-				remarks: remarks,
+				followupDate,
+				remarks,
 				status: 'planned',
 				counsellorId: userId,
 				createdBy: userId,
-				collegeId: collegeId
+				collegeId,
+				followUpType: 'Call',
 			});
 			await newFollowup.save();
-			doc.followupDate = new Date(followup);
+			doc.followupDate = followupDate;
+			doc.followUpCall = newFollowup._id;
+			actionParts.push(`Followup updated to ${followupDate.toLocaleString()}`);
+		} else if (followupNotRequired) {
+			// Substatus has Followup Required = false → close any open planned follow-ups
+			const autoCompleteResult = await B2cFollowup.updateMany(
+				{ appliedCourseId: doc._id, status: 'planned' },
+				{ $set: { status: 'done', updatedBy: userId, statusUpdatedAt: new Date() } }
+			);
+			const completedCount = autoCompleteResult.modifiedCount || autoCompleteResult.nModified || 0;
+			if (completedCount > 0) {
+				doc.followupDate = null;
+				if (Array.isArray(doc.followups) && doc.followups.length > 0) {
+					doc.followups.forEach((f) => {
+						if (f?.status === 'Planned') f.status = 'Done';
+					});
+				}
+				actionParts.push('Planned followups auto-marked done (substatus does not require followup)');
+			}
 		}
 
 		if (googleCalendarEvent && newFollowup && req.user.googleAuthToken?.accessToken) {
@@ -8105,7 +8156,8 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 
 		return res.json({ success: true, data: doc });
 	} catch (error) {
-		return res.status(500).json({ success: false, message: 'Internal Server Error' });
+		console.error('[Lead Status Change] Error:', error);
+		return res.status(500).json({ success: false, message: error.message || 'Internal Server Error' });
 	}
 });
 
@@ -8133,7 +8185,9 @@ router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 		// Fetch the new status document (including sub-statuses) only once
 		const newStatusDoc = await Status.findById(_leadStatus).lean();
 		const newStatusTitle = newStatusDoc ? newStatusDoc.title : 'Unknown';
-		const newSubStatusTitle = newStatusDoc?.substatuses?.find(s => s._id.toString() === _leadSubStatus)?.title || 'Unknown';
+		const selectedSubstatus = newStatusDoc?.substatuses?.find(s => s._id.toString() === String(_leadSubStatus));
+		const newSubStatusTitle = selectedSubstatus?.title || 'Unknown';
+		const followupNotRequired = selectedSubstatus && selectedSubstatus.hasFollowup === false;
 
 		// Process profiles in parallel using Promise.all
 		const updatePromises = selectedProfiles.map(async (id) => {
@@ -8159,6 +8213,18 @@ router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 			if (_leadSubStatus && doc._leadSubStatus.toString() !== _leadSubStatus) {
 				actionParts.push(`Lead sub-status changed from "${oldSubStatusTitle}" to "${newSubStatusTitle}"`);
 				doc._leadSubStatus = _leadSubStatus;
+			}
+
+			if (followupNotRequired) {
+				const autoCompleteResult = await B2cFollowup.updateMany(
+					{ appliedCourseId: doc._id, status: 'planned' },
+					{ $set: { status: 'done', updatedBy: userId, statusUpdatedAt: new Date() } }
+				);
+				const completedCount = autoCompleteResult.modifiedCount || autoCompleteResult.nModified || 0;
+				if (completedCount > 0) {
+					doc.followupDate = null;
+					actionParts.push('Planned followups auto-marked done (substatus does not require followup)');
+				}
 			}
 
 			if (doc.followups?.length > 0) {
