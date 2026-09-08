@@ -8007,7 +8007,9 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 		// Fetch the new status document (including sub-statuses)
 		const newStatusDoc = await Status.findById(_leadStatus).lean();
 		const newStatusTitle = newStatusDoc ? newStatusDoc.title : 'Unknown';
-		const newSubStatusTitle = newStatusDoc?.substatuses?.find(s => s._id.toString() === _leadSubStatus)?.title || 'Unknown';
+		const selectedSubstatus = newStatusDoc?.substatuses?.find(s => s._id.toString() === String(_leadSubStatus));
+		const newSubStatusTitle = selectedSubstatus?.title || 'Unknown';
+		const followupNotRequired = selectedSubstatus && selectedSubstatus.hasFollowup === false;
 
 		// If lead sub-status is updated, log the change and update the sub-status
 		// Logging changes
@@ -8065,6 +8067,22 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 			doc.followupDate = followupDate;
 			doc.followUpCall = newFollowup._id;
 			actionParts.push(`Followup updated to ${followupDate.toLocaleString()}`);
+		} else if (followupNotRequired) {
+			// Substatus has Followup Required = false → close any open planned follow-ups
+			const autoCompleteResult = await B2cFollowup.updateMany(
+				{ appliedCourseId: doc._id, status: 'planned' },
+				{ $set: { status: 'done', updatedBy: userId, statusUpdatedAt: new Date() } }
+			);
+			const completedCount = autoCompleteResult.modifiedCount || autoCompleteResult.nModified || 0;
+			if (completedCount > 0) {
+				doc.followupDate = null;
+				if (Array.isArray(doc.followups) && doc.followups.length > 0) {
+					doc.followups.forEach((f) => {
+						if (f?.status === 'Planned') f.status = 'Done';
+					});
+				}
+				actionParts.push('Planned followups auto-marked done (substatus does not require followup)');
+			}
 		}
 
 		if (googleCalendarEvent && newFollowup && req.user.googleAuthToken?.accessToken) {
@@ -8167,7 +8185,9 @@ router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 		// Fetch the new status document (including sub-statuses) only once
 		const newStatusDoc = await Status.findById(_leadStatus).lean();
 		const newStatusTitle = newStatusDoc ? newStatusDoc.title : 'Unknown';
-		const newSubStatusTitle = newStatusDoc?.substatuses?.find(s => s._id.toString() === _leadSubStatus)?.title || 'Unknown';
+		const selectedSubstatus = newStatusDoc?.substatuses?.find(s => s._id.toString() === String(_leadSubStatus));
+		const newSubStatusTitle = selectedSubstatus?.title || 'Unknown';
+		const followupNotRequired = selectedSubstatus && selectedSubstatus.hasFollowup === false;
 
 		// Process profiles in parallel using Promise.all
 		const updatePromises = selectedProfiles.map(async (id) => {
@@ -8193,6 +8213,18 @@ router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 			if (_leadSubStatus && doc._leadSubStatus.toString() !== _leadSubStatus) {
 				actionParts.push(`Lead sub-status changed from "${oldSubStatusTitle}" to "${newSubStatusTitle}"`);
 				doc._leadSubStatus = _leadSubStatus;
+			}
+
+			if (followupNotRequired) {
+				const autoCompleteResult = await B2cFollowup.updateMany(
+					{ appliedCourseId: doc._id, status: 'planned' },
+					{ $set: { status: 'done', updatedBy: userId, statusUpdatedAt: new Date() } }
+				);
+				const completedCount = autoCompleteResult.modifiedCount || autoCompleteResult.nModified || 0;
+				if (completedCount > 0) {
+					doc.followupDate = null;
+					actionParts.push('Planned followups auto-marked done (substatus does not require followup)');
+				}
 			}
 
 			if (doc.followups?.length > 0) {
