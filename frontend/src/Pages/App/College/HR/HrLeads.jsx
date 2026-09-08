@@ -3,9 +3,11 @@ import { createPortal } from 'react-dom';
 import axios from 'axios';
 import moment from 'moment';
 import Calendar from 'react-calendar';
+import DatePicker from 'react-date-picker';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import 'react-calendar/dist/Calendar.css';
+import 'react-date-picker/dist/DatePicker.css';
 import './HrLeads.css';
 import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
@@ -85,11 +87,169 @@ const userRefId = (user) => String(user?._id || user || '');
 
 const EMPTY_FOLLOWUP_BUCKET = { done: 0, planned: 0, missed: 0 };
 
+const EMPTY_HR_FILTERS = {
+  applyingFor: '',
+  statuses: '',
+  subStatuses: '',
+  hasFollowUpCall: '',
+  hasFollowUpVisit: '',
+  createdFromDate: null,
+  createdToDate: null,
+  modifiedFromDate: null,
+  modifiedToDate: null,
+  nextActionFromDate: null,
+  nextActionToDate: null,
+};
+
+const EMPTY_HR_MULTISELECT = {
+  counselor: [],
+  owner: [],
+};
+
+const toFilterYmd = (value) => (value ? moment(value).format('YYYY-MM-DD') : undefined);
+
+const formatFilterDate = (date) => {
+  const parsed = date instanceof Date ? date : date ? new Date(date) : null;
+  if (!parsed || Number.isNaN(parsed.getTime())) return '';
+  return parsed.toLocaleDateString('en-GB');
+};
+
+const MultiSelectCheckbox = ({
+  title,
+  options,
+  selectedValues,
+  onChange,
+  icon = 'fas fa-list',
+  isOpen,
+  onToggle,
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) setSearchTerm('');
+  }, [isOpen]);
+
+  const handleCheckboxChange = (value) => {
+    const newValues = selectedValues.includes(value)
+      ? selectedValues.filter((item) => item !== value)
+      : [...selectedValues, value];
+    onChange(newValues);
+  };
+
+  const filteredOptions = [...(options || [])]
+    .sort((a, b) => (a?.label || '').localeCompare((b?.label || ''), undefined, { sensitivity: 'base' }))
+    .filter((option) => (option?.label || '').toLowerCase().includes(searchTerm.toLowerCase()));
+
+  const getDisplayText = () => {
+    if (!selectedValues.length) return `Select ${title}`;
+    if (selectedValues.length === 1) {
+      const selectedOption = options.find((opt) => opt.value === selectedValues[0]);
+      return selectedOption ? selectedOption.label : selectedValues[0];
+    }
+    if (selectedValues.length <= 2) {
+      return selectedValues
+        .map((val) => options.find((opt) => opt.value === val)?.label || val)
+        .join(', ');
+    }
+    return `${selectedValues.length} items selected`;
+  };
+
+  return (
+    <div className="multi-select-container-new">
+      <label className="form-label small fw-bold text-dark d-flex align-items-center mb-2">
+        <i className={`${icon} me-1 text-primary`} />
+        {title}
+        {selectedValues.length > 0 && (
+          <span className="badge bg-primary ms-2">{selectedValues.length}</span>
+        )}
+      </label>
+      <div className="multi-select-dropdown-new">
+        <button
+          type="button"
+          className={`form-select multi-select-trigger ${isOpen ? 'open' : ''}`}
+          onClick={onToggle}
+          style={{ cursor: 'pointer', textAlign: 'left' }}
+        >
+          <span className="select-display-text">{getDisplayText()}</span>
+          <i className={`fas fa-chevron-${isOpen ? 'up' : 'down'} dropdown-arrow`} />
+        </button>
+        {isOpen && (
+          <div className="multi-select-options-new">
+            <div className="options-search">
+              <div className="input-group input-group-sm">
+                <span className="input-group-text" style={{ height: '40px' }}>
+                  <i className="fas fa-search" />
+                </span>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder={`Search ${title.toLowerCase()}...`}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+            </div>
+            <div className="options-list-new">
+              {filteredOptions.map((option) => (
+                <label key={option.value} className="option-item-new">
+                  <input
+                    type="checkbox"
+                    className="form-check-input me-2"
+                    checked={selectedValues.includes(option.value)}
+                    onChange={() => handleCheckboxChange(option.value)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <span className="option-label-new">{option.label}</span>
+                  {selectedValues.includes(option.value) && (
+                    <i className="fas fa-check text-primary ms-auto" />
+                  )}
+                </label>
+              ))}
+              {filteredOptions.length === 0 && (
+                <div className="no-options">
+                  <i className="fas fa-info-circle me-2" />
+                  {searchTerm
+                    ? `No ${title.toLowerCase()} found for "${searchTerm}"`
+                    : `No ${title.toLowerCase()} available`}
+                </div>
+              )}
+            </div>
+            {selectedValues.length > 0 && (
+              <div className="options-footer">
+                <small className="text-muted">
+                  {selectedValues.length} of {filteredOptions.length} selected
+                  {searchTerm && ` (filtered from ${options.length} total)`}
+                </small>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const formatFollowupDate = (value) => {
   if (!value) return 'N/A';
   const dateObj = new Date(value);
   if (Number.isNaN(dateObj.getTime())) return 'N/A';
   return moment(dateObj).format('DD MMM YYYY, hh:mm A');
+};
+
+const getNextActionDate = (lead) => {
+  const dates = [lead?.nextCallFollowup?.followupDate, lead?.nextVisitFollowup?.followupDate]
+    .map((value) => (value ? new Date(value) : null))
+    .filter((dateObj) => dateObj && !Number.isNaN(dateObj.getTime()));
+  if (!dates.length) return 'N/A';
+  dates.sort((a, b) => a.getTime() - b.getTime());
+  return formatFollowupDate(dates[0]);
+};
+
+const toFollowupMoment = (dateValue, timeValue) => {
+  if (!dateValue || !timeValue) return null;
+  const parsed = moment(`${dateValue} ${timeValue}`, 'YYYY-MM-DD HH:mm');
+  return parsed.isValid() ? parsed : null;
 };
 
 const getFileType = (url) => {
@@ -300,6 +460,17 @@ const HrLeads = () => {
   const [uploadingDoc, setUploadingDoc] = useState('');
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
+  const [isFilterCollapsed, setIsFilterCollapsed] = useState(true);
+  const [filterData, setFilterData] = useState(EMPTY_HR_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState(EMPTY_HR_FILTERS);
+  const [multiSelect, setMultiSelect] = useState(EMPTY_HR_MULTISELECT);
+  const [appliedMultiSelect, setAppliedMultiSelect] = useState(EMPTY_HR_MULTISELECT);
+  const [dropdownStates, setDropdownStates] = useState({ counselor: false, owner: false });
+  const [selectedProfiles, setSelectedProfiles] = useState([]);
+  const [selectedConcernPerson, setSelectedConcernPerson] = useState('');
+  const [referring, setReferring] = useState(false);
+  const [leadHistory, setLeadHistory] = useState([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth <= 768);
@@ -362,9 +533,34 @@ const HrLeads = () => {
       applyingFor: applyingFor || undefined,
       followupType: followupFilter?.type || undefined,
       followupBucket: followupFilter?.bucket || undefined,
+      subStatus: appliedFilters.subStatuses || undefined,
+      owner: appliedMultiSelect.owner.length ? JSON.stringify(appliedMultiSelect.owner.map(String)) : undefined,
+      counselor: appliedMultiSelect.counselor.length ? JSON.stringify(appliedMultiSelect.counselor.map(String)) : undefined,
+      hasFollowUpCall: appliedFilters.hasFollowUpCall === true
+        ? 'true'
+        : appliedFilters.hasFollowUpCall === false
+          ? 'false'
+          : undefined,
+      hasFollowUpVisit: appliedFilters.hasFollowUpVisit === true
+        ? 'true'
+        : appliedFilters.hasFollowUpVisit === false
+          ? 'false'
+          : undefined,
+      createdFromDate: toFilterYmd(appliedFilters.createdFromDate),
+      createdToDate: toFilterYmd(appliedFilters.createdToDate),
+      modifiedFromDate: toFilterYmd(appliedFilters.modifiedFromDate),
+      modifiedToDate: toFilterYmd(appliedFilters.modifiedToDate),
+      nextActionFromDate: toFilterYmd(appliedFilters.nextActionFromDate),
+      nextActionToDate: toFilterYmd(appliedFilters.nextActionToDate),
       ...dateRange,
+      ...(appliedFilters.createdFromDate || appliedFilters.createdToDate
+        ? {
+          startDate: toFilterYmd(appliedFilters.createdFromDate) || dateRange.startDate,
+          endDate: toFilterYmd(appliedFilters.createdToDate) || dateRange.endDate,
+        }
+        : {}),
     }),
-    [page, search, leadStatus, applyingFor, followupFilter, dateRange]
+    [page, search, leadStatus, applyingFor, followupFilter, dateRange, appliedFilters, appliedMultiSelect]
   );
 
   const fetchCounts = useCallback(async () => {
@@ -407,6 +603,17 @@ const HrLeads = () => {
   }, [fetchLeads, fetchCounts]);
 
   useEffect(() => {
+    if (!dropdownStates.counselor && !dropdownStates.owner) return undefined;
+    const onDown = (event) => {
+      if (!event.target.closest('.multi-select-container-new')) {
+        setDropdownStates({ counselor: false, owner: false });
+      }
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [dropdownStates]);
+
+  useEffect(() => {
     const fetchHrStatuses = async () => {
       try {
         const res = await axios.get(`${backendUrl}/college/hr/statuses`, { headers });
@@ -432,6 +639,79 @@ const HrLeads = () => {
     (kind) => (hrStatuses || []).find((status) => approvalFromMilestone(status.milestone) === kind),
     [hrStatuses]
   );
+
+  const filterSubStatuses = useMemo(
+    () => getSubStatuses(filterData.statuses),
+    [getSubStatuses, filterData.statuses]
+  );
+
+  const totalSelected = (multiSelect.counselor?.length || 0) + (multiSelect.owner?.length || 0);
+  const appliedSelected = (appliedMultiSelect.counselor?.length || 0) + (appliedMultiSelect.owner?.length || 0);
+  const countFilledFilters = (data) => Object.values(data).filter((val) => val === false || (val && val !== 'true')).length;
+  const appliedFilterCount = countFilledFilters(appliedFilters) + appliedSelected;
+
+  const toggleDropdown = (key) => {
+    setDropdownStates((prev) => ({
+      counselor: false,
+      owner: false,
+      [key]: !prev[key],
+    }));
+  };
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilterData((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === 'statuses' ? { subStatuses: '' } : {}),
+    }));
+  };
+
+  const handleDateFilterChange = (date, field) => {
+    setFilterData((prev) => ({ ...prev, [field]: date }));
+  };
+
+  const clearDateFilter = (kind) => {
+    if (kind === 'created') {
+      setFilterData((prev) => ({ ...prev, createdFromDate: null, createdToDate: null }));
+    } else if (kind === 'modified') {
+      setFilterData((prev) => ({ ...prev, modifiedFromDate: null, modifiedToDate: null }));
+    } else if (kind === 'nextAction') {
+      setFilterData((prev) => ({ ...prev, nextActionFromDate: null, nextActionToDate: null }));
+    }
+  };
+
+  const applyAdvancedFilters = () => {
+    setAppliedFilters(filterData);
+    setAppliedMultiSelect(multiSelect);
+    if (filterData.applyingFor !== undefined) setApplyingFor(filterData.applyingFor || '');
+    if (filterData.statuses) setLeadStatus(String(filterData.statuses));
+    if (filterData.createdFromDate || filterData.createdToDate) {
+      setHeaderDatePreset('');
+      setShowHeaderDateRangePicker(false);
+    }
+    setPage(1);
+    setIsFilterCollapsed(true);
+    setDropdownStates({ counselor: false, owner: false });
+  };
+
+  const clearAllFilters = () => {
+    setFilterData(EMPTY_HR_FILTERS);
+    setAppliedFilters(EMPTY_HR_FILTERS);
+    setMultiSelect(EMPTY_HR_MULTISELECT);
+    setAppliedMultiSelect(EMPTY_HR_MULTISELECT);
+    setApplyingFor('');
+    setLeadStatus('all');
+    setFollowupFilter(null);
+    setHeaderDatePreset('');
+    setHeaderDateFrom(null);
+    setHeaderDateTo(null);
+    setShowHeaderDateRangePicker(false);
+    setSearch('');
+    setSearchInput('');
+    setPage(1);
+    setDropdownStates({ counselor: false, owner: false });
+  };
 
   useEffect(() => {
     const fetchCounselors = async () => {
@@ -552,8 +832,107 @@ const HrLeads = () => {
     setFollowUpType('Call');
     setRemarks('');
     setStatusAttachment(null);
+    setSelectedConcernPerson('');
+    setLeadHistory([]);
     document.body.classList.remove('panel-open');
   };
+
+  const toggleLeadSelect = (leadId, checked) => {
+    const id = String(leadId);
+    setSelectedProfiles((prev) => {
+      if (checked) return prev.includes(id) ? prev : [...prev, id];
+      return prev.filter((item) => item !== id);
+    });
+  };
+
+  const openReferPanel = (lead, bulk = false) => {
+    setSelectedConcernPerson('');
+    if (bulk) {
+      setStatusPanelLead(null);
+      setShowPanel('RefferAllLeads');
+    } else {
+      setStatusPanelLead(lead);
+      setShowPanel('Reffer');
+    }
+    if (isMobile) document.body.classList.add('panel-open');
+  };
+
+  const handleReferLead = async () => {
+    if (!selectedConcernPerson) {
+      toast.error('Please select a counselor');
+      return;
+    }
+    const isBulk = showPanel === 'RefferAllLeads';
+    const leadIds = isBulk
+      ? selectedProfiles
+      : statusPanelLead?._id
+        ? [String(statusPanelLead._id)]
+        : [];
+    if (!leadIds.length) {
+      toast.error(isBulk ? 'Please select at least one lead to refer' : 'Please select a lead to refer');
+      return;
+    }
+    try {
+      setReferring(true);
+      const res = await axios.post(
+        `${backendUrl}/college/hr/leads/refer`,
+        { counselorId: selectedConcernPerson, leadIds },
+        { headers }
+      );
+      if (res.data?.success) {
+        toast.success(res.data.message || 'Lead referred successfully');
+        setSelectedProfiles([]);
+        closePanel();
+        fetchLeads();
+        fetchCounts();
+      } else {
+        toast.error(res.data?.message || 'Failed to refer lead');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to refer lead');
+    } finally {
+      setReferring(false);
+    }
+  };
+
+  const openHistoryPanel = (lead) => {
+    setStatusPanelLead(lead);
+    setShowPanel('leadHistory');
+    if (isMobile) document.body.classList.add('panel-open');
+  };
+
+  const fetchLeadHistory = useCallback(async (lead) => {
+    const leadId = lead?._id;
+    if (!leadId) {
+      setLeadHistory([]);
+      setIsHistoryLoading(false);
+      return;
+    }
+    try {
+      setIsHistoryLoading(true);
+      setLeadHistory([]);
+      const response = await axios.get(`${backendUrl}/college/hr/leads/${leadId}`, { headers });
+      if (response.data?.success) {
+        const logs = [...(response.data.data?.logs || [])].sort(
+          (a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0)
+        );
+        setLeadHistory(logs);
+      } else {
+        toast.error('Failed to load history');
+      }
+    } catch (error) {
+      console.error('Error fetching lead history:', error);
+      toast.error(error.response?.data?.message || 'Failed to load history');
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  }, [backendUrl, headers]);
+
+  useEffect(() => {
+    if (showPanel === 'leadHistory' && statusPanelLead?._id) {
+      fetchLeadHistory(statusPanelLead);
+    }
+  }, [showPanel, statusPanelLead, fetchLeadHistory]);
 
   const openDocumentModal = (e, doc, lead) => {
     e?.preventDefault?.();
@@ -603,6 +982,11 @@ const HrLeads = () => {
       toast.error('Followup date and time are mandatory for this status.');
       return;
     }
+    const statusFollowupAt = sub?.hasFollowup ? toFollowupMoment(followupDate, followupTime) : null;
+    if (sub?.hasFollowup && (!statusFollowupAt || !statusFollowupAt.isAfter(moment()))) {
+      toast.error('Please select a future date and time. Past time is counted as Missed.');
+      return;
+    }
     if (sub?.hasAttachment && !statusAttachment) {
       toast.error('Attachment is mandatory for this status.');
       return;
@@ -616,7 +1000,7 @@ const HrLeads = () => {
     if (sub?.hasRemarks) payload.remark = remarks.trim();
     if (sub?.hasFollowup) {
       payload.followupType = 'Call';
-      payload.followupDate = moment(`${followupDate} ${followupTime}`, 'YYYY-MM-DD HH:mm').toISOString();
+      payload.followupDate = statusFollowupAt.toISOString();
     }
 
     const updated = await updateLead(statusPanelLead._id, payload);
@@ -662,13 +1046,23 @@ const HrLeads = () => {
       return;
     }
 
+    const followupAt = toFollowupMoment(followupDate, followupTime);
+    if (!followupAt) {
+      toast.error('Please select a valid followup date and time');
+      return;
+    }
+    if (!followupAt.isAfter(moment())) {
+      toast.error('Please select a future date and time. Past time is counted as Missed.');
+      return;
+    }
+
     try {
       setSavingStatus(true);
       const res = await axios.post(
         `${backendUrl}/college/hr/leads/${statusPanelLead._id}/followup`,
         {
           type: followUpType,
-          followupDate: moment(`${followupDate} ${followupTime}`, 'YYYY-MM-DD HH:mm').toISOString(),
+          followupDate: followupAt.toISOString(),
           remarks: remarks.trim(),
         },
         { headers }
@@ -911,6 +1305,7 @@ const HrLeads = () => {
 
   const renderEditPanel = () => {
     if (!showPanel || !statusPanelLead) return null;
+    if (showPanel === 'Reffer' || showPanel === 'RefferAllLeads' || showPanel === 'leadHistory') return null;
     const isFollowup = showPanel === 'followUp';
     // Fields only appear when the sub-status was configured to require them.
     const activeSub = getSubStatuses(selectedStatus).find((s) => String(s._id) === String(selectedSubStatus));
@@ -996,6 +1391,7 @@ const HrLeads = () => {
                     type="time"
                     className="form-control border-0 bgcolor"
                     value={followupTime}
+                    min={followupDate === moment().format('YYYY-MM-DD') ? moment().format('HH:mm') : undefined}
                     onChange={(e) => setFollowupTime(e.target.value)}
                     style={{ backgroundColor: '#f1f2f6', height: 42, paddingInline: 10 }}
                   />
@@ -1082,6 +1478,236 @@ const HrLeads = () => {
     );
   };
 
+  const renderRefferPanel = () => {
+    const isBulk = showPanel === 'RefferAllLeads';
+    if (showPanel !== 'Reffer' && !isBulk) return null;
+
+    const panelContent = (
+      <div className="card border-0 shadow-sm">
+        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
+          <div className="d-flex align-items-center">
+            <div className="me-2">
+              <i className="fas fa-user-edit text-secondary" />
+            </div>
+            <h6 className="mb-0 followUp fw-medium">
+              {showPanel === 'Reffer' && `Refer Lead ${statusPanelLead?.fullName || 'Unknown'} to Counselor`}
+              {isBulk && 'Refer All Lead to Counselor'}
+            </h6>
+          </div>
+          <button className="btn-close" type="button" onClick={closePanel} />
+        </div>
+        <div className="card-body">
+          <form>
+            <div className="mb-1">
+              <label htmlFor="hr-refer-counselor" className="form-label small fw-medium text-dark">
+                Select Counselor<span className="text-danger">*</span>
+              </label>
+              <select
+                className="form-select border-0 bgcolor"
+                id="hr-refer-counselor"
+                value={selectedConcernPerson || ''}
+                style={{
+                  height: '42px',
+                  paddingTop: '8px',
+                  paddingInline: '10px',
+                  width: '100%',
+                  backgroundColor: '#f1f2f6',
+                }}
+                onChange={(e) => setSelectedConcernPerson(e.target.value)}
+              >
+                <option value="">Select Counselor</option>
+                {counselorOptions.map((counselor) => (
+                  <option key={counselor.value} value={counselor.value}>{counselor.label}</option>
+                ))}
+              </select>
+            </div>
+            {isBulk && (
+              <p className="small text-muted mb-0 mt-2">
+                {selectedProfiles.length} lead(s) selected
+              </p>
+            )}
+            <div className="d-flex justify-content-end gap-2 mt-4">
+              <button
+                type="button"
+                className="btn"
+                style={{ border: '1px solid #ddd', padding: '8px 24px', fontSize: 14 }}
+                onClick={closePanel}
+              >
+                CLOSE
+              </button>
+              <button
+                type="button"
+                className="btn text-white"
+                disabled={referring}
+                onClick={handleReferLead}
+                style={{ backgroundColor: '#fd7e14', border: 'none', padding: '8px 24px', fontSize: 14 }}
+              >
+                {referring ? 'REFERRING...' : (showPanel === 'Reffer' ? 'REFER LEAD' : 'REFER BULK LEAD')}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+
+    if (isMobile) {
+      return (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closePanel();
+          }}
+        >
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content">
+              {panelContent}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="col-11 transition-col" id="refferPanel">
+        {panelContent}
+      </div>
+    );
+  };
+
+  const renderLeadHistoryPanel = () => {
+    if (showPanel !== 'leadHistory') return null;
+
+    const panelContent = (
+      <div className="card border-0 shadow-sm h-100">
+        <div className="card-header bg-white d-flex justify-content-between align-items-center py-3 border-bottom">
+          <div className="d-flex align-items-center">
+            <div className="me-2">
+              <i className="fas fa-history text-primary" />
+            </div>
+            <h6 className="mb-0 fw-medium">
+              Lead History{statusPanelLead?.fullName ? ` — ${statusPanelLead.fullName}` : ''}
+            </h6>
+          </div>
+          <button className="btn-close" type="button" onClick={closePanel} />
+        </div>
+        <div className="card-body p-0 d-flex flex-column h-100">
+          <div
+            className="flex-grow-1 overflow-auto px-3 py-2"
+            style={{
+              maxHeight: isMobile ? '60vh' : '65vh',
+              minHeight: '200px',
+            }}
+          >
+            {isHistoryLoading ? (
+              <div className="d-flex align-items-center justify-content-center h-100 py-5">
+                <div className="spinner-border text-primary" role="status">
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+              </div>
+            ) : leadHistory.length > 0 ? (
+              <div className="timeline">
+                {leadHistory.map((log, index) => (
+                  <div key={log._id || index} className="timeline-item mb-4">
+                    <div className="timeline-marker">
+                      <div className="timeline-marker-icon">
+                        <i className="fas fa-circle text-primary" style={{ fontSize: 8 }} />
+                      </div>
+                      {index !== leadHistory.length - 1 && <div className="timeline-line" />}
+                    </div>
+                    <div className="timeline-content">
+                      <div className="card border-0 shadow-sm">
+                        <div className="card-body p-3">
+                          <div className="d-flex justify-content-between align-items-start mb-2" style={{ flexDirection: 'column' }}>
+                            <span className="bg-light text-dark border px-2 py-1 rounded">
+                              {log.timestamp
+                                ? new Date(log.timestamp).toLocaleString('en-IN', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })
+                                : 'Unknown Date'}
+                            </span>
+                            <small className="text-muted mt-1">
+                              <i className="fas fa-user me-1" />
+                              Modified By: {log.user?.name || 'Unknown User'}
+                            </small>
+                          </div>
+                          <div className="mb-2">
+                            <strong className="text-dark d-block mb-1">Action:</strong>
+                            <div className="text-muted small" style={{ lineHeight: 1.6 }}>
+                              {log.action ? (
+                                String(log.action).split(';').map((actionPart, actionIndex) => (
+                                  <div key={actionIndex} className="mb-1">• {actionPart.trim()}</div>
+                                ))
+                              ) : (
+                                <div className="text-muted">No action specified</div>
+                              )}
+                            </div>
+                          </div>
+                          {log.remarks && (
+                            <div>
+                              <strong className="text-dark d-block mb-1">Remarks:</strong>
+                              <p className="mb-0 text-muted small" style={{ lineHeight: 1.4 }}>
+                                {log.remarks}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="d-flex flex-column align-items-center justify-content-center h-100 text-center py-5">
+                <div className="mb-3">
+                  <i className="fas fa-history text-muted" style={{ fontSize: '3rem', opacity: 0.5 }} />
+                </div>
+                <h6 className="text-muted mb-2">No History Available</h6>
+                <p className="text-muted small mb-0">No actions have been recorded for this lead yet.</p>
+              </div>
+            )}
+          </div>
+          <div className="border-top px-3 py-3 bg-light">
+            <div className="d-flex justify-content-end">
+              <button type="button" className="btn btn-outline-secondary" onClick={closePanel}>
+                <i className="fas fa-times me-1" />
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+
+    if (isMobile) {
+      return (
+        <div
+          className="modal show d-block"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closePanel();
+          }}
+        >
+          <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
+            <div className="modal-content" style={{ height: '85vh' }}>
+              {panelContent}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="col-11 transition-col" id="leadHistoryPanel" style={{ height: '80vh' }}>
+        {panelContent}
+      </div>
+    );
+  };
+
   const renderLeadCard = (lead) => {
     const phone = formatPhone(lead.mobile);
     const approval = approvalFromMilestone(lead.statusMilestone);
@@ -1107,6 +1733,18 @@ const HrLeads = () => {
             <div className="lead-strip-v3__profile">
               <div className="lead-strip-v3__profile-top">
                 <div className="lead-strip-v3__profile-head">
+                  <label className="lead-strip-v3__check" title="Select">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      checked={selectedProfiles.includes(String(lead._id))}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        toggleLeadSelect(lead._id, e.target.checked);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </label>
                   <div className="lead-strip-v3__name text-capitalize" title={lead.fullName || 'NA'}>
                     {lead.fullName || 'N/A'}
                   </div>
@@ -1339,6 +1977,30 @@ const HrLeads = () => {
                     )}
                     <button
                       type="button"
+                      className="lead-strip-v3__icon-btn"
+                      title="Refer Lead"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openReferPanel(lead, false);
+                      }}
+                    >
+                      <i className="fas fa-share-alt" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      className="lead-strip-v3__icon-btn"
+                      title="History List"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openHistoryPanel(lead);
+                      }}
+                    >
+                      <i className="fas fa-history" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
                       className="lead-strip-v3__icon-btn lead-strip-v3__icon-btn--collapse"
                       onClick={() => {
                         setExpandedId(expandedId === lead._id ? null : lead._id);
@@ -1370,6 +2032,17 @@ const HrLeads = () => {
                   ) : (
                     <span className="lead-card-kyc-dash__btn">No Resume</span>
                   )}
+                  <button
+                    type="button"
+                    className="lead-card-kyc-dash__btn"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openHistoryPanel(lead);
+                    }}
+                  >
+                    History List
+                  </button>
                 </div>
               </div>
             </div>
@@ -1409,11 +2082,12 @@ const HrLeads = () => {
                   <div className="row g-2 hr-info-grid">
                     {[
                       { label: 'LEAD AGE', value: leadAgeDays(lead.createdAt) },
-                      { label: 'APPLIED FOR', value: lead.applyingFor || 'N/A' },
+                      { label: 'Jobs', value: lead.applyingFor || 'N/A' },
                       { label: 'QUALIFICATION', value: lead.qualification || 'N/A' },
                       { label: 'DATE OF BIRTH', value: formatDob(lead.dateOfBirth) },
                       { label: 'LEAD CREATION DATE', value: formatLeadDate(lead.createdAt) },
                       { label: 'LEAD MODIFICATION DATE', value: formatLeadDate(lead.updatedAt) },
+                      { label: 'NEXT ACTION DATE', value: getNextActionDate(lead) },
                       {
                         label: 'LEAD OWNER',
                         value: (
@@ -1459,9 +2133,10 @@ const HrLeads = () => {
             )}
 
             {expandedId === lead._id && (activeTab[lead._id] || 0) === 1 && (() => {
-              const documents = Array.isArray(lead.documents) && lead.documents.length
+              const documents = (Array.isArray(lead.documents) && lead.documents.length
                 ? lead.documents
-                : [{ key: 'resume', name: 'Resume / CV', fileUrl: lead.resume, uploadedAt: hasResume ? lead.updatedAt : null }];
+                : [{ key: 'resume', name: 'Resume / CV', fileUrl: lead.resume, uploadedAt: hasResume ? lead.updatedAt : null }]
+              ).filter((doc) => String(doc.key || '').toLowerCase() !== 'photo' && !/photo/i.test(doc.name || ''));
               const uploadedCount = documents.filter((doc) => doc.fileUrl).length;
               return (
               <div className="tab-content px-3 pb-3">
@@ -1583,7 +2258,9 @@ const HrLeads = () => {
     );
   };
 
-  const isPanelOpen = Boolean(showPanel && statusPanelLead);
+  const isReferPanel = showPanel === 'Reffer' || showPanel === 'RefferAllLeads';
+  const isHistoryPanel = showPanel === 'leadHistory';
+  const isPanelOpen = Boolean((showPanel && statusPanelLead) || isReferPanel || isHistoryPanel);
   const mainContentClass = !isMobile && isPanelOpen ? 'col-8' : 'col-12';
 
   return (
@@ -1617,12 +2294,15 @@ const HrLeads = () => {
                   <div className="col-md-8 col-xl-8 d-none d-md-flex justify-content-end align-items-center">
                     <div className="b2b-cycle-filters">
                       <div className="b2b-cycle-filters__item">
-                        <label className="small fw-semibold mb-0">Role</label>
+                        <label className="small fw-semibold mb-0">Jobs</label>
                         <select
                           className="form-select form-select-sm b2b-cycle-filters__select"
                           value={applyingFor}
                           onChange={(e) => {
-                            setApplyingFor(e.target.value);
+                            const value = e.target.value;
+                            setApplyingFor(value);
+                            setFilterData((prev) => ({ ...prev, applyingFor: value }));
+                            setAppliedFilters((prev) => ({ ...prev, applyingFor: value }));
                             setPage(1);
                           }}
                         >
@@ -1650,6 +2330,21 @@ const HrLeads = () => {
                           onClick={() => setShowAddModal(true)}
                         >
                           <i className="fas fa-plus" style={{ fontSize: '10px' }} /> Add Leads
+                        </button>
+                        <button
+                          className="btn btn-sm btn-outline-primary"
+                          disabled={loading || leads.length === 0}
+                          style={{ padding: '6px 12px', fontSize: '11px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
+                          onClick={() => {
+                            if (!selectedProfiles.length) {
+                              toast.info('Please select at least one lead to refer');
+                              return;
+                            }
+                            openReferPanel(null, true);
+                          }}
+                        >
+                          <i className="fas fa-share-alt" style={{ fontSize: '10px' }} />
+                          Refer All Leads
                         </button>
                       </div>
                       <div className="adm-cycle-toolbar__inner d-flex align-items-center gap-2">
@@ -1686,6 +2381,27 @@ const HrLeads = () => {
                             <i className="fas fa-search" />
                           </button>
                         </form>
+                        <button
+                          type="button"
+                          className={`btn btn-sm ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-secondary'}`}
+                          onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+                          style={{
+                            background: !isFilterCollapsed ? 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)' : '#ffffff',
+                            color: !isFilterCollapsed ? '#ffffff' : 'rgb(250, 85, 121)',
+                            fontWeight: 500,
+                            padding: '8px 16px',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            borderWidth: '1.5px',
+                            borderColor: 'rgb(250, 85, 121)',
+                          }}
+                        >
+                          <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`} />
+                          {isMobile ? 'Filters' : 'More'}
+                          {appliedFilterCount > 0 && (
+                            <span className="badge bg-primary ms-1">{appliedFilterCount}</span>
+                          )}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1693,6 +2409,424 @@ const HrLeads = () => {
               </div>
             </nav>
           </div>
+
+          {!isFilterCollapsed && (
+            <div
+              className="modal show fade d-block"
+              style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setIsFilterCollapsed(true);
+              }}
+            >
+              <div className="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered mx-auto justify-content-center">
+                <div className="modal-content">
+                  <div className="modal-header bg-white border-bottom">
+                    <div className="d-flex justify-content-between align-items-center w-100">
+                      <div className="d-flex align-items-center">
+                        <i className="fas fa-filter text-primary me-2" />
+                        <h5 className="fw-bold mb-0 text-dark">Advanced Filters</h5>
+                        {totalSelected > 0 && (
+                          <span className="badge bg-primary ms-2">{totalSelected} Active</span>
+                        )}
+                      </div>
+                      <div className="d-flex align-items-center gap-2">
+                        <button type="button" className="btn btn-sm btn-outline-danger" onClick={clearAllFilters}>
+                          <i className="fas fa-times-circle me-1" />
+                          Clear
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-close"
+                          onClick={() => setIsFilterCollapsed(true)}
+                          aria-label="Close"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="modal-body p-4">
+                    <div className="row g-4">
+                      <div className="col-md-3">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-briefcase me-1 text-success" />
+                          Applying For
+                        </label>
+                        <select
+                          className="form-select"
+                          name="applyingFor"
+                          value={filterData.applyingFor}
+                          onChange={handleFilterChange}
+                        >
+                          <option value="">All Roles</option>
+                          {roles.map((role) => (
+                            <option key={role} value={role}>{role}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Counselor"
+                          options={counselorOptions}
+                          selectedValues={multiSelect.counselor}
+                          onChange={(values) => setMultiSelect((prev) => ({ ...prev, counselor: values }))}
+                          icon="fas fa-user-tie"
+                          isOpen={dropdownStates.counselor}
+                          onToggle={() => toggleDropdown('counselor')}
+                        />
+                      </div>
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Owner"
+                          options={counselorOptions}
+                          selectedValues={multiSelect.owner}
+                          onChange={(values) => setMultiSelect((prev) => ({ ...prev, owner: values }))}
+                          icon="fas fa-user"
+                          isOpen={dropdownStates.owner}
+                          onToggle={() => toggleDropdown('owner')}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="row g-4 mt-3">
+                      <div className="col-12">
+                        <h6 className="text-dark fw-bold mb-3">
+                          <i className="fas fa-calendar-alt me-2 text-primary" />
+                          Status Filter
+                        </h6>
+                      </div>
+                      <div className="col-12 col-md-6 mb-3 mb-md-0">
+                        <select
+                          className="form-select border-0 bgcolor"
+                          id="status"
+                          name="statuses"
+                          value={filterData.statuses}
+                          style={{
+                            height: '42px',
+                            paddingTop: '8px',
+                            paddingInline: '10px',
+                            width: '100%',
+                            backgroundColor: '#f1f2f6',
+                          }}
+                          onChange={handleFilterChange}
+                        >
+                          <option value="">Select Status</option>
+                          {hrStatuses.map((status) => (
+                            <option key={status._id} value={status._id}>{status.title}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-12 col-md-6">
+                        <select
+                          className="form-select border-0 bgcolor"
+                          name="subStatuses"
+                          id="subStatus"
+                          value={filterData.subStatuses}
+                          style={{
+                            height: '42px',
+                            paddingTop: '8px',
+                            backgroundColor: '#f1f2f6',
+                            paddingInline: '10px',
+                            width: '100%',
+                          }}
+                          onChange={handleFilterChange}
+                        >
+                          <option value="">Select Sub-Status</option>
+                          {filterSubStatuses.map((sub) => (
+                            <option key={sub._id} value={sub._id}>{sub.title}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-md-3">
+                        <label className="form-label fw-medium text-dark mb-2">
+                          <i className="fas fa-phone text-primary me-2" />
+                          Followup Calling
+                        </label>
+                        <select
+                          className="form-select"
+                          value={filterData.hasFollowUpCall === true || filterData.hasFollowUpCall === 'yes' ? 'yes' : filterData.hasFollowUpCall === false || filterData.hasFollowUpCall === 'no' ? 'no' : ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setFilterData((prev) => ({
+                              ...prev,
+                              hasFollowUpCall: value === 'yes' ? true : value === 'no' ? false : '',
+                            }));
+                          }}
+                        >
+                          <option value="">Select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+                      <div className="col-md-3">
+                        <label className="form-label fw-medium text-dark mb-2">
+                          <i className="fas fa-map-marker-alt text-primary me-2" />
+                          Followup Visit
+                        </label>
+                        <select
+                          className="form-select"
+                          value={filterData.hasFollowUpVisit === true || filterData.hasFollowUpVisit === 'yes' ? 'yes' : filterData.hasFollowUpVisit === false || filterData.hasFollowUpVisit === 'no' ? 'no' : ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setFilterData((prev) => ({
+                              ...prev,
+                              hasFollowUpVisit: value === 'yes' ? true : value === 'no' ? false : '',
+                            }));
+                          }}
+                        >
+                          <option value="">Select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="row g-4 mt-3">
+                      <div className="col-12">
+                        <h6 className="text-dark fw-bold mb-3">
+                          <i className="fas fa-calendar-alt me-2 text-primary" />
+                          Date Range Filters
+                        </h6>
+                      </div>
+                      <div className="col-12 col-md-4 mb-3 mb-md-0">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-calendar-plus me-1 text-success" />
+                          Lead Creation Date Range
+                        </label>
+                        <div className="card border-0 bg-light p-1">
+                          <div className="row g-2">
+                            <div className="col-12 col-sm-6 firstDatepicker fixDate">
+                              <label className="form-label small">From Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'createdFromDate')}
+                                value={filterData.createdFromDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-success" />}
+                                maxDate={filterData.createdToDate || new Date()}
+                              />
+                            </div>
+                            <div className="col-12 col-sm-6 fixDate">
+                              <label className="form-label small">To Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'createdToDate')}
+                                value={filterData.createdToDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-success" />}
+                                minDate={filterData.createdFromDate}
+                                maxDate={new Date()}
+                              />
+                            </div>
+                          </div>
+                          {(filterData.createdFromDate || filterData.createdToDate) && (
+                            <div className="mt-2 p-2 bg-success bg-opacity-10 rounded">
+                              <small className="text-success">
+                                <i className="fas fa-info-circle me-1" />
+                                <strong>Selected:</strong>
+                                {filterData.createdFromDate && ` From ${formatFilterDate(filterData.createdFromDate)}`}
+                                {filterData.createdFromDate && filterData.createdToDate && ' |'}
+                                {filterData.createdToDate && ` To ${formatFilterDate(filterData.createdToDate)}`}
+                              </small>
+                            </div>
+                          )}
+                          <div className="mt-2">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-danger w-100 CButton"
+                              onClick={() => clearDateFilter('created')}
+                              disabled={!filterData.createdFromDate && !filterData.createdToDate}
+                            >
+                              <i className="fas fa-times me-1" />
+                              Clear
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="col-12 col-md-4 mb-3 mb-md-0">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-calendar-edit me-1 text-warning" />
+                          Lead Modification Date Range
+                        </label>
+                        <div className="card border-0 bg-light p-1">
+                          <div className="row g-2">
+                            <div className="col-12 col-sm-6 fixDate">
+                              <label className="form-label small">From Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'modifiedFromDate')}
+                                value={filterData.modifiedFromDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-warning" />}
+                                maxDate={filterData.modifiedToDate || new Date()}
+                              />
+                            </div>
+                            <div className="col-12 col-sm-6 fixDate">
+                              <label className="form-label small">To Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'modifiedToDate')}
+                                value={filterData.modifiedToDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-warning" />}
+                                minDate={filterData.modifiedFromDate}
+                                maxDate={new Date()}
+                              />
+                            </div>
+                          </div>
+                          {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
+                            <div className="mt-2 p-2 bg-warning bg-opacity-10 rounded">
+                              <small className="text-warning">
+                                <i className="fas fa-info-circle me-1" />
+                                <strong>Selected:</strong>
+                                {filterData.modifiedFromDate && ` From ${formatFilterDate(filterData.modifiedFromDate)}`}
+                                {filterData.modifiedFromDate && filterData.modifiedToDate && ' |'}
+                                {filterData.modifiedToDate && ` To ${formatFilterDate(filterData.modifiedToDate)}`}
+                              </small>
+                            </div>
+                          )}
+                          <div className="mt-2">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-danger w-100 CButton"
+                              onClick={() => clearDateFilter('modified')}
+                              disabled={!filterData.modifiedFromDate && !filterData.modifiedToDate}
+                            >
+                              <i className="fas fa-times me-1" />
+                              Clear
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="col-12 col-md-4 mb-3 mb-md-0">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-calendar-check me-1 text-info" />
+                          Next Action Date Range
+                        </label>
+                        <div className="card border-0 bg-light p-1">
+                          <div className="row g-2">
+                            <div className="col-12 col-sm-6 fixDate">
+                              <label className="form-label small">From Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'nextActionFromDate')}
+                                value={filterData.nextActionFromDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-info" />}
+                                maxDate={filterData.nextActionToDate}
+                              />
+                            </div>
+                            <div className="col-12 col-sm-6 fixDate translateX">
+                              <label className="form-label small">To Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'nextActionToDate')}
+                                value={filterData.nextActionToDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar text-info" />}
+                                minDate={filterData.nextActionFromDate}
+                              />
+                            </div>
+                          </div>
+                          {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
+                            <div className="mt-2 p-2 bg-info bg-opacity-10 rounded">
+                              <small className="text-info">
+                                <i className="fas fa-info-circle me-1" />
+                                <strong>Selected:</strong>
+                                {filterData.nextActionFromDate && ` From ${formatFilterDate(filterData.nextActionFromDate)}`}
+                                {filterData.nextActionFromDate && filterData.nextActionToDate && ' |'}
+                                {filterData.nextActionToDate && ` To ${formatFilterDate(filterData.nextActionToDate)}`}
+                              </small>
+                            </div>
+                          )}
+                          <div className="mt-2">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-danger w-100 CButton"
+                              onClick={() => clearDateFilter('nextAction')}
+                              disabled={!filterData.nextActionFromDate && !filterData.nextActionToDate}
+                            >
+                              <i className="fas fa-times me-1" />
+                              Clear
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="row mt-4">
+                      <div className="col-12">
+                        <div className="alert alert-info">
+                          <div className="d-flex align-items-center">
+                            <i className="fas fa-info-circle me-2" />
+                            <div>
+                              <strong>Results Summary:</strong> Showing {leads.length} results on page {pagination.page} of {pagination.totalPages}
+                              <div className="mt-2">
+                                {(filterData.createdFromDate || filterData.createdToDate) && (
+                                  <span className="badge bg-success me-2">
+                                    <i className="fas fa-calendar-plus me-1" />
+                                    Created Date Filter Active
+                                  </span>
+                                )}
+                                {(filterData.modifiedFromDate || filterData.modifiedToDate) && (
+                                  <span className="badge bg-warning me-2">
+                                    <i className="fas fa-calendar-edit me-1" />
+                                    Modified Date Filter Active
+                                  </span>
+                                )}
+                                {(filterData.nextActionFromDate || filterData.nextActionToDate) && (
+                                  <span className="badge bg-info me-2">
+                                    <i className="fas fa-calendar-check me-1" />
+                                    Next Action Date Filter Active
+                                  </span>
+                                )}
+                                {totalSelected > 0 && (
+                                  <span className="badge bg-primary me-2">
+                                    <i className="fas fa-filter me-1" />
+                                    {totalSelected} Multi-Select Filters Active
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="modal-footer bg-light border-top">
+                    <div className="d-flex justify-content-between align-items-center w-100">
+                      <div className="text-muted small">
+                        <i className="fas fa-filter me-1" />
+                        {countFilledFilters(filterData) + totalSelected} filters applied
+                      </div>
+                      <div className="d-flex gap-2">
+                        <button
+                          type="button"
+                          className="btn btn-outline-secondary"
+                          onClick={() => setIsFilterCollapsed(true)}
+                        >
+                          <i className="fas fa-eye-slash me-1" />
+                          Hide Filters
+                        </button>
+                        <button type="button" className="btn btn-primary" onClick={applyAdvancedFilters}>
+                          <i className="fas fa-search me-1" />
+                          Apply Filters
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div
             className="content-body marginTopMobile"
@@ -1899,11 +3033,15 @@ const HrLeads = () => {
               }}
             >
               {renderEditPanel()}
+              {renderRefferPanel()}
+              {renderLeadHistoryPanel()}
             </div>
           </div>
         )}
 
         {isMobile && renderEditPanel()}
+        {isMobile && renderRefferPanel()}
+        {isMobile && renderLeadHistoryPanel()}
       </div>
 
       {showDocumentModal && (

@@ -2,6 +2,7 @@ const cron = require("node-cron");
 const axios = require("axios");
 const b2cFollowup = require("../controllers/models/b2cFollowup");
 const FollowUp = require("../controllers/models/b2b/followUp");
+const CareerApplication = require("../controllers/models/careerApplication");
 const { User, WhatsAppTemplate, AppliedCourses } = require("../controllers/models");
 
 // WhatsApp API configuration
@@ -147,6 +148,33 @@ async function markB2bMissedFollowups(startOfTodayIST) {
   return result;
 }
 
+async function markHrMissedFollowups(startOfTodayIST) {
+  const result = await CareerApplication.updateMany(
+    {
+      isDeleted: { $ne: true },
+      followups: {
+        $elemMatch: {
+          status: 'planned',
+          followupDate: { $lt: startOfTodayIST },
+        },
+      },
+    },
+    {
+      $set: { 'followups.$[fu].status': 'missed' },
+    },
+    {
+      arrayFilters: [
+        { 'fu.status': 'planned', 'fu.followupDate': { $lt: startOfTodayIST } },
+      ],
+    }
+  );
+
+  console.log(
+    `[Cron][HR] Marked overdue planned followups as missed on ${result.modifiedCount} lead(s) (before ${startOfTodayIST.toISOString()})`
+  );
+  return result;
+}
+
 function missedFollowupSchedular() {
   // Every day at 12:00 AM IST — mark yesterday's (and older) planned followups as missed
   cron.schedule("0 0 * * *", async () => {
@@ -157,6 +185,12 @@ function missedFollowupSchedular() {
         await markB2bMissedFollowups(startOfTodayIST);
       } catch (b2bErr) {
         console.error("[Cron][B2B] Error updating missed followups:", b2bErr);
+      }
+
+      try {
+        await markHrMissedFollowups(startOfTodayIST);
+      } catch (hrErr) {
+        console.error("[Cron][HR] Error updating missed followups:", hrErr);
       }
 
       const followups = await b2cFollowup.find({

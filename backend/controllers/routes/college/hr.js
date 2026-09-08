@@ -6,12 +6,12 @@ const { isCollege } = require('../../../helpers');
 const CareerApplication = require('../../models/careerApplication');
 const StatusHr = require('../../models/statusHr');
 const College = require('../../models/college');
+const User = require('../../models/users');
 const { resolveJobHrOwner } = require('../../../helpers/resolveJobHrOwner');
 
 const STATUS_POPULATE = { path: 'leadStatus', select: 'title milestone substatuses' };
 const HR_DOCUMENT_TYPES = [
   { key: 'resume', name: 'Resume / CV' },
-  { key: 'photo', name: 'Photograph' }
 ];
 const { resolvePublicUrl } = require('../../../helpers/s3Storage');
 const { uploadSinglefile } = require('../functions/images');
@@ -110,8 +110,45 @@ const serializeLead = (doc) => {
   return lead;
 };
 
-const buildFollowupSummary = (followups = []) => {
+const IST_TIMEZONE = 'Asia/Kolkata';
+
+const getStartOfTodayIST = () => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: IST_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const y = parts.find((p) => p.type === 'year').value;
+  const m = parts.find((p) => p.type === 'month').value;
+  const d = parts.find((p) => p.type === 'day').value;
+  return new Date(`${y}-${m}-${d}T00:00:00+05:30`);
+};
+
+const closeOpenHrFollowups = (lead, type) => {
   const now = new Date();
+  const startOfToday = getStartOfTodayIST();
+  (lead.followups || []).forEach((item) => {
+    if (item.type !== type || item.status !== 'planned') return;
+    const when = item.followupDate ? new Date(item.followupDate) : null;
+    if (when && when.getTime() < startOfToday.getTime()) {
+      item.status = 'missed';
+      return;
+    }
+    item.status = 'done';
+    item.completedAt = now;
+  });
+};
+
+const isHrFollowupMissed = (item, startOfToday = getStartOfTodayIST()) => {
+  if (!item || item.status === 'done') return false;
+  if (item.status === 'missed') return true;
+  const followupDate = item.followupDate ? new Date(item.followupDate) : null;
+  return Boolean(followupDate && followupDate < startOfToday);
+};
+
+const buildFollowupSummary = (followups = []) => {
+  const startOfToday = getStartOfTodayIST();
   const counts = {
     call: { done: 0, planned: 0, missed: 0 },
     visit: { done: 0, planned: 0, missed: 0 },
@@ -126,12 +163,12 @@ const buildFollowupSummary = (followups = []) => {
       counts[bucketKey].done += 1;
       return;
     }
-    if (!followupDate) return;
-    if (followupDate < now) {
+    if (isHrFollowupMissed(item, startOfToday)) {
       counts[bucketKey].missed += 1;
-    } else {
-      counts[bucketKey].planned += 1;
+      return;
     }
+    if (!followupDate) return;
+    counts[bucketKey].planned += 1;
     const current = bucketKey === 'visit' ? nextVisit : nextCall;
     if (!current || followupDate < new Date(current.followupDate)) {
       const next = { followupDate, remarks: item.remarks || '' };
@@ -144,21 +181,166 @@ const buildFollowupSummary = (followups = []) => {
 };
 
 const followupMatch = (type, bucket) => {
-  const now = new Date();
+  const startOfToday = getStartOfTodayIST();
   if (bucket === 'done') {
     return { followups: { $elemMatch: { type, status: 'done' } } };
   }
   if (bucket === 'missed') {
-    return { followups: { $elemMatch: { type, status: 'planned', followupDate: { $lt: now } } } };
+    return {
+      followups: {
+        $elemMatch: {
+          type,
+          $or: [
+            { status: 'missed' },
+            { status: 'planned', followupDate: { $lt: startOfToday } },
+          ],
+        },
+      },
+    };
   }
-  return { followups: { $elemMatch: { type, status: 'planned', followupDate: { $gte: now } } } };
+  return { followups: { $elemMatch: { type, status: 'planned', followupDate: { $gte: startOfToday } } } };
 };
+
+const parseHrFollowupDate = (value) => {
+  if (!value || value === 'null') return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
+    const parsed = moment(value, 'YYYY-MM-DD');
+    return parsed.isValid() ? parsed : null;
+  }
+  const parsed = moment(value);
+  return parsed.isValid() ? parsed : null;
+};
+
+const resolveHrFollowupRange = (fromDate, toDate, allTime) => {
+  if (String(allTime) === 'true') return { from: null, to: null };
+  const fromM = parseHrFollowupDate(fromDate);
+  const toM = parseHrFollowupDate(toDate) || fromM;
+  if (!fromM && !toM) {
+    return {
+      from: moment().startOf('day').toDate(),
+      to: moment().endOf('day').toDate(),
+    };
+  }
+  return {
+    from: fromM ? fromM.clone().startOf('day').toDate() : null,
+    to: toM ? toM.clone().endOf('day').toDate() : null,
+  };
+};
+
+const buildHrUnwoundFollowupMatch = (status = 'planned', from, to) => {
+  const startOfToday = getStartOfTodayIST();
+  const dateFilter = {};
+
+  if (status === 'done') {
+    if (from) dateFilter.$gte = from;
+    if (to) dateFilter.$lte = to;
+    return {
+      'followups.status': 'done',
+      ...(Object.keys(dateFilter).length ? { 'followups.followupDate': dateFilter } : {}),
+    };
+  }
+
+  if (status === 'missed') {
+    const missedDate = {};
+    if (from) missedDate.$gte = from;
+    if (to) missedDate.$lte = to;
+    const overdueDate = { $lt: startOfToday };
+    if (from) overdueDate.$gte = from;
+    if (to && to < startOfToday) overdueDate.$lt = to;
+    return {
+      $or: [
+        {
+          'followups.status': 'missed',
+          ...(Object.keys(missedDate).length ? { 'followups.followupDate': missedDate } : {}),
+        },
+        { 'followups.status': 'planned', 'followups.followupDate': overdueDate },
+      ],
+    };
+  }
+
+  const plannedFrom = from && from > startOfToday ? from : startOfToday;
+  dateFilter.$gte = plannedFrom;
+  if (to) dateFilter.$lte = to;
+  if (dateFilter.$lte && dateFilter.$gte > dateFilter.$lte) {
+    dateFilter.$gte = new Date('9999-01-01');
+  }
+  return { 'followups.status': 'planned', 'followups.followupDate': dateFilter };
+};
+
+const buildHrFollowupLeadMatch = (req) => {
+  const match = {
+    isDeleted: { $ne: true },
+    followups: { $exists: true, $not: { $size: 0 } },
+  };
+
+  const name = String(req.query.name || '').trim();
+  if (name) {
+    match.$or = [
+      { fullName: new RegExp(name, 'i') },
+      { email: new RegExp(name, 'i') },
+      { mobile: new RegExp(name, 'i') },
+    ];
+  }
+
+  let counselorArray = [];
+  try {
+    if (req.query.counselor) counselorArray = JSON.parse(req.query.counselor);
+  } catch (error) {
+    counselorArray = [];
+  }
+  if (Array.isArray(counselorArray) && counselorArray.length) {
+    const ids = counselorArray
+      .filter((id) => mongoose.Types.ObjectId.isValid(id))
+      .map((id) => new mongoose.Types.ObjectId(id));
+    if (ids.length) {
+      const ownerOr = [
+        { leadOwner: { $in: ids } },
+        { assignedTo: { $in: ids } },
+        { 'followups.createdBy': { $in: ids } },
+      ];
+      if (match.$or) {
+        match.$and = [{ $or: match.$or }, { $or: ownerOr }];
+        delete match.$or;
+      } else {
+        match.$or = ownerOr;
+      }
+    }
+  }
+
+  return applyCollegeScope(match, req.user?.college?._id);
+};
+
+const serializeHrFollowupRow = (lead, item) => ({
+  _id: item._id,
+  leadId: lead._id,
+  appliedCourseId: lead._id,
+  name: lead.fullName,
+  mobile: lead.mobile,
+  email: lead.email,
+  city: lead.city,
+  applyingFor: lead.applyingFor,
+  followupDate: item.followupDate,
+  followUpType: item.type || 'Call',
+  remarks: item.remarks || '',
+  status: item.status,
+  _candidate: {
+    name: lead.fullName,
+    mobile: lead.mobile,
+    email: lead.email,
+  },
+});
 
 const toObjectId = (value) => {
   if (!value) return null;
   const id = typeof value === 'object' ? (value._id || value.id) : value;
   if (!id || !mongoose.Types.ObjectId.isValid(String(id))) return null;
   return String(id);
+};
+
+const sameId = (a, b) => {
+  const left = toObjectId(a);
+  const right = toObjectId(b);
+  return Boolean(left && right && left === right);
 };
 
 const toCollegeObjectId = (value) => {
@@ -193,6 +375,43 @@ const applyCollegeScope = (match, collegeId) => {
     match.$or = scope.$or;
   }
   return match;
+};
+
+const parseIdList = (value) => {
+  if (value == null || value === '') return [];
+  let items = value;
+  if (typeof value === 'string') {
+    try {
+      items = JSON.parse(value);
+    } catch {
+      items = value.split(',');
+    }
+  }
+  if (!Array.isArray(items)) items = [items];
+  return items
+    .map((id) => String(id || '').trim())
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+};
+
+const parseYesNo = (value) => {
+  const raw = String(value ?? '').trim().toLowerCase();
+  if (raw === 'true' || raw === 'yes' || raw === '1') return true;
+  if (raw === 'false' || raw === 'no' || raw === '0') return false;
+  return null;
+};
+
+const dayRange = (from, to) => {
+  const range = {};
+  if (from) {
+    const start = moment(from).startOf('day').toDate();
+    if (!Number.isNaN(start.getTime())) range.$gte = start;
+  }
+  if (to) {
+    const end = moment(to).endOf('day').toDate();
+    if (!Number.isNaN(end.getTime())) range.$lte = end;
+  }
+  return Object.keys(range).length ? range : null;
 };
 
 const exactInsensitive = (value) => new RegExp(`^${String(value).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
@@ -256,15 +475,52 @@ const buildMatch = (query = {}, collegeId) => {
     applyingFor,
     startDate,
     endDate,
+    createdFromDate,
+    createdToDate,
+    modifiedFromDate,
+    modifiedToDate,
+    nextActionFromDate,
+    nextActionToDate,
     city,
     followupType,
     followupBucket,
+    owner,
+    counselor,
+    hasFollowUpCall,
+    hasFollowUpVisit,
   } = query;
 
   const match = { isDeleted: { $ne: true } };
+  const extraClauses = [];
+  const followupClauses = [];
 
   if (followupType && followupBucket) {
-    Object.assign(match, followupMatch(followupType === 'Visit' ? 'Visit' : 'Call', followupBucket));
+    followupClauses.push(followupMatch(followupType === 'Visit' ? 'Visit' : 'Call', followupBucket));
+  }
+
+  const hasCall = parseYesNo(hasFollowUpCall);
+  if (hasCall === true) {
+    followupClauses.push({ followups: { $elemMatch: { type: 'Call' } } });
+  } else if (hasCall === false) {
+    followupClauses.push({ followups: { $not: { $elemMatch: { type: 'Call' } } } });
+  }
+
+  const hasVisit = parseYesNo(hasFollowUpVisit);
+  if (hasVisit === true) {
+    followupClauses.push({ followups: { $elemMatch: { type: 'Visit' } } });
+  } else if (hasVisit === false) {
+    followupClauses.push({ followups: { $not: { $elemMatch: { type: 'Visit' } } } });
+  }
+
+  const nextActionRange = dayRange(nextActionFromDate, nextActionToDate);
+  if (nextActionRange) {
+    followupClauses.push({ followups: { $elemMatch: { followupDate: nextActionRange } } });
+  }
+
+  if (followupClauses.length === 1) {
+    Object.assign(match, followupClauses[0]);
+  } else if (followupClauses.length > 1) {
+    extraClauses.push(...followupClauses);
   }
 
   // Statuses are configured from the HR Status Design page, so filters carry StatusHr ids.
@@ -289,17 +545,35 @@ const buildMatch = (query = {}, collegeId) => {
     match.city = new RegExp(String(city).trim(), 'i');
   }
 
-  if (startDate || endDate) {
-    match.createdAt = {};
-    if (startDate) {
-      const start = moment(startDate).startOf('day').toDate();
-      if (!Number.isNaN(start.getTime())) match.createdAt.$gte = start;
-    }
-    if (endDate) {
-      const end = moment(endDate).endOf('day').toDate();
-      if (!Number.isNaN(end.getTime())) match.createdAt.$lte = end;
-    }
-    if (!Object.keys(match.createdAt).length) delete match.createdAt;
+  const createdStart = createdFromDate || startDate;
+  const createdEnd = createdToDate || endDate;
+  const createdRange = dayRange(createdStart, createdEnd);
+  if (createdRange) match.createdAt = createdRange;
+
+  const modifiedRange = dayRange(modifiedFromDate, modifiedToDate);
+  if (modifiedRange) match.updatedAt = modifiedRange;
+
+  const ownerIds = parseIdList(owner);
+  const counselorIds = parseIdList(counselor);
+  if (ownerIds.length) {
+    extraClauses.push({
+      $or: [
+        { leadOwner: { $in: ownerIds } },
+        { assignedTo: { $in: ownerIds } },
+      ],
+    });
+  }
+  if (counselorIds.length) {
+    extraClauses.push({
+      $or: [
+        { assignedTo: { $in: counselorIds } },
+        { leadOwner: { $in: counselorIds } },
+      ],
+    });
+  }
+
+  if (extraClauses.length) {
+    match.$and = [...(match.$and || []), ...extraClauses];
   }
 
   const q = String(search || '').trim();
@@ -313,8 +587,10 @@ const buildMatch = (query = {}, collegeId) => {
       { experience: new RegExp(q, 'i') },
     ];
     if (match.$or) {
-      match.$and = [{ $or: match.$or }, { $or: searchOr }];
+      match.$and = [...(match.$and || []), { $or: match.$or }, { $or: searchOr }];
       delete match.$or;
+    } else if (match.$and) {
+      match.$and.push({ $or: searchOr });
     } else {
       match.$or = searchOr;
     }
@@ -424,6 +700,122 @@ router.get('/leads/counts', isCollege, async (req, res) => {
   }
 });
 
+router.get('/my-followups', isCollege, async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+    const skip = (page - 1) * limit;
+    const followupStatus = String(req.query.followupStatus || 'planned').toLowerCase();
+    const { from, to } = resolveHrFollowupRange(req.query.fromDate, req.query.toDate, req.query.allTime);
+    const leadMatch = buildHrFollowupLeadMatch(req);
+    const itemMatch = buildHrUnwoundFollowupMatch(followupStatus, from, to);
+
+    const [facet] = await CareerApplication.aggregate([
+      { $match: leadMatch },
+      { $unwind: '$followups' },
+      { $match: itemMatch },
+      { $sort: { 'followups.followupDate': 1, _id: 1 } },
+      {
+        $facet: {
+          data: [
+            { $skip: skip },
+            { $limit: limit },
+            {
+              $project: {
+                _id: '$followups._id',
+                leadId: '$_id',
+                appliedCourseId: '$_id',
+                name: '$fullName',
+                mobile: '$mobile',
+                email: '$email',
+                city: '$city',
+                applyingFor: '$applyingFor',
+                followupDate: '$followups.followupDate',
+                followUpType: { $ifNull: ['$followups.type', 'Call'] },
+                remarks: '$followups.remarks',
+                status: '$followups.status',
+                _candidate: {
+                  name: '$fullName',
+                  mobile: '$mobile',
+                  email: '$email',
+                },
+              },
+            },
+          ],
+          total: [{ $count: 'count' }],
+        },
+      },
+    ]);
+
+    const data = facet?.data || [];
+    const total = facet?.total?.[0]?.count || 0;
+
+    return res.json({
+      success: true,
+      data,
+      page,
+      totalPages: Math.max(Math.ceil(total / limit), 1),
+      total,
+    });
+  } catch (error) {
+    console.error('[HR followups] list error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch HR followups' });
+  }
+});
+
+router.get('/followupcounts', isCollege, async (req, res) => {
+  try {
+    const startOfToday = getStartOfTodayIST();
+    const { from, to } = resolveHrFollowupRange(req.query.fromDate, req.query.toDate, req.query.allTime);
+    const leadMatch = buildHrFollowupLeadMatch(req);
+    const dateMatch = {};
+    if (from || to) {
+      dateMatch['followups.followupDate'] = {};
+      if (from) dateMatch['followups.followupDate'].$gte = from;
+      if (to) dateMatch['followups.followupDate'].$lte = to;
+    }
+
+    const rows = await CareerApplication.aggregate([
+      { $match: leadMatch },
+      { $unwind: '$followups' },
+      ...(Object.keys(dateMatch).length ? [{ $match: dateMatch }] : []),
+      {
+        $group: {
+          _id: {
+            $cond: [
+              { $eq: ['$followups.status', 'done'] },
+              'done',
+              {
+                $cond: [
+                  {
+                    $or: [
+                      { $eq: ['$followups.status', 'missed'] },
+                      { $lt: ['$followups.followupDate', startOfToday] },
+                    ],
+                  },
+                  'missed',
+                  'planned',
+                ],
+              },
+            ],
+          },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const counts = { planned: 0, done: 0, missed: 0 };
+    rows.forEach((row) => {
+      if (row?._id && counts[row._id] !== undefined) counts[row._id] = row.count || 0;
+    });
+
+    return res.json({ success: true, data: counts });
+  } catch (error) {
+    console.error('[HR followups] counts error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch HR followup counts' });
+  }
+});
+
 // Configured HR statuses (managed from the HR Status Design page)
 router.get('/statuses', isCollege, async (req, res) => {
   try {
@@ -492,6 +884,97 @@ router.get('/leads/download', isCollege, async (req, res) => {
   } catch (error) {
     console.error('[HR leads] download error:', error);
     return res.status(500).json({ success: false, message: 'Failed to download HR leads' });
+  }
+});
+
+router.post('/leads/refer', isCollege, async (req, res) => {
+  try {
+    const counselorId = toCollegeObjectId(req.body.counselorId);
+    let leadIds = req.body.leadIds || req.body.appliedCourseId;
+    if (!Array.isArray(leadIds)) leadIds = leadIds ? [leadIds] : [];
+    leadIds = [...new Set(leadIds.map((id) => String(id || '').trim()).filter(Boolean))];
+
+    if (!counselorId) {
+      return res.status(400).json({ success: false, message: 'Valid counselor is required' });
+    }
+    if (!leadIds.length) {
+      return res.status(400).json({ success: false, message: 'Select at least one lead to refer' });
+    }
+
+    const counselor = await User.findById(counselorId).select('name').lean();
+    if (!counselor) {
+      return res.status(404).json({ success: false, message: 'Counselor not found' });
+    }
+
+    const validIds = leadIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
+    const leads = await CareerApplication.find(applyCollegeScope({
+      _id: { $in: validIds },
+      isDeleted: { $ne: true },
+    }, req.user?.college?._id));
+
+    if (!leads.length) {
+      return res.status(404).json({ success: false, message: 'No HR leads found' });
+    }
+
+    const newName = counselor.name?.trim() || 'Unknown';
+    let referred = 0;
+    let skipped = 0;
+
+    for (const lead of leads) {
+      const previousOwnerId = toCollegeObjectId(lead.leadOwner || lead.assignedTo);
+      if (sameId(previousOwnerId, counselorId)) {
+        skipped += 1;
+        continue;
+      }
+
+      let nextCoOwner = toCollegeObjectId(lead.leadCoOwner);
+      if (sameId(nextCoOwner, counselorId)) nextCoOwner = null;
+
+      if (previousOwnerId && !sameId(previousOwnerId, counselorId)) {
+        if (nextCoOwner && !sameId(nextCoOwner, previousOwnerId)) {
+          return res.status(400).json({
+            success: false,
+            message: `${lead.fullName || 'Lead'} already has a co-owner. Remove the co-owner first so the previous owner can become co-owner.`,
+          });
+        }
+        if (!nextCoOwner) nextCoOwner = previousOwnerId;
+      }
+
+      const previousOwner = previousOwnerId
+        ? await User.findById(previousOwnerId).select('name').lean()
+        : null;
+      const oldName = previousOwner?.name?.trim() || 'Unassigned';
+
+      await CareerApplication.findByIdAndUpdate(lead._id, {
+        $set: {
+          leadOwner: counselorId,
+          assignedTo: counselorId,
+          leadCoOwner: nextCoOwner,
+        },
+        $push: {
+          logs: {
+            user: req.user?._id,
+            timestamp: new Date(),
+            action: `Lead referred from ${oldName} to ${newName}`,
+            remarks: previousOwnerId
+              ? 'Previous owner set as co-owner'
+              : 'No previous owner to set as co-owner',
+          },
+        },
+      });
+      referred += 1;
+    }
+
+    return res.json({
+      success: true,
+      message: referred
+        ? `Referred ${referred} lead(s) successfully${skipped ? `, ${skipped} already owned` : ''}`
+        : 'Selected leads are already owned by this counselor',
+      data: { referred, skipped, found: leads.length },
+    });
+  } catch (error) {
+    console.error('[HR leads] refer error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to refer HR leads' });
   }
 });
 
@@ -844,6 +1327,35 @@ router.route("/digitalhrleads").post(async (req, res) => {
       });
   }
 });
+router.get('/leads/:id', isCollege, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid lead id' });
+    }
+
+    const lead = await CareerApplication.findOne({
+      _id: id,
+      isDeleted: { $ne: true },
+      ...collegeScopeFilter(req.user?.college?._id),
+    })
+      .populate('leadOwner', 'name email')
+      .populate('leadCoOwner', 'name email')
+      .populate('assignedTo', 'name email')
+      .populate('logs.user', 'name email')
+      .populate(STATUS_POPULATE);
+
+    if (!lead) {
+      return res.status(404).json({ success: false, message: 'Lead not found' });
+    }
+
+    return res.json({ success: true, data: serializeLead(lead) });
+  } catch (error) {
+    console.error('[HR leads] get error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch HR lead' });
+  }
+});
+
 router.patch('/leads/:id', isCollege, async (req, res) => {
   try {
     const { id } = req.params;
@@ -892,12 +1404,7 @@ router.patch('/leads/:id', isCollege, async (req, res) => {
         }
 
         const followupType = req.body.followupType === 'Visit' ? 'Visit' : 'Call';
-        (lead.followups || []).forEach((item) => {
-          if (item.type === followupType && item.status === 'planned') {
-            item.status = 'done';
-            item.completedAt = new Date();
-          }
-        });
+        closeOpenHrFollowups(lead, followupType);
         lead.followups.push({
           type: followupType,
           followupDate: nextFollowup,
@@ -1002,12 +1509,7 @@ router.post('/leads/:id/followup', isCollege, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Lead not found' });
     }
 
-    (lead.followups || []).forEach((item) => {
-      if (item.type === type && item.status === 'planned') {
-        item.status = 'done';
-        item.completedAt = new Date();
-      }
-    });
+    closeOpenHrFollowups(lead, type);
 
     lead.followups.push({
       type,
@@ -1038,6 +1540,51 @@ router.post('/leads/:id/followup', isCollege, async (req, res) => {
   } catch (error) {
     console.error('[HR leads] followup error:', error);
     return res.status(500).json({ success: false, message: 'Failed to set followup' });
+  }
+});
+
+router.post('/leads/:id/followup/:followupId/complete', isCollege, async (req, res) => {
+  try {
+    const { id, followupId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(followupId)) {
+      return res.status(400).json({ success: false, message: 'Invalid id' });
+    }
+
+    const lead = await CareerApplication.findOne({
+      _id: id,
+      isDeleted: { $ne: true },
+      ...collegeScopeFilter(req.user?.college?._id),
+    });
+    if (!lead) {
+      return res.status(404).json({ success: false, message: 'Lead not found' });
+    }
+
+    const item = lead.followups.id(followupId);
+    if (!item) {
+      return res.status(404).json({ success: false, message: 'Followup not found' });
+    }
+    if (item.status === 'done') {
+      return res.status(400).json({ success: false, message: 'Followup is already complete' });
+    }
+
+    item.status = 'done';
+    item.completedAt = new Date();
+    lead.logs.push({
+      user: req.user?._id,
+      action: `${item.type || 'Call'} followup marked complete`,
+      remarks: item.remarks || '',
+      timestamp: new Date(),
+    });
+    await lead.save();
+
+    return res.json({
+      success: true,
+      message: 'Follow-up marked complete successfully',
+      data: serializeHrFollowupRow(lead, item),
+    });
+  } catch (error) {
+    console.error('[HR followups] complete error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to mark followup complete' });
   }
 });
 

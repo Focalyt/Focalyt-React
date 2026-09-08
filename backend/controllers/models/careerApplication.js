@@ -104,7 +104,7 @@ const careerApplicationSchema = new Schema(
         type: { type: String, enum: ['Call', 'Visit'], default: 'Call' },
         followupDate: { type: Date, required: true },
         remarks: { type: String, default: '' },
-        status: { type: String, enum: ['planned', 'done'], default: 'planned' },
+        status: { type: String, enum: ['planned', 'done', 'missed'], default: 'planned' },
         createdBy: { type: ObjectId, ref: 'User' },
         createdAt: { type: Date, default: Date.now },
         completedAt: { type: Date },

@@ -104,6 +104,7 @@ import PreVerification from './Pages/App/College/PreVerification/PreVerification
 import AICounsellor from './Pages/App/College/AICounsellor/AICounsellor';
 import MyFollowup from './Pages/App/College/MyFollowupB2C/MyFollowupB2C';
 import MyFollowupB2B from './Pages/App/College/MyFollowupB2B/MyFollowupB2B';
+import MyFollowups from './Pages/App/College/HR/MyFollowups';
 import AddLeads from './Pages/App/College/Course/AddLeads';
 import TypeB2b from './Pages/App/College/Settings/TypeOfB2B/TypeB2b';
 import B2BProject from './Pages/App/College/Settings/B2BProject/B2BProject';
@@ -367,6 +368,7 @@ const Layout = () => {
           <Route path='statusdesignhr' element={<HrStatus/>}/>
           <Route path='academicCoordinator' element={<AcademicCoordinator/>}/>
           <Route path='seniorTrainer' element={<SeniorTrainerModule/>}/>
+          <Route path='myfollow' element={<MyFollowups/>}/>
         </Route>
 
         {/* company  */}

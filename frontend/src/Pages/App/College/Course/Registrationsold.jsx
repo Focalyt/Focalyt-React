@@ -1157,6 +1157,8 @@ const CRMDashboard = () => {
   // Documents specific state
   const [statusFilter, setStatusFilter] = useState('all');
   const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [showRemarksModal, setShowRemarksModal] = useState(false);
+  const [remarksModalData, setRemarksModalData] = useState({ text: '', name: '' });
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [documentZoom, setDocumentZoom] = useState(1);
   const [documentRotation, setDocumentRotation] = useState(0);
@@ -4526,6 +4528,64 @@ console.log('API Response:', response.data);
 
     return [...remarkNotes, ...followupNotes].slice(-10);
   }, []);
+
+  const getProfileRemarksText = useCallback((profile) => {
+    const remarks = profile?.remarks;
+    if (!remarks) return '';
+    if (typeof remarks === 'string') return remarks.trim();
+    if (Array.isArray(remarks)) {
+      return remarks
+        .map((item) => (typeof item === 'string' ? item : (item?.remark || item?.text || item?.comment || '')))
+        .filter(Boolean)
+        .join('\n');
+    }
+    return String(remarks).trim();
+  }, []);
+
+  const truncateRemarks = useCallback((text, max = 70) => {
+    const value = (text || '').replace(/\s+/g, ' ').trim();
+    if (!value) return 'N/A';
+    if (value.length <= max) return value;
+    return `${value.slice(0, max).trim()}...`;
+  }, []);
+
+  const openRemarksModal = useCallback((profile) => {
+    setRemarksModalData({
+      text: getProfileRemarksText(profile),
+      name: profile?._candidate?.name || profile?.name || 'Lead',
+    });
+    setShowRemarksModal(true);
+  }, [getProfileRemarksText]);
+
+  const renderRemarksField = useCallback((profile) => {
+    const fullText = getProfileRemarksText(profile);
+    const hasRemarks = Boolean(fullText);
+
+    return (
+      <div className="info-group">
+        <div className="info-label">Remarks</div>
+        <div className="info-value remarks-preview-wrap">
+          <span className="remarks-preview-text" title={hasRemarks ? fullText : undefined}>
+            {hasRemarks ? truncateRemarks(fullText) : 'N/A'}
+          </span>
+          <button
+            type="button"
+            className="remarks-preview-edit-btn"
+            title={hasRemarks ? 'View full remarks' : 'No remarks'}
+            aria-label="View full remarks"
+            disabled={!hasRemarks}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (hasRemarks) openRemarksModal(profile);
+            }}
+          >
+            <i className="fas fa-pen" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+    );
+  }, [getProfileRemarksText, truncateRemarks, openRemarksModal]);
 
   const getProfileDocumentSnapshot = useCallback((profile) => {
     const documents = Array.isArray(profile?.uploadedDocs) ? profile.uploadedDocs : [];
@@ -18174,10 +18234,7 @@ useEffect(() => {
                                                 <div className="info-label">BRANCH NAME</div>
                                                 <div className="info-value">{profile._center?.name || 'N/A'}</div>
                                               </div>
-                                              <div className="info-group">
-                                                <div className="info-label">Remarks</div>
-                                                <div className="info-value">{profile.remarks || 'N/A'}</div>
-                                              </div>
+                                              {renderRemarksField(profile)}
                                             </div>
                                           </div>
                                         </div>
@@ -18315,10 +18372,7 @@ useEffect(() => {
                                                       <div className="info-value">{profile.updatedAt ?
                                                         new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
                                                     </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">Remarks</div>
-                                                      <div className="info-value">{profile.remarks || 'N/A'}</div>
-                                                    </div>
+                                                    {renderRemarksField(profile)}
                                                     <div className="info-group">
                                                       <div className="info-label">LEAD MODIFICATION By</div>
                                                       <div className="info-value">Mar 21, 2025 3:32 PM</div>
@@ -18437,10 +18491,7 @@ useEffect(() => {
                                                     </div>
                                                   </div>
                                                   <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">Remarks</div>
-                                                      <div className="info-value">{profile.remarks || 'N/A'}</div>
-                                                    </div>
+                                                    {renderRemarksField(profile)}
                                                   </div>
                                                   <div className="col-xl- col-3">
                                                     <div className="info-group">
@@ -19998,6 +20049,48 @@ useEffect(() => {
             </div>
           </div>
         </>
+      )}
+
+      {showRemarksModal && (
+        <div
+          className="modal show fade d-block"
+          tabIndex="-1"
+          role="dialog"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1070 }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowRemarksModal(false);
+          }}
+        >
+          <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable" role="document">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">
+                  Remarks{remarksModalData.name ? ` — ${remarksModalData.name}` : ''}
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  aria-label="Close"
+                  onClick={() => setShowRemarksModal(false)}
+                />
+              </div>
+              <div className="modal-body">
+                <div className="remarks-modal-text">
+                  {remarksModalData.text || 'No remarks available.'}
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowRemarksModal(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Unified AI Supervision Modal */}
@@ -21843,6 +21936,65 @@ background: #fd2b5a;
 
 .info-group {
     padding: 8px;
+}
+
+.remarks-preview-wrap {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    min-width: 0;
+}
+
+.remarks-preview-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.35;
+    max-height: 2.7em;
+    flex: 1;
+    min-width: 0;
+}
+
+.remarks-preview-edit-btn {
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    border-radius: 6px;
+    color: #2563eb;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1;
+}
+
+.remarks-preview-edit-btn:hover:not(:disabled) {
+    background: #eff6ff;
+    border-color: #93c5fd;
+}
+
+.remarks-preview-edit-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.remarks-modal-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 14px;
+    line-height: 1.55;
+    color: #111827;
+    max-height: 60vh;
+    overflow-y: auto;
 }
 
 /* Responsive adjustments */
