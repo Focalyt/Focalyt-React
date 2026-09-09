@@ -1259,6 +1259,7 @@ const CRMDashboard = () => {
   const [aiCallLabel, setAiCallLabel] = useState('');
   const [aiCallLeads, setAiCallLeads] = useState([]);
   const [aiCallSentIds, setAiCallSentIds] = useState([]);
+  const [aiCallingProfileId, setAiCallingProfileId] = useState(null);
   const aiFabWrapRef = useRef(null);
   const AI_FAB_NEW_LEAD_ID = '64ab1234abcd5678ef901235';
   const AI_FAB_NOT_CONNECTED_ID = '6a3f5a53cfccaeeb28a4d1a3';
@@ -1273,6 +1274,84 @@ const CRMDashboard = () => {
     const event = String(ai.lastEvent || '').toUpperCase();
     return ['MAKE_CALL_QUEUED', 'CALL_COMPLETED', 'CALL_FAILED', 'CALL_TRANSFERED'].includes(event);
   }, [aiCallSentIds]);
+
+  const handleSingleLeadAiCall = useCallback(async (profile) => {
+    const leadId = String(profile?._id || '').trim();
+    const mobile = profile?._candidate?.mobile || profile?.mobile || '';
+    const name = profile?._candidate?.name || profile?.name || 'this lead';
+
+    if (!leadId) {
+      toast.error('Lead id missing');
+      return;
+    }
+    if (!mobile) {
+      toast.error('Lead has no mobile number');
+      return;
+    }
+    if (aiCallingProfileId || aiFabBusy) {
+      toast.info('AI call is already in progress');
+      return;
+    }
+
+    const alreadyCalled = hasAiAlreadyGoneThroughLead(profile);
+    const confirmed = window.confirm(
+      alreadyCalled
+        ? `AI already called ${name}. Call again at ${mobile}?`
+        : `Start AI call to ${name} (${mobile})?`
+    );
+    if (!confirmed) return;
+
+    setAiCallingProfileId(leadId);
+    try {
+      const res = await axios.post(
+        `${backendUrl}/college/digitalLead/voicex-make-call`,
+        { appliedCourseId: leadId },
+        { headers: { 'x-auth': token } }
+      );
+      setAiCallSentIds((prev) => [...new Set([...(prev || []).map(String), leadId])]);
+      setAllProfiles((prev) => (prev || []).map((row) => (
+        String(row._id) === leadId
+          ? {
+              ...row,
+              aiVoice: {
+                ...(row.aiVoice || {}),
+                lastEvent: 'MAKE_CALL_QUEUED',
+                lastMakeCallStatus: 'queued',
+              },
+            }
+          : row
+      )));
+      toast.success(res.data?.msg || `AI call started for ${name}`);
+    } catch (err) {
+      toast.error(err.response?.data?.msg || err.message || 'Failed to start AI call');
+    } finally {
+      setAiCallingProfileId(null);
+    }
+  }, [aiCallingProfileId, aiFabBusy, backendUrl, hasAiAlreadyGoneThroughLead, token]);
+
+  const renderAiCallIconButton = (profile) => {
+    const leadId = String(profile?._id || '');
+    const isCalling = aiCallingProfileId === leadId;
+    const alreadyCalled = hasAiAlreadyGoneThroughLead(profile);
+    return (
+      <button
+        type="button"
+        className={`lead-strip-v3__icon-btn lead-strip-v3__icon-btn--ai-call${alreadyCalled ? ' is-called' : ''}`}
+        title={isCalling ? 'Starting AI call...' : alreadyCalled ? 'AI already called — click to call again' : 'AI Call'}
+        aria-label="AI Call"
+        disabled={isCalling || Boolean(aiCallingProfileId)}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleSingleLeadAiCall(profile);
+        }}
+      >
+        {isCalling
+          ? <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
+          : <i className="fas fa-headset" aria-hidden="true"></i>}
+      </button>
+    );
+  };
 
   const closeAiCallBulk = useCallback(() => {
     setShowBulkInputs(false);
@@ -18017,6 +18096,7 @@ useEffect(() => {
                                                 <i className="fas fa-id-card" aria-hidden="true"></i> KYC
                                               </span>
                                               <div className="lead-strip-v3__head-actions">
+                                              {renderAiCallIconButton(profile)}
                                               <div className="lead-strip-v3__actions-wrap">
                                                 <button
                                                   type="button"
@@ -30176,6 +30256,29 @@ max-width: 600px;
           background: #eff6ff;
           color: #2563eb;
           border-color: #bfdbfe;
+        }
+
+        .lead-strip-v3__icon-btn--ai-call{
+          background: #eef2ff;
+          color: #4f46e5;
+          border-color: #c7d2fe;
+        }
+
+        .lead-strip-v3__icon-btn--ai-call:hover:not(:disabled){
+          background: #4f46e5;
+          color: #fff;
+          border-color: #4f46e5;
+        }
+
+        .lead-strip-v3__icon-btn--ai-call.is-called{
+          background: #ecfdf5;
+          color: #059669;
+          border-color: #a7f3d0;
+        }
+
+        .lead-strip-v3__icon-btn--ai-call:disabled{
+          opacity: 0.55;
+          cursor: not-allowed;
         }
 
         .lead-strip-v3__icon-btn--collapse{
