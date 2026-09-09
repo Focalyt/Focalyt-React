@@ -2524,7 +2524,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 		const [slotDocs, followups, followupStatRows] = await Promise.all([
 			AppliedCourses.find({ _id: { $in: appliedIds } })
-				.select('followUpCall followUpVisit')
+				.select('followUpCall followUpVisit aiVoice')
 				.lean(),
 			B2cFollowup
 				.find({ appliedCourseId: { $in: appliedIds }, status: 'planned' })
@@ -2586,6 +2586,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 		const slotIdSet = new Set();
 		const courseSlotIds = new Map();
+		const aiVoiceByCourse = new Map();
 		(slotDocs || []).forEach((doc) => {
 			const key = String(doc._id);
 			courseSlotIds.set(key, {
@@ -2594,6 +2595,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			});
 			if (doc.followUpCall) slotIdSet.add(String(doc.followUpCall));
 			if (doc.followUpVisit) slotIdSet.add(String(doc.followUpVisit));
+			if (doc.aiVoice) aiVoiceByCourse.set(key, doc.aiVoice);
 		});
 
 		const slotRows = slotIdSet.size
@@ -2644,6 +2646,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				visitByCourse.get(courseKey) || slottedVisit || null
 			);
 			const followup = followUpCall || followUpVisit || followupByCourse.get(courseKey) || null;
+			// Prefer direct DB read — aggregate projection can drop nested aiVoice in some paths
+			const aiVoiceDoc = aiVoiceByCourse.get(courseKey) || doc.aiVoice || {};
 
 			return {
 				_id: doc._id,
@@ -2709,10 +2713,13 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				approval: doc.approval,
 				leadAssignment: doc.leadAssignment,
 				aiVoice: {
-					lastEvent: doc.aiVoice?.lastEvent || '',
-					lastMakeCallStatus: doc.aiVoice?.lastMakeCallStatus || '',
-					lastCallHistoryId: doc.aiVoice?.lastCallHistoryId || '',
-					lastWebhookAt: doc.aiVoice?.lastWebhookAt || null,
+					lastEvent: aiVoiceDoc.lastEvent || '',
+					lastMakeCallStatus: aiVoiceDoc.lastMakeCallStatus || '',
+					lastCallHistoryId: aiVoiceDoc.lastCallHistoryId || '',
+					lastWebhookAt: aiVoiceDoc.lastWebhookAt || null,
+					lastCallStatus: aiVoiceDoc.lastCallStatus || '',
+					lastCancelAt: aiVoiceDoc.lastCancelAt || null,
+					lastFailureReason: aiVoiceDoc.lastFailureReason || '',
 				},
 				remarks: doc.remarks,
 				counsellor: doc.counsellor
@@ -3804,6 +3811,7 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 			followup: 1,
 			followUpCall: 1,
 			followUpVisit: 1,
+			aiVoice: 1,
 		}
 	});
 

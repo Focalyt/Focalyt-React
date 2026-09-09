@@ -1426,6 +1426,11 @@ router.post("/voicex-webhook", async (req, res) => {
                 doc.aiVoice.lastIdempotencyKey = idempotencyKey;
                 doc.aiVoice.lastWebhookAt = new Date();
                 doc.aiVoice.recordingUrl = recordingUrl;
+                if (['CALL_COMPLETED', 'CALL_FAILED', 'CALL_TRANSFERED'].includes(event)) {
+                    doc.aiVoice.lastMakeCallStatus = 'done';
+                } else if (event === 'MAKE_CALL_CANCELLED') {
+                    doc.aiVoice.lastMakeCallStatus = 'cancelled';
+                }
 
                 const statusEvents = ['CALL_COMPLETED', 'CALL_TRANSFERED'];
                 const shouldMapStatus = statusEvents.includes(event)

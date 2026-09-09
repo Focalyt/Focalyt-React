@@ -1260,6 +1260,7 @@ const CRMDashboard = () => {
   const [aiCallLeads, setAiCallLeads] = useState([]);
   const [aiCallSentIds, setAiCallSentIds] = useState([]);
   const [aiCallingProfileId, setAiCallingProfileId] = useState(null);
+  const [aiCancellingProfileId, setAiCancellingProfileId] = useState(null);
   const aiFabWrapRef = useRef(null);
   const AI_FAB_NEW_LEAD_ID = '64ab1234abcd5678ef901235';
   const AI_FAB_NOT_CONNECTED_ID = '6a3f5a53cfccaeeb28a4d1a3';
@@ -1274,6 +1275,19 @@ const CRMDashboard = () => {
     const event = String(ai.lastEvent || '').toUpperCase();
     return ['MAKE_CALL_QUEUED', 'CALL_COMPLETED', 'CALL_FAILED', 'CALL_TRANSFERED'].includes(event);
   }, [aiCallSentIds]);
+
+  // VoiceX keeps no-answer numbers in their retry queue — Cancel permanently removes them.
+  // If AI already dialed (and it wasn't a completed conversation / already cancelled), show Cancel.
+  const shouldCancelVoiceXCall = useCallback((profile) => {
+    const ai = profile?.aiVoice || {};
+    const status = String(ai.lastMakeCallStatus || '').toLowerCase();
+    const event = String(ai.lastEvent || '').toUpperCase();
+    if (status === 'cancelled' || event === 'MAKE_CALL_CANCELLED') return false;
+    if (event === 'CALL_COMPLETED' || event === 'CALL_TRANSFERED') return false;
+    return hasAiAlreadyGoneThroughLead(profile);
+  }, [hasAiAlreadyGoneThroughLead]);
+
+  const isAiCallScheduled = shouldCancelVoiceXCall;
 
   const handleSingleLeadAiCall = useCallback(async (profile) => {
     const leadId = String(profile?._id || '').trim();
@@ -1329,26 +1343,97 @@ const CRMDashboard = () => {
     }
   }, [aiCallingProfileId, aiFabBusy, backendUrl, hasAiAlreadyGoneThroughLead, token]);
 
+  const handleCancelLeadAiCall = useCallback(async (profile) => {
+    const leadId = String(profile?._id || '').trim();
+    const mobile = profile?._candidate?.mobile || profile?.mobile || '';
+    const name = profile?._candidate?.name || profile?.name || 'this lead';
+
+    if (!leadId) {
+      toast.error('Lead id missing');
+      return;
+    }
+    if (!mobile) {
+      toast.error('Lead has no mobile number to cancel on VoiceX');
+      return;
+    }
+    if (aiCancellingProfileId || aiCallingProfileId) {
+      toast.info('Please wait, another AI call action is in progress');
+      return;
+    }
+
+    // VoiceX Cancel API permanently deletes pending schedules for this phone
+    // (including no-answer retries that go back into their queue).
+    // Docs: https://xtremegenai.com/docs — delete_call_by_phone_campaign_dashboard
+    const confirmed = window.confirm(
+      `Cancel AI call for ${name} (${mobile})?\n\n` +
+      `This permanently removes this number from the VoiceX schedule/retry queue ` +
+      `(including no-answer callbacks).`
+    );
+    if (!confirmed) return;
+
+    setAiCancellingProfileId(leadId);
+    try {
+      const res = await axios.post(
+        `${backendUrl}/college/digitalLead/voicex-cancel`,
+        { appliedCourseId: leadId, phoneNumber: mobile },
+        { headers: { 'x-auth': token } }
+      );
+      setAiCallSentIds((prev) => (prev || []).filter((id) => String(id) !== leadId));
+      setAllProfiles((prev) => (prev || []).map((row) => (
+        String(row._id) === leadId
+          ? {
+              ...row,
+              aiVoice: {
+                ...(row.aiVoice || {}),
+                lastEvent: 'MAKE_CALL_CANCELLED',
+                lastMakeCallStatus: 'cancelled',
+                lastCancelAt: new Date().toISOString(),
+              },
+            }
+          : row
+      )));
+      toast.success(res.data?.msg || `Cancelled. VoiceX will not retry ${name}.`);
+    } catch (err) {
+      toast.error(err.response?.data?.msg || err.message || 'Failed to cancel AI call');
+    } finally {
+      setAiCancellingProfileId(null);
+    }
+  }, [aiCallingProfileId, aiCancellingProfileId, backendUrl, token]);
+
   const renderAiCallIconButton = (profile) => {
     const leadId = String(profile?._id || '');
     const isCalling = aiCallingProfileId === leadId;
-    const alreadyCalled = hasAiAlreadyGoneThroughLead(profile);
+    const isCancelling = aiCancellingProfileId === leadId;
+    const canCancelVoiceX = shouldCancelVoiceXCall(profile);
+    const alreadyCalledDone = hasAiAlreadyGoneThroughLead(profile) && !canCancelVoiceX;
+    const busy = isCalling || isCancelling || Boolean(aiCallingProfileId) || Boolean(aiCancellingProfileId);
+
+    let title = 'AI Call';
+    if (isCalling) title = 'Starting AI call...';
+    else if (isCancelling) title = 'Cancelling AI call...';
+    else if (canCancelVoiceX) title = 'Cancel AI call — permanently remove from VoiceX retry queue';
+    else if (alreadyCalledDone) title = 'AI call finished — click to call again';
+
     return (
       <button
         type="button"
-        className={`lead-strip-v3__icon-btn lead-strip-v3__icon-btn--ai-call${alreadyCalled ? ' is-called' : ''}`}
-        title={isCalling ? 'Starting AI call...' : alreadyCalled ? 'AI already called — click to call again' : 'AI Call'}
-        aria-label="AI Call"
-        disabled={isCalling || Boolean(aiCallingProfileId)}
+        className={`lead-strip-v3__icon-btn lead-strip-v3__icon-btn--ai-call${canCancelVoiceX ? ' is-scheduled' : ''}${alreadyCalledDone ? ' is-called' : ''}`}
+        title={title}
+        aria-label={canCancelVoiceX ? 'Cancel AI Call' : 'AI Call'}
+        disabled={busy}
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          handleSingleLeadAiCall(profile);
+          // No-answer leads stay in VoiceX queue — always Cancel, never "call again"
+          if (shouldCancelVoiceXCall(profile)) handleCancelLeadAiCall(profile);
+          else handleSingleLeadAiCall(profile);
         }}
       >
-        {isCalling
+        {(isCalling || isCancelling)
           ? <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
-          : <i className="fas fa-headset" aria-hidden="true"></i>}
+          : canCancelVoiceX
+            ? <i className="fas fa-phone-slash" aria-hidden="true"></i>
+            : <i className="fas fa-headset" aria-hidden="true"></i>}
       </button>
     );
   };
@@ -30274,6 +30359,18 @@ max-width: 600px;
           background: #ecfdf5;
           color: #059669;
           border-color: #a7f3d0;
+        }
+
+        .lead-strip-v3__icon-btn--ai-call.is-scheduled{
+          background: #fef2f2;
+          color: #dc2626;
+          border-color: #fecaca;
+        }
+
+        .lead-strip-v3__icon-btn--ai-call.is-scheduled:hover:not(:disabled){
+          background: #dc2626;
+          color: #fff;
+          border-color: #dc2626;
         }
 
         .lead-strip-v3__icon-btn--ai-call:disabled{
