@@ -1137,7 +1137,7 @@ const CRMDashboard = () => {
   const [input1Value, setInput1Value] = useState('');
   const skipBulkAutoSelectRef = useRef(false); // when true, Input 1 change came from checkbox sync — don't re-select first N
   const [showBulkInputs, setShowBulkInputs] = useState(false);
-  const [bulkMode, setBulkMode] = useState(null); // 'whatsapp' or 'bulkaction'
+  const [bulkMode, setBulkMode] = useState(null); // 'whatsapp' | 'bulkaction' | 'bulkrefer' | 'AiCall'
 
   const [mainContentClass, setMainContentClass] = useState('col-12');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -1253,7 +1253,162 @@ const CRMDashboard = () => {
   const [aiSupervisionQueueFilter, setAiSupervisionQueueFilter] = useState('all');
   const [isAiFabOpen, setIsAiFabOpen] = useState(false);
   const [aiFabSubstatuses, setAiFabSubstatuses] = useState([]);
+  const [aiFabBusy, setAiFabBusy] = useState(false);
+  const [aiCallSource, setAiCallSource] = useState('');
+  const [aiCallTotalCount, setAiCallTotalCount] = useState(0);
+  const [aiCallLabel, setAiCallLabel] = useState('');
+  const [aiCallLeads, setAiCallLeads] = useState([]);
+  const [aiCallSentIds, setAiCallSentIds] = useState([]);
   const aiFabWrapRef = useRef(null);
+  const AI_FAB_NEW_LEAD_ID = '64ab1234abcd5678ef901235';
+  const AI_FAB_NOT_CONNECTED_ID = '6a3f5a53cfccaeeb28a4d1a3';
+
+  const hasAiAlreadyGoneThroughLead = useCallback((profile) => {
+    const id = String(profile?._id || profile?.lead_id || '');
+    if (id && aiCallSentIds.some((sentId) => String(sentId) === id)) return true;
+    const ai = profile?.aiVoice || {};
+    if (String(ai.lastMakeCallStatus || '').toLowerCase() === 'queued') return true;
+    if (String(ai.lastCallHistoryId || '').trim()) return true;
+    if (ai.lastWebhookAt) return true;
+    const event = String(ai.lastEvent || '').toUpperCase();
+    return ['MAKE_CALL_QUEUED', 'CALL_COMPLETED', 'CALL_FAILED', 'CALL_TRANSFERED'].includes(event);
+  }, [aiCallSentIds]);
+
+  const closeAiCallBulk = useCallback(() => {
+    setShowBulkInputs(false);
+    setBulkMode(null);
+    setInput1Value('');
+    setSelectedProfiles([]);
+    setAiCallSource('');
+    setAiCallTotalCount(0);
+    setAiCallLabel('');
+    setAiCallLeads([]);
+  }, []);
+
+  const handleAiFabQueue = useCallback(async (substatus) => {
+    const source = String(substatus?._id) === AI_FAB_NEW_LEAD_ID
+      ? 'b2c-today'
+      : String(substatus?._id) === AI_FAB_NOT_CONNECTED_ID
+        ? 'untouch-not-connected'
+        : '';
+    const label = source === 'b2c-today'
+      ? "today's B2C"
+      : source === 'untouch-not-connected'
+        ? 'Untouch / Not Connected'
+        : substatus?.title || 'AI';
+
+    setIsAiFabOpen(false);
+    if (!source) {
+      toast.info(substatus?.title || 'AI');
+      return;
+    }
+    if (aiFabBusy) {
+      toast.info('AI calls are already being queued');
+      return;
+    }
+
+    setAiFabBusy(true);
+    try {
+      const listPath = source === 'b2c-today' ? 'b2c-today' : 'untouch-not-connected';
+      const listRes = await axios.get(`${backendUrl}/college/digitalLead/${listPath}`, {
+        headers: { 'x-auth': token },
+      });
+      const leads = (Array.isArray(listRes.data?.data) ? listRes.data.data : []).filter(
+        (row) => !aiCallSentIds.some((id) => String(id) === String(row.lead_id || ''))
+      );
+      const total = leads.length;
+      if (!total) {
+        toast.info(`No remaining ${label} leads to send to AI`);
+        return;
+      }
+
+      setAiCallSource(source);
+      setAiCallTotalCount(total);
+      setAiCallLabel(label);
+      setAiCallLeads(leads);
+      setSelectedProfiles([]);
+      setBulkMode('AiCall');
+      setShowBulkInputs(true);
+      setInput1Value('');
+      toast.info(`Type how many of ${total} remaining ${label} lead(s) to call, or tick leads in the list`);
+    } catch (err) {
+      toast.error(err.response?.data?.msg || err.message || 'Failed to load AI call leads');
+    } finally {
+      setAiFabBusy(false);
+    }
+  }, [aiCallSentIds, aiFabBusy, backendUrl, token]);
+
+  const handleAiCallDispatch = useCallback(async () => {
+    const selectedIds = [...new Set(
+      (Array.isArray(selectedProfiles) ? selectedProfiles : [])
+        .map((id) => String(id || '').trim())
+        .filter(Boolean)
+        .filter((id) => {
+          if (aiCallSentIds.some((sentId) => String(sentId) === id)) return false;
+          const profile = (allProfiles || []).find((row) => String(row._id) === id)
+            || (aiCallLeads || []).find((row) => String(row.lead_id) === id);
+          return profile ? !hasAiAlreadyGoneThroughLead(profile) : true;
+        })
+    )];
+    const numValue = parseInt(String(input1Value || '').trim(), 10);
+    const MAX_AI_CALL_BATCH = 20;
+    if (!aiCallSource) {
+      toast.info('Pick New Lead or Not Connected first');
+      return;
+    }
+    if (!numValue || numValue < 1) {
+      toast.info('Type how many leads to call in the left box');
+      return;
+    }
+    if (numValue > MAX_AI_CALL_BATCH) {
+      toast.info(`Max ${MAX_AI_CALL_BATCH} leads per click`);
+      return;
+    }
+    const idsToSend = selectedIds.slice(0, numValue);
+    if (aiFabBusy) {
+      toast.info('AI calls are already being queued');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Send ${idsToSend.length || numValue} lead(s) to AI call?`
+    );
+    if (!confirmed) return;
+
+    setAiFabBusy(true);
+    try {
+      const payload = {
+        source: aiCallSource,
+        limit: numValue,
+        ...(idsToSend.length ? { leadIds: idsToSend } : {}),
+      };
+      const dispatchRes = await axios.post(
+        `${backendUrl}/college/digitalLead/voicex-dispatch`,
+        payload,
+        { headers: { 'x-auth': token } }
+      );
+      const queued = dispatchRes.data?.queued ?? (idsToSend.length || numValue);
+      setAiCallSentIds((prev) => [...new Set([...(prev || []).map(String), ...idsToSend])]);
+      setAllProfiles((prev) => (prev || []).map((profile) => (
+        idsToSend.includes(String(profile._id))
+          ? {
+              ...profile,
+              aiVoice: {
+                ...(profile.aiVoice || {}),
+                lastEvent: 'MAKE_CALL_QUEUED',
+                lastMakeCallStatus: 'queued',
+              },
+            }
+          : profile
+      )));
+      toast.success(`${queued} ${aiCallLabel} lead(s) queued for AI call`);
+      closeAiCallBulk();
+    } catch (err) {
+      toast.error(err.response?.data?.msg || err.message || 'Failed to start AI calls');
+    } finally {
+      setAiFabBusy(false);
+    }
+  }, [aiCallLabel, aiCallLeads, aiCallSentIds, aiCallSource, aiFabBusy, allProfiles, backendUrl, closeAiCallBulk, hasAiAlreadyGoneThroughLead, input1Value, selectedProfiles, token]);
 
   useEffect(() => {
     if (!isAiFabOpen) return undefined;
@@ -1609,10 +1764,16 @@ const CRMDashboard = () => {
     setSelectedProfiles(next);
 
     // Keep Input 1 count in sync when user manually checks/unchecks leads
-    if (bulkMode === 'whatsapp' || bulkMode === 'bulkrefer' || bulkMode === 'bulkaction') {
+    if (bulkMode === 'whatsapp' || bulkMode === 'bulkrefer' || bulkMode === 'bulkaction' || bulkMode === 'AiCall') {
       skipBulkAutoSelectRef.current = true;
       setInput1Value(next.length > 0 ? String(next.length) : '');
     }
+  };
+
+  const isProfileSelected = (profile) => {
+    const profileId = String(profile?._id ?? '');
+    if (!profileId || !Array.isArray(selectedProfiles)) return false;
+    return selectedProfiles.some((id) => String(id) === profileId);
   };
 
 
@@ -2594,8 +2755,10 @@ const CRMDashboard = () => {
 
         // Switch to "All" tab so the newly added lead is visible regardless of leadStatus tab filter
         setActiveCrmFilter(0);
+        setActiveAiPerformanceId(null);
         const newFilterData = { ...(filterData || {}) };
         delete newFilterData.leadStatus;
+        delete newFilterData.aiLeadStatus;
         setFilterData(newFilterData);
 
         // Reset all form fields
@@ -2999,6 +3162,7 @@ const CRMDashboard = () => {
     courseType: '',
     status: 'true',
     leadStatus: '',
+    aiLeadStatus: '',
     sector: '',
     followupStatus: '',
     hasFollowUpCall: '', // '' | true | false
@@ -3058,6 +3222,15 @@ const CRMDashboard = () => {
   const performanceFilters = useMemo(
     () => crmFilters.filter((f) => f._id && f._id !== 'all'),
     [crmFilters]
+  );
+  const [aiStatusCounts, setAiStatusCounts] = useState({});
+  const [activeAiPerformanceId, setActiveAiPerformanceId] = useState(null);
+  const aiPerformanceFilters = useMemo(
+    () => performanceFilters.map((filter) => ({
+      ...filter,
+      count: aiStatusCounts[filter._id]?.count ?? 0,
+    })),
+    [performanceFilters, aiStatusCounts]
   );
   const [statuses, setStatuses] = useState([
     { _id: '', name: '', count: 0 },
@@ -3183,6 +3356,7 @@ const CRMDashboard = () => {
       courseType: '',
       status: 'true',
       leadStatus: '',
+      aiLeadStatus: '',
       sector: '',
       createdFromDate: null,
       createdToDate: null,
@@ -3199,6 +3373,7 @@ const CRMDashboard = () => {
     };
 
     setFilterData(clearedFilters);
+    setActiveAiPerformanceId(null);
     setFormData({
       projects: { type: "includes", values: [] },
       verticals: { type: "includes", values: [] },
@@ -3990,6 +4165,8 @@ console.log('API Response:', response.data);
                 followup: fullDetail.followup,
                 followUpCall: fullDetail.followUpCall,
                 followUpVisit: fullDetail.followUpVisit,
+                followupStats: fullDetail.followupStats ?? p.followupStats,
+                followupDate: fullDetail.followupDate ?? null,
               } : p));
             }
           } catch (err) {
@@ -4102,6 +4279,7 @@ console.log('API Response:', response.data);
                 followup: response.data.followup ?? p.followup,
                 followUpCall: response.data.followUpCall ?? p.followUpCall,
                 followUpVisit: response.data.followUpVisit ?? p.followUpVisit,
+                followupStats: response.data.followupStats ?? p.followupStats,
               }
               : p
           )));
@@ -4230,7 +4408,7 @@ console.log('API Response:', response.data);
   }, [currentPage]);
 
   // Add this function in your component:
-  const updateCrmFiltersFromBackend = (backendCounts, filteredTotalCountFromAPI = null, approvalCountsFromApi = null) => {
+  const updateCrmFiltersFromBackend = (backendCounts, filteredTotalCountFromAPI = null, approvalCountsFromApi = null, aiBackendCounts = null) => {
     // Always calculate "All" count by summing all individual tab counts
     // This ensures "All" tab count remains consistent regardless of which tab is active
     const calculatedFilteredTotal = Object.keys(backendCounts || {})
@@ -4286,6 +4464,9 @@ console.log('API Response:', response.data);
       done: approvalCountsFromApi?.approved ?? 0,
       pending: approvalCountsFromApi?.pending ?? allCount,
     });
+    if (aiBackendCounts) {
+      setAiStatusCounts(aiBackendCounts);
+    }
   };
 
   const fetchDashboardCounts = async (filters = filterData, cycleOverride = null) => {
@@ -4298,6 +4479,7 @@ console.log('API Response:', response.data);
         ...(filters?.courseType && { courseType: filters.courseType }),
         ...(filters?.status && filters.status !== 'true' && { status: filters.status }),
         ...(filters?.leadStatus && { leadStatus: filters.leadStatus }),
+        ...(filters?.aiLeadStatus && { aiLeadStatus: filters.aiLeadStatus }),
         ...(filters?.sector && { sector: filters.sector }),
         ...(filters?.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
         ...(filters?.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
@@ -4400,6 +4582,7 @@ console.log('API Response:', response.data);
       ...(filters.courseType && { courseType: filters.courseType }),
       ...(filters.status && filters.status !== 'true' && { status: filters.status }),
       ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
+      ...(filters.aiLeadStatus && { aiLeadStatus: filters.aiLeadStatus }),
       ...(filters.sector && { sector: filters.sector }),
       ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
       ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
@@ -4470,7 +4653,7 @@ console.log('API Response:', response.data);
         } else if (shouldFetchKycCandidates) {
           await fetchMilestoneCounts(filters);
         } else {
-          await fetchRegistrationCrmFilterCounts(filters, page, null);
+          await fetchRegistrationCrmFilterCounts(filters, page, null, cycleOverride || cycleFilters);
           await fetchDashboardCounts(filters, cycleOverride || cycleFilters);
           await fetchKycCounts();
           await fetchMilestoneCounts(filters);
@@ -4671,6 +4854,7 @@ console.log('API Response:', response.data);
       _course: profile?._course,
       _center: profile?._center,
       _leadStatus: profile?._leadStatus,
+      _aiLeadStatus: profile?._aiLeadStatus,
       selectedSubstatus: profile?.selectedSubstatus,
       leadAssignment: profile?.leadAssignment,
       followupDate,
@@ -4718,6 +4902,7 @@ console.log('API Response:', response.data);
       _course: aiProfile._course,
       _center: aiProfile._center,
       _leadStatus: aiProfile._leadStatus,
+      _aiLeadStatus: aiProfile._aiLeadStatus,
       selectedSubstatus: aiProfile.selectedSubstatus,
       followupDate: aiProfile.followupDate,
       followups: aiProfile.followups,
@@ -4853,6 +5038,7 @@ console.log('API Response:', response.data);
     const queryParams = new URLSearchParams({
       page: page.toString(),
       leadStatus: crmFilters[activeCrmFilter]._id,
+      ...(filters.aiLeadStatus && { aiLeadStatus: filters.aiLeadStatus }),
       ...(filters.name && { name: filters.name }),
       ...(filters.courseType && { courseType: filters.courseType }),
       ...(filters.status && filters.status !== 'true' && { status: filters.status }),
@@ -4893,13 +5079,16 @@ console.log('API Response:', response.data);
     }
   };
 
-  const fetchRegistrationCrmFilterCounts = async (filters = filterData, page = currentPage, filteredTotalCount = null) => {
+  const fetchRegistrationCrmFilterCounts = async (filters = filterData, page = currentPage, filteredTotalCount = null, cycleOverride = null) => {
 
     if (!token) {
       console.warn('No token found in session storage.');
       setIsLoadingProfiles(false);
       return;
     }
+
+    const cycle = cycleOverride || cycleFilters;
+    const fd = formDataRef.current || formData;
 
     // Prepare query parameters
     const queryParams = new URLSearchParams({
@@ -4918,7 +5107,7 @@ console.log('API Response:', response.data);
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       ...(filters.approvalStatus && { approvalStatus: filters.approvalStatus }),
       // Multi-select filters
-      ...buildListFilterQueryParts(formData, cycleFilters),
+      ...buildListFilterQueryParts(fd, cycle),
     });
 
     try {
@@ -4932,7 +5121,7 @@ console.log('API Response:', response.data);
         const data = response.data;
         // Debug log to verify counts received
        
-        updateCrmFiltersFromBackend(data.crmFilterCount, filteredTotalCount, data.approvalCounts)
+        updateCrmFiltersFromBackend(data.crmFilterCount, filteredTotalCount, data.approvalCounts, data.aiCrmFilterCount)
 
       } else {
         console.error('Failed to fetch crm filter counts', response.data.message);
@@ -5133,10 +5322,12 @@ console.log('API Response:', response.data);
     setSelectedFollowupBucket('');
     setSelectedMilestoneFilter(null);
     setActiveCrmFilter(0);
+    setActiveAiPerformanceId(null);
 
     const newFilterData = { ...filterData };
     delete newFilterData.approvalStatus;
     delete newFilterData.leadStatus;
+    delete newFilterData.aiLeadStatus;
     delete newFilterData.followupStatus;
     if (tab === 'ekyc') {
       newFilterData.kyc = false;
@@ -5222,6 +5413,7 @@ console.log('API Response:', response.data);
 
     const newFilterData = { ...filterData, followupStatus: '' };
     delete newFilterData.leadStatus;
+    delete newFilterData.aiLeadStatus;
     delete newFilterData.kyc;
     if (next) {
       newFilterData.approvalStatus = next.toUpperCase();
@@ -5230,6 +5422,7 @@ console.log('API Response:', response.data);
     }
     setFilterData(newFilterData);
     setActiveCrmFilter(0);
+    setActiveAiPerformanceId(null);
     fetchProfileData(newFilterData, 1);
   };
 
@@ -5246,6 +5439,22 @@ console.log('API Response:', response.data);
     }
   };
 
+  const handleAiPerformanceChipClick = (filterId) => {
+    if (pageMainTab === 'ekyc') return;
+    setActiveAiPerformanceId(filterId || null);
+    setCurrentPage(1);
+    setInput1Value('');
+    setSelectedProfiles([]);
+    const newFilterData = { ...filterData };
+    if (filterId) {
+      newFilterData.aiLeadStatus = filterId;
+    } else {
+      delete newFilterData.aiLeadStatus;
+    }
+    setFilterData(newFilterData);
+    fetchProfileData(newFilterData, 1);
+  };
+
   const handleFollowupDashClick = (type, bucket) => {
     const followupType = String(type || 'Call').toLowerCase();
     const key = `${followupType}:${bucket}`;
@@ -5255,11 +5464,13 @@ console.log('API Response:', response.data);
     setSelectedApprovalFilter(null);
     setSelectedKycFilter(null);
     setSelectedMilestoneFilter(null);
+    setActiveAiPerformanceId(null);
     setCurrentPage(1);
 
     const newFilterData = { ...filterData };
     delete newFilterData.kyc;
     delete newFilterData.leadStatus;
+    delete newFilterData.aiLeadStatus;
     delete newFilterData.approvalStatus;
 
     if (followupType === 'visit') {
@@ -5283,6 +5494,7 @@ console.log('API Response:', response.data);
     const newFilterData = { ...baseFilterData };
     delete newFilterData.followupStatus;
     delete newFilterData.leadStatus;
+    delete newFilterData.aiLeadStatus;
     delete newFilterData.approvalStatus;
     delete newFilterData.kyc;
     delete newFilterData.kycBucket;
@@ -5319,6 +5531,7 @@ console.log('API Response:', response.data);
     setSelectedApprovalFilter(null);
     setSelectedFollowupBucket('');
     setSelectedMilestoneFilter(null);
+    setActiveAiPerformanceId(null);
     setCurrentPage(1);
 
     if (selectedKycFilter === filter) {
@@ -5371,10 +5584,12 @@ console.log('API Response:', response.data);
     const newFilterData = { ...filterData };
     delete newFilterData.followupStatus;
     delete newFilterData.leadStatus;
+    delete newFilterData.aiLeadStatus;
     delete newFilterData.approvalStatus;
     delete newFilterData.kyc;
     setFilterData(newFilterData);
     setActiveCrmFilter(0);
+    setActiveAiPerformanceId(null);
     fetchProfileData(newFilterData, 1, null, null, nextMilestone);
   };
 
@@ -5477,9 +5692,20 @@ console.log('API Response:', response.data);
 
   const getProfileFollowupDoneCount = (profile, type) => {
     const t = String(type || '').toLowerCase() === 'visit' ? 'visit' : 'call';
-    const apiCount = Number(profile?.followupStats?.[t]?.done);
-    if (Number.isFinite(apiCount) && apiCount > 0) return apiCount;
+    if (profile?.followupStats?.[t] != null && profile.followupStats[t].done != null) {
+      const apiCount = Number(profile.followupStats[t].done);
+      if (Number.isFinite(apiCount)) return apiCount;
+    }
     return getProfileFollowupBucket(profile, type) === 'done' ? 1 : 0;
+  };
+
+  const getProfileFollowupMissedCount = (profile, type) => {
+    const t = String(type || '').toLowerCase() === 'visit' ? 'visit' : 'call';
+    if (profile?.followupStats?.[t] != null && profile.followupStats[t].missed != null) {
+      const apiCount = Number(profile.followupStats[t].missed);
+      if (Number.isFinite(apiCount)) return apiCount;
+    }
+    return getProfileFollowupBucket(profile, type) === 'missed' ? 1 : 0;
   };
 
   // No red when planned or already done (NA date after done is fine).
@@ -6028,15 +6254,18 @@ console.log('API Response:', response.data);
   const openProfileKycTab = openProfileDocumentsTab;
 
   const performanceTotalCount = approvalCounts.total || crmFilters[0]?.count || 0;
+  const aiPerformanceTotalCount = typeof aiStatusCounts.all === 'number'
+    ? aiStatusCounts.all
+    : performanceTotalCount;
   const activePerformanceId = (() => {
     const id = crmFilters[activeCrmFilter]?._id;
     if (!id || id === 'all') return null;
     return id;
   })();
 
-  // Auto-select profiles based on Input 1 value (bulk WhatsApp, bulk Refer, bulk Action)
+  // Auto-select profiles based on Input 1 value (bulk WhatsApp, bulk Refer, bulk Action, AI Call)
   useEffect(() => {
-    if (bulkMode !== 'whatsapp' && bulkMode !== 'bulkrefer' && bulkMode !== 'bulkaction') {
+    if (bulkMode !== 'whatsapp' && bulkMode !== 'bulkrefer' && bulkMode !== 'bulkaction' && bulkMode !== 'AiCall') {
       return;
     }
 
@@ -6058,12 +6287,18 @@ console.log('API Response:', response.data);
       return;
     }
 
-    // Get total available leads from CRM filter
-    const totalAvailableLeads = crmFilters[activeCrmFilter]?.count || allProfiles.length;
+    const profilesForSelect = bulkMode === 'AiCall'
+      ? allProfiles.filter((profile) => !hasAiAlreadyGoneThroughLead(profile))
+      : allProfiles;
+
+    // Get total available leads from CRM filter (AI Call uses remaining New Lead / Not Connected)
+    const totalAvailableLeads = bulkMode === 'AiCall'
+      ? (aiCallTotalCount || profilesForSelect.length)
+      : (crmFilters[activeCrmFilter]?.count || allProfiles.length);
     const validNumValue = Math.min(numValue, totalAvailableLeads);
 
     // If user wants more profiles than currently loaded, fetch them
-    if (validNumValue > allProfiles.length && validNumValue > 0) {
+    if (validNumValue > profilesForSelect.length && validNumValue > 0) {
       const fetchProfilesForSelection = async () => {
         if (!token) return;
 
@@ -6071,8 +6306,9 @@ console.log('API Response:', response.data);
 
           const queryParams = new URLSearchParams({
             page: '1',
-            limit: validNumValue.toString(),
+            limit: (bulkMode === 'AiCall' ? Math.max(validNumValue * 3, 50) : validNumValue).toString(),
             leadStatus: crmFilters[activeCrmFilter]?._id || '',
+            ...(filterData.aiLeadStatus && { aiLeadStatus: filterData.aiLeadStatus }),
             ...(filterData.name && { name: filterData.name }),
             ...(filterData.courseType && { courseType: filterData.courseType }),
             ...(filterData.status && filterData.status !== 'true' && { status: filterData.status }),
@@ -6092,7 +6328,9 @@ console.log('API Response:', response.data);
           });
 
           if (response.data.success && response.data.data) {
-            const fetchedProfiles = response.data.data;
+            const fetchedProfiles = bulkMode === 'AiCall'
+              ? response.data.data.filter((profile) => !hasAiAlreadyGoneThroughLead(profile))
+              : response.data.data;
             const selectedProfilesData = fetchedProfiles.slice(0, validNumValue);
             const profilesToSelect = selectedProfilesData.map(profile => profile._id);
             setSelectedProfiles(profilesToSelect);
@@ -6108,7 +6346,8 @@ console.log('API Response:', response.data);
         } catch (error) {
           console.error('Error fetching profiles for selection:', error);
           // Fallback: select from current allProfiles
-          const selectedProfilesData = allProfiles.slice(0, Math.min(validNumValue, allProfiles.length));
+          const selectedProfilesData = (bulkMode === 'AiCall' ? profilesForSelect : allProfiles)
+            .slice(0, Math.min(validNumValue, (bulkMode === 'AiCall' ? profilesForSelect : allProfiles).length));
           const profilesToSelect = selectedProfilesData.map(profile => profile._id);
           setSelectedProfiles(profilesToSelect);
           
@@ -6129,8 +6368,8 @@ console.log('API Response:', response.data);
 
       return () => clearTimeout(timeoutId);
     } else {
-      // Use current allProfiles if we have enough
-      const selectedProfilesData = allProfiles.slice(0, validNumValue);
+      // Use current visible leads if we have enough (AI Call skips already-called leads)
+      const selectedProfilesData = profilesForSelect.slice(0, validNumValue);
       const profilesToSelect = selectedProfilesData.map(profile => profile._id);
       setSelectedProfiles(profilesToSelect);
       
@@ -6143,7 +6382,7 @@ console.log('API Response:', response.data);
       });
     }
 
-  }, [input1Value, allProfiles, bulkMode, crmFilters, activeCrmFilter, filterData, formData]);
+  }, [input1Value, allProfiles, bulkMode, crmFilters, activeCrmFilter, filterData, formData, aiCallTotalCount, hasAiAlreadyGoneThroughLead]);
 
 
 
@@ -8675,6 +8914,7 @@ console.log('API Response:', response.data);
         page: '1',
         limit: '10000', // Fetch up to 10000 profiles
         leadStatus: crmFilters[activeCrmFilter]?._id || '',
+        ...(filterData.aiLeadStatus && { aiLeadStatus: filterData.aiLeadStatus }),
         ...(filterData.name && { name: filterData.name }),
         ...(filterData.courseType && { courseType: filterData.courseType }),
         ...(filterData.status && filterData.status !== 'true' && { status: filterData.status }),
@@ -13370,7 +13610,7 @@ useEffect(() => {
     });
     setCurrentPage(1);
     fetchProfileData(filterData, 1, next);
-    fetchRegistrationCrmFilterCounts(filterData, 1, null);
+    fetchRegistrationCrmFilterCounts(filterData, 1, null, next);
     fetchDashboardCounts(filterData, next);
   };
 
@@ -13399,6 +13639,42 @@ useEffect(() => {
     setCurrentPage(1);
     fetchProfileData(newFilterData, 1);
   };
+
+  useEffect(() => {
+    if (bulkMode !== 'AiCall' || !aiCallSource) return;
+
+    if (aiCallSource === 'b2c-today') {
+      if (headerDatePreset === 'today') return;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      applyHeaderLeadCreationDateFilter(today, new Date(today), 'today');
+      return;
+    }
+
+    if (aiCallSource === 'untouch-not-connected') {
+      const untouchId = '64ab1234abcd5678ef901234';
+      const notConnectedId = AI_FAB_NOT_CONNECTED_ID;
+      if (String(filterData.leadStatus || '') === untouchId && String(filterData.subStatuses || '') === notConnectedId) {
+        return;
+      }
+      const untouchIndex = crmFilters.findIndex((f) => String(f._id) === untouchId);
+      if (untouchIndex >= 0) setActiveCrmFilter(untouchIndex);
+      const newFilterData = {
+        ...filterData,
+        leadStatus: untouchId,
+        subStatuses: notConnectedId,
+        followupStatus: '',
+      };
+      delete newFilterData.kyc;
+      setSelectedFollowupBucket('');
+      setSelectedApprovalFilter(null);
+      setSelectedKycFilter(null);
+      setSelectedMilestoneFilter(null);
+      setFilterData(newFilterData);
+      setCurrentPage(1);
+      fetchProfileData(newFilterData, 1);
+    }
+  }, [bulkMode, aiCallSource]);
 
   const handleHeaderDateReset = () => {
     const newFilterData = {
@@ -14126,7 +14402,51 @@ useEffect(() => {
           })}
         </div>
       </div>
-
+      <div className="b2b-dash-section mt-3">
+        <span className="b2b-dash-section__label">Ai Performance</span>
+        <div className="b2b-mobile-hscroll b2b-mobile-hscroll--chips d-flex gap-2 align-items-center pt-1">
+          <button
+            type="button"
+            className="b2b-perf-chip"
+            style={{
+              padding: '6px 14px',
+              fontSize: '12px',
+              fontWeight: 600,
+              borderRadius: '999px',
+              cursor: 'pointer',
+              color: !activeAiPerformanceId ? '#fff' : 'rgb(250, 85, 121)',
+              backgroundColor: !activeAiPerformanceId ? 'rgb(250, 85, 121)' : '#fff',
+              border: !activeAiPerformanceId ? 'none' : '1.5px solid rgb(250, 85, 121)',
+            }}
+            onClick={() => handleAiPerformanceChipClick(null)}
+          >
+            All ({aiPerformanceTotalCount})
+          </button>
+          {aiPerformanceFilters.map((filter, index) => {
+            const isSelected = activeAiPerformanceId === filter._id;
+            return (
+              <button
+                key={filter._id || index}
+                type="button"
+                className="b2b-perf-chip"
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  borderRadius: '999px',
+                  cursor: 'pointer',
+                  color: isSelected ? '#fff' : 'rgb(250, 85, 121)',
+                  backgroundColor: isSelected ? 'rgb(250, 85, 121)' : '#fff',
+                  border: isSelected ? 'none' : '1.5px solid rgb(250, 85, 121)',
+                }}
+                onClick={() => handleAiPerformanceChipClick(filter._id)}
+              >
+                {(filter.name || 'Status').toUpperCase()} ({filter.count ?? 0})
+              </button>
+            );
+          })}
+        </div>
+      </div>
       <div className="b2b-dash-section mt-3">
         <span className="b2b-dash-section__label">Performance</span>
         <div className="b2b-mobile-hscroll b2b-mobile-hscroll--chips d-flex gap-2 align-items-center pt-1">
@@ -14210,11 +14530,13 @@ useEffect(() => {
               setSelectedMilestoneFilter(null);
               const cleared = { ...filterData, followupStatus: '' };
               delete cleared.leadStatus;
+              delete cleared.aiLeadStatus;
               delete cleared.kyc;
               delete cleared.kycBucket;
               delete cleared.approvalStatus;
               setFilterData(cleared);
               setActiveCrmFilter(0);
+              setActiveAiPerformanceId(null);
               fetchProfileData(cleared, 1, null, null, null);
             }}
             style={{ fontSize: '12px', fontWeight: 600, borderRadius: '999px' }}
@@ -14894,10 +15216,7 @@ useEffect(() => {
               className="crm-ai-fab-sub"
               title={substatus.title}
               style={{ transitionDelay: isAiFabOpen ? `${0.06 * (index + 1)}s` : '0s' }}
-              onClick={() => {
-                setIsAiFabOpen(false);
-                toast.info(substatus.title);
-              }}
+              onClick={() => handleAiFabQueue(substatus)}
             >
               <i className={
                 String(substatus._id) === '64ab1234abcd5678ef901235'
@@ -15687,6 +16006,7 @@ useEffect(() => {
                     <div className="adm-cycle-toolbar__outer d-flex gap-2 align-items-center justify-content-between">
                       <div className="adm-cycle-toolbar__actions d-flex flex-nowrap gap-2 align-items-center">
                         {showBulkInputs ? (
+                          <div className="d-flex align-items-center gap-2">
                           <div style={{
                             display: "flex",
                             alignItems: "stretch",
@@ -15700,15 +16020,15 @@ useEffect(() => {
                           }}>
                             <input
                               type="text"
-                              placeholder="Input 1"
+                              placeholder={bulkMode === 'AiCall' ? 'How many leads' : 'Input 1'}
                               value={input1Value}
                               onFocus={() => {
-                                if (bulkMode === 'whatsapp' || bulkMode === 'bulkaction' || bulkMode === 'bulkrefer') {
+                                if (bulkMode === 'whatsapp' || bulkMode === 'bulkaction' || bulkMode === 'bulkrefer' || bulkMode === 'bulkcourse') {
                                   runAiSupervisionForFirstN();
                                 }
                               }}
                               onClick={() => {
-                                if (bulkMode === 'whatsapp' || bulkMode === 'bulkaction' || bulkMode === 'bulkrefer') {
+                                if (bulkMode === 'whatsapp' || bulkMode === 'bulkaction' || bulkMode === 'bulkrefer' || bulkMode === 'bulkcourse') {
                                   runAiSupervisionForFirstN();
                                 }
                               }}
@@ -15716,17 +16036,25 @@ useEffect(() => {
                                 if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
                                   e.preventDefault();
                                 }
+                                const maxValue = bulkMode === 'AiCall'
+                                  ? Math.min(20, aiCallTotalCount || 0)
+                                  : (crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0);
                                 if (e.key === 'Enter' && bulkMode === 'whatsapp' && input1Value) {
                                   e.preventDefault();
                                   const numValue = parseInt(input1Value, 10);
-                                  const maxValue = crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0;
                                   if (numValue >= 1 && numValue <= maxValue) {
                                     setModalType('whatsapp');
                                   }
                                 }
+                                if (e.key === 'Enter' && bulkMode === 'AiCall' && input1Value) {
+                                  e.preventDefault();
+                                  handleAiCallDispatch();
+                                }
                               }}
                               onChange={(e) => {
-                                const maxValue = crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0;
+                                const maxValue = bulkMode === 'AiCall'
+                                  ? Math.min(20, aiCallTotalCount || 0)
+                                  : (crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0);
                                 let inputValue = e.target.value.replace(/[^0-9]/g, '');
                                 if (inputValue === '') {
                                   setInput1Value('');
@@ -15755,8 +16083,9 @@ useEffect(() => {
                             <input
                               type="text"
                               placeholder="Input 2"
-                              value={crmFilters[activeCrmFilter]?.count || 0}
+                              value={bulkMode === 'AiCall' ? (aiCallTotalCount || 0) : (crmFilters[activeCrmFilter]?.count || 0)}
                               readOnly
+                              title={bulkMode === 'AiCall' ? `Total ${aiCallLabel} leads` : 'Total filtered leads'}
                               style={{
                                 width: "50%",
                                 border: "none",
@@ -15769,6 +16098,34 @@ useEffect(() => {
                                 cursor: "default"
                               }}
                             />
+                          </div>
+                          {bulkMode === 'AiCall' && (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-primary"
+                                disabled={aiFabBusy || !input1Value}
+                                onClick={handleAiCallDispatch}
+                                style={{
+                                  padding: '6px 10px',
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                {aiFabBusy ? 'Queuing...' : 'Call AI'}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-secondary"
+                                onClick={closeAiCallBulk}
+                                title="Cancel AI call"
+                                style={{ padding: '6px 8px', fontSize: '11px' }}
+                              >
+                                <i className="fas fa-times"></i>
+                              </button>
+                            </>
+                          )}
                           </div>
                         ) : (
                           <>
@@ -17060,7 +17417,7 @@ useEffect(() => {
                                         <label className="lhm__check" title="Select">
                                           <input
                                             onChange={(e) => handleCheckboxChange(profile, e.target.checked)}
-                                            checked={selectedProfiles && Array.isArray(selectedProfiles) ? selectedProfiles.includes(profile._id) : false}
+                                            checked={isProfileSelected(profile)}
                                             className="form-check-input"
                                             type="checkbox"
                                           />
@@ -17191,6 +17548,12 @@ useEffect(() => {
                                           </button>
                                         </div>
                                         <div className="lhm__kv">
+                                          <span className="lhm__kv-label">AI Status</span>
+                                          <span className="lhm__kv-pill" style={{ cursor: 'default' }}>
+                                            {profile._aiLeadStatus?.title || 'Untouch'}
+                                          </span>
+                                        </div>
+                                        <div className="lhm__kv">
                                           <span className="lhm__kv-label">Sub-Status</span>
                                           <button
                                             type="button"
@@ -17232,7 +17595,7 @@ useEffect(() => {
                                             return [
                                               { label: 'Done', value: getProfileFollowupDoneCount(profile, 'Call'), bg: 'rgb(18, 179, 255)' },
                                               { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: 'rgb(12, 125, 180)' },
-                                              { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: 'rgb(8, 80, 120)' },
+                                              { label: 'Missed', value: getProfileFollowupMissedCount(profile, 'Call'), bg: 'rgb(8, 80, 120)' },
                                             ];
                                           })().map((s) => (
                                             <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
@@ -17267,7 +17630,7 @@ useEffect(() => {
                                             return [
                                               { label: 'Done', value: getProfileFollowupDoneCount(profile, 'Visit'), bg: 'rgb(75, 85, 99)' },
                                               { label: 'Planned', value: b === 'planned' ? 1 : 0, bg: 'rgb(55, 65, 81)' },
-                                              { label: 'Missed', value: b === 'missed' ? 1 : 0, bg: 'rgb(35, 42, 52)' },
+                                              { label: 'Missed', value: getProfileFollowupMissedCount(profile, 'Visit'), bg: 'rgb(35, 42, 52)' },
                                             ];
                                           })().map((s) => (
                                             <div key={s.label} className="lhm__stat-card" style={{ background: s.bg }}>
@@ -17378,7 +17741,7 @@ useEffect(() => {
                                               <label className="lead-strip-v3__check" title="Select">
                                                 <input
                                                   onChange={(e) => handleCheckboxChange(profile, e.target.checked)}
-                                                  checked={selectedProfiles && Array.isArray(selectedProfiles) ? selectedProfiles.includes(profile._id) : false}
+                                                  checked={isProfileSelected(profile)}
                                                   className="form-check-input"
                                                   type="checkbox"
                                                 />
@@ -17473,6 +17836,12 @@ useEffect(() => {
                                                 >
                                                   {profile._leadStatus?.title || 'Untouch Lead'}
                                                 </button>
+                                              </div>
+                                              <div className="lead-strip-v3__kv">
+                                                <span className="lead-strip-v3__kv-label">AI Status</span>
+                                                <span className="lead-strip-v3__kv-pill" style={{ cursor: 'default' }}>
+                                                  {profile._aiLeadStatus?.title || 'Untouch'}
+                                                </span>
                                               </div>
                                               <div className="lead-strip-v3__kv">
                                                 <span className="lead-strip-v3__kv-label">Sub-Status</span>
@@ -17590,7 +17959,7 @@ useEffect(() => {
                                           {renderStatGrid([
                                             { key: 'fc-done', label: 'Done', value: getProfileFollowupDoneCount(profile, 'Call'), bg: 'rgb(18, 179, 255)' },
                                             { key: 'fc-planned', label: 'Planned', value: callBucket === 'planned' ? 1 : 0, bg: 'rgb(12, 125, 180)' },
-                                            { key: 'fc-missed', label: 'Missed', value: callBucket === 'missed' ? 1 : 0, bg: 'rgb(8, 80, 120)' },
+                                            { key: 'fc-missed', label: 'Missed', value: getProfileFollowupMissedCount(profile, 'Call'), bg: 'rgb(8, 80, 120)' },
                                           ])}
                                           <div className="lead-strip-v3__footer">
                                             <div className="lead-strip-v3__footer-main">
@@ -17620,7 +17989,7 @@ useEffect(() => {
                                           {renderStatGrid([
                                             { key: 'fv-done', label: 'Done', value: getProfileFollowupDoneCount(profile, 'Visit'), bg: 'rgb(75, 85, 99)' },
                                             { key: 'fv-planned', label: 'Planned', value: visitBucket === 'planned' ? 1 : 0, bg: 'rgb(55, 65, 81)' },
-                                            { key: 'fv-missed', label: 'Missed', value: visitBucket === 'missed' ? 1 : 0, bg: 'rgb(35, 42, 52)' },
+                                            { key: 'fv-missed', label: 'Missed', value: getProfileFollowupMissedCount(profile, 'Visit'), bg: 'rgb(35, 42, 52)' },
                                           ])}
                                           <div className="lead-strip-v3__footer">
                                             <div className="lead-strip-v3__footer-main">
