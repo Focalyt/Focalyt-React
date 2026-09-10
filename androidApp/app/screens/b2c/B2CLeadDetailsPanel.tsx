@@ -80,6 +80,22 @@ function statusColor(status: string): string {
   return '#f59e0b';
 }
 
+function splitHumanAndAiRemarks(remarks?: string, aiRemark?: string) {
+  const dedicated = String(aiRemark || '').trim();
+  const aiLines: string[] = [];
+  const humanLines: string[] = [];
+  String(remarks || '')
+    .split(/\r?\n/)
+    .forEach((line) => {
+      if (/^\s*\[AI Call\]/i.test(line)) aiLines.push(line.trim());
+      else humanLines.push(line);
+    });
+  return {
+    remarks: humanLines.join('\n').trim() || 'N/A',
+    aiRemark: dedicated || aiLines.join('\n').trim() || 'N/A',
+  };
+}
+
 function LeadDetailsTab({ profile }: { profile: B2CProfile }) {
   const leadAge = profile.createdAt
     ? `${Math.floor((Date.now() - new Date(profile.createdAt).getTime()) / 86400000)} Days`
@@ -88,6 +104,7 @@ function LeadDetailsTab({ profile }: { profile: B2CProfile }) {
     profile.logs?.length && profile.logs[profile.logs.length - 1]?.user?.name
       ? profile.logs[profile.logs.length - 1]!.user!.name!
       : 'N/A';
+  const remarkFields = splitHumanAndAiRemarks(profile.remarks, profile.aiRemark);
 
   return (
     <ScrollView style={styles.tabScroll} nestedScrollEnabled>
@@ -108,7 +125,8 @@ function LeadDetailsTab({ profile }: { profile: B2CProfile }) {
         <InfoRow label="TYPE OF PROJECT" value={profile._course?.typeOfProject || 'N/A'} />
         <InfoRow label="BRANCH NAME" value={profile._center?.name || 'N/A'} />
         <InfoRow label="BATCH NAME" value={profile._course?.batchName || 'N/A'} />
-        <InfoRow label="REMARKS" value={profile.remarks || 'N/A'} />
+        <InfoRow label="REMARKS" value={remarkFields.remarks} />
+        <InfoRow label="AI REMARK" value={remarkFields.aiRemark} />
       </View>
     </ScrollView>
   );

@@ -103,6 +103,7 @@ export type B2CProfile = {
   updatedAt?: string;
   kyc?: boolean;
   remarks?: string;
+  aiRemark?: string;
   approval?: { status?: 'APPROVED' | 'PENDING' | 'REJECTED' | string };
   followUpCall?: B2CFollowUpSlot | null;
   followUpVisit?: B2CFollowUpSlot | null;

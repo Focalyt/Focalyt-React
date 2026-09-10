@@ -1158,7 +1158,7 @@ const CRMDashboard = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [showRemarksModal, setShowRemarksModal] = useState(false);
-  const [remarksModalData, setRemarksModalData] = useState({ text: '', name: '' });
+  const [remarksModalData, setRemarksModalData] = useState({ text: '', name: '', title: 'Remarks' });
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [documentZoom, setDocumentZoom] = useState(1);
   const [documentRotation, setDocumentRotation] = useState(0);
@@ -1260,6 +1260,7 @@ const CRMDashboard = () => {
   const [aiCallLeads, setAiCallLeads] = useState([]);
   const [aiCallSentIds, setAiCallSentIds] = useState([]);
   const [aiCallingProfileId, setAiCallingProfileId] = useState(null);
+  const [aiCancellingProfileId, setAiCancellingProfileId] = useState(null);
   const aiFabWrapRef = useRef(null);
   const AI_FAB_NEW_LEAD_ID = '64ab1234abcd5678ef901235';
   const AI_FAB_NOT_CONNECTED_ID = '6a3f5a53cfccaeeb28a4d1a3';
@@ -1274,6 +1275,19 @@ const CRMDashboard = () => {
     const event = String(ai.lastEvent || '').toUpperCase();
     return ['MAKE_CALL_QUEUED', 'CALL_COMPLETED', 'CALL_FAILED', 'CALL_TRANSFERED'].includes(event);
   }, [aiCallSentIds]);
+
+  // VoiceX keeps no-answer numbers in their retry queue — Cancel permanently removes them.
+  // If AI already dialed (and it wasn't a completed conversation / already cancelled), show Cancel.
+  const shouldCancelVoiceXCall = useCallback((profile) => {
+    const ai = profile?.aiVoice || {};
+    const status = String(ai.lastMakeCallStatus || '').toLowerCase();
+    const event = String(ai.lastEvent || '').toUpperCase();
+    if (status === 'cancelled' || event === 'MAKE_CALL_CANCELLED') return false;
+    if (event === 'CALL_COMPLETED' || event === 'CALL_TRANSFERED') return false;
+    return hasAiAlreadyGoneThroughLead(profile);
+  }, [hasAiAlreadyGoneThroughLead]);
+
+  const isAiCallScheduled = shouldCancelVoiceXCall;
 
   const handleSingleLeadAiCall = useCallback(async (profile) => {
     const leadId = String(profile?._id || '').trim();
@@ -1329,26 +1343,97 @@ const CRMDashboard = () => {
     }
   }, [aiCallingProfileId, aiFabBusy, backendUrl, hasAiAlreadyGoneThroughLead, token]);
 
+  const handleCancelLeadAiCall = useCallback(async (profile) => {
+    const leadId = String(profile?._id || '').trim();
+    const mobile = profile?._candidate?.mobile || profile?.mobile || '';
+    const name = profile?._candidate?.name || profile?.name || 'this lead';
+
+    if (!leadId) {
+      toast.error('Lead id missing');
+      return;
+    }
+    if (!mobile) {
+      toast.error('Lead has no mobile number to cancel on VoiceX');
+      return;
+    }
+    if (aiCancellingProfileId || aiCallingProfileId) {
+      toast.info('Please wait, another AI call action is in progress');
+      return;
+    }
+
+    // VoiceX Cancel API permanently deletes pending schedules for this phone
+    // (including no-answer retries that go back into their queue).
+    // Docs: https://xtremegenai.com/docs — delete_call_by_phone_campaign_dashboard
+    const confirmed = window.confirm(
+      `Cancel AI call for ${name} (${mobile})?\n\n` +
+      `This permanently removes this number from the VoiceX schedule/retry queue ` +
+      `(including no-answer callbacks).`
+    );
+    if (!confirmed) return;
+
+    setAiCancellingProfileId(leadId);
+    try {
+      const res = await axios.post(
+        `${backendUrl}/college/digitalLead/voicex-cancel`,
+        { appliedCourseId: leadId, phoneNumber: mobile },
+        { headers: { 'x-auth': token } }
+      );
+      setAiCallSentIds((prev) => (prev || []).filter((id) => String(id) !== leadId));
+      setAllProfiles((prev) => (prev || []).map((row) => (
+        String(row._id) === leadId
+          ? {
+              ...row,
+              aiVoice: {
+                ...(row.aiVoice || {}),
+                lastEvent: 'MAKE_CALL_CANCELLED',
+                lastMakeCallStatus: 'cancelled',
+                lastCancelAt: new Date().toISOString(),
+              },
+            }
+          : row
+      )));
+      toast.success(res.data?.msg || `Cancelled. VoiceX will not retry ${name}.`);
+    } catch (err) {
+      toast.error(err.response?.data?.msg || err.message || 'Failed to cancel AI call');
+    } finally {
+      setAiCancellingProfileId(null);
+    }
+  }, [aiCallingProfileId, aiCancellingProfileId, backendUrl, token]);
+
   const renderAiCallIconButton = (profile) => {
     const leadId = String(profile?._id || '');
     const isCalling = aiCallingProfileId === leadId;
-    const alreadyCalled = hasAiAlreadyGoneThroughLead(profile);
+    const isCancelling = aiCancellingProfileId === leadId;
+    const canCancelVoiceX = shouldCancelVoiceXCall(profile);
+    const alreadyCalledDone = hasAiAlreadyGoneThroughLead(profile) && !canCancelVoiceX;
+    const busy = isCalling || isCancelling || Boolean(aiCallingProfileId) || Boolean(aiCancellingProfileId);
+
+    let title = 'AI Call';
+    if (isCalling) title = 'Starting AI call...';
+    else if (isCancelling) title = 'Cancelling AI call...';
+    else if (canCancelVoiceX) title = 'Cancel AI call — permanently remove from VoiceX retry queue';
+    else if (alreadyCalledDone) title = 'AI call finished — click to call again';
+
     return (
       <button
         type="button"
-        className={`lead-strip-v3__icon-btn lead-strip-v3__icon-btn--ai-call${alreadyCalled ? ' is-called' : ''}`}
-        title={isCalling ? 'Starting AI call...' : alreadyCalled ? 'AI already called — click to call again' : 'AI Call'}
-        aria-label="AI Call"
-        disabled={isCalling || Boolean(aiCallingProfileId)}
+        className={`lead-strip-v3__icon-btn lead-strip-v3__icon-btn--ai-call${canCancelVoiceX ? ' is-scheduled' : ''}${alreadyCalledDone ? ' is-called' : ''}`}
+        title={title}
+        aria-label={canCancelVoiceX ? 'Cancel AI Call' : 'AI Call'}
+        disabled={busy}
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          handleSingleLeadAiCall(profile);
+          // No-answer leads stay in VoiceX queue — always Cancel, never "call again"
+          if (shouldCancelVoiceXCall(profile)) handleCancelLeadAiCall(profile);
+          else handleSingleLeadAiCall(profile);
         }}
       >
-        {isCalling
+        {(isCalling || isCancelling)
           ? <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
-          : <i className="fas fa-headset" aria-hidden="true"></i>}
+          : canCancelVoiceX
+            ? <i className="fas fa-phone-slash" aria-hidden="true"></i>
+            : <i className="fas fa-headset" aria-hidden="true"></i>}
       </button>
     );
   };
@@ -4791,8 +4876,7 @@ console.log('API Response:', response.data);
     return [...remarkNotes, ...followupNotes].slice(-10);
   }, []);
 
-  const getProfileRemarksText = useCallback((profile) => {
-    const remarks = profile?.remarks;
+  const normalizeRemarkValue = useCallback((remarks) => {
     if (!remarks) return '';
     if (typeof remarks === 'string') return remarks.trim();
     if (Array.isArray(remarks)) {
@@ -4804,6 +4888,29 @@ console.log('API Response:', response.data);
     return String(remarks).trim();
   }, []);
 
+  const splitHumanAndAiRemarks = useCallback((text) => {
+    const aiLines = [];
+    const humanLines = [];
+    String(text || '').split(/\r?\n/).forEach((line) => {
+      if (/^\s*\[AI Call\]/i.test(line)) aiLines.push(line.trim());
+      else humanLines.push(line);
+    });
+    return {
+      human: humanLines.join('\n').trim(),
+      ai: aiLines.join('\n').trim(),
+    };
+  }, []);
+
+  const getProfileRemarksText = useCallback((profile) => {
+    return splitHumanAndAiRemarks(normalizeRemarkValue(profile?.remarks)).human;
+  }, [normalizeRemarkValue, splitHumanAndAiRemarks]);
+
+  const getProfileAiRemarkText = useCallback((profile) => {
+    const dedicated = typeof profile?.aiRemark === 'string' ? profile.aiRemark.trim() : '';
+    if (dedicated) return dedicated;
+    return splitHumanAndAiRemarks(normalizeRemarkValue(profile?.remarks)).ai;
+  }, [normalizeRemarkValue, splitHumanAndAiRemarks]);
+
   const truncateRemarks = useCallback((text, max = 70) => {
     const value = (text || '').replace(/\s+/g, ' ').trim();
     if (!value) return 'N/A';
@@ -4811,21 +4918,24 @@ console.log('API Response:', response.data);
     return `${value.slice(0, max).trim()}...`;
   }, []);
 
-  const openRemarksModal = useCallback((profile) => {
+  const openRemarksModal = useCallback((profile, options = {}) => {
+    const title = options.title || 'Remarks';
+    const text = options.text != null ? options.text : getProfileRemarksText(profile);
     setRemarksModalData({
-      text: getProfileRemarksText(profile),
+      text,
+      title,
       name: profile?._candidate?.name || profile?.name || 'Lead',
     });
     setShowRemarksModal(true);
   }, [getProfileRemarksText]);
 
-  const renderRemarksField = useCallback((profile) => {
-    const fullText = getProfileRemarksText(profile);
+  const renderRemarkPreviewField = useCallback((profile, { label, text, modalTitle }) => {
+    const fullText = text || '';
     const hasRemarks = Boolean(fullText);
 
     return (
       <div className="info-group">
-        <div className="info-label">Remarks</div>
+        <div className="info-label">{label}</div>
         <div className="info-value remarks-preview-wrap">
           <span className="remarks-preview-text" title={hasRemarks ? fullText : undefined}>
             {hasRemarks ? truncateRemarks(fullText) : 'N/A'}
@@ -4833,13 +4943,13 @@ console.log('API Response:', response.data);
           <button
             type="button"
             className="remarks-preview-edit-btn"
-            title={hasRemarks ? 'View full remarks' : 'No remarks'}
-            aria-label="View full remarks"
+            title={hasRemarks ? `View full ${label.toLowerCase()}` : `No ${label.toLowerCase()}`}
+            aria-label={`View full ${label.toLowerCase()}`}
             disabled={!hasRemarks}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              if (hasRemarks) openRemarksModal(profile);
+              if (hasRemarks) openRemarksModal(profile, { title: modalTitle || label, text: fullText });
             }}
           >
             <i className="fas fa-pen" aria-hidden="true"></i>
@@ -4847,7 +4957,23 @@ console.log('API Response:', response.data);
         </div>
       </div>
     );
-  }, [getProfileRemarksText, truncateRemarks, openRemarksModal]);
+  }, [truncateRemarks, openRemarksModal]);
+
+  const renderRemarksField = useCallback((profile) => (
+    renderRemarkPreviewField(profile, {
+      label: 'Remarks',
+      text: getProfileRemarksText(profile),
+      modalTitle: 'Remarks',
+    })
+  ), [renderRemarkPreviewField, getProfileRemarksText]);
+
+  const renderAiRemarksField = useCallback((profile) => (
+    renderRemarkPreviewField(profile, {
+      label: 'AI Remark',
+      text: getProfileAiRemarkText(profile),
+      modalTitle: 'AI Remark',
+    })
+  ), [renderRemarkPreviewField, getProfileAiRemarkText]);
 
   const getProfileDocumentSnapshot = useCallback((profile) => {
     const documents = Array.isArray(profile?.uploadedDocs) ? profile.uploadedDocs : [];
@@ -18684,6 +18810,7 @@ useEffect(() => {
                                                 <div className="info-value">{profile._center?.name || 'N/A'}</div>
                                               </div>
                                               {renderRemarksField(profile)}
+                                              {renderAiRemarksField(profile)}
                                             </div>
                                           </div>
                                         </div>
@@ -18822,6 +18949,7 @@ useEffect(() => {
                                                         new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
                                                     </div>
                                                     {renderRemarksField(profile)}
+                                                    {renderAiRemarksField(profile)}
                                                     <div className="info-group">
                                                       <div className="info-label">LEAD MODIFICATION By</div>
                                                       <div className="info-value">Mar 21, 2025 3:32 PM</div>
@@ -18941,6 +19069,9 @@ useEffect(() => {
                                                   </div>
                                                   <div className="col-xl- col-3">
                                                     {renderRemarksField(profile)}
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    {renderAiRemarksField(profile)}
                                                   </div>
                                                   <div className="col-xl- col-3">
                                                     <div className="info-group">
@@ -20514,7 +20645,7 @@ useEffect(() => {
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">
-                  Remarks{remarksModalData.name ? ` — ${remarksModalData.name}` : ''}
+                  {remarksModalData.title || 'Remarks'}{remarksModalData.name ? ` — ${remarksModalData.name}` : ''}
                 </h5>
                 <button
                   type="button"
@@ -20525,7 +20656,7 @@ useEffect(() => {
               </div>
               <div className="modal-body">
                 <div className="remarks-modal-text">
-                  {remarksModalData.text || 'No remarks available.'}
+                  {remarksModalData.text || `No ${(remarksModalData.title || 'remarks').toLowerCase()} available.`}
                 </div>
               </div>
               <div className="modal-footer">
@@ -30274,6 +30405,18 @@ max-width: 600px;
           background: #ecfdf5;
           color: #059669;
           border-color: #a7f3d0;
+        }
+
+        .lead-strip-v3__icon-btn--ai-call.is-scheduled{
+          background: #fef2f2;
+          color: #dc2626;
+          border-color: #fecaca;
+        }
+
+        .lead-strip-v3__icon-btn--ai-call.is-scheduled:hover:not(:disabled){
+          background: #dc2626;
+          color: #fff;
+          border-color: #dc2626;
         }
 
         .lead-strip-v3__icon-btn--ai-call:disabled{

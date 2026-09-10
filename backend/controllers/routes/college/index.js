@@ -12,6 +12,7 @@ const { ObjectId } = require('mongoose').Types.ObjectId;
 const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
+const { applyHumanRemarksToDoc, humanRemarksSetPayload } = require("../../../helpers/aiRemark");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
 	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, CoursesCopy, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage, UploadCandidates, Placement, PlacementStatus, BatchMonitor } = require("../../models");
 const { ReEnquire } = require("../../models");
@@ -2526,7 +2527,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 		const [slotDocs, followups, followupStatRows] = await Promise.all([
 			AppliedCourses.find({ _id: { $in: appliedIds } })
-				.select('followUpCall followUpVisit')
+				.select('followUpCall followUpVisit aiVoice')
 				.lean(),
 			B2cFollowup
 				.find({ appliedCourseId: { $in: appliedIds }, status: 'planned' })
@@ -2588,6 +2589,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 
 		const slotIdSet = new Set();
 		const courseSlotIds = new Map();
+		const aiVoiceByCourse = new Map();
 		(slotDocs || []).forEach((doc) => {
 			const key = String(doc._id);
 			courseSlotIds.set(key, {
@@ -2596,6 +2598,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			});
 			if (doc.followUpCall) slotIdSet.add(String(doc.followUpCall));
 			if (doc.followUpVisit) slotIdSet.add(String(doc.followUpVisit));
+			if (doc.aiVoice) aiVoiceByCourse.set(key, doc.aiVoice);
 		});
 
 		const slotRows = slotIdSet.size
@@ -2646,6 +2649,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				visitByCourse.get(courseKey) || slottedVisit || null
 			);
 			const followup = followUpCall || followUpVisit || followupByCourse.get(courseKey) || null;
+			// Prefer direct DB read — aggregate projection can drop nested aiVoice in some paths
+			const aiVoiceDoc = aiVoiceByCourse.get(courseKey) || doc.aiVoice || {};
 
 			return {
 				_id: doc._id,
@@ -2711,12 +2716,16 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				approval: doc.approval,
 				leadAssignment: doc.leadAssignment,
 				aiVoice: {
-					lastEvent: doc.aiVoice?.lastEvent || '',
-					lastMakeCallStatus: doc.aiVoice?.lastMakeCallStatus || '',
-					lastCallHistoryId: doc.aiVoice?.lastCallHistoryId || '',
-					lastWebhookAt: doc.aiVoice?.lastWebhookAt || null,
+					lastEvent: aiVoiceDoc.lastEvent || '',
+					lastMakeCallStatus: aiVoiceDoc.lastMakeCallStatus || '',
+					lastCallHistoryId: aiVoiceDoc.lastCallHistoryId || '',
+					lastWebhookAt: aiVoiceDoc.lastWebhookAt || null,
+					lastCallStatus: aiVoiceDoc.lastCallStatus || '',
+					lastCancelAt: aiVoiceDoc.lastCancelAt || null,
+					lastFailureReason: aiVoiceDoc.lastFailureReason || '',
 				},
 				remarks: doc.remarks,
+				aiRemark: doc.aiRemark || '',
 				counsellor: doc.counsellor
 					? {
 						_id: doc.counsellor._id || doc.counsellor,
@@ -3803,9 +3812,11 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 			leadCoOwner: 1,
 			leadCoOwner2: 1,
 			remarks: 1,
+			aiRemark: 1,
 			followup: 1,
 			followUpCall: 1,
 			followUpVisit: 1,
+			aiVoice: 1,
 		}
 	});
 
@@ -8118,10 +8129,8 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 
 
 		// If remarks are set or updated, log the change and update remarks
-		if (remarks && doc.remarks !== remarks) {
-			//   actionParts.push(`Remarks updated: "${remarks}"`);
+		if (applyHumanRemarksToDoc(doc, remarks)) {
 			actionParts.push(`Remarks updated`);  // Remarks included in action log
-			doc.remarks = remarks; // Update remarks
 		}
 
 		// If there are no changes, log a generic action
@@ -8236,10 +8245,9 @@ router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 				}
 			}
 
-			// Update remarks if provided
-			if (remarks && doc.remarks !== remarks) {
+			// Update remarks if provided (AI remarks stay on aiRemark)
+			if (applyHumanRemarksToDoc(doc, remarks)) {
 				actionParts.push(`Remarks updated`);
-				doc.remarks = remarks;
 			}
 
 			// If no changes were made
@@ -8408,9 +8416,8 @@ router.put('/lead/bulk_course_change', [isCollege], async (req, res) => {
 					doc._center = null;
 				}
 
-				if (remarks && doc.remarks !== remarks) {
+				if (applyHumanRemarksToDoc(doc, remarks)) {
 					actionParts.push('Remarks updated');
-					doc.remarks = remarks;
 				}
 
 				if (actionParts.length === 0) {
@@ -11324,11 +11331,14 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 				timestamp: new Date()
 			};
 
+			const existingLead = await AppliedCourses.findById(appliedCourseId).select('remarks aiRemark').lean();
+			const remarksSet = humanRemarksSetPayload(existingLead, remarks);
+
 			const updateAppliedRemarks = await AppliedCourses.findOneAndUpdate(
 				{ _id: appliedCourseId },
 				{
 					$set: {
-						remarks,
+						...remarksSet,
 						followupDate,
 						[slotField]: followup._id,
 					},
@@ -11467,11 +11477,14 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 				timestamp: new Date()
 			};
 
+			const existingLead = await AppliedCourses.findById(appliedCourseId).select('remarks aiRemark').lean();
+			const remarksSet = humanRemarksSetPayload(existingLead, remarks);
+
 			await AppliedCourses.findOneAndUpdate(
 				{ _id: appliedCourseId },
 				{
 					$set: {
-						remarks,
+						...remarksSet,
 						followupDate,
 						[slotField]: newFollowup._id,
 					},

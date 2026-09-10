@@ -13,6 +13,7 @@ let { StatusLogs, AppliedCourses, CandidateProfile, Courses, Center, User, ReEnq
 let { statusLogHelper } = require('../../../helpers/college');
 let { isCollege } = require('../../../helpers');
 let voicex = require('../../../helpers/voicex');
+let { splitRemarksAndAi, mergeAiRemark, prependAiRemark } = require('../../../helpers/aiRemark');
 
 function isVoiceAutoCallEnabled() {
     return voicex.isAutoCallEnabled();
@@ -1426,6 +1427,11 @@ router.post("/voicex-webhook", async (req, res) => {
                 doc.aiVoice.lastIdempotencyKey = idempotencyKey;
                 doc.aiVoice.lastWebhookAt = new Date();
                 doc.aiVoice.recordingUrl = recordingUrl;
+                if (['CALL_COMPLETED', 'CALL_FAILED', 'CALL_TRANSFERED'].includes(event)) {
+                    doc.aiVoice.lastMakeCallStatus = 'done';
+                } else if (event === 'MAKE_CALL_CANCELLED') {
+                    doc.aiVoice.lastMakeCallStatus = 'cancelled';
+                }
 
                 const statusEvents = ['CALL_COMPLETED', 'CALL_TRANSFERED'];
                 const shouldMapStatus = statusEvents.includes(event)
@@ -1470,8 +1476,12 @@ router.post("/voicex-webhook", async (req, res) => {
                 }
 
                 if (summary) {
-                    const aiLine = `[AI Call] ${summary}`;
-                    doc.remarks = doc.remarks ? `${aiLine}\n${doc.remarks}` : aiLine;
+                    const split = splitRemarksAndAi(doc.remarks);
+                    if (split.aiRemark) {
+                        doc.aiRemark = mergeAiRemark(doc.aiRemark, split.aiRemark);
+                        doc.remarks = split.remarks;
+                    }
+                    doc.aiRemark = prependAiRemark(doc.aiRemark, summary);
                 }
 
                 doc.logs = doc.logs || [];
