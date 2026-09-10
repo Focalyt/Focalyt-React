@@ -1218,6 +1218,12 @@ function CollegeLayout({ children }) {
                   <span className="menu-title">{t('available_jobs')}</span>
                 </Link>
               </li>
+              {/* <li className={`nav-item ${location.pathname === '/institute/addjob' ? 'active' : ''}`}>
+                <Link to="/institute/addjob" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faPlusCircle} />
+                  <span className="menu-title">Add Job</span>
+                </Link>
+              </li> */}
 
               {/* Events */}
               <li className={`nav-item has-sub dropdown-events ${openSubmenu.events ? 'open' : ''}`}>

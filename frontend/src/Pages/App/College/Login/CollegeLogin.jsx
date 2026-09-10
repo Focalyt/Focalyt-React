@@ -73,7 +73,7 @@ const CollegeLogin = () => {
             if (returnUrl) {
                 navigate(returnUrl);
             } else {
-                navigate('/institute/dashboard');
+                navigate('/institute/registration');
             }
         }
     }, [userData]);
@@ -144,7 +144,7 @@ const CollegeLogin = () => {
                         navigate(decodeURIComponent(returnUrl));
                     } else {
                         // window.location.href = '/institute/dashboard';
-                        navigate('/institute/dashboard');
+                        navigate('/institute/registration');
                     }
                 } else {
                     setSuccessMessage('');

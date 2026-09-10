@@ -87,6 +87,7 @@ import UploadCandidates from './Pages/App/College/UploadCandidates/UploadCandida
 import UploadTemplates from './Pages/App/College/UploadTemplates/UploadTemplates';
 import MyStudents from './Pages/App/College/MyStudents/MyStudents';
 import AvailableJobs from './Pages/App/College/AvailableJobs/AvailableJobs';
+import AddJob from './Pages/App/College/Job/AddJob';
 import AppliedEvents from './Pages/App/Candidate/Events/AppliedEvents';
 import CandidateManagementPortal from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal';
 import CandidateManagementPortal_old from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal_copy';
@@ -307,6 +308,7 @@ const Layout = () => {
           <Route path="uploadTemplates" element={<UploadTemplates/>}/>
           <Route path="myStudents" element={<MyStudents/>}/>
           <Route path="availablejobs" element={<AvailableJobs/>}/>
+          <Route path="addjob" element={<AddJob/>}/>
           <Route path="candidatemanagment" element={<CandidateManagementPortal/>}/>
           <Route path='addcourse' element={<AddCourse/>}/>
           <Route path='addcoursecopy' element={<AddCoursecopy/>}/>
