@@ -12,6 +12,7 @@ const { ObjectId } = require('mongoose').Types.ObjectId;
 const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
+const { applyHumanRemarksToDoc, humanRemarksSetPayload } = require("../../../helpers/aiRemark");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
 	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, CoursesCopy, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage, UploadCandidates, Placement, PlacementStatus, BatchMonitor } = require("../../models");
 const { ReEnquire } = require("../../models");
@@ -2722,6 +2723,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					lastFailureReason: aiVoiceDoc.lastFailureReason || '',
 				},
 				remarks: doc.remarks,
+				aiRemark: doc.aiRemark || '',
 				counsellor: doc.counsellor
 					? {
 						_id: doc.counsellor._id || doc.counsellor,
@@ -3808,6 +3810,7 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 			leadCoOwner: 1,
 			leadCoOwner2: 1,
 			remarks: 1,
+			aiRemark: 1,
 			followup: 1,
 			followUpCall: 1,
 			followUpVisit: 1,
@@ -8124,10 +8127,8 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 
 
 		// If remarks are set or updated, log the change and update remarks
-		if (remarks && doc.remarks !== remarks) {
-			//   actionParts.push(`Remarks updated: "${remarks}"`);
+		if (applyHumanRemarksToDoc(doc, remarks)) {
 			actionParts.push(`Remarks updated`);  // Remarks included in action log
-			doc.remarks = remarks; // Update remarks
 		}
 
 		// If there are no changes, log a generic action
@@ -8242,10 +8243,9 @@ router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 				}
 			}
 
-			// Update remarks if provided
-			if (remarks && doc.remarks !== remarks) {
+			// Update remarks if provided (AI remarks stay on aiRemark)
+			if (applyHumanRemarksToDoc(doc, remarks)) {
 				actionParts.push(`Remarks updated`);
-				doc.remarks = remarks;
 			}
 
 			// If no changes were made
@@ -8414,9 +8414,8 @@ router.put('/lead/bulk_course_change', [isCollege], async (req, res) => {
 					doc._center = null;
 				}
 
-				if (remarks && doc.remarks !== remarks) {
+				if (applyHumanRemarksToDoc(doc, remarks)) {
 					actionParts.push('Remarks updated');
-					doc.remarks = remarks;
 				}
 
 				if (actionParts.length === 0) {
@@ -11330,11 +11329,14 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 				timestamp: new Date()
 			};
 
+			const existingLead = await AppliedCourses.findById(appliedCourseId).select('remarks aiRemark').lean();
+			const remarksSet = humanRemarksSetPayload(existingLead, remarks);
+
 			const updateAppliedRemarks = await AppliedCourses.findOneAndUpdate(
 				{ _id: appliedCourseId },
 				{
 					$set: {
-						remarks,
+						...remarksSet,
 						followupDate,
 						[slotField]: followup._id,
 					},
@@ -11473,11 +11475,14 @@ router.post("/b2c-set-followups", [isCollege], async (req, res) => {
 				timestamp: new Date()
 			};
 
+			const existingLead = await AppliedCourses.findById(appliedCourseId).select('remarks aiRemark').lean();
+			const remarksSet = humanRemarksSetPayload(existingLead, remarks);
+
 			await AppliedCourses.findOneAndUpdate(
 				{ _id: appliedCourseId },
 				{
 					$set: {
-						remarks,
+						...remarksSet,
 						followupDate,
 						[slotField]: newFollowup._id,
 					},

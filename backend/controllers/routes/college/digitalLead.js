@@ -13,6 +13,7 @@ let { StatusLogs, AppliedCourses, CandidateProfile, Courses, Center, User, ReEnq
 let { statusLogHelper } = require('../../../helpers/college');
 let { isCollege } = require('../../../helpers');
 let voicex = require('../../../helpers/voicex');
+let { splitRemarksAndAi, mergeAiRemark, prependAiRemark } = require('../../../helpers/aiRemark');
 
 function isVoiceAutoCallEnabled() {
     return voicex.isAutoCallEnabled();
@@ -1475,8 +1476,12 @@ router.post("/voicex-webhook", async (req, res) => {
                 }
 
                 if (summary) {
-                    const aiLine = `[AI Call] ${summary}`;
-                    doc.remarks = doc.remarks ? `${aiLine}\n${doc.remarks}` : aiLine;
+                    const split = splitRemarksAndAi(doc.remarks);
+                    if (split.aiRemark) {
+                        doc.aiRemark = mergeAiRemark(doc.aiRemark, split.aiRemark);
+                        doc.remarks = split.remarks;
+                    }
+                    doc.aiRemark = prependAiRemark(doc.aiRemark, summary);
                 }
 
                 doc.logs = doc.logs || [];

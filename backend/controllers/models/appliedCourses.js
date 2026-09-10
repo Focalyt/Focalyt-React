@@ -247,6 +247,10 @@ const appliedCoursesSchema = new Schema(
       type: String,
       default: "",
     },
+    aiRemark: {
+      type: String,
+      default: "",
+    },
     aiVoice: {
       lastEvent: { type: String, default: "" },
       lastDisposition: { type: String, default: "" },
