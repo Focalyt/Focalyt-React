@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import Choices from 'choices.js';
 import 'choices.js/public/assets/styles/choices.min.css';
@@ -18,6 +18,10 @@ function AddJob() {
   const token = userData.token;
   const navigate = useNavigate();
   const { id } = useParams(); // present when editing an existing job
+  const [searchParams] = useSearchParams();
+  const prefillVerticalId = searchParams.get('verticalId') || '';
+  const prefillProjectId = searchParams.get('projectId') || '';
+  const prefillCenterId = searchParams.get('centerId') || '';
 
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -34,9 +38,15 @@ function AddJob() {
   const [cityList, setCityList] = useState([]);
   const [coinsRequired, setCoinsRequired] = useState({ contactcoins: 0 });
   const [coinOffers, setCoinOffers] = useState([]);
+  const [verticals, setVerticals] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [centers, setCenters] = useState([]);
 
   // ---------- form state ----------
   const [form, setForm] = useState({
+    vertical: prefillVerticalId,
+    project: prefillProjectId,
+    center: prefillCenterId,
     displayCompanyName: '',
     title: '',
     _industry: '',
@@ -108,6 +118,13 @@ function AddJob() {
   // ---------- helpers ----------
   const asArray = (value) => (Array.isArray(value) ? value : []);
   const updateField = (name, value) => setForm((prev) => ({ ...prev, [name]: value }));
+  const updateMappingField = (name, value) => {
+    setForm((prev) => {
+      if (name === 'vertical') return { ...prev, vertical: value, project: '', center: '' };
+      if (name === 'project') return { ...prev, project: value, center: '' };
+      return { ...prev, [name]: value };
+    });
+  };
 
   const needsStream = QUALIFICATIONS_WITH_STREAM.includes(
     asArray(qualificationList).find((q) => q._id === form._qualification)?.name
@@ -138,6 +155,59 @@ function AddJob() {
 
     fetchInitialData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const fetchVerticals = async () => {
+      try {
+        const res = await axios.get(`${backendUrl}/college/getVerticals`, authHeaders);
+        setVerticals(asArray(res.data?.data));
+      } catch (err) {
+        console.error('Failed loading verticals:', err.message);
+        setVerticals([]);
+      }
+    };
+    fetchVerticals();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      if (!form.vertical) {
+        setProjects([]);
+        return;
+      }
+      try {
+        const res = await axios.get(
+          `${backendUrl}/college/list-projects?vertical=${form.vertical}`,
+          authHeaders
+        );
+        setProjects(asArray(res.data?.data));
+      } catch (err) {
+        console.error('Failed loading projects:', err.message);
+        setProjects([]);
+      }
+    };
+    fetchProjects();
+  }, [form.vertical]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const fetchCenters = async () => {
+      if (!form.project) {
+        setCenters([]);
+        return;
+      }
+      try {
+        const res = await axios.get(
+          `${backendUrl}/college/list-centers?projectId=${form.project}`,
+          authHeaders
+        );
+        setCenters(asArray(res.data?.data));
+      } catch (err) {
+        console.error('Failed loading centers:', err.message);
+        setCenters([]);
+      }
+    };
+    fetchCenters();
+  }, [form.project]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const el = benefitsRef.current;
@@ -440,6 +510,9 @@ function AddJob() {
   const validate = () => {
     const newErrors = {};
 
+    if (!form.vertical) newErrors.vertical = 'Please select a vertical';
+    if (!form.project) newErrors.project = 'Please select a project';
+    if (!form.center) newErrors.center = 'Please select a center';
     if (!form.title.trim()) newErrors.title = 'Enter job title';
     if (!workLocRef.current?.value?.trim() || !form.latitude || !form.longitude || !form.place) {
       newErrors.location = 'Select a work location from the suggestions';
@@ -519,10 +592,22 @@ function AddJob() {
       });
 
       if (res.data?.status) {
-        navigate('/institute/availablejobs');
+        if (form.vertical && form.project) {
+          const params = new URLSearchParams({
+            stage: 'center',
+            verticalId: form.vertical,
+            projectId: form.project,
+          });
+          navigate(`/institute/candidatemanagment?${params.toString()}`);
+        } else {
+          navigate('/institute/availablejobs');
+        }
+      } else {
+        alert(res.data?.message || 'Failed to add job');
       }
     } catch (err) {
       console.error('Error submitting the form:', err.message);
+      alert(err.response?.data?.message || err.message || 'Failed to add job');
     } finally {
       setLoading(false);
     }
@@ -648,6 +733,56 @@ function AddJob() {
                 <div className="card-content" id="jd-info">
                   <div className="card-body">
                     <div className="row">
+                      <div className={`col-xl-3 mb-1 ${errors.vertical ? 'error' : ''}`}>
+                        <label>Vertical</label><span className="mandatory"> *</span>
+                        <select
+                          className="form-control"
+                          value={form.vertical}
+                          onChange={(e) => updateMappingField('vertical', e.target.value)}
+                        >
+                          <option value="">Select Vertical</option>
+                          {asArray(verticals).map((item) => (
+                            <option key={item._id || item.id} value={item._id || item.id}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className={`col-xl-3 mb-1 ${errors.project ? 'error' : ''}`}>
+                        <label>Project</label><span className="mandatory"> *</span>
+                        <select
+                          className="form-control"
+                          value={form.project}
+                          onChange={(e) => updateMappingField('project', e.target.value)}
+                          disabled={!form.vertical}
+                        >
+                          <option value="">Select Project</option>
+                          {asArray(projects).map((item) => (
+                            <option key={item._id || item.id} value={item._id || item.id}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className={`col-xl-3 mb-1 ${errors.center ? 'error' : ''}`}>
+                        <label>Center</label><span className="mandatory"> *</span>
+                        <select
+                          className="form-control"
+                          value={form.center}
+                          onChange={(e) => updateMappingField('center', e.target.value)}
+                          disabled={!form.project}
+                        >
+                          <option value="">Select Center</option>
+                          {asArray(centers).map((item) => (
+                            <option key={item._id || item.id} value={item._id || item.id}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
                       <div className={`col-xl-3 mb-1 ${errors.organizationName ? 'error' : ''}`}>
                         <label>Display Organization Name</label><span className="mandatory"> *</span>
                         <input

@@ -51,7 +51,7 @@ const sessionPlanSchema = new Schema(
     vertical: { type: ObjectId, ref: 'Vertical', default: null, index: true },
     project: { type: ObjectId, ref: 'Project', default: null, index: true },
     center: { type: ObjectId, ref: 'Center', default: null, index: true },
-    course: { type: ObjectId, ref: 'coursescopy', required: true, index: true },
+    course: { type: ObjectId, ref: 'coursescopy', default: null, index: true },
     batch: { type: ObjectId, ref: 'Batch', default: null, index: true },
 
     verticalName: { type: String, default: '' },

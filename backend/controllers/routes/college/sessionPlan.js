@@ -52,6 +52,14 @@ const normalizeQuestions = (items = []) =>
     marks: Number(item.marks) || 0,
   }));
 
+const normalizeSubSessions = (items = []) =>
+  (Array.isArray(items) ? items : [])
+    .map((item) => ({
+      name: String(item.name || item.topic || '').trim(),
+      duration: String(item.duration || ''),
+    }))
+    .filter((item) => item.name);
+
 const mapSessionToClient = (doc) => {
   const session = typeof doc.toObject === 'function' ? doc.toObject() : doc;
   const sessionDate = session.sessionDate
@@ -83,6 +91,7 @@ const mapSessionToClient = (doc) => {
     subSessions: session.subSessions || '',
     subSessionName: session.subSessionName || '',
     duration: session.duration || '',
+    subSessionItems: session.subSessionItems || [],
     unitNumber: session.unitNumber || '',
     unitName: session.unitName || '',
     chapterNumber: session.chapterNumber || '',
@@ -131,9 +140,6 @@ const mapSessionToClient = (doc) => {
 
 const buildSessionPayload = (body = {}, collegeId, userId, existing = null) => {
   const courseId = toObjectId(body.course);
-  if (!courseId && !existing?.course) {
-    throw new Error('Course is required');
-  }
 
   const title = String(body.title || '').trim();
   if (!title && !existing?.title) {
@@ -145,7 +151,7 @@ const buildSessionPayload = (body = {}, collegeId, userId, existing = null) => {
     vertical: toObjectId(body.department || body.vertical) ?? existing?.vertical ?? null,
     project: toObjectId(body.project) ?? existing?.project ?? null,
     center: toObjectId(body.center) ?? existing?.center ?? null,
-    course: courseId || existing.course,
+    course: courseId || existing?.course || null,
     batch: toObjectId(body.batch) ?? existing?.batch ?? null,
 
     verticalName: body.departmentName || body.verticalName || existing?.verticalName || '',
@@ -162,6 +168,9 @@ const buildSessionPayload = (body = {}, collegeId, userId, existing = null) => {
     subSessions: body.subSessions != null ? String(body.subSessions) : (existing?.subSessions || ''),
     subSessionName: body.subSessionName || existing?.subSessionName || '',
     duration: body.duration || existing?.duration || '',
+    subSessionItems: body.subSessionItems
+      ? normalizeSubSessions(body.subSessionItems)
+      : (existing?.subSessionItems || []),
 
     unitNumber: body.unitNumber != null ? String(body.unitNumber) : (existing?.unitNumber || ''),
     unitName: body.unitName || existing?.unitName || '',

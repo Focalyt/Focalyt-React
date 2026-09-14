@@ -8936,7 +8936,7 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 
 		const user = req.user;
 
-		let { fromDate, toDate, projects, verticals, course, center, counselor, owner, allTime, filterBy } = req.query;
+		let { fromDate, toDate, projects, verticals, course, center, counselor, owner, allTime, filterBy, createdFromDate, createdToDate, batch } = req.query;
 		const useAllTime = allTime === 'true' || allTime === true;
 		const useActivityFilter = filterBy === 'activity';
 
@@ -8950,6 +8950,7 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 		let courseArray = [];
 		let centerArray = [];
 		let counselorArray = [];
+		let batchArray = [];
 
 		try {
 			if (projects) projectsArray = JSON.parse(projects);
@@ -8957,6 +8958,7 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 			if (course) courseArray = JSON.parse(course);
 			if (center) centerArray = JSON.parse(center);
 			if (counselor) counselorArray = JSON.parse(counselor);
+			if (batch) batchArray = JSON.parse(batch);
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
@@ -9110,6 +9112,8 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 					center: { $first: '$centerData._id' },
 					status: { $first: '$status' },
 					followUpType: { $first: '$followUpType' },
+					leadCreatedAt: { $first: '$appliedCourseId.createdAt' },
+					batch: { $first: '$appliedCourseId.batch' },
 				}
 			}
 
@@ -9135,6 +9139,20 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 		// Center filter (multi-select)
 		if (centerArray.length > 0) {
 			additionalMatches['center'] = { $in: centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+		if (batchArray.length > 0) {
+			additionalMatches['batch'] = { $in: batchArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+		if (createdFromDate || createdToDate) {
+			additionalMatches.leadCreatedAt = {};
+			if (createdFromDate) {
+				additionalMatches.leadCreatedAt.$gte = new Date(createdFromDate);
+			}
+			if (createdToDate) {
+				const toDate = new Date(createdToDate);
+				toDate.setHours(23, 59, 59, 999);
+				additionalMatches.leadCreatedAt.$lte = toDate;
+			}
 		}
 		if (Object.keys(additionalMatches).length > 0) {
 			aggregate.push({ $match: additionalMatches });
@@ -10084,7 +10102,8 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			course,
 			center,
 			counselor,
-			owner
+			owner,
+			batch
 		} = req.query;
 
 		// Parse multi-select filter values
@@ -10093,6 +10112,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 		let courseArray = [];
 		let centerArray = [];
 		let counselorArray = [];
+		let batchArray = [];
 
 		try {
 			if (projects) projectsArray = JSON.parse(projects);
@@ -10100,6 +10120,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			if (course) courseArray = JSON.parse(course);
 			if (center) centerArray = JSON.parse(center);
 			if (counselor) counselorArray = JSON.parse(counselor);
+			if (batch) batchArray = JSON.parse(batch);
 		} catch (parseError) {
 			console.error('Error parsing filter arrays:', parseError);
 		}
@@ -10109,7 +10130,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
 
 		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
-			projectsArray, verticalsArray, courseArray, centerArray, name
+			projectsArray, verticalsArray, courseArray, centerArray, batchArray, name
 		});
 
 		teamMembers = hasPersonFilter
@@ -10471,6 +10492,11 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			additionalMatches['_center._id'] = { $in: centerArray.map(id => new mongoose.Types.ObjectId(id)) };
 		}
 
+		// Batch filter (multi-select)
+		if (batchArray.length > 0) {
+			additionalMatches['batch'] = { $in: batchArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+
 		// Name search filter
 		if (name && name.trim()) {
 			const searchTerm = name.trim();
@@ -10515,7 +10541,9 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			verticalsArray,
 			courseArray,
 			centerArray,
-			counselorArray
+			counselorArray,
+			ownerArray,
+			batchArray
 		};
 
 		// Tab counts must ignore the active kyc tab filter so every tab shows its true total
@@ -10738,12 +10766,13 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 
 		};
 
-		if (teamMemberIds.length > 0) {
-			baseMatchStage.$or = [
-				{ registeredBy: { $in: teamMemberIds } },
-				{ counsellor: { $in: teamMemberIds } }
-			];
-		}
+		applyB2cLeadOwnershipToMatch(baseMatchStage, {
+			teamMemberIds,
+			ownerIds: appliedFilters.ownerArray || [],
+			counselorIds: (appliedFilters.ownerArray && appliedFilters.ownerArray.length > 0)
+				? []
+				: (appliedFilters.counselorArray || []),
+		});
 
 		// Add date filters
 		if (appliedFilters.createdFromDate || appliedFilters.createdToDate) {
@@ -10909,6 +10938,10 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 
 		if (appliedFilters.centerArray && appliedFilters.centerArray.length > 0) {
 			additionalMatches['_center._id'] = { $in: appliedFilters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+
+		if (appliedFilters.batchArray && appliedFilters.batchArray.length > 0) {
+			additionalMatches['batch'] = { $in: appliedFilters.batchArray.map(id => new mongoose.Types.ObjectId(id)) };
 		}
 
 		if (appliedFilters.name && appliedFilters.name.trim()) {
@@ -12585,7 +12618,9 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			verticalsArray,
 			courseArray,
 			centerArray,
-			counselorArray
+			counselorArray,
+			ownerArray,
+			batchArray
 		});
 
 		const allFilteredResults = await AppliedCourses
@@ -13032,15 +13067,16 @@ async function calculateAdmissionFilterCounts(teamMembers, collegeId, appliedFil
 
 		};
 
-		if (teamMembers && teamMembers.length > 0) {
-			const teamMemberIds = teamMembers.map(member =>
-				typeof member === 'string' ? new mongoose.Types.ObjectId(member) : member
-			);
-			baseMatchStage.$or = [
-				{ registeredBy: { $in: teamMemberIds } },
-				{ counsellor: { $in: teamMemberIds } }
-			];
-		}
+		const teamMemberIds = (teamMembers || []).map(member =>
+			typeof member === 'string' ? new mongoose.Types.ObjectId(member) : member
+		);
+		applyB2cLeadOwnershipToMatch(baseMatchStage, {
+			teamMemberIds,
+			ownerIds: appliedFilters.ownerArray || [],
+			counselorIds: (appliedFilters.ownerArray && appliedFilters.ownerArray.length > 0)
+				? []
+				: (appliedFilters.counselorArray || []),
+		});
 		// Add date filters
 		if (appliedFilters.createdFromDate || appliedFilters.createdToDate) {
 			baseMatchStage.createdAt = {};
@@ -13104,6 +13140,9 @@ async function calculateAdmissionFilterCounts(teamMembers, collegeId, appliedFil
 		}
 		if (appliedFilters.courseArray && appliedFilters.courseArray.length > 0) {
 			additionalMatches['_course._id'] = { $in: appliedFilters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
+		}
+		if (appliedFilters.batchArray && appliedFilters.batchArray.length > 0) {
+			additionalMatches['batch'] = { $in: appliedFilters.batchArray.map(id => new mongoose.Types.ObjectId(id)) };
 		}
 		if (appliedFilters.name && appliedFilters.name.trim()) {
 			const searchTerm = appliedFilters.name.trim();

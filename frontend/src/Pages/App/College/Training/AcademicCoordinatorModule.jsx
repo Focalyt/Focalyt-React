@@ -1,4 +1,6 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
+import axios from "axios";
 
 /* ---------------------------------------------------------------
    Tokens (§7 of the design note)
@@ -29,94 +31,138 @@ const STATUS_STYLE = {
   Completed: { fg: T.mint, bg: T.mintTint, dot: T.mint },
 };
 
-const ACTIVITY_TYPES = [
-  { id: "classroom", name: "Classroom teaching", color: "#3b82f6" },
-  { id: "practical", name: "Practical / hands-on", color: "#10b981" },
-  { id: "assessment", name: "Assessment", color: "#f97316" },
-  { id: "field", name: "Field visit", color: "#8b5cf6" },
-  { id: "digital", name: "Digital learning", color: "#ec4899" },
-];
+const BACKEND_URL = process.env.REACT_APP_MIPIE_BACKEND_URL ;
+const authHeaders = (token) => ({ "x-auth": token });
 
-const SENIOR_TRAINERS = [
-  { id: "st1", name: "Anjali Mehra", email: "anjali.mehra@focalyt.com" },
-  { id: "st2", name: "Rohit Sharma", email: "rohit.sharma@focalyt.com" },
-  { id: "st3", name: "Preeti Kaur", email: "preeti.kaur@focalyt.com" },
-  { id: "st4", name: "Vikram Nair", email: "vikram.nair@focalyt.com" },
-];
+const fetchActivityTypesApi = async (token) => {
+  const res = await axios.get(`${BACKEND_URL}/college/session-plans/activity-types`, {
+    headers: authHeaders(token),
+  });
+  return Array.isArray(res.data?.data) ? res.data.data : [];
+};
 
-/* ---------------------------------------------------------------
-   Wizard mock data (§5.2) — path picker options
----------------------------------------------------------------- */
-const DEPARTMENTS = [
-  { id: "d1", name: "Retail & Sales", meta: "3 active courses" },
-  { id: "d2", name: "Healthcare", meta: "2 active courses" },
-  { id: "d3", name: "IT & Digital", meta: "4 active courses" },
-];
-const PROJECTS = [
-  { id: "p1", name: "Skill India Retail", meta: "Batch-based" },
-  { id: "p2", name: "Urban Youth Employment", meta: "Batch-based" },
-];
-const CENTERS = [
-  { id: "c1", name: "Ludhiana Training Center", meta: "Punjab" },
-  { id: "c2", name: "Amritsar Training Center", meta: "Punjab" },
-  { id: "c3", name: "Jalandhar Training Center", meta: "Punjab" },
-];
-const COURSES = [
-  { id: "co1", name: "Retail Sales Associate", meta: "2 units · 3 chapters" },
-  { id: "co2", name: "Store Operations Assistant", meta: "No unit structure" },
-];
-const BATCHES = [
-  { id: "b1", name: "Jan-2026", meta: "24 students" },
-  { id: "b2", name: "Mar-2026", meta: "18 students" },
-];
+const saveActivityTypesApi = async (token, types) => {
+  const res = await axios.put(
+    `${BACKEND_URL}/college/session-plans/activity-types`,
+    { types },
+    { headers: authHeaders(token) }
+  );
+  return Array.isArray(res.data?.data) ? res.data.data : types;
+};
 
-const PICKER_STEPS = [
-  { key: "department", label: "Department", options: DEPARTMENTS, tint: T.skyTint, ink: "#1d4ed8" },
-  { key: "project", label: "Project", options: PROJECTS, tint: T.lilacTint, ink: "#6d28d9" },
-  { key: "center", label: "Center", options: CENTERS, tint: "#ffe4d6", ink: "#c2410c" },
-  { key: "course", label: "Course", options: COURSES, tint: T.mintTint, ink: "#047857" },
-  { key: "batch", label: "Batch", options: BATCHES, tint: "#fef3c7", ink: "#b45309" },
-];
+const fetchSessionsApi = async (token) => {
+  const res = await axios.get(`${BACKEND_URL}/college/session-plans`, {
+    headers: authHeaders(token),
+  });
+  return Array.isArray(res.data?.data) ? res.data.data : [];
+};
 
-/* ---------------------------------------------------------------
-   Demo sessions for the selected batch (§2 example)
----------------------------------------------------------------- */
-const INITIAL_SESSIONS = [
-  {
-    id: "s1", number: 1, unit: null, chapter: null, name: "Batch orientation",
-    status: "Scheduled", activityIds: ["classroom"], tot: false, hours: 2,
-    method: "Lecture", duration: "2 hrs", topics: ["Program overview", "Rules & expectations"],
-    subTopics: [], materials: { documents: 1, learning: 1 },
-    notes: "Introduce the batch to the program calendar and attendance policy.",
-    fieldTrainer: null, totTrainer: null,
-  },
-  {
-    id: "s2", number: 2, unit: "Unit 1 · Foundation Skills", chapter: "Ch. 1 · Introduction to Retail",
-    name: "Store orientation", status: "Scheduled", activityIds: ["practical", "field"], tot: true,
-    hours: 3, method: "Demonstration", duration: "3 hrs",
-    topics: ["Store layout basics", "Customer greeting protocol"],
-    subTopics: ["Store layout", "Greeting"], materials: { documents: 2, learning: 3 },
-    notes: "Cover the safety walkthrough before floor time. Pair students for greeting practice.",
-    fieldTrainer: null, totTrainer: null,
-  },
-  {
-    id: "s3", number: 3, unit: "Unit 1 · Foundation Skills", chapter: "Ch. 2 · Product Knowledge",
-    name: "Product categories", status: "Sent to Senior Trainer", activityIds: ["assessment"], tot: false,
-    hours: 2, method: "Lecture + quiz", duration: "2 hrs",
-    topics: ["SKU categories", "Seasonal lines"], subTopics: [],
-    materials: { documents: 1, learning: 2 }, notes: "",
-    fieldTrainer: null, totTrainer: null,
-  },
-  {
-    id: "s4", number: 4, unit: "Unit 2 · Advanced Skills", chapter: "Ch. 3 · Upselling Techniques",
-    name: "Cross-sell & upsell", status: "Assigned", activityIds: ["practical", "digital"], tot: true,
-    hours: 2, method: "Roleplay", duration: "2 hrs",
-    topics: ["Reading buying signals", "Suggestive selling"], subTopics: [],
-    materials: { documents: 3, learning: 1 },
-    notes: "Field trainer runs live roleplay pairs; record two clips per pair for review.",
-    fieldTrainer: "Manpreet Singh", totTrainer: "Anjali Mehra",
-  },
-];
+const createSessionApi = async (token, payload) => {
+  const res = await axios.post(`${BACKEND_URL}/college/session-plans`, payload, {
+    headers: authHeaders(token),
+  });
+  if (!res.data?.status) throw new Error(res.data?.message || "Failed to create session");
+  return res.data.data;
+};
+
+const updateSessionApi = async (token, sessionId, payload) => {
+  const res = await axios.put(`${BACKEND_URL}/college/session-plans/${sessionId}`, payload, {
+    headers: authHeaders(token),
+  });
+  if (!res.data?.status) throw new Error(res.data?.message || "Failed to update session");
+  return res.data.data;
+};
+
+const patchSessionApi = async (token, sessionId, payload) => {
+  const res = await axios.patch(`${BACKEND_URL}/college/session-plans/${sessionId}`, payload, {
+    headers: authHeaders(token),
+  });
+  if (!res.data?.status) throw new Error(res.data?.message || "Failed to update session");
+  return res.data.data;
+};
+
+const deleteSessionApi = async (token, sessionId) => {
+  const res = await axios.delete(`${BACKEND_URL}/college/session-plans/${sessionId}`, {
+    headers: authHeaders(token),
+  });
+  if (!res.data?.status) throw new Error(res.data?.message || "Failed to delete session");
+};
+
+const splitList = (value) =>
+  String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const mapApiSessionToUi = (api = {}) => {
+  const activities = Array.isArray(api.sessionActivities) ? api.sessionActivities : [];
+  const unitParts = [api.unitNumber ? `Unit ${api.unitNumber}` : "", api.unitName].filter(Boolean);
+  const chapterParts = [api.chapterNumber ? `Ch. ${api.chapterNumber}` : "", api.chapterName].filter(Boolean);
+  const agenda = Array.isArray(api.subSessionItems) && api.subSessionItems.length
+    ? api.subSessionItems.map((item, i) => ({
+        id: item._id || item.id || `agenda-${i}`,
+        duration: item.duration || "",
+        topic: item.name || item.topic || "",
+      }))
+    : splitList(api.topicCovered).map((topic, i) => ({
+        id: `topic-${i}`,
+        duration: "",
+        topic,
+      }));
+  const withIds = (items = []) =>
+    (Array.isArray(items) ? items : []).map((item, i) => ({
+      id: item.id || item._id || `item-${i}`,
+      name: item.name || "",
+      type: item.type || "Document",
+    }));
+
+  return {
+    id: String(api.id || api._id),
+    number: api.sessionNumber || "",
+    unit: unitParts.length ? unitParts.join(" · ") : null,
+    chapter: chapterParts.length ? chapterParts.join(" · ") : null,
+    unitNumber: api.unitNumber || "",
+    unitName: api.unitName || "",
+    chapterNumber: api.chapterNumber || "",
+    chapterName: api.chapterName || "",
+    name: api.title || "",
+    status: api.workflowStatus || "Scheduled",
+    activityIds: activities.map((a) => a.id).filter(Boolean),
+    tot: api.includeTot === true,
+    hours: api.hours || "",
+    method: api.trainingMethod || "",
+    duration: api.duration || (api.hours ? `${api.hours} hrs` : ""),
+    topics: agenda.map((a) => a.topic).filter(Boolean),
+    subTopics: splitList(api.subTopics),
+    materials: {
+      documents: (api.evidenceDocs || []).filter((item) => item?.name).length,
+      learning: (api.learningMaterials || []).filter((item) => item?.name).length,
+    },
+    notes: api.notes || "",
+    fieldTrainer: api.fieldTrainerName || null,
+    totTrainer: api.totTrainerName || null,
+    totTopic: api.totTopicCovered || "",
+    totMethod: api.totTrainingMethod || "",
+    totUseSameTopic: api.totUseSameTopics !== false,
+    totQuestions: Array.isArray(api.totQuestionBank)
+      ? api.totQuestionBank.map((q, i) => ({
+          id: q.id || q._id || `totq-${i}`,
+          question: q.question || "",
+          options: Array.isArray(q.options) && q.options.length ? q.options : ["", "", "", ""],
+          correctIndex: Number(q.correctIndex) || 0,
+        }))
+      : [],
+    studentMaterial: withIds(api.learningMaterials),
+    requiredDocuments: withIds(api.evidenceDocs),
+    standardTlm: withIds(api.standardTlm),
+    trainerTlm: withIds(api.trainerBasedTlm),
+    totCompletionProofs: withIds(api.totCompletionProofs),
+    agendaBlocks: agenda,
+    resources: api.classroomLabResources || "",
+  };
+};
+
+
 
 /* ---------------------------------------------------------------
    Small building blocks
@@ -150,37 +196,21 @@ function StatusPill({ status }) {
   );
 }
 
-function ActivityDots({ ids }) {
-  return (
-    <span style={{ display: "inline-flex", gap: 3 }}>
-      {ids.map((id) => {
-        const a = ACTIVITY_TYPES.find((x) => x.id === id);
-        return (
-          <span
-            key={id}
-            title={a?.name}
-            style={{ width: 7, height: 7, borderRadius: 999, background: a?.color || T.mute }}
-          />
-        );
-      })}
-    </span>
-  );
-}
-
 function Toast({ toast }) {
   if (!toast) return null;
   const good = toast.type === "success";
-  return (
+  return createPortal(
     <div
       style={{
-        position: "absolute", left: "50%", bottom: 20, transform: "translateX(-50%)",
+        position: "fixed", left: "50%", bottom: 24, transform: "translateX(-50%)",
         background: good ? "#065f46" : "#7f1d1d", color: "#fff", padding: "10px 18px",
         borderRadius: 12, fontSize: 13, fontWeight: 600, boxShadow: "0 6px 20px rgba(0,0,0,0.15)",
-        zIndex: 200, maxWidth: 360, textAlign: "center",
+        zIndex: 10100, maxWidth: 360, textAlign: "center",
       }}
     >
       {toast.message}
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -188,21 +218,19 @@ function Toast({ toast }) {
    Main component
 ---------------------------------------------------------------- */
 export default function AcademicCoordinatorMockup() {
-  const [view, setView] = useState("workspace"); 
-
-  const [selection, setSelection] = useState({});
-  const [sessions, setSessions] = useState(INITIAL_SESSIONS);
+  const [sessions, setSessions] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [activityFilter, setActivityFilter] = useState("All");
-  const [moreOpen, setMoreOpen] = useState(false);
   const [modal, setModal] = useState(null); // 'create' | 'refer' | 'activity'
   const [createStep, setCreateStep] = useState(0);
   const [editingSession, setEditingSession] = useState(null);
-  const [activityTypes, setActivityTypes] = useState(ACTIVITY_TYPES);
+  const [savingSession, setSavingSession] = useState(false);
+  const [activityTypes, setActivityTypes] = useState([]);
+  const [typesLoading, setTypesLoading] = useState(true);
   const [toast, setToast] = useState(null);
-  const moreRef = useRef(null);
+  const persistTimer = useRef(null);
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -213,37 +241,86 @@ export default function AcademicCoordinatorMockup() {
   }, []);
 
   useEffect(() => {
-    function onClick(e) {
-      if (moreRef.current && !moreRef.current.contains(e.target)) setMoreOpen(false);
-    }
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, []);
-
-  useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 2600);
     return () => clearTimeout(t);
   }, [toast]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const token = sessionStorage.getItem("token");
+      if (!token) {
+        if (!cancelled) {
+          setActivityTypes([]);
+          setSessions([]);
+          setTypesLoading(false);
+        }
+        return;
+      }
+      try {
+        const [types, sessionRows] = await Promise.all([
+          fetchActivityTypesApi(token),
+          fetchSessionsApi(token),
+        ]);
+        if (!cancelled) {
+          setActivityTypes(types);
+          setSessions(sessionRows.map(mapApiSessionToUi));
+        }
+      } catch (err) {
+        console.error("Failed to load academic coordinator data", err);
+        if (!cancelled) {
+          setActivityTypes([]);
+          setSessions([]);
+          setToast({ type: "error", message: err.response?.data?.message || "Failed to load data" });
+        }
+      } finally {
+        if (!cancelled) setTypesLoading(false);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+      clearTimeout(persistTimer.current);
+    };
+  }, []);
+
+  const persistActivityTypes = useCallback(async (nextTypes) => {
+    const token = sessionStorage.getItem("token");
+    if (!token) {
+      setToast({ type: "error", message: "Please sign in to save activity types" });
+      return;
+    }
+    try {
+      const saved = await saveActivityTypesApi(token, nextTypes);
+      setActivityTypes(saved);
+    } catch (err) {
+      console.error("Failed to save activity types", err);
+      setToast({ type: "error", message: err.response?.data?.message || "Failed to save activity types" });
+    }
+  }, []);
+
+  const handleActivityTypesChange = useCallback((nextTypes, options = {}) => {
+    const persistNow = options.persist !== false;
+    setActivityTypes(nextTypes);
+    clearTimeout(persistTimer.current);
+    if (persistNow) {
+      persistActivityTypes(nextTypes);
+    } else {
+      persistTimer.current = setTimeout(() => persistActivityTypes(nextTypes), 450);
+    }
+  }, [persistActivityTypes]);
 
   const display = { fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" };
   const body = { fontFamily: "'Inter', system-ui, sans-serif" };
 
   const selected = sessions.find((s) => s.id === selectedId) || null;
 
-  const kpis = useMemo(() => {
-    const total = sessions.length;
-    const scheduled = sessions.filter((s) => s.status === "Scheduled").length;
-    const withSenior = sessions.filter((s) => s.status === "Sent to Senior Trainer").length;
-    const assigned = sessions.filter((s) => s.status === "Assigned").length;
-    return { total, scheduled, withSenior, assigned };
-  }, [sessions]);
-
   const distribution = useMemo(() => {
     const counts = {};
-    sessions.forEach((s) => s.activityIds.forEach((id) => (counts[id] = (counts[id] || 0) + 1)));
+    sessions.forEach((s) => (s.activityIds || []).forEach((id) => (counts[id] = (counts[id] || 0) + 1)));
     const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
-    return activityTypes
+    return (activityTypes || [])
       .map((a) => ({ ...a, count: counts[a.id] || 0, pct: ((counts[a.id] || 0) / total) * 100 }))
       .filter((a) => a.count > 0);
   }, [sessions, activityTypes]);
@@ -251,7 +328,7 @@ export default function AcademicCoordinatorMockup() {
   const filteredSessions = useMemo(() => {
     return sessions.filter((s) => {
       if (statusFilter !== "All" && s.status !== statusFilter) return false;
-      if (activityFilter !== "All" && !s.activityIds.includes(activityFilter)) return false;
+      if (activityFilter !== "All" && !(s.activityIds || []).includes(activityFilter)) return false;
       if (search && !(s.name.toLowerCase().includes(search.toLowerCase()))) return false;
       return true;
     });
@@ -269,48 +346,77 @@ export default function AcademicCoordinatorMockup() {
     return { noUnit, units };
   }, [filteredSessions]);
 
-  function pickOption(step, option) {
-    setSelection((prev) => ({ ...prev, [PICKER_STEPS[step].key]: option }));
-    if (step === PICKER_STEPS.length - 1) {
-      setView("workspace");
-    }
-  }
-
-  function changeStep(i) {
-    setSelection((prev) => {
-      const next = { ...prev };
-      PICKER_STEPS.slice(i).forEach((s) => delete next[s.key]);
-      return next;
-    });
-  }
-
-  function breadcrumbText() {
-    return PICKER_STEPS.map((s) => selection[s.key]?.name).filter(Boolean).join("  ›  ");
-  }
-
   function openCreate(existing) {
     setEditingSession(existing || null);
     setCreateStep(0);
     setModal("create");
   }
 
-  function saveSession() {
-    setModal(null);
-    setToast({ type: "success", message: editingSession ? "Session plan updated" : "Session plan created" });
+  async function saveSession(draft) {
+    const token = sessionStorage.getItem("token");
+    if (!token) {
+      setToast({ type: "error", message: "Please sign in to save sessions" });
+      return;
+    }
+    if (!draft?.title?.trim()) {
+      setToast({ type: "error", message: "Please enter a session name" });
+      return;
+    }
+    setSavingSession(true);
+    try {
+      const saved = editingSession?.id
+        ? await updateSessionApi(token, editingSession.id, draft)
+        : await createSessionApi(token, draft);
+      const mapped = mapApiSessionToUi(saved);
+      setSessions((prev) => {
+        const exists = prev.some((s) => s.id === mapped.id);
+        return exists ? prev.map((s) => (s.id === mapped.id ? mapped : s)) : [...prev, mapped];
+      });
+      setSelectedId(mapped.id);
+      setModal(null);
+      setToast({ type: "success", message: editingSession ? "Session plan updated" : "Session plan created" });
+    } catch (err) {
+      console.error("Failed to save session", err);
+      setToast({ type: "error", message: err.response?.data?.message || err.message || "Failed to save session" });
+    } finally {
+      setSavingSession(false);
+    }
   }
 
-  function deleteSession(id) {
-    setSessions((prev) => prev.filter((s) => s.id !== id));
-    if (selectedId === id) setSelectedId(null);
-    setToast({ type: "success", message: "Session plan deleted" });
+  async function deleteSession(id) {
+    const token = sessionStorage.getItem("token");
+    if (!token) {
+      setToast({ type: "error", message: "Please sign in to delete sessions" });
+      return;
+    }
+    try {
+      await deleteSessionApi(token, id);
+      setSessions((prev) => prev.filter((s) => s.id !== id));
+      if (selectedId === id) setSelectedId(null);
+      setToast({ type: "success", message: "Session plan deleted" });
+    } catch (err) {
+      console.error("Failed to delete session", err);
+      setToast({ type: "error", message: err.response?.data?.message || "Failed to delete session" });
+    }
   }
 
-  function referSession(trainer) {
-    setSessions((prev) =>
-      prev.map((s) => (s.id === selectedId ? { ...s, status: "Sent to Senior Trainer" } : s))
-    );
-    setModal(null);
-    setToast({ type: "success", message: `Referred to ${trainer.name}` });
+  async function referSession(trainer) {
+    const token = sessionStorage.getItem("token");
+    if (!token || !selectedId) return;
+    try {
+      const saved = await patchSessionApi(token, selectedId, {
+        workflowStatus: "Sent to Senior Trainer",
+        seniorTrainerId: trainer.id,
+        seniorTrainerName: trainer.name,
+      });
+      const mapped = mapApiSessionToUi(saved);
+      setSessions((prev) => prev.map((s) => (s.id === mapped.id ? mapped : s)));
+      setModal(null);
+      setToast({ type: "success", message: `Referred to ${trainer.name}` });
+    } catch (err) {
+      console.error("Failed to refer session", err);
+      setToast({ type: "error", message: err.response?.data?.message || "Failed to refer session" });
+    }
   }
 
   return (
@@ -344,42 +450,26 @@ export default function AcademicCoordinatorMockup() {
 
       {/* BODY */}
       <div style={{ flex: 1, padding: "0 24px 24px", overflow: "auto" }} className="ac-scroll">
-        {view === "picker" ? (
-          <PathPicker
-            display={display}
-            selection={selection}
-            onPick={pickOption}
-            onChangeStep={changeStep}
-          />
-        ) : (
-          <Workspace
-            display={display}
-            selection={selection}
-            kpis={kpis}
-            distribution={distribution}
-            statusFilter={statusFilter}
-            setStatusFilter={setStatusFilter}
-            activityFilter={activityFilter}
-            setActivityFilter={setActivityFilter}
-            search={search}
-            setSearch={setSearch}
-            grouped={grouped}
-            selectedId={selectedId}
-            setSelectedId={setSelectedId}
-            selected={selected}
-            activityTypes={activityTypes}
-            onNewPlan={() => openCreate(null)}
-            onEdit={() => openCreate(selected)}
-            onDelete={() => deleteSession(selected.id)}
-            onRefer={() => setModal("refer")}
-            moreOpen={moreOpen}
-            setMoreOpen={setMoreOpen}
-            moreRef={moreRef}
-            onChangeBatch={() => { changeStep(4); setView("picker"); setSelectedId(null); }}
-            onManageActivities={() => setModal("activity")}
-            breadcrumbText={breadcrumbText()}
-          />
-        )}
+        <Workspace
+          display={display}
+          distribution={distribution}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          activityFilter={activityFilter}
+          setActivityFilter={setActivityFilter}
+          search={search}
+          setSearch={setSearch}
+          grouped={grouped}
+          selectedId={selectedId}
+          setSelectedId={setSelectedId}
+          selected={selected}
+          activityTypes={activityTypes}
+          onNewPlan={() => openCreate(null)}
+          onEdit={() => openCreate(selected)}
+          onDelete={() => deleteSession(selected.id)}
+          onRefer={() => setModal("refer")}
+          onManageActivities={() => setModal("activity")}
+        />
       </div>
 
       {/* MODALS */}
@@ -390,9 +480,9 @@ export default function AcademicCoordinatorMockup() {
           setStep={setCreateStep}
           onClose={() => setModal(null)}
           onSave={saveSession}
+          saving={savingSession}
           editing={editingSession}
           activityTypes={activityTypes}
-          breadcrumbText={breadcrumbText()}
         />
       )}
       {modal === "refer" && selected && (
@@ -407,7 +497,8 @@ export default function AcademicCoordinatorMockup() {
         <ActivityModal
           display={display}
           types={activityTypes}
-          setTypes={setActivityTypes}
+          loading={typesLoading}
+          onChange={handleActivityTypesChange}
           onClose={() => setModal(null)}
         />
       )}
@@ -418,112 +509,21 @@ export default function AcademicCoordinatorMockup() {
 }
 
 /* ---------------------------------------------------------------
-   Path picker (§5.2)
----------------------------------------------------------------- */
-function PathPicker({ display, selection, onPick, onChangeStep }) {
-  const nextOpen = PICKER_STEPS.findIndex((s) => !selection[s.key]);
-
-  return (
-    <div style={{ maxWidth: 760, margin: "0 auto", paddingTop: 12 }}>
-      <div style={{ ...display, fontSize: 22, fontWeight: 700, marginBottom: 4 }}>
-        Choose the batch to plan
-      </div>
-      <div style={{ fontSize: 13, color: T.mute, marginBottom: 20 }}>
-        Pick each level below — the next one unlocks once you choose.
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {PICKER_STEPS.map((step, i) => {
-          const value = selection[step.key];
-          const isOpen = i === nextOpen;
-          const isLocked = nextOpen !== -1 && i > nextOpen;
-
-          if (value) {
-            return (
-              <div
-                key={step.key}
-                style={{ display: "flex", alignItems: "center", gap: 12, background: "#fff", border: `1px solid ${T.line}`, borderRadius: 14, padding: 12 }}
-              >
-                <IconTile tint={step.tint} ink={step.ink} size={38}>{step.label[0]}</IconTile>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: T.mute, textTransform: "uppercase", letterSpacing: 0.3 }}>{step.label}</div>
-                  <div style={{ fontSize: 14, fontWeight: 700 }}>{value.name}</div>
-                </div>
-                <span
-                  onClick={() => onChangeStep(i)}
-                  style={{ fontSize: 12, fontWeight: 600, color: T.coral, cursor: "pointer" }}
-                >
-                  Change
-                </span>
-              </div>
-            );
-          }
-
-          if (isLocked) {
-            return (
-              <div
-                key={step.key}
-                style={{ display: "flex", alignItems: "center", gap: 12, background: T.page, border: `1px dashed ${T.line}`, borderRadius: 14, padding: 12, opacity: 0.6 }}
-              >
-                <IconTile tint="#eef1f6" ink={T.mute} size={38}>{step.label[0]}</IconTile>
-                <div style={{ fontSize: 13, color: T.mute }}>{step.label} — pick the previous level first</div>
-              </div>
-            );
-          }
-
-          return (
-            <div key={step.key} style={{ background: "#fff", border: `1px solid ${T.line}`, borderRadius: 16, padding: 16 }}>
-              <div style={{ ...display, fontSize: 13, fontWeight: 700, color: T.ink, marginBottom: 10 }}>
-                Select {step.label.toLowerCase()}
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
-                {step.options.map((opt) => (
-                  <div
-                    key={opt.id}
-                    className="ac-card-btn"
-                    onClick={() => onPick(i, opt)}
-                    style={{ background: "#fff", border: `1px solid ${T.line}`, borderRadius: 14, padding: 12, display: "flex", gap: 10, alignItems: "center" }}
-                  >
-                    <IconTile tint={step.tint} ink={step.ink} size={40}>{step.label[0]}</IconTile>
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 600 }}>{opt.name}</div>
-                      <div style={{ fontSize: 11, color: T.mute, marginTop: 2 }}>{opt.meta}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/* ---------------------------------------------------------------
    Workspace (§5.3–5.8)
 ---------------------------------------------------------------- */
 function Workspace(props) {
   const {
-    display, selection, kpis, distribution, statusFilter, setStatusFilter,
+    display, distribution, statusFilter, setStatusFilter,
     activityFilter, setActivityFilter, search, setSearch, grouped,
     selectedId, setSelectedId, selected, activityTypes, onNewPlan, onEdit,
-    onDelete, onRefer, moreOpen, setMoreOpen, moreRef, onChangeBatch,
-    onManageActivities, breadcrumbText,
+    onDelete, onRefer, onManageActivities,
   } = props;
-
-  const kpiTiles = [
-    { label: "Plans", value: kpis.total, bg: "#fff", fg: T.ink, filter: "All" },
-    { label: "Scheduled", value: kpis.scheduled, bg: T.skyTint, fg: T.sky, filter: "Scheduled" },
-    { label: "With senior", value: kpis.withSenior, bg: T.amberTint, fg: T.amber, filter: "Sent to Senior Trainer" },
-    { label: "Assigned", value: kpis.assigned, bg: T.lilacTint, fg: T.lilac, filter: "Assigned" },
-  ];
 
   return (
     <div>
       {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
-        <div style={{ display: "flex", gap: 8, position: "relative" }} ref={moreRef}>
+        <div style={{ display: "flex", gap: 8, position: "relative" }}>
           <button
             onClick={onManageActivities}
             style={{ height: 40, padding: "0 16px", borderRadius: 999, border: `1px solid ${T.line}`, background: "#fff", fontSize: 13, fontWeight: 600, color: T.ink, cursor: "pointer" }}
@@ -593,7 +593,7 @@ function Workspace(props) {
           style={{ width: 180, height: 40 }}
         >
           <option value="All">All activities</option>
-          {activityTypes.map((a) => (
+          {(activityTypes || []).map((a) => (
             <option key={a.id} value={a.id}>{a.name}</option>
           ))}
         </select>
@@ -607,7 +607,7 @@ function Workspace(props) {
           selectedId={selectedId}
           setSelectedId={setSelectedId}
           onCreateFirst={onNewPlan}
-          selection={selection}
+          activityTypes={activityTypes || []}
         />
         <DetailPanel
           display={display}
@@ -622,9 +622,9 @@ function Workspace(props) {
   );
 }
 
-function SessionRow({ s, selectedId, setSelectedId }) {
+function SessionRow({ s, selectedId, setSelectedId, activityTypes = [] }) {
   const isSel = selectedId === s.id;
-  const barColor = ACTIVITY_TYPES.find((a) => a.id === s.activityIds[0])?.color || T.mute;
+  const barColor = activityTypes.find((a) => a.id === (s.activityIds || [])[0])?.color || T.mute;
   return (
     <div
       className="ac-toc-row"
@@ -637,7 +637,7 @@ function SessionRow({ s, selectedId, setSelectedId }) {
       }}
     >
       <span style={{ width: 5, height: 22, borderRadius: 3, background: barColor, flexShrink: 0 }} />
-      <span style={{ fontSize: 12, color: T.mute, width: 18, flexShrink: 0 }}>{String(s.number).padStart(2, "0")}</span>
+      <span style={{ fontSize: 12, color: T.mute, width: 18, flexShrink: 0 }}>{s.number ? String(s.number).padStart(2, "0") : "—"}</span>
       <span style={{ fontSize: 13, fontWeight: 500, flex: 1 }}>{s.name}</span>
       {s.tot && (
         <span style={{ fontSize: 10, fontWeight: 700, background: T.mintTint, color: T.mint, padding: "2px 7px", borderRadius: 999 }}>TOT</span>
@@ -647,15 +647,14 @@ function SessionRow({ s, selectedId, setSelectedId }) {
   );
 }
 
-function TocPanel({ display, grouped, selectedId, setSelectedId, onCreateFirst, selection }) {
+function TocPanel({ display, grouped, selectedId, setSelectedId, onCreateFirst, activityTypes = [] }) {
   const empty = grouped.noUnit.length === 0 && Object.keys(grouped.units).length === 0;
   return (
     <div style={{ background: "#fff", border: `1px solid ${T.line}`, borderRadius: 16, padding: 16 }}>
       <div style={{ marginBottom: 10 }}>
         <div style={{ ...display, fontSize: 15, fontWeight: 700 }}>
-          {selection.course?.name || "Course"}
+          Syllabus
         </div>
-        <div style={{ fontSize: 12, color: T.mute }}>{selection.batch?.name || "Batch"}</div>
       </div>
 
       {empty ? (
@@ -677,7 +676,7 @@ function TocPanel({ display, grouped, selectedId, setSelectedId, onCreateFirst, 
                 Sessions without unit
               </div>
               {grouped.noUnit.map((s) => (
-                <SessionRow key={s.id} s={s} selectedId={selectedId} setSelectedId={setSelectedId} />
+                <SessionRow key={s.id} s={s} selectedId={selectedId} setSelectedId={setSelectedId} activityTypes={activityTypes} />
               ))}
             </div>
           )}
@@ -691,7 +690,7 @@ function TocPanel({ display, grouped, selectedId, setSelectedId, onCreateFirst, 
                   <div style={{ fontSize: 12, fontWeight: 600, color: T.mute, margin: "4px 0" }}>{chapter}</div>
                   <div style={{ paddingLeft: 6 }}>
                     {sess.map((s) => (
-                      <SessionRow key={s.id} s={s} selectedId={selectedId} setSelectedId={setSelectedId} />
+                      <SessionRow key={s.id} s={s} selectedId={selectedId} setSelectedId={setSelectedId} activityTypes={activityTypes} />
                     ))}
                   </div>
                 </div>
@@ -714,7 +713,7 @@ function DetailPanel({ display, session, onEdit, onDelete, onRefer, activityType
     );
   }
 
-  const colors = session.activityIds.map((id) => activityTypes.find((a) => a.id === id)?.color || T.mute);
+  const colors = (session.activityIds || []).map((id) => (activityTypes || []).find((a) => a.id === id)?.color || T.mute);
   const gradient = colors.length > 1 ? `linear-gradient(90deg, ${colors.join(",")})` : colors[0];
   const isAssigned = session.status === "Assigned" || session.status === "In Progress" || session.status === "Completed";
 
@@ -751,11 +750,11 @@ function DetailPanel({ display, session, onEdit, onDelete, onRefer, activityType
           </div>
         )}
 
-        {session.subTopics.length > 0 && (
+        {(session.subTopics || []).length > 0 && (
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: T.mute, marginBottom: 6, textTransform: "uppercase" }}>Sub topics</div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {session.subTopics.map((t) => (
+              {(session.subTopics || []).map((t) => (
                 <span key={t} style={{ fontSize: 12, background: T.page, borderRadius: 999, padding: "5px 10px" }}>{t}</span>
               ))}
             </div>
@@ -764,11 +763,11 @@ function DetailPanel({ display, session, onEdit, onDelete, onRefer, activityType
 
         <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
           <div style={{ flex: 1, background: T.page, borderRadius: 12, padding: "10px 12px" }}>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{session.materials.documents}</div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>{session.materials?.documents || 0}</div>
             <div style={{ fontSize: 11, color: T.mute }}>Documents</div>
           </div>
           <div style={{ flex: 1, background: T.page, borderRadius: 12, padding: "10px 12px" }}>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{session.materials.learning}</div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>{session.materials?.learning || 0}</div>
             <div style={{ fontSize: 11, color: T.mute }}>Learning material</div>
           </div>
         </div>
@@ -837,21 +836,56 @@ function DetailPanel({ display, session, onEdit, onDelete, onRefer, activityType
 }
 
 /* ---------------------------------------------------------------
-   Modal shell — normal-flow overlay
+   Modal shell — viewport overlay (portaled so layout overflow cannot clip it)
 ---------------------------------------------------------------- */
 function ModalShell({ children, onClose, width = 560 }) {
-  return (
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  return createPortal(
     <div
       onClick={onClose}
       style={{
-        position: "absolute", inset: 0, background: "rgba(15,23,42,0.4)",
-        display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 20,
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15,23,42,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 10050,
+        padding: 20,
       }}
     >
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: width, maxHeight: "85%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        style={{
+          background: "#fff",
+          borderRadius: 20,
+          width: "100%",
+          maxWidth: width,
+          maxHeight: "90vh",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          boxShadow: "0 24px 64px rgba(15, 23, 42, 0.28)",
+        }}
+      >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -860,18 +894,29 @@ function ModalShell({ children, onClose, width = 560 }) {
 ---------------------------------------------------------------- */
 const CREATE_STEPS = ["Place in the course", "Session", "Materials", "TOT & notes"];
 
-function CreateModal({ display, step, setStep, onClose, onSave, editing, activityTypes, breadcrumbText }) {
+function CreateModal({ display, step, setStep, onClose, onSave, saving, editing, activityTypes }) {
   const [name, setName] = useState(editing?.name || "");
+  const [sessionNumber, setSessionNumber] = useState(editing?.number || "");
+  const [hours, setHours] = useState(editing?.hours || "");
+  const [method, setMethod] = useState(editing?.method || "");
+  const [resources, setResources] = useState(editing?.resources || "");
+  const [unitNumber, setUnitNumber] = useState(editing?.unitNumber || "");
+  const [unitName, setUnitName] = useState(editing?.unitName || "");
+  const [chapterNumber, setChapterNumber] = useState(editing?.chapterNumber || "");
+  const [chapterName, setChapterName] = useState(editing?.chapterName || "");
+  const [subTopicsStr, setSubTopicsStr] = useState((editing?.subTopics || []).join(", "));
+  const [selectedActivityIds, setSelectedActivityIds] = useState(editing?.activityIds || []);
   const [includeTot, setIncludeTot] = useState(editing?.tot || false);
-  const [totUseSameTopic, setTotUseSameTopic] = useState(true);
+  const [totUseSameTopic, setTotUseSameTopic] = useState(editing?.totUseSameTopic !== false);
   const [totTopic, setTotTopic] = useState(editing?.totTopic || "");
   const [totMethod, setTotMethod] = useState(editing?.totMethod || "");
-  const [studentMaterial, setStudentMaterial] = useState([]);
-  const [requiredDocuments, setRequiredDocuments] = useState([]);
-  const [standardTlm, setStandardTlm] = useState([]);
-  const [trainerTlm, setTrainerTlm] = useState([]);
-  const [totCompletionProofs, setTotCompletionProofs] = useState([]);
-  const [agendaBlocks, setAgendaBlocks] = useState([]);
+  const [notes, setNotes] = useState(editing?.notes || "");
+  const [studentMaterial, setStudentMaterial] = useState(editing?.studentMaterial || []);
+  const [requiredDocuments, setRequiredDocuments] = useState(editing?.requiredDocuments || []);
+  const [standardTlm, setStandardTlm] = useState(editing?.standardTlm || []);
+  const [trainerTlm, setTrainerTlm] = useState(editing?.trainerTlm || []);
+  const [totCompletionProofs, setTotCompletionProofs] = useState(editing?.totCompletionProofs || []);
+  const [agendaBlocks, setAgendaBlocks] = useState(editing?.agendaBlocks || []);
 
   const MATERIAL_TYPE_OPTIONS = ["PDF", "Image", "Video", "Document", "Presentation"];
 
@@ -921,14 +966,7 @@ function CreateModal({ display, step, setStep, onClose, onSave, editing, activit
   const [totQuestions, setTotQuestions] = useState(
     editing?.totQuestions && editing.totQuestions.length
       ? editing.totQuestions
-      : [
-          {
-            id: `totq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            question: "What is the greeting protocol first step?",
-            options: ["Smile & make eye contact", "Ask for ID", "Offer discount", "Call the manager"],
-            correctIndex: 0,
-          },
-        ]
+      : []
   );
 
   const updateTotQuestion = (index, field, value) => {
@@ -960,10 +998,62 @@ function CreateModal({ display, step, setStep, onClose, onSave, editing, activit
     setTotQuestions([createTotQuestion()]);
   };
 
+  const toggleActivity = (id) => {
+    setSelectedActivityIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const namedItems = (items) => (items || []).filter((item) => item.name?.trim()).map((item) => ({
+    id: item.id,
+    name: item.name.trim(),
+    type: item.type || "Document",
+  }));
+
+  const handleSave = () => {
+    if (!name.trim() || saving) return;
+    const selectedTypes = (activityTypes || []).filter((a) => selectedActivityIds.includes(a.id));
+    onSave({
+      title: name.trim(),
+      sessionNumber: String(sessionNumber || "").trim(),
+      hours: String(hours || "").trim(),
+      duration: hours ? `${hours} hrs` : "",
+      trainingMethod: method.trim(),
+      classroomLabResources: resources.trim(),
+      unitNumber: String(unitNumber || "").trim(),
+      unitName: unitName.trim(),
+      chapterNumber: String(chapterNumber || "").trim(),
+      chapterName: chapterName.trim(),
+      subTopics: subTopicsStr.trim(),
+      topicCovered: agendaBlocks.map((block) => block.topic).filter(Boolean).join(", "),
+      subSessionItems: agendaBlocks
+        .filter((block) => block.topic?.trim())
+        .map((block) => ({ name: block.topic.trim(), duration: String(block.duration || "") })),
+      sessionActivities: selectedTypes.map((a) => ({ id: a.id, name: a.name, color: a.color })),
+      learningMaterials: namedItems(studentMaterial),
+      evidenceDocs: namedItems(requiredDocuments),
+      standardTlm: namedItems(standardTlm),
+      trainerBasedTlm: namedItems(trainerTlm),
+      includeTot,
+      totUseSameTopics: includeTot ? totUseSameTopic : false,
+      totTopicCovered: includeTot && !totUseSameTopic ? totTopic.trim() : "",
+      totTrainingMethod: includeTot ? totMethod.trim() : "",
+      totCompletionProofs: includeTot ? namedItems(totCompletionProofs) : [],
+      totQuestionBank: includeTot
+        ? totQuestions
+            .filter((q) => q.question?.trim())
+            .map((q) => ({
+              question: q.question.trim(),
+              options: q.options || [],
+              correctIndex: q.correctIndex || 0,
+            }))
+        : [],
+      notes: notes.trim(),
+      workflowStatus: editing?.status || "Scheduled",
+    });
+  };
+
   return (
     <ModalShell onClose={onClose} width={640}>
       <div style={{ padding: "18px 22px 0" }}>
-        <div style={{ fontSize: 11, color: T.mute, marginBottom: 10 }}>{breadcrumbText}</div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ ...display, fontSize: 18, fontWeight: 700 }}>{editing ? "Edit session plan" : "New session plan"}</div>
           <span onClick={onClose} style={{ cursor: "pointer", color: T.mute, fontSize: 18 }}>×</span>
@@ -984,34 +1074,48 @@ function CreateModal({ display, step, setStep, onClose, onSave, editing, activit
             <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Activity types</label>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
-                {activityTypes.map((a) => (
-                  <span key={a.id} style={{ fontSize: 12, fontWeight: 600, padding: "7px 12px", borderRadius: 999, background: a.color + "22", color: a.color, border: `1.5px solid ${a.color}55`, cursor: "pointer" }}>
-                    {a.name}
-                  </span>
-                ))}
+                {(activityTypes || []).length === 0 ? (
+                  <span style={{ fontSize: 12, color: T.mute }}>No activity types yet. Add them from Activity types.</span>
+                ) : (activityTypes || []).map((a) => {
+                  const on = selectedActivityIds.includes(a.id);
+                  return (
+                    <span
+                      key={a.id}
+                      onClick={() => toggleActivity(a.id)}
+                      style={{
+                        fontSize: 12, fontWeight: 600, padding: "7px 12px", borderRadius: 999, cursor: "pointer",
+                        background: on ? a.color : a.color + "22",
+                        color: on ? "#fff" : a.color,
+                        border: `1.5px solid ${on ? a.color : a.color + "55"}`,
+                      }}
+                    >
+                      {a.name}
+                    </span>
+                  );
+                })}
               </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div><label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Unit number</label><input className="ac-input" placeholder="1" /></div>
-              <div><label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Unit name</label><input className="ac-input" placeholder="Foundation Skills" /></div>
-              <div><label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Chapter number</label><input className="ac-input" placeholder="1" /></div>
-              <div><label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Chapter name</label><input className="ac-input" placeholder="Introduction to Retail" /></div>
+              <div><label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Unit number</label><input className="ac-input" placeholder="1" value={unitNumber} onChange={(e) => setUnitNumber(e.target.value)} /></div>
+              <div><label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Unit name</label><input className="ac-input" placeholder="Foundation Skills" value={unitName} onChange={(e) => setUnitName(e.target.value)} /></div>
+              <div><label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Chapter number</label><input className="ac-input" placeholder="1" value={chapterNumber} onChange={(e) => setChapterNumber(e.target.value)} /></div>
+              <div><label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Chapter name</label><input className="ac-input" placeholder="Introduction to Retail" value={chapterName} onChange={(e) => setChapterName(e.target.value)} /></div>
             </div>
-            <div><label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Sub topics</label><input className="ac-input" placeholder="Store layout, greeting" /></div>
+            <div><label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Sub topics</label><input className="ac-input" placeholder="Store layout, greeting" value={subTopicsStr} onChange={(e) => setSubTopicsStr(e.target.value)} /></div>
           </div>
         )}
 
         {step === 1 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 12 }}>
-              <div><label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Session number</label><input className="ac-input" placeholder="2" /></div>
+              <div><label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Session number</label><input className="ac-input" placeholder="2" value={sessionNumber} onChange={(e) => setSessionNumber(e.target.value)} /></div>
               <div><label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Session name *</label><input className="ac-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Store orientation" /></div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div><label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Duration (hrs)</label><input className="ac-input" placeholder="3" /></div>
-              <div><label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Teaching method</label><input className="ac-input" placeholder="Demonstration" /></div>
+              <div><label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Duration (hrs)</label><input className="ac-input" placeholder="3" value={hours} onChange={(e) => setHours(e.target.value)} /></div>
+              <div><label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Teaching method</label><input className="ac-input" placeholder="Demonstration" value={method} onChange={(e) => setMethod(e.target.value)} /></div>
             </div>
-            <div><label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Classroom / lab resources</label><input className="ac-input" placeholder="Projector, mock store shelf" /></div>
+            <div><label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Classroom / lab resources</label><input className="ac-input" placeholder="Projector, mock store shelf" value={resources} onChange={(e) => setResources(e.target.value)} /></div>
             <div style={{ border: `1px dashed ${T.line}`, borderRadius: 12, padding: "10px 12px" }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: T.mute, marginBottom: 8 }}>Topics covered</div>
               <p style={{ fontSize: 12, color: T.mute, marginBottom: 8 }}>Add each topic with duration in minutes</p>
@@ -1276,7 +1380,7 @@ function CreateModal({ display, step, setStep, onClose, onSave, editing, activit
                 </button>
               </>
             )}
-            <div><label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Planning notes</label><textarea className="ac-input" rows={3} placeholder="Anything the Senior Trainer or field trainer should know" /></div>
+            <div><label style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>Planning notes</label><textarea className="ac-input" rows={3} placeholder="Anything the Senior Trainer or field trainer should know" value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
           </div>
         )}
       </div>
@@ -1290,8 +1394,13 @@ function CreateModal({ display, step, setStep, onClose, onSave, editing, activit
         {step < 3 ? (
           <button onClick={() => setStep(step + 1)} style={{ height: 40, padding: "0 20px", borderRadius: 12, border: "none", background: T.ink, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Next</button>
         ) : (
-          <button disabled={!name && !editing} onClick={onSave} style={{ height: 40, padding: "0 20px", borderRadius: 12, border: "none", background: T.coral, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: !name && !editing ? 0.5 : 1 }}>
-            Save plan
+          <button
+            type="button"
+            disabled={!name.trim() || saving}
+            onClick={handleSave}
+            style={{ height: 40, padding: "0 20px", borderRadius: 12, border: "none", background: T.coral, color: "#fff", fontSize: 13, fontWeight: 700, cursor: !name.trim() || saving ? "not-allowed" : "pointer", opacity: !name.trim() || saving ? 0.5 : 1 }}
+          >
+            {saving ? "Saving..." : "Save plan"}
           </button>
         )}
       </div>
@@ -1305,8 +1414,8 @@ function CreateModal({ display, step, setStep, onClose, onSave, editing, activit
 function ReferModal({ display, session, onClose, onSend }) {
   const [query, setQuery] = useState("");
   const [pickedId, setPickedId] = useState(null);
-  const filtered = SENIOR_TRAINERS.filter((t) => t.name.toLowerCase().includes(query.toLowerCase()));
-  const picked = SENIOR_TRAINERS.find((t) => t.id === pickedId);
+  const filtered = [];
+  const picked = null;
 
   return (
     <ModalShell onClose={onClose} width={440}>
@@ -1355,13 +1464,33 @@ function ReferModal({ display, session, onClose, onSend }) {
 ---------------------------------------------------------------- */
 const SWATCHES = ["#3b82f6", "#10b981", "#f97316", "#8b5cf6", "#ec4899", "#eab308", "#06b6d4", "#ef4444", "#84cc16", "#6366f1", "#14b8a6", "#f43f5e"];
 
-function ActivityModal({ display, types, setTypes, onClose }) {
+function ActivityModal({ display, types = [], loading, onChange, onClose }) {
   const [newName, setNewName] = useState("");
+  const [colorFor, setColorFor] = useState(null);
+  const list = types || [];
 
   function addType() {
-    if (!newName.trim()) return;
-    setTypes((prev) => [...prev, { id: "a" + Date.now(), name: newName.trim(), color: SWATCHES[prev.length % SWATCHES.length] }]);
+    const name = newName.trim();
+    if (!name) return;
+    const next = [
+      ...list,
+      { id: "a" + Date.now(), name, color: SWATCHES[list.length % SWATCHES.length] },
+    ];
     setNewName("");
+    onChange(next);
+  }
+
+  function renameType(id, name) {
+    onChange(list.map((x) => (x.id === id ? { ...x, name } : x)), { persist: false });
+  }
+
+  function recolorType(id, color) {
+    onChange(list.map((x) => (x.id === id ? { ...x, color } : x)));
+    setColorFor(null);
+  }
+
+  function removeType(id) {
+    onChange(list.filter((x) => x.id !== id));
   }
 
   return (
@@ -1369,29 +1498,81 @@ function ActivityModal({ display, types, setTypes, onClose }) {
       <div style={{ padding: 22 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
           <div style={{ ...display, fontSize: 17, fontWeight: 700 }}>Activity types</div>
-          <span onClick={onClose} style={{ cursor: "pointer", color: T.mute, fontSize: 18 }}>×</span>
+          <span onClick={onClose} style={{ cursor: "pointer", color: T.mute, fontSize: 18, lineHeight: 1 }}>×</span>
         </div>
-        <div style={{ fontSize: 12, color: T.mute, marginBottom: 14 }}>These colors show on the syllabus and session cards.</div>
+        <div style={{ fontSize: 12, color: T.mute, marginBottom: 14 }}>Add your own types. Colors show on the syllabus and session cards.</div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 260, overflow: "auto" }}>
-          {types.map((a) => (
-            <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, border: `1px solid ${T.line}`, borderRadius: 12, padding: "8px 10px" }}>
-              <span style={{ width: 20, height: 20, borderRadius: 999, background: a.color, flexShrink: 0 }} />
-              <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{a.name}</span>
-              <span style={{ fontSize: 11, fontWeight: 600, background: a.color + "22", color: a.color, padding: "3px 9px", borderRadius: 999 }}>{a.name}</span>
-              <span
-                onClick={() => setTypes((prev) => prev.filter((x) => x.id !== a.id))}
-                style={{ cursor: "pointer", color: T.mute, fontSize: 14 }}
-              >
-                🗑
-              </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 320, overflow: "auto" }}>
+          {loading && list.length === 0 && (
+            <div style={{ fontSize: 13, color: T.mute, padding: "12px 4px" }}>Loading activity types…</div>
+          )}
+          {!loading && list.length === 0 && (
+            <div style={{ fontSize: 13, color: T.mute, padding: "12px 4px" }}>No activity types yet. Type a name below and click + Add type.</div>
+          )}
+          {list.map((a) => (
+            <div key={a.id} style={{ border: `1px solid ${T.line}`, borderRadius: 12, padding: "8px 10px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button
+                  type="button"
+                  title="Change color"
+                  onClick={() => setColorFor((id) => (id === a.id ? null : a.id))}
+                  style={{ width: 22, height: 22, borderRadius: 999, background: a.color, flexShrink: 0, border: colorFor === a.id ? `2px solid ${T.ink}` : "2px solid transparent", cursor: "pointer", padding: 0 }}
+                />
+                <input
+                  className="ac-input"
+                  value={a.name}
+                  onChange={(e) => renameType(a.id, e.target.value)}
+                  style={{ flex: 1, height: 34, padding: "6px 10px", fontSize: 13, fontWeight: 600 }}
+                />
+                <span style={{ fontSize: 11, fontWeight: 600, background: a.color + "22", color: a.color, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>{a.name || "Preview"}</span>
+                <span
+                  onClick={() => removeType(a.id)}
+                  title="Delete"
+                  style={{ cursor: "pointer", color: T.mute, fontSize: 14 }}
+                >
+                  🗑
+                </span>
+              </div>
+              {colorFor === a.id && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10, paddingLeft: 32 }}>
+                  {SWATCHES.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => recolorType(a.id, color)}
+                      style={{
+                        width: 18, height: 18, borderRadius: 999, background: color, cursor: "pointer", padding: 0,
+                        border: a.color === color ? "2px solid #0f172a" : "2px solid transparent",
+                      }}
+                      aria-label={`Use ${color}`}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
 
         <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-          <input className="ac-input" placeholder="New activity type name" value={newName} onChange={(e) => setNewName(e.target.value)} />
-          <button onClick={addType} style={{ height: 40, padding: "0 16px", borderRadius: 12, border: "none", background: T.ink, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+          <input
+            className="ac-input"
+            placeholder="New activity type name"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addType();
+              }
+            }}
+            style={{ flex: 1, minWidth: 0 }}
+          />
+          <button
+            type="button"
+            onClick={addType}
+            disabled={!newName.trim()}
+            style={{ height: 40, padding: "0 16px", borderRadius: 12, border: "none", background: T.ink, color: "#fff", fontSize: 13, fontWeight: 700, cursor: newName.trim() ? "pointer" : "not-allowed", whiteSpace: "nowrap", opacity: newName.trim() ? 1 : 0.45, flexShrink: 0 }}
+          >
             + Add type
           </button>
         </div>

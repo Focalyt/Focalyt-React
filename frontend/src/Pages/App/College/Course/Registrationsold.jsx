@@ -3098,6 +3098,27 @@ const CRMDashboard = () => {
     };
   }, [formData, cycleFilters]);
 
+  const toFilterIsoDate = (value) => {
+    if (!value) return null;
+    return value instanceof Date ? value.toISOString() : value;
+  };
+
+  const buildLeadDateQueryParts = useCallback((filters = {}) => ({
+    ...(filters.name && { name: filters.name }),
+    ...(filters.courseType && { courseType: filters.courseType }),
+    ...(filters.status && filters.status !== 'true' && { status: filters.status }),
+    ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
+    ...(filters.sector && { sector: filters.sector }),
+    ...(filters.createdFromDate && { createdFromDate: toFilterIsoDate(filters.createdFromDate) }),
+    ...(filters.createdToDate && { createdToDate: toFilterIsoDate(filters.createdToDate) }),
+    ...(filters.modifiedFromDate && { modifiedFromDate: toFilterIsoDate(filters.modifiedFromDate) }),
+    ...(filters.modifiedToDate && { modifiedToDate: toFilterIsoDate(filters.modifiedToDate) }),
+    ...(filters.nextActionFromDate && { nextActionFromDate: toFilterIsoDate(filters.nextActionFromDate) }),
+    ...(filters.nextActionToDate && { nextActionToDate: toFilterIsoDate(filters.nextActionToDate) }),
+    ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
+    ...(filters.approvalStatus && { approvalStatus: filters.approvalStatus }),
+  }), []);
+
   const applyKycFilterCounts = useCallback((crmFilterCounts) => {
     if (!crmFilterCounts) return;
     setEkycFilters([
@@ -3116,14 +3137,20 @@ const CRMDashboard = () => {
     });
   }, []);
 
-  const fetchKycCounts = useCallback(async () => {
+  const fetchKycCounts = useCallback(async (filters = filterDataRef.current || {}, cycleOverride = null) => {
     if (!token) return;
     try {
       const fd = formDataRef.current || formData;
+      const dateParts = { ...buildLeadDateQueryParts(filters) };
+      delete dateParts.leadStatus;
+      delete dateParts.subStatuses;
+      delete dateParts.approvalStatus;
+      delete dateParts.status;
       const queryParams = new URLSearchParams({
         page: '1',
         limit: '1',
-        ...buildListFilterQueryParts(fd, cycleFilters),
+        ...dateParts,
+        ...buildListFilterQueryParts(fd, cycleOverride || cycleFilters),
       });
       const res = await axios.get(`${backendUrl}/college/kycCandidates?${queryParams}`, {
         headers: { 'x-auth': token },
@@ -3134,29 +3161,17 @@ const CRMDashboard = () => {
     } catch (e) {
       console.error('KYC counts fetch error', e);
     }
-  }, [backendUrl, token, buildListFilterQueryParts, cycleFilters, applyKycFilterCounts]);
+  }, [backendUrl, token, buildLeadDateQueryParts, buildListFilterQueryParts, cycleFilters, applyKycFilterCounts]);
 
-  const fetchMilestoneCounts = useCallback(async (filters = filterDataRef.current || {}) => {
+  const fetchMilestoneCounts = useCallback(async (filters = filterDataRef.current || {}, cycleOverride = null) => {
     if (!token) return;
     try {
       const fd = formDataRef.current || formData;
       const queryParams = new URLSearchParams({
         page: '1',
         limit: '1',
-        ...(filters.name && { name: filters.name }),
-        ...(filters.courseType && { courseType: filters.courseType }),
-        ...(filters.status && filters.status !== 'true' && { status: filters.status }),
-        ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
-        ...(filters.sector && { sector: filters.sector }),
-        ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
-        ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
-        ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
-        ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
-        ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
-        ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
-        ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
-        ...(filters.approvalStatus && { approvalStatus: filters.approvalStatus }),
-        ...buildListFilterQueryParts(fd, cycleFilters),
+        ...buildLeadDateQueryParts(filters),
+        ...buildListFilterQueryParts(fd, cycleOverride || cycleFilters),
       });
 
       const admissionRes = await axios.get(`${backendUrl}/college/admission-list?${queryParams}`, {
@@ -3171,7 +3186,7 @@ const CRMDashboard = () => {
     } catch (e) {
       console.error('Milestone counts fetch error', e);
     }
-  }, [backendUrl, token, buildListFilterQueryParts, cycleFilters]);
+  }, [backendUrl, token, buildLeadDateQueryParts, buildListFilterQueryParts, cycleFilters]);
 
   // Dropdown open state
   const [dropdownStates, setDropdownStates] = useState({
@@ -4632,20 +4647,8 @@ console.log('API Response:', response.data);
       const cycle = cycleOverride || cycleFilters;
       const listParts = buildListFilterQueryParts(formDataRef.current || formData, cycle);
       const sharedFilterParts = {
-        ...(filters?.name && { name: filters.name }),
-        ...(filters?.courseType && { courseType: filters.courseType }),
-        ...(filters?.status && filters.status !== 'true' && { status: filters.status }),
-        ...(filters?.leadStatus && { leadStatus: filters.leadStatus }),
+        ...buildLeadDateQueryParts(filters),
         ...(filters?.aiLeadStatus && { aiLeadStatus: filters.aiLeadStatus }),
-        ...(filters?.sector && { sector: filters.sector }),
-        ...(filters?.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
-        ...(filters?.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
-        ...(filters?.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
-        ...(filters?.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
-        ...(filters?.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
-        ...(filters?.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
-        ...(filters?.subStatuses && { subStatuses: filters.subStatuses }),
-        ...(filters?.approvalStatus && { approvalStatus: filters.approvalStatus }),
       };
       const followupParams = new URLSearchParams({ allTime: 'true', ...listParts, ...sharedFilterParts });
       const followupRes = await axios.get(`${backendUrl}/college/followupcounts?${followupParams}`, {
@@ -4805,16 +4808,13 @@ console.log('API Response:', response.data);
         if (milestoneFilter === 'kycDone' || shouldFetchKycCandidates) {
           applyKycFilterCounts(data.crmFilterCounts);
         }
-        if (milestoneFilter === 'kycDone' || milestoneFilter === 'admission') {
-          await fetchMilestoneCounts(filters);
-        } else if (shouldFetchKycCandidates) {
-          await fetchMilestoneCounts(filters);
-        } else {
-          await fetchRegistrationCrmFilterCounts(filters, page, null, cycleOverride || cycleFilters);
-          await fetchDashboardCounts(filters, cycleOverride || cycleFilters);
-          await fetchKycCounts();
-          await fetchMilestoneCounts(filters);
+        const activeCycle = cycleOverride || cycleFilters;
+        if (!(milestoneFilter === 'kycDone' || milestoneFilter === 'admission' || shouldFetchKycCandidates)) {
+          await fetchRegistrationCrmFilterCounts(filters, page, null, activeCycle);
         }
+        await fetchDashboardCounts(filters, activeCycle);
+        await fetchKycCounts(filters, activeCycle);
+        await fetchMilestoneCounts(filters, activeCycle);
       } else {
         console.error('Failed to fetch profile data', response.data.message);
       }
@@ -5695,7 +5695,7 @@ console.log('API Response:', response.data);
       const { newFilterData, tab } = buildKycFilterData(filter);
       setFilterData(newFilterData);
       fetchProfileData(newFilterData, 1, null, tab);
-      fetchKycCounts();
+      fetchKycCounts(newFilterData);
       return;
     }
 
@@ -5704,7 +5704,7 @@ console.log('API Response:', response.data);
     const { newFilterData, tab } = buildKycFilterData(filter);
     setFilterData(newFilterData);
     fetchProfileData(newFilterData, 1, null, tab);
-    fetchKycCounts();
+    fetchKycCounts(newFilterData);
   };
 
   const isKycDashSelected = (filter) => selectedKycFilter === filter;
@@ -13769,6 +13769,8 @@ useEffect(() => {
     fetchProfileData(filterData, 1, next);
     fetchRegistrationCrmFilterCounts(filterData, 1, null, next);
     fetchDashboardCounts(filterData, next);
+    fetchKycCounts(filterData, next);
+    fetchMilestoneCounts(filterData, next);
   };
 
   useEffect(() => {
