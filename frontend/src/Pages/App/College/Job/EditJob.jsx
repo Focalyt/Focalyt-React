@@ -121,40 +121,118 @@ function EditJob() {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [
-          companyRes, industryRes, qualificationRes, subQualificationRes,
-          stateRes, coinsRes, techSkillsRes, nonTechSkillsRes,
-        ] = await Promise.all([
-          axios.get(`${backendUrl}/company/profile`, authHeaders),
-          axios.get(`${backendUrl}/company/industries`, authHeaders),
-          axios.get(`${backendUrl}/company/qualifications`, authHeaders),
-          axios.get(`${backendUrl}/company/subQualifications`, authHeaders),
-          axios.get(`${backendUrl}/company/states`, authHeaders),
-          axios.get(`${backendUrl}/company/coinsRequired`, authHeaders),
-          axios.get(`${backendUrl}/company/techSkills`, authHeaders),
-          axios.get(`${backendUrl}/company/nonTechSkills`, authHeaders),
-        ]);
+        const res = await axios.get(`${backendUrl}/college/job/form-data`, authHeaders);
+        const data = res.data?.data || {};
 
-        setCompany(companyRes.data?.company || companyRes.data || {});
-        setIndustryList(asArray(industryRes.data?.industry || industryRes.data));
-        setQualificationList(asArray(qualificationRes.data?.qualification || qualificationRes.data));
-        setSubQualificationList(asArray(subQualificationRes.data?.subQualification || subQualificationRes.data));
-        setStateList(asArray(stateRes.data?.state || stateRes.data));
-        setCoinsRequired(coinsRes.data || { contactcoins: 0 });
-        setTechSkillsList(asArray(techSkillsRes.data?.techskills || techSkillsRes.data));
-        setNonTechSkillsList(asArray(nonTechSkillsRes.data?.nontechskills || nonTechSkillsRes.data));
+        setCompany({ name: data.college?.name || '', creditLeft: 0, _id: data.college?._id });
+        setIndustryList(asArray(data.industry));
+        setQualificationList(asArray(data.qualification));
+        setSubQualificationList(asArray(data.subQualification));
+        setStateList(asArray(data.state));
+        setCoinsRequired({ contactcoins: 0 });
+        if (data.college?.name) {
+          setForm((prev) => ({ ...prev, displayCompanyName: prev.displayCompanyName || data.college.name }));
+        }
       } catch (err) {
-        console.error('Failed loading reference data:', err.message);
+        console.error('Failed loading form reference data:', err.message);
         setIndustryList([]);
         setQualificationList([]);
         setSubQualificationList([]);
         setStateList([]);
+      }
+
+      try {
+        const [techSkillsRes, nonTechSkillsRes] = await Promise.all([
+          axios.get(`${backendUrl}/company/techSkills`, authHeaders),
+          axios.get(`${backendUrl}/company/nonTechSkills`, authHeaders),
+        ]);
+        setTechSkillsList(asArray(techSkillsRes.data?.techskills || techSkillsRes.data));
+        setNonTechSkillsList(asArray(nonTechSkillsRes.data?.nontechskills || nonTechSkillsRes.data));
+      } catch (err) {
+        console.error('Failed loading skills:', err.message);
         setTechSkillsList([]);
         setNonTechSkillsList([]);
       }
     };
     fetchInitialData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---------- load the job being edited ----------
+  useEffect(() => {
+    if (!id) return;
+    const fetchJob = async () => {
+      try {
+        const res = await axios.get(`${backendUrl}/company/job/${id}`, authHeaders);
+        const jd = res.data?.jd || res.data;
+        if (!jd) return;
+
+        setForm((prev) => ({
+          ...prev,
+          displayCompanyName: jd.displayCompanyName || '',
+          title: jd.title || '',
+          _industry: jd._industry?.toString() || '',
+          experience: jd.experience?.toString() || '',
+          experienceMonths: jd.experienceMonths?.toString() || '',
+          _qualification: jd._qualification?.toString() || '',
+          _subQualification: jd._subQualification || [],
+          cutprice: jd.cutprice || '',
+          validity: jd.validity ? new Date(jd.validity).toISOString().split('T')[0] : '',
+          state: jd.state?.toString() || '',
+          city: jd.city?.toString() || '',
+          place: jd.place || '',
+          latitude: jd.latitude || '',
+          longitude: jd.longitude || '',
+          noOfPosition: jd.noOfPosition || '',
+          genderPreference: jd.genderPreference || 'no preference',
+          jobType: jd.jobType || '',
+          compensation: jd.compensation || '',
+          pay: jd.pay || '',
+          ageMin: jd.ageMin || 18,
+          ageMax: jd.ageMax || 70,
+          shift: jd.shift || '',
+          shiftTimingFrom: jd.shiftTimingFrom || '',
+          shiftTimingTo: jd.shiftTimingTo || '',
+          work: jd.work || '',
+          benifits: jd.benifits || [],
+          remarks: jd.remarks || '',
+          payOut: jd.payOut || '',
+          _techSkills: jd._techSkills || [],
+          _nonTechSkills: jd._nonTechSkills || [],
+          requirement: jd.requirement || '',
+          isFixed: jd.isFixed === true ? 'true' : jd.isFixed === false ? 'false' : '',
+          amount: jd.amount || '',
+          min: jd.min || '',
+          max: jd.max || '',
+          isPublic: jd.postingType === 'Private' ? 'false' : 'true',
+          collegeAcNo: Array.isArray(jd.collegeAcNo)
+            ? jd.collegeAcNo
+            : jd.collegeAcNo
+            ? [jd.collegeAcNo]
+            : [''],
+          isContact: jd.isContact ? 'true' : 'false',
+          nameof: jd.nameof || '',
+          phoneNumberof: jd.phoneNumberof || '',
+          whatsappNumberof: jd.whatsappNumberof || '',
+          emailof: jd.emailof || '',
+          jobDescription: jd.jobDescription || prev.jobDescription,
+          duties: jd.duties || '',
+          isedited: jd.isedited || false,
+        }));
+
+        if (jd.state) fetchCities(jd.state);
+        if (jd.questionsAnswers?.length) {
+          setQuestionAnswers(
+            jd.questionsAnswers.map((qa) => ({ question: qa.Question, answer: qa.Answer }))
+          );
+        }
+        setExistingVideo(jd.jobVideo || '');
+        setExistingThumbnail(jd.jobVideoThumbnail || '');
+      } catch (err) {
+        console.error('Failed loading job:', err.message);
+      }
+    };
+    fetchJob();
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const el = benefitsRef.current;
@@ -235,83 +313,6 @@ function EditJob() {
     instance.setChoiceByValue(selected);
   }, [form._subQualification]);
 
-  // ---------- load the job being edited ----------
-  useEffect(() => {
-    if (!id) return;
-    const fetchJob = async () => {
-      try {
-        const res = await axios.get(`${backendUrl}/company/job/${id}`, authHeaders);
-        const jd = res.data?.jd || res.data;
-        if (!jd) return;
-
-        setForm((prev) => ({
-          ...prev,
-          displayCompanyName: jd.displayCompanyName || '',
-          title: jd.title || '',
-          _industry: jd._industry?.toString() || '',
-          experience: jd.experience?.toString() || '',
-          experienceMonths: jd.experienceMonths?.toString() || '',
-          _qualification: jd._qualification?.toString() || '',
-          _subQualification: jd._subQualification || [],
-          cutprice: jd.cutprice || '',
-          validity: jd.validity ? new Date(jd.validity).toISOString().split('T')[0] : '',
-          state: jd.state?.toString() || '',
-          city: jd.city?.toString() || '',
-          place: jd.place || '',
-          latitude: jd.latitude || '',
-          longitude: jd.longitude || '',
-          noOfPosition: jd.noOfPosition || '',
-          genderPreference: jd.genderPreference || 'no preference',
-          jobType: jd.jobType || '',
-          compensation: jd.compensation || '',
-          pay: jd.pay || '',
-          ageMin: jd.ageMin || 18,
-          ageMax: jd.ageMax || 70,
-          shift: jd.shift || '',
-          shiftTimingFrom: jd.shiftTimingFrom || '',
-          shiftTimingTo: jd.shiftTimingTo || '',
-          work: jd.work || '',
-          benifits: jd.benifits || [],
-          remarks: jd.remarks || '',
-          payOut: jd.payOut || '',
-          _techSkills: jd._techSkills || [],
-          _nonTechSkills: jd._nonTechSkills || [],
-          requirement: jd.requirement || '',
-          isFixed: jd.isFixed === true ? 'true' : jd.isFixed === false ? 'false' : '',
-          amount: jd.amount || '',
-          min: jd.min || '',
-          max: jd.max || '',
-          isPublic: jd.postingType === 'Private' ? 'false' : 'true',
-          collegeAcNo: Array.isArray(jd.collegeAcNo)
-            ? jd.collegeAcNo
-            : jd.collegeAcNo
-            ? [jd.collegeAcNo]
-            : [''],
-          isContact: jd.isContact ? 'true' : 'false',
-          nameof: jd.nameof || '',
-          phoneNumberof: jd.phoneNumberof || '',
-          whatsappNumberof: jd.whatsappNumberof || '',
-          emailof: jd.emailof || '',
-          jobDescription: jd.jobDescription || prev.jobDescription,
-          duties: jd.duties || '',
-          isedited: jd.isedited || false,
-        }));
-
-        if (jd.state) fetchCities(jd.state);
-        if (jd.questionsAnswers?.length) {
-          setQuestionAnswers(
-            jd.questionsAnswers.map((qa) => ({ question: qa.Question, answer: qa.Answer }))
-          );
-        }
-        setExistingVideo(jd.jobVideo || '');
-        setExistingThumbnail(jd.jobVideoThumbnail || '');
-      } catch (err) {
-        console.error('Failed loading job:', err.message);
-      }
-    };
-    fetchJob();
-  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // ---------- cities on state change ----------
   const fetchCities = async (stateId) => {
     try {
@@ -319,7 +320,7 @@ function EditJob() {
         params: { stateId },
         ...authHeaders,
       });
-      setCityList(res.data?.cityValues || res.data || []);
+      setCityList(asArray(res.data?.cityValues || res.data));
     } catch (err) {
       console.error('Failed loading cities:', err.message);
     }
@@ -574,7 +575,7 @@ function EditJob() {
   const loadCoinOffers = async () => {
     try {
       const res = await axios.get(`${backendUrl}/company/getCoinOffers`, authHeaders);
-      setCoinOffers(res.data || []);
+      setCoinOffers(asArray(res.data));
       if (res.data?.length) setSelectedOffer(res.data[0]);
     } catch (err) {
       console.error(err.message);
@@ -716,7 +717,7 @@ function EditJob() {
                           onChange={(e) => updateField('_industry', e.target.value)}
                         >
                           <option value="">Select option</option>
-                          {industryList.map((item) => (
+                          {asArray(industryList).map((item) => (
                             <option key={item._id} value={item._id} className="text-capitalize">
                               {item.name}
                             </option>
@@ -760,7 +761,7 @@ function EditJob() {
                           onChange={(e) => updateField('_qualification', e.target.value)}
                         >
                           <option value="">Select option</option>
-                          {qualificationList.map((item) => (
+                          {asArray(qualificationList).map((item) => (
                             <option key={item._id} value={item._id} className="text-capitalize">
                               {item.name}
                             </option>
@@ -833,7 +834,7 @@ function EditJob() {
                       <label>State</label><span className="mandatory"> *</span>
                       <select className="form-control" value={form.state} onChange={handleStateChange}>
                         <option value="">Select option</option>
-                        {stateList.map((item) => (
+                        {asArray(stateList).map((item) => (
                           <option key={item._id} value={item._id} className="text-capitalize">
                             {item.name}
                           </option>
@@ -849,7 +850,7 @@ function EditJob() {
                         onChange={(e) => updateField('city', e.target.value)}
                       >
                         <option value="">Select option</option>
-                        {cityList.map((item) => (
+                        {asArray(cityList).map((item) => (
                           <option key={item._id} value={item._id} className="text-capitalize">
                             {item.name}
                           </option>
@@ -1142,7 +1143,7 @@ function EditJob() {
                           updateField('_techSkills', Array.from(e.target.selectedOptions, (o) => o.value))
                         }
                       >
-                        {techSkillsList.map((item) => (
+                        {asArray(techSkillsList).map((item) => (
                           <option key={item._id} value={item._id} className="text-capitalize">
                             {item.name}
                           </option>
@@ -1160,7 +1161,7 @@ function EditJob() {
                           updateField('_nonTechSkills', Array.from(e.target.selectedOptions, (o) => o.value))
                         }
                       >
-                        {nonTechSkillsList.map((item) => (
+                        {asArray(nonTechSkillsList).map((item) => (
                           <option key={item._id} value={item._id} className="text-capitalize">
                             {item.name}
                           </option>
@@ -1606,7 +1607,7 @@ function EditJob() {
                 <ul className="list-unstyled">
                   <li>
                     <div className="col-xl-8 mx-auto">
-                      {coinOffers.map((offer) => (
+                      {asArray(coinOffers).map((offer) => (
                         <div className="row inner-border my-2 text-white popup-bg py-1" key={offer._id}>
                           <div className="col-9 pr-0">{offer.displayOffer}</div>
                           <div className="col-3 text-left">

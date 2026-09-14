@@ -13,6 +13,7 @@ const {
 	City,
 	Qualification,
 	SubQualification,
+	HiringStatus,
 } = require("../../models");
 
 const router = express.Router();
@@ -207,6 +208,75 @@ router.post("/add", async (req, res) => {
 	} catch (error) {
 		console.error("Error adding college job:", error);
 		return res.status(500).json({ status: false, message: error.message || "Job description failed" });
+	}
+});
+
+router.get("/list", async (req, res) => {
+	try {
+		const college = req.college;
+		const page = parseInt(req.query.page, 10) || 1;
+		const perPage = 20;
+		const hrIds = (college?._concernPerson || []).map((person) => person._id).filter(Boolean);
+		const filter = hrIds.length ? { hr: { $in: hrIds } } : { _id: null };
+
+		const [count, jd, shortlistedCandCount] = await Promise.all([
+			Vacancy.countDocuments(filter),
+			Vacancy.find(filter)
+				.select("title experience _qualification createdAt status validity displayCompanyName")
+				.populate({ path: "_qualification", select: "name" })
+				.sort({ createdAt: -1 })
+				.skip(perPage * (page - 1))
+				.limit(perPage)
+				.lean(),
+			HiringStatus.aggregate([
+				{ $match: { job: { $ne: null }, isDeleted: false } },
+				{ $group: { _id: { job: "$job" }, count: { $sum: 1 } } },
+			]),
+		]);
+
+		return res.json({
+			success: true,
+			jd,
+			totalPages: Math.ceil(count / perPage) || 1,
+			page,
+			shortlistedCandCount,
+			canAdd: Boolean(college),
+			isExist: Boolean(college),
+			college: {
+				_id: college?._id,
+				name: college?.name || "",
+				creditLeft: 0,
+			},
+		});
+	} catch (error) {
+		console.error("Error listing college jobs:", error);
+		return res.status(500).json({ success: false, message: error.message || "Unable to load jobs" });
+	}
+});
+
+router.patch("/changeStatus", async (req, res) => {
+	try {
+		const { id, status } = req.body || {};
+		if (!id) {
+			return res.status(400).json({ success: false, message: "Job id is required" });
+		}
+
+		const job = await Vacancy.findById(id);
+		if (!job) {
+			return res.status(404).json({ success: false, message: "Job not found" });
+		}
+
+		const hrIds = (req.college?._concernPerson || []).map((person) => String(person._id));
+		if (job.hr && hrIds.length && !hrIds.includes(String(job.hr))) {
+			return res.status(403).json({ success: false, message: "You cannot update this job" });
+		}
+
+		job.status = status === true || status === "true";
+		await job.save();
+		return res.json({ success: true, message: "Status updated" });
+	} catch (error) {
+		console.error("Error changing college job status:", error);
+		return res.status(500).json({ success: false, message: error.message || "Unable to update status" });
 	}
 });
 

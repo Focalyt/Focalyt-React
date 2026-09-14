@@ -88,6 +88,8 @@ import UploadTemplates from './Pages/App/College/UploadTemplates/UploadTemplates
 import MyStudents from './Pages/App/College/MyStudents/MyStudents';
 import AvailableJobs from './Pages/App/College/AvailableJobs/AvailableJobs';
 import AddJob from './Pages/App/College/Job/AddJob';
+import ViewJob from './Pages/App/College/Job/ViewJob';
+import EditJob from './Pages/App/College/Job/EditJob';
 import AppliedEvents from './Pages/App/Candidate/Events/AppliedEvents';
 import CandidateManagementPortal from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal';
 import CandidateManagementPortal_old from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal_copy';
@@ -103,6 +105,7 @@ import ApprovalManagement from './Pages/App/College/ApprovalManagement/ApprovalM
 import Status from './Pages/App/College/Status/status';
 import PreVerification from './Pages/App/College/PreVerification/PreVerification';
 import AICounsellor from './Pages/App/College/AICounsellor/AICounsellor';
+import LeadCompare from './Pages/App/College/Lead/Lead';
 import MyFollowup from './Pages/App/College/MyFollowupB2C/MyFollowupB2C';
 import MyFollowupB2B from './Pages/App/College/MyFollowupB2B/MyFollowupB2B';
 import MyFollowups from './Pages/App/College/HR/MyFollowups';
@@ -309,6 +312,8 @@ const Layout = () => {
           <Route path="myStudents" element={<MyStudents/>}/>
           <Route path="availablejobs" element={<AvailableJobs/>}/>
           <Route path="addjob" element={<AddJob/>}/>
+          <Route path="viewjob" element={<ViewJob/>}/>
+          <Route path="editjob/:id" element={<EditJob/>}/>
           <Route path="candidatemanagment" element={<CandidateManagementPortal/>}/>
           <Route path='addcourse' element={<AddCourse/>}/>
           <Route path='addcoursecopy' element={<AddCoursecopy/>}/>
@@ -328,6 +333,7 @@ const Layout = () => {
           <Route path='statusdesign' element={<Status/>}/>
           <Route path='preverification' element={<PreVerification />} />
           <Route path='ai-counsellor' element={<AICounsellor />} />
+          <Route path='lead' element={<LeadCompare />} />
           <Route path = 'myfollowup' element={<MyFollowup/>}/>
           <Route path = 'myfollowupb2b' element={<MyFollowupB2B/>}/>
           <Route path='registrationcards' element={<RegistrationCards/>}/>
