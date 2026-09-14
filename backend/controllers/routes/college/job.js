@@ -36,6 +36,128 @@ const toArray = (value) => {
 
 const toBoolean = (value) => value === true || value === "true";
 
+const ARRAY_KEYS = new Set(["_subQualification", "benifits", "_techSkills", "_nonTechSkills"]);
+const SKIP_KEYS = new Set([
+	"isPublic",
+	"collegeAcNo",
+	"questionsAnswers",
+	"isEdit",
+	"isedited",
+	"_id",
+	"hr",
+	"dateOfPosting",
+	"createdAt",
+	"updatedAt",
+	"__v",
+]);
+
+const normalizeBody = (body = {}) => {
+	const out = {};
+	Object.keys(body).forEach((key) => {
+		const cleanKey = key.endsWith("[]") ? key.slice(0, -2) : key;
+		const value = body[key];
+		if (out[cleanKey] !== undefined) {
+			out[cleanKey] = [...toArray(out[cleanKey]), ...toArray(value)];
+		} else {
+			out[cleanKey] = value;
+		}
+	});
+	return out;
+};
+
+const canManageJob = (req, job) => {
+	const hrIds = (req.college?._concernPerson || []).map((person) => String(person._id));
+	if (!job?.hr || !hrIds.length) return true;
+	return hrIds.includes(String(job.hr));
+};
+
+const parseJobPayload = async (req, { includeFiles = true } = {}) => {
+	const body = normalizeBody(req.body);
+	const jobDetails = {};
+
+	Object.keys(body).forEach((key) => {
+		if (SKIP_KEYS.has(key)) return;
+		if (body[key] === "" || body[key] == null) return;
+		if (key === "isContact" || key === "isFixed") {
+			jobDetails[key] = toBoolean(Array.isArray(body[key]) ? body[key][body[key].length - 1] : body[key]);
+		} else if (ARRAY_KEYS.has(key)) {
+			jobDetails[key] = toArray(body[key]);
+		} else {
+			jobDetails[key] = body[key];
+		}
+	});
+
+	if (body.latitude && body.longitude) {
+		jobDetails.location = {
+			type: "Point",
+			coordinates: [Number(body.longitude), Number(body.latitude)],
+		};
+	}
+
+	if (includeFiles) {
+		if (req.files?.jobVideo) {
+			jobDetails.jobVideo = await uploadJobFile(req.files.jobVideo, req.college?._id || req.user._id, body.title);
+		}
+		if (req.files?.jobVideoThumbnail) {
+			jobDetails.jobVideoThumbnail = await uploadJobFile(
+				req.files.jobVideoThumbnail,
+				req.college?._id || req.user._id,
+				body.title
+			);
+		}
+	}
+
+	const isPublic = body.isPublic === undefined ? true : toBoolean(body.isPublic);
+	if (!isPublic) {
+		jobDetails.postingType = "Private";
+		const collegeAcNos = toArray(body.collegeAcNo)
+			.map((no) => String(no).trim())
+			.filter(Boolean);
+		if (!collegeAcNos.length) {
+			const error = new Error("Private jobs require at least one College Account Number.");
+			error.statusCode = 400;
+			throw error;
+		}
+		jobDetails.collegeAcNo = collegeAcNos;
+	} else {
+		jobDetails.postingType = "Public";
+		jobDetails.collegeAcNo = [];
+	}
+
+	if (jobDetails.isContact) {
+		jobDetails.nameof = body.nameof || "";
+		jobDetails.phoneNumberof = body.phoneNumberof || "";
+		jobDetails.whatsappNumberof = body.whatsappNumberof || "";
+		jobDetails.emailof = body.emailof || "";
+	} else if (body.isContact !== undefined) {
+		jobDetails.isContact = false;
+		jobDetails.nameof = "";
+		jobDetails.phoneNumberof = "";
+		jobDetails.whatsappNumberof = "";
+		jobDetails.emailof = "";
+	}
+
+	if (body.questionsAnswers) {
+		try {
+			const parsed = typeof body.questionsAnswers === "string" ? JSON.parse(body.questionsAnswers) : body.questionsAnswers;
+			jobDetails.questionsAnswers = (Array.isArray(parsed) ? parsed : [])
+				.filter((item) => item?.question || item?.Question || item?.answer || item?.Answer)
+				.map((item) => ({
+					Question: item.question || item.Question || "",
+					Answer: item.answer || item.Answer || "",
+				}));
+		} catch (err) {
+			console.warn("Unable to parse questionsAnswers:", err.message);
+		}
+	}
+
+	if (!jobDetails.displayCompanyName) {
+		jobDetails.displayCompanyName = req.college?.name || "";
+	}
+
+	return { jobDetails, body };
+};
+
 const allowedVideoExtensions = ["mp4", "mkv", "mov", "avi", "wmv"];
 const allowedImageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "webp"];
 
@@ -114,90 +236,10 @@ router.post("/cities", async (req, res) => {
 
 router.post("/add", async (req, res) => {
 	try {
-		const body = req.body || {};
-		const jobDetails = {};
-		const skipKeys = new Set(["isPublic", "collegeAcNo", "collegeAcNo[]", "questionsAnswers", "isEdit"]);
-
-		Object.keys(body).forEach((key) => {
-			if (skipKeys.has(key)) return;
-			if (body[key] === "" || body[key] == null) return;
-			if (key === "isContact" || key === "isFixed") {
-				jobDetails[key] = toBoolean(Array.isArray(body[key]) ? body[key][body[key].length - 1] : body[key]);
-			} else if (key === "_subQualification" || key === "benifits" || key === "_techSkills" || key === "_nonTechSkills") {
-				jobDetails[key] = toArray(body[key]);
-			} else {
-				jobDetails[key] = body[key];
-			}
-		});
-
-		if (body.latitude && body.longitude) {
-			jobDetails.location = {
-				type: "Point",
-				coordinates: [Number(body.longitude), Number(body.latitude)],
-			};
-		}
-
-		if (req.files?.jobVideo) {
-			jobDetails.jobVideo = await uploadJobFile(req.files.jobVideo, req.college?._id || req.user._id, body.title);
-		}
-		if (req.files?.jobVideoThumbnail) {
-			jobDetails.jobVideoThumbnail = await uploadJobFile(
-				req.files.jobVideoThumbnail,
-				req.college?._id || req.user._id,
-				body.title
-			);
-		}
+		const { jobDetails, body } = await parseJobPayload(req);
 
 		if (toBoolean(body.isEdit)) {
 			jobDetails._subQualification = [];
-		}
-
-		const isPublic = body.isPublic === undefined ? true : toBoolean(body.isPublic);
-		if (!isPublic) {
-			jobDetails.postingType = "Private";
-			const collegeAcNos = toArray(body.collegeAcNo || body["collegeAcNo[]"])
-				.map((no) => String(no).trim())
-				.filter(Boolean);
-			if (!collegeAcNos.length) {
-				return res.status(400).json({
-					status: false,
-					message: "Private jobs require at least one College Account Number.",
-				});
-			}
-			jobDetails.collegeAcNo = collegeAcNos;
-		} else {
-			jobDetails.postingType = "Public";
-			jobDetails.collegeAcNo = [];
-		}
-
-		if (jobDetails.isContact) {
-			jobDetails.nameof = body.nameof || "";
-			jobDetails.phoneNumberof = body.phoneNumberof || "";
-			jobDetails.whatsappNumberof = body.whatsappNumberof || "";
-			jobDetails.emailof = body.emailof || "";
-		} else {
-			jobDetails.nameof = "";
-			jobDetails.phoneNumberof = "";
-			jobDetails.whatsappNumberof = "";
-			jobDetails.emailof = "";
-		}
-
-		if (body.questionsAnswers) {
-			try {
-				const parsed = typeof body.questionsAnswers === "string" ? JSON.parse(body.questionsAnswers) : body.questionsAnswers;
-				jobDetails.questionsAnswers = (Array.isArray(parsed) ? parsed : [])
-					.filter((item) => item?.question || item?.Question || item?.answer || item?.Answer)
-					.map((item) => ({
-						Question: item.question || item.Question || "",
-						Answer: item.answer || item.Answer || "",
-					}));
-			} catch (err) {
-				console.warn("Unable to parse questionsAnswers:", err.message);
-			}
-		}
-
-		if (!jobDetails.displayCompanyName) {
-			jobDetails.displayCompanyName = req.college?.name || "";
 		}
 
 		jobDetails.hr = req.user._id;
@@ -207,7 +249,59 @@ router.post("/add", async (req, res) => {
 		return res.json({ status: true, message: "Job added", data: { _id: jd._id } });
 	} catch (error) {
 		console.error("Error adding college job:", error);
-		return res.status(500).json({ status: false, message: error.message || "Job description failed" });
+		const statusCode = error.statusCode || 500;
+		return res.status(statusCode).json({ status: false, message: error.message || "Job description failed" });
+	}
+});
+
+router.get("/details/:id", async (req, res) => {
+	try {
+		const { id } = req.params;
+		if (!id) {
+			return res.status(400).json({ status: false, success: false, message: "Job id is required" });
+		}
+
+		const job = await Vacancy.findById(id).lean();
+		if (!job) {
+			return res.status(404).json({ status: false, success: false, message: "Job not found" });
+		}
+		if (!canManageJob(req, job)) {
+			return res.status(403).json({ status: false, success: false, message: "You cannot view this job" });
+		}
+
+		return res.json({ status: true, success: true, jd: job, vacancy: job });
+	} catch (error) {
+		console.error("Error loading college job details:", error);
+		return res.status(500).json({ status: false, success: false, message: error.message || "Unable to load job" });
+	}
+});
+
+router.post("/edit/:id", async (req, res) => {
+	try {
+		const { id } = req.params;
+		if (!id) {
+			return res.status(400).json({ status: false, message: "Job id is required" });
+		}
+
+		const job = await Vacancy.findById(id);
+		if (!job) {
+			return res.status(404).json({ status: false, message: "Job not found" });
+		}
+		if (!canManageJob(req, job)) {
+			return res.status(403).json({ status: false, message: "You cannot update this job" });
+		}
+
+		const { jobDetails } = await parseJobPayload(req);
+		jobDetails.isedited = true;
+
+		Object.assign(job, jobDetails);
+		await job.save();
+
+		return res.json({ status: true, success: true, message: "Job updated", data: { _id: job._id } });
+	} catch (error) {
+		console.error("Error updating college job:", error);
+		const statusCode = error.statusCode || 500;
+		return res.status(statusCode).json({ status: false, message: error.message || "Unable to update job" });
 	}
 });
 

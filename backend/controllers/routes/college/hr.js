@@ -7,6 +7,11 @@ const CareerApplication = require('../../models/careerApplication');
 const StatusHr = require('../../models/statusHr');
 const College = require('../../models/college');
 const User = require('../../models/users');
+const CandidateProfile = require('../../models/candidateProfile');
+const Project = require('../../models/Project');
+const Vertical = require('../../models/verticals');
+const Vacancy = require('../../models/vacancy');
+const AppliedJobs = require('../../models/appliedJobs');
 const { resolveJobHrOwner } = require('../../../helpers/resolveJobHrOwner');
 
 const STATUS_POPULATE = { path: 'leadStatus', select: 'title milestone substatuses' };
@@ -59,6 +64,14 @@ const serializeLead = (doc) => {
     lead.resume = '';
   }
   lead.leadOwner = lead.leadOwner || lead.assignedTo || null;
+  lead.projectName = (lead.project && typeof lead.project === 'object' && lead.project.name) ? lead.project.name : '';
+  lead.departmentName = (lead.department && typeof lead.department === 'object' && lead.department.name) ? lead.department.name : '';
+  if (lead.project && typeof lead.project === 'object' && lead.project.name) {
+    lead.project = { _id: lead.project._id, name: lead.project.name };
+  }
+  if (lead.department && typeof lead.department === 'object' && lead.department.name) {
+    lead.department = { _id: lead.department._id, name: lead.department.name };
+  }
 
   const statusRef = lead.leadStatus;
   if (statusRef && typeof statusRef === 'object' && statusRef.title) {
@@ -415,6 +428,77 @@ const dayRange = (from, to) => {
 };
 
 const exactInsensitive = (value) => new RegExp(`^${String(value).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+
+const pickBodyValue = (body, keys) => {
+  for (const key of keys) {
+    const value = body?.[key];
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      return value;
+    }
+  }
+  return undefined;
+};
+
+const normalizeGender = (value) => {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'm' || raw === 'male') return 'Male';
+  if (raw === 'f' || raw === 'female') return 'Female';
+  if (raw === 'o' || raw === 'other') return 'Other';
+  return String(value || '').trim();
+};
+
+const parseIncomingDate = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  const str = String(value).trim();
+  const parsed = moment(str, ['DD/MM/YYYY', 'D/M/YYYY', 'YYYY-MM-DD', 'MM/DD/YYYY', 'M/D/YYYY', moment.ISO_8601], true);
+  if (parsed.isValid()) return parsed.toDate();
+  const fallback = new Date(str);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
+};
+
+const mobileLookupValues = (mobile) => {
+  const values = [mobile, String(mobile)];
+  const asNumber = Number(mobile);
+  if (!Number.isNaN(asNumber)) values.push(asNumber);
+  return [...new Set(values)];
+};
+
+const resolveNamedProjectAndDepartment = async ({ projectName, departmentName, collegeId }) => {
+  const result = { projectId: null, departmentId: null };
+
+  if (departmentName) {
+    const collegeScoped = collegeId
+      ? await Vertical.findOne({ name: exactInsensitive(departmentName), college: collegeId })
+      : null;
+    const department = collegeScoped
+      || await Vertical.findOne({ name: exactInsensitive(departmentName) });
+    if (!department) {
+      return { error: 'department_not_found' };
+    }
+    result.departmentId = department._id;
+  }
+
+  if (projectName) {
+    const collegeQuery = { name: exactInsensitive(projectName) };
+    if (collegeId) collegeQuery.college = collegeId;
+    const collegeScoped = await Project.findOne(collegeQuery);
+    const project = collegeScoped
+      || await Project.findOne({ name: exactInsensitive(projectName) });
+    if (!project) {
+      return { error: 'project_not_found' };
+    }
+    if (result.departmentId && project.vertical && String(project.vertical) !== String(result.departmentId)) {
+      return { error: 'project_department_mismatch' };
+    }
+    result.projectId = project._id;
+    if (!result.departmentId && project.vertical) {
+      result.departmentId = project.vertical;
+    }
+  }
+
+  return result;
+};
 
 const firstHrStatus = async (collegeId) => {
   const id = toCollegeObjectId(collegeId);
@@ -1070,23 +1154,41 @@ router.post('/leads', isCollege, async (req, res) => {
   }
 });
 
-// Public ingestion for digital career leads (ads / landing pages / lead forms).
-// Mirrors /college/digitalLead/addleaddandcourseapply: status and sub-status arrive as titles,
-// and a repeat submission for the same role is recorded as a re-enquiry instead of a duplicate lead.
+// Public ingestion for digital career leads (ads / landing pages / Excel).
+// Verify User by mobile. New numbers create User then CandidateProfile, then AppliedJobs.
+// Repeat apply for the same job is returned as duplicate. CareerApplication is not used.
 router.route("/digitalhrleads").post(async (req, res) => {
   try {
-      console.log("[DigitalHRLead] POST /digitalhrleads →", {
-          fullname: req.body.fullname,
-          mobile: req.body.mobile,
-          applyingFor: req.body.applyingFor,
-          jobId: req.body.jobId || req.body._job,
-          city: req.body.city,
-          college: req.body.college,
-          source: req.body.source || "Digital Lead"
-      });
+      let fullname = pickBodyValue(req.body, ['fullname', 'full_name', 'fullName', 'name']);
+      let mobile = pickBodyValue(req.body, ['mobile', 'phone_number', 'phoneNumber', 'phone']);
+      let email = pickBodyValue(req.body, ['email']);
+      let gender = pickBodyValue(req.body, ['gender']);
+      let city = pickBodyValue(req.body, ['city']);
+      let applyingFor = pickBodyValue(req.body, ['applyingFor', 'applying_for']);
+      let experience = pickBodyValue(req.body, ['experience']);
+      let qualification = pickBodyValue(req.body, ['qualification', 'education_level', 'educationLevel']);
+      let dob = pickBodyValue(req.body, ['dob', 'date_of_birth', 'dateOfBirth']);
+      let source = pickBodyValue(req.body, ['source']);
+      let remark = pickBodyValue(req.body, ['remark', 'Remarks', 'remarks']);
+      let status = pickBodyValue(req.body, ['status']);
+      let subStatus = pickBodyValue(req.body, ['subStatus', 'sub_status', 'sub status']);
+      let college = pickBodyValue(req.body, ['college', 'CollegeId', 'collegeId', 'college_id']);
+      const projectName = String(pickBodyValue(req.body, ['project_name', 'projectName', 'project name']) || '').trim();
+      const departmentName = String(pickBodyValue(req.body, ['department_name', 'departmentName', 'department name']) || '').trim();
+      const maritalStatus = String(pickBodyValue(req.body, ['marital_status', 'maritalStatus']) || '').trim();
+      const incomingJobId = pickBodyValue(req.body, ['jobId', '_job', 'job_id']);
 
-      let { fullname, mobile, email,  gender, city, applyingFor, experience, qualification, dob, source, remark, status, subStatus, college } = req.body;
-      const incomingJobId = req.body.jobId || req.body._job;
+      console.log("[DigitalHRLead] POST /digitalhrleads →", {
+          fullname,
+          mobile,
+          applyingFor,
+          jobId: incomingJobId,
+          city,
+          college,
+          projectName,
+          departmentName,
+          source: source || "Digital Lead"
+      });
 
       if (!fullname || !mobile || !email || !gender || !city || !status || !subStatus || !college) {
           return res.status(400).json({
@@ -1113,28 +1215,46 @@ router.route("/digitalhrleads").post(async (req, res) => {
 
       if (!source) {
         source = 'Digital Lead';
-    }
-
-      // Normalize mobile number
-      mobile = mobile.toString().trim().replace(/[\s-]/g, "");
-
-      if (mobile.startsWith("+91")) {
-          mobile = mobile.slice(3);
-      } else if (mobile.startsWith("91") && mobile.length === 12) {
-          mobile = mobile.slice(2);
       }
 
-      if (!/^[6-9][0-9]{9}$/.test(mobile)) {
+      mobile = normalizeMobile(mobile);
+
+      if (!MOBILE_RE.test(mobile)) {
           return res.status(400).json({
               status: false,
               msg: "Invalid Indian mobile number"
           });
       }
 
-      if (!EMAIL_RE.test(email.trim())) {
+      if (!EMAIL_RE.test(String(email).trim())) {
           return res.status(400).json({
               status: false,
               msg: "Invalid email format"
+          });
+      }
+
+      gender = normalizeGender(gender);
+      const namedRefs = await resolveNamedProjectAndDepartment({
+          projectName,
+          departmentName,
+          collegeId,
+      });
+      if (namedRefs.error === 'department_not_found') {
+          return res.status(404).json({
+              status: false,
+              msg: "Department not found"
+          });
+      }
+      if (namedRefs.error === 'project_not_found') {
+          return res.status(404).json({
+              status: false,
+              msg: "Project not found"
+          });
+      }
+      if (namedRefs.error === 'project_department_mismatch') {
+          return res.status(400).json({
+              status: false,
+              msg: "Project does not belong to the given department"
           });
       }
 
@@ -1161,7 +1281,7 @@ router.route("/digitalhrleads").post(async (req, res) => {
 
       const subStatusDocument = statusDocument.substatuses.find(
           item =>
-              item.title.toLowerCase() === subStatus.trim().toLowerCase()
+              item.title.toLowerCase() === String(subStatus).trim().toLowerCase()
       );
 
       if (!subStatusDocument) {
@@ -1171,11 +1291,9 @@ router.route("/digitalhrleads").post(async (req, res) => {
           });
       }
 
-     
+      const parsedDob = parseIncomingDate(dob);
 
-      const parsedDob = dob ? new Date(dob) : null;
-
-      if (dob && Number.isNaN(parsedDob.getTime())) {
+      if (dob && !parsedDob) {
           return res.status(400).json({
               status: false,
               msg: "Invalid date of birth"
@@ -1220,101 +1338,202 @@ router.route("/digitalhrleads").post(async (req, res) => {
           });
       }
 
-      // Same mobile applying for the same role at the same college is a re-enquiry, not a new lead.
-      const existingLead = await CareerApplication.findOne({
-          mobile,
-          applyingFor: exactInsensitive(applyingFor),
-          college: collegeId,
-          isDeleted: { $ne: true }
-      }).populate(STATUS_POPULATE);
-
-      if (existingLead) {
-          existingLead.logs.push({
-              action: `Re-enquiry received from ${source}`,
-              remarks: remark || "",
-              timestamp: new Date()
-          });
-          if (!existingLead.leadOwner && !existingLead.assignedTo && jobOwner.hrId) {
-              existingLead.leadOwner = jobOwner.hrId;
-              existingLead.assignedTo = jobOwner.hrId;
-              existingLead.logs.push({
-                  action: `Lead owner auto-assigned to ${jobOwner.hrName}`,
-                  remarks: jobOwner.jobTitle
-                      ? `Matched job "${jobOwner.jobTitle}"`
-                      : applyingFor,
-                  timestamp: new Date()
-              });
-          }
-          await existingLead.save();
-
-          console.log("[DigitalHRLead] Re-enquiry logged →", { leadId: existingLead._id.toString(), mobile, applyingFor });
-
-          return res.status(200).json({
+      const jobId = toCollegeObjectId(jobOwner.jobId || incomingJobId);
+      if (!jobId) {
+          return res.status(400).json({
               status: false,
-              duplicate: true,
-              msg: "Lead already exists for this job, re-enquiry recorded",
-              data: {
-                  leadId: existingLead._id,
-                  lead: serializeLead(existingLead)
-              }
+              msg: "A valid job id is required"
           });
       }
-      const ownerLog = jobOwner.hrId
-          ? {
-              action: `Lead owner auto-assigned to ${jobOwner.hrName}`,
-              remarks: jobOwner.jobTitle
-                  ? `Matched job "${jobOwner.jobTitle}"`
-                  : applyingFor,
-              timestamp: new Date()
-          }
-          : null;
 
-      const lead = await CareerApplication.create({
-          fullName: capitalizeWords(fullname),
-          email: email.trim().toLowerCase(),
-          mobile,
-          gender,
-          city,
-          applyingFor,
-          experience: experience || "",
-          qualification: qualification || "",
-          dateOfBirth: parsedDob || undefined,
-          resume: isActualMediaFile(resumeUrl) ? resumeUrl : '',
-          remark: remark || "",
-          source,
-          college: collegeId,
-          leadOwner: jobOwner.hrId || undefined,
-          assignedTo: jobOwner.hrId || undefined,
-          leadStatus: statusDocument._id,
-          leadSubstatus: subStatusDocument._id,
-          logs: [
-              {
-                  action: `Lead added with ${statusDocument.title} and ${subStatusDocument.title} from ${source}`,
-                  remarks: remark || "",
-                  timestamp: new Date()
-              },
-              ...(ownerLog ? [ownerLog] : [])
-          ]
+      const vacancy = await Vacancy.findById(jobId).select('_id title _company').lean();
+      if (!vacancy) {
+          return res.status(404).json({
+              status: false,
+              msg: "Job not found"
+          });
+      }
+
+      const mobileNumber = parseInt(mobile, 10);
+      const mobileValues = mobileLookupValues(mobile);
+      const existingUser = await User.findOne({
+          mobile: { $in: mobileValues },
+          isDeleted: { $ne: true },
+      });
+      let existingCandidate = await CandidateProfile.findOne({
+          mobile: { $in: mobileValues },
+          isDeleted: { $ne: true },
       });
 
-      const createdLead = await CareerApplication.findById(lead._id)
-          .populate(STATUS_POPULATE)
-          .populate('leadOwner', 'name email')
-          .populate('assignedTo', 'name email');
-      console.log("[DigitalHRLead] Lead created →", {
-          leadId: lead._id.toString(),
+      if (existingCandidate) {
+          const alreadyApplied = await AppliedJobs.findOne({
+              _candidate: existingCandidate._id,
+              _job: jobId,
+          });
+          const alreadyOnProfile = (existingCandidate.appliedJobs || []).some(
+              (item) => String(item.jobId || item) === String(jobId)
+          );
+          if (alreadyApplied || alreadyOnProfile) {
+              console.log("[DigitalHRLead] Duplicate apply →", {
+                  mobile,
+                  candidateId: existingCandidate._id.toString(),
+                  jobId: jobId.toString(),
+                  appliedJobId: alreadyApplied?._id?.toString(),
+              });
+              return res.status(200).json({
+                  status: false,
+                  duplicate: true,
+                  msg: existingUser
+                      ? "User already exists for this number and job already applied"
+                      : "Candidate already exists and job already applied",
+                  data: {
+                      appliedJobId: alreadyApplied?._id || null,
+                      candidateId: existingCandidate._id,
+                      jobId,
+                      existingUser: Boolean(existingUser),
+                  }
+              });
+          }
+      }
+
+      if (!existingUser) {
+          await User.create({
+              name: capitalizeWords(fullname),
+              email: String(email).trim().toLowerCase(),
+              mobile: mobileNumber,
+              role: 3,
+              status: true,
+              source,
+              isImported: true,
+          });
+          console.log("[DigitalHRLead] User created →", { mobile, name: fullname });
+      }
+
+      const experienceYears = parseInt(String(experience || '').replace(/_/g, ' '), 10);
+      const hiringStatusEntry = {
+          company: vacancy._company || undefined,
+          job: jobId,
+          status: `${statusDocument.title}${subStatusDocument?.title ? ` / ${subStatusDocument.title}` : ''}`,
+          comment: remark || '',
+          eventDate: new Date().toISOString(),
+      };
+
+      if (!existingCandidate) {
+          const candidateData = {
+              name: capitalizeWords(fullname),
+              mobile: mobileNumber,
+              email: String(email).trim().toLowerCase(),
+              sex: gender,
+              dob: parsedDob || undefined,
+              verified: false,
+              source,
+              isImported: true,
+              maritalStatus,
+              remark: remark || '',
+              college: collegeId,
+              project: namedRefs.projectId || undefined,
+              department: namedRefs.departmentId || undefined,
+              isExperienced: Number.isFinite(experienceYears) && experienceYears > 0,
+              personalInfo: {
+                  totalExperience: Number.isFinite(experienceYears) ? experienceYears : undefined,
+                  currentAddress: {
+                      city: city || '',
+                  },
+              },
+              appliedJobs: [{ jobId }],
+              hiringStatus: [hiringStatusEntry],
+          };
+          if (qualification) {
+              candidateData.qualifications = [{
+                  specialization: String(qualification).trim(),
+              }];
+          }
+          if (isActualMediaFile(resumeUrl)) {
+              candidateData.personalInfo.resume = [{
+                  name: 'Resume / CV',
+                  url: resumeUrl,
+                  uploadedAt: new Date(),
+              }];
+          }
+          existingCandidate = await CandidateProfile.create(candidateData);
+          console.log("[DigitalHRLead] CandidateProfile created →", {
+              candidateId: existingCandidate._id.toString(),
+              mobile,
+          });
+      } else {
+          const alreadyLinked = (existingCandidate.appliedJobs || []).some(
+              (item) => String(item.jobId || item) === String(jobId)
+          );
+          if (!alreadyLinked) {
+              existingCandidate.appliedJobs = existingCandidate.appliedJobs || [];
+              existingCandidate.appliedJobs.push({ jobId });
+          }
+          existingCandidate.personalInfo = existingCandidate.personalInfo || {};
+          existingCandidate.personalInfo.currentAddress = existingCandidate.personalInfo.currentAddress || {};
+          if (city && !existingCandidate.personalInfo.currentAddress.city) {
+              existingCandidate.personalInfo.currentAddress.city = city;
+          }
+          if (Number.isFinite(experienceYears) && !existingCandidate.personalInfo.totalExperience) {
+              existingCandidate.personalInfo.totalExperience = experienceYears;
+              existingCandidate.isExperienced = experienceYears > 0;
+          }
+          if (maritalStatus && !existingCandidate.maritalStatus) existingCandidate.maritalStatus = maritalStatus;
+          if (remark && !existingCandidate.remark) existingCandidate.remark = remark;
+          if (!existingCandidate.college) existingCandidate.college = collegeId;
+          if (!existingCandidate.project && namedRefs.projectId) existingCandidate.project = namedRefs.projectId;
+          if (!existingCandidate.department && namedRefs.departmentId) existingCandidate.department = namedRefs.departmentId;
+          if (qualification && !(existingCandidate.qualifications || []).length) {
+              existingCandidate.qualifications = [{ specialization: String(qualification).trim() }];
+          }
+          existingCandidate.hiringStatus = existingCandidate.hiringStatus || [];
+          existingCandidate.hiringStatus.push(hiringStatusEntry);
+          if (isActualMediaFile(resumeUrl)) {
+              existingCandidate.personalInfo.resume = existingCandidate.personalInfo.resume || [];
+              existingCandidate.personalInfo.resume.push({
+                  name: 'Resume / CV',
+                  url: resumeUrl,
+                  uploadedAt: new Date(),
+              });
+          }
+          await existingCandidate.save();
+      }
+
+      const appliedJob = await AppliedJobs.create({
+          _candidate: existingCandidate._id,
+          _job: jobId,
+          _company: vacancy._company || undefined,
+      });
+
+      const createdApply = await AppliedJobs.findById(appliedJob._id)
+          .populate({
+              path: '_candidate',
+              select: 'name mobile email sex dob source maritalStatus remark college project department personalInfo.currentAddress.city personalInfo.totalExperience qualifications hiringStatus appliedJobs',
+              populate: [
+                  { path: 'college', select: 'name' },
+                  { path: 'project', select: 'name' },
+                  { path: 'department', select: 'name' },
+              ],
+          })
+          .populate('_job', 'title')
+          .populate('_company', 'name');
+
+      console.log("[DigitalHRLead] AppliedJobs created →", {
+          appliedJobId: appliedJob._id.toString(),
           mobile,
-          applyingFor,
-          leadOwner: jobOwner.hrId,
-          matchedJob: jobOwner.jobTitle,
+          jobId: jobId.toString(),
+          jobTitle: vacancy.title,
+          projectId: namedRefs.projectId,
+          departmentId: namedRefs.departmentId,
       });
 
       return res.status(201).json({
           status: true,
-          msg: "HR lead added successfully",
+          msg: "Candidate saved and job applied successfully",
           data: {
-              leadId: lead._id,
-              lead: serializeLead(createdLead)
+              appliedJobId: appliedJob._id,
+              candidateId: existingCandidate._id,
+              jobId,
+              appliedJob: createdApply,
           }
       });
   } catch (err) {

@@ -312,7 +312,9 @@ const Layout = () => {
           <Route path="myStudents" element={<MyStudents/>}/>
           <Route path="availablejobs" element={<AvailableJobs/>}/>
           <Route path="addjob" element={<AddJob/>}/>
+          <Route path="addjob/:id" element={<AddJob/>}/>
           <Route path="viewjob" element={<ViewJob/>}/>
+          <Route path="job/:id" element={<EditJob readOnly />}/>
           <Route path="editjob/:id" element={<EditJob/>}/>
           <Route path="candidatemanagment" element={<CandidateManagementPortal/>}/>
           <Route path='addcourse' element={<AddCourse/>}/>

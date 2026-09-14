@@ -10,9 +10,55 @@ const BENEFIT_OPTIONS = [
   'Joining Bonus', 'Fuel Allowance', 'Travel Allowance', 'Laptop', 'Mobile', 'Others',
 ];
 
-const QUALIFICATIONS_WITH_STREAM = ['10th', '12th', 'Upto 5th'];
+function initChoicesInContainer(container, { options, selected, placeholder, onChange }) {
+  if (!container) return { instance: null, cleanup: () => {} };
 
-function EditJob() {
+  container.innerHTML = '';
+  const select = document.createElement('select');
+  select.className = 'form-control';
+  select.multiple = true;
+  options.forEach((item) => {
+    const option = document.createElement('option');
+    const value = typeof item === 'object' ? String(item._id ?? item.value ?? '') : String(item);
+    const label = typeof item === 'object' ? (item.name || item.label || value) : String(item);
+    option.value = value;
+    option.textContent = label;
+    option.classList.add('text-capitalize');
+    select.appendChild(option);
+  });
+  container.appendChild(select);
+
+  const instance = new Choices(select, {
+    removeItemButton: true,
+    shouldSort: false,
+    searchEnabled: true,
+    placeholder: true,
+    placeholderValue: placeholder,
+    itemSelectText: '',
+    position: 'bottom',
+    shouldSortItems: false,
+  });
+
+  const selectedValues = (selected || []).map(String).filter(Boolean);
+  if (selectedValues.length) instance.setChoiceByValue(selectedValues);
+
+  const handleChange = () => {
+    const values = instance.getValue(true);
+    onChange(Array.isArray(values) ? values : []);
+  };
+  select.addEventListener('change', handleChange);
+
+  return {
+    instance,
+    cleanup: () => {
+      select.removeEventListener('change', handleChange);
+      try { instance.destroy(); } catch (err) { /* ignore */ }
+      if (container) container.innerHTML = '';
+    },
+  };
+}
+
+function EditJob({ readOnly = false }) {
   const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
   const token = userData.token;
   const navigate = useNavigate();
@@ -45,7 +91,6 @@ function EditJob() {
     experienceMonths: '',
     _qualification: '',
     _subQualification: [],
-    cutprice: '',
     validity: '',
     state: '',
     city: '',
@@ -111,11 +156,48 @@ function EditJob() {
   const benefitsChoicesRef = useRef(null);
 
   const asArray = (value) => (Array.isArray(value) ? value : []);
+  const toId = (value) => {
+    if (value == null || value === '') return '';
+    if (typeof value === 'object') return String(value._id || '');
+    return String(value);
+  };
+  const toIdList = (value) => asArray(value).map(toId).filter(Boolean);
+  const toDateInput = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
   const updateField = (name, value) => setForm((prev) => ({ ...prev, [name]: value }));
 
-  const needsStream = QUALIFICATIONS_WITH_STREAM.includes(
-    asArray(qualificationList).find((q) => q._id === form._qualification)?.name
+  const streamOptions = asArray(subQualificationList).filter(
+    (item) => toId(item._qualification) === String(form._qualification || '')
   );
+  const hasStreamOptions = streamOptions.length > 0;
+
+  const handleQualificationChange = (e) => {
+    const qualificationId = e.target.value;
+    setForm((prev) => ({
+      ...prev,
+      _qualification: qualificationId,
+      _subQualification: [],
+    }));
+  };
+
+  const selectedStreams = () => {
+    const fromChoices = streamChoicesRef.current?.getValue(true);
+    if (Array.isArray(fromChoices) && fromChoices.length) return fromChoices.map(String);
+    return asArray(form._subQualification).map(String);
+  };
+
+  const streamLabel = streamOptions
+    .filter((item) => selectedStreams().includes(String(item._id)))
+    .map((item) => item.name)
+    .join(', ');
+  const benefitsLabel = asArray(form.benifits).filter(Boolean).join(', ');
 
   // ---------- initial reference data ----------
   useEffect(() => {
@@ -162,23 +244,23 @@ function EditJob() {
     if (!id) return;
     const fetchJob = async () => {
       try {
-        const res = await axios.get(`${backendUrl}/company/job/${id}`, authHeaders);
-        const jd = res.data?.jd || res.data;
-        if (!jd) return;
+        const res = await axios.get(`${backendUrl}/college/job/details/${id}`, authHeaders);
+        const jd = res.data?.jd || res.data?.vacancy || res.data;
+        if (!jd || typeof jd !== 'object') return;
 
+        const stateId = toId(jd.state);
         setForm((prev) => ({
           ...prev,
-          displayCompanyName: jd.displayCompanyName || '',
+          displayCompanyName: jd.displayCompanyName || prev.displayCompanyName || '',
           title: jd.title || '',
-          _industry: jd._industry?.toString() || '',
+          _industry: toId(jd._industry),
           experience: jd.experience?.toString() || '',
           experienceMonths: jd.experienceMonths?.toString() || '',
-          _qualification: jd._qualification?.toString() || '',
-          _subQualification: jd._subQualification || [],
-          cutprice: jd.cutprice || '',
-          validity: jd.validity ? new Date(jd.validity).toISOString().split('T')[0] : '',
-          state: jd.state?.toString() || '',
-          city: jd.city?.toString() || '',
+          _qualification: toId(jd._qualification),
+          _subQualification: toIdList(jd._subQualification),
+          validity: toDateInput(jd.validity),
+          state: stateId,
+          city: toId(jd.city),
           place: jd.place || '',
           latitude: jd.latitude || '',
           longitude: jd.longitude || '',
@@ -193,11 +275,11 @@ function EditJob() {
           shiftTimingFrom: jd.shiftTimingFrom || '',
           shiftTimingTo: jd.shiftTimingTo || '',
           work: jd.work || '',
-          benifits: jd.benifits || [],
+          benifits: asArray(jd.benifits),
           remarks: jd.remarks || '',
           payOut: jd.payOut || '',
-          _techSkills: jd._techSkills || [],
-          _nonTechSkills: jd._nonTechSkills || [],
+          _techSkills: toIdList(jd._techSkills),
+          _nonTechSkills: toIdList(jd._nonTechSkills),
           requirement: jd.requirement || '',
           isFixed: jd.isFixed === true ? 'true' : jd.isFixed === false ? 'false' : '',
           amount: jd.amount || '',
@@ -219,47 +301,40 @@ function EditJob() {
           isedited: jd.isedited || false,
         }));
 
-        if (jd.state) fetchCities(jd.state);
-        if (jd.questionsAnswers?.length) {
+        if (stateId) fetchCities(stateId);
+        const answers = jd.questionsAnswers || jd.questionAnswers;
+        if (answers?.length) {
           setQuestionAnswers(
-            jd.questionsAnswers.map((qa) => ({ question: qa.Question, answer: qa.Answer }))
+            answers.map((qa) => ({
+              question: qa.Question || qa.question || '',
+              answer: qa.Answer || qa.answer || '',
+            }))
           );
         }
         setExistingVideo(jd.jobVideo || '');
         setExistingThumbnail(jd.jobVideoThumbnail || '');
       } catch (err) {
         console.error('Failed loading job:', err.message);
+        alert(err.response?.data?.message || (readOnly ? 'Unable to load this job' : 'Unable to load this job for editing'));
       }
     };
     fetchJob();
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const el = benefitsRef.current;
-    if (!el) return undefined;
+    if (readOnly) return undefined;
+    const container = benefitsRef.current;
+    if (!container) return undefined;
 
-    const instance = new Choices(el, {
-      removeItemButton: true,
-      shouldSort: false,
-      searchEnabled: true,
-      placeholder: true,
-      placeholderValue: 'Select Additional Benefits',
-      itemSelectText: '',
+    const { instance, cleanup } = initChoicesInContainer(container, {
+      options: BENEFIT_OPTIONS,
+      selected: form.benifits,
+      placeholder: 'Select Additional Benefits',
+      onChange: (values) => updateField('benifits', values),
     });
     benefitsChoicesRef.current = instance;
-
-    const selected = asArray(form.benifits);
-    if (selected.length) instance.setChoiceByValue(selected);
-
-    const onChange = () => {
-      const values = instance.getValue(true);
-      updateField('benifits', Array.isArray(values) ? values : []);
-    };
-    el.addEventListener('change', onChange);
-
     return () => {
-      el.removeEventListener('change', onChange);
-      try { instance.destroy(); } catch (err) { /* ignore */ }
+      cleanup();
       benefitsChoicesRef.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -272,39 +347,28 @@ function EditJob() {
   }, [form.benifits]);
 
   useEffect(() => {
-    if (needsStream || !streamRef.current || !asArray(subQualificationList).length) return undefined;
+    if (readOnly) return undefined;
+    const container = streamRef.current;
+    if (!container) return undefined;
 
-    if (streamChoicesRef.current) {
-      try { streamChoicesRef.current.destroy(); } catch (err) { /* ignore */ }
+    if (!hasStreamOptions) {
+      container.innerHTML = '';
       streamChoicesRef.current = null;
+      return undefined;
     }
 
-    const el = streamRef.current;
-    const instance = new Choices(el, {
-      removeItemButton: true,
-      shouldSort: false,
-      searchEnabled: true,
-      placeholder: true,
-      placeholderValue: 'Select Stream',
-      itemSelectText: '',
+    const { instance, cleanup } = initChoicesInContainer(container, {
+      options: streamOptions,
+      selected: form._subQualification,
+      placeholder: 'Select Stream',
+      onChange: (values) => updateField('_subQualification', values.map(String)),
     });
     streamChoicesRef.current = instance;
-
-    const selected = asArray(form._subQualification).map(String);
-    if (selected.length) instance.setChoiceByValue(selected);
-
-    const onChange = () => {
-      const values = instance.getValue(true);
-      updateField('_subQualification', Array.isArray(values) ? values : []);
-    };
-    el.addEventListener('change', onChange);
-
     return () => {
-      el.removeEventListener('change', onChange);
-      try { instance.destroy(); } catch (err) { /* ignore */ }
+      cleanup();
       streamChoicesRef.current = null;
     };
-  }, [needsStream, subQualificationList]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hasStreamOptions, form._qualification, streamOptions.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const instance = streamChoicesRef.current;
@@ -316,10 +380,11 @@ function EditJob() {
   // ---------- cities on state change ----------
   const fetchCities = async (stateId) => {
     try {
-      const res = await axios.get(`${backendUrl}/company/getcitiesbyId`, {
-        params: { stateId },
-        ...authHeaders,
-      });
+      const res = await axios.post(
+        `${backendUrl}/college/job/cities`,
+        { stateId },
+        authHeaders
+      );
       setCityList(asArray(res.data?.cityValues || res.data));
     } catch (err) {
       console.error('Failed loading cities:', err.message);
@@ -336,6 +401,7 @@ function EditJob() {
 
   // ---------- Google Places autocomplete ----------
   useEffect(() => {
+    if (readOnly) return undefined;
     const scriptId = 'google-maps-script';
     if (document.getElementById(scriptId)) {
       initAutocomplete();
@@ -485,13 +551,13 @@ function EditJob() {
     const newErrors = {};
 
     if (!form.title.trim()) newErrors.title = 'Enter job title';
-    if (!workLocRef.current?.value?.trim() || !form.latitude || !form.longitude || !form.place) {
+    if (!form.place?.trim() && !workLocRef.current?.value?.trim()) {
       newErrors.location = 'Select a work location from the suggestions';
     }
     if (!form._industry) newErrors.industry = 'Please select an industry';
     if (!form.experience) newErrors.experience = 'Please select experience';
     if (!form._qualification) newErrors.qualification = 'Please select qualification';
-    if (needsStream && form._subQualification.length === 0)
+    if (hasStreamOptions && form._subQualification.length === 0)
       newErrors.subQualification = 'Please select a stream';
     if (!form.validity) newErrors.validity = 'Please select validity date';
     if (!form.state) newErrors.state = 'Please select state';
@@ -517,12 +583,17 @@ function EditJob() {
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (Object.keys(newErrors).length) {
+      alert('Please fill the required fields before saving.');
+      return false;
+    }
+    return true;
   };
 
   // ---------- submit ----------
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (readOnly) return;
     if (!validate()) return;
 
     const creditsLeft = Number(company.creditLeft || 0);
@@ -542,7 +613,9 @@ function EditJob() {
     try {
       const formData = new FormData();
       Object.entries(form).forEach(([key, value]) => {
-        if (['_subQualification', 'benifits', 'collegeAcNo', '_techSkills', '_nonTechSkills'].includes(key)) {
+        if (key === '_subQualification') {
+          selectedStreams().forEach((v) => formData.append(`${key}[]`, v));
+        } else if (['benifits', 'collegeAcNo', '_techSkills', '_nonTechSkills'].includes(key)) {
           value.forEach((v) => formData.append(`${key}[]`, v));
         } else {
           formData.append(key, value);
@@ -557,15 +630,18 @@ function EditJob() {
       if (jobVideo) formData.append('jobVideo', jobVideo);
       if (jobVideoThumbnail) formData.append('jobVideoThumbnail', jobVideoThumbnail);
 
-      const res = await axios.post(`${backendUrl}/company/editJobs/${id}`, formData, {
+      const res = await axios.post(`${backendUrl}/college/job/edit/${id}`, formData, {
         headers: { ...authHeaders.headers, 'Content-Type': 'multipart/form-data' },
       });
 
       if (res.data?.status || res.status === 200) {
-        navigate('/company/list/jobs');
+        navigate('/institute/viewjob');
+      } else {
+        alert(res.data?.message || 'Failed to update job');
       }
     } catch (err) {
       console.error('Error updating the job:', err.message);
+      alert(err.response?.data?.message || err.message || 'Failed to update job');
     } finally {
       setLoading(false);
     }
@@ -670,18 +746,30 @@ function EditJob() {
             <div className="col-xl-12 px-3 text-right">
               <button
                 type="button"
-                className="btn btn-outline-primary"
-                onClick={() => navigate('/company/list/jobs')}
+                className="btn btn-outline-primary mr-2"
+                onClick={() => navigate('/institute/viewjob')}
               >
                 All Job Details
               </button>
+              {!readOnly && (
+                <button
+                  type="submit"
+                  className="btn btn-success text-white"
+                  disabled={loading}
+                >
+                  {loading ? 'Saving...' : 'Update Job'}
+                </button>
+              )}
             </div>
-
-            {/* ---------- Basic info ---------- */}
+          </div>
+        </section>
+        <fieldset disabled={readOnly} style={readOnly ? { border: 0, padding: 0, margin: 0 } : undefined}>
+        <section>
+          <div className="row">
             <div className="col-xl-12 col-lg-12 px-3">
               <div className="card mt-2">
                 <div className="card-header border border-top-0 border-left-0 border-right-0">
-                  <h4 className="card-title pb-1">Edit Job Description</h4>
+                  <h4 className="card-title pb-1">{readOnly ? 'View Job Description' : 'Edit Job Description'}</h4>
                 </div>
                 <div className="card-content" id="jd-info">
                   <div className="card-body">
@@ -758,7 +846,7 @@ function EditJob() {
                         <select
                           className="form-control"
                           value={form._qualification}
-                          onChange={(e) => updateField('_qualification', e.target.value)}
+                          onChange={handleQualificationChange}
                         >
                           <option value="">Select option</option>
                           {asArray(qualificationList).map((item) => (
@@ -769,42 +857,29 @@ function EditJob() {
                         </select>
                       </div>
 
-                      {needsStream ? (
-                        <div className="col-xl-3 mb-1">
-                          <label>Stream</label><span className="mandatory"> *</span>
+                      <div className={`col-xl-3 mb-1 ${errors.subQualification ? 'error' : ''}`}>
+                        <label>Stream</label>
+                        {hasStreamOptions && !readOnly ? <span className="mandatory"> *</span> : null}
+                        {readOnly ? (
                           <input
                             type="text"
                             className="form-control"
                             disabled
-                            placeholder="Enter your subQualification"
+                            value={streamLabel || '—'}
                           />
-                        </div>
-                      ) : (
-                        <div className={`col-xl-3 mb-1 ${errors.subQualification ? 'error' : ''}`}>
-                          <label>Stream</label><span className="mandatory"> *</span>
-                          <select
-                            ref={streamRef}
-                            className="form-control"
-                            multiple
-                            defaultValue={asArray(form._subQualification)}
-                          >
-                            {asArray(subQualificationList).map((item) => (
-                              <option key={item._id} value={item._id} className="text-capitalize">
-                                {item.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-
-                      <div className="col-xl-2 mb-1">
-                        <label>Cut Price</label>
-                        <input
-                          className="form-control"
-                          type="number"
-                          value={form.cutprice}
-                          onChange={(e) => updateField('cutprice', e.target.value)}
-                        />
+                        ) : (
+                          <>
+                            <div ref={streamRef} style={{ display: hasStreamOptions ? 'block' : 'none' }} />
+                            {!hasStreamOptions && (
+                              <input
+                                type="text"
+                                className="form-control"
+                                disabled
+                                placeholder={form._qualification ? 'No stream available for this qualification' : 'Select qualification first'}
+                              />
+                            )}
+                          </>
+                        )}
                       </div>
 
                       <div className={`col-xl-3 mb-1 ${errors.validity ? 'error' : ''}`}>
@@ -870,8 +945,9 @@ function EditJob() {
                           type="text"
                           ref={workLocRef}
                           className="form-control"
-                          defaultValue={form.place}
+                          value={form.place}
                           id="work-loc"
+                          onChange={(e) => updateField('place', e.target.value)}
                         />
                       </div>
                     </div>
@@ -1083,16 +1159,16 @@ function EditJob() {
 
                     <div className="col-xl-3 mb-1">
                       <label>Additional Benefits</label>
-                      <select
-                        ref={benefitsRef}
-                        className="form-control"
-                        multiple
-                        defaultValue={asArray(form.benifits)}
-                      >
-                        {BENEFIT_OPTIONS.map((b) => (
-                          <option key={b} value={b}>{b}</option>
-                        ))}
-                      </select>
+                      {readOnly ? (
+                        <input
+                          type="text"
+                          className="form-control"
+                          disabled
+                          value={benefitsLabel || '—'}
+                        />
+                      ) : (
+                        <div ref={benefitsRef} />
+                      )}
                     </div>
 
                     <div className="col-xl-3">
@@ -1542,20 +1618,23 @@ function EditJob() {
                     </div>
                   </div>
 
+                  {!readOnly && (
                   <div className="col-xl-12 mb-1 text-right">
                     <button
                       type="submit"
                       className="btn btn-success waves-effect waves-light text-white"
                       disabled={loading}
                     >
-                      {loading ? 'Saving...' : 'SUBMIT'}
+                      {loading ? 'Saving...' : 'Update Job'}
                     </button>
                   </div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
         </section>
+        </fieldset>
       </form>
 
       {/* ---------- Insufficient coins modal ---------- */}
@@ -1697,6 +1776,26 @@ function EditJob() {
           </div>
         </div>
       )}
+      <style>{`
+        #jd-info,
+        #jd-info .card,
+        #jd-info .card-body,
+        #jd-info .card-content,
+        .choices {
+          overflow: visible !important;
+        }
+        .choices__list--dropdown,
+        .choices__list[aria-expanded] {
+          z-index: 1100 !important;
+          max-height: 220px;
+          overflow: auto;
+        }
+        fieldset[disabled] .form-control,
+        fieldset[disabled] .form-check-input {
+          background-color: #f3f3f3 !important;
+          pointer-events: none;
+        }
+      `}</style>
     </div>
   );
 }

@@ -287,7 +287,7 @@ const ViewJob = () => {
                                   <span className="offer-valid bg-danger ml-1">Expired</span>
                                 ) : (
                                   <>
-                                    <Link to={`/institute/editjob/${job._id}`} className="btn btn-primary btn-sm">
+                                    <Link to={`/institute/job/${job._id}`} className="btn btn-primary btn-sm">
                                       View
                                     </Link>
                                   </>

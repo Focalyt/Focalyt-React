@@ -66,6 +66,29 @@ const careerApplicationSchema = new Schema(
       index: true,
       default: null,
     },
+    candidate: {
+      type: ObjectId,
+      ref: 'CandidateProfile',
+      index: true,
+      default: null,
+    },
+    project: {
+      type: ObjectId,
+      ref: 'Project',
+      index: true,
+      default: null,
+    },
+    department: {
+      type: ObjectId,
+      ref: 'Vertical',
+      index: true,
+      default: null,
+    },
+    maritalStatus: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     leadStatus: {
       type: ObjectId,
       ref: 'StatusHr',

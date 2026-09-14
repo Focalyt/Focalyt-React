@@ -301,7 +301,12 @@ const candidateProfileSchema = new Schema(
     source: {
       type: String,
       default: 'website'
-    }
+    },
+    maritalStatus: { type: String, trim: true, default: '' },
+    remark: { type: String, trim: true, default: '' },
+    college: { type: ObjectId, ref: 'College' },
+    project: { type: ObjectId, ref: 'Project' },
+    department: { type: ObjectId, ref: 'Vertical' },
   },
   { timestamps: true }
 );

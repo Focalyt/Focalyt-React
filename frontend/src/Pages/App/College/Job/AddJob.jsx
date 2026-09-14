@@ -11,7 +11,53 @@ const BENEFIT_OPTIONS = [
   'Travel Allowance', 'Laptop', 'Mobile', 'Others',
 ];
 
-const QUALIFICATIONS_WITH_STREAM = ['10th', '12th', 'Upto 5th'];
+function initChoicesInContainer(container, { options, selected, placeholder, onChange }) {
+  if (!container) return { instance: null, cleanup: () => {} };
+
+  container.innerHTML = '';
+  const select = document.createElement('select');
+  select.className = 'form-control';
+  select.multiple = true;
+  options.forEach((item) => {
+    const option = document.createElement('option');
+    const value = typeof item === 'object' ? String(item._id ?? item.value ?? '') : String(item);
+    const label = typeof item === 'object' ? (item.name || item.label || value) : String(item);
+    option.value = value;
+    option.textContent = label;
+    option.classList.add('text-capitalize');
+    select.appendChild(option);
+  });
+  container.appendChild(select);
+
+  const instance = new Choices(select, {
+    removeItemButton: true,
+    shouldSort: false,
+    searchEnabled: true,
+    placeholder: true,
+    placeholderValue: placeholder,
+    itemSelectText: '',
+    position: 'bottom',
+    shouldSortItems: false,
+  });
+
+  const selectedValues = (selected || []).map(String).filter(Boolean);
+  if (selectedValues.length) instance.setChoiceByValue(selectedValues);
+
+  const handleChange = () => {
+    const values = instance.getValue(true);
+    onChange(Array.isArray(values) ? values : []);
+  };
+  select.addEventListener('change', handleChange);
+
+  return {
+    instance,
+    cleanup: () => {
+      select.removeEventListener('change', handleChange);
+      try { instance.destroy(); } catch (err) { /* ignore */ }
+      if (container) container.innerHTML = '';
+    },
+  };
+}
 
 function AddJob() {
   const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
@@ -117,6 +163,21 @@ function AddJob() {
 
   // ---------- helpers ----------
   const asArray = (value) => (Array.isArray(value) ? value : []);
+  const toId = (value) => {
+    if (value == null || value === '') return '';
+    if (typeof value === 'object') return String(value._id || '');
+    return String(value);
+  };
+  const toIdList = (value) => asArray(value).map(toId).filter(Boolean);
+  const toDateInput = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
   const updateField = (name, value) => setForm((prev) => ({ ...prev, [name]: value }));
   const updateMappingField = (name, value) => {
     setForm((prev) => {
@@ -126,9 +187,25 @@ function AddJob() {
     });
   };
 
-  const needsStream = QUALIFICATIONS_WITH_STREAM.includes(
-    asArray(qualificationList).find((q) => q._id === form._qualification)?.name
+  const streamOptions = asArray(subQualificationList).filter(
+    (item) => toId(item._qualification) === String(form._qualification || '')
   );
+  const hasStreamOptions = streamOptions.length > 0;
+
+  const handleQualificationChange = (e) => {
+    const qualificationId = e.target.value;
+    setForm((prev) => ({
+      ...prev,
+      _qualification: qualificationId,
+      _subQualification: [],
+    }));
+  };
+
+  const selectedStreams = () => {
+    const fromChoices = streamChoicesRef.current?.getValue(true);
+    if (Array.isArray(fromChoices) && fromChoices.length) return fromChoices.map(String);
+    return asArray(form._subQualification).map(String);
+  };
 
   // ---------- initial data load ----------
   useEffect(() => {
@@ -210,31 +287,18 @@ function AddJob() {
   }, [form.project]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const el = benefitsRef.current;
-    if (!el) return undefined;
+    const container = benefitsRef.current;
+    if (!container) return undefined;
 
-    const instance = new Choices(el, {
-      removeItemButton: true,
-      shouldSort: false,
-      searchEnabled: true,
-      placeholder: true,
-      placeholderValue: 'Select Additional Benefits',
-      itemSelectText: '',
+    const { instance, cleanup } = initChoicesInContainer(container, {
+      options: BENEFIT_OPTIONS,
+      selected: form.benifits,
+      placeholder: 'Select Additional Benefits',
+      onChange: (values) => updateField('benifits', values),
     });
     benefitsChoicesRef.current = instance;
-
-    const selected = asArray(form.benifits);
-    if (selected.length) instance.setChoiceByValue(selected);
-
-    const onChange = () => {
-      const values = instance.getValue(true);
-      updateField('benifits', Array.isArray(values) ? values : []);
-    };
-    el.addEventListener('change', onChange);
-
     return () => {
-      el.removeEventListener('change', onChange);
-      try { instance.destroy(); } catch (err) { /* ignore */ }
+      cleanup();
       benefitsChoicesRef.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -247,39 +311,27 @@ function AddJob() {
   }, [form.benifits]);
 
   useEffect(() => {
-    if (needsStream || !streamRef.current || !asArray(subQualificationList).length) return undefined;
+    const container = streamRef.current;
+    if (!container) return undefined;
 
-    if (streamChoicesRef.current) {
-      try { streamChoicesRef.current.destroy(); } catch (err) { /* ignore */ }
+    if (!hasStreamOptions) {
+      container.innerHTML = '';
       streamChoicesRef.current = null;
+      return undefined;
     }
 
-    const el = streamRef.current;
-    const instance = new Choices(el, {
-      removeItemButton: true,
-      shouldSort: false,
-      searchEnabled: true,
-      placeholder: true,
-      placeholderValue: 'Select Stream',
-      itemSelectText: '',
+    const { instance, cleanup } = initChoicesInContainer(container, {
+      options: streamOptions,
+      selected: form._subQualification,
+      placeholder: 'Select Stream',
+      onChange: (values) => updateField('_subQualification', values.map(String)),
     });
     streamChoicesRef.current = instance;
-
-    const selected = asArray(form._subQualification).map(String);
-    if (selected.length) instance.setChoiceByValue(selected);
-
-    const onChange = () => {
-      const values = instance.getValue(true);
-      updateField('_subQualification', Array.isArray(values) ? values : []);
-    };
-    el.addEventListener('change', onChange);
-
     return () => {
-      el.removeEventListener('change', onChange);
-      try { instance.destroy(); } catch (err) { /* ignore */ }
+      cleanup();
       streamChoicesRef.current = null;
     };
-  }, [needsStream, subQualificationList]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hasStreamOptions, form._qualification, streamOptions.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const instance = streamChoicesRef.current;
@@ -293,24 +345,23 @@ function AddJob() {
     if (!id) return;
     const fetchVacancy = async () => {
       try {
-        const res = await axios.get(`${backendUrl}/company/job/${id}`, authHeaders);
-        const vacancy = res.data?.vacancy || res.data;
-        if (!vacancy) return;
+        const res = await axios.get(`${backendUrl}/college/job/details/${id}`, authHeaders);
+        const vacancy = res.data?.vacancy || res.data?.jd || res.data;
+        if (!vacancy || typeof vacancy !== 'object') return;
 
+        const stateId = toId(vacancy.state);
         setForm((prev) => ({
           ...prev,
           displayCompanyName: vacancy.displayCompanyName || prev.displayCompanyName,
           title: vacancy.title || '',
-          _industry: vacancy._industry?.toString() || '',
+          _industry: toId(vacancy._industry),
           experience: vacancy.experience?.toString() || '',
           experienceMonths: vacancy.experienceMonths?.toString() || '',
-          _qualification: vacancy._qualification?.toString() || '',
-          _subQualification: vacancy._subQualification || [],
-          validity: vacancy.validity
-            ? new Date(vacancy.validity).toISOString().split('T')[0]
-            : '',
-          state: vacancy.state?.toString() || '',
-          city: vacancy.city?.toString() || '',
+          _qualification: toId(vacancy._qualification),
+          _subQualification: toIdList(vacancy._subQualification),
+          validity: toDateInput(vacancy.validity),
+          state: stateId,
+          city: toId(vacancy.city),
           place: vacancy.place || '',
           latitude: vacancy.latitude || '',
           longitude: vacancy.longitude || '',
@@ -325,7 +376,7 @@ function AddJob() {
           shiftTimingFrom: vacancy.shiftTimingFrom || '',
           shiftTimingTo: vacancy.shiftTimingTo || '',
           work: vacancy.work || '',
-          benifits: vacancy.benifits || [],
+          benifits: asArray(vacancy.benifits),
           remarks: vacancy.remarks || '',
           payOut: vacancy.payOut || '',
           requirement: vacancy.requirement || '',
@@ -349,10 +400,14 @@ function AddJob() {
           isEdit: true,
         }));
 
-        if (vacancy.state) fetchCities(vacancy.state);
-        if (vacancy.questionAnswers?.length) {
+        if (stateId) fetchCities(stateId);
+        const answers = vacancy.questionsAnswers || vacancy.questionAnswers;
+        if (answers?.length) {
           setQuestionAnswers(
-            vacancy.questionAnswers.map((qa) => ({ question: qa.Question, answer: qa.Answer }))
+            answers.map((qa) => ({
+              question: qa.Question || qa.question || '',
+              answer: qa.Answer || qa.answer || '',
+            }))
           );
         }
       } catch (err) {
@@ -520,7 +575,7 @@ function AddJob() {
     if (!form._industry) newErrors.industry = 'Please select an industry';
     if (!form.experience || !form.experienceMonths) newErrors.experience = 'Please select experience';
     if (!form._qualification) newErrors.qualification = 'Please select qualification';
-    if (needsStream && form._subQualification.length === 0)
+    if (hasStreamOptions && form._subQualification.length === 0)
       newErrors.subQualification = 'Please select a stream';
     if (!form.validity) newErrors.validity = 'Please select validity date';
     if (!form.state) newErrors.state = 'Please select state';
@@ -572,7 +627,9 @@ function AddJob() {
     try {
       const formData = new FormData();
       Object.entries(form).forEach(([key, value]) => {
-        if (key === '_subQualification' || key === 'benifits' || key === 'collegeAcNo') {
+        if (key === '_subQualification') {
+          selectedStreams().forEach((v) => formData.append(`${key}[]`, v));
+        } else if (key === 'benifits' || key === 'collegeAcNo') {
           value.forEach((v) => formData.append(`${key}[]`, v));
         } else {
           formData.append(key, value);
@@ -856,7 +913,7 @@ function AddJob() {
                         <select
                           className="form-control"
                           value={form._qualification}
-                          onChange={(e) => updateField('_qualification', e.target.value)}
+                          onChange={handleQualificationChange}
                         >
                           <option value="">Select option</option>
                           {asArray(qualificationList).map((item) => (
@@ -867,33 +924,19 @@ function AddJob() {
                         </select>
                       </div>
 
-                      {needsStream ? (
-                        <div className="col-xl-3 mb-1">
-                          <label>Stream</label><span className="mandatory"> *</span>
+                      <div className={`col-xl-3 mb-1 ${errors.subQualification ? 'error' : ''}`}>
+                        <label>Stream</label>
+                        {hasStreamOptions ? <span className="mandatory"> *</span> : null}
+                        <div ref={streamRef} style={{ display: hasStreamOptions ? 'block' : 'none' }} />
+                        {!hasStreamOptions && (
                           <input
                             type="text"
                             className="form-control"
                             disabled
-                            placeholder="Enter your subQualification"
+                            placeholder={form._qualification ? 'No stream available for this qualification' : 'Select qualification first'}
                           />
-                        </div>
-                      ) : (
-                        <div className={`col-xl-3 mb-1 ${errors.subQualification ? 'error' : ''}`}>
-                          <label>Stream</label><span className="mandatory"> *</span>
-                          <select
-                            ref={streamRef}
-                            className="form-control"
-                            multiple
-                            defaultValue={asArray(form._subQualification)}
-                          >
-                            {asArray(subQualificationList).map((item) => (
-                              <option key={item._id} value={item._id} className="text-capitalize">
-                                {item.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
+                        )}
+                      </div>
 
                       <div className={`col-xl-3 mb-1 ${errors.validity ? 'error' : ''}`}>
                         <label>Active Till</label><span className="asterisk"> *</span>
@@ -1170,16 +1213,7 @@ function AddJob() {
 
                     <div className="col-xl-3 mb-1">
                       <label>Additional Benefits</label>
-                      <select
-                        ref={benefitsRef}
-                        className="form-control"
-                        multiple
-                        defaultValue={asArray(form.benifits)}
-                      >
-                        {BENEFIT_OPTIONS.map((b) => (
-                          <option key={b} value={b}>{b}</option>
-                        ))}
-                      </select>
+                      <div ref={benefitsRef} />
                     </div>
 
                     <div className="col-xl-3">
@@ -1726,6 +1760,21 @@ function AddJob() {
           </div>
         </div>
       )}
+      <style>{`
+        #jd-info,
+        #jd-info .card,
+        #jd-info .card-body,
+        #jd-info .card-content,
+        .choices {
+          overflow: visible !important;
+        }
+        .choices__list--dropdown,
+        .choices__list[aria-expanded] {
+          z-index: 1100 !important;
+          max-height: 220px;
+          overflow: auto;
+        }
+      `}</style>
     </div>
   );
 }
