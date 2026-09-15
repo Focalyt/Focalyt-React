@@ -1224,7 +1224,7 @@ const CRMDashboard = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [showRemarksModal, setShowRemarksModal] = useState(false);
-  const [remarksModalData, setRemarksModalData] = useState({ text: '', name: '' });
+  const [remarksModalData, setRemarksModalData] = useState({ text: '', name: '', title: 'Remarks' });
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [documentZoom, setDocumentZoom] = useState(1);
   const [documentRotation, setDocumentRotation] = useState(0);
@@ -4994,8 +4994,7 @@ console.log('API Response:', response.data);
     return [...remarkNotes, ...followupNotes].slice(-10);
   }, []);
 
-  const getProfileRemarksText = useCallback((profile) => {
-    const remarks = profile?.remarks;
+  const normalizeRemarkValue = useCallback((remarks) => {
     if (!remarks) return '';
     if (typeof remarks === 'string') return remarks.trim();
     if (Array.isArray(remarks)) {
@@ -5007,6 +5006,29 @@ console.log('API Response:', response.data);
     return String(remarks).trim();
   }, []);
 
+  const splitHumanAndAiRemarks = useCallback((text) => {
+    const aiLines = [];
+    const humanLines = [];
+    String(text || '').split(/\r?\n/).forEach((line) => {
+      if (/^\s*\[AI Call\]/i.test(line)) aiLines.push(line.trim());
+      else humanLines.push(line);
+    });
+    return {
+      human: humanLines.join('\n').trim(),
+      ai: aiLines.join('\n').trim(),
+    };
+  }, []);
+
+  const getProfileRemarksText = useCallback((profile) => {
+    return splitHumanAndAiRemarks(normalizeRemarkValue(profile?.remarks)).human;
+  }, [normalizeRemarkValue, splitHumanAndAiRemarks]);
+
+  const getProfileAiRemarkText = useCallback((profile) => {
+    const dedicated = typeof profile?.aiRemark === 'string' ? profile.aiRemark.trim() : '';
+    if (dedicated) return dedicated;
+    return splitHumanAndAiRemarks(normalizeRemarkValue(profile?.remarks)).ai;
+  }, [normalizeRemarkValue, splitHumanAndAiRemarks]);
+
   const truncateRemarks = useCallback((text, max = 70) => {
     const value = (text || '').replace(/\s+/g, ' ').trim();
     if (!value) return 'N/A';
@@ -5014,21 +5036,24 @@ console.log('API Response:', response.data);
     return `${value.slice(0, max).trim()}...`;
   }, []);
 
-  const openRemarksModal = useCallback((profile) => {
+  const openRemarksModal = useCallback((profile, options = {}) => {
+    const title = options.title || 'Remarks';
+    const text = options.text != null ? options.text : getProfileRemarksText(profile);
     setRemarksModalData({
-      text: getProfileRemarksText(profile),
+      text,
+      title,
       name: profile?._candidate?.name || profile?.name || 'Lead',
     });
     setShowRemarksModal(true);
   }, [getProfileRemarksText]);
 
-  const renderRemarksField = useCallback((profile) => {
-    const fullText = getProfileRemarksText(profile);
+  const renderRemarkPreviewField = useCallback((profile, { label, text, modalTitle }) => {
+    const fullText = text || '';
     const hasRemarks = Boolean(fullText);
 
     return (
       <div className="info-group">
-        <div className="info-label">Remarks</div>
+        <div className="info-label">{label}</div>
         <div className="info-value remarks-preview-wrap">
           <span className="remarks-preview-text" title={hasRemarks ? fullText : undefined}>
             {hasRemarks ? truncateRemarks(fullText) : 'N/A'}
@@ -5036,13 +5061,13 @@ console.log('API Response:', response.data);
           <button
             type="button"
             className="remarks-preview-edit-btn"
-            title={hasRemarks ? 'View full remarks' : 'No remarks'}
-            aria-label="View full remarks"
+            title={hasRemarks ? `View full ${label.toLowerCase()}` : `No ${label.toLowerCase()}`}
+            aria-label={`View full ${label.toLowerCase()}`}
             disabled={!hasRemarks}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              if (hasRemarks) openRemarksModal(profile);
+              if (hasRemarks) openRemarksModal(profile, { title: modalTitle || label, text: fullText });
             }}
           >
             <i className="fas fa-pen" aria-hidden="true"></i>
@@ -5050,7 +5075,23 @@ console.log('API Response:', response.data);
         </div>
       </div>
     );
-  }, [getProfileRemarksText, truncateRemarks, openRemarksModal]);
+  }, [truncateRemarks, openRemarksModal]);
+
+  const renderRemarksField = useCallback((profile) => (
+    renderRemarkPreviewField(profile, {
+      label: 'Remarks',
+      text: getProfileRemarksText(profile),
+      modalTitle: 'Remarks',
+    })
+  ), [renderRemarkPreviewField, getProfileRemarksText]);
+
+  const renderAiRemarksField = useCallback((profile) => (
+    renderRemarkPreviewField(profile, {
+      label: 'AI Remark',
+      text: getProfileAiRemarkText(profile),
+      modalTitle: 'AI Remark',
+    })
+  ), [renderRemarkPreviewField, getProfileAiRemarkText]);
 
   const getProfileDocumentSnapshot = useCallback((profile) => {
     const documents = Array.isArray(profile?.uploadedDocs) ? profile.uploadedDocs : [];
@@ -18918,6 +18959,7 @@ useEffect(() => {
                                                 <div className="info-value">{profile._center?.name || 'N/A'}</div>
                                               </div>
                                               {renderRemarksField(profile)}
+                                              {renderAiRemarksField(profile)}
                                             </div>
                                           </div>
                                         </div>
@@ -19056,6 +19098,7 @@ useEffect(() => {
                                                         new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
                                                     </div>
                                                     {renderRemarksField(profile)}
+                                                    {renderAiRemarksField(profile)}
                                                     <div className="info-group">
                                                       <div className="info-label">LEAD MODIFICATION By</div>
                                                       <div className="info-value">Mar 21, 2025 3:32 PM</div>
@@ -19175,6 +19218,9 @@ useEffect(() => {
                                                   </div>
                                                   <div className="col-xl- col-3">
                                                     {renderRemarksField(profile)}
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    {renderAiRemarksField(profile)}
                                                   </div>
                                                   <div className="col-xl- col-3">
                                                     <div className="info-group">
@@ -20748,7 +20794,7 @@ useEffect(() => {
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">
-                  Remarks{remarksModalData.name ? ` — ${remarksModalData.name}` : ''}
+                  {remarksModalData.title || 'Remarks'}{remarksModalData.name ? ` — ${remarksModalData.name}` : ''}
                 </h5>
                 <button
                   type="button"
@@ -20759,7 +20805,7 @@ useEffect(() => {
               </div>
               <div className="modal-body">
                 <div className="remarks-modal-text">
-                  {remarksModalData.text || 'No remarks available.'}
+                  {remarksModalData.text || `No ${(remarksModalData.title || 'remarks').toLowerCase()} available.`}
                 </div>
               </div>
               <div className="modal-footer">

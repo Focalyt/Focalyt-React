@@ -30,6 +30,19 @@ const normalizeRemarks = (value) => {
   return String(value).trim();
 };
 
+const splitHumanAndAiRemarks = (remarks) => {
+  const aiLines = [];
+  const humanLines = [];
+  String(remarks || '').split(/\r?\n/).forEach((line) => {
+    if (/^\s*\[AI Call\]/i.test(line)) aiLines.push(line.trim());
+    else humanLines.push(line);
+  });
+  return {
+    human: humanLines.join('\n').trim(),
+    ai: aiLines.join('\n').trim(),
+  };
+};
+
 const truncateText = (value, max = 90) => {
   const text = String(value || '').replace(/\s+/g, ' ').trim();
   if (!text) return '—';
@@ -186,10 +199,12 @@ const Lead = () => {
       aiCalled: isAiCallCompleted(lead),
       aiStatus,
       aiDisposition: lead?.aiVoice?.lastDisposition || '',
-      aiRemarks: normalizeRemarks(lead?.aiRemark) || normalizeRemarks(lead?.aiVoice?.lastSummary),
+      aiRemarks: normalizeRemarks(lead?.aiRemark)
+        || splitHumanAndAiRemarks(normalizeRemarks(lead?.remarks)).ai
+        || normalizeRemarks(lead?.aiVoice?.lastSummary),
       humanCalled: Number(lead?.followupStats?.call?.done || 0) > 0,
       humanStatus,
-      humanRemarks: normalizeRemarks(lead?.remarks),
+      humanRemarks: splitHumanAndAiRemarks(normalizeRemarks(lead?.remarks)).human,
       aiCallAt: lead?.aiVoice?.lastWebhookAt || '',
       createdAt: lead?.createdAt || '',
       changed,
