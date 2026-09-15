@@ -26,6 +26,72 @@ const getProfileGroupRootId = (profile) => {
 
 const pickFirstNonEmpty = (...vals) => vals.find((v) => v != null && String(v).trim() !== '') || '';
 
+const toHrFilterYmd = (value) => {
+  if (!value) return undefined;
+  const parsed = moment(value);
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD') : undefined;
+};
+
+const mapHrLeadToB2cProfile = (lead) => {
+  const owner = lead?.leadOwner && typeof lead.leadOwner === 'object'
+    ? lead.leadOwner
+    : (lead?.leadOwner ? { _id: lead.leadOwner } : null);
+  const coOwner = lead?.leadCoOwner && typeof lead.leadCoOwner === 'object'
+    ? lead.leadCoOwner
+    : (lead?.leadCoOwner ? { _id: lead.leadCoOwner } : null);
+  const jobName = lead?.applyingFor || '';
+  const projectName = lead?.projectName || lead?.project?.name || '';
+  const departmentName = lead?.departmentName || lead?.department?.name || '';
+
+  return {
+    _id: lead?._id,
+    isHrJobLead: true,
+    source: lead?.source || '',
+    _candidate: {
+      _id: lead?.candidate,
+      name: lead?.fullName || '',
+      mobile: lead?.mobile,
+      email: lead?.email || '',
+      sex: lead?.gender || '',
+      dob: lead?.dateOfBirth || null,
+      maritalStatus: lead?.maritalStatus || '',
+      personalInfo: {
+        currentAddress: { city: lead?.city || '' },
+        totalExperience: lead?.experience || '',
+      },
+      remark: lead?.remark || '',
+    },
+    _course: {
+      name: jobName,
+      projectName,
+      typeOfProject: departmentName,
+    },
+    _center: null,
+    project: lead?.project || null,
+    vertical: lead?.department || null,
+    counsellor: owner,
+    leadCoOwner: coOwner,
+    leadCoOwner2: null,
+    assignedTo: owner,
+    leadAssignment: owner
+      ? [{
+        _counsellor: owner._id || owner,
+        counsellorName: owner.name || '',
+        assignDate: lead?.createdAt,
+      }]
+      : [],
+    remark: lead?.remark || '',
+    remarks: lead?.remark || '',
+    _leadStatus: lead?.leadStatus || null,
+    _leadSubStatus: lead?.leadSubstatus || null,
+    followups: lead?.followups || [],
+    logs: lead?.logs || [],
+    createdAt: lead?.createdAt,
+    updatedAt: lead?.updatedAt,
+    documents: lead?.documents || [],
+  };
+};
+
 const MultiSelectCheckbox = ({
   title,
   options,
@@ -4801,7 +4867,66 @@ console.log('API Response:', response.data);
 
       if (response.data.success && response.data.data) {
         const data = response.data;
-        setAllProfiles(data.data);
+        let profiles = Array.isArray(data.data) ? [...data.data] : [];
+        const cycle = cycleOverride || cycleFilters;
+        const shouldMergeHrLeads = listEndpoint === 'appliedCandidates'
+          && Number(page) === 1
+          && !filters.leadStatus
+          && !filters.subStatuses
+          && !filters.approvalStatus
+          && !filters.followupStatus
+          && !filters.aiLeadStatus
+          && !cycle?.course
+          && !cycle?.center
+          && !cycle?.batch;
+
+        if (shouldMergeHrLeads) {
+          try {
+            const listParts = buildListFilterQueryParts(formDataRef.current || formData, cycle);
+            const hrParams = {
+              page: 1,
+              limit: 100,
+              search: filters.name || undefined,
+              startDate: toHrFilterYmd(filters.createdFromDate),
+              endDate: toHrFilterYmd(filters.createdToDate),
+              createdFromDate: toHrFilterYmd(filters.createdFromDate),
+              createdToDate: toHrFilterYmd(filters.createdToDate),
+              modifiedFromDate: toHrFilterYmd(filters.modifiedFromDate),
+              modifiedToDate: toHrFilterYmd(filters.modifiedToDate),
+              nextActionFromDate: toHrFilterYmd(filters.nextActionFromDate),
+              nextActionToDate: toHrFilterYmd(filters.nextActionToDate),
+              owner: listParts.owner,
+              counselor: listParts.counselor,
+            };
+            if (filters.hasFollowUpCall === true || filters.hasFollowUpCall === 'yes') {
+              hrParams.hasFollowUpCall = 'true';
+            } else if (filters.hasFollowUpCall === false || filters.hasFollowUpCall === 'no') {
+              hrParams.hasFollowUpCall = 'false';
+            }
+            if (filters.hasFollowUpVisit === true || filters.hasFollowUpVisit === 'yes') {
+              hrParams.hasFollowUpVisit = 'true';
+            } else if (filters.hasFollowUpVisit === false || filters.hasFollowUpVisit === 'no') {
+              hrParams.hasFollowUpVisit = 'false';
+            }
+            if (activeLeadViewTab === 'noFollowup') {
+              hrParams.hasFollowUpCall = 'false';
+              hrParams.hasFollowUpVisit = 'false';
+            }
+
+            const hrRes = await axios.get(`${backendUrl}/college/hr/leads`, {
+              headers: { 'x-auth': token },
+              params: hrParams,
+            });
+            const hrLeads = hrRes.data?.success ? (hrRes.data?.data?.leads || []) : [];
+            const hrProfiles = hrLeads.map(mapHrLeadToB2cProfile);
+            const hrIds = new Set(hrProfiles.map((item) => String(item._id)));
+            profiles = [...hrProfiles, ...profiles.filter((item) => !hrIds.has(String(item._id)))];
+          } catch (hrErr) {
+            console.error('Error fetching HR leads for B2C list:', hrErr);
+          }
+        }
+
+        setAllProfiles(profiles);
         setTotalPages(data.totalPages);
         setPageSize(data.limit || data.pageSize || pageSize);
 
@@ -5975,16 +6100,28 @@ console.log('API Response:', response.data);
     }
 
     try {
-      const response = await axios.put(
-        `${backendUrl}/college/update/${profile._id}`,
-        { counsellor: nextId },
-        {
-          headers: {
-            'x-auth': token,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const isHrJobLead = Boolean(profile?.isHrJobLead);
+      const response = isHrJobLead
+        ? await axios.patch(
+          `${backendUrl}/college/hr/leads/${profile._id}`,
+          { leadOwner: nextId },
+          {
+            headers: {
+              'x-auth': token,
+              'Content-Type': 'application/json',
+            },
+          }
+        )
+        : await axios.put(
+          `${backendUrl}/college/update/${profile._id}`,
+          { counsellor: nextId },
+          {
+            headers: {
+              'x-auth': token,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
 
       if (!response.data?.success) {
         alert(response.data?.message || 'Failed to update lead owner');
@@ -6032,17 +6169,34 @@ console.log('API Response:', response.data);
     const nextId = String(newCoOwnerId || '');
     if (currentId === nextId) return;
 
+    if (profile?.isHrJobLead && field === 'leadCoOwner2') {
+      toast.info('HR job leads support only one co-owner');
+      return;
+    }
+
     try {
-      const response = await axios.put(
-        `${backendUrl}/college/update/${profile._id}`,
-        { [field]: nextId || null },
-        {
-          headers: {
-            'x-auth': token,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const isHrJobLead = Boolean(profile?.isHrJobLead);
+      const response = isHrJobLead
+        ? await axios.patch(
+          `${backendUrl}/college/hr/leads/${profile._id}`,
+          { leadCoOwner: nextId || null },
+          {
+            headers: {
+              'x-auth': token,
+              'Content-Type': 'application/json',
+            },
+          }
+        )
+        : await axios.put(
+          `${backendUrl}/college/update/${profile._id}`,
+          { [field]: nextId || null },
+          {
+            headers: {
+              'x-auth': token,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
 
       if (!response.data?.success) {
         alert(response.data?.message || 'Failed to update co-owner');

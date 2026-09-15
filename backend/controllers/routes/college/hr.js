@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 const moment = require('moment');
 const router = express.Router();
 const { isCollege } = require('../../../helpers');
-const CareerApplication = require('../../models/careerApplication');
 const StatusHr = require('../../models/statusHr');
 const College = require('../../models/college');
 const User = require('../../models/users');
@@ -58,6 +57,32 @@ const capitalizeWords = (str) => {
 
 const serializeLead = (doc) => {
   const lead = doc?.toObject ? doc.toObject() : { ...doc };
+  const candidate = lead._candidate && typeof lead._candidate === 'object' ? lead._candidate : null;
+  const job = lead._job && typeof lead._job === 'object' ? lead._job : null;
+  if (!lead.fullName && candidate?.name) lead.fullName = candidate.name;
+  if (!lead.mobile && (candidate?.mobile || candidate?.mobile === 0)) lead.mobile = candidate.mobile;
+  if (!lead.email && candidate?.email) lead.email = candidate.email;
+  if (!lead.city && candidate?.personalInfo?.currentAddress?.city) {
+    lead.city = candidate.personalInfo.currentAddress.city;
+  }
+  if (!lead.gender && candidate?.sex) lead.gender = candidate.sex;
+  if (!lead.applyingFor && job?.title) lead.applyingFor = job.title;
+  if (!lead.experience && candidate?.personalInfo?.totalExperience != null) {
+    lead.experience = String(candidate.personalInfo.totalExperience);
+  }
+  if (!lead.qualification && candidate?.qualifications?.[0]?.specialization) {
+    lead.qualification = candidate.qualifications[0].specialization;
+  }
+  if (!lead.dateOfBirth && candidate?.dob) lead.dateOfBirth = candidate.dob;
+  if (!lead.remark && candidate?.remark) lead.remark = candidate.remark;
+  if (!lead.source && candidate?.source) lead.source = candidate.source;
+  if (!lead.maritalStatus && candidate?.maritalStatus) lead.maritalStatus = candidate.maritalStatus;
+  if (!lead.project && candidate?.project) lead.project = candidate.project;
+  if (!lead.department && candidate?.department) lead.department = candidate.department;
+  if (!lead.resume && candidate?.personalInfo?.resume?.[0]?.url) {
+    lead.resume = candidate.personalInfo.resume[0].url;
+  }
+  if (!lead.leadOwner && job?.hr) lead.leadOwner = job.hr;
   if (isActualMediaFile(lead.resume)) {
     lead.resume = resolvePublicUrl(lead.resume) || lead.resume;
   } else {
@@ -361,32 +386,15 @@ const toCollegeObjectId = (value) => {
   return id ? new mongoose.Types.ObjectId(id) : null;
 };
 
-// A college sees its own leads plus older records that were saved before college scoping.
 const collegeScopeFilter = (collegeId) => {
   const id = toCollegeObjectId(collegeId);
   if (!id) return {};
-  return {
-    $or: [
-      { college: id },
-      { college: null },
-      { college: { $exists: false } },
-    ],
-  };
+  return { college: id };
 };
 
 const applyCollegeScope = (match, collegeId) => {
   const scope = collegeScopeFilter(collegeId);
-  if (!scope.$or) return match;
-  if (match.$or || match.$and) {
-    match.$and = [
-      ...(match.$and || []),
-      ...(match.$or ? [{ $or: match.$or }] : []),
-      { $or: scope.$or },
-    ];
-    delete match.$or;
-  } else {
-    match.$or = scope.$or;
-  }
+  if (scope.college) match.college = scope.college;
   return match;
 };
 
@@ -551,6 +559,213 @@ const resolveHrStatus = async (statusTitle, subStatusTitle, collegeId) => {
   return { status, substatus };
 };
 
+const parseHiringStatusTitles = (hiringStatus = [], jobId) => {
+  const entry = (hiringStatus || []).find((item) => String(item?.job || '') === String(jobId || ''));
+  const raw = String(entry?.status || '').trim();
+  if (!raw) return { statusTitle: '', subStatusTitle: '', entry: null };
+  const [statusTitle, ...rest] = raw.split('/').map((part) => part.trim()).filter(Boolean);
+  return { statusTitle: statusTitle || '', subStatusTitle: rest.join(' / '), entry: entry || null };
+};
+
+const hiringEntryForJob = (candidate, jobId) =>
+  (candidate?.hiringStatus || []).find((item) => String(item?.job || '') === String(jobId || '')) || null;
+
+const APPLY_LEAD_POPULATE = [
+  {
+    path: '_candidate',
+    populate: [
+      { path: 'project', select: 'name' },
+      { path: 'department', select: 'name' },
+      { path: 'college', select: 'name' },
+    ],
+  },
+  {
+    path: '_job',
+    select: 'title hr',
+    populate: { path: 'hr', select: 'name email' },
+  },
+  { path: 'leadOwner', select: 'name email' },
+  { path: 'leadCoOwner', select: 'name email' },
+  { path: 'assignedTo', select: 'name email' },
+  { path: 'project', select: 'name' },
+  { path: 'department', select: 'name' },
+  { path: 'logs.user', select: 'name email' },
+  STATUS_POPULATE,
+];
+
+const loadStatusIndex = async (collegeId) => {
+  const id = toCollegeObjectId(collegeId);
+  const scope = [{ college: null }, { college: { $exists: false } }];
+  if (id) scope.unshift({ college: id });
+  const list = await StatusHr.find({ isDeleted: { $ne: true }, $or: scope }).sort({ index: 1 }).lean();
+  const byTitle = new Map();
+  const byId = new Map();
+  list.forEach((status) => {
+    byId.set(String(status._id), status);
+    byTitle.set(String(status.title || '').trim().toLowerCase(), status);
+  });
+  return { list, byTitle, byId };
+};
+
+const mapApplyToLead = (apply, statusIndex) => {
+  const candidate = apply?._candidate && typeof apply._candidate === 'object' ? apply._candidate : {};
+  const job = apply?._job && typeof apply._job === 'object' ? apply._job : {};
+  const jobId = job._id || apply?._job;
+  const { statusTitle, subStatusTitle } = parseHiringStatusTitles(candidate.hiringStatus, jobId);
+  let statusDoc = apply.leadStatus && apply.leadStatus.title
+    ? apply.leadStatus
+    : (apply.leadStatus ? statusIndex.byId.get(String(apply.leadStatus)) : null);
+  if (!statusDoc && statusTitle) {
+    statusDoc = statusIndex.byTitle.get(statusTitle.toLowerCase()) || null;
+  }
+  const subFromApply = apply.leadSubstatus
+    ? (statusDoc?.substatuses || []).find((item) => String(item._id) === String(apply.leadSubstatus))
+    : null;
+  const subFromHiring = (statusDoc?.substatuses || []).find(
+    (item) => String(item.title || '').trim().toLowerCase() === String(subStatusTitle || '').trim().toLowerCase()
+  ) || null;
+  const sub = subFromApply || subFromHiring || null;
+  const resumeUrl = apply.resume
+    || (candidate.personalInfo?.resume || []).find((item) => isActualMediaFile(item?.url))?.url
+    || '';
+  const leadOwner = apply.leadOwner || apply.assignedTo || job.hr || null;
+
+  return serializeLead({
+    _id: apply._id,
+    fullName: candidate.name || '',
+    mobile: candidate.mobile,
+    email: candidate.email || '',
+    city: candidate.personalInfo?.currentAddress?.city || '',
+    gender: candidate.sex || '',
+    applyingFor: job.title || '',
+    experience: candidate.personalInfo?.totalExperience != null
+      ? String(candidate.personalInfo.totalExperience)
+      : '',
+    qualification: candidate.qualifications?.[0]?.specialization || '',
+    dateOfBirth: candidate.dob || null,
+    remark: apply.remark || candidate.remark || '',
+    source: apply.source || candidate.source || '',
+    college: apply.college || candidate.college || null,
+    project: apply.project || candidate.project || null,
+    department: apply.department || candidate.department || null,
+    maritalStatus: candidate.maritalStatus || '',
+    resume: resumeUrl,
+    documents: apply.documents || [],
+    leadStatus: statusDoc || null,
+    leadSubstatus: sub?._id || apply.leadSubstatus || null,
+    leadOwner,
+    leadCoOwner: apply.leadCoOwner || null,
+    assignedTo: apply.assignedTo || leadOwner,
+    followups: apply.followups || [],
+    logs: apply.logs || [],
+    createdAt: apply.createdAt,
+    updatedAt: apply.updatedAt,
+    candidate: candidate._id || apply._candidate,
+    _job: job._id || apply._job,
+  });
+};
+
+const collegeCandidateMatch = (collegeId, extra = {}) => {
+  const id = toCollegeObjectId(collegeId);
+  const match = { isDeleted: { $ne: true }, ...extra };
+  if (id) match.college = id;
+  return match;
+};
+
+const queryAppliedLeads = async (query, collegeId) => {
+  const candMatch = collegeCandidateMatch(collegeId);
+  const extraClauses = [];
+  const q = String(query.search || '').trim();
+  if (q) {
+    const digits = q.replace(/\D/g, '');
+    const searchOr = [
+      { name: new RegExp(q, 'i') },
+      { email: new RegExp(q, 'i') },
+    ];
+    if (digits) {
+      searchOr.push({ mobile: digits });
+      const asNumber = Number(digits);
+      if (!Number.isNaN(asNumber)) searchOr.push({ mobile: asNumber });
+    }
+    extraClauses.push({ $or: searchOr });
+  }
+  if (query.city) {
+    extraClauses.push({ 'personalInfo.currentAddress.city': new RegExp(String(query.city).trim(), 'i') });
+  }
+  if (extraClauses.length) candMatch.$and = extraClauses;
+
+  const collegeIdObj = toCollegeObjectId(collegeId);
+  const candidateIds = await CandidateProfile.find(candMatch).distinct('_id');
+  const applyMatch = {
+    isDeleted: { $ne: true },
+    $or: [
+      ...(collegeIdObj ? [{ college: collegeIdObj }] : []),
+      { _candidate: { $in: candidateIds.length ? candidateIds : [new mongoose.Types.ObjectId()] } },
+    ],
+  };
+
+  const createdRange = dayRange(query.createdFromDate || query.startDate, query.createdToDate || query.endDate);
+  if (createdRange) applyMatch.createdAt = createdRange;
+  const modifiedRange = dayRange(query.modifiedFromDate, query.modifiedToDate);
+  if (modifiedRange) applyMatch.updatedAt = modifiedRange;
+
+  let applies = await AppliedJobs.find(applyMatch)
+    .populate(APPLY_LEAD_POPULATE)
+    .sort({ createdAt: -1 })
+    .lean();
+
+  applies = applies.filter((item) => item._candidate && item._candidate._id);
+
+  if (query.applyingFor) {
+    applies = applies.filter((item) => String(item._job?.title || '') === String(query.applyingFor));
+  }
+
+  const statusIndex = await loadStatusIndex(collegeId);
+  let leads = applies.map((item) => mapApplyToLead(item, statusIndex));
+
+  if (query.leadStatus && query.leadStatus !== 'all') {
+    if (query.leadStatus === 'none') {
+      leads = leads.filter((lead) => !lead.leadStatus);
+    } else {
+      leads = leads.filter((lead) => String(lead.leadStatus?._id || '') === String(query.leadStatus));
+    }
+  }
+  if (query.subStatus) {
+    leads = leads.filter((lead) => String(lead.leadSubstatus || '') === String(query.subStatus));
+  }
+
+  const ownerIds = parseIdList(query.owner).map(String);
+  const counselorIds = parseIdList(query.counselor).map(String);
+  const ownerFilter = [...ownerIds, ...counselorIds];
+  if (ownerFilter.length) {
+    leads = leads.filter((lead) => ownerFilter.includes(String(lead.leadOwner?._id || lead.leadOwner || '')));
+  }
+
+  return { leads, statusIndex };
+};
+
+const loadAppliedLead = async (id, collegeId) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) return null;
+  const apply = await AppliedJobs.findById(id).populate(APPLY_LEAD_POPULATE);
+  if (!apply?._candidate) return null;
+  const college = toCollegeObjectId(collegeId);
+  const applyCollege = toCollegeObjectId(apply.college);
+  const candidateCollege = toCollegeObjectId(apply._candidate.college);
+  if (college) {
+    const matchesApply = applyCollege && String(applyCollege) === String(college);
+    const matchesCandidate = candidateCollege && String(candidateCollege) === String(college);
+    if (!matchesApply && !matchesCandidate) return null;
+  }
+  const statusIndex = await loadStatusIndex(collegeId);
+  return {
+    apply,
+    candidate: apply._candidate,
+    job: apply._job,
+    lead: mapApplyToLead(apply, statusIndex),
+    statusIndex,
+  };
+};
+
 const buildMatch = (query = {}, collegeId) => {
   const {
     search,
@@ -688,30 +903,19 @@ router.get('/leads', isCollege, async (req, res) => {
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
     const skip = (page - 1) * limit;
-    const match = buildMatch(req.query, req.user?.college?._id);
-
-    const [leads, total] = await Promise.all([
-      CareerApplication.find(match)
-        .populate('leadOwner', 'name email')
-        .populate('leadCoOwner', 'name email')
-        .populate('assignedTo', 'name email')
-        .populate(STATUS_POPULATE)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      CareerApplication.countDocuments(match),
-    ]);
+    const { leads } = await queryAppliedLeads(req.query, req.user?.college?._id);
+    const total = leads.length;
+    const paged = leads.slice(skip, skip + limit);
 
     return res.json({
       success: true,
       data: {
-        leads: leads.map(serializeLead),
+        leads: paged,
         pagination: {
           page,
           limit,
           total,
-          totalPages: Math.max(Math.ceil(total / limit), 1),
+          totalPages: Math.max(Math.ceil(total / limit) || 1, 1),
         },
       },
     });
@@ -723,51 +927,33 @@ router.get('/leads', isCollege, async (req, res) => {
 
 router.get('/leads/counts', isCollege, async (req, res) => {
   try {
-    const baseMatch = buildMatch({
+    const { leads } = await queryAppliedLeads({
       ...req.query,
       leadStatus: 'all',
       followupType: undefined,
       followupBucket: undefined,
     }, req.user?.college?._id);
 
-    const followupBuckets = ['done', 'planned', 'missed'];
-    const [grouped, roles, ...followupTotals] = await Promise.all([
-      CareerApplication.aggregate([
-        { $match: baseMatch },
-        {
-          $group: {
-            _id: '$leadStatus',
-            count: { $sum: 1 },
-          },
-        },
-      ]),
-      CareerApplication.distinct('applyingFor', { ...baseMatch }),
-      ...['Call', 'Visit'].flatMap((type) =>
-        followupBuckets.map((bucket) =>
-          CareerApplication.countDocuments({ ...baseMatch, ...followupMatch(type, bucket) })
-        )
-      ),
-    ]);
-
+    const counts = { all: leads.length, none: 0 };
+    const roles = new Set();
     const followups = {
-      call: {
-        done: followupTotals[0] || 0,
-        planned: followupTotals[0] || 0,
-        missed: followupTotals[0] || 0,
-      },
-      visit: {
-        done: followupTotals[0] || 0,
-        planned: followupTotals[0] || 0,
-        missed: followupTotals[0] || 0,
-      },
+      call: { done: 0, planned: 0, missed: 0 },
+      visit: { done: 0, planned: 0, missed: 0 },
     };
+    const startOfToday = getStartOfTodayIST();
 
-    // Counts are keyed by StatusHr id, 'none' holds leads without a configured status.
-    const counts = { all: 0, none: 0 };
-    grouped.forEach((row) => {
-      const key = row._id ? String(row._id) : 'none';
-      counts[key] = (counts[key] || 0) + row.count;
-      counts.all += row.count;
+    leads.forEach((lead) => {
+      if (lead.applyingFor) roles.add(lead.applyingFor);
+      const key = lead.leadStatus?._id ? String(lead.leadStatus._id) : 'none';
+      counts[key] = (counts[key] || 0) + 1;
+      if (key === 'none') counts.none += 1;
+
+      (lead.followups || []).forEach((item) => {
+        const bucketKey = item?.type === 'Visit' ? 'visit' : 'call';
+        if (item?.status === 'done') followups[bucketKey].done += 1;
+        else if (isHrFollowupMissed(item, startOfToday)) followups[bucketKey].missed += 1;
+        else if (item?.status === 'planned') followups[bucketKey].planned += 1;
+      });
     });
 
     return res.json({
@@ -775,7 +961,7 @@ router.get('/leads/counts', isCollege, async (req, res) => {
       data: {
         counts,
         followups,
-        roles: (roles || []).filter(Boolean).sort((a, b) => a.localeCompare(b)),
+        roles: [...roles].sort((a, b) => a.localeCompare(b)),
       },
     });
   } catch (error) {
@@ -791,54 +977,40 @@ router.get('/my-followups', isCollege, async (req, res) => {
     const skip = (page - 1) * limit;
     const followupStatus = String(req.query.followupStatus || 'planned').toLowerCase();
     const { from, to } = resolveHrFollowupRange(req.query.fromDate, req.query.toDate, req.query.allTime);
-    const leadMatch = buildHrFollowupLeadMatch(req);
-    const itemMatch = buildHrUnwoundFollowupMatch(followupStatus, from, to);
+    const { leads } = await queryAppliedLeads({ search: req.query.name }, req.user?.college?._id);
+    const startOfToday = getStartOfTodayIST();
 
-    const [facet] = await CareerApplication.aggregate([
-      { $match: leadMatch },
-      { $unwind: '$followups' },
-      { $match: itemMatch },
-      { $sort: { 'followups.followupDate': 1, _id: 1 } },
-      {
-        $facet: {
-          data: [
-            { $skip: skip },
-            { $limit: limit },
-            {
-              $project: {
-                _id: '$followups._id',
-                leadId: '$_id',
-                appliedCourseId: '$_id',
-                name: '$fullName',
-                mobile: '$mobile',
-                email: '$email',
-                city: '$city',
-                applyingFor: '$applyingFor',
-                followupDate: '$followups.followupDate',
-                followUpType: { $ifNull: ['$followups.type', 'Call'] },
-                remarks: '$followups.remarks',
-                status: '$followups.status',
-                _candidate: {
-                  name: '$fullName',
-                  mobile: '$mobile',
-                  email: '$email',
-                },
-              },
-            },
-          ],
-          total: [{ $count: 'count' }],
-        },
-      },
-    ]);
+    const matchesStatus = (item) => {
+      const when = item.followupDate ? new Date(item.followupDate) : null;
+      if (followupStatus === 'done') return item.status === 'done';
+      if (followupStatus === 'missed') return isHrFollowupMissed(item, startOfToday);
+      return item.status === 'planned' && when && when >= startOfToday;
+    };
+    const matchesDate = (item) => {
+      if (!from && !to) return true;
+      const when = item.followupDate ? new Date(item.followupDate) : null;
+      if (!when) return false;
+      if (from && when < from) return false;
+      if (to && when > to) return false;
+      return true;
+    };
 
-    const data = facet?.data || [];
-    const total = facet?.total?.[0]?.count || 0;
+    const rows = [];
+    leads.forEach((lead) => {
+      (lead.followups || []).forEach((item) => {
+        if (!matchesStatus(item) || !matchesDate(item)) return;
+        rows.push(serializeHrFollowupRow(lead, item));
+      });
+    });
+    rows.sort((a, b) => new Date(a.followupDate) - new Date(b.followupDate));
+    const total = rows.length;
+    const data = rows.slice(skip, skip + limit);
 
     return res.json({
       success: true,
       data,
       page,
-      totalPages: Math.max(Math.ceil(total / limit), 1),
+      totalPages: Math.max(Math.ceil(total / limit) || 1, 1),
       total,
     });
   } catch (error) {
@@ -851,46 +1023,18 @@ router.get('/followupcounts', isCollege, async (req, res) => {
   try {
     const startOfToday = getStartOfTodayIST();
     const { from, to } = resolveHrFollowupRange(req.query.fromDate, req.query.toDate, req.query.allTime);
-    const leadMatch = buildHrFollowupLeadMatch(req);
-    const dateMatch = {};
-    if (from || to) {
-      dateMatch['followups.followupDate'] = {};
-      if (from) dateMatch['followups.followupDate'].$gte = from;
-      if (to) dateMatch['followups.followupDate'].$lte = to;
-    }
-
-    const rows = await CareerApplication.aggregate([
-      { $match: leadMatch },
-      { $unwind: '$followups' },
-      ...(Object.keys(dateMatch).length ? [{ $match: dateMatch }] : []),
-      {
-        $group: {
-          _id: {
-            $cond: [
-              { $eq: ['$followups.status', 'done'] },
-              'done',
-              {
-                $cond: [
-                  {
-                    $or: [
-                      { $eq: ['$followups.status', 'missed'] },
-                      { $lt: ['$followups.followupDate', startOfToday] },
-                    ],
-                  },
-                  'missed',
-                  'planned',
-                ],
-              },
-            ],
-          },
-          count: { $sum: 1 },
-        },
-      },
-    ]);
-
+    const { leads } = await queryAppliedLeads({ search: req.query.name }, req.user?.college?._id);
     const counts = { planned: 0, done: 0, missed: 0 };
-    rows.forEach((row) => {
-      if (row?._id && counts[row._id] !== undefined) counts[row._id] = row.count || 0;
+
+    leads.forEach((lead) => {
+      (lead.followups || []).forEach((item) => {
+        const when = item.followupDate ? new Date(item.followupDate) : null;
+        if (from && when && when < from) return;
+        if (to && when && when > to) return;
+        if (item.status === 'done') counts.done += 1;
+        else if (isHrFollowupMissed(item, startOfToday)) counts.missed += 1;
+        else if (item.status === 'planned') counts.planned += 1;
+      });
     });
 
     return res.json({ success: true, data: counts });
@@ -935,13 +1079,7 @@ router.get('/statuses', isCollege, async (req, res) => {
 
 router.get('/leads/download', isCollege, async (req, res) => {
   try {
-    const match = buildMatch(req.query, req.user?.college?._id);
-    const leads = await CareerApplication.find(match)
-      .populate('leadOwner', 'name email')
-      .populate('leadCoOwner', 'name email')
-      .populate(STATUS_POPULATE)
-      .sort({ createdAt: -1 })
-      .lean();
+    const { leads } = await queryAppliedLeads(req.query, req.user?.college?._id);
 
     const rows = leads.map((lead) => ({
       Date: moment(lead.createdAt).utcOffset('+05:30').format('DD/MM/YYYY hh:mm A'),
@@ -991,10 +1129,15 @@ router.post('/leads/refer', isCollege, async (req, res) => {
     }
 
     const validIds = leadIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
-    const leads = await CareerApplication.find(applyCollegeScope({
-      _id: { $in: validIds },
-      isDeleted: { $ne: true },
-    }, req.user?.college?._id));
+    const applies = await AppliedJobs.find({ _id: { $in: validIds }, isDeleted: { $ne: true } })
+      .populate('_candidate', 'name college')
+      .populate('_job', 'hr');
+    const collegeId = toCollegeObjectId(req.user?.college?._id);
+    const leads = applies.filter((item) => {
+      if (!collegeId) return true;
+      if (item.college && String(item.college) === String(collegeId)) return true;
+      return item._candidate && String(item._candidate.college) === String(collegeId);
+    });
 
     if (!leads.length) {
       return res.status(404).json({ success: false, message: 'No HR leads found' });
@@ -1004,21 +1147,21 @@ router.post('/leads/refer', isCollege, async (req, res) => {
     let referred = 0;
     let skipped = 0;
 
-    for (const lead of leads) {
-      const previousOwnerId = toCollegeObjectId(lead.leadOwner || lead.assignedTo);
+    for (const apply of leads) {
+      const previousOwnerId = toCollegeObjectId(apply.leadOwner || apply.assignedTo || apply._job?.hr);
       if (sameId(previousOwnerId, counselorId)) {
         skipped += 1;
         continue;
       }
 
-      let nextCoOwner = toCollegeObjectId(lead.leadCoOwner);
+      let nextCoOwner = toCollegeObjectId(apply.leadCoOwner);
       if (sameId(nextCoOwner, counselorId)) nextCoOwner = null;
 
       if (previousOwnerId && !sameId(previousOwnerId, counselorId)) {
         if (nextCoOwner && !sameId(nextCoOwner, previousOwnerId)) {
           return res.status(400).json({
             success: false,
-            message: `${lead.fullName || 'Lead'} already has a co-owner. Remove the co-owner first so the previous owner can become co-owner.`,
+            message: `${apply._candidate?.name || 'Lead'} already has a co-owner. Remove the co-owner first so the previous owner can become co-owner.`,
           });
         }
         if (!nextCoOwner) nextCoOwner = previousOwnerId;
@@ -1029,23 +1172,19 @@ router.post('/leads/refer', isCollege, async (req, res) => {
         : null;
       const oldName = previousOwner?.name?.trim() || 'Unassigned';
 
-      await CareerApplication.findByIdAndUpdate(lead._id, {
-        $set: {
-          leadOwner: counselorId,
-          assignedTo: counselorId,
-          leadCoOwner: nextCoOwner,
-        },
-        $push: {
-          logs: {
-            user: req.user?._id,
-            timestamp: new Date(),
-            action: `Lead referred from ${oldName} to ${newName}`,
-            remarks: previousOwnerId
-              ? 'Previous owner set as co-owner'
-              : 'No previous owner to set as co-owner',
-          },
-        },
+      apply.leadOwner = counselorId;
+      apply.assignedTo = counselorId;
+      apply.leadCoOwner = nextCoOwner;
+      apply.logs = apply.logs || [];
+      apply.logs.push({
+        user: req.user?._id,
+        timestamp: new Date(),
+        action: `Lead referred from ${oldName} to ${newName}`,
+        remarks: previousOwnerId
+          ? 'Previous owner set as co-owner'
+          : 'No previous owner to set as co-owner',
       });
+      await apply.save();
       referred += 1;
     }
 
@@ -1106,47 +1245,110 @@ router.post('/leads', isCollege, async (req, res) => {
       jobId: req.body.jobId || req.body._job,
       collegeId,
     });
-    const ownerLog = jobOwner.hrId
-      ? {
-          user: req.user?._id,
-          action: `Lead owner auto-assigned to ${jobOwner.hrName}`,
-          remarks: jobOwner.jobTitle
-            ? `Matched job "${jobOwner.jobTitle}"`
-            : applyingFor,
-        }
-      : null;
 
-    const lead = await CareerApplication.create({
-      fullName,
-      email,
-      mobile,
-      city,
-      applyingFor,
-      experience,
-      qualification,
-      dateOfBirth: dateOfBirth && !Number.isNaN(dateOfBirth.getTime()) ? dateOfBirth : undefined,
-      resume: isActualMediaFile(resumeUrl) ? resumeUrl : '',
+    const jobId = toCollegeObjectId(jobOwner.jobId);
+    const vacancy = jobId ? await Vacancy.findById(jobId).select('_id title _company hr').lean() : null;
+    const mobileValues = mobileLookupValues(mobile);
+    let candidate = await CandidateProfile.findOne({
+      mobile: { $in: mobileValues },
+      isDeleted: { $ne: true },
+    });
+
+    const experienceYears = parseInt(String(experience || '').replace(/_/g, ' '), 10);
+    const statusLabel = defaultStatus
+      ? `${defaultStatus.title}${defaultStatus.substatuses?.[0]?.title ? ` / ${defaultStatus.substatuses[0].title}` : ''}`
+      : '';
+
+    if (!candidate) {
+      candidate = await CandidateProfile.create({
+        name: fullName,
+        email,
+        mobile: parseInt(mobile, 10),
+        source,
+        remark,
+        college: collegeId,
+        dob: dateOfBirth && !Number.isNaN(dateOfBirth.getTime()) ? dateOfBirth : undefined,
+        isImported: true,
+        personalInfo: {
+          totalExperience: Number.isFinite(experienceYears) ? experienceYears : undefined,
+          currentAddress: { city },
+          resume: isActualMediaFile(resumeUrl) ? [{ name: 'Resume / CV', url: resumeUrl, uploadedAt: new Date() }] : [],
+        },
+        qualifications: qualification ? [{ specialization: qualification }] : [],
+        appliedJobs: jobId ? [{ jobId }] : [],
+        hiringStatus: jobId ? [{
+          company: vacancy?._company,
+          job: jobId,
+          status: statusLabel,
+          comment: remark,
+          eventDate: new Date().toISOString(),
+        }] : [],
+      });
+    } else {
+      if (!candidate.college) candidate.college = collegeId;
+      if (remark && !candidate.remark) candidate.remark = remark;
+      if (city) {
+        candidate.personalInfo = candidate.personalInfo || {};
+        candidate.personalInfo.currentAddress = candidate.personalInfo.currentAddress || {};
+        if (!candidate.personalInfo.currentAddress.city) candidate.personalInfo.currentAddress.city = city;
+      }
+      if (jobId) {
+        const alreadyLinked = (candidate.appliedJobs || []).some((item) => String(item.jobId || item) === String(jobId));
+        if (!alreadyLinked) {
+          candidate.appliedJobs = candidate.appliedJobs || [];
+          candidate.appliedJobs.push({ jobId });
+        }
+        const existingHiring = hiringEntryForJob(candidate, jobId);
+        if (!existingHiring) {
+          candidate.hiringStatus = candidate.hiringStatus || [];
+          candidate.hiringStatus.push({
+            company: vacancy?._company,
+            job: jobId,
+            status: statusLabel,
+            comment: remark,
+            eventDate: new Date().toISOString(),
+          });
+        }
+      }
+      await candidate.save();
+    }
+
+    if (jobId) {
+      const alreadyApplied = await AppliedJobs.findOne({ _candidate: candidate._id, _job: jobId });
+      if (alreadyApplied) {
+        const loaded = await loadAppliedLead(alreadyApplied._id, collegeId);
+        return res.status(200).json({
+          success: true,
+          message: 'Candidate already applied for this job',
+          data: loaded?.lead,
+        });
+      }
+    }
+
+    const applied = await AppliedJobs.create({
+      _candidate: candidate._id,
+      _job: jobId || undefined,
+      _company: vacancy?._company || undefined,
+      college: collegeId,
       remark,
       source,
-      college: collegeId,
-      leadOwner: jobOwner.hrId || undefined,
-      assignedTo: jobOwner.hrId || undefined,
+      resume: isActualMediaFile(resumeUrl) ? resumeUrl : '',
       leadStatus: defaultStatus?._id || null,
       leadSubstatus: defaultStatus?.substatuses?.[0]?._id || null,
-      logs: [
-        {
-          user: req.user?._id,
-          action: 'Lead created',
-          remarks: source === 'manual' ? 'Added from HR panel' : source,
-        },
-        ...(ownerLog ? [ownerLog] : []),
-      ],
+      leadOwner: jobOwner.hrId || undefined,
+      assignedTo: jobOwner.hrId || undefined,
+      logs: [{
+        user: req.user?._id,
+        action: 'Lead created',
+        remarks: source === 'manual' ? 'Added from HR panel' : source,
+      }],
     });
+    const loaded = await loadAppliedLead(applied._id, collegeId);
 
     return res.status(201).json({
       success: true,
       message: 'HR lead added successfully',
-      data: serializeLead(lead),
+      data: loaded?.lead,
     });
   } catch (error) {
     console.error('[HR leads] create error:', error);
@@ -1156,7 +1358,7 @@ router.post('/leads', isCollege, async (req, res) => {
 
 // Public ingestion for digital career leads (ads / landing pages / Excel).
 // Verify User by mobile. New numbers create User then CandidateProfile, then AppliedJobs.
-// Repeat apply for the same job is returned as duplicate. CareerApplication is not used.
+// Repeat apply for the same job is returned as duplicate. HR list reads AppliedJobs.
 router.route("/digitalhrleads").post(async (req, res) => {
   try {
       let fullname = pickBodyValue(req.body, ['fullname', 'full_name', 'fullName', 'name']);
@@ -1502,6 +1704,21 @@ router.route("/digitalhrleads").post(async (req, res) => {
           _candidate: existingCandidate._id,
           _job: jobId,
           _company: vacancy._company || undefined,
+          college: collegeId,
+          project: namedRefs.projectId || existingCandidate.project || undefined,
+          department: namedRefs.departmentId || existingCandidate.department || undefined,
+          remark: remark || '',
+          source: source || 'Digital Lead',
+          resume: isActualMediaFile(resumeUrl) ? resumeUrl : '',
+          leadStatus: statusDocument?._id || null,
+          leadSubstatus: subStatusDocument?._id || null,
+          leadOwner: jobOwner.hrId || undefined,
+          assignedTo: jobOwner.hrId || undefined,
+          logs: [{
+              action: 'Lead created',
+              remarks: 'Imported from digital job apply',
+              timestamp: new Date(),
+          }],
       });
 
       const createdApply = await AppliedJobs.findById(appliedJob._id)
@@ -1548,27 +1765,11 @@ router.route("/digitalhrleads").post(async (req, res) => {
 });
 router.get('/leads/:id', isCollege, async (req, res) => {
   try {
-    const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ success: false, message: 'Invalid lead id' });
-    }
-
-    const lead = await CareerApplication.findOne({
-      _id: id,
-      isDeleted: { $ne: true },
-      ...collegeScopeFilter(req.user?.college?._id),
-    })
-      .populate('leadOwner', 'name email')
-      .populate('leadCoOwner', 'name email')
-      .populate('assignedTo', 'name email')
-      .populate('logs.user', 'name email')
-      .populate(STATUS_POPULATE);
-
-    if (!lead) {
+    const loaded = await loadAppliedLead(req.params.id, req.user?.college?._id);
+    if (!loaded) {
       return res.status(404).json({ success: false, message: 'Lead not found' });
     }
-
-    return res.json({ success: true, data: serializeLead(lead) });
+    return res.json({ success: true, data: loaded.lead });
   } catch (error) {
     console.error('[HR leads] get error:', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch HR lead' });
@@ -1577,17 +1778,18 @@ router.get('/leads/:id', isCollege, async (req, res) => {
 
 router.patch('/leads/:id', isCollege, async (req, res) => {
   try {
-    const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ success: false, message: 'Invalid lead id' });
-    }
-
-    const lead = await CareerApplication.findOne({ _id: id, isDeleted: { $ne: true }, ...collegeScopeFilter(req.user?.college?._id) });
-    if (!lead) {
+    const loaded = await loadAppliedLead(req.params.id, req.user?.college?._id);
+    if (!loaded) {
       return res.status(404).json({ success: false, message: 'Lead not found' });
     }
 
-    const updates = {};
+    const apply = await AppliedJobs.findById(loaded.apply._id);
+    if (!apply) {
+      return res.status(404).json({ success: false, message: 'Lead not found' });
+    }
+    if (!apply.followups) apply.followups = [];
+    if (!apply.logs) apply.logs = [];
+    const candidate = await CandidateProfile.findById(loaded.candidate._id);
     const logActions = [];
 
     if (typeof req.body.leadStatus !== 'undefined') {
@@ -1623,81 +1825,66 @@ router.patch('/leads/:id', isCollege, async (req, res) => {
         }
 
         const followupType = req.body.followupType === 'Visit' ? 'Visit' : 'Call';
-        closeOpenHrFollowups(lead, followupType);
-        lead.followups.push({
+        closeOpenHrFollowups(apply, followupType);
+        apply.followups.push({
           type: followupType,
           followupDate: nextFollowup,
           remarks: String(req.body.remark || '').trim(),
           status: 'planned',
           createdBy: req.user?._id,
         });
-        await lead.save();
         logActions.push(`${followupType} followup scheduled`);
       }
 
-      if (String(lead.leadStatus || '') !== statusId) {
-        logActions.push(`Status changed to ${status.title}`);
-      }
-      if (String(lead.leadSubstatus || '') !== String(substatus?._id || '')) {
-        logActions.push(`Sub-status changed to ${substatus?.title || 'None'}`);
-      }
-      updates.leadStatus = statusId;
-      updates.leadSubstatus = substatus?._id || null;
+      apply.leadStatus = statusId;
+      apply.leadSubstatus = substatus?._id || null;
+      logActions.push(`Status changed to ${status.title}${substatus?.title ? ` / ${substatus.title}` : ''}`);
     }
 
-    if (typeof req.body.remark === 'string' && req.body.remark !== lead.remark) {
-      updates.remark = req.body.remark.trim();
+    if (typeof req.body.remark === 'string') {
+      apply.remark = req.body.remark.trim();
       logActions.push('Remark updated');
     }
 
-    if (typeof req.body.qualification === 'string' && req.body.qualification !== (lead.qualification || '')) {
-      updates.qualification = req.body.qualification.trim();
+    if (candidate && typeof req.body.qualification === 'string') {
+      if (!(candidate.qualifications || []).length) candidate.qualifications = [{ specialization: req.body.qualification.trim() }];
+      else candidate.qualifications[0].specialization = req.body.qualification.trim();
       logActions.push('Qualification updated');
     }
 
-    if (typeof req.body.dateOfBirth !== 'undefined') {
+    if (candidate && typeof req.body.dateOfBirth !== 'undefined') {
       const nextDob = req.body.dateOfBirth ? new Date(req.body.dateOfBirth) : null;
-      updates.dateOfBirth = nextDob && !Number.isNaN(nextDob.getTime()) ? nextDob : null;
+      candidate.dob = nextDob && !Number.isNaN(nextDob.getTime()) ? nextDob : null;
       logActions.push('Date of birth updated');
     }
 
     if (typeof req.body.leadOwner !== 'undefined' || typeof req.body.assignedTo !== 'undefined') {
-      const nextOwner = toObjectId(req.body.leadOwner ?? req.body.assignedTo);
-      updates.leadOwner = nextOwner;
-      updates.assignedTo = nextOwner;
+      apply.leadOwner = toObjectId(req.body.leadOwner ?? req.body.assignedTo);
+      apply.assignedTo = apply.leadOwner;
       logActions.push('Lead owner updated');
     }
 
     if (typeof req.body.leadCoOwner !== 'undefined') {
-      updates.leadCoOwner = toObjectId(req.body.leadCoOwner);
+      apply.leadCoOwner = toObjectId(req.body.leadCoOwner);
       logActions.push('Lead co-owner updated');
     }
 
-    if (!Object.keys(updates).length) {
-      return res.json({ success: true, message: 'No changes', data: serializeLead(lead) });
-    }
+    logActions.forEach((action) => {
+      apply.logs.push({
+        user: req.user?._id,
+        action,
+        remarks: req.body.remark || '',
+        timestamp: new Date(),
+      });
+    });
 
-    updates.$push = {
-      logs: {
-        $each: logActions.map((action) => ({
-          user: req.user?._id,
-          action,
-          remarks: req.body.remark || '',
-          timestamp: new Date(),
-        })),
-      },
-    };
-
-    const updated = await CareerApplication.findByIdAndUpdate(id, updates, { new: true })
-      .populate('leadOwner', 'name email')
-      .populate('leadCoOwner', 'name email')
-      .populate('assignedTo', 'name email')
-      .populate(STATUS_POPULATE);
-
+    await apply.save();
+    if (candidate) await candidate.save();
+    const next = await loadAppliedLead(req.params.id, req.user?.college?._id);
     return res.json({
       success: true,
-      message: 'Lead updated',
-      data: serializeLead(updated),
+      message: logActions.length ? 'Lead updated' : 'No changes',
+      data: next?.lead,
     });
   } catch (error) {
     console.error('[HR leads] update error:', error);
@@ -1723,38 +1910,37 @@ router.post('/leads/:id/followup', isCollege, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Remarks are mandatory for followup' });
     }
 
-    const lead = await CareerApplication.findOne({ _id: id, isDeleted: { $ne: true }, ...collegeScopeFilter(req.user?.college?._id) });
-    if (!lead) {
+    const loaded = await loadAppliedLead(id, req.user?.college?._id);
+    if (!loaded) {
       return res.status(404).json({ success: false, message: 'Lead not found' });
     }
 
-    closeOpenHrFollowups(lead, type);
+    const apply = await AppliedJobs.findById(id);
+    if (!apply.followups) apply.followups = [];
+    if (!apply.logs) apply.logs = [];
+    closeOpenHrFollowups(apply, type);
 
-    lead.followups.push({
+    apply.followups.push({
       type,
       followupDate,
       remarks,
       status: 'planned',
       createdBy: req.user?._id,
     });
-    lead.logs.push({
+    apply.logs.push({
       user: req.user?._id,
       action: `${type} followup scheduled`,
       remarks,
       timestamp: new Date(),
     });
-    await lead.save();
+    await apply.save();
 
-    const updated = await CareerApplication.findById(lead._id)
-      .populate('leadOwner', 'name email')
-      .populate('leadCoOwner', 'name email')
-      .populate('assignedTo', 'name email')
-      .populate(STATUS_POPULATE);
+    const updated = await loadAppliedLead(id, req.user?.college?._id);
 
     return res.json({
       success: true,
       message: `${type} followup set successfully`,
-      data: serializeLead(updated),
+      data: updated?.lead,
     });
   } catch (error) {
     console.error('[HR leads] followup error:', error);
@@ -1769,16 +1955,17 @@ router.post('/leads/:id/followup/:followupId/complete', isCollege, async (req, r
       return res.status(400).json({ success: false, message: 'Invalid id' });
     }
 
-    const lead = await CareerApplication.findOne({
-      _id: id,
-      isDeleted: { $ne: true },
-      ...collegeScopeFilter(req.user?.college?._id),
-    });
-    if (!lead) {
+    const loaded = await loadAppliedLead(id, req.user?.college?._id);
+    if (!loaded) {
       return res.status(404).json({ success: false, message: 'Lead not found' });
     }
 
-    const item = lead.followups.id(followupId);
+    const apply = await AppliedJobs.findById(id);
+    if (!apply.followups) apply.followups = [];
+    if (!apply.logs) apply.logs = [];
+    const item = apply.followups.id
+      ? apply.followups.id(followupId)
+      : (apply.followups || []).find((row) => String(row._id) === String(followupId));
     if (!item) {
       return res.status(404).json({ success: false, message: 'Followup not found' });
     }
@@ -1788,18 +1975,18 @@ router.post('/leads/:id/followup/:followupId/complete', isCollege, async (req, r
 
     item.status = 'done';
     item.completedAt = new Date();
-    lead.logs.push({
+    apply.logs.push({
       user: req.user?._id,
       action: `${item.type || 'Call'} followup marked complete`,
       remarks: item.remarks || '',
       timestamp: new Date(),
     });
-    await lead.save();
+    await apply.save();
 
     return res.json({
       success: true,
       message: 'Follow-up marked complete successfully',
-      data: serializeHrFollowupRow(lead, item),
+      data: serializeHrFollowupRow(loaded.lead, item),
     });
   } catch (error) {
     console.error('[HR followups] complete error:', error);
@@ -1825,8 +2012,8 @@ router.post('/leads/:id/documents', isCollege, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please choose a file to upload' });
     }
 
-    const lead = await CareerApplication.findOne({ _id: id, isDeleted: { $ne: true }, ...collegeScopeFilter(req.user?.college?._id) });
-    if (!lead) {
+    const loaded = await loadAppliedLead(id, req.user?.college?._id);
+    if (!loaded) {
       return res.status(404).json({ success: false, message: 'Lead not found' });
     }
 
@@ -1839,31 +2026,29 @@ router.post('/leads/:id/documents', isCollege, async (req, res) => {
       uploadedAt: new Date(),
     };
 
-    const docs = Array.isArray(lead.documents) ? lead.documents.map((item) => item.toObject?.() || item) : [];
+    const apply = await AppliedJobs.findById(id);
+    if (!apply.documents) apply.documents = [];
+    if (!apply.logs) apply.logs = [];
+    const docs = Array.isArray(apply.documents) ? apply.documents.map((item) => item.toObject?.() || item) : [];
     const existingIndex = docs.findIndex((item) => item.key === docType.key);
     if (existingIndex >= 0) docs[existingIndex] = { ...docs[existingIndex], ...nextDoc };
     else docs.push(nextDoc);
-
-    lead.documents = docs;
-    if (docType.key === 'resume') lead.resume = fileUrl;
-    lead.logs.push({
+    apply.documents = docs;
+    if (docType.key === 'resume') apply.resume = fileUrl;
+    apply.logs.push({
       user: req.user?._id,
       action: `${docType.name} uploaded`,
       remarks: '',
       timestamp: new Date(),
     });
-    await lead.save();
+    await apply.save();
 
-    const updated = await CareerApplication.findById(lead._id)
-      .populate('leadOwner', 'name email')
-      .populate('leadCoOwner', 'name email')
-      .populate('assignedTo', 'name email')
-      .populate(STATUS_POPULATE);
+    const updated = await loadAppliedLead(id, req.user?.college?._id);
 
     return res.json({
       success: true,
       message: `${docType.name} uploaded`,
-      data: serializeLead(updated),
+      data: updated?.lead,
     });
   } catch (error) {
     console.error('[HR leads] document upload error:', error);
