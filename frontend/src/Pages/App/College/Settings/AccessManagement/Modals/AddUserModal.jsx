@@ -62,6 +62,9 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
       can_add_course: false,
       can_add_batch: false,
       can_assign_batch: false,
+
+      // Academic Coordinator
+      can_be_academic_coordinator: false,
       can_be_senior_trainer: false,
       can_be_trainer: false,
 
@@ -198,6 +201,7 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
         can_add_course: true,
         can_add_batch: true,
         can_assign_batch: true,
+        can_be_academic_coordinator: true,
         can_be_senior_trainer: true,
         can_be_trainer: true,
         can_view_users: true,
@@ -235,6 +239,7 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
         can_add_course: false,
         can_add_batch: false,
         can_assign_batch: false,
+        can_be_academic_coordinator: false,
         can_be_senior_trainer: false,
         can_be_trainer: false,
         can_view_users: true,
@@ -393,7 +398,7 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
       }
 
       // Training Management Dependencies
-      if (['can_add_vertical', 'can_add_project', 'can_add_center', 'can_add_course', 'can_add_batch', 'can_assign_batch', 'can_be_senior_trainer', 'can_be_trainer'].includes(permission) && value === true) {
+      if (['can_add_vertical', 'can_add_project', 'can_add_center', 'can_add_course', 'can_add_batch', 'can_assign_batch'].includes(permission) && value === true) {
         updatedPermissions.can_view_training = true;
       }
       if (permission === 'can_view_training' && value === false) {
@@ -403,8 +408,6 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
         updatedPermissions.can_add_course = false;
         updatedPermissions.can_add_batch = false;
         updatedPermissions.can_assign_batch = false;
-        updatedPermissions.can_be_senior_trainer = false;
-        updatedPermissions.can_be_trainer = false;
       }
 
       // User Management Dependencies
@@ -1049,7 +1052,36 @@ const AddUserModal = ({ onClose, onAddUser, users = [], entities = {} }) => {
                       can_add_center: '🏫 Add Center',
                       can_add_course: '📚 Add Course',
                       can_add_batch: '👥 Add Batch',
-                      can_assign_batch: '🎯 Assign Batch',
+                      can_assign_batch: '🎯 Assign Batch'
+                    }).map(([permission, label]) => (
+                      <div key={permission} className="col-md-6">
+                        <div className="form-check">
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            checked={userForm.permissions[permission]}
+                            onChange={(e) => handlePermissionChange(permission, e.target.checked)}
+                            id={`perm_${permission}`}
+                          />
+                          <label className="form-check-label" htmlFor={`perm_${permission}`}>
+                            {label}
+                          </label>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Academic Coordinator */}
+              <div className="card mb-3">
+                <div className="card-header text-white" style={{ backgroundColor: '#7c3aed' }}>
+                  <h6 className="mb-0">🧭 Academic Coordinator</h6>
+                </div>
+                <div className="card-body">
+                  <div className="row g-2">
+                    {Object.entries({
+                      can_be_academic_coordinator: '👔 Academic Coordinator',
                       can_be_senior_trainer: '🛡️ Senior Trainer',
                       can_be_trainer: '👨‍🏫 Trainer'
                     }).map(([permission, label]) => (
