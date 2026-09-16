@@ -48,6 +48,7 @@ const videoTimestampRoutes = require("./videoTimestamp");
 //Trainer route 
 const trainerRoutes = require('./trainer');
 const sessionPlanRoutes = require('./sessionPlan');
+const courseActivityRoutes = require('./courseActivity');
 
 //b2b routes
 const b2bRoutes = require("./b2b/b2b");
@@ -400,6 +401,7 @@ router.use("/lrp", isCollege, lrpRoutes);
 router.use("/video-timestamp", videoTimestampRoutes);
 router.use("/trainer", trainerRoutes)
 router.use("/session-plans", isCollege, sessionPlanRoutes)
+router.use("/course-activities", isCollege, courseActivityRoutes)
 const readXlsxFile = require("read-excel-file/node");
 const appliedCourses = require("../../models/appliedCourses");
 

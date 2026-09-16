@@ -139,10 +139,18 @@ const coursecopySchema = new Schema({
     default: null
   },
 
+  // Planning path for Academic Coordinator. Session is always required.
+  // Allowed: session | unit-session | chapter-session | unit-chapter-session
   courseStructure: {
     unit: { type: Boolean, default: true },
     chapter: { type: Boolean, default: true },
     session: { type: Boolean, default: true },
+    path: {
+      type: String,
+      enum: ['session', 'unit-session', 'chapter-session', 'unit-chapter-session'],
+      default: 'unit-chapter-session',
+    },
+    pathLabel: { type: String, default: 'Unit → Chapter → Session' },
   },
 
 }, { timestamps: true });

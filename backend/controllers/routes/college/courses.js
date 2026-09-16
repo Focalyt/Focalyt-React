@@ -26,6 +26,7 @@ const {
 const s3 = require("../../../helpers/objectStorage");
 const { normalizeStorageKey } = require('../../../helpers/s3Storage');
 const { buildCourseDocumentKey } = require('../../../helpers/storagePaths');
+const { normalizeCourseStructure } = require('../../../helpers/courseStructure');
 const allowedVideoExtensions = ['mp4', 'mkv', 'mov', 'avi', 'wmv'];
 const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
 const allowedDocumentExtensions = ['pdf', 'doc', 'docx']; // ✅ PDF aur DOC types allow karein
@@ -89,6 +90,57 @@ const normalizeCourseMedia = (body) => {
 	if (body.testimonialvideos) body.testimonialvideos = body.testimonialvideos.map(normalizeStorageKey);
 	if (body.thumbnail) body.thumbnail = normalizeStorageKey(body.thumbnail);
 	if (body.brochure) body.brochure = normalizeStorageKey(body.brochure);
+	return body;
+};
+
+// Fields shown only when Course Fee Type is Paid (hidden for Free on addcoursecopy)
+const PAID_ONLY_FIELDS = [
+	'registrationCharges',
+	'courseFee',
+	'cutPrice',
+	'examFee',
+	'otherFee',
+	'emiOptionAvailable',
+	'maxEMITenure',
+];
+
+// Fields shown only when Course Type is course+job
+const COURSE_JOB_ONLY_FIELDS = ['ojt', 'stipendDuringTraining'];
+
+const isBlank = (value) => value === undefined || value === null || String(value).trim() === '';
+
+/**
+ * Mirror addcoursecopy UI: hide/clear paid fields for Free, require EMI for Paid.
+ */
+const applyCourseFeeTypeRules = (body) => {
+	const feeType = String(body.courseFeeType || '').trim();
+	if (!['Paid', 'Free'].includes(feeType)) {
+		const err = new Error('Course Fee Type is required and must be Paid or Free');
+		err.statusCode = 400;
+		throw err;
+	}
+	body.courseFeeType = feeType;
+
+	if (feeType === 'Free') {
+		PAID_ONLY_FIELDS.forEach((field) => {
+			body[field] = '';
+		});
+	} else if (isBlank(body.emiOptionAvailable)) {
+		const err = new Error('EMI Option Available is required for paid courses');
+		err.statusCode = 400;
+		throw err;
+	}
+
+	if (body.courseType !== 'coursejob') {
+		COURSE_JOB_ONLY_FIELDS.forEach((field) => {
+			body[field] = '';
+		});
+	} else if (isBlank(body.ojt)) {
+		const err = new Error('OJT is required when Course Type is Course + Job');
+		err.statusCode = 400;
+		throw err;
+	}
+
 	return body;
 };
 
@@ -361,15 +413,7 @@ router
 			body.classResourcesRequired = JSON.parse(body.classResourcesRequired || '[]');
 			body.labResourcesRequired = JSON.parse(body.labResourcesRequired || '[]');
 			body.questionAnswers = JSON.parse(body.questionAnswers || '[]');
-			if (body.courseStructure) {
-				try {
-					body.courseStructure = typeof body.courseStructure === 'string'
-						? JSON.parse(body.courseStructure)
-						: body.courseStructure;
-				} catch (_) {
-					delete body.courseStructure;
-				}
-			}
+			body.courseStructure = normalizeCourseStructure(body.courseStructure);
 			body.createdBy = JSON.parse(body.createdBy || '{}');
 
 			if (files?.photos) {
@@ -464,6 +508,7 @@ router
 				}
 			}
 
+			applyCourseFeeTypeRules(body);
 			normalizeCourseMedia(body);
 
 			// Save ONLY into coursescopy collection
@@ -682,10 +727,8 @@ router
 					? JSON.parse(body.questionAnswers)
 					: body.questionAnswers;
 			}
-			if (body.courseStructure) {
-				body.courseStructure = typeof body.courseStructure === 'string'
-					? JSON.parse(body.courseStructure)
-					: body.courseStructure;
+			if (body.courseStructure !== undefined) {
+				body.courseStructure = normalizeCourseStructure(body.courseStructure);
 			}
 			if (body.createdBy) {
 				body.createdBy = typeof body.createdBy === 'string'
@@ -782,6 +825,8 @@ router
 			}
 
 			normalizeCourseMedia(body);
+
+			applyCourseFeeTypeRules(body);
 
 			// Update ONLY in coursescopy collection
 			const updatedCourse = await CoursesCopy.findByIdAndUpdate(courseId, body, { new: true, runValidators: true });

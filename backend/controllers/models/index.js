@@ -70,6 +70,7 @@ module.exports.Courses=require('./courses');
 module.exports.CoursesCopy=require('./coursescopy');
 module.exports.SessionPlan=require('./sessionPlan');
 module.exports.SessionActivityType=require('./sessionActivityType');
+module.exports.CourseActivity=require('./courseActivity');
 module.exports.Post=require('./post');
 module.exports.CourseSectors=require('./courseSectors');
 module.exports.AppliedCourses = require("./appliedCourses");
