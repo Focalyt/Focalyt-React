@@ -161,6 +161,53 @@ function applyB2cLeadOwnershipToMatch(match, { teamMemberIds, ownerIds, counselo
 	applyB2cLeadOwnershipMatch(match, { teamMemberIds, ownerIds, counselorIds });
 }
 
+function buildB2cCreatedDateRange(fromDate, toDate) {
+	const range = {};
+	if (fromDate) range.$gte = new Date(fromDate);
+	if (toDate) {
+		const to = new Date(toDate);
+		// Match appliedCandidates: cover the full selected day regardless of timezone.
+		to.setDate(to.getDate() + 1);
+		range.$lte = to;
+	}
+	return range;
+}
+
+function andB2cMatchClause(match, clause) {
+	if (!match || !clause || !Object.keys(clause).length) return;
+	if (Array.isArray(match.$and)) {
+		match.$and.push(clause);
+		return;
+	}
+	if (match.$or) {
+		const existingOr = match.$or;
+		delete match.$or;
+		match.$and = [{ $or: existingOr }, clause];
+		return;
+	}
+	Object.assign(match, clause);
+}
+
+/** Admission card should match lead created date OR the date it was moved to admission. */
+function applyAdmissionDateFilterToMatch(match, createdFromDate, createdToDate) {
+	if (!createdFromDate && !createdToDate) return;
+	const range = buildB2cCreatedDateRange(createdFromDate, createdToDate);
+	andB2cMatchClause(match, {
+		$or: [
+			{ admissionDate: range },
+			{ createdAt: range },
+			{
+				logs: {
+					$elemMatch: {
+						action: 'Moved to Admission List',
+						timestamp: range,
+					},
+				},
+			},
+		],
+	});
+}
+
 function isB2cQuickSearch(name) {
 	return Boolean(name && String(name).trim());
 }
@@ -182,6 +229,39 @@ function hasB2cUserSelectedWideningFilter({
 		(Array.isArray(batchArray) && batchArray.length) ||
 		isB2cQuickSearch(name)
 	);
+}
+
+function applyB2cAccessKeepingUserWidening(user, {
+	projectsArray = [],
+	verticalsArray = [],
+	courseArray = [],
+	centerArray = [],
+	batchArray = [],
+	name,
+} = {}) {
+	const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+		projectsArray,
+		verticalsArray,
+		courseArray,
+		centerArray,
+		batchArray,
+		name,
+	});
+	// Default view is owner/co-owner only. Do not auto-fill access verticals/projects
+	// into the query — that hid own leads and zeroed dashboard counts.
+	if (!userSelectedWideningFilter) {
+		return {
+			verticalsArray: [],
+			projectsArray: [],
+			userSelectedWideningFilter: false,
+		};
+	}
+	const scoped = applyB2cAccessToFilters(user, verticalsArray, projectsArray);
+	return {
+		verticalsArray: scoped.verticalsArray,
+		projectsArray: scoped.projectsArray,
+		userSelectedWideningFilter,
+	};
 }
 
 async function resolveB2cOwnershipTeamMembers(user, counselorArray = [], options = {}) {
@@ -2420,11 +2500,10 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 		const ownerArray = parseB2cFilterIdArray(owner);
 		const hasPersonFilter = ownerArray.length > 0 || counselorArray.length > 0;
 
-		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
-
-		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+		let userSelectedWideningFilter;
+		({ verticalsArray, projectsArray, userSelectedWideningFilter } = applyB2cAccessKeepingUserWidening(user, {
 			projectsArray, verticalsArray, courseArray, centerArray, batchArray, name
-		});
+		}));
 
 		// Person Owner/Counsellor filters use dedicated ownership match.
 		// Admin with no filter: own/co-owned only. Widening filters (or quick search): all leads.
@@ -3182,11 +3261,10 @@ router.route("/appliedCandidatesWithWhatsApp").get(isCollege, async (req, res) =
 		const ownerArray = parseB2cFilterIdArray(owner);
 		const hasPersonFilter = ownerArray.length > 0 || counselorArray.length > 0;
 
-		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
-
-		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+		let userSelectedWideningFilter;
+		({ verticalsArray, projectsArray, userSelectedWideningFilter } = applyB2cAccessKeepingUserWidening(user, {
 			projectsArray, verticalsArray, courseArray, centerArray, name
-		});
+		}));
 
 		let teamMembers = hasPersonFilter
 			? []
@@ -4251,11 +4329,10 @@ router.route("/downloadleads").get(isCollege, async (req, res) => {
 		const ownerArray = parseB2cFilterIdArray(owner);
 		const hasPersonFilter = ownerArray.length > 0 || counselorArray.length > 0;
 
-		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
-
-		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+		let userSelectedWideningFilter;
+		({ verticalsArray, projectsArray, userSelectedWideningFilter } = applyB2cAccessKeepingUserWidening(user, {
 			projectsArray, verticalsArray, courseArray, centerArray, name
-		});
+		}));
 
 		let teamMembers = hasPersonFilter
 			? []
@@ -4713,11 +4790,10 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 		const ownerArray = parseB2cFilterIdArray(owner);
 		const hasPersonFilter = ownerArray.length > 0 || counselorArray.length > 0;
 
-		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
-
-		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+		let userSelectedWideningFilter;
+		({ verticalsArray, projectsArray, userSelectedWideningFilter } = applyB2cAccessKeepingUserWidening(user, {
 			projectsArray, verticalsArray, courseArray, centerArray, name
-		});
+		}));
 
 		const teamMembers = hasPersonFilter
 			? []
@@ -5072,7 +5148,13 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 
 	} catch (error) {
 		console.error('Error calculating filter counts:', error);
-		return { all: 0 };
+		return res.status(500).json({
+			success: false,
+			message: error.message || 'Failed to calculate filter counts',
+			crmFilterCount: { all: 0 },
+			aiCrmFilterCount: { all: 0 },
+			approvalCounts: { total: 0, approved: 0, pending: 0, rejected: 0 },
+		});
 	}
 })
 
@@ -8747,6 +8829,9 @@ router.put('/update/:id', isCollege, async (req, res) => {
 
 		// Add log for Move to Admission List
 		if (typeof updateData.admissionDone !== 'undefined' && updateData.admissionDone === true) {
+			if (!appliedCourse.admissionDate) {
+				appliedCourse.admissionDate = new Date();
+			}
 			appliedCourse.logs.push({
 				user: user._id,
 				timestamp: new Date(),
@@ -8964,7 +9049,9 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 		}
 		const ownerArray = parseB2cFilterIdArray(owner);
 
-		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
+		({ verticalsArray, projectsArray } = applyB2cAccessKeepingUserWidening(user, {
+			projectsArray, verticalsArray, courseArray, centerArray, batchArray
+		}));
 
 		let aggregate = [];
 		let baseMatch = {
@@ -10127,11 +10214,10 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 		const ownerArray = parseB2cFilterIdArray(owner);
 		const hasPersonFilter = ownerArray.length > 0 || counselorArray.length > 0;
 
-		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
-
-		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+		let userSelectedWideningFilter;
+		({ verticalsArray, projectsArray, userSelectedWideningFilter } = applyB2cAccessKeepingUserWidening(user, {
 			projectsArray, verticalsArray, courseArray, centerArray, batchArray, name
-		});
+		}));
 
 		teamMembers = hasPersonFilter
 			? []
@@ -11723,7 +11809,9 @@ router.get("/leads/my-followups", isCollege, async (req, res) => {
 		}
 		const ownerArray = parseB2cFilterIdArray(owner);
 
-		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
+		({ verticalsArray, projectsArray } = applyB2cAccessKeepingUserWidening(user, {
+			projectsArray, verticalsArray, courseArray, centerArray, name: searchName
+		}));
 
 		let baseMatch = buildFollowupCounselorMatch(user, counselorArray, ownerArray);
 
@@ -12388,11 +12476,10 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		const ownerArray = parseB2cFilterIdArray(owner);
 		const hasPersonFilter = ownerArray.length > 0 || counselorArray.length > 0;
 
-		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
-
-		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+		let userSelectedWideningFilter;
+		({ verticalsArray, projectsArray, userSelectedWideningFilter } = applyB2cAccessKeepingUserWidening(user, {
 			projectsArray, verticalsArray, courseArray, centerArray, batchArray, name
-		});
+		}));
 
 		teamMembers = hasPersonFilter
 			? []
@@ -12422,18 +12509,8 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			ownerIds: ownerArray,
 			counselorIds: ownerArray.length > 0 ? [] : counselorArray,
 		});
-		// Add date filters to base match
-		if (createdFromDate || createdToDate) {
-			baseMatchStage.createdAt = {};
-			if (createdFromDate) {
-				baseMatchStage.createdAt.$gte = new Date(createdFromDate);
-			}
-			if (createdToDate) {
-				const toDate = new Date(createdToDate);
-				toDate.setHours(23, 59, 59, 999);
-				baseMatchStage.createdAt.$lte = toDate;
-			}
-		}
+		// Date filter: lead created in range OR admitted in range
+		applyAdmissionDateFilterToMatch(baseMatchStage, createdFromDate, createdToDate);
 		if (modifiedFromDate || modifiedToDate) {
 			baseMatchStage.updatedAt = {};
 			if (modifiedFromDate) {
@@ -13077,18 +13154,12 @@ async function calculateAdmissionFilterCounts(teamMembers, collegeId, appliedFil
 				? []
 				: (appliedFilters.counselorArray || []),
 		});
-		// Add date filters
-		if (appliedFilters.createdFromDate || appliedFilters.createdToDate) {
-			baseMatchStage.createdAt = {};
-			if (appliedFilters.createdFromDate) {
-				baseMatchStage.createdAt.$gte = new Date(appliedFilters.createdFromDate);
-			}
-			if (appliedFilters.createdToDate) {
-				const toDate = new Date(appliedFilters.createdToDate);
-				toDate.setHours(23, 59, 59, 999);
-				baseMatchStage.createdAt.$lte = toDate;
-			}
-		}
+		// Date filter: lead created in range OR admitted in range
+		applyAdmissionDateFilterToMatch(
+			baseMatchStage,
+			appliedFilters.createdFromDate,
+			appliedFilters.createdToDate
+		);
 		if (appliedFilters.modifiedFromDate || appliedFilters.modifiedToDate) {
 			baseMatchStage.updatedAt = {};
 			if (appliedFilters.modifiedFromDate) {
@@ -13856,11 +13927,10 @@ router.get('/dashbord-data', isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 
-		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
-
-		const userSelectedWideningFilter = hasB2cUserSelectedWideningFilter({
+		let userSelectedWideningFilter;
+		({ verticalsArray, projectsArray, userSelectedWideningFilter } = applyB2cAccessKeepingUserWidening(user, {
 			projectsArray, verticalsArray, courseArray, centerArray, name
-		});
+		}));
 
 		let teamMembers = await resolveB2cOwnershipTeamMembers(user, counselorArray, {
 			userSelectedWideningFilter,

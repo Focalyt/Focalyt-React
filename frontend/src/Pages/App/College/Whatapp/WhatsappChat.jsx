@@ -7389,93 +7389,74 @@ const WhatsappChat = () => {
 
   // Render WhatsApp Panel (Desktop Sidebar or Mobile Modal)
   const renderWhatsAppPanel = () => {
+    if (showPanel !== 'Whatsapp' || !selectedProfile) return null;
     const panelContent = (
-      <div className="d-flex flex-column" style={{ height: '100%', backgroundColor: '#f0f2f5' }}>
+      <div className="d-flex flex-column h-100" style={{ height: '100%', backgroundColor: '#efeae2' }} id="whatsappPanel">
         {/* WhatsApp Header */}
-        <div className="bg-white border-bottom" style={{ padding: '16px 16px 12px 16px', position: 'relative' }}>
+        <div style={{ padding: '10px 16px', position: 'relative', minHeight: 60, background: '#f0f2f5', borderBottom: '1px solid #e9edef' }}>
 
-          <div className="d-flex align-items-center mb-2">
+          <div className="d-flex align-items-center">
+            {isMobile ? (
+              <button
+                type="button"
+                className="btn btn-link text-decoration-none me-1 p-1"
+                onClick={closePanel}
+                style={{ color: '#54656f' }}
+                title="Back"
+              >
+                <i className="fas fa-arrow-left" />
+              </button>
+            ) : null}
             <div
-              className="rounded-circle d-flex align-items-center justify-content-center text-white me-3"
+              className="rounded-circle d-flex align-items-center justify-content-center me-3"
               style={{
-                width: '48px',
-                height: '48px',
-                fontSize: '20px',
-                fontWeight: '600',
-                background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                width: '40px',
+                height: '40px',
+                fontSize: '14px',
+                fontWeight: '700',
+                background: '#dfc5f7',
+                color: '#1f2c34',
                 flexShrink: 0
               }}
             >
-              {selectedProfile?._candidate?.name?.charAt(0)?.toUpperCase() || 'R'}
+              {(selectedProfile?._candidate?.name?.charAt(0) || 'C').toUpperCase()}
             </div>
-            <div className="flex-grow-1">
-              <h6 className="mb-0 fw-bold" style={{ fontSize: '16px' }}>
-                {selectedProfile?._candidate?.name || 'NA'}
+            <div className="flex-grow-1 overflow-hidden">
+              <h6 className="mb-0 fw-semibold text-truncate" style={{ fontSize: '16px', color: '#111b21' }}>
+                {selectedProfile?._candidate?.name || 'N/A'}
               </h6>
-              <p className="mb-0 text-muted" style={{ fontSize: '13px' }}>
-                {selectedProfile?._candidate?.mobile || 'NA'}
+              <p className="mb-0 text-truncate" style={{ fontSize: '13px', color: '#667781' }}>
+                {selectedProfile?._candidate?.mobile || 'N/A'}
+                {sessionWindow.isOpen ? (
+                  <span className="ms-2" style={{ color: '#0A6E44', fontSize: 11 }}>
+                    · {sessionCountdown} left
+                  </span>
+                ) : (
+                  <span className="ms-2" style={{ color: '#856404', fontSize: 11 }}>
+                    · No active window
+                  </span>
+                )}
               </p>
             </div>
             <button
-              className="btn-close"
+              type="button"
+              className="btn btn-link text-decoration-none p-1"
               onClick={closePanel}
-              style={{ marginLeft: '8px' }}
-            ></button>
+              style={{ color: '#54656f' }}
+              title="Close chat"
+            >
+              <i className="fas fa-times" />
+            </button>
           </div>
-
-          {/* Session Status Badge - Below name */}
-          <div className="d-flex align-items-center" style={{ paddingLeft: '64px' }}>
-            {sessionWindow.isOpen ? (
-              <div
-                className="d-flex align-items-center px-2 py-1 rounded"
-                style={{
-                  backgroundColor: '#D1F4E0',
-                  border: '1px solid #25D366',
-                  fontSize: '11px',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                <div
-                  className="rounded-circle me-1"
-                  style={{
-                    width: '6px',
-                    height: '6px',
-                    backgroundColor: '#25D366'
-                  }}
-                ></div>
-                <span className="fw-semibold" style={{ color: '#0A6E44' }}>
-                  <i className="fas fa-clock me-1" style={{ fontSize: '10px' }}></i>
-                  {sessionCountdown} remaining
-                </span>
-              </div>
-            ) : (
-              <div
-                className="d-flex align-items-center px-2 py-1 rounded"
-                style={{
-                  backgroundColor: '#FFF3CD',
-                  border: '1px solid #FFA500',
-                  fontSize: '11px',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                <i className="fas fa-clock me-1" style={{ color: '#FFA500', fontSize: '10px' }}></i>
-                <span className="fw-semibold" style={{ color: '#856404' }}>
-                  No Active Window
-                </span>
-              </div>
-            )}
-          </div>
-
         </div>
 
         {/* Messages Area */}
         <div
           className="flex-grow-1 overflow-auto p-3"
           style={{
-            backgroundColor: '#ECE5DD',
-            backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 0h100v100H0z\' fill=\'%23ECE5DD\'/%3E%3Cpath d=\'M50 0L0 50h100L50 0z\' fill=\'%23E1DCD5\' fill-opacity=\'0.1\'/%3E%3C/svg%3E")',
-            maxHeight: '55vh',
-            minHeight: '300px'
+            backgroundColor: '#efeae2',
+            backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h60v60H0z' fill='%23efeae2'/%3E%3Cpath d='M30 0L0 30h60L30 0z' fill='%23e5ddd5' fill-opacity='0.4'/%3E%3C/svg%3E\")",
+            minHeight: 0
           }}
         >
           {/* Loading State */}
@@ -8498,29 +8479,7 @@ const WhatsappChat = () => {
       </div>
     );
 
-    if (isMobile) {
-      return showPanel === 'Whatsapp' ? (
-        <div
-          className='modal show d-block'
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closePanel();
-          }}
-        >
-          <div className="modal-dialog modal-dialog-centered modal-lg" style={{ maxHeight: '90vh' }}>
-            <div className="modal-content" style={{ height: '80vh' }}>
-              {panelContent}
-            </div>
-          </div>
-        </div>
-      ) : null;
-    }
-
-    return showPanel === 'Whatsapp' ? (
-      <div className="col-11 transition-col" id="whatsappPanel">
-        {panelContent}
-      </div>
-    ) : null;
+    return panelContent;
   };
   /************************************/
 
@@ -8947,8 +8906,60 @@ const WhatsappChat = () => {
   };
 
 
+  const avatarColors = ['#dfc5f7', '#c5e1ef', '#f7d5c5', '#d5f7c5', '#f7c5d5', '#c5f7ef', '#efe9c5', '#c5c8f7'];
+  const getAvatarColor = (name = '') => {
+    let hash = 0;
+    for (let i = 0; i < name.length; i += 1) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return avatarColors[Math.abs(hash) % avatarColors.length];
+  };
+  const getAvatarInitials = (name = '') => {
+    const parts = String(name).trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return 'C';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  };
+  const formatChatListTime = (value) => {
+    if (!value) return '';
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    const now = new Date();
+    const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startMsg = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diffDays = Math.round((startToday - startMsg) / 86400000);
+    if (diffDays === 0) {
+      return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    }
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return d.toLocaleDateString('en-US', { weekday: 'long' });
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+  const getProfileUnreadCount = (profile) => {
+    if (!profile) return 0;
+    const isActiveWhatsappProfile = showPanel === 'Whatsapp' && selectedProfile?._id === profile._id;
+    if (isActiveWhatsappProfile) return 0;
+    const profilePhone = normalizePhone(profile._candidate?.mobile);
+    const phoneKey = profilePhone ? `phone_${profilePhone}` : null;
+    return Number((unreadMessageCounts[profile._id] ?? (phoneKey ? unreadMessageCounts[phoneKey] : 0)) ?? 0);
+  };
+  const getChatPreview = (profile) => {
+    const lastMessage = profile?.lastMessage;
+    const text = String(
+      profile?.lastMessageText
+      || (typeof lastMessage === 'string' ? lastMessage : lastMessage?.text)
+      || lastMessage?.message
+      || profile?.lastWhatsappMessage
+      || ''
+    ).trim();
+    if (text) return text;
+    const phone = profile?._candidate?.mobile;
+    return phone ? `+91 ${String(phone).replace(/\D/g, '').slice(-10)}` : 'No messages yet';
+  };
+
+  const sortedChatProfiles = sortProfilesByMessageTime(allProfiles, unreadMessageCounts, lastMessageTime) || [];
+  const unreadChatCount = sortedChatProfiles.reduce((sum, profile) => sum + (getProfileUnreadCount(profile) > 0 ? 1 : 0), 0);
+
   return (
-    <div className="container-fluid">
+    <div className="wa-inbox-root">
       <style>
         {`
           @media (max-width: 768px) {
@@ -8964,139 +8975,6 @@ const WhatsappChat = () => {
           }
         `}
       </style>
-      <div className="row">
-        <div className={isMobile ? 'col-12' : mainContentClass}>
-          <div
-            className="content-blur-overlay"
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              height: `${navHeight + 50}px`,
-              background: `linear-gradient(
-                180deg,
-                rgba(255, 255, 255, ${isScrolled ? 0.7 : 0}) 0%,
-                rgba(255, 255, 255, ${isScrolled ? 0.5 : 0}) 50%,
-                rgba(255, 255, 255, ${isScrolled ? 0.2 : 0}) 80%,
-                transparent 100%
-              )`,
-              backdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
-              WebkitBackdropFilter: isScrolled ? `blur(${blurIntensity * 0.5}px)` : 'none',
-              pointerEvents: 'none',
-              zIndex: 9,
-              transition: 'all 0.3s ease',
-              opacity: isScrolled ? 1 : 0
-            }}
-          />
-          <div className="position-relative" ref={widthRef} >
-            <nav ref={navRef} className="" style={{
-              zIndex: 11, backgroundColor: `rgba(255, 255, 255, ${navbarOpacity})`, position: 'fixed', width: `${width}px`, backdropFilter: `blur(${blurIntensity}px)`,
-              WebkitBackdropFilter: `blur(${blurIntensity}px)`,
-              boxShadow: isScrolled
-                ? '0 8px 32px 0 rgba(31, 38, 135, 0.25)'
-                : '0 4px 25px 0 #0000001a', paddingBlock: '10px',
-              transition: 'all 0.3s ease',
-            }}
-            >
-              <div className="container-fluid">
-                <div className="row align-items-center">
-                  <div className="col-md-6 d-md-block d-sm-none">
-                    <div className="d-flex align-items-center">
-                      <h4 className="fw-bold text-dark mb-0 me-3">Whatsapp Chat</h4>
-                      <nav aria-label="breadcrumb">
-                        <ol className="breadcrumb mb-0 small">
-                          <li className="breadcrumb-item">
-                            <a href="/institute/dashboard" className="text-decoration-none">Home</a>
-                          </li>
-                          <li className="breadcrumb-item active">Whatsapp Chat</li>
-                        </ol>
-                      </nav>
-                    </div>
-                  </div>
-
-                  <div className="col-md-6">
-                    <div className="d-flex justify-content-end align-items-center gap-2">
-                      <div className="input-group" style={{ maxWidth: '300px' }}>
-
-                        <input
-                          type="text"
-                          name="name"
-                          className="form-control border-start-0 m-0"
-                          placeholder="Quick search..."
-                          value={filterData.name}
-                          onChange={handleFilterChange}
-                        />
-                        <button
-                          onClick={() => fetchProfileData()}
-                          className={`btn btn-outline-primary`}
-                          style={{ whiteSpace: 'nowrap' ,marginBottom:'0px' }}
-                        >
-                          <i className={`fas fa-search me-1`}></i>
-                          Search
-
-                        </button>
-                      </div>
-
-
-                      <button
-                        onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
-                        className={`btn ${!isFilterCollapsed ? 'btn-primary' : 'btn-outline-primary'}`}
-                        style={{ whiteSpace: 'nowrap' }}
-                      >
-                        <i className={`fas fa-filter me-1 ${!isFilterCollapsed ? 'fa-spin' : ''}`}></i>
-                        Filters
-                        {Object.values(filterData).filter(val => val && val !== 'true').length > 0 && (
-                          <span className="bg-light text-dark ms-1">
-                            {Object.values(filterData).filter(val => val && val !== 'true').length}
-                          </span>
-                        )}
-                      </button>
-
-
-                    </div>
-                  </div>
-
-                  {/* Filter Buttons Row */}
-                  <div className="col-12 mt-2">
-                    <div className={`d-flex gap-2 align-items-center ${isMobile ? 'mobile-filter-scroll' : 'flex-wrap mediaCrmFilters'}`}>
-                      {crmFilters.map((filter, index) => (
-                        <div key={index} className="d-flex align-items-center gap-1">
-                          <div className='d-flex position-relative'>
-                            <button
-                              className={`btn btn-sm btncrm ${activeCrmFilter === index ? 'btn-primary' : 'btn-outline-secondary'}`}
-                              onClick={() => handleCrmFilterClick(index)}
-                              style={isMobile ? { whiteSpace: 'nowrap', flexShrink: 0 } : {}}
-                            >
-                              {filter.name}
-                              <span className={`ms-1 ${activeCrmFilter === index ? 'text-white' : 'text-dark'}`}>
-                                ({filter.count})
-                              </span>
-                            </button>
-
-                            {filter.milestone && (
-                              <span
-                                className="position-absolute bg-success text-white px-2 py-1 rounded-pill"
-                                style={{
-                                  fontSize: '0.7rem',
-                                  top: '-8px',
-                                  right: '-10px',
-                                  transform: 'scale(0.8)'
-                                }}
-                                title={`Milestone: ${filter.milestone}`}
-                              >
-                                🚩 {filter.milestone}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </nav>
-          </div>
 
           {/* Advanced Filters */}
           {!isFilterCollapsed && (
@@ -9575,2305 +9453,321 @@ const WhatsappChat = () => {
           )}
 
 
-          {/* Main Content */}
-          <div className="content-body marginTopMobile" style={{
-            marginTop: `${navHeight + 10}px`,
-            transition: 'margin-top 0.2s ease-in-out'
-          }}>
-            <section className="list-view">
-              <div className="row">
-                {/* Desktop Layout */}
-                <div className="d-none flex-row-reverse d-md-flex justify-content-between align-items-center gap-2">
-                 
-                  {/* Left side - Buttons */}
-                  <div style={{ display: "flex", gap: "8px" }}>
-                  <button className="btn btn-sm btn-outline-primary" style={{
-                    padding: "6px 12px",
-                    fontSize: "11px",
-                    fontWeight: "600",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px"
-                  }}
-                    onClick={downloadLeads}
-                  >
-                    <i className="fas fa-download" style={{ fontSize: "10px" }}></i>
-                    Download Leads
-                  </button>
-                  <button className="btn btn-sm btn-outline-primary" style={{
-                    padding: "6px 12px",
-                    fontSize: "11px",
-                    fontWeight: "600",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px"
-                  }}
-                  onClick={() => {
-                    setShowBulkInputs(true);
-                    setBulkMode('whatsapp');
-                    setInput1Value('');
-                  }}
-                  >
-                    <i className="fas fa-download" style={{ fontSize: "10px" }}></i>
-                    Bulk Messages
-                  </button>
-                  {((permissions?.custom_permissions?.can_add_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-                    <>
-                      <button className="btn btn-sm btn-outline-primary" style={{
-                        padding: "6px 12px",
-                        fontSize: "11px",
-                        fontWeight: "600",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "4px"
-                      }}
-                        onClick={() => {
-                          openPanel(null, 'AddAllLeads');
-                        }}
-                      >
-                        <i className="fas fa-plus" style={{ fontSize: "10px" }}></i>
-                        Add Leads
-                      </button>
-                    </>
+          <div className="wa-shell">
+            {!isMobile && (
+              <aside className="wa-nav-rail">
+                <button type="button" className="wa-nav-btn wa-nav-btn--active" title="Chats">
+                  <i className="fas fa-comment-dots" />
+                  {(unreadChatCount || 0) > 0 && (
+                    <span className="wa-nav-badge">{Math.min(unreadChatCount, 99)}</span>
                   )}
-                  {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-                    <>
-                      <button
-                        className="btn btn-sm btn-outline-primary"
-                        disabled={isLoadingProfiles || allProfiles.length === 0}
-                        style={{
-                          padding: "6px 12px",
-                          fontSize: "11px",
-                          fontWeight: "600",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "4px"
-                        }}
-                        onClick={() => {
-                          openPanel(null, 'RefferAllLeads');
-                        }}
-                      >
-                        <i className="fas fa-share-alt" style={{ fontSize: "10px" }}></i>
-                        Refer All Leads
-                      </button>
-                      <button
-                        className="btn btn-sm btn-outline-secondary"
-                        disabled={isLoadingProfiles || allProfiles.length === 0}
-                        style={{
-                          padding: "6px 12px",
-                          fontSize: "11px",
-                          fontWeight: "600",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "4px"
-                        }}
-                        onClick={() => { 
-                          setShowBulkInputs(true);
-                          setBulkMode('bulkaction');
-                          setInput1Value('');
-                          openEditPanel(null, 'bulkstatuschange');
-                        }}
-                      >
-                        <i className="fas fa-tasks" style={{ fontSize: "10px" }}></i>
-                        Bulk Action
-                      </button>
-                    </>)}
-                  </div>
+                </button>
+              </aside>
+            )}
 
-                  {/* Right side - Input Fields */}
-                  {showBulkInputs && (
-                    <div style={{
-                      display: "flex",
-                      alignItems: "stretch",
-                      border: "1px solid #dee2e6",
-                      borderRadius: "4px",
-                      backgroundColor: "#fff",
-                      overflow: "hidden",
-                      width: "200px",
-                      height: "32px",
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
-                    }}>
-                      <input
-                        type="text"
-                        placeholder="Input 1"
-                        value={input1Value}
-                        onKeyDown={(e) => {
-                          // Allow numbers, backspace, delete, arrows, tab, enter
-                          if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
-                            e.preventDefault();
-                          }
-                          // If Enter is pressed and bulk mode is 'whatsapp' and input has value
-                          if (e.key === 'Enter' && bulkMode === 'whatsapp' && input1Value) {
-                            e.preventDefault();
-                            const numValue = parseInt(input1Value, 10);
-                            const maxValue = allProfiles?.length || 0;
-                            if (numValue >= 1 && numValue <= maxValue) {
-                              setShowWhatsappModal(true);
-                            }
-                          }
-                        }}
-                        onChange={(e) => {
-                          const maxValue = allProfiles?.length || 0;
-                          let inputValue = e.target.value.replace(/[^0-9]/g, '');
-                          
-                          // Allow empty string for clearing the input
-                          if (inputValue === '') {
-                            setInput1Value('');
-                            return;
-                          }
-                          
-                          // Convert to number for validation
-                          const numValue = parseInt(inputValue, 10);
-                          
-                          // Prevent values less than 1 (minimum is 1)
-                          if (numValue < 1 || isNaN(numValue)) {
-                            inputValue = '1';
-                          }
-                          // Prevent values greater than max (number of leads)
-                          else if (numValue > maxValue && maxValue > 0) {
-                            inputValue = maxValue.toString();
-                          }
-                          
-                          setInput1Value(inputValue);
-                        }}
-                        style={{
-                          width: "50%",
-                          border: "none",
-                          borderRight: "1px solid #dee2e6",
-                          outline: "none",
-                          padding: "4px 10px",
-                          fontSize: "12px",
-                          backgroundColor: "transparent",
-                          height: "100%",
-                          boxSizing: "border-box"
-                        }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Input 2"
-                        value={crmFilters[activeCrmFilter]?.count || 0}
-                        readOnly
-                        style={{
-                          width: "50%",
-                          border: "none",
-                          outline: "none",
-                          padding: "4px 10px",
-                          fontSize: "12px",
-                          backgroundColor: "transparent",
-                          height: "100%",
-                          boxSizing: "border-box",
-                          cursor: "default"
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Mobile Layout */}
-                <div className="d-md-none">
-                  <div className="row g-2">
-                    <div className="col-6">
-                      <button className="btn btn-sm btn-outline-primary w-100" style={{
-                        padding: "8px 6px",
-                        fontSize: "10px",
-                        fontWeight: "600",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "4px"
-                      }}
-                        onClick={downloadLeads}
-                      >
-                        <i className="fas fa-download" style={{ fontSize: "9px" }}></i>
-                        Download
-                      </button>
-                    </div>
-                    {((permissions?.custom_permissions?.can_add_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-                      <div className="col-6">
-                        <button className="btn btn-sm btn-outline-primary w-100" style={{
-                          padding: "8px 6px",
-                          fontSize: "10px",
-                          fontWeight: "600",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "4px"
-                        }}
-                          onClick={() => {
-                            openPanel(null, 'AddAllLeads');
-                          }}
-                        >
-                          <i className="fas fa-plus" style={{ fontSize: "9px" }}></i>
-                          Add Leads
-                        </button>
-                      </div>
-                    )}
-                    {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-                      <>
-                        <div className="col-6">
-                          <button
-                            className="btn btn-sm btn-outline-primary w-100"
-                            disabled={isLoadingProfiles || allProfiles.length === 0}
-                            style={{
-                              padding: "8px 6px",
-                              fontSize: "10px",
-                              fontWeight: "600",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: "4px"
-                            }}
-                            onClick={() => {
-                              openPanel(null, 'RefferAllLeads');
-                            }}
-                          >
-                            <i className="fas fa-share-alt" style={{ fontSize: "9px" }}></i>
-                            Refer
-                          </button>
-                        </div>
-                        <div className="col-6">
-                          <button
-                            className="btn btn-sm btn-outline-secondary w-100"
-                            disabled={isLoadingProfiles || allProfiles.length === 0}
-                            style={{
-                              padding: "8px 6px",
-                              fontSize: "10px",
-                              fontWeight: "600",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: "4px"
-                            }}
-                            onClick={() => { openEditPanel(null, 'bulkstatuschange') }}
-                          >
-                            <i className="fas fa-tasks" style={{ fontSize: "9px" }}></i>
-                            Bulk
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
+            <section
+              className="wa-chat-list"
+              style={{ display: isMobile && showPanel === 'Whatsapp' ? 'none' : 'flex' }}
+            >
+              <div className="wa-chat-list__header">
+                <h1 className="wa-brand">WhatsApp</h1>
+                <div className="wa-chat-list__actions">
+                  <button
+                    type="button"
+                    className="wa-icon-btn"
+                    title="Refresh chats"
+                    onClick={() => fetchProfileData()}
+                  >
+                    <i className={'fas fa-sync-alt' + (isLoadingProfiles ? ' fa-spin' : '')} />
+                  </button>
+                  <button
+                    type="button"
+                    className="wa-icon-btn"
+                    title="Filters"
+                    onClick={() => setIsFilterCollapsed(!isFilterCollapsed)}
+                  >
+                    <i className={'fas fa-filter' + (!isFilterCollapsed ? ' fa-spin' : '')} />
+                  </button>
+                  <button type="button" className="wa-icon-btn" title="Menu" disabled>
+                    <i className="fas fa-ellipsis-v" />
+                  </button>
                 </div>
               </div>
-              <div className='row'>
-                <div>
-                  <div className="col-12 rounded equal-height-2 coloumn-2">
-                    <div className="card px-3">
-                      <div className="row" id="crm-main-row">
 
-                        {/* Loading State */}
-                        {isLoadingProfiles && (
-                          <div className="col-12 text-center py-5">
-                            <div className="d-flex flex-column align-items-center">
-                              <div className="spinner-border text-primary mb-3" role="status" style={{ width: '3rem', height: '3rem' }}>
-                                <span className="visually-hidden">Loading...</span>
-                              </div>
-                              <h5 className="text-muted">Loading profiles...</h5>
-                              <p className="text-muted small">Please wait while we fetch the latest data</p>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Profiles List */}
-                        {!isLoadingProfiles && allProfiles && (() => {
-                          const sortedProfiles = sortProfilesByMessageTime(allProfiles, unreadMessageCounts, lastMessageTime) || [];
-                          const shouldPinSelectedProfile = showPanel === 'Whatsapp' && selectedProfile?._id;
-                          const pinnedProfile = shouldPinSelectedProfile
-                            ? sortedProfiles.find(profile => profile._id === selectedProfile._id)
-                            : null;
-                          const orderedProfiles = pinnedProfile
-                            ? [pinnedProfile, ...sortedProfiles.filter(profile => profile._id !== selectedProfile._id)]
-                            : sortedProfiles;
-
-                          return orderedProfiles.map((profile, profileIndex) => (
-                          <div className={`card-content transition-col mb-2`} key={profileIndex}>
-
-                            {/* Profile Header Card */}
-                            <div className="card border-0 shadow-sm mb-0 mt-2">
-                              <div className="card-body px-1 py-0 my-2">
-                                <div className="row align-items-center justify-content-around">
-                                  <div className="col-md-7">
-                                    <div className="d-flex align-items-center">
-                                      <div className="form-check me-md-3 me-sm-1 me-1">
-                                        <input 
-                                          onChange={(e) => handleCheckboxChange(profile, e.target.checked)} 
-                                          checked={selectedProfiles && Array.isArray(selectedProfiles) ? selectedProfiles.includes(profile._id) : false}
-                                          className="form-check-input" 
-                                          type="checkbox" 
-                                        />
-                                      </div>
-                                      <div className="me-md-3 me-sm-1 me-1">
-                                        <div className="circular-progress-container" data-percent={profile.docCounts.totalRequired > 0 ? profile.docCounts.uploadPercentage : 'NA'}>
-                                          <svg width="40" height="40">
-                                            <circle className="circle-bg" cx="20" cy="20" r="16"></circle>
-                                            <circle className="circle-progress" cx="20" cy="20" r="16"></circle>
-                                          </svg>
-                                          <div className="progress-text"></div>
-                                        </div>
-                                      </div>
-                                      <div className="d-flex flex-column">
-                                        <h6 className="mb-0 fw-bold">{profile._candidate?.name || 'Your Name'}</h6>
-                                        <small className="text-muted">{profile._candidate?.mobile || 'Mobile Number'}</small>
-                                        <small className="text-muted">{profile._candidate?.email || 'Email'}</small>
-                                      </div>
-                                      <div className='whatsappbutton'>
-                                        <button className="btn btn-outline-primary btn-sm border-0" title="Call" style={{ fontSize: '20px' }}>
-                                          <a href={`tel:${profile._candidate?.mobile}`} target="_blank" rel="noopener noreferrer">
-                                            <i className="fas fa-phone"></i>
-                                          </a>
-                                        </button>
-
-                                        {/* <a
-                                          className="btn btn-outline-success btn-sm border-0"
-                                          href={`https://wa.me/${profile._candidate?.mobile}`}
-                                          style={{ fontSize: '20px' }}
-                                          title="WhatsApp"
-                                          target="_blank"
-                                        >
-                                          <i className="fab fa-whatsapp"></i>
-                                        </a> */}
-                                        <button
-                                          type="button"
-                                          className="btn btn-outline-success btn-sm border-0"
-                                          onClick={async (e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            e.nativeEvent.stopImmediatePropagation();
-                                            await openPanel(profile, 'whatsapp');
-                                          }}
-                                          style={{ fontSize: '20px', position: 'relative' }}
-                                          title="WhatsApp"
-                                        >
-                                          <i className="fab fa-whatsapp"></i>
-                                          {(() => {
-                                            const profilePhone = normalizePhone(profile._candidate?.mobile);
-                                            const phoneKey = profilePhone ? `phone_${profilePhone}` : null;
-                                            const isActiveWhatsappProfile =
-                                              showPanel === 'Whatsapp' && selectedProfile?._id === profile._id;
-                                            const unreadCount = isActiveWhatsappProfile
-                                              ? 0
-                                              : ((unreadMessageCounts[profile._id] ?? (phoneKey ? unreadMessageCounts[phoneKey] : 0)) ?? 0);
-                                            return unreadCount > 0 ? (
-                                              <span
-                                                className="badge bg-danger"
-                                                style={{
-                                                  position: 'absolute',
-                                                  top: '-5px',
-                                                  right: '-5px',
-                                                  fontSize: unreadCount > 99 ? '9px' : '10px',
-                                                  padding: unreadCount > 99 ? '2px 5px' : '2px 6px',
-                                                  borderRadius: '10px',
-                                                  minWidth: '18px',
-                                                  height: '18px',
-                                                  display: 'flex',
-                                                  alignItems: 'center',
-                                                  justifyContent: 'center',
-                                                  fontWeight: '600',
-                                                  zIndex: 10,
-                                                  whiteSpace: 'nowrap'
-                                                }}
-                                              >
-                                                {unreadCount}
-                                              </span>
-                                            ) : null;
-                                          })()}
-                                        </button>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="col-md-3 mt-3">
-                                    <div className="d-flex gap-2">
-                                      <div className="flex-grow-1">
-                                        <input
-                                          type="text"
-                                          className="form-control form-control-sm m-0"
-                                          style={{
-                                            cursor: 'pointer',
-                                            border: '1px solid #ddd',
-                                            borderRadius: '0px',
-                                            borderTopRightRadius: '5px',
-                                            borderTopLeftRadius: '5px',
-                                            width: '145px',
-                                            height: '20px',
-                                            fontSize: '10px'
-                                          }}
-                                          value={profile._leadStatus?.title}
-                                          readOnly
-                                          onClick={() => {
-                                            openEditPanel(profile, 'StatusChange');
-                                          }}
-
-                                        />
-                                        <input
-                                          type="text"
-                                          className="form-control form-control-sm m-0"
-                                          value={profile.selectedSubstatus?.title}
-                                          style={{
-                                            cursor: 'pointer',
-                                            border: '1px solid #ddd',
-                                            borderRadius: '0px',
-                                            borderBottomRightRadius: '5px',
-                                            borderBottomLeftRadius: '5px',
-                                            width: '145px',
-                                            height: '20px',
-                                            fontSize: '10px'
-                                          }}
-                                          readOnly
-                                        />
-                                      </div>
-
- <div className="col-md-1 text-end d-md-none d-sm-block d-block">
-                                    <div className="btn-group">
-                                      {/* Three-dot button for mobile - Opens Modal */}
-                                      <button
-                                        className="btn btn-sm btn-outline-secondary border-0"
-                                        onClick={() => togglePopup(profileIndex)}
-                                        aria-label="Options"
-                                      >
-                                        <i className="fas fa-ellipsis-v"></i>
-                                      </button>
-
-                                      {/* Expand/Collapse button */}
-                                      <button
-                                        className="btn btn-sm btn-outline-secondary border-0"
-                                        onClick={() => toggleLeadDetails(profileIndex)}
-                                      >
-                                        {leadDetailsVisible === profileIndex ? (
-                                          <i className="fas fa-chevron-up"></i>
-                                        ) : (
-                                          <i className="fas fa-chevron-down"></i>
-                                        )}
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                    </div>
-                                  </div>
-
-                                 
-
-                                  <div className="col-md-1 text-end d-md-block d-sm-none d-none">
-                                    <div className="btn-group">
-
-                                      <div style={{ position: "relative", display: "inline-block" }}>
-                                        <button
-                                          className="btn btn-sm btn-outline-secondary border-0"
-                                          onClick={() => togglePopup(profileIndex)}
-                                          aria-label="Options"
-                                        >
-                                          <i className="fas fa-ellipsis-v"></i>
-                                        </button>
-
-                                        {/* Overlay for click outside */}
-                                        {showPopup === profileIndex && (
-                                          <div
-                                            onClick={() => setShowPopup(null)}
-                                            style={{
-                                              position: "fixed",
-                                              top: 0,
-                                              left: 0,
-                                              width: "100vw",
-                                              height: "100vh",
-                                              backgroundColor: "transparent",
-                                              zIndex: 8,
-                                            }}
-                                          ></div>
-                                        )}
-
-                                        <div
-                                          style={{
-                                            position: "absolute",
-                                            top: "28px", // button ke thoda niche
-                                            right: "-100px",
-                                            width: "170px",
-                                            backgroundColor: "white",
-                                            border: "1px solid #ddd",
-                                            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                            borderRadius: "4px",
-                                            padding: "8px 0",
-                                            zIndex: 9,
-                                            transform: showPopup === profileIndex ? "translateX(-70px)" : "translateX(100%)",
-                                            transition: "transform 0.3s ease-in-out",
-                                            pointerEvents: showPopup === profileIndex ? "auto" : "none",
-                                            display: showPopup === profileIndex ? "block" : "none"
-                                          }}
-                                        >
-
-                                          {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-                                            <>
-                                              <button
-                                                className="dropdown-item"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
-                                                onClick={() => (handleMoveToKyc(profile))}
-                                              >
-                                                Move To KYC List
-                                              </button>
-
-                                              <button
-                                                className="dropdown-item"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
-                                                onClick={() => {
-                                                  openEditPanel(profile, 'SetFollowup');
-                                                }}
-                                              >
-                                                Set Followup
-                                              </button>
-                                              <button
-                                                className="btn btn-primary border-0 text-black"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
-                                                onClick={() => {
-                                                  handleFetchCandidate(profile);
-                                                  // open modal for this profile
-                                                }}
-                                              >
-                                                Profile Edit
-                                              </button>
-                                              <button
-                                                className="btn btn-primary border-0 text-black"
-                                                style={{
-                                                  width: "100%",
-                                                  padding: "8px 16px",
-                                                  border: "none",
-                                                  background: "none",
-                                                  textAlign: "left",
-                                                  cursor: "pointer",
-                                                  fontSize: "12px",
-                                                  fontWeight: "600"
-                                                }}
-                                                onClick={() => {
-                                                  getBranches(profile);
-                                                  setShowBranchModal(true);
-                                                }}
-                                              >
-                                                Change Branch
-                                              </button>
-                                            </>
-                                          )}
-
-                                          {((permissions?.custom_permissions?.can_assign_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-                                            <button
-                                              className="dropdown-item"
-                                              style={{
-                                                width: "100%",
-                                                padding: "8px 16px",
-                                                border: "none",
-                                                background: "none",
-                                                textAlign: "left",
-                                                cursor: "pointer",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                              }}
-                                              onClick={() => {
-                                                openPanel(profile, 'Reffer');
-                                              }}
-                                            >
-                                              Reffer
-                                            </button>
-                                          )}
-
-                                          <button
-                                            className="dropdown-item"
-                                            style={{
-                                              width: "100%",
-                                              padding: "8px 16px",
-                                              border: "none",
-                                              background: "none",
-                                              textAlign: "left",
-                                              cursor: "pointer",
-                                              fontSize: "12px",
-                                              fontWeight: "600"
-                                            }}
-                                            onClick={() => openleadHistoryPanel(profile)}
-                                          >
-                                            History List
-                                          </button>
-
-
-
-                                        </div>
-                                      </div>
-
-
-
-                                      <button
-                                        className="btn btn-sm btn-outline-secondary border-0"
-                                        onClick={() => toggleLeadDetails(profileIndex)}
-                                      >
-                                        {leadDetailsVisible === profileIndex ? (
-                                          <i className="fas fa-chevron-up"></i>
-                                        ) : (
-                                          <i className="fas fa-chevron-down"></i>
-                                        )}
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Tab Navigation and Content Card */}
-                            <div className="card border-0 shadow-sm mb-4">
-                              <div className="card-header bg-white border-bottom-0 py-3 mb-3">
-                                <ul
-                                  className="nav nav-pills nav-pills-sm"
-                                  style={{
-                                    display: 'flex',
-                                    flexWrap: isMobile ? 'nowrap' : 'wrap',
-                                    overflowX: isMobile ? 'auto' : 'visible',
-                                    overflowY: 'hidden',
-                                    WebkitOverflowScrolling: 'touch',
-                                    scrollbarWidth: 'none',
-                                    msOverflowStyle: 'none',
-                                    gap: '8px',
-                                    paddingBottom: isMobile ? '8px' : '0'
-                                  }}
-                                >
-                                  {tabs.map((tab, tabIndex) => (
-                                    <li
-                                      className="nav-item"
-                                      key={tabIndex}
-                                      style={{
-                                        flexShrink: isMobile ? 0 : 1,
-                                        whiteSpace: 'nowrap'
-                                      }}
-                                    >
-                                      <button
-                                        className={`nav-link ${(activeTab[profileIndex] || 0) === tabIndex ? 'active' : ''}`}
-                                        onClick={() => handleTabClick(profileIndex, tabIndex, profile)}
-                                        style={{
-                                          minWidth: isMobile ? 'auto' : 'unset',
-                                          padding: isMobile ? '8px 16px' : '0.5rem 1rem',
-                                          fontSize: isMobile ? '13px' : '14px',
-                                          borderRadius: '8px',
-                                          whiteSpace: 'nowrap'
-                                        }}
-                                      >
-                                        {tab}
-                                      </button>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-
-                              {/* Tab Content - Only show if leadDetailsVisible is true */}
-                              {leadDetailsVisible === profileIndex && (
-                                isLoadingProfilesData ? (
-                                  <div className="text-center">
-                                    <div className="spinner-border" role="status">
-                                      <span className="visually-hidden">Loading...</span>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="tab-content">
-
-                                    {/* Lead Details Tab */}
-                                    {/* {activeTab === 0 && ( */}
-                                    {(activeTab[profileIndex] || 0) === 0 && (
-                                      <div className="tab-pane active" id="lead-details">
-                                        {/* Your lead details content here */}
-                                        <div className="scrollable-container">
-                                          <div className="scrollable-content">
-                                            <div className="info-card">
-                                              <div className="info-group">
-                                                <div className="info-label">LEAD AGE</div>
-                                                <div className="info-value">{profile.createdAt ?
-                                                  Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                  : 'N/A'}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">PROJECT</div>
-                                                <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">NEXT ACTION DATE</div>
-                                                <div className="info-value">
-                                                  {profile.followup?.followupDate ? (() => {
-                                                    const dateObj = new Date(profile.followup?.followupDate);
-                                                    const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                      day: '2-digit',
-                                                      month: 'short',
-                                                      year: 'numeric',
-                                                    }).replace(/ /g, '-');
-                                                    const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                      hour: '2-digit',
-                                                      minute: '2-digit',
-                                                      hour12: true,
-                                                    });
-                                                    return `${datePart}, ${timePart}`;
-                                                  })() : 'N/A'}
-                                                </div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">LEAD MODIFICATION BY</div>
-                                                <div className="info-value">{profile.logs?.length ? profile.logs[profile.logs.length - 1]?.user?.name || 'N/A' : 'N/A'}</div>
-                                              </div>
-                                            </div>
-
-                                            <div className="info-card">
-                                              <div className="info-group">
-                                                <div className="info-label">STATE</div>
-                                                <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">SECTOR</div>
-                                                <div className="info-value">{profile._course?.sectors || 'N/A'}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">LEAD CREATION DATE</div>
-                                                <div className="info-value">
-                                                  {profile.createdAt ? (() => {
-                                                    const dateObj = new Date(profile.createdAt);
-                                                    const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                      day: '2-digit',
-                                                      month: 'short',
-                                                      year: 'numeric',
-                                                    }).replace(/ /g, '-');
-                                                    const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                      hour: '2-digit',
-                                                      minute: '2-digit',
-                                                      hour12: true,
-                                                    });
-                                                    return `${datePart}, ${timePart}`;
-                                                  })() : 'N/A'}
-                                                </div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">Counsellor Name</div>
-                                                <div className="info-value">{profile.leadAssignment && profile.leadAssignment.length > 0 ? profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A' : 'N/A'}</div>
-                                              </div>
-                                            </div>
-
-                                            <div className="info-card">
-                                              <div className="info-group">
-                                                <div className="info-label">CITY</div>
-                                                <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">COURSE / JOB NAME</div>
-                                                <div className="info-value">{profile._course?.name || 'N/A'}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                <div className="info-value">
-                                                  {profile.updatedAt ? (() => {
-                                                    const dateObj = new Date(profile.updatedAt);
-                                                    const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                      day: '2-digit',
-                                                      month: 'short',
-                                                      year: 'numeric',
-                                                    }).replace(/ /g, '-');
-                                                    const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                      hour: '2-digit',
-                                                      minute: '2-digit',
-                                                      hour12: true,
-                                                    });
-                                                    return `${datePart}, ${timePart}`;
-                                                  })() : 'N/A'}
-                                                </div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">LEAD OWNER</div>
-                                                <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
-                                              </div>
-                                            </div>
-
-                                            <div className="info-card">
-                                              <div className="info-group">
-                                                <div className="info-label">TYPE OF PROJECT</div>
-                                                <div className="info-value">{profile._course?.typeOfProject || 'N/A'}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">BRANCH NAME</div>
-                                                <div className="info-value">{profile._center?.name || 'N/A'}</div>
-                                              </div>
-                                              <div className="info-group">
-                                                <div className="info-label">Remarks</div>
-                                                <div className="info-value">{profile.remarks || 'N/A'}</div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        </div>
-
-
-                                        <div className="scroll-arrow scroll-left d-md-none" onClick={scrollLeft}>&lt;</div>
-                                        <div className="scroll-arrow scroll-right d-md-none" onClick={scrollRight}>&gt;</div>
-
-
-                                        <div className="desktop-view">
-                                          <div className="row g-4">
-
-                                            <div className="col-12">
-                                              <div className="scrollable-container">
-                                                <div className="scrollable-content">
-                                                  <div className="info-card">
-                                                    <div className="info-group">
-                                                      <div className="info-label">LEAD AGE</div>
-                                                      <div className="info-value">{profile.createdAt ?
-                                                        Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                        : 'N/A'}</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">Lead Owner</div>
-                                                      <div className="info-value">{profile.leadOwner?.join(', ') || 'N/A'}</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">COURSE / JOB NAME</div>
-                                                      <div className="info-value">{profile._course?.name}</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">BATCH NAME</div>
-                                                      <div className="info-value">{profile._course?.batchName || 'N/A'}</div>
-                                                    </div>
-                                                    {/* <div className="info-group">
-                                                      <div className="info-label">Source Contact Name</div>
-                                                      <div className="info-value">{profile._candidate?.sourceInfo?.sourceName || 'N/A'}</div>
-                                                    </div> */}
-                                                  </div>
-
-                                                  <div className="info-card">
-                                                    <div className="info-group">
-                                                      <div className="info-label">TYPE OF PROJECT</div>
-                                                      <div className="info-value">{profile._course?.typeOfProject}</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">PROJECT</div>
-                                                      <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">SECTOR</div>
-                                                      <div className="info-value">{profile._course?.sectors}</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">LEAD CREATION DATE</div>
-                                                      <div className="info-value">{profile.createdAt ?
-                                                        new Date(profile.createdAt).toLocaleString() : 'N/A'}</div>
-                                                    </div>
-                                                  </div>
-
-                                                  <div className="info-card">
-                                                    <div className="info-group">
-                                                      <div className="info-label">STATE</div>
-                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">City</div>
-                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">BRANCH NAME</div>
-                                                      <div className="info-value">{profile._center?.name || 'N/A'}</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                      <div className="info-value">{profile.updatedAt ?
-                                                        new Date(profile.updatedAt).toLocaleString() : 'N/A'}</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">Remarks</div>
-                                                      <div className="info-value">{profile.remarks || 'N/A'}</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">LEAD MODIFICATION By</div>
-                                                      <div className="info-value">Mar 21, 2025 3:32 PM</div>
-                                                    </div>
-                                                    <div className="info-group">
-                                                      <div className="info-label">Counsellor Name</div>
-                                                      <div className="info-value">{profile.leadAssignment && profile.leadAssignment.length > 0 ? profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A' : 'N/A'}</div>
-                                                    </div>
-                                                  </div>
-                                                </div>
-                                              </div>
-                                              <div className="scroll-arrow scroll-left d-md-none">&lt;</div>
-                                              <div className="scroll-arrow scroll-right  d-md-none">&gt;</div>
-
-                                              <div className="desktop-view">
-                                                <div className="row">
-                                                  <div className="col-xl-3 col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">LEAD AGE</div>
-                                                      <div className="info-value">{profile.createdAt ?
-                                                        Math.floor((new Date() - new Date(profile.createdAt)) / (1000 * 60 * 60 * 24)) + ' Days'
-                                                        : 'N/A'}</div>
-                                                    </div>
-                                                  </div>
-
-                                                  <div className="col-xl-3 col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">STATE</div>
-                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.state || 'N/A'}</div>
-                                                    </div>
-                                                  </div>
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">CITY</div>
-                                                      <div className="info-value">{profile._candidate?.personalInfo?.currentAddress?.city || 'N/A'}</div>
-                                                    </div>
-                                                  </div>
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">TYPE OF PROJECT</div>
-                                                      <div className="info-value">{profile._course?.typeOfProject}</div>
-                                                    </div>
-                                                  </div>
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">PROJECT</div>
-                                                      <div className="info-value">{profile._course?.projectName || 'N/A'}</div>
-                                                    </div>
-                                                  </div>
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">Sector</div>
-                                                      <div className="info-value">{profile._course?.sectors}</div>
-                                                    </div>
-                                                  </div>
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">COURSE / JOB NAME</div>
-                                                      <div className="info-value">{profile._course?.name}</div>
-                                                    </div>
-                                                  </div>
-
-
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">BRANCH NAME</div>
-                                                      <div className="info-value">{profile._center?.name || 'N/A'}</div>
-                                                    </div>
-                                                  </div>
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">NEXT ACTION DATE</div>
-                                                      <div className="info-value">
-                                                        {profile.followup?.followupDate ? (() => {
-                                                          const dateObj = new Date(profile.followup?.followupDate);
-                                                          const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                            day: '2-digit',
-                                                            month: 'short',
-                                                            year: 'numeric',
-                                                          }).replace(/ /g, '-');
-                                                          const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                            hour: '2-digit',
-                                                            minute: '2-digit',
-                                                            hour12: true,
-                                                          });
-                                                          return `${datePart}, ${timePart}`;
-                                                        })() : 'N/A'}
-
-                                                      </div>
-
-                                                    </div>
-                                                  </div>
-
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">LEAD CREATION DATE</div>
-                                                      <div className="info-value">{profile.createdAt ? (() => {
-                                                        const dateObj = new Date(profile.createdAt);
-                                                        const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                          day: '2-digit',
-                                                          month: 'short',
-                                                          year: 'numeric',
-                                                        }).replace(/ /g, '-');
-                                                        const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                          hour: '2-digit',
-                                                          minute: '2-digit',
-                                                          hour12: true,
-                                                        });
-                                                        return `${datePart}, ${timePart}`;
-                                                      })() : 'N/A'}</div>
-                                                    </div>
-                                                  </div>
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">LEAD MODIFICATION DATE</div>
-                                                      <div className="info-value">{profile.updatedAt ? (() => {
-                                                        const dateObj = new Date(profile.updatedAt);
-                                                        const datePart = dateObj.toLocaleDateString('en-GB', {
-                                                          day: '2-digit',
-                                                          month: 'short',
-                                                          year: 'numeric',
-                                                        }).replace(/ /g, '-');
-                                                        const timePart = dateObj.toLocaleTimeString('en-US', {
-                                                          hour: '2-digit',
-                                                          minute: '2-digit',
-                                                          hour12: true,
-                                                        });
-                                                        return `${datePart}, ${timePart}`;
-                                                      })() : 'N/A'}</div>
-                                                    </div>
-                                                  </div>
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">Remarks</div>
-                                                      <div className="info-value">{profile.remarks || 'N/A'}</div>
-                                                    </div>
-                                                  </div>
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">LEAD MODIFICATION BY</div>
-                                                      <div className="info-value">{profile.logs?.length ? profile.logs[profile.logs.length - 1]?.user?.name || '' : ''}
-                                                      </div>
-                                                    </div>
-                                                  </div>
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">Counsellor Name</div>
-                                                      <div className="info-value"> {profile.leadAssignment && profile.leadAssignment.length > 0 ? profile.leadAssignment[profile.leadAssignment.length - 1]?.counsellorName || 'N/A' : 'N/A'}</div>
-                                                    </div>
-                                                  </div>
-                                                  <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">LEAD OWNER</div>
-                                                      <div className="info-value">{profile.registeredBy?.name || 'Self Registerd'}</div>
-                                                    </div>
-
-                                                  </div>
-                                                  {/* <div className="col-xl- col-3">
-                                                    <div className="info-group">
-                                                      <div className="info-label">Source Contact Name</div>
-                                                      <div className="info-value">{profile._candidate?.sourceInfo?.sourceName || 'N/A'}</div>
-                                                    </div>
-                                                  </div> */}
-                                                </div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {/* Profile Tab */}
-                                    {/* {activeTab === 1 && ( */}
-                                    {(activeTab[profileIndex] || 0) === 1 && (
-                                      <div className="tab-pane active" id="profile">
-                                        <div className="resume-preview-body">
-                                          <div id="resume-download" className="resume-document">
-
-                                            <div className="resume-document-header">
-                                              <div className="resume-profile-section">
-                                                {profile._candidate?.personalInfo?.image ? (
-                                                  <img
-                                                    src={`${profile._candidate?.personalInfo?.image}`}
-                                                    alt="Profile"
-                                                    className="resume-profile-image"
-                                                  />
-                                                ) : (
-                                                  <div className="resume-profile-placeholder">
-                                                    <i className="bi bi-person-circle"></i>
-                                                  </div>
-                                                )}
-
-                                                <div className="resume-header-content">
-                                                  <h1 className="resume-name">
-                                                    {profile._candidate?.name || 'Your Name'}
-                                                  </h1>
-                                                  <p className="resume-title">
-                                                    {profile._candidate?.personalInfo?.professionalTitle || 'Professional Title'}
-                                                  </p>
-                                                  <p className="resume-title">
-                                                    {profile._candidate?.sex || 'Sex'}
-                                                  </p>
-
-                                                  <div className="resume-contact-details">
-
-                                                    <div className="resume-contact-item">
-                                                      <i className="bi bi-telephone-fill"></i>
-                                                      <span>{profile._candidate?.mobile}</span>
-                                                    </div>
-
-
-                                                    <div className="resume-contact-item">
-                                                      <i className="bi bi-envelope-fill"></i>
-                                                      <span>{profile._candidate?.email}</span>
-                                                    </div>
-
-                                                    {profile._candidate?.dob && (
-                                                      <div className="resume-contact-item">
-                                                        <i className="bi bi-calendar-heart-fill"></i>
-                                                        {new Date(profile._candidate.dob).toLocaleDateString('en-IN', {
-                                                          day: '2-digit',
-                                                          month: 'long',
-                                                          year: 'numeric'
-                                                        })}
-                                                      </div>
-                                                    )}
-                                                    {profile._candidate?.personalInfo?.currentAddress?.city && (
-                                                      <div className="resume-contact-item">
-                                                        <i className="bi bi-geo-alt-fill"></i>
-                                                        <span>Current:{profile._candidate.personalInfo.currentAddress.fullAddress}</span>
-                                                      </div>
-                                                    )}
-                                                    {profile._candidate?.personalInfo?.permanentAddress?.city && (
-                                                      <div className="resume-contact-item">
-                                                        <i className="bi bi-house-fill"></i>
-                                                        <span>Permanent: {profile._candidate.personalInfo.permanentAddress.fullAddress}</span>
-                                                      </div>
-                                                    )}
-                                                  </div>
-                                                </div>
-                                              </div>
-
-                                              <div className="resume-summary">
-                                                <h2 className="resume-section-title">Professional Summary</h2>
-                                                <p>{profile._candidates?.personalInfo?.summary || 'No summary provided'}</p>
-                                              </div>
-                                            </div>
-
-
-                                            <div className="resume-document-body">
-
-                                              <div className="resume-column resume-left-column">
-
-                                                {profile._candidate?.isExperienced === false ? (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Work Experience</h2>
-                                                    <div className="resume-experience-item">
-                                                      <div className="resume-item-header">
-                                                        <h3 className="resume-item-title">Fresher</h3>
-                                                      </div>
-                                                      <div className="resume-item-content">
-                                                        <p>Looking for opportunities to start my career</p>
-                                                      </div>
-                                                    </div>
-                                                  </div>
-                                                ) : (
-                                                  profile._candidate?.experiences?.length > 0 && (
-                                                    <div className="resume-section">
-                                                      <h2 className="resume-section-title">Work Experience</h2>
-                                                      {profile._candidate.experiences.map((exp, index) => (
-                                                        <div className="resume-experience-item" key={`resume-exp-${index}`}>
-                                                          <div className="resume-item-header">
-                                                            {exp.jobTitle && (
-                                                              <h3 className="resume-item-title">{exp.jobTitle}</h3>
-                                                            )}
-                                                            {exp.companyName && (
-                                                              <p className="resume-item-subtitle">{exp.companyName}</p>
-                                                            )}
-                                                            {(exp.from || exp.to || exp.currentlyWorking) && (
-                                                              <p className="resume-item-period">
-                                                                {exp.from ? new Date(exp.from).toLocaleDateString('en-IN', {
-                                                                  year: 'numeric',
-                                                                  month: 'short',
-                                                                }) : 'Start Date'}
-                                                                {" - "}
-                                                                {exp.currentlyWorking ? 'Present' :
-                                                                  exp.to ? new Date(exp.to).toLocaleDateString('en-IN', {
-                                                                    year: 'numeric',
-                                                                    month: 'short',
-                                                                  }) : 'End Date'}
-                                                              </p>
-                                                            )}
-                                                          </div>
-                                                          {exp.jobDescription && (
-                                                            <div className="resume-item-content">
-                                                              <p>{exp.jobDescription}</p>
-                                                            </div>
-                                                          )}
-                                                        </div>
-                                                      ))}
-                                                    </div>
-                                                  )
-                                                )}
-
-                                                {profile._candidate?.qualifications?.length > 0 && (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Education</h2>
-                                                    {profile._candidate.qualifications.map((edu, index) => (
-                                                      <div className="resume-education-item" key={`resume-edu-${index}`}>
-                                                        <div className="resume-item-header">
-                                                          {edu.education && (
-                                                            <h3 className="resume-item-title">{edu.education}</h3>
-                                                          )}
-                                                          {edu.course && (
-                                                            <h3 className="resume-item-title">{edu.course}</h3>
-                                                          )}
-                                                          {edu.universityName && (
-                                                            <p className="resume-item-subtitle">{edu.universityName}</p>
-                                                          )}
-                                                          {edu.schoolName && (
-                                                            <p className="resume-item-subtitle">{edu.schoolName}</p>
-                                                          )}
-                                                          {edu.collegeName && (
-                                                            <p className="resume-item-subtitle">{edu.collegeName}</p>
-                                                          )}
-                                                          {edu.passingYear && (
-                                                            <p className="resume-item-period">{edu.passingYear}</p>
-                                                          )}
-                                                        </div>
-                                                        <div className="resume-item-content">
-                                                          {edu.marks && <p>Marks: {edu.marks}%</p>}
-                                                          {edu.specialization && <p>Specialization: {edu.specialization}</p>}
-                                                        </div>
-                                                      </div>
-                                                    ))}
-                                                  </div>
-                                                )}
-                                              </div>
-
-
-                                              <div className="resume-column resume-right-column">
-
-                                                {profile._candidate?.personalInfo?.skills?.length > 0 && (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Skills</h2>
-                                                    <div className="resume-skills-list">
-                                                      {profile._candidate?.personalInfo?.skills?.map((skill, index) => (
-                                                        <div className="resume-skill-item" key={`resume-skill-${index}`}>
-                                                          <div className="resume-skill-name">{skill?.skillName || 'Skill'}</div>
-                                                          {skill?.skillPercent && (
-                                                            <div className="resume-skill-bar-container">
-                                                              <div
-                                                                className="resume-skill-bar"
-                                                                style={{ width: `${skill?.skillPercent || 0}%` }}
-                                                              ></div>
-                                                              <span className="resume-skill-percent">{skill?.skillPercent || 0}%</span>
-                                                            </div>
-                                                          )}
-                                                        </div>
-                                                      ))}
-                                                    </div>
-                                                  </div>
-                                                )}
-
-
-
-                                                {profile._candidate?.personalInfo?.languages?.length > 0 && (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Languages</h2>
-                                                    <div className="resume-languages-list">
-                                                      {profile._candidate.personalInfo.languages.map((lang, index) => (
-                                                        <div className="resume-language-item" key={`resume-lang-${index}`}>
-                                                          <div className="resume-language-name">{lang.name || lang.lname || 'Language'}</div>
-                                                          {lang.level && (
-                                                            <div className="resume-language-level">
-                                                              {[1, 2, 3, 4, 5].map(dot => (
-                                                                <span
-                                                                  key={`resume-lang-dot-${index}-${dot}`}
-                                                                  className={`resume-level-dot ${dot <= (lang.level || 0) ? 'filled' : ''}`}
-                                                                ></span>
-                                                              ))}
-                                                            </div>
-                                                          )}
-                                                        </div>
-                                                      ))}
-                                                    </div>
-                                                  </div>
-                                                )}
-
-
-                                                {profile._candidate?.personalInfo?.certifications?.length > 0 && (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Certifications</h2>
-                                                    <ul className="resume-certifications-list">
-                                                      {profile._candidate.personalInfo.certifications.map((cert, index) => (
-                                                        <li key={`resume-cert-${index}`} className="resume-certification-item">
-                                                          <strong>{cert.certificateName || cert.name}</strong>
-                                                          {cert.orgName && (
-                                                            <span className="resume-cert-org"> - {cert.orgName}</span>
-                                                          )}
-                                                          {(cert.month || cert.year) && (
-                                                            <span className="resume-cert-date">
-                                                              {cert.month && cert.year ?
-                                                                ` (${cert.month}/${cert.year})` :
-                                                                cert.month ?
-                                                                  ` (${cert.month})` :
-                                                                  cert.year ?
-                                                                    ` (${cert.year})` :
-                                                                    ''}
-                                                            </span>
-                                                          )}
-                                                        </li>
-                                                      ))}
-                                                    </ul>
-                                                  </div>
-                                                )}
-
-
-                                                {profile._candidate?.personalInfo?.projects?.length > 0 && (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Projects</h2>
-                                                    {profile._candidate.personalInfo.projects.map((proj, index) => (
-                                                      <div className="resume-project-item" key={`resume-proj-${index}`}>
-                                                        <div className="resume-item-header">
-                                                          <h3 className="resume-project-title">
-                                                            {proj.projectName || 'Project'}
-                                                            {proj.year && <span className="resume-project-year"> ({proj.year})</span>}
-                                                          </h3>
-                                                        </div>
-                                                        {proj.description && (
-                                                          <div className="resume-item-content">
-                                                            <p>{proj.description}</p>
-                                                          </div>
-                                                        )}
-                                                      </div>
-                                                    ))}
-                                                  </div>
-                                                )}
-
-
-                                                {profile._candidate?.personalInfo?.interest?.length > 0 && (
-                                                  <div className="resume-section">
-                                                    <h2 className="resume-section-title">Interests</h2>
-                                                    <div className="resume-interests-tags">
-                                                      {profile._candidate.personalInfo.interest.map((interest, index) => (
-                                                        <span className="resume-interest-tag" key={`resume-interest-${index}`}>
-                                                          {interest}
-                                                        </span>
-                                                      ))}
-                                                    </div>
-                                                  </div>
-                                                )}
-
-                                              </div>
-                                            </div>
-
-
-                                            {profile._candidate?.personalInfo?.declaration?.text && (
-                                              <div className="resume-declaration">
-                                                <h2 className="resume-section-title">Declaration</h2>
-                                                <p>{profile._candidate.personalInfo.declaration.text}</p>
-
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-                                      </div>
-
-
-                                    )}
-
-                                    {/* Job History Tab */}
-                                    {/* {activeTab === 2 && ( */}
-                                    {(activeTab[profileIndex] || 0) === 2 && (
-                                      <div className="tab-pane active" id="job-history">
-                                        <div className="section-card">
-                                          <div className="table-responsive">
-                                            <table className="table table-hover table-bordered job-history-table">
-                                              <thead className="table-light">
-                                                <tr>
-                                                  <th>S.No</th>
-                                                  <th>Company Name</th>
-                                                  <th>Position</th>
-                                                  {/* <th>Duration</th>
-                                                  <th>Location</th>
-                                                  <th>Status</th> */}
-                                                </tr>
-                                              </thead>
-                                              <tbody>
-
-                                                {jobHistory?.length > 0 ? (
-                                                  jobHistory?.map((job, index) => (
-                                                    <tr key={index}>
-                                                      <td>{index + 1}</td>
-                                                      <td>{job._job.displayCompanyName}</td>
-                                                      <td>{job._job.title}</td>
-                                                      {/* <td>
-                                                                  {job.from ? moment(job.from).format('MMM YYYY') : 'N/A'} -
-                                                                  {job.currentlyWorking ? 'Present' : job.to ? moment(job.to).format('MMM YYYY') : 'N/A'}
-                                                                </td>
-                                                                <td>Remote</td>
-                                                                <td><span className="text-success">Completed</span></td> */}
-                                                    </tr>
-                                                  ))
-                                                ) : (
-                                                  <tr>
-                                                    <td colSpan={6} className="text-center">No job history available</td>
-                                                  </tr>
-                                                )}
-                                              </tbody>
-                                            </table>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {/* Course History Tab */}
-                                    {/* {activeTab === 3 && ( */}
-                                    {(activeTab[profileIndex] || 0) === 3 && (
-
-                                      <div className="tab-pane active" id="course-history">
-                                        <div className="section-card">
-                                          <div className="table-responsive">
-                                            <table className="table table-hover table-bordered course-history-table">
-                                              <thead className="table-light">
-                                                <tr>
-                                                  <th>S.No</th>
-                                                  <th>Applied Date</th>
-                                                  <th>Course Name</th>
-                                                  <th>Lead Added By</th>
-                                                  <th>Counsellor</th>
-                                                  <th>Status</th>
-                                                </tr>
-                                              </thead>
-                                              <tbody>
-                                                {courseHistory?.length > 0 ? (
-                                                  courseHistory?.map((course, index) => (
-                                                    <tr key={index}>
-                                                      <td>{index + 1}</td>
-                                                      <td>{new Date(course.createdAt).toLocaleDateString('en-GB')}</td>
-                                                      <td>{course._course?.name || 'N/A'}</td>
-                                                      <td>{course.registeredBy?.name || 'Self Registered'}</td>
-                                                      <td>{course.month || ''} {course.year || ''}</td>
-                                                      <td><span className="text-success">{course._leadStatus?.title || '-'}</span></td>
-                                                    </tr>
-                                                  ))
-                                                ) : (
-                                                  <tr>
-                                                    <td colSpan={6} className="text-center">No course history available</td>
-                                                  </tr>
-                                                )}
-                                              </tbody>
-                                            </table>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {/* Documents Tab */}
-                                    {/* {activeTab === 4 && ( */}
-
-                                    {(activeTab[profileIndex] || 0) === 4 && (
-                                      <div className="tab-pane active" id='studentsDocuments'>
-                                        {(() => {
-                                          const documentsToDisplay = profile.uploadedDocs || [];
-                                          const totalRequired = profile?.docCounts?.totalRequired || 0;
-
-                                          // If no documents are required, show a message
-                                          if (totalRequired === 0) {
-                                            return (
-                                              <div className="col-12 text-center py-5">
-                                                <div className="text-muted">
-                                                  <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
-                                                  <h5 className="text-success">No Documents Required</h5>
-                                                  <p>This course does not require any document verification.</p>
-                                                </div>
-                                              </div>
-
-                                            );
-                                          }
-
-                                          // If documents are required, show the full interface
-                                          return (
-                                            <div className="enhanced-documents-panel">
-                                              {/* Enhanced Stats Grid */}
-                                              <div className="stats-grid">
-                                                {(() => {
-                                                  // Use backend counts only, remove static document fallback
-                                                  const backendCounts = profile?.docCounts || {};
-                                                  return (
-                                                    <>
-                                                      <div className="stat-card total-docs">
-                                                        <div className="stat-icon d-md-block d-sm-none d-none">
-                                                          <i className="fas fa-file-alt"></i>
-                                                        </div>
-                                                        <div className="stat-info">
-                                                          <h4>{backendCounts.totalRequired || 0}</h4>
-                                                          <p>Total Required</p>
-                                                        </div>
-                                                        <div className="stat-trend d-md-block d-sm-none d-none">
-                                                          <i className="fas fa-list"></i>
-                                                        </div>
-                                                      </div>
-
-                                                      <div className="stat-card uploaded-docs">
-                                                        <div className="stat-icon d-md-block d-sm-none d-none">
-                                                          <i className="fas fa-cloud-upload-alt"></i>
-                                                        </div>
-                                                        <div className="stat-info">
-                                                          <h4>{backendCounts.uploadedCount || 0}</h4>
-                                                          <p>Uploaded</p>
-                                                        </div>
-                                                        <div className="stat-trend d-md-block d-sm-none d-none">
-                                                          <i className="fas fa-arrow-up"></i>
-                                                        </div>
-                                                      </div>
-
-                                                      <div className="stat-card pending-docs">
-                                                        <div className="stat-icon d-md-block d-sm-none d-none">
-                                                          <i className="fas fa-clock"></i>
-                                                        </div>
-                                                        <div className="stat-info">
-                                                          <h4>{backendCounts.pendingVerificationCount || 0}</h4>
-                                                          <p>Pending Review</p>
-                                                        </div>
-                                                        <div className="stat-trend d-md-block d-sm-none d-none">
-                                                          <i className="fas fa-exclamation-triangle"></i>
-                                                        </div>
-                                                      </div>
-
-                                                      <div className="stat-card verified-docs">
-                                                        <div className="stat-icon d-md-block d-sm-none d-none">
-                                                          <i className="fas fa-check-circle"></i>
-                                                        </div>
-                                                        <div className="stat-info">
-                                                          <h4>{backendCounts.verifiedCount || 0}</h4>
-                                                          <p>Approved</p>
-                                                        </div>
-                                                        <div className="stat-trend d-md-block d-sm-none d-none">
-                                                          <i className="fas fa-thumbs-up"></i>
-                                                        </div>
-                                                      </div>
-
-                                                      <div className="stat-card rejected-docs">
-                                                        <div className="stat-icon d-md-block d-sm-none d-none">
-                                                          <i className="fas fa-times-circle"></i>
-                                                        </div>
-                                                        <div className="stat-info">
-                                                          <h4>{backendCounts.RejectedCount || 0}</h4>
-                                                          <p>Rejected</p>
-                                                        </div>
-                                                        <div className="stat-trend d-md-block d-sm-none d-none">
-                                                          <i className="fas fa-arrow-down"></i>
-                                                        </div>
-                                                      </div>
-                                                    </>
-                                                  );
-                                                })()}
-                                              </div>
-
-                                              {/* Enhanced Filter Section */}
-                                              <div className="filter-section-enhanced">
-                                                <div className="filter-tabs-container">
-                                                  <h5 className="filter-title">
-                                                    <i className="fas fa-filter me-2"></i>
-                                                    Filter Documents
-                                                  </h5>
-                                                  <div className="filter-tabs">
-                                                    {(() => {
-                                                      const backendCounts = profile?.docCounts || {};
-                                                      return (
-                                                        <>
-                                                          <button
-                                                            className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
-                                                            onClick={() => setStatusFilter('all')}
-                                                          >
-                                                            <i className="fas fa-list-ul"></i>
-                                                            All Documents
-                                                            <span className="badge">{backendCounts.totalRequired || 0}</span>
-                                                          </button>
-                                                          <button
-                                                            className={`filter-btn pending ${statusFilter === 'pending' ? 'active' : ''}`}
-                                                            onClick={() => setStatusFilter('pending')}
-                                                          >
-                                                            <i className="fas fa-clock"></i>
-                                                            Pending
-                                                            <span className="badge">{backendCounts.pendingVerificationCount || 0}</span>
-                                                          </button>
-                                                          <button
-                                                            className={`filter-btn verified ${statusFilter === 'verified' ? 'active' : ''}`}
-                                                            onClick={() => setStatusFilter('verified')}
-                                                          >
-                                                            <i className="fas fa-check-circle"></i>
-                                                            Verified
-                                                            <span className="badge">{backendCounts.verifiedCount || 0}</span>
-                                                          </button>
-                                                          <button
-                                                            className={`filter-btn rejected ${statusFilter === 'rejected' ? 'active' : ''}`}
-                                                            onClick={() => setStatusFilter('rejected')}
-                                                          >
-                                                            <i className="fas fa-times-circle"></i>
-                                                            Rejected
-                                                            <span className="badge">{backendCounts.RejectedCount || 0}</span>
-                                                          </button>
-                                                        </>
-                                                      );
-                                                    })()}
-                                                  </div>
-                                                </div>
-                                              </div>
-
-                                              {/* Enhanced Documents Grid */}
-                                              <div className="documents-grid-enhanced">
-                                                {(() => {
-                                                  // Filter documents based on status filter
-                                                  const filteredDocs = filterDocuments(documentsToDisplay);
-
-                                                  if (filteredDocs.length === 0) {
-                                                    return (
-                                                      <div className="col-12 text-center py-5">
-                                                        <div className="text-muted">
-                                                          <i className="fas fa-filter fa-3x mb-3"></i>
-                                                          <h5>No Documents Found</h5>
-                                                          <p>No documents match the current filter criteria.</p>
-                                                        </div>
-                                                      </div>
-                                                    );
-                                                  }
-
-                                                  return filteredDocs.map((doc, index) => {
-                                                    // Check if this is a document with upload data or just uploaded file info
-                                                    const latestUpload = doc.uploads && doc.uploads.length > 0
-                                                      ? doc.uploads[doc.uploads.length - 1]
-                                                      : (doc.fileUrl && doc.status !== "Not Uploaded" ? doc : null);
-
-                                                    return (
-                                                      <div key={doc._id || index} className="document-card-enhanced">
-                                                        <div className="document-image-container">
-                                                          {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
-                                                            <>
-                                                              {(() => {
-                                                                const fileUrl = latestUpload?.fileUrl || doc.fileUrl;
-                                                                const fileType = getFileType(fileUrl);
-
-                                                                if (fileType === 'image') {
-                                                                  return (
-                                                                    <img
-                                                                      src={fileUrl}
-                                                                      alt="Document Preview"
-                                                                      className="document-image"
-                                                                    />
-                                                                  );
-                                                                } else if (fileType === 'pdf') {
-                                                                  return (
-                                                                    <div className="document-preview-icon">
-                                                                      <i className="fa-solid fa-file" style={{ fontSize: '100px', color: '#dc3545' }}></i>
-                                                                      <p style={{ fontSize: '12px', marginTop: '10px' }}>PDF Document</p>
-                                                                    </div>
-                                                                  );
-                                                                } else {
-                                                                  return (
-                                                                    <div className="document-preview-icon">
-                                                                      <i className={`fas ${fileType === 'pdf' ? 'fa-file-word' :
-                                                                        fileType === 'spreadsheet' ? 'fa-file-excel' : 'fa-file'
-                                                                        }`} style={{ fontSize: '40px', color: '#6c757d' }}></i>
-                                                                      <p style={{ fontSize: '12px', marginTop: '10px' }}>
-                                                                        {fileType === 'document' ? 'Document' :
-                                                                          fileType === 'spreadsheet' ? 'Spreadsheet' : 'File'}
-                                                                      </p>
-                                                                    </div>
-                                                                  );
-                                                                }
-                                                              })()}
-                                                              <div className="image-overlay">
-                                                                <button
-                                                                  className="preview-btn"
-                                                                  onClick={() => openDocumentModal(doc)}
-                                                                >
-                                                                  <i className="fas fa-search-plus"></i>
-                                                                  Preview
-                                                                </button>
-                                                              </div>
-                                                            </>
-                                                          ) : (
-                                                            <div className="no-document-placeholder">
-                                                              <i className="fas fa-file-upload"></i>
-                                                              <p>No Document</p>
-                                                            </div>
-                                                          )}
-
-                                                          {/* Status Badge Overlay */}
-                                                          <div className="status-badge-overlay">
-                                                            {(latestUpload?.status === 'Pending' || doc.status === 'Pending') && (
-                                                              <span className="status-badge-new pending">
-                                                                <i className="fas fa-clock"></i>
-                                                                Pending
-                                                              </span>
-                                                            )}
-                                                            {(latestUpload?.status === 'Verified' || doc.status === 'Verified') && (
-                                                              <span className="status-badge-new verified">
-                                                                <i className="fas fa-check-circle"></i>
-                                                                Verified
-                                                              </span>
-                                                            )}
-                                                            {(latestUpload?.status === 'Rejected' || doc.status === 'Rejected') && (
-                                                              <span className="status-badge-new rejected">
-                                                                <i className="fas fa-times-circle"></i>
-                                                                Rejected
-                                                              </span>
-                                                            )}
-                                                            {(!latestUpload && doc.status === "Not Uploaded") && (
-                                                              <span className="status-badge-new not-uploaded">
-                                                                <i className="fas fa-upload"></i>
-                                                                Required
-                                                              </span>
-                                                            )}
-                                                          </div>
-                                                        </div>
-
-                                                        <div className="document-info-section">
-                                                          <div className="document-header">
-                                                            <h4 className="document-title">{doc.Name || `Document ${index + 1}`}</h4>
-                                                            <div className="document-actions">
-                                                              {(!latestUpload) ? (
-                                                                <button className="action-btn upload-btn" title="Upload Document" data-bs-toggle="modal" data-bs-target="#staticBackdrop" onClick={() => {
-                                                                  setSelectedProfile(profile); // Set the current profile
-                                                                  openUploadModal(doc);        // Open the upload modal
-                                                                }}>
-                                                                  <i className="fas fa-cloud-upload-alt"></i>
-                                                                  Upload
-                                                                </button>
-                                                              ) : (
-                                                                <button
-                                                                  className="action-btn verify-btn"
-                                                                  onClick={() => openDocumentModal(doc)}
-                                                                  title="Verify Document"
-                                                                >
-                                                                  <i className="fas fa-search"></i>
-                                                                  PREVIEW
-                                                                </button>
-                                                              )}
-                                                            </div>
-                                                          </div>
-
-                                                          <div className="document-meta">
-                                                            <div className="meta-item">
-                                                              <i className="fas fa-calendar-alt text-muted"></i>
-                                                              <span className="meta-text">
-                                                                {(latestUpload?.uploadedAt || doc.uploadedAt) ?
-                                                                  new Date(latestUpload?.uploadedAt || doc.uploadedAt).toLocaleDateString('en-GB', {
-                                                                    day: '2-digit',
-                                                                    month: 'short',
-                                                                    year: 'numeric'
-                                                                  }) :
-                                                                  'Not uploaded'
-                                                                }
-                                                              </span>
-                                                            </div>
-
-                                                            {latestUpload && (
-                                                              <div className="meta-item">
-                                                                <i className="fas fa-clock text-muted"></i>
-                                                                <span className="meta-text">
-                                                                  {new Date(latestUpload.uploadedAt).toLocaleTimeString('en-GB', {
-                                                                    hour: '2-digit',
-                                                                    minute: '2-digit'
-                                                                  })}
-                                                                </span>
-                                                              </div>
-                                                            )}
-                                                          </div>
-                                                        </div>
-                                                      </div>
-                                                    );
-                                                  });
-                                                })()}
-                                              </div>
-
-                                              {/* <DocumentModal /> */}
-                                              {showDocumentModal && (
-                                                <DocumentModal
-                                                  showDocumentModal={showDocumentModal}
-                                                  selectedDocument={selectedDocument}
-                                                  closeDocumentModal={closeDocumentModal}
-                                                  updateDocumentStatus={updateDocumentStatus}
-                                                  getFileType={getFileType}
-                                                />
-                                              )}
-                                              <div className="modal fade w-100" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
-                                                <div className="modal-dialog d-flex  justify-content-center mx-auto w-100">
-                                                  <div className="modal-content p-0 w-100">
-                                                    <div className="modal-header">
-                                                      <h3>
-                                                        <i className="fas fa-cloud-upload-alt me-2"></i>
-                                                        Upload {selectedDocumentForUpload?.Name || 'Document'}
-                                                      </h3>
-                                                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onClick={closeUploadModal}></button>
-                                                    </div>
-                                                    <div className="modal-body">
-
-
-
-                                                      <div className="upload-section">
-                                                        {!selectedFile ? (
-                                                          <div className="file-drop-zone">
-                                                            <div className="drop-zone-content">
-                                                              <i className="fas fa-cloud-upload-alt upload-icon"></i>
-                                                              <h4>Choose a file to upload</h4>
-                                                              <p>Drag and drop a file here, or click to select</p>
-                                                              <div className="file-types">
-                                                                <span>Supported: JPG, PNG, GIF, PDF</span>
-                                                                <span>Max size: 10MB</span>
-                                                              </div>
-                                                              <input
-                                                                type="file"
-                                                                id="file-input"
-                                                                accept=".jpg,.jpeg,.png,.gif,.pdf"
-                                                                onChange={handleFileSelect}
-                                                                style={{ display: 'none' }}
-                                                              />
-                                                              <button
-                                                                className="btn btn-primary"
-
-                                                                onClick={() => document.getElementById('file-input').click()}
-                                                              >
-                                                                <i className="fas fa-folder-open me-2"></i>
-                                                                Choose File
-                                                              </button>
-                                                            </div>
-                                                          </div>
-                                                        ) : (
-                                                          <div className="file-preview-section">
-                                                            <div className="selected-file-info">
-                                                              <h4>Selected File:</h4>
-                                                              <div className="file-details">
-                                                                <div className="file-icon">
-                                                                  <i className={`fas ${selectedFile.type.startsWith('image/') ? 'fa-image' : 'fa-file-pdf'}`}></i>
-                                                                </div>
-                                                                <div className="file-info">
-                                                                  <p className="file-name">{selectedFile.name}</p>
-                                                                  <p className="file-size">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                                                                </div>
-                                                                <button
-                                                                  className="btn btn-sm btn-outline-secondary"
-                                                                  onClick={() => {
-                                                                    setSelectedFile(null);
-                                                                    setUploadPreview(null);
-                                                                  }}
-                                                                >
-                                                                  <i className="fas fa-trash"></i>
-                                                                </button>
-                                                              </div>
-                                                            </div>
-
-                                                            {uploadPreview && (
-                                                              <div className="upload-preview">
-                                                                <h5>Preview:</h5>
-                                                                <img src={uploadPreview} alt="Upload Preview" className="preview-image" />
-                                                              </div>
-                                                            )}
-
-                                                            {isUploading && (
-                                                              <div className="upload-progress-section">
-                                                                <h5>Uploading...</h5>
-                                                                <div className="progress-bar-container">
-                                                                  <div
-                                                                    className="progress-bar"
-                                                                    style={{ width: `${uploadProgress}%` }}
-                                                                  ></div>
-                                                                </div>
-                                                                <p>{uploadProgress}% Complete</p>
-                                                              </div>
-                                                            )}
-                                                          </div>
-                                                        )}
-                                                      </div>
-
-
-
-                                                    </div>
-                                                    <div className="modal-footer">
-                                                      <button
-                                                        className="btn btn-secondary"
-                                                        onClick={closeUploadModal}
-                                                        disabled={isUploading}
-                                                      >
-                                                        Cancel
-                                                      </button>
-                                                      <button
-                                                        className="btn btn-primary"
-                                                        onClick={handleFileUpload}
-                                                        disabled={!selectedFile || isUploading}
-                                                      >
-                                                        {isUploading ? (
-                                                          <>
-                                                            <i className="fas fa-spinner fa-spin me-2"></i>
-                                                            Uploading...
-                                                          </>
-                                                        ) : (
-                                                          <>
-                                                            <i className="fas fa-upload me-2"></i>
-                                                            Upload Document
-                                                          </>
-                                                        )}
-                                                      </button>
-                                                    </div>
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          );
-                                        })()}
-                                      </div>
-                                    )}
-
-                                  </div>)
-                              )}
-                            </div>
-
-                            {/* <div class="modal fade" id={`profileModal-${profile._id}`} data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby={`profileModalLabel-${profile._id}`} aria-hidden="true">
-                              <div class="modal-dialog modal-dialog-scrollable">
-                                <div class="modal-content new-modal-content">
-                                  <div class="modal-header">
-                                    <h1 class="modal-title fs-5" id={`profileModalLabel-${profile._id}`}>Modal title</h1>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                  </div>
-                                  <div class="modal-body">
-                                    <CandidateProfile ref={candidateRef} />
-                                  </div>
-                                  <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                    <button onClick={handleSaveCV} type="button" class="btn btn-primary">Save CV</button>
-                                  </div>
-                                </div>
-                              </div>
-                            </div> */}
-
-                            {openModalId === profile._id && (
-                              <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                                <div className="modal-dialog modal-dialog-scrollable m-0 mt-2">
-                                  <div className="modal-content new-modal-content">
-                                    <div className="modal-header">
-                                      <h1 className="modal-title fs-5">Candidate Profile</h1>
-                                      <button type="button" className="btn-close" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}></button>
-                                    </div>
-                                    <div className="modal-body">
-                                      <CandidateProfile ref={candidateRef} />
-                                    </div>
-                                    <div className="modal-footer">
-                                      <button type="button" className="btn btn-secondary" onClick={() => { setOpenModalId(null); setSelectedProfile(null) }}>Close</button>
-                                      <button onClick={handleSaveCV} type="button" className="btn btn-primary">Save CV</button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {showBranchModal && (
-                              <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                                <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered">
-                                  <div className="modal-content">
-                                    <div className="modal-header">
-                                      <h1 className="modal-title fs-5">Select Branch</h1>
-                                      <button type="button" className="btn-close" onClick={() => setShowBranchModal(false)}></button>
-                                    </div>
-                                    <div className="modal-body">
-                                      <div className="position-relative">
-                                        <select
-                                          className="form-select border-0 shadow-sm"
-                                          id="course"
-                                          value={selectedBranch}
-                                          onChange={(e) => setSelectedBranch(e.target.value)}
-                                          style={{
-                                            height: '48px',
-                                            padding: '12px 16px',
-                                            backgroundColor: '#f8f9fa',
-                                            borderRadius: '8px',
-                                            fontSize: '14px',
-                                            transition: 'all 0.3s ease',
-                                            border: '1px solid #e9ecef',
-
-                                          }}
-
-                                        >
-                                          <option value="">Select Branch</option>
-                                          {branches && branches.data && branches.data.length > 0 && branches.data.map((branch, index) => (
-                                            <option key={branch._id || index} value={branch._id}>
-                                              {branch.name}
-                                            </option>
-                                          ))}
-                                        </select>
-                                      </div>
-
-
-                                    </div>
-                                    <div className="modal-footer">
-                                      <button type="button" className="btn btn-secondary" onClick={() => {
-                                        setShowBranchModal(false);
-                                        setSelectedBranch('');
-                                      }}>Close</button>
-                                      <button type="button" className="btn btn-primary" onClick={() => updateBranch(profile, selectedBranch)}>Save Branch</button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {showWhatsappModal && (
-                            <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                              <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered" style={{ maxWidth: '600px' }}>
-                                <div className="modal-content">
-                                  <div className="modal-header">
-                                    <h1 className="modal-title fs-5">Whatsapp Chat</h1>
-                                    <button type="button" className="btn-close" onClick={() => {
-                                      setShowWhatsappModal(false);
-                                      setSelectedSenderId('');
-                                      setSelectedWhatsappNumbers([]);
-                                      setResponseRecipient('sender');
-                                      setSelectedWhatsappTemplateModal('');
-                                      setWhatsappMessage('');
-                                      setShowBulkInputs(false);
-                                      setBulkMode(null);
-                                    }}></button>
-                                  </div>
-                                  <div className="modal-body" style={{ padding: '20px' }}>
-                                    
-                                    <div className="mb-4">
-                                      <h5 className="fw-bold mb-3">Select the whatsapp number to send</h5>
-                                      <div className="d-flex flex-column gap-2">
-                                        {['Primary Mobile', 'Father\'s Mobile', 'Mother\'s Mobile', 'Whatsapp Number'].map((numberType) => (
-                                          <div key={numberType} className="form-check">
-                                            <input
-                                              className="form-check-input"
-                                              type="checkbox"
-                                              id={`whatsappNumber-${numberType}`}
-                                              checked={selectedWhatsappNumbers.includes(numberType)}
-                                              onChange={(e) => {
-                                                if (e.target.checked) {
-                                                  setSelectedWhatsappNumbers([...selectedWhatsappNumbers, numberType]);
-                                                } else {
-                                                  setSelectedWhatsappNumbers(selectedWhatsappNumbers.filter(n => n !== numberType));
-                                                }
-                                              }}
-                                              style={{ cursor: 'pointer' }}
-                                            />
-                                            <label className="form-check-label" htmlFor={`whatsappNumber-${numberType}`} style={{ cursor: 'pointer' }}>
-                                              {numberType}
-                                            </label>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-
-                                    {/* <div className="mb-4">
-                                      <h5 className="fw-bold mb-3">Select a user to receive students response</h5>
-                                      <div className="d-flex flex-column gap-2">
-                                        <div className="form-check">
-                                          <input
-                                            className="form-check-input"
-                                            type="radio"
-                                            name="responseRecipient"
-                                            id="responseRecipientSender"
-                                            value="sender"
-                                            checked={responseRecipient === 'sender'}
-                                            onChange={(e) => setResponseRecipient(e.target.value)}
-                                            style={{ cursor: 'pointer', accentColor: '#ff6b35' }}
-                                          />
-                                          <label className="form-check-label" htmlFor="responseRecipientSender" style={{ cursor: 'pointer' }}>
-                                            Sender
-                                          </label>
-                                        </div>
-                                        <div className="form-check">
-                                          <input
-                                            className="form-check-input"
-                                            type="radio"
-                                            name="responseRecipient"
-                                            id="responseRecipientLeadOwner"
-                                            value="leadOwner"
-                                            checked={responseRecipient === 'leadOwner'}
-                                            onChange={(e) => setResponseRecipient(e.target.value)}
-                                            style={{ cursor: 'pointer', accentColor: '#ff6b35' }}
-                                          />
-                                          <label className="form-check-label" htmlFor="responseRecipientLeadOwner" style={{ cursor: 'pointer' }}>
-                                            Lead Owner
-                                          </label>
-                                        </div>
-                                      </div>
-                                    </div> */}
-
-                                    {/* Select WhatsApp Template Section */}
-                                    <div className="mb-4">
-                                      <label htmlFor="whatsappTemplate" className="form-label fw-bold mb-2">Select WhatsApp Template</label>
-                                      <select
-                                        className="form-select border-0 shadow-sm"
-                                        id="whatsappTemplate"
-                                        value={selectedWhatsappTemplateModal}
-                                        onChange={(e) => setSelectedWhatsappTemplateModal(e.target.value)}
-                                        disabled={whatsappTemplates.length === 0}
-                                        style={{
-                                          height: '48px',
-                                          padding: '12px 16px',
-                                          backgroundColor: whatsappTemplates.length === 0 ? '#e9ecef' : '#f8f9fa',
-                                          borderRadius: '8px',
-                                          fontSize: '14px',
-                                          transition: 'all 0.3s ease',
-                                          border: '1px solid #e9ecef',
-                                          cursor: whatsappTemplates.length === 0 ? 'not-allowed' : 'pointer'
-                                        }}
-                                      >
-                                        <option value="">
-                                          {whatsappTemplates.length === 0 ? 'Loading templates...' : 'Select WhatsApp Template'}
-                                        </option>
-                                        {whatsappTemplates && whatsappTemplates.length > 0 && whatsappTemplates.map((template, index) => (
-                                          <option key={template.id || index} value={template.id || template.name}>
-                                            {template.name || template.id}
-                                          </option>
-                                        ))}
-                                      </select>
-                                      {whatsappTemplates.length === 0 && (
-                                        <small className="text-muted d-block mt-1">
-                                          <i className="fas fa-spinner fa-spin me-1"></i>
-                                          Fetching templates...
-                                        </small>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="modal-footer">
-                                    <button type="button" className="btn btn-secondary" onClick={() => {
-                                      setShowWhatsappModal(false);
-                                      setSelectedSenderId('');
-                                      setSelectedWhatsappNumbers([]);
-                                      setResponseRecipient('sender');
-                                      setSelectedWhatsappTemplateModal('');
-                                      setWhatsappMessage('');
-                                    }}>Close</button>
-                                    <button type="button" className="btn btn-primary" onClick={handleBulkWhatsappSend} disabled={isSendingBulkWhatsapp}>
-                                      {isSendingBulkWhatsapp ? (
-                                        <>
-                                          <span className="spinner-border spinner-border-sm me-2"></span>
-                                          Sending...
-                                        </>
-                                      ) : (
-                                        'Send Message'
-                                      )}
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                            )}
-
-                            <style>
-                              {
-                                `.new-modal-content{
-                                 width:1000px!important;
-                                 transform: translateX(25%);
-                                 }
-
-                                 @media(max-width:768px){
-                                 .new-modal-content{
-                                 width:100%!important;
-                                 transform: translateX(0%)
-                                 }
-                                 }
-                                  `
-                              }
-                            </style>
-                          </div>
-
-
-                        ));
-                        })()}
-
-
-
+              <div className="wa-search-wrap">
+                <i className="fas fa-search wa-search-icon" />
+                <input
+                  type="text"
+                  name="name"
+                  className="wa-search-input"
+                  placeholder="Search or start a new chat"
+                  value={filterData.name}
+                  onChange={handleFilterChange}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      fetchProfileData();
+                    }
+                  }}
+                />
+                {filterData.name ? (
+                  <button
+                    type="button"
+                    className="wa-search-clear"
+                    onClick={() => {
+                      const newFilterData = { ...filterData, name: '' };
+                      setFilterData(newFilterData);
+                      fetchProfileData(newFilterData, 1);
+                    }}
+                  >
+                    <i className="fas fa-times" />
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="wa-chat-scroll">
+                {isLoadingProfiles && !sortedChatProfiles.length ? (
+                  <div className="wa-empty-list">
+                    <div className="spinner-border text-success mb-2" role="status" />
+                    <div>Loading chats...</div>
+                  </div>
+                ) : null}
+
+                {!isLoadingProfiles && !sortedChatProfiles.length ? (
+                  <div className="wa-empty-list">
+                    <i className="fab fa-whatsapp" />
+                    <div className="fw-semibold">No chats found</div>
+                    <div>Try another search</div>
+                  </div>
+                ) : null}
+
+                {sortedChatProfiles.map((profile) => {
+                  const phone = profile._candidate?.mobile || '';
+                  const name = profile._candidate?.name || phone || 'Unknown';
+                  const unreadCount = getProfileUnreadCount(profile);
+                  const isUnread = unreadCount > 0;
+                  const isActive = showPanel === 'Whatsapp' && selectedProfile?._id === profile._id;
+                  const preview = getChatPreview(profile);
+                  return (
+                    <button
+                      key={profile._id || phone}
+                      type="button"
+                      className={'wa-chat-item' + (isActive ? ' is-active' : '') + (isUnread ? ' is-unread' : '')}
+                      onClick={() => openPanel(profile, 'whatsapp')}
+                    >
+                      <div
+                        className="wa-chat-avatar"
+                        style={{ background: getAvatarColor(name) }}
+                      >
+                        {getAvatarInitials(name)}
                       </div>
+                      <div className="wa-chat-item__body">
+                        <div className="wa-chat-item__top">
+                          <span className="wa-chat-item__name">{name}</span>
+                          <span className={'wa-chat-item__time' + (isUnread ? ' is-unread' : '')}>
+                            {formatChatListTime(lastMessageTime[profile._id] || profile.lastMessageTime)}
+                          </span>
+                        </div>
+                        <div className="wa-chat-item__bottom">
+                          <span className={'wa-chat-item__preview' + (isUnread ? ' is-unread' : '')}>
+                            {preview}
+                          </span>
+                          {isUnread ? (
+                            <span className="wa-unread-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
 
+              {totalPages > 1 ? (
+                <div className="wa-pager">
+                  <button
+                    type="button"
+                    disabled={currentPage <= 1 || isLoadingProfiles}
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                  >
+                    <i className="fas fa-chevron-left" />
+                  </button>
+                  <span>{currentPage} / {totalPages}</span>
+                  <button
+                    type="button"
+                    disabled={currentPage >= totalPages || isLoadingProfiles}
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                  >
+                    <i className="fas fa-chevron-right" />
+                  </button>
+                </div>
+              ) : null}
+            </section>
 
+            <section
+              className="wa-main-pane"
+              style={{ display: isMobile && showPanel !== 'Whatsapp' ? 'none' : 'flex' }}
+            >
+              {showPanel === 'Whatsapp' && selectedProfile ? (
+                renderWhatsAppPanel()
+              ) : (
+                <div className="wa-welcome">
+                  <div className="wa-welcome-card">
+                    <div className="wa-welcome-illu">
+                      <div className="wa-welcome-illu__screen">
+                        <i className="fab fa-whatsapp" />
+                      </div>
+                    </div>
+                    <h2>WhatsApp for College</h2>
+                    <p>
+                      Send messages, templates and follow up with candidates in one place — just like WhatsApp Web.
+                    </p>
+                    <button
+                      type="button"
+                      className="wa-welcome-btn"
+                      onClick={() => {
+                        if (sortedChatProfiles[0]) openPanel(sortedChatProfiles[0], 'whatsapp');
+                      }}
+                      disabled={!sortedChatProfiles.length}
+                    >
+                      Start chatting
+                    </button>
+                  </div>
+                  <div className="wa-welcome-actions">
+                    <div className="wa-welcome-action">
+                      <div className="wa-welcome-action__icon"><i className="fas fa-file-alt" /></div>
+                      <span>Send document</span>
+                    </div>
+                    <div className="wa-welcome-action">
+                      <div className="wa-welcome-action__icon"><i className="fas fa-user-plus" /></div>
+                      <span>Add contact</span>
+                    </div>
+                    <div className="wa-welcome-action">
+                      <div className="wa-welcome-action__icon wa-welcome-action__icon--ai"><i className="fas fa-star" /></div>
+                      <span>Ask AI</span>
                     </div>
                   </div>
                 </div>
-
-              </div>
-
-              <nav aria-label="Page navigation" className="mt-4">
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <small className="text-muted">
-                    Page {currentPage} of {totalPages} ({allProfiles.length} results)
-                  </small>
-                </div>
-
-                <ul className="pagination justify-content-center">
-                  <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                    <button
-                      className="page-link"
-                      onClick={() => setCurrentPage(currentPage - 1)}
-                      disabled={currentPage === 1}
-                    >
-                      &laquo;
-                    </button>
-                  </li>
-
-                  {currentPage > 3 && (
-                    <>
-                      <li className="page-item">
-                        <button className="page-link" onClick={() => setCurrentPage(1)}>1</button>
-                      </li>
-                      {currentPage > 4 && <li className="page-item disabled"><span className="page-link">...</span></li>}
-                    </>
-                  )}
-
-                  {getPaginationPages().map((pageNumber) => (
-                    <li key={pageNumber} className={`page-item ${currentPage === pageNumber ? 'active' : ''}`}>
-                      <button className="page-link" onClick={() => setCurrentPage(pageNumber)}>
-                        {pageNumber}
-                      </button>
-                    </li>
-                  ))}
-
-                  {currentPage < totalPages - 2 && !getPaginationPages().includes(totalPages) && (
-                    <>
-                      {currentPage < totalPages - 3 && <li className="page-item disabled"><span className="page-link">...</span></li>}
-                      <li className="page-item">
-                        <button className="page-link" onClick={() => setCurrentPage(totalPages)}>{totalPages}</button>
-                      </li>
-                    </>
-                  )}
-
-                  <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-                    <button
-                      className="page-link"
-                      onClick={() => setCurrentPage(currentPage + 1)}
-                      disabled={currentPage === totalPages}
-                    >
-                      &raquo;
-                    </button>
-                  </li>
-                </ul>
-              </nav>
+              )}
             </section>
           </div>
 
-        </div>
+        {showPanel && showPanel !== 'Whatsapp' && (
+          <div className="wa-side-overlay">
+            {renderEditPanel()}
+            {renderRefferPanel()}
+            {renderLeadHistoryPanel()}
+            {renderAllLeadPanel()}
+            {renderChangeCenterPanel()}
+          </div>
+        )}
+        {renderActionsModal()}
 
-        {/* Right Sidebar for Desktop - Panels */}
-        {!isMobile && (
-          <div className="col-4">
-            <div className="row " style={{
-
-              transition: 'margin-top 0.2s ease-in-out',
-              position: 'fixed',
-              width: '-webkit-fill-available',
-              zIndex: '10'
-            }}>
-              {renderEditPanel()}
-              {renderRefferPanel()}
-              {renderWhatsAppPanel()}
-              {renderLeadHistoryPanel()}
-              {renderAllLeadPanel()}
-              {renderChangeCenterPanel()}
+        {showWhatsappModal && (
+          <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered" style={{ maxWidth: '600px' }}>
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h1 className="modal-title fs-5">Whatsapp Chat</h1>
+                  <button type="button" className="btn-close" onClick={() => {
+                    setShowWhatsappModal(false);
+                    setSelectedSenderId('');
+                    setSelectedWhatsappNumbers([]);
+                    setResponseRecipient('sender');
+                    setSelectedWhatsappTemplateModal('');
+                    setWhatsappMessage('');
+                    setShowBulkInputs(false);
+                    setBulkMode(null);
+                  }}></button>
+                </div>
+                <div className="modal-body" style={{ padding: '20px' }}>
+                  <div className="mb-4">
+                    <h5 className="fw-bold mb-3">Select the whatsapp number to send</h5>
+                    <div className="d-flex flex-column gap-2">
+                      {['Primary Mobile', 'Father\'s Mobile', 'Mother\'s Mobile', 'Whatsapp Number'].map((numberType) => (
+                        <div key={numberType} className="form-check">
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            id={`whatsappNumber-${numberType}`}
+                            checked={selectedWhatsappNumbers.includes(numberType)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedWhatsappNumbers([...selectedWhatsappNumbers, numberType]);
+                              } else {
+                                setSelectedWhatsappNumbers(selectedWhatsappNumbers.filter(n => n !== numberType));
+                              }
+                            }}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          <label className="form-check-label" htmlFor={`whatsappNumber-${numberType}`} style={{ cursor: 'pointer' }}>
+                            {numberType}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="mb-4">
+                    <label htmlFor="whatsappTemplate" className="form-label fw-bold mb-2">Select WhatsApp Template</label>
+                    <select
+                      className="form-select border-0 shadow-sm"
+                      id="whatsappTemplate"
+                      value={selectedWhatsappTemplateModal}
+                      onChange={(e) => setSelectedWhatsappTemplateModal(e.target.value)}
+                      disabled={whatsappTemplates.length === 0}
+                      style={{
+                        height: '48px',
+                        padding: '12px 16px',
+                        backgroundColor: whatsappTemplates.length === 0 ? '#e9ecef' : '#f8f9fa',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        transition: 'all 0.3s ease',
+                        border: '1px solid #e9ecef',
+                        cursor: whatsappTemplates.length === 0 ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      <option value="">
+                        {whatsappTemplates.length === 0 ? 'Loading templates...' : 'Select WhatsApp Template'}
+                      </option>
+                      {whatsappTemplates && whatsappTemplates.length > 0 && whatsappTemplates.map((template, index) => (
+                        <option key={template.id || index} value={template.id || template.name}>
+                          {template.name || template.id}
+                        </option>
+                      ))}
+                    </select>
+                    {whatsappTemplates.length === 0 && (
+                      <small className="text-muted d-block mt-1">
+                        <i className="fas fa-spinner fa-spin me-1"></i>
+                        Fetching templates...
+                      </small>
+                    )}
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-secondary" onClick={() => {
+                    setShowWhatsappModal(false);
+                    setSelectedSenderId('');
+                    setSelectedWhatsappNumbers([]);
+                    setResponseRecipient('sender');
+                    setSelectedWhatsappTemplateModal('');
+                    setWhatsappMessage('');
+                  }}>Close</button>
+                  <button type="button" className="btn btn-primary" onClick={handleBulkWhatsappSend} disabled={isSendingBulkWhatsapp}>
+                    {isSendingBulkWhatsapp ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2"></span>
+                        Sending...
+                      </>
+                    ) : (
+                      'Send Message'
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Mobile Modals */}
-        {isMobile && renderEditPanel()}
-        {isMobile && renderRefferPanel()}
-        {isMobile && renderWhatsAppPanel()}
-        {isMobile && renderLeadHistoryPanel()}
-        {isMobile && renderAllLeadPanel()}
-        {isMobile && renderChangeCenterPanel()}
-        {renderActionsModal()}
-      </div>
       <UploadModal />
+
 
       {/* <div style={{ background: 'rgba(0, 0, 0, 0.5)', width: '100%', position: 'absolute', minHeight: '100vh', top: '0', zIndex: '13', position: 'fixed' }}>
         <div className='card' style={{ border: '1px solid red', width: '70%', height: '100%' }}>
@@ -11890,8 +9784,380 @@ const WhatsappChat = () => {
         {`
         /* Existing styles */
         html body .content .content-wrapper {
-          padding: calc(0.9rem - 0.1rem) 1.2rem
+          padding: 0 !important;
         }
+.wa-inbox-root {
+  height: calc(100vh - 5rem);
+  min-height: calc(100vh - 5rem);
+  background: #d1d7db;
+  overflow: hidden;
+  font-family: Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif;
+}
+.wa-shell {
+  display: flex;
+  height: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  background: #fff;
+  box-shadow: 0 0 20px rgba(0,0,0,0.08);
+}
+.wa-nav-rail {
+  width: 60px;
+  background: #f0f2f5;
+  border-right: 1px solid #e9edef;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  flex-shrink: 0;
+}
+.wa-nav-btn {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  background: transparent;
+  border-radius: 50%;
+  color: #54656f;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+.wa-nav-btn--active { background: #d9fdd3; color: #0b141a; }
+.wa-nav-badge {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #25d366;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wa-chat-list {
+  width: 380px;
+  min-width: 320px;
+  max-width: 420px;
+  border-right: 1px solid #e9edef;
+  background: #fff;
+  height: 100%;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.wa-chat-list__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 8px;
+}
+.wa-brand {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #00a884;
+  letter-spacing: -0.3px;
+}
+.wa-chat-list__actions { display: flex; gap: 2px; }
+.wa-icon-btn {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  background: transparent;
+  border-radius: 50%;
+  color: #54656f;
+  font-size: 16px;
+}
+.wa-icon-btn:hover { background: #f0f2f5; }
+.wa-icon-btn:disabled { opacity: 0.4; }
+.wa-search-wrap {
+  position: relative;
+  margin: 4px 12px 10px;
+}
+.wa-search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #54656f;
+  font-size: 13px;
+}
+.wa-search-input {
+  width: 100%;
+  height: 38px;
+  border: 0;
+  outline: none;
+  background: #f0f2f5;
+  border-radius: 8px;
+  padding: 0 36px 0 40px;
+  font-size: 14px;
+  color: #111b21;
+}
+.wa-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: #54656f;
+}
+.wa-filter-row {
+  display: flex;
+  gap: 8px;
+  padding: 0 12px 10px;
+  overflow-x: auto;
+}
+.wa-filter-chip {
+  border: 0;
+  background: #f0f2f5;
+  color: #54656f;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.wa-filter-chip.is-active {
+  background: #d9fdd3;
+  color: #0b7a4b;
+}
+.wa-filter-chip--plus {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wa-chat-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+.wa-chat-scroll::-webkit-scrollbar { width: 6px; }
+.wa-chat-scroll::-webkit-scrollbar-thumb { background: #ccd0d5; border-radius: 8px; }
+.wa-empty-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 16px;
+  color: #667781;
+  text-align: center;
+  gap: 4px;
+  font-size: 13px;
+}
+.wa-empty-list .fab { font-size: 40px; color: #d1d7db; margin-bottom: 8px; }
+.wa-chat-item {
+  width: 100%;
+  border: 0;
+  background: #fff;
+  display: flex;
+  gap: 12px;
+  padding: 10px 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.wa-chat-item:hover { background: #f5f6f6; }
+.wa-chat-item.is-active { background: #f0f2f5; }
+.wa-chat-avatar {
+  width: 49px;
+  height: 49px;
+  border-radius: 50%;
+  color: #1f2c34;
+  font-weight: 700;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.wa-chat-item__body { flex: 1; min-width: 0; border-bottom: 1px solid #f0f2f5; padding-bottom: 10px; }
+.wa-chat-item:last-child .wa-chat-item__body { border-bottom: 0; }
+.wa-chat-item__top, .wa-chat-item__bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.wa-chat-item__name {
+  font-size: 16px;
+  font-weight: 500;
+  color: #111b21;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wa-chat-item.is-unread .wa-chat-item__name { font-weight: 700; }
+.wa-chat-item__time { font-size: 12px; color: #667781; flex-shrink: 0; }
+.wa-chat-item__time.is-unread { color: #25d366; font-weight: 600; }
+.wa-chat-item__preview {
+  font-size: 13px;
+  color: #667781;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.wa-chat-item__preview.is-unread { color: #111b21; font-weight: 600; }
+.wa-unread-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #25d366;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.wa-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-top: 1px solid #e9edef;
+  background: #fafafa;
+  color: #667781;
+  font-size: 12px;
+}
+.wa-pager button {
+  border: 1px solid #e9edef;
+  background: #fff;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: #54656f;
+}
+.wa-pager button:disabled { opacity: 0.4; }
+.wa-main-pane {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  background: #f0f2f5;
+  flex-direction: column;
+}
+.wa-welcome {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #f0f2f5;
+  border-bottom: 6px solid #00a884;
+}
+.wa-welcome-card {
+  width: min(520px, 92%);
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(11, 20, 26, 0.08);
+  padding: 36px 28px 28px;
+  text-align: center;
+}
+.wa-welcome-illu {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 18px;
+}
+.wa-welcome-illu__screen {
+  width: 140px;
+  height: 92px;
+  border-radius: 12px;
+  background: linear-gradient(160deg, #e8f8ef 0%, #d9fdd3 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #00a884;
+  font-size: 42px;
+  box-shadow: inset 0 0 0 1px rgba(0,168,132,0.12);
+}
+.wa-welcome-card h2 {
+  margin: 0 0 10px;
+  font-size: 28px;
+  font-weight: 360;
+  color: #41525d;
+}
+.wa-welcome-card p {
+  margin: 0 auto 22px;
+  max-width: 380px;
+  color: #667781;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.wa-welcome-btn {
+  border: 0;
+  background: #00a884;
+  color: #fff;
+  border-radius: 999px;
+  padding: 10px 28px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.wa-welcome-btn:disabled { opacity: 0.5; }
+.wa-welcome-actions {
+  display: flex;
+  gap: 28px;
+  margin-top: 28px;
+}
+.wa-welcome-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #667781;
+  font-size: 12px;
+}
+.wa-welcome-action__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid #e9edef;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #54656f;
+  font-size: 16px;
+}
+.wa-welcome-action__icon--ai { color: #7c4dff; }
+#whatsappPanel { height: 100% !important; min-height: 100% !important; }
+.wa-chat-list button:focus, .wa-nav-btn:focus, .wa-icon-btn:focus, .wa-filter-chip:focus {
+  outline: none;
+  box-shadow: none;
+}
+.wa-side-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(11, 20, 26, 0.35);
+  display: flex;
+  justify-content: flex-end;
+}
+.wa-side-overlay > * {
+  width: min(520px, 100%);
+  height: 100%;
+  background: #fff;
+  overflow: auto;
+}
+@media (max-width: 992px) {
+  .wa-chat-list {
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+  }
+  .wa-welcome-card h2 { font-size: 22px; }
+}
 .modal-header {
     background-color: #fc2b5a;
     border-bottom: none;
@@ -13105,7 +11371,8 @@ background: #fd2b5a;
 }
 
 #whatsappPanel {
-    height: 73dvh;
+    height: 100% !important;
+    min-height: 100% !important;
 }
 
 .info-group {
@@ -14915,7 +13182,7 @@ margin-left:15px;
           margin-top: 175px!important;
           }
           html body .content .content-wrapper{
-          padding:1.8rem 0.9rem 0;
+          padding: 0 !important;
           }
         }
 
@@ -16463,7 +14730,8 @@ margin-left:15px;
           }
 
           #whatsappPanel {
-              height: 73dvh;
+              height: 100% !important;
+              min-height: 100% !important;
           }
 
           .info-group {
@@ -18043,7 +16311,7 @@ margin-left:15px;
           margin-top: 175px!important;
           }
           html body .content .content-wrapper{
-          padding:1.8rem 0.9rem 0!important;
+          padding: 0 !important;
           }
               .nav-tabs-main{
                   white-space: nowrap;
