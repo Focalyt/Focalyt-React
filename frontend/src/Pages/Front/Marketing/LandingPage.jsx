@@ -2,13 +2,57 @@ import React, { useState } from "react";
 import { Check, Clock, Heart, Play, Star } from "lucide-react";
 import FrontLayout from "../../../Component/Layouts/Front";
 
+const PROPERTIES = [
+  {
+    id: "taj-palace",
+    name: "The Taj Mahal Palace, Mumbai",
+    stars: 5,
+    location: "Colaba, Mumbai",
+    distance: "About a minute walk to The Taj Mahal Palace",
+    image:
+      "https://commons.wikimedia.org/wiki/Special:FilePath/Taj_Mahal_Palace_Hotel.jpg?width=960",
+    imageFallback:
+      "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=960&q=80",
+    mediaCount: "1115 Photos & Videos",
+    ratingLabel: "Excellent",
+    rating: "4.6",
+    ratingCount: "1673 Ratings",
+    price: "27,000",
+    taxes: "4,860",
+    perks: [
+      { type: "gift", text: "Get Taj Gift Card worth INR 3000 for Dining & Spa" },
+      { type: "clock", text: "Guaranteed Early Check-in/Late Check-out available" },
+      { type: "heritage", text: "Enjoy guided Heritage Walk of the Palace and learn about its history" },
+    ],
+  },
+  {
+    id: "taj-tower",
+    name: "Taj Mahal Tower, Mumbai",
+    stars: 5,
+    location: "Colaba, Mumbai",
+    distance: "100 m from The Taj Mahal Palace, Mumbai",
+    image:
+      "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=960&q=80",
+    imageFallback:
+      "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=960&q=80",
+    mediaCount: "2657 Photos & Videos",
+    ratingLabel: "Excellent",
+    rating: "4.7",
+    ratingCount: "5897 Ratings",
+    price: "18,500",
+    taxes: "3,330",
+    perks: [
+      { type: "gift", text: "Get Taj Gift Card worth INR 2500 for Dining & Spa" },
+      { type: "dot", text: "Complimentary Welcome Drink on arrival" },
+      {
+        type: "heritage",
+        text: "Experience stunning views of the Gateway of India, excellent hospitality, fine dining options",
+      },
+    ],
+  },
+];
 
 function StarRow({ count }) {
-
-    const navigate = useNavigate();
-    const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
-    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
-
   return (
     <span className="htl-stars" aria-label={`${count} star hotel`}>
       {Array.from({ length: count }).map((_, i) => (
