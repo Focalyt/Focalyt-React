@@ -1536,6 +1536,7 @@ const CRMDashboard = () => {
       const listRes = await axios.get(`${backendUrl}/college/digitalLead/${listPath}`, {
         headers: { 'x-auth': token },
       });
+      console.log('listRes', listRes);
       const leads = (Array.isArray(listRes.data?.data) ? listRes.data.data : []).filter(
         (row) => !aiCallSentIds.some((id) => String(id) === String(row.lead_id || ''))
       );
@@ -3249,10 +3250,15 @@ const CRMDashboard = () => {
     if (!token) return;
     try {
       const fd = formDataRef.current || formData;
+      const dateParts = { ...buildLeadDateQueryParts(filters) };
+      delete dateParts.leadStatus;
+      delete dateParts.subStatuses;
+      delete dateParts.approvalStatus;
+      delete dateParts.status;
       const queryParams = new URLSearchParams({
         page: '1',
         limit: '1',
-        ...buildLeadDateQueryParts(filters),
+        ...dateParts,
         ...buildListFilterQueryParts(fd, cycleOverride || cycleFilters),
       });
 
@@ -3341,7 +3347,7 @@ const CRMDashboard = () => {
       const response = await axios.get(`${backendUrl}/college/candidate/appliedCourses/${selectedProfile._candidate._id}`, {
         headers: { 'x-auth': token }
       });
-      // console.log("response", response);
+      console.log("response", response);
       if (response.data && response.data.courses) {
         setCourseHistory(response.data.courses);
       }

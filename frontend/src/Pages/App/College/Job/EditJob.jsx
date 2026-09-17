@@ -81,9 +81,15 @@ function EditJob({ readOnly = false }) {
   const [nonTechSkillsList, setNonTechSkillsList] = useState([]);
   const [coinsRequired, setCoinsRequired] = useState({ contactcoins: 0 });
   const [coinOffers, setCoinOffers] = useState([]);
+  const [verticals, setVerticals] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [centers, setCenters] = useState([]);
 
   // ---------- form state (mirrors `jd`) ----------
   const [form, setForm] = useState({
+    vertical: '',
+    project: '',
+    center: '',
     displayCompanyName: '',
     title: '',
     _industry: '',
@@ -172,6 +178,13 @@ function EditJob({ readOnly = false }) {
     return `${yyyy}-${mm}-${dd}`;
   };
   const updateField = (name, value) => setForm((prev) => ({ ...prev, [name]: value }));
+  const updateMappingField = (name, value) => {
+    setForm((prev) => {
+      if (name === 'vertical') return { ...prev, vertical: value, project: '', center: '' };
+      if (name === 'project') return { ...prev, project: value, center: '' };
+      return { ...prev, [name]: value };
+    });
+  };
 
   const streamOptions = asArray(subQualificationList).filter(
     (item) => toId(item._qualification) === String(form._qualification || '')
@@ -239,6 +252,59 @@ function EditJob({ readOnly = false }) {
     fetchInitialData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    const fetchVerticals = async () => {
+      try {
+        const res = await axios.get(`${backendUrl}/college/getVerticals`, authHeaders);
+        setVerticals(asArray(res.data?.data));
+      } catch (err) {
+        console.error('Failed loading verticals:', err.message);
+        setVerticals([]);
+      }
+    };
+    fetchVerticals();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      if (!form.vertical) {
+        setProjects([]);
+        return;
+      }
+      try {
+        const res = await axios.get(
+          `${backendUrl}/college/list-projects?vertical=${form.vertical}`,
+          authHeaders
+        );
+        setProjects(asArray(res.data?.data));
+      } catch (err) {
+        console.error('Failed loading projects:', err.message);
+        setProjects([]);
+      }
+    };
+    fetchProjects();
+  }, [form.vertical]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const fetchCenters = async () => {
+      if (!form.project) {
+        setCenters([]);
+        return;
+      }
+      try {
+        const res = await axios.get(
+          `${backendUrl}/college/list-centers?projectId=${form.project}`,
+          authHeaders
+        );
+        setCenters(asArray(res.data?.data));
+      } catch (err) {
+        console.error('Failed loading centers:', err.message);
+        setCenters([]);
+      }
+    };
+    fetchCenters();
+  }, [form.project]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ---------- load the job being edited ----------
   useEffect(() => {
     if (!id) return;
@@ -251,6 +317,9 @@ function EditJob({ readOnly = false }) {
         const stateId = toId(jd.state);
         setForm((prev) => ({
           ...prev,
+          vertical: toId(jd.vertical),
+          project: toId(jd.project),
+          center: toId(jd.center),
           displayCompanyName: jd.displayCompanyName || prev.displayCompanyName || '',
           title: jd.title || '',
           _industry: toId(jd._industry),
@@ -550,6 +619,9 @@ function EditJob({ readOnly = false }) {
   const validate = () => {
     const newErrors = {};
 
+    if (!form.vertical) newErrors.vertical = 'Please select a vertical';
+    if (!form.project) newErrors.project = 'Please select a project';
+    if (!form.center) newErrors.center = 'Please select a center';
     if (!form.title.trim()) newErrors.title = 'Enter job title';
     if (!form.place?.trim() && !workLocRef.current?.value?.trim()) {
       newErrors.location = 'Select a work location from the suggestions';
@@ -774,6 +846,57 @@ function EditJob({ readOnly = false }) {
                 <div className="card-content" id="jd-info">
                   <div className="card-body">
                     <div className="row">
+                      <div className={`col-xl-3 mb-1 ${errors.vertical ? 'error' : ''}`}>
+                        <label>Vertical</label><span className="mandatory"> *</span>
+                        <select
+                          className="form-control"
+                          value={form.vertical}
+                          onChange={(e) => updateMappingField('vertical', e.target.value)}
+                          disabled={readOnly}
+                        >
+                          <option value="">Select Vertical</option>
+                          {asArray(verticals).map((item) => (
+                            <option key={item._id || item.id} value={item._id || item.id}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className={`col-xl-3 mb-1 ${errors.project ? 'error' : ''}`}>
+                        <label>Project</label><span className="mandatory"> *</span>
+                        <select
+                          className="form-control"
+                          value={form.project}
+                          onChange={(e) => updateMappingField('project', e.target.value)}
+                          disabled={readOnly || !form.vertical}
+                        >
+                          <option value="">Select Project</option>
+                          {asArray(projects).map((item) => (
+                            <option key={item._id || item.id} value={item._id || item.id}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className={`col-xl-3 mb-1 ${errors.center ? 'error' : ''}`}>
+                        <label>Center</label><span className="mandatory"> *</span>
+                        <select
+                          className="form-control"
+                          value={form.center}
+                          onChange={(e) => updateMappingField('center', e.target.value)}
+                          disabled={readOnly || !form.project}
+                        >
+                          <option value="">Select Center</option>
+                          {asArray(centers).map((item) => (
+                            <option key={item._id || item.id} value={item._id || item.id}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
                       <div className={`col-xl-3 mb-1 ${errors.organizationName ? 'error' : ''}`}>
                         <label>Display Organization Name</label><span className="mandatory"> *</span>
                         <input
