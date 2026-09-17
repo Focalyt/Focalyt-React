@@ -75,6 +75,17 @@ const sessionPlanSchema = new Schema(
     unitName: { type: String, default: '' },
     chapterNumber: { type: String, default: '' },
     chapterName: { type: String, default: '' },
+    courseStructure: {
+      unit: { type: Boolean, default: true },
+      chapter: { type: Boolean, default: true },
+      session: { type: Boolean, default: true },
+      path: {
+        type: String,
+        enum: ['session', 'unit-session', 'chapter-session', 'unit-chapter-session'],
+        default: 'unit-chapter-session',
+      },
+      pathLabel: { type: String, default: 'Unit → Chapter → Session' },
+    },
     subTopics: { type: String, default: '' },
     topicCovered: { type: String, default: '' },
     trainingMethod: { type: String, default: '' },
@@ -91,6 +102,7 @@ const sessionPlanSchema = new Schema(
     startTime: { type: String, default: '' },
     endTime: { type: String, default: '' },
 
+    activityIds: [{ type: ObjectId, ref: 'CourseActivity' }],
     sessionActivities: { type: [activityItemSchema], default: [] },
 
     evidenceDocs: { type: [materialItemSchema], default: [] },

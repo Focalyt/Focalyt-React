@@ -582,7 +582,11 @@ const APPLY_LEAD_POPULATE = [
   {
     path: '_job',
     select: 'title hr',
-    populate: { path: 'hr', select: 'name email' },
+    populate: [
+      { path: 'hr', select: 'name email' },
+      { path: 'vertical', select: 'name' },
+      { path: 'project', select: 'name' },
+    ],
   },
   { path: 'leadOwner', select: 'name email' },
   { path: 'leadCoOwner', select: 'name email' },
@@ -646,8 +650,8 @@ const mapApplyToLead = (apply, statusIndex) => {
     remark: apply.remark || candidate.remark || '',
     source: apply.source || candidate.source || '',
     college: apply.college || candidate.college || null,
-    project: apply.project || candidate.project || null,
-    department: apply.department || candidate.department || null,
+    project: apply.project || candidate.project || job.project || null,
+    department: apply.department || candidate.department || job.vertical || null,
     maritalStatus: candidate.maritalStatus || '',
     resume: resumeUrl,
     documents: apply.documents || [],
@@ -1548,12 +1552,19 @@ router.route("/digitalhrleads").post(async (req, res) => {
           });
       }
 
-      const vacancy = await Vacancy.findById(jobId).select('_id title _company').lean();
+      const vacancy = await Vacancy.findById(jobId).select('_id title _company vertical project center').lean();
       if (!vacancy) {
           return res.status(404).json({
               status: false,
               msg: "Job not found"
           });
+      }
+
+      if (!namedRefs.projectId && vacancy.project) {
+          namedRefs.projectId = vacancy.project;
+      }
+      if (!namedRefs.departmentId && vacancy.vertical) {
+          namedRefs.departmentId = vacancy.vertical;
       }
 
       const mobileNumber = parseInt(mobile, 10);

@@ -1,7 +1,8 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const { isCollege } = require('../../../helpers');
-const { SessionPlan, SessionActivityType, College } = require('../../models');
+const { SessionPlan, SessionActivityType, College, CoursesCopy, CourseActivity } = require('../../models');
+const { normalizeCourseStructure } = require('../../../helpers/courseStructure');
 
 const router = express.Router();
 const { ObjectId } = mongoose.Types;
@@ -109,6 +110,7 @@ const mapSessionToClient = (doc) => {
     startTime: session.startTime || '',
     endTime: session.endTime || '',
     sessionActivities: normalizeActivities(session.sessionActivities),
+    activityIds: (session.activityIds || []).map((id) => String(id)).filter(Boolean),
     evidenceDocs: session.evidenceDocs || [],
     learningMaterials: session.learningMaterials || [],
     preSessionRequirements: session.preSessionRequirements || [],
@@ -135,6 +137,7 @@ const mapSessionToClient = (doc) => {
     completedAt: session.completedAt || null,
     createdAt: session.createdAt || null,
     updatedAt: session.updatedAt || null,
+    courseStructure: normalizeCourseStructure(session.courseStructure),
   };
 };
 
@@ -193,6 +196,9 @@ const buildSessionPayload = (body = {}, collegeId, userId, existing = null) => {
     sessionActivities: body.sessionActivities
       ? normalizeActivities(body.sessionActivities)
       : (existing?.sessionActivities || []),
+    activityIds: body.activityIds !== undefined
+      ? (Array.isArray(body.activityIds) ? body.activityIds : [])
+      : (existing?.activityIds || []),
 
     evidenceDocs: body.evidenceDocs ? normalizeMaterials(body.evidenceDocs) : (existing?.evidenceDocs || []),
     learningMaterials: body.learningMaterials
@@ -256,6 +262,86 @@ const buildSessionPayload = (body = {}, collegeId, userId, existing = null) => {
     payload.createdBy = userId;
   }
 
+  return payload;
+};
+
+const applyCourseStructureToSession = async (payload, existing = null) => {
+  let structure = payload.courseStructure || existing?.courseStructure || null;
+
+  if (payload.course) {
+    const course = await CoursesCopy.findById(payload.course).select('courseStructure').lean();
+    if (course?.courseStructure) {
+      structure = course.courseStructure;
+    }
+  }
+
+  payload.courseStructure = normalizeCourseStructure(structure);
+
+  if (!payload.courseStructure.unit) {
+    payload.unitNumber = '';
+    payload.unitName = '';
+  }
+  if (!payload.courseStructure.chapter) {
+    payload.chapterNumber = '';
+    payload.chapterName = '';
+  }
+
+  return payload;
+};
+
+const collectActivityIds = (payload = {}) => {
+  const fromIds = Array.isArray(payload.activityIds) ? payload.activityIds : [];
+  const fromSnapshots = Array.isArray(payload.sessionActivities) ? payload.sessionActivities : [];
+  const merged = [
+    ...fromIds,
+    ...fromSnapshots.map((item) => item.id || item._id || item.key),
+  ];
+  const unique = [];
+  const seen = new Set();
+  merged.forEach((value) => {
+    const id = toObjectId(value);
+    if (!id) return;
+    const key = String(id);
+    if (seen.has(key)) return;
+    seen.add(key);
+    unique.push(id);
+  });
+  return unique;
+};
+
+const applyCourseActivitiesToSession = async (payload, collegeId) => {
+  const requestedIds = collectActivityIds(payload);
+  if (!requestedIds.length) {
+    payload.activityIds = [];
+    payload.sessionActivities = payload.sessionActivities?.length
+      ? normalizeActivities(payload.sessionActivities)
+      : [];
+    return payload;
+  }
+
+  if (!payload.course) {
+    throw new Error('Select a course before attaching activities to a session');
+  }
+
+  const activities = await CourseActivity.find({
+    _id: { $in: requestedIds },
+    college: collegeId,
+    course: payload.course,
+    isDeleted: false,
+  }).lean();
+
+  const byId = new Map(activities.map((item) => [String(item._id), item]));
+  const ordered = requestedIds
+    .map((id) => byId.get(String(id)))
+    .filter(Boolean);
+
+  payload.activityIds = ordered.map((item) => item._id);
+  payload.sessionActivities = ordered.map((item) => ({
+    id: String(item._id),
+    key: String(item._id),
+    name: item.name,
+    color: item.color || '#2563eb',
+  }));
   return payload;
 };
 
@@ -387,6 +473,8 @@ router.post('/', async (req, res) => {
   try {
     const college = await resolveCollege(req);
     const payload = buildSessionPayload(req.body, college._id, req.user._id);
+    await applyCourseStructureToSession(payload);
+    await applyCourseActivitiesToSession(payload, college._id);
     const created = await SessionPlan.create(payload);
     return res.status(201).json({
       status: true,
@@ -413,6 +501,8 @@ router.put('/:id', async (req, res) => {
     }
 
     const payload = buildSessionPayload(req.body, college._id, req.user._id, existing);
+    await applyCourseStructureToSession(payload, existing);
+    await applyCourseActivitiesToSession(payload, college._id);
     Object.assign(existing, payload);
     await existing.save();
 

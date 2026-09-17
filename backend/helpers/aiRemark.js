@@ -36,20 +36,40 @@ function prependAiRemark(existing, summary) {
 
 function applyHumanRemarksToDoc(doc, remarks) {
   if (!doc || remarks == null || String(remarks).trim() === '') return false;
-  const nextRemarks = String(remarks);
-  const split = splitRemarksAndAi(doc.remarks);
-  if (split.aiRemark) {
-    doc.aiRemark = mergeAiRemark(doc.aiRemark, split.aiRemark);
+
+  const existing = splitRemarksAndAi(doc.remarks);
+  const incoming = splitRemarksAndAi(remarks);
+
+  const nextAi = mergeAiRemark(mergeAiRemark(doc.aiRemark, existing.aiRemark), incoming.aiRemark);
+  if (nextAi) doc.aiRemark = nextAi;
+
+  const nextHuman = incoming.remarks;
+  if (!nextHuman) {
+    if (existing.aiRemark && String(doc.remarks || '') !== existing.remarks) {
+      doc.remarks = existing.remarks;
+      return true;
+    }
+    return false;
   }
-  if (String(doc.remarks || '') === nextRemarks) return false;
-  doc.remarks = nextRemarks;
+
+  if (String(doc.remarks || '') === nextHuman && !existing.aiRemark && !incoming.aiRemark) return false;
+  doc.remarks = nextHuman;
   return true;
 }
 
 function humanRemarksSetPayload(existingDoc, remarks) {
-  const split = splitRemarksAndAi(existingDoc?.remarks);
-  const aiRemark = mergeAiRemark(existingDoc?.aiRemark, split.aiRemark);
-  const $set = { remarks };
+  if (remarks == null || String(remarks).trim() === '') return {};
+
+  const existing = splitRemarksAndAi(existingDoc?.remarks);
+  const incoming = splitRemarksAndAi(remarks);
+  const aiRemark = mergeAiRemark(
+    mergeAiRemark(existingDoc?.aiRemark, existing.aiRemark),
+    incoming.aiRemark
+  );
+
+  const $set = {};
+  if (incoming.remarks) $set.remarks = incoming.remarks;
+  else if (existing.aiRemark) $set.remarks = existing.remarks;
   if (aiRemark) $set.aiRemark = aiRemark;
   return $set;
 }

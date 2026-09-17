@@ -104,6 +104,9 @@ const vacancySchema = new Schema(
       type: Boolean,
       default: false,
     },
+    vertical: { type: ObjectId, ref: "Vertical" },
+    project: { type: ObjectId, ref: "Project" },
+    center: { type: ObjectId, ref: "Center" },
     hr: { type: ObjectId, ref: "User" },
     hrAssignmentStatus: {
       type: Number,

@@ -162,7 +162,7 @@ const ViewCourses = () => {
       const user = JSON.parse(sessionStorage.getItem('user'));
       const currentParams = qs.parse(location.search);
       const response = await axios.post(
-        `${backendUrl}/college/courses/${courseId}/duplicate`,
+        `${backendUrl}/college/courses/${courseId}/duplicatecoursecopy`,
         {},
         {
           headers: {
