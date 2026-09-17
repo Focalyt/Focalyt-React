@@ -49,6 +49,7 @@ export type B2CProfile = {
     whatsapp?: string | number;
     sex?: string;
     dob?: string;
+    source?: string;
     isExperienced?: boolean;
     personalInfo?: {
       professionalTitle?: string;
@@ -832,6 +833,10 @@ export function getProfileLeadCoOwnerLabel(profile: B2CProfile): string {
 
 export function getProfileLeadCoOwner2Label(profile: B2CProfile): string {
   return profile.leadCoOwner2?.name || '—';
+}
+
+export function getProfileLeadSourceLabel(profile: B2CProfile): string {
+  return profile.registeredBy?.name || profile._candidate?.source || 'N/A';
 }
 
 export async function fetchB2CProfileDetails(

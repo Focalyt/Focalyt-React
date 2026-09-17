@@ -14,7 +14,7 @@ const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
 const { applyHumanRemarksToDoc, humanRemarksSetPayload } = require("../../../helpers/aiRemark");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, CoursesCopy, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage, UploadCandidates, Placement, PlacementStatus, BatchMonitor } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, CoursesCopy, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage, UploadCandidates, Placement, PlacementStatus, BatchMonitor, Source } = require("../../models");
 const { ReEnquire } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
@@ -160,6 +160,86 @@ function applyB2cLeadOwnershipMatch(baseMatch, { teamMemberIds, registeredByMe, 
 /** Apply person Owner/Counsellor match on a raw $match object (counts/KYC/admission). */
 function applyB2cLeadOwnershipToMatch(match, { teamMemberIds, ownerIds, counselorIds } = {}) {
 	applyB2cLeadOwnershipMatch(match, { teamMemberIds, ownerIds, counselorIds });
+}
+
+const DIGITAL_LEAD_REGISTERED_BY = new mongoose.Types.ObjectId('68c16764eeda1e3f36a329d9');
+
+function escapeRegex(value) {
+	return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+async function resolveB2cLeadSourceFilter(leadSourceIds) {
+	const ids = toB2cObjectIdList(leadSourceIds).filter((id) => mongoose.Types.ObjectId.isValid(String(id)));
+	if (!ids.length) return { registeredByIds: [], candidateIds: [] };
+
+	const sourceDocs = await Source.find({ _id: { $in: ids } }).select('_id name').lean();
+	const names = [...new Set(sourceDocs.map((doc) => String(doc.name || '').trim()).filter(Boolean))];
+	const registeredByIds = [...ids];
+	const isDigitalLead = names.some((name) => /^digital\s*lead$/i.test(name));
+	if (isDigitalLead && !registeredByIds.some((id) => String(id) === String(DIGITAL_LEAD_REGISTERED_BY))) {
+		registeredByIds.push(DIGITAL_LEAD_REGISTERED_BY);
+	}
+
+	let candidateIds = [];
+	if (names.length) {
+		const sourceNameMatch = names.map((name) => ({
+			source: { $regex: new RegExp(`^${escapeRegex(name)}$`, 'i') },
+		}));
+		if (isDigitalLead) {
+			sourceNameMatch.push({ source: { $regex: /^fb\s*form$/i } });
+		}
+		const candidates = await CandidateProfile.find({ $or: sourceNameMatch }).select('_id').lean();
+		candidateIds = candidates.map((candidate) => candidate._id);
+	}
+
+	return { registeredByIds, candidateIds };
+}
+
+function applyB2cLeadSourceMatch(baseMatch, leadSourceFilter) {
+	if (!baseMatch) return;
+	const registeredByIds = toB2cObjectIdList(
+		Array.isArray(leadSourceFilter) ? leadSourceFilter : leadSourceFilter?.registeredByIds
+	).filter((id) => mongoose.Types.ObjectId.isValid(String(id)));
+	const candidateIds = toB2cObjectIdList(
+		Array.isArray(leadSourceFilter) ? [] : leadSourceFilter?.candidateIds
+	).filter((id) => mongoose.Types.ObjectId.isValid(String(id)));
+	if (!registeredByIds.length && !candidateIds.length) return;
+
+	const or = [];
+	if (registeredByIds.length) or.push({ registeredBy: { $in: registeredByIds } });
+	if (candidateIds.length) or.push({ _candidate: { $in: candidateIds } });
+	const sourceClause = or.length === 1 ? or[0] : { $or: or };
+
+	const pushAnd = (clause) => {
+		baseMatch.$and = [...(baseMatch.$and || []), clause];
+	};
+
+	if (baseMatch.registeredBy) {
+		const existing = baseMatch.registeredBy;
+		delete baseMatch.registeredBy;
+		pushAnd({ registeredBy: existing });
+		pushAnd(sourceClause);
+		return;
+	}
+
+	if (baseMatch.$or && sourceClause.$or) {
+		pushAnd({ $or: baseMatch.$or });
+		delete baseMatch.$or;
+		pushAnd(sourceClause);
+		return;
+	}
+
+	if (Array.isArray(baseMatch.$and)) {
+		pushAnd(sourceClause);
+		return;
+	}
+
+	if (sourceClause.$or) {
+		baseMatch.$or = sourceClause.$or;
+		return;
+	}
+
+	Object.assign(baseMatch, sourceClause);
 }
 
 function isB2cQuickSearch(name) {
@@ -2397,7 +2477,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			nextActionFromDate, nextActionToDate,
 			projects, verticals, course, center, counselor, owner, subStatuses, batch, registeredByMe,
 			followupStatus, approvalStatus,
-			hasFollowUpCall, hasFollowUpVisit,
+			hasFollowUpCall, hasFollowUpVisit, leadSource,
 		} = req.query;
 
 		// console.log("substautes", subStatuses)
@@ -2420,6 +2500,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 		const ownerArray = parseB2cFilterIdArray(owner);
+		const leadSourceArray = parseB2cFilterIdArray(leadSource);
+		const leadSourceFilter = await resolveB2cLeadSourceFilter(leadSourceArray);
 		const hasPersonFilter = ownerArray.length > 0 || counselorArray.length > 0;
 
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
@@ -2492,6 +2574,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 				approvalStatus,
 				hasFollowUpCall,
 				hasFollowUpVisit,
+				leadSourceFilter,
 			},
 			pagination: { skip, limit }
 		});
@@ -3162,7 +3245,7 @@ router.route("/appliedCandidatesWithWhatsApp").get(isCollege, async (req, res) =
 			name, courseType, status, leadStatus, aiLeadStatus,
 			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
 			nextActionFromDate, nextActionToDate,
-			projects, verticals, course, center, counselor, owner, subStatuses
+			projects, verticals, course, center, counselor, owner, subStatuses, leadSource
 		} = req.query;
 
 		// Parse multi-select filters
@@ -3182,6 +3265,8 @@ router.route("/appliedCandidatesWithWhatsApp").get(isCollege, async (req, res) =
 			console.error('Error parsing filter arrays:', parseError);
 		}
 		const ownerArray = parseB2cFilterIdArray(owner);
+		const leadSourceArray = parseB2cFilterIdArray(leadSource);
+		const leadSourceFilter = await resolveB2cLeadSourceFilter(leadSourceArray);
 		const hasPersonFilter = ownerArray.length > 0 || counselorArray.length > 0;
 
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
@@ -3217,6 +3302,7 @@ router.route("/appliedCandidatesWithWhatsApp").get(isCollege, async (req, res) =
 				projectsArray, verticalsArray, courseArray, centerArray, subStatuses,
 				ownerIds: ownerArray,
 				counselorIds: ownerArray.length > 0 ? [] : counselorArray,
+				leadSourceFilter,
 			},
 			pagination: { skip, limit }
 		});
@@ -3535,6 +3621,7 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 		ownerIds: filters.ownerIds,
 		counselorIds: filters.counselorIds,
 	});
+	applyB2cLeadSourceMatch(baseMatch, filters.leadSourceFilter);
 
 	if (filters.followupAppliedIds && filters.followupAppliedIds.length > 0) {
 		baseMatch._id = { $in: filters.followupAppliedIds };
@@ -3860,6 +3947,7 @@ function buildSimplifiedPipelineWithWhatsApp({ teamMemberIds, college, filters, 
 		ownerIds: filters.ownerIds,
 		counselorIds: filters.counselorIds,
 	});
+	applyB2cLeadSourceMatch(baseMatch, filters.leadSourceFilter);
 
 
 	// Add date filters
@@ -4231,7 +4319,7 @@ router.route("/downloadleads").get(isCollege, async (req, res) => {
 			name, courseType, status, leadStatus, aiLeadStatus,
 			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
 			nextActionFromDate, nextActionToDate,
-			projects, verticals, course, center, counselor, owner, subStatuses
+			projects, verticals, course, center, counselor, owner, subStatuses, leadSource
 		} = req.query;
 
 		// Parse multi-select filters
@@ -4251,6 +4339,8 @@ router.route("/downloadleads").get(isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 		const ownerArray = parseB2cFilterIdArray(owner);
+		const leadSourceArray = parseB2cFilterIdArray(leadSource);
+		const leadSourceFilter = await resolveB2cLeadSourceFilter(leadSourceArray);
 		const hasPersonFilter = ownerArray.length > 0 || counselorArray.length > 0;
 
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
@@ -4286,6 +4376,7 @@ router.route("/downloadleads").get(isCollege, async (req, res) => {
 				projectsArray, verticalsArray, courseArray, centerArray, subStatuses,
 				ownerIds: ownerArray,
 				counselorIds: ownerArray.length > 0 ? [] : counselorArray,
+				leadSourceFilter,
 			}
 		});
 
@@ -4365,6 +4456,7 @@ function downloadPipeline({ teamMemberIds, college, filters }) {
 		ownerIds: filters.ownerIds,
 		counselorIds: filters.counselorIds,
 	});
+	applyB2cLeadSourceMatch(baseMatch, filters.leadSourceFilter);
 
 
 	// Add date filters
@@ -4692,7 +4784,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
 			nextActionFromDate, nextActionToDate,
 			projects, verticals, course, center, counselor, owner,
-			subStatuses
+			subStatuses, leadSource
 		} = req.query;
 
 
@@ -4713,6 +4805,8 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			console.error('Error parsing filter arrays:', parseError);
 		}
 		const ownerArray = parseB2cFilterIdArray(owner);
+		const leadSourceArray = parseB2cFilterIdArray(leadSource);
+		const leadSourceFilter = await resolveB2cLeadSourceFilter(leadSourceArray);
 		const hasPersonFilter = ownerArray.length > 0 || counselorArray.length > 0;
 
 		({ verticalsArray, projectsArray } = applyB2cAccessToFilters(user, verticalsArray, projectsArray));
@@ -4805,11 +4899,13 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			ownerIds: ownerArray,
 			counselorIds: ownerArray.length > 0 ? [] : counselorArray,
 		});
+		applyB2cLeadSourceMatch(basePipeline[0].$match, leadSourceFilter);
 		applyB2cLeadOwnershipToMatch(movedInKYCPipeline[0].$match, {
 			teamMemberIds,
 			ownerIds: ownerArray,
 			counselorIds: ownerArray.length > 0 ? [] : counselorArray,
 		});
+		applyB2cLeadSourceMatch(movedInKYCPipeline[0].$match, leadSourceFilter);
 
 		// Add date filters to base pipeline
 		const dateFilters = {};

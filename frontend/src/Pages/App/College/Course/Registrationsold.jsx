@@ -2733,6 +2733,16 @@ const CRMDashboard = () => {
       .filter((counselor) => !query || (counselor?.label || '').toLowerCase().includes(query));
   }, [counselorOptions, selectSearch.coOwner2]);
 
+  const sourceOptions = useMemo(
+    () => (sources || [])
+      .filter((source) => source && source.status !== false)
+      .map((source) => ({
+        value: String(source._id),
+        label: source.name || 'Untitled',
+      })),
+    [sources]
+  );
+
   useEffect(() => {
     const handleOutsideClick = (event) => {
       if (courseDropdownRef.current && !courseDropdownRef.current.contains(event.target)) {
@@ -3100,6 +3110,10 @@ const CRMDashboard = () => {
       type: "includes",
       values: []
     },
+    leadSource: {
+      type: "includes",
+      values: []
+    },
     sector: {
       type: "includes",
       values: []
@@ -3153,6 +3167,7 @@ const CRMDashboard = () => {
     const batchValues = cycle.batch ? [cycle.batch] : [];
     const counselorValues = cycle.counsellor ? [cycle.counsellor] : (fd.counselor?.values || []);
     const ownerValues = cycle.owner ? [cycle.owner] : (fd.owner?.values || []);
+    const leadSourceValues = fd.leadSource?.values || [];
     return {
       ...(projectsValues.length > 0 && { projects: JSON.stringify(projectsValues) }),
       ...(verticalsValues.length > 0 && { verticals: JSON.stringify(verticalsValues) }),
@@ -3161,6 +3176,7 @@ const CRMDashboard = () => {
       ...(batchValues.length > 0 && { batch: JSON.stringify(batchValues) }),
       ...(counselorValues.length > 0 && { counselor: JSON.stringify(counselorValues) }),
       ...(ownerValues.length > 0 && { owner: JSON.stringify(ownerValues) }),
+      ...(leadSourceValues.length > 0 && { leadSource: JSON.stringify(leadSourceValues) }),
     };
   }, [formData, cycleFilters]);
 
@@ -3262,6 +3278,7 @@ const CRMDashboard = () => {
     center: false,
     counselor: false,
     owner: false,
+    leadSource: false,
     sector: false,
     statuses: false,
     subStatuses: false
@@ -3619,6 +3636,7 @@ const CRMDashboard = () => {
       center: { type: "includes", values: [] },
       counselor: { type: "includes", values: [] },
       owner: { type: "includes", values: [] },
+      leadSource: { type: "includes", values: [] },
       sector: { type: "includes", values: [] },
     });
     setCycleFilters({
@@ -6128,6 +6146,13 @@ console.log('API Response:', response.data);
 
   const getProfileLeadCoOwner2Label = (profile) => (
     profile?.leadCoOwner2?.name || '—'
+  );
+
+  const getProfileLeadSourceLabel = (profile) => (
+    profile?.registeredBy?.name
+    || profile?._registeredBy?.name
+    || profile?._candidate?.source
+    || 'N/A'
   );
 
   const handleUpdateLeadOwner = async (profile, newOwnerId) => {
@@ -17194,6 +17219,17 @@ useEffect(() => {
                           onToggle={() => toggleDropdown('owner')}
                         />
                       </div>
+                      <div className="col-md-3">
+                        <MultiSelectCheckbox
+                          title="Lead Source"
+                          options={sourceOptions}
+                          selectedValues={formData.leadSource?.values || []}
+                          onChange={(values) => handleCriteriaChange('leadSource', values)}
+                          icon="fas fa-bullseye"
+                          isOpen={dropdownStates.leadSource}
+                          onToggle={() => toggleDropdown('leadSource')}
+                        />
+                      </div>
                     </div>
 
                     {/* status filters  */}
@@ -18947,6 +18983,10 @@ useEffect(() => {
                                                   )}
                                                 </div>
                                               </div>
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD SOURCE</div>
+                                                <div className="info-value">{getProfileLeadSourceLabel(profile)}</div>
+                                              </div>
                                             </div>
 
                                             <div className="info-card">
@@ -19044,6 +19084,10 @@ useEffect(() => {
                                                           getProfileLeadCoOwner2Label(profile)
                                                         )}
                                                       </div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD SOURCE</div>
+                                                      <div className="info-value">{getProfileLeadSourceLabel(profile)}</div>
                                                     </div>
                                                     <div className="info-group">
                                                       <div className="info-label">COURSE / JOB NAME</div>
@@ -19303,6 +19347,12 @@ useEffect(() => {
                                                           getProfileLeadCoOwner2Label(profile)
                                                         )}
                                                       </div>
+                                                    </div>
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD SOURCE</div>
+                                                      <div className="info-value">{getProfileLeadSourceLabel(profile)}</div>
                                                     </div>
                                                   </div>
                                                   {/* <div className="col-xl- col-3">

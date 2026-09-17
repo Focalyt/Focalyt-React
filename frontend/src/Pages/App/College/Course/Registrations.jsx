@@ -6012,6 +6012,13 @@ console.log('API Response:', response.data);
     profile?.leadCoOwner2?.name || '—'
   );
 
+  const getProfileLeadSourceLabel = (profile) => (
+    profile?.registeredBy?.name
+    || profile?._registeredBy?.name
+    || profile?._candidate?.source
+    || 'N/A'
+  );
+
   const handleUpdateLeadOwner = async (profile, newOwnerId) => {
     if (!profile?._id || !token) return;
     const currentId = getProfileLeadOwnerId(profile);
@@ -18798,6 +18805,10 @@ useEffect(() => {
                                                   )}
                                                 </div>
                                               </div>
+                                              <div className="info-group">
+                                                <div className="info-label">LEAD SOURCE</div>
+                                                <div className="info-value">{getProfileLeadSourceLabel(profile)}</div>
+                                              </div>
                                             </div>
 
                                             <div className="info-card">
@@ -18895,6 +18906,10 @@ useEffect(() => {
                                                           getProfileLeadCoOwner2Label(profile)
                                                         )}
                                                       </div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD SOURCE</div>
+                                                      <div className="info-value">{getProfileLeadSourceLabel(profile)}</div>
                                                     </div>
                                                     <div className="info-group">
                                                       <div className="info-label">COURSE / JOB NAME</div>
@@ -19154,6 +19169,12 @@ useEffect(() => {
                                                           getProfileLeadCoOwner2Label(profile)
                                                         )}
                                                       </div>
+                                                    </div>
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">LEAD SOURCE</div>
+                                                      <div className="info-value">{getProfileLeadSourceLabel(profile)}</div>
                                                     </div>
                                                   </div>
                                                   {/* <div className="col-xl- col-3">
