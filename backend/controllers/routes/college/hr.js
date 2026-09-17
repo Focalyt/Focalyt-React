@@ -8,6 +8,7 @@ const College = require('../../models/college');
 const User = require('../../models/users');
 const CandidateProfile = require('../../models/candidateProfile');
 const Project = require('../../models/Project');
+let Status = require('../../models/status');
 const Vertical = require('../../models/verticals');
 const Vacancy = require('../../models/vacancy');
 const AppliedJobs = require('../../models/appliedJobs');
@@ -557,6 +558,37 @@ const resolveHrStatus = async (statusTitle, subStatusTitle, collegeId) => {
   }
 
   return { status, substatus };
+};
+
+const findSubstatusByTitle = (statusDoc, subStatusTitle) => {
+  const wanted = String(subStatusTitle || '').trim().toLowerCase();
+  if (!wanted) return null;
+  return (statusDoc?.substatuses || []).find(
+    (item) => String(item.title || '').trim().toLowerCase() === wanted
+  ) || null;
+};
+
+const resolveCollegeStatus = async (statusTitle, subStatusTitle, collegeId) => {
+  const title = String(statusTitle || '').trim();
+  if (!title) return { error: 'Status not found' };
+
+  const id = toCollegeObjectId(collegeId);
+  const statuses = await Status.find({ title: exactInsensitive(title) });
+  if (!statuses.length) return { error: 'Status not found' };
+
+  const rank = (doc) => {
+    if (id && doc.college && String(doc.college) === String(id)) return 0;
+    if (!doc.college) return 1;
+    return 2;
+  };
+
+  const ordered = [...statuses].sort((a, b) => rank(a) - rank(b));
+  for (const status of ordered) {
+    const substatus = findSubstatusByTitle(status, subStatusTitle);
+    if (substatus) return { status, substatus };
+  }
+
+  return { error: 'Substatus not found' };
 };
 
 const parseHiringStatusTitles = (hiringStatus = [], jobId) => {
@@ -1464,38 +1496,15 @@ router.route("/digitalhrleads").post(async (req, res) => {
           });
       }
 
-      // Prefer this college's status; fall back to a global HR Status Design record.
-      let statusDocument = await StatusHr.findOne({
-          isDeleted: { $ne: true },
-          title: exactInsensitive(status),
-          college: collegeId
-      });
-      if (!statusDocument) {
-          statusDocument = await StatusHr.findOne({
-              isDeleted: { $ne: true },
-              title: exactInsensitive(status),
-              $or: [{ college: null }, { college: { $exists: false } }]
-          });
-      }
-
-      if (!statusDocument) {
+      const resolvedStatus = await resolveCollegeStatus(status, subStatus, collegeId);
+      if (resolvedStatus.error) {
           return res.status(404).json({
               status: false,
-              msg: "Status not found"
+              msg: resolvedStatus.error
           });
       }
-
-      const subStatusDocument = statusDocument.substatuses.find(
-          item =>
-              item.title.toLowerCase() === String(subStatus).trim().toLowerCase()
-      );
-
-      if (!subStatusDocument) {
-          return res.status(404).json({
-              status: false,
-              msg: "Substatus not found"
-          });
-      }
+      const statusId = resolvedStatus.status;
+      const subStatusId = resolvedStatus.substatus;
 
       const parsedDob = parseIncomingDate(dob);
 
@@ -1626,7 +1635,7 @@ router.route("/digitalhrleads").post(async (req, res) => {
       const hiringStatusEntry = {
           company: vacancy._company || undefined,
           job: jobId,
-          status: `${statusDocument.title}${subStatusDocument?.title ? ` / ${subStatusDocument.title}` : ''}`,
+          status: `${statusId.title}${subStatusId?.title ? ` / ${subStatusId.title}` : ''}`,
           comment: remark || '',
           eventDate: new Date().toISOString(),
       };
@@ -1721,8 +1730,8 @@ router.route("/digitalhrleads").post(async (req, res) => {
           remark: remark || '',
           source: source || 'Digital Lead',
           resume: isActualMediaFile(resumeUrl) ? resumeUrl : '',
-          leadStatus: statusDocument?._id || null,
-          leadSubstatus: subStatusDocument?._id || null,
+          leadStatus: statusId?._id || null,
+          leadSubstatus: subStatusId?._id || null,
           leadOwner: jobOwner.hrId || undefined,
           assignedTo: jobOwner.hrId || undefined,
           logs: [{
