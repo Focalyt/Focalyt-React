@@ -80,6 +80,9 @@ const userSchema = new Schema(
 				can_add_course: { type: Boolean, default: false },
 				can_add_batch: { type: Boolean, default: false },
 				can_assign_batch: { type: Boolean, default: false },
+
+				// Academic Coordinator
+				can_be_academic_coordinator: { type: Boolean, default: false },
 				can_be_senior_trainer: { type: Boolean, default: false },
 				can_be_trainer: { type: Boolean, default: false },
 

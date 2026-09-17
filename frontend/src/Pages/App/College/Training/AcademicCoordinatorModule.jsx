@@ -280,6 +280,20 @@ export default function AcademicCoordinatorMockup() {
   const [selectedCourseId, setSelectedCourseId] = useState(() => sessionStorage.getItem(COURSE_STORAGE_KEY) || "");
   const [toast, setToast] = useState(null);
   const persistTimer = useRef(null);
+  const [permissions, setPermissions] = useState();
+
+  useEffect(() => {
+    const token = getAuthToken();
+    if (!token || !BACKEND_URL) return undefined;
+    axios.get(`${BACKEND_URL}/college/permission`, {
+      headers: { "x-auth": token },
+    }).then((res) => {
+      if (res.data.status) setPermissions(res.data.permissions);
+    }).catch((err) => {
+      console.error("Failed to load academic coordinator permissions", err);
+    });
+    return undefined;
+  }, []);
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -546,6 +560,22 @@ export default function AcademicCoordinatorMockup() {
       console.error("Failed to refer session", err);
       setToast({ type: "error", message: err.response?.data?.message || "Failed to refer session" });
     }
+  }
+
+  const canBeAcademicCoordinator =
+    (permissions?.custom_permissions?.can_be_academic_coordinator && permissions?.permission_type === "Custom") ||
+    permissions?.permission_type === "Admin";
+
+  if (permissions && !canBeAcademicCoordinator) {
+    return (
+      <div style={{ ...body, background: T.page, minHeight: 600, borderRadius: 16, padding: 48, textAlign: "center", color: T.ink }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>🔒</div>
+        <div style={{ ...display, fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Access denied</div>
+        <div style={{ color: T.mute }}>
+          You need <strong>Academic Coordinator</strong> permission (or Admin) to use this module.
+        </div>
+      </div>
+    );
   }
 
   return (

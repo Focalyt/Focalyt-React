@@ -878,7 +878,7 @@ router.get('/permissions/matrix', checkPermission('can_view_users'), async (req,
       'can_view_kyc', 'can_verify_reject_kyc', 'can_request_kyc',
       'can_view_training', 'can_add_vertical', 'can_add_project', 'can_add_center',
       'can_add_course', 'can_add_batch', 'can_assign_batch',
-      'can_be_senior_trainer', 'can_be_trainer',
+      'can_be_academic_coordinator', 'can_be_senior_trainer', 'can_be_trainer',
       'can_view_users', 'can_add_users', 'can_edit_users', 'can_delete_users', 'can_manage_roles',
       'can_bulk_import', 'can_bulk_export', 'can_bulk_update', 'can_bulk_delete', 'can_bulk_communication'
     ];
@@ -1244,12 +1244,14 @@ router.get('/training-role-users', isCollege, async (req, res) => {
       ? 'can_be_senior_trainer'
       : roleType === 'trainer'
         ? 'can_be_trainer'
-        : null;
+        : roleType === 'academic' || roleType === 'coordinator'
+          ? 'can_be_academic_coordinator'
+          : null;
 
     if (!permissionKey) {
       return res.status(400).json({
         success: false,
-        message: 'roleType must be "senior" or "trainer"',
+        message: 'roleType must be "senior", "trainer", or "academic"',
       });
     }
 

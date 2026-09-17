@@ -69,6 +69,11 @@ const ViewCourses = () => {
   const [courses, setCourses] = useState([]);
   const [status, setStatus] = useState(false);
   const [isArchived, setIsArchived] = useState(false);
+  const [permissions, setPermissions] = useState();
+  const canBeAcademicCoordinator =
+    permissions?.permission_type === 'Admin' ||
+    (permissions?.permission_type === 'Custom' &&
+      permissions?.custom_permissions?.can_be_academic_coordinator === true);
   const [filterData, setFilterData] = useState({
     name: '',
     FromDate: '',
@@ -76,6 +81,24 @@ const ViewCourses = () => {
     Profile: '',
     status: 'true'
   });
+
+  useEffect(() => {
+    const fetchPermissions = async () => {
+      try {
+        const user = JSON.parse(sessionStorage.getItem('user') || '{}');
+        if (!user.token) return;
+        const response = await axios.get(`${backendUrl}/college/permission`, {
+          headers: { 'x-auth': user.token },
+        });
+        if (response.data.status) {
+          setPermissions(response.data.permissions);
+        }
+      } catch (error) {
+        console.error('Error fetching permissions:', error);
+      }
+    };
+    fetchPermissions();
+  }, [backendUrl]);
 
   // Get query params from URL
   useEffect(() => {
@@ -191,6 +214,7 @@ const ViewCourses = () => {
   };
 
   const handleAddSection = (course) => {
+    if (!canBeAcademicCoordinator) return;
     const centerList = Array.isArray(course.center) ? course.center : [];
     const firstCenter = centerList[0];
     const courseId = resolveId(course._id);
@@ -564,32 +588,35 @@ const ViewCourses = () => {
                         <Copy size={15} />
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => handleAddSection(course)}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '5px',
-                          height: '34px',
-                          padding: '0 10px',
-                          background: '#fef2f5',
-                          borderRadius: '8px',
-                          color: '#FC2B5A',
-                          transition: 'all 0.2s',
-                          border: '1px solid #fecdd3',
-                          cursor: 'pointer',
-                          marginLeft: '8px',
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          whiteSpace: 'nowrap',
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.background = '#FC2B5A'; e.currentTarget.style.color = 'white'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = '#fef2f5'; e.currentTarget.style.color = '#FC2B5A'; }}
-                      >
-                        <Layers size={14} />
-                      </button>
+                      {canBeAcademicCoordinator && (
+                        <button
+                          type="button"
+                          title="Academic Coordinator"
+                          onClick={() => handleAddSection(course)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '5px',
+                            height: '34px',
+                            padding: '0 10px',
+                            background: '#fef2f5',
+                            borderRadius: '8px',
+                            color: '#FC2B5A',
+                            transition: 'all 0.2s',
+                            border: '1px solid #fecdd3',
+                            cursor: 'pointer',
+                            marginLeft: '8px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            whiteSpace: 'nowrap',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = '#FC2B5A'; e.currentTarget.style.color = 'white'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = '#fef2f5'; e.currentTarget.style.color = '#FC2B5A'; }}
+                        >
+                          <Layers size={14} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
