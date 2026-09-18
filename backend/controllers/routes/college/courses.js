@@ -8,8 +8,9 @@ const path = require("path");
 const { auth1, isAdmin, isCollege } = require("../../../helpers");
 const { resolveB2cProjectIds } = require("../../../helpers/b2cAccess");
 const moment = require("moment");
-const { Courses, CoursesCopy, College, Country, User, Qualification, CourseSectors, AppliedCourses, Center } = require("../../models");
+const { Courses, CoursesCopy, College, Country, User, Qualification, CourseSectors, AppliedCourses, Center, Source } = require("../../models");
 const Candidate = require("../../models/candidateProfile");
+const readXlsxFile = require("read-excel-file/node");
 const CandidateVisitCalender = require("../../models/candidateVisitCalender");
 const candidateServices = require('../services/candidate')
 const { candidateCashbackEventName } = require('../../db/constant');
@@ -35,6 +36,172 @@ const allowedExtensions = [...allowedVideoExtensions, ...allowedImageExtensions,
 const destination = path.resolve(__dirname, '..', '..', '..', 'public', 'temp');
 
 if (!fs.existsSync(destination)) fs.mkdirSync(destination);
+
+const B2C_BULK_HEADER_MAP = {
+	name: 'name',
+	candidatename: 'name',
+	fullname: 'name',
+	studentname: 'name',
+	leadname: 'name',
+	mobile: 'mobile',
+	mobilenumber: 'mobile',
+	phone: 'mobile',
+	phonenumber: 'mobile',
+	contact: 'mobile',
+	contactnumber: 'mobile',
+	email: 'email',
+	emailaddress: 'email',
+	mail: 'email',
+	whatsapp: 'whatsapp',
+	whatsappnumber: 'whatsapp',
+	wa: 'whatsapp',
+	address: 'address',
+	fulladdress: 'address',
+	currentaddress: 'address',
+	dateofbirth: 'dob',
+	dob: 'dob',
+	birthdate: 'dob',
+	birthday: 'dob',
+	gender: 'gender',
+	sex: 'gender',
+};
+
+const normalizeB2cHeaderKey = (header) =>
+	String(header || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
+
+const normalizeB2cPhone = (value) => {
+	if (value === null || value === undefined || value === '') return '';
+	let raw = value;
+	if (typeof raw === 'number') {
+		raw = (raw >= 1e9 || raw < -1e9) ? raw.toFixed(0) : String(raw);
+		raw = raw.replace(/\.0+$/, '').replace('.', '');
+	} else {
+		raw = String(raw).trim();
+		if (/[eE][+\-]/.test(raw)) {
+			const num = parseFloat(raw);
+			if (!Number.isNaN(num)) raw = num.toFixed(0);
+		}
+	}
+	let digits = String(raw).replace(/\D/g, '');
+	if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
+	if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
+	return digits;
+};
+
+const normalizeB2cGender = (value) => {
+	const raw = String(value || '').trim().toLowerCase();
+	if (['male', 'm', 'man', 'boy'].includes(raw)) return 'male';
+	if (['female', 'f', 'woman', 'girl', 'w'].includes(raw)) return 'female';
+	if (['other', 'o', 'others', 'prefernottosay'].includes(raw)) return 'other';
+	return '';
+};
+
+const parseB2cExcelDob = (value) => {
+	if (value === null || value === undefined || value === '') return null;
+	let parsedDate = null;
+	if (value instanceof Date) {
+		parsedDate = value;
+	} else if (
+		typeof value === 'number' ||
+		(
+			!Number.isNaN(parseFloat(value)) &&
+			parseFloat(value) > 0 &&
+			parseFloat(value) < 100000 &&
+			!String(value).includes('-') &&
+			!String(value).includes('/')
+		)
+	) {
+		const excelSerialNumber = typeof value === 'number' ? value : parseFloat(value);
+		const excelEpoch = new Date(1899, 11, 30);
+		parsedDate = new Date(excelEpoch.getTime() + excelSerialNumber * 24 * 60 * 60 * 1000);
+	} else {
+		const dobStr = String(value).trim();
+		const ddmmyyyy = dobStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+		if (ddmmyyyy) {
+			parsedDate = new Date(
+				parseInt(ddmmyyyy[3], 10),
+				parseInt(ddmmyyyy[2], 10) - 1,
+				parseInt(ddmmyyyy[1], 10)
+			);
+		} else {
+			const yyyymmdd = dobStr.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+			if (yyyymmdd) {
+				parsedDate = new Date(
+					parseInt(yyyymmdd[1], 10),
+					parseInt(yyyymmdd[2], 10) - 1,
+					parseInt(yyyymmdd[3], 10)
+				);
+			} else {
+				parsedDate = new Date(dobStr);
+			}
+		}
+	}
+	if (!parsedDate || Number.isNaN(parsedDate.getTime())) return null;
+	const year = parsedDate.getFullYear();
+	const currentYear = new Date().getFullYear();
+	if (year < 1950 || year > currentYear + 1) return null;
+	return parsedDate;
+};
+
+const mapB2cExcelRows = (excelData) => {
+	const headers = excelData[0] || [];
+	const normalizedHeaders = headers.map((h) => (h ? String(h).trim() : ''));
+	return excelData.slice(1).map((row) => {
+		const obj = {};
+		normalizedHeaders.forEach((header, index) => {
+			if (!header) return;
+			const normalizedKey = normalizeB2cHeaderKey(header);
+			let mappedKey = B2C_BULK_HEADER_MAP[normalizedKey];
+			if (!mappedKey) {
+				for (const [key, value] of Object.entries(B2C_BULK_HEADER_MAP)) {
+					if (normalizedKey.startsWith(key) || key.startsWith(normalizedKey)) {
+						mappedKey = value;
+						break;
+					}
+				}
+			}
+			if (!mappedKey) return;
+			const value = row[index];
+			if (value === null || value === undefined) return;
+			if (mappedKey === 'mobile' || mappedKey === 'whatsapp') {
+				const phone = normalizeB2cPhone(value);
+				if (phone) obj[mappedKey] = phone;
+				return;
+			}
+			if (mappedKey === 'gender') {
+				const gender = normalizeB2cGender(value);
+				if (gender) obj[mappedKey] = gender;
+				return;
+			}
+			if (mappedKey === 'dob') {
+				obj[mappedKey] = value;
+				return;
+			}
+			const stringValue = String(value).trim();
+			if (stringValue && stringValue !== 'undefined' && stringValue !== 'null') {
+				obj[mappedKey] = stringValue;
+			}
+		});
+		return obj;
+	});
+};
+
+const resolveOptionalCoOwnerUser = async (rawValue, label) => {
+	const coOwnerRaw = rawValue != null ? String(rawValue).trim() : '';
+	if (!coOwnerRaw) return null;
+	if (!mongoose.Types.ObjectId.isValid(coOwnerRaw)) {
+		const err = new Error(`Invalid ${label} selected in the upload form. Please choose again.`);
+		err.statusCode = 400;
+		throw err;
+	}
+	const coOwnerUser = await User.findById(coOwnerRaw).select('_id').lean();
+	if (!coOwnerUser) {
+		const err = new Error(`${label} not found. Please choose again.`);
+		err.statusCode = 400;
+		throw err;
+	}
+	return coOwnerUser._id;
+};
 
 const storage = multer.diskStorage({
 	destination,
@@ -1550,6 +1717,331 @@ router.post('/addleadsb2c', isCollege, async (req, res) => {
 			message: "Internal server error",
 			error: err.message
 		});
+	}
+});
+
+// Bulk import B2C leads from Excel. Screen fields apply to every row.
+router.post('/leads/import', isCollege, async (req, res) => {
+	let filePath;
+	try {
+		const user = req.user;
+		const courseId = req.body?.courseId ? String(req.body.courseId).trim() : '';
+		const centerId = req.body?.centerId ? String(req.body.centerId).trim() : '';
+		const counselorId = req.body?.counselorId ? String(req.body.counselorId).trim() : '';
+		const registeredBy = req.body?.registeredBy ? String(req.body.registeredBy).trim() : '';
+		const highestQualification = req.body?.highestQualification ? String(req.body.highestQualification).trim() : '';
+		const bodyLeadCoOwner = req.body?.leadCoOwner ? String(req.body.leadCoOwner).trim() : '';
+		const bodyLeadCoOwner2 = req.body?.leadCoOwner2 ? String(req.body.leadCoOwner2).trim() : '';
+
+		if (!courseId || !centerId || !counselorId || !registeredBy || !highestQualification) {
+			return res.status(400).json({
+				status: false,
+				message: 'Please select Course, Training Center, Counselor, Source, and Highest Qualification before importing.'
+			});
+		}
+
+		const validIds = [courseId, centerId, counselorId, registeredBy, highestQualification];
+		if (validIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
+			return res.status(400).json({
+				status: false,
+				message: 'One or more selected fields are invalid. Please choose again.'
+			});
+		}
+
+		const [course, center, counselor, source, qualification] = await Promise.all([
+			Courses.findById(courseId).select('center name').lean(),
+			Center.findById(centerId).select('_id name').lean(),
+			User.findById(counselorId).select('_id name').lean(),
+			Source.findById(registeredBy).select('_id name').lean(),
+			Qualification.findById(highestQualification).select('_id name').lean(),
+		]);
+
+		if (!course) {
+			return res.status(400).json({ status: false, message: 'Selected course was not found. Please choose again.' });
+		}
+		if (!center) {
+			return res.status(400).json({ status: false, message: 'Selected training center was not found. Please choose again.' });
+		}
+		const courseCenterIds = (course.center || []).map((c) => String(c._id || c));
+		if (courseCenterIds.length && !courseCenterIds.includes(String(centerId))) {
+			return res.status(400).json({
+				status: false,
+				message: 'Selected training center does not belong to the selected course.'
+			});
+		}
+		if (!counselor) {
+			return res.status(400).json({ status: false, message: 'Selected counselor was not found. Please choose again.' });
+		}
+		if (!source) {
+			return res.status(400).json({ status: false, message: 'Selected source was not found. Please choose again.' });
+		}
+		if (!qualification) {
+			return res.status(400).json({ status: false, message: 'Selected highest qualification was not found. Please choose again.' });
+		}
+
+		let leadCoOwnerId = null;
+		let leadCoOwner2Id = null;
+		try {
+			leadCoOwnerId = await resolveOptionalCoOwnerUser(bodyLeadCoOwner, 'Co-owner 1');
+			leadCoOwner2Id = await resolveOptionalCoOwnerUser(bodyLeadCoOwner2, 'Co-owner 2');
+		} catch (coOwnerErr) {
+			return res.status(coOwnerErr.statusCode || 400).json({
+				status: false,
+				message: coOwnerErr.message || 'Invalid co-owner'
+			});
+		}
+
+		let uploadedFile;
+		let fileExtension;
+		if (req.files && req.files.file) {
+			uploadedFile = Array.isArray(req.files.file) ? req.files.file[0] : req.files.file;
+			fileExtension = path.extname(uploadedFile.name).toLowerCase();
+			const tempFileName = `${path.basename(uploadedFile.name, fileExtension)}-${Date.now()}${fileExtension}`;
+			filePath = path.join(destination, tempFileName);
+			await new Promise((resolve, reject) => {
+				uploadedFile.mv(filePath, (err) => {
+					if (err) reject(err);
+					else resolve();
+				});
+			});
+		} else if (req.file) {
+			uploadedFile = req.file;
+			filePath = req.file.path;
+			fileExtension = path.extname(req.file.originalname).toLowerCase();
+		} else {
+			return res.status(400).json({
+				status: false,
+				message: 'Please upload a file'
+			});
+		}
+
+		if (fileExtension !== '.xlsx' && fileExtension !== '.xls') {
+			return res.status(400).json({
+				status: false,
+				message: 'Unsupported file format. Please upload an Excel file (.xlsx or .xls)'
+			});
+		}
+
+		const excelData = await readXlsxFile(filePath);
+		if (!excelData || excelData.length < 2) {
+			return res.status(400).json({
+				status: false,
+				message: 'Excel file has no data rows. Please use the sample file and add leads.'
+			});
+		}
+
+		let leads = mapB2cExcelRows(excelData).filter((row) => {
+			if (!row || typeof row !== 'object') return false;
+			const hasName = row.name != null && String(row.name).trim() !== '';
+			const hasMobile = row.mobile != null && String(row.mobile).trim() !== '';
+			return hasName || hasMobile;
+		});
+
+		if (!leads.length) {
+			return res.status(400).json({
+				status: false,
+				message: 'No valid rows found. Required Excel columns: Name, Mobile, WhatsApp, Gender.'
+			});
+		}
+
+		const phoneRegex = /^\d{10}$/;
+		const normalizeEmail = (v) => String(v || '').trim().toLowerCase();
+		const errors = [];
+		const fileMobiles = [];
+		const fileEmails = [];
+
+		for (const row of leads) {
+			const m = normalizeB2cPhone(row.mobile);
+			if (m) fileMobiles.push(m);
+			const e = normalizeEmail(row.email);
+			if (e) fileEmails.push(e);
+		}
+
+		const existingMobileSet = new Set();
+		const existingEmailSet = new Set();
+		if (fileMobiles.length || fileEmails.length) {
+			const mobileNumbers = fileMobiles.map((m) => Number(m)).filter((n) => !Number.isNaN(n));
+			const existing = await Candidate.find({
+				$or: [
+					...(mobileNumbers.length ? [{ mobile: { $in: mobileNumbers } }] : []),
+					...(fileEmails.length ? [{ email: { $in: fileEmails } }] : []),
+				],
+			})
+				.select('mobile email')
+				.lean();
+
+			for (const doc of existing || []) {
+				if (doc?.mobile != null) existingMobileSet.add(String(doc.mobile));
+				if (doc?.email) existingEmailSet.add(normalizeEmail(doc.email));
+			}
+		}
+
+		const seenMobileInFile = new Set();
+		const seenEmailInFile = new Set();
+		let insertedCount = 0;
+
+		for (let i = 0; i < leads.length; i++) {
+			const row = leads[i];
+			const excelRow = i + 2;
+			try {
+				const name = row.name != null ? String(row.name).trim() : '';
+				const cleanMobile = normalizeB2cPhone(row.mobile);
+				const cleanWhatsapp = normalizeB2cPhone(row.whatsapp);
+				const gender = normalizeB2cGender(row.gender);
+				const email = normalizeEmail(row.email);
+				const address = row.address != null ? String(row.address).trim() : '';
+
+				if (!name || !cleanMobile || !cleanWhatsapp || !gender) {
+					errors.push(`Row ${excelRow}: Missing required fields (Name, Mobile, WhatsApp, Gender are required)`);
+					continue;
+				}
+				if (!phoneRegex.test(cleanMobile)) {
+					errors.push(`Row ${excelRow}: Invalid mobile number format (should be 10 digits)`);
+					continue;
+				}
+				if (!phoneRegex.test(cleanWhatsapp)) {
+					errors.push(`Row ${excelRow}: Invalid WhatsApp number format (should be 10 digits)`);
+					continue;
+				}
+				if (email && !/^\S+@\S+\.\S+$/.test(email)) {
+					errors.push(`Row ${excelRow}: Invalid email address`);
+					continue;
+				}
+
+				if (seenMobileInFile.has(cleanMobile)) {
+					errors.push(`Row ${excelRow}: Mobile ${cleanMobile} is duplicate in the uploaded file`);
+					continue;
+				}
+				seenMobileInFile.add(cleanMobile);
+
+				if (email) {
+					if (seenEmailInFile.has(email)) {
+						errors.push(`Row ${excelRow}: Email ${email} is duplicate in the uploaded file`);
+						continue;
+					}
+					seenEmailInFile.add(email);
+				}
+
+				if (existingMobileSet.has(cleanMobile)) {
+					errors.push(`Row ${excelRow}: Mobile ${cleanMobile} already exists`);
+					continue;
+				}
+				if (email && existingEmailSet.has(email)) {
+					errors.push(`Row ${excelRow}: Email ${email} already exists`);
+					continue;
+				}
+
+				const dob = parseB2cExcelDob(row.dob);
+
+				try {
+					const existingUser = await User.findOne({
+						mobile: Number(cleanMobile),
+						role: { $in: [3, '3'] },
+					}).select('_id').lean();
+					if (!existingUser) {
+						await User.create({
+							role: 3,
+							mobile: Number(cleanMobile),
+							name,
+							email: email || undefined,
+							status: true,
+						});
+					}
+				} catch (userErr) {
+					console.log(`B2C bulk upload: user create skipped for row ${excelRow}:`, userErr.message);
+				}
+
+				const candidateData = {
+					name,
+					mobile: Number(cleanMobile),
+					whatsapp: Number(cleanWhatsapp),
+					sex: gender,
+					highestQualification,
+					isImported: true,
+					source: 'bulk_upload',
+					personalInfo: {
+						currentAddress: {
+							type: 'Point',
+							coordinates: [0, 0],
+							fullAddress: address,
+						},
+					},
+				};
+				if (email) candidateData.email = email;
+				if (dob) candidateData.dob = dob;
+
+				const candidate = await Candidate.create(candidateData);
+
+				try {
+					const appliedCoursePayload = {
+						_candidate: candidate._id,
+						_course: courseId,
+						_center: centerId,
+						counsellor: counselorId,
+						registeredBy,
+						_leadStatus: new mongoose.Types.ObjectId('64ab1234abcd5678ef901234'),
+						_leadSubStatus: new mongoose.Types.ObjectId('64ab1234abcd5678ef901235'),
+						_aiLeadStatus: new mongoose.Types.ObjectId('64ab1234abcd5678ef901234'),
+						_aiLeadSubStatus: new mongoose.Types.ObjectId('64ab1234abcd5678ef901235'),
+						leadAssignment: [{
+							_counsellor: counselorId,
+							counsellorName: counselor.name,
+							assignDate: new Date(),
+							assignedBy: user._id,
+						}],
+					};
+					if (leadCoOwnerId) appliedCoursePayload.leadCoOwner = leadCoOwnerId;
+					if (leadCoOwner2Id) appliedCoursePayload.leadCoOwner2 = leadCoOwner2Id;
+
+					const appliedCourse = await AppliedCourses.create(appliedCoursePayload);
+					await Candidate.updateOne(
+						{ _id: candidate._id },
+						{
+							$addToSet: { _appliedCourses: appliedCourse._id },
+							$push: { appliedCourses: { courseId, centerId } },
+						}
+					);
+				} catch (applyErr) {
+					await Candidate.deleteOne({ _id: candidate._id });
+					throw applyErr;
+				}
+
+				existingMobileSet.add(cleanMobile);
+				if (email) existingEmailSet.add(email);
+				insertedCount += 1;
+			} catch (rowErr) {
+				if (rowErr && rowErr.code === 11000) {
+					errors.push(`Row ${excelRow}: Mobile already exists`);
+					continue;
+				}
+				errors.push(`Row ${excelRow}: ${rowErr.message || 'Failed to import lead'}`);
+			}
+		}
+
+		res.json({
+			status: true,
+			data: {
+				inserted: insertedCount,
+				errors: errors.length,
+				errorDetails: errors,
+			},
+			message: `Import completed. ${insertedCount} leads imported successfully${errors.length > 0 ? `, ${errors.length} errors found` : ''}`,
+		});
+	} catch (error) {
+		console.error('Error importing B2C leads:', error);
+		res.status(500).json({
+			status: false,
+			message: 'Failed to import leads',
+			error: error.message,
+		});
+	} finally {
+		if (filePath && fs.existsSync(filePath)) {
+			try {
+				fs.unlinkSync(filePath);
+			} catch (unlinkErr) {
+				console.log('Error deleting B2C bulk upload temp file:', unlinkErr.message);
+			}
+		}
 	}
 });
 

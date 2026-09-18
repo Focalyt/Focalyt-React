@@ -3775,11 +3775,14 @@ const CRMDashboard = () => {
         const allFilter = { _id: 'all', name: 'All' };
 
 
-        setCrmFilters([allFilter, ...status.map(r => ({
+        const statusFilters = status.map(r => ({
           _id: r._id,
           name: r.title,
-          milestone: r.milestone,  // agar backend me count nahi hai to 0
-        }))]);
+          milestone: r.milestone,
+          count: r.count || 0,
+        }));
+        const statusTotal = statusFilters.reduce((sum, item) => sum + (Number(item.count) || 0), 0);
+        setCrmFilters([{ ...allFilter, count: statusTotal }, ...statusFilters]);
 
         setStatuses(status.map(r => ({
           _id: r._id,
@@ -4730,28 +4733,27 @@ console.log('API Response:', response.data);
       .filter(key => key !== 'all' && key !== 'null')
       .reduce((sum, key) => {
         const statusData = backendCounts[key];
-        if (statusData && typeof statusData === 'object' && statusData.count) {
-          return sum + (statusData.count || 0);
+        if (statusData && typeof statusData === 'object') {
+          return sum + (Number(statusData.count) || 0);
         } else if (typeof statusData === 'number') {
           return sum + statusData;
         }
         return sum;
       }, 0);
-    
-    // Use calculated sum, or fallback to backend's "all" value, or 0
-    const allCount = calculatedFilteredTotal > 0 ? calculatedFilteredTotal : (backendCounts.all || 0);
+
+    const allCount = Math.max(calculatedFilteredTotal, Number(backendCounts?.all) || 0);
 
     setCrmFilters(prevFilters => {
       return prevFilters.map(filter => {
-        if (filter._id === 'all') {
+        if (filter._id === 'all' || !filter._id) {
           return { ...filter, count: allCount };
         }
 
-        const backendFilter = backendCounts[filter._id];
+        const backendFilter = backendCounts[filter._id] || backendCounts[String(filter._id)];
         if (backendFilter) {
           return {
             ...filter,
-            count: backendFilter.count || 0,
+            count: Number(backendFilter.count) || 0,
             milestone: backendFilter.milestone
           };
         }
@@ -14712,16 +14714,99 @@ useEffect(() => {
     const fileInput = bulkUploadFileInputRef.current;
     if (!fileInput || !fileInput.files || !fileInput.files[0]) {
       setBulkUploadMessage('Please select a file');
+      setBulkUploadSuccess(false);
       return;
     }
+
+    const selectedFile = fileInput.files[0];
+    if (!(selectedFile instanceof File)) {
+      setBulkUploadMessage('Invalid file object. Please select the file again.');
+      setBulkUploadSuccess(false);
+      return;
+    }
+
+    const ext = selectedFile.name.substring(selectedFile.name.lastIndexOf('.')).toLowerCase();
+    if (ext !== '.xlsx' && ext !== '.xls') {
+      setBulkUploadMessage('Please upload an Excel file (.xlsx or .xls)');
+      setBulkUploadSuccess(false);
+      return;
+    }
+
     if (!validateBulkUploadForm()) {
-      setBulkUploadMessage('Please complete all required fields above');
+      setBulkUploadMessage('Please complete all required fields above (Course, Training Center, Counselor, Source, Highest Qualification)');
+      setBulkUploadSuccess(false);
       return;
     }
+
     setBulkUploadLoading(true);
-    setBulkUploadSuccess(true);
-    setBulkUploadMessage(`Selected ${fileInput.files[0].name}. Import uses Course, Center, Counselor, Source, and Qualification from above.`);
-    setBulkUploadLoading(false);
+    setBulkUploadMessage('');
+    setBulkUploadErrors([]);
+    setBulkUploadSuccess(false);
+
+    const formData = new FormData();
+    formData.append('file', selectedFile, selectedFile.name);
+    formData.append('courseId', bulkUploadFormData.courseId);
+    formData.append('centerId', bulkUploadFormData.centerId);
+    formData.append('counselorId', bulkUploadFormData.counselorId);
+    formData.append('registeredBy', bulkUploadFormData.registeredBy);
+    formData.append('highestQualification', bulkUploadFormData.highestQualification);
+    if (bulkUploadFormData.leadCoOwnerId) {
+      formData.append('leadCoOwner', bulkUploadFormData.leadCoOwnerId);
+    }
+    if (bulkUploadFormData.leadCoOwner2Id) {
+      formData.append('leadCoOwner2', bulkUploadFormData.leadCoOwner2Id);
+    }
+
+    try {
+      const response = await axios.post(`${backendUrl}/college/courses/leads/import`, formData, {
+        headers: { 'x-auth': token },
+      });
+
+      if (response.data.status) {
+        const successCount = response.data.data?.inserted || 0;
+        const errorCount = response.data.data?.errors || 0;
+        const errorDetails = response.data.data?.errorDetails || [];
+
+        setBulkUploadSuccess(successCount > 0);
+        setBulkUploadMessage(
+          `${successCount} leads imported successfully${errorCount > 0 ? `. ${errorCount} errors found.` : '.'}`
+        );
+        if (errorDetails.length > 0) {
+          setBulkUploadErrors(errorDetails);
+        }
+
+        if (successCount > 0) {
+          const newFilterData = { ...(filterData || {}) };
+          delete newFilterData.leadStatus;
+          delete newFilterData.aiLeadStatus;
+          newFilterData.followupStatus = '';
+          delete newFilterData.kyc;
+          setSelectedFollowupBucket('');
+          setSelectedApprovalFilter(null);
+          setSelectedKycFilter(null);
+          setSelectedMilestoneFilter(null);
+          setActiveCrmFilter(0);
+          setActiveAiPerformanceId(null);
+          filterDataRef.current = newFilterData;
+          setFilterData(newFilterData);
+          setCurrentPage(1);
+          await fetchStatus();
+          await fetchProfileData(newFilterData, 1);
+          handleCloseBulkUploadModal();
+        }
+      } else {
+        setBulkUploadSuccess(false);
+        setBulkUploadMessage(response.data.message || 'Failed to upload file');
+      }
+    } catch (error) {
+      console.error('Error uploading B2C leads:', error);
+      setBulkUploadSuccess(false);
+      setBulkUploadMessage(
+        error.response?.data?.message || 'Failed to upload file. Please try again.'
+      );
+    } finally {
+      setBulkUploadLoading(false);
+    }
   };
 
   const handleCloseBulkUploadModal = () => {
