@@ -449,7 +449,7 @@ module.exports.sendMails = async (subject, message, email, options = {}) => {
     port: 465,
     auth: {
       user: "focalytportal@gmail.com",
-      pass: "fbhw naro vtiu hpyf ",
+      pass: "sowb abdi lhpc kfbc ",
       // pass: "sgymepbsvctmday",
       // pass: "mcsmzquieeevemdt",
     },
@@ -492,7 +492,7 @@ module.exports.sendMail = async (subject, message, email) => {
     port: 465,
     auth: {
       user: "focalytportal@gmail.com",
-      pass: "fbhw naro vtiu hpyf",
+      pass: "sowb abdi lhpc kfbc",
     },
     tls: { rejectUnauthorized: false },
   });
@@ -528,7 +528,7 @@ module.exports.sendPartnerMail = async (subject, message, email) => {
     port: 465,
     auth: {
       user: "focalytportal@gmail.com",
-      pass: "fbhw naro vtiu hpyf",
+      pass: "sowb abdi lhpc kfbc",
     },
     tls: { rejectUnauthorized: false },
   });
