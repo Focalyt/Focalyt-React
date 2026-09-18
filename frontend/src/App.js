@@ -20,6 +20,7 @@ import Jobs from './Pages/Front/Jobs/Jobs';
 import JobDetails from './Pages/Front/Jobs/JobDetails';
 import Contact from './Pages/Front/Contact/Contact';
 import Marketing from './Pages/Front/Marketing/Marketing';
+import LandingPage from './Pages/Front/Marketing/LandingPage';
 import CourseDetails from './Pages/Front/CourseDetails/CourseDetails';
 import EmployersTermsofService from './Pages/Front/EmpTerms/EmpTerms';
 import UserAgreement from './Pages/Front/UserAgreement/UserAgreement';
@@ -236,6 +237,7 @@ const Layout = () => {
         <Route exact path="/jobdetailsmore/:jobId" element={<JobDetails />} />
         <Route exact path="/contact" element={<Contact />} />
         <Route exact path="/marketing" element={<Marketing />} />
+        <Route exact path="/landing" element={<LandingPage />} />
         <Route exact path="/coursedetails/:courseId" element={<CourseDetails />} />
         <Route exact path="/cmp/login" element={<CompanyLogin />} />
         <Route exact path="/community" element={<Community />} />

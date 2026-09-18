@@ -84,6 +84,8 @@ const mapHrLeadToB2cProfile = (lead) => {
       : [],
     remark: lead?.remark || '',
     remarks: lead?.remark || '',
+    aiRemark: lead?.aiRemark || '',
+    aiVoice: lead?.aiVoice || null,
     _leadStatus: lead?.leadStatus || null,
     _leadSubStatus: lead?.leadSubstatus || null,
     followups: lead?.followups || [],
@@ -5076,7 +5078,12 @@ console.log('API Response:', response.data);
   const getProfileAiRemarkText = useCallback((profile) => {
     const dedicated = typeof profile?.aiRemark === 'string' ? profile.aiRemark.trim() : '';
     if (dedicated) return dedicated;
-    return splitHumanAndAiRemarks(normalizeRemarkValue(profile?.remarks)).ai;
+    const fromRemarks = splitHumanAndAiRemarks(normalizeRemarkValue(profile?.remarks)).ai;
+    if (fromRemarks) return fromRemarks;
+    const summary = typeof profile?.aiVoice?.lastSummary === 'string'
+      ? profile.aiVoice.lastSummary.trim()
+      : '';
+    return summary;
   }, [normalizeRemarkValue, splitHumanAndAiRemarks]);
 
   const truncateRemarks = useCallback((text, max = 70) => {
@@ -19274,6 +19281,12 @@ useEffect(() => {
                                                     </div>
                                                   </div>
                                                   <div className="col-xl- col-3">
+                                                    {renderRemarksField(profile)}
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    {renderAiRemarksField(profile)}
+                                                  </div>
+                                                  <div className="col-xl- col-3">
                                                     <div className="info-group">
                                                       <div className="info-label">LEAD MODIFICATION DATE</div>
                                                       <div className="info-value">{profile.updatedAt ? (() => {
@@ -19291,12 +19304,6 @@ useEffect(() => {
                                                         return `${datePart}, ${timePart}`;
                                                       })() : 'N/A'}</div>
                                                     </div>
-                                                  </div>
-                                                  <div className="col-xl- col-3">
-                                                    {renderRemarksField(profile)}
-                                                  </div>
-                                                  <div className="col-xl- col-3">
-                                                    {renderAiRemarksField(profile)}
                                                   </div>
                                                   <div className="col-xl- col-3">
                                                     <div className="info-group">
