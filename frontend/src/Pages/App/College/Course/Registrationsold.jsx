@@ -32,6 +32,8 @@ const toHrFilterYmd = (value) => {
   return parsed.isValid() ? parsed.format('YYYY-MM-DD') : undefined;
 };
 
+const isHrDepartmentLabel = (label) => String(label || '').trim().toLowerCase() === 'hr';
+
 const mapHrLeadToB2cProfile = (lead) => {
   const owner = lead?.leadOwner && typeof lead.leadOwner === 'object'
     ? lead.leadOwner
@@ -973,7 +975,11 @@ const CRMDashboard = () => {
         });
         if (res.data.status) {
           setVerticalOptions(res.data.verticals.map(v => ({ value: v._id, label: v.name })));
-          setProjectOptions(res.data.projects.map(p => ({ value: p._id, label: p.name })));
+          setProjectOptions(res.data.projects.map(p => ({
+            value: p._id,
+            label: p.name,
+            vertical: p.vertical?._id || p.vertical || null,
+          })));
           setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
           // setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
           // Fetch ALL centers (not just from AppliedCourses) to show aligned centers
@@ -3131,12 +3137,16 @@ const CRMDashboard = () => {
 
   const cycleProjectOptions = useMemo(() => {
     if (!cycleFilters.department) return projectOptions;
-    const projectIds = new Set(
+    const deptId = String(cycleFilters.department);
+    const projectIdsFromCourses = new Set(
       allCoursesMeta
-        .filter((c) => String(c.vertical?._id || c.vertical) === String(cycleFilters.department))
+        .filter((c) => String(c.vertical?._id || c.vertical) === deptId)
         .map((c) => String(c.project?._id || c.project))
     );
-    return projectOptions.filter((p) => projectIds.has(String(p.value)));
+    return projectOptions.filter((p) =>
+      projectIdsFromCourses.has(String(p.value))
+      || String(p.vertical?._id || p.vertical) === deptId
+    );
   }, [cycleFilters.department, projectOptions, allCoursesMeta]);
 
   const cycleCourseOptions = useMemo(() => {
@@ -4893,6 +4903,16 @@ console.log('API Response:', response.data);
         const data = response.data;
         let profiles = Array.isArray(data.data) ? [...data.data] : [];
         const cycle = cycleOverride || cycleFilters;
+        const hrDepartmentIds = new Set(
+          (verticalOptions || [])
+            .filter((opt) => isHrDepartmentLabel(opt.label))
+            .map((opt) => String(opt.value))
+        );
+        const selectedDepartmentId = cycle?.department ? String(cycle.department) : '';
+        const departmentAllowsHr = !selectedDepartmentId || hrDepartmentIds.has(selectedDepartmentId);
+        const selectedProject = (projectOptions || []).find((opt) => String(opt.value) === String(cycle?.project || ''));
+        const selectedProjectVertical = String(selectedProject?.vertical?._id || selectedProject?.vertical || '');
+        const projectAllowsHr = !cycle?.project || hrDepartmentIds.has(selectedProjectVertical);
         const shouldMergeHrLeads = listEndpoint === 'appliedCandidates'
           && Number(page) === 1
           && !filters.leadStatus
@@ -4902,7 +4922,9 @@ console.log('API Response:', response.data);
           && !filters.aiLeadStatus
           && !cycle?.course
           && !cycle?.center
-          && !cycle?.batch;
+          && !cycle?.batch
+          && departmentAllowsHr
+          && projectAllowsHr;
 
         if (shouldMergeHrLeads) {
           try {
@@ -4921,6 +4943,10 @@ console.log('API Response:', response.data);
               nextActionToDate: toHrFilterYmd(filters.nextActionToDate),
               owner: listParts.owner,
               counselor: listParts.counselor,
+              department: selectedDepartmentId && hrDepartmentIds.has(selectedDepartmentId)
+                ? selectedDepartmentId
+                : undefined,
+              project: cycle?.project || undefined,
             };
             if (filters.hasFollowUpCall === true || filters.hasFollowUpCall === 'yes') {
               hrParams.hasFollowUpCall = 'true';

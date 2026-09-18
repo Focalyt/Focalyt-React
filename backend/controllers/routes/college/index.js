@@ -14441,7 +14441,7 @@ router.get('/filters-data', [isCollege], async (req, res) => {
 			if (Array.isArray(ac.projects)) {
 				ac.projects.forEach(p => {
 					if (p && p._id && !projectSet.has(p._id.toString())) {
-						projectSet.set(p._id.toString(), { _id: p._id, name: p.name });
+						projectSet.set(p._id.toString(), { _id: p._id, name: p.name, vertical: p.vertical || null });
 					}
 				});
 			}
@@ -14471,6 +14471,27 @@ router.get('/filters-data', [isCollege], async (req, res) => {
 			});
 		});
 
+
+		// Include departments/projects with no AppliedCourses (e.g. HR jobs).
+		const [allVerticals, allProjects] = await Promise.all([
+			Vertical.find({ college: college._id, status: { $ne: false } }).select('_id name').lean(),
+			Project.find({ college: college._id, status: 'active' }).select('_id name vertical').lean(),
+		]);
+		allVerticals.forEach((v) => {
+			if (v && v._id && !verticalSet.has(String(v._id))) {
+				verticalSet.set(String(v._id), { _id: v._id, name: v.name });
+			}
+		});
+		allProjects.forEach((p) => {
+			if (!p || !p._id) return;
+			const key = String(p._id);
+			const existing = projectSet.get(key);
+			if (!existing) {
+				projectSet.set(key, { _id: p._id, name: p.name, vertical: p.vertical || null });
+			} else if (!existing.vertical && p.vertical) {
+				existing.vertical = p.vertical;
+			}
+		});
 
 		const access = getB2cAccessScope(user);
 		let verticals = Array.from(verticalSet.values());

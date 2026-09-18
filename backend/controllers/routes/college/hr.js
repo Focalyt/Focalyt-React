@@ -745,6 +745,18 @@ const queryAppliedLeads = async (query, collegeId) => {
     leads = leads.filter((lead) => ownerFilter.includes(String(lead.leadOwner?._id || lead.leadOwner || '')));
   }
 
+  if (query.project && mongoose.Types.ObjectId.isValid(String(query.project))) {
+    const projectId = String(query.project);
+    leads = leads.filter((lead) => String(lead.project?._id || lead.project || '') === projectId);
+  }
+  if (query.department && mongoose.Types.ObjectId.isValid(String(query.department))) {
+    const departmentId = String(query.department);
+    leads = leads.filter((lead) => {
+      const leadDept = String(lead.department?._id || lead.department || '');
+      return !leadDept || leadDept === departmentId;
+    });
+  }
+
   return { leads, statusIndex };
 };
 
