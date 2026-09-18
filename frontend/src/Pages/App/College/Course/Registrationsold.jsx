@@ -7,6 +7,7 @@ import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import axios from 'axios'
+import * as XLSX from 'xlsx';
 import { toast } from 'react-toastify';
 import { getGoogleAuthCode, getGoogleRefreshToken } from '../../../../Component/googleOAuth';
 
@@ -2688,6 +2689,25 @@ const CRMDashboard = () => {
 
   // Form validation state
   const [formErrors, setFormErrors] = useState({});
+  const [showAddLeadModal, setShowAddLeadModal] = useState(false);
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [bulkUploadFile, setBulkUploadFile] = useState(null);
+  const [bulkUploadLoading, setBulkUploadLoading] = useState(false);
+  const [bulkUploadMessage, setBulkUploadMessage] = useState('');
+  const [bulkUploadErrors, setBulkUploadErrors] = useState([]);
+  const [bulkUploadSuccess, setBulkUploadSuccess] = useState(false);
+  const [bulkUploadFormData, setBulkUploadFormData] = useState({
+    courseId: '',
+    centerId: '',
+    counselorId: '',
+    leadCoOwnerId: '',
+    leadCoOwner2Id: '',
+    registeredBy: '',
+    highestQualification: '',
+  });
+  const [bulkUploadFormErrors, setBulkUploadFormErrors] = useState({});
+  const [bulkUploadCenters, setBulkUploadCenters] = useState([]);
+  const bulkUploadFileInputRef = useRef(null);
 
   // Form submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -2863,6 +2883,26 @@ const CRMDashboard = () => {
     } finally {
     }
   };
+
+  useEffect(() => {
+    const loadBulkCenters = async () => {
+      if (!showBulkUploadModal || !bulkUploadFormData.courseId) {
+        setBulkUploadCenters([]);
+        return;
+      }
+      try {
+        const response = await axios.get(
+          `${backendUrl}/college/courses/course_centers?courseId=${bulkUploadFormData.courseId}`,
+          { headers: { 'x-auth': token, 'Content-Type': 'application/json' } }
+        );
+        setBulkUploadCenters(response.data.status ? (response.data.data || []) : []);
+      } catch (error) {
+        console.error('Error fetching bulk upload centers:', error);
+        setBulkUploadCenters([]);
+      }
+    };
+    loadBulkCenters();
+  }, [showBulkUploadModal, bulkUploadFormData.courseId, backendUrl, token]);
 
   const handleDuplicateLeadHistoryResponse = async (payload, mobile) => {
     const message = payload?.message || payload?.msg || payload?.error || '';
@@ -3049,6 +3089,7 @@ const CRMDashboard = () => {
         await fetchProfileData(newFilterData, 1);
 
         closePanel();
+        setShowAddLeadModal(false);
       }
       else {
         const handledDuplicate = await handleDuplicateLeadHistoryResponse(response.data, mobile);
@@ -14532,6 +14573,166 @@ useEffect(() => {
     { key: 'kyc-verified', filter: 'verified', label: 'Verified', title: 'KYC verified leads', valueKey: 'verified', bg: '#10b981' },
   ];
 
+  const resetB2cAddLeadForm = () => {
+    setCandidateFormData({
+      name: '',
+      mobile: '',
+      email: '',
+      sex: '',
+      dob: '',
+      whatsapp: '',
+      showProfileForm: false,
+      highestQualification: '',
+      personalInfo: {
+        currentAddress: {
+          type: 'Point',
+          coordinates: [0, 0],
+          latitude: '',
+          longitude: '',
+          city: '',
+          state: '',
+          fullAddress: ''
+        }
+      }
+    });
+    setCourseId('');
+    setCenterId('');
+    setCounselorId('');
+    setLeadCoOwnerId('');
+    setLeadCoOwner2Id('');
+    setRegisteredBy('');
+    setSelectSearch({ course: '', center: '', qualification: '', counselor: '', coOwner: '', coOwner2: '' });
+    setIsCourseDropdownOpen(false);
+    setIsCenterDropdownOpen(false);
+    setIsQualificationDropdownOpen(false);
+    setIsCounselorDropdownOpen(false);
+    setIsCoOwnerDropdownOpen(false);
+    setIsCoOwner2DropdownOpen(false);
+    setFormErrors({});
+  };
+
+  const handleOpenLeadModal = () => {
+    resetB2cAddLeadForm();
+    setShowAddLeadModal(true);
+  };
+
+  const handleCloseLeadModal = () => {
+    setShowAddLeadModal(false);
+  };
+
+  const handleBulkUploadInputChange = (e) => {
+    const { name, value } = e.target;
+    if (name === 'courseId') {
+      setBulkUploadFormData((prev) => ({ ...prev, courseId: value, centerId: '' }));
+    } else {
+      setBulkUploadFormData((prev) => ({ ...prev, [name]: value }));
+    }
+    if (bulkUploadFormErrors[name]) {
+      setBulkUploadFormErrors((prev) => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const validateBulkUploadForm = () => {
+    const errors = {};
+    if (!bulkUploadFormData.courseId) errors.courseId = 'Course is required';
+    if (!bulkUploadFormData.centerId) errors.centerId = 'Training center is required';
+    if (!bulkUploadFormData.counselorId) errors.counselorId = 'Counselor is required';
+    if (!bulkUploadFormData.registeredBy) errors.registeredBy = 'Source is required';
+    if (!bulkUploadFormData.highestQualification) errors.highestQualification = 'Highest qualification is required';
+    setBulkUploadFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const isBulkUploadConfigComplete = Boolean(
+    bulkUploadFormData.courseId &&
+    bulkUploadFormData.centerId &&
+    bulkUploadFormData.counselorId &&
+    bulkUploadFormData.registeredBy &&
+    bulkUploadFormData.highestQualification
+  );
+
+  const openBulkUploadModal = () => {
+    setBulkUploadFormData({
+      courseId: '',
+      centerId: '',
+      counselorId: '',
+      leadCoOwnerId: '',
+      leadCoOwner2Id: '',
+      registeredBy: '',
+      highestQualification: '',
+    });
+    setBulkUploadFormErrors({});
+    setBulkUploadCenters([]);
+    setBulkUploadFile(null);
+    setBulkUploadMessage('');
+    setBulkUploadErrors([]);
+    setBulkUploadSuccess(false);
+    setShowBulkUploadModal(true);
+    if (bulkUploadFileInputRef.current) bulkUploadFileInputRef.current.value = '';
+  };
+
+  const downloadB2cLeadsSampleExcel = () => {
+    const rows = [
+      ['Name', 'Mobile', 'Email', 'WhatsApp', 'Address', 'Date of Birth', 'Gender'],
+      ['Rahul Sharma', '9876543210', 'rahul@example.com', '9876543210', '123 MG Road, Mumbai', '1998-05-12', 'Male'],
+      ['Priya Singh', '9876543211', 'priya@example.com', '9876543211', '45 Park Street, Delhi', '1999-08-21', 'Female'],
+      ['Amit Kumar', '9876543212', 'amit@example.com', '9876543212', '78 Tech Park, Bangalore', '1997-01-30', 'Male'],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Leads');
+    XLSX.writeFile(wb, 'b2c_leads_sample.xlsx');
+  };
+
+  const handleBulkFileChange = (e) => {
+    const selectedFile = e.target.files[0];
+    if (!selectedFile) return;
+    const validTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+    ];
+    const fileExtension = selectedFile.name.substring(selectedFile.name.lastIndexOf('.')).toLowerCase();
+    if (!validTypes.includes(selectedFile.type) && !['.xlsx', '.xls'].includes(fileExtension)) {
+      setBulkUploadMessage('Please select an Excel file (.xlsx or .xls)');
+      e.target.value = '';
+      return;
+    }
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      setBulkUploadMessage('File size should not exceed 10MB');
+      e.target.value = '';
+      return;
+    }
+    setBulkUploadFile(selectedFile);
+    setBulkUploadMessage('');
+    setBulkUploadErrors([]);
+    setBulkUploadSuccess(false);
+  };
+
+  const handleBulkUpload = async () => {
+    const fileInput = bulkUploadFileInputRef.current;
+    if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+      setBulkUploadMessage('Please select a file');
+      return;
+    }
+    if (!validateBulkUploadForm()) {
+      setBulkUploadMessage('Please complete all required fields above');
+      return;
+    }
+    setBulkUploadLoading(true);
+    setBulkUploadSuccess(true);
+    setBulkUploadMessage(`Selected ${fileInput.files[0].name}. Import uses Course, Center, Counselor, Source, and Qualification from above.`);
+    setBulkUploadLoading(false);
+  };
+
+  const handleCloseBulkUploadModal = () => {
+    setShowBulkUploadModal(false);
+    setBulkUploadFile(null);
+    setBulkUploadMessage('');
+    setBulkUploadErrors([]);
+    setBulkUploadSuccess(false);
+    if (bulkUploadFileInputRef.current) bulkUploadFileInputRef.current.value = '';
+  };
+
   const getKycDashFilterLabel = (filter) => {
     const row = kycDashFilterOptions.find((item) => item.filter === filter);
     return row?.title || row?.label || filter;
@@ -16594,6 +16795,20 @@ useEffect(() => {
                                 Add Leads
                               </button>
                             )}
+
+<button className="btn btn-sm btn-outline-primary" style={{
+                                padding: "6px 12px",
+                                fontSize: "11px",
+                                fontWeight: "600",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px"
+                              }}
+                              onClick={openBulkUploadModal}
+                              >
+                                <i className="fas fa-plus" style={{ fontSize: "10px" }}></i>
+                                Add Bulk Leads
+                              </button>
                             {((permissions?.custom_permissions?.can_edit_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
                               <>
                                 <button
@@ -21525,10 +21740,765 @@ useEffect(() => {
         </div>
       </div> */}
 
-      {/* <!-- Button trigger modal --> */}
+      {showAddLeadModal && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
+          <div className="modal-dialog modal-lg modal-dialog-centered">
+            <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+              <div className="modal-header" style={{ background: 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)', color: 'white' }}>
+                <h5 className="modal-title d-flex align-items-center">
+                  <i className="fas fa-user-plus me-2"></i>
+                  Add Lead
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={handleCloseLeadModal}
+                ></button>
+              </div>
 
+              <div className="modal-body p-4">
+                <form onSubmit={handleAddLeadsB2C}>
+                  <div className="row g-3">
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        Candidate Number <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        className="form-control"
+                        placeholder="Enter 10 digit candidate number"
+                        maxLength="10"
+                        required
+                        value={candidateFormData.mobile}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                          handleInputChange('mobile', value);
+                        }}
+                      />
+                    </div>
 
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        Select Course <span className="text-danger">*</span>
+                      </label>
+                      <div className="position-relative" ref={courseDropdownRef}>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Select / Search course..."
+                          value={selectSearch.course}
+                          onFocus={() => setIsCourseDropdownOpen(true)}
+                          onClick={() => setIsCourseDropdownOpen(true)}
+                          onChange={(e) => {
+                            updateSelectSearch('course', e.target.value);
+                            setCourseId('');
+                            setCenterId('');
+                            setIsCourseDropdownOpen(true);
+                          }}
+                          disabled={loadingData}
+                        />
+                        <input type="hidden" required value={courseId} readOnly />
+                        {isCourseDropdownOpen && (
+                          <div className="shadow-sm" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000, backgroundColor: '#fff', border: '1px solid #e9ecef', borderRadius: '8px', marginTop: '6px', maxHeight: '220px', overflowY: 'auto' }}>
+                            {filteredSortedCourses.length ? (
+                              filteredSortedCourses.map((course) => (
+                                <button
+                                  key={course._id}
+                                  type="button"
+                                  onClick={() => {
+                                    setCourseId(course._id);
+                                    updateSelectSearch('course', course.name || '');
+                                    updateSelectSearch('center', '');
+                                    setCenterId('');
+                                    setIsCourseDropdownOpen(false);
+                                  }}
+                                  style={{ width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '10px 12px', fontSize: '14px', cursor: 'pointer' }}
+                                >
+                                  {course.name}
+                                </button>
+                              ))
+                            ) : (
+                              <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>No course found</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        Select Training Center <span className="text-danger">*</span>
+                      </label>
+                      <div className="position-relative" ref={centerDropdownRef}>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Select / Search training center..."
+                          value={selectSearch.center}
+                          onFocus={() => courseId && setIsCenterDropdownOpen(true)}
+                          onClick={() => courseId && setIsCenterDropdownOpen(true)}
+                          onChange={(e) => {
+                            updateSelectSearch('center', e.target.value);
+                            setCenterId('');
+                            if (courseId) setIsCenterDropdownOpen(true);
+                          }}
+                          disabled={!courseId}
+                        />
+                        <input type="hidden" required value={centerId} readOnly />
+                        {isCenterDropdownOpen && courseId && (
+                          <div className="shadow-sm" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000, backgroundColor: '#fff', border: '1px solid #e9ecef', borderRadius: '8px', marginTop: '6px', maxHeight: '220px', overflowY: 'auto' }}>
+                            {filteredSortedCenters.length ? (
+                              filteredSortedCenters.map((center) => (
+                                <button
+                                  key={center._id}
+                                  type="button"
+                                  onClick={() => {
+                                    setCenterId(center._id);
+                                    updateSelectSearch('center', center.name || '');
+                                    setIsCenterDropdownOpen(false);
+                                  }}
+                                  style={{ width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '10px 12px', fontSize: '14px', cursor: 'pointer' }}
+                                >
+                                  {center.name}
+                                </button>
+                              ))
+                            ) : (
+                              <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>No center found</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        Name <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Enter candidate name"
+                        required
+                        value={candidateFormData.name}
+                        onChange={(e) => handleInputChange('name', e.target.value)}
+                      />
+                    </div>
+
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        Email <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        className="form-control"
+                        placeholder="Enter email address"
+                        required
+                        value={candidateFormData.email}
+                        onChange={(e) => handleInputChange('email', e.target.value)}
+                      />
+                    </div>
+
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">Address</label>
+                      <input
+                        ref={addressInputRef}
+                        type="text"
+                        className="form-control"
+                        maxLength="100"
+                        name="address"
+                        placeholder="Enter address"
+                        value={candidateFormData.personalInfo.currentAddress.fullAddress}
+                        onChange={(e) => setCandidateFormData({
+                          ...candidateFormData,
+                          personalInfo: {
+                            ...candidateFormData.personalInfo,
+                            currentAddress: {
+                              ...candidateFormData.personalInfo.currentAddress,
+                              fullAddress: e.target.value
+                            }
+                          }
+                        })}
+                      />
+                    </div>
+
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        Gender <span className="text-danger">*</span>
+                      </label>
+                      <select
+                        className="form-select"
+                        required
+                        value={candidateFormData.sex}
+                        onChange={(e) => handleInputChange('sex', e.target.value)}
+                      >
+                        <option value="">Select Gender</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        Date Of Birth <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        className="form-control"
+                        required
+                        value={candidateFormData.dob}
+                        onChange={(e) => handleInputChange('dob', e.target.value)}
+                      />
+                    </div>
+
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        WhatsApp Number <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        className="form-control"
+                        placeholder="Enter WhatsApp number"
+                        maxLength="10"
+                        required
+                        value={candidateFormData.whatsapp}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                          handleInputChange('whatsapp', value);
+                        }}
+                      />
+                    </div>
+
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        Highest Qualification <span className="text-danger">*</span>
+                      </label>
+                      <div className="position-relative" ref={qualificationDropdownRef}>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Select / Search highest qualification..."
+                          value={selectSearch.qualification}
+                          onFocus={() => !loadingData && setIsQualificationDropdownOpen(true)}
+                          onClick={() => !loadingData && setIsQualificationDropdownOpen(true)}
+                          onChange={(e) => {
+                            updateSelectSearch('qualification', e.target.value);
+                            handleInputChange('highestQualification', '');
+                            if (!loadingData) setIsQualificationDropdownOpen(true);
+                          }}
+                          disabled={loadingData}
+                        />
+                        <input type="hidden" required value={candidateFormData.highestQualification || ''} readOnly />
+                        {isQualificationDropdownOpen && !loadingData && (
+                          <div className="shadow-sm" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000, backgroundColor: '#fff', border: '1px solid #e9ecef', borderRadius: '8px', marginTop: '6px', maxHeight: '220px', overflowY: 'auto' }}>
+                            {filteredSortedQualifications.length ? (
+                              filteredSortedQualifications.map((qualification) => (
+                                <button
+                                  key={qualification._id}
+                                  type="button"
+                                  onClick={() => {
+                                    handleInputChange('highestQualification', qualification._id);
+                                    updateSelectSearch('qualification', qualification.name || '');
+                                    setIsQualificationDropdownOpen(false);
+                                  }}
+                                  style={{ width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '10px 12px', fontSize: '14px', cursor: 'pointer' }}
+                                >
+                                  {qualification.name}
+                                </button>
+                              ))
+                            ) : (
+                              <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>No qualification found</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        Counselor Name <span className="text-danger">*</span>
+                      </label>
+                      <div className="position-relative" ref={counselorDropdownRef}>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Select / Search counselor..."
+                          value={selectSearch.counselor}
+                          onFocus={() => setIsCounselorDropdownOpen(true)}
+                          onClick={() => setIsCounselorDropdownOpen(true)}
+                          onChange={(e) => {
+                            updateSelectSearch('counselor', e.target.value);
+                            setCounselorId('');
+                            setIsCounselorDropdownOpen(true);
+                          }}
+                        />
+                        {isCounselorDropdownOpen && (
+                          <div className="shadow-sm" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000, backgroundColor: '#fff', border: '1px solid #e9ecef', borderRadius: '8px', marginTop: '6px', maxHeight: '220px', overflowY: 'auto' }}>
+                            {filteredSortedCounselors.length ? (
+                              filteredSortedCounselors.map((counselor) => (
+                                <button
+                                  key={counselor.value}
+                                  type="button"
+                                  onClick={() => {
+                                    setCounselorId(counselor.value);
+                                    updateSelectSearch('counselor', counselor.label || '');
+                                    setIsCounselorDropdownOpen(false);
+                                  }}
+                                  style={{ width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '10px 12px', fontSize: '14px', cursor: 'pointer' }}
+                                >
+                                  {counselor.label}
+                                </button>
+                              ))
+                            ) : (
+                              <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>No counselor found</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">Co-owner 1</label>
+                      <div className="position-relative" ref={coOwnerDropdownRef}>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Select / Search co-owner 1 (optional)..."
+                          value={selectSearch.coOwner}
+                          onFocus={() => setIsCoOwnerDropdownOpen(true)}
+                          onClick={() => setIsCoOwnerDropdownOpen(true)}
+                          onChange={(e) => {
+                            updateSelectSearch('coOwner', e.target.value);
+                            setLeadCoOwnerId('');
+                            setIsCoOwnerDropdownOpen(true);
+                          }}
+                        />
+                        {isCoOwnerDropdownOpen && (
+                          <div className="shadow-sm" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000, backgroundColor: '#fff', border: '1px solid #e9ecef', borderRadius: '8px', marginTop: '6px', maxHeight: '220px', overflowY: 'auto' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLeadCoOwnerId('');
+                                updateSelectSearch('coOwner', '');
+                                setIsCoOwnerDropdownOpen(false);
+                              }}
+                              style={{ width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '10px 12px', fontSize: '14px', cursor: 'pointer', color: '#666' }}
+                            >
+                              No co-owner
+                            </button>
+                            {filteredSortedCoOwners.length ? (
+                              filteredSortedCoOwners.map((counselor) => (
+                                <button
+                                  key={`co-${counselor.value}`}
+                                  type="button"
+                                  onClick={() => {
+                                    setLeadCoOwnerId(counselor.value);
+                                    updateSelectSearch('coOwner', counselor.label || '');
+                                    setIsCoOwnerDropdownOpen(false);
+                                  }}
+                                  style={{ width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '10px 12px', fontSize: '14px', cursor: 'pointer' }}
+                                >
+                                  {counselor.label}
+                                </button>
+                              ))
+                            ) : (
+                              <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>No user found</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">Co-owner 2</label>
+                      <div className="position-relative" ref={coOwner2DropdownRef}>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Select / Search co-owner 2 (optional)..."
+                          value={selectSearch.coOwner2}
+                          onFocus={() => setIsCoOwner2DropdownOpen(true)}
+                          onClick={() => setIsCoOwner2DropdownOpen(true)}
+                          onChange={(e) => {
+                            updateSelectSearch('coOwner2', e.target.value);
+                            setLeadCoOwner2Id('');
+                            setIsCoOwner2DropdownOpen(true);
+                          }}
+                        />
+                        {isCoOwner2DropdownOpen && (
+                          <div className="shadow-sm" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000, backgroundColor: '#fff', border: '1px solid #e9ecef', borderRadius: '8px', marginTop: '6px', maxHeight: '220px', overflowY: 'auto' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setLeadCoOwner2Id('');
+                                updateSelectSearch('coOwner2', '');
+                                setIsCoOwner2DropdownOpen(false);
+                              }}
+                              style={{ width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '10px 12px', fontSize: '14px', cursor: 'pointer', color: '#666' }}
+                            >
+                              No co-owner
+                            </button>
+                            {filteredSortedCoOwners2.length ? (
+                              filteredSortedCoOwners2.map((counselor) => (
+                                <button
+                                  key={`co2-${counselor.value}`}
+                                  type="button"
+                                  onClick={() => {
+                                    setLeadCoOwner2Id(counselor.value);
+                                    updateSelectSearch('coOwner2', counselor.label || '');
+                                    setIsCoOwner2DropdownOpen(false);
+                                  }}
+                                  style={{ width: '100%', textAlign: 'left', border: 'none', background: 'transparent', padding: '10px 12px', fontSize: '14px', cursor: 'pointer' }}
+                                >
+                                  {counselor.label}
+                                </button>
+                              ))
+                            ) : (
+                              <div style={{ padding: '10px 12px', fontSize: '13px', color: '#666' }}>No user found</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold">
+                        Source <span className="text-danger">*</span>
+                      </label>
+                      <select
+                        className="form-select"
+                        value={registeredBy}
+                        onChange={(e) => setRegisteredBy(e.target.value)}
+                      >
+                        <option value="">Select Third Party Source</option>
+                        {sources.map((source) => (
+                          <option key={source._id} value={source._id} className="text-capitalize">
+                            {source.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="d-flex justify-content-end gap-2 mt-4">
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary px-4"
+                      onClick={handleCloseLeadModal}
+                      disabled={isSubmitting}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn px-4 text-white"
+                      disabled={isSubmitting}
+                      style={{ backgroundColor: '#fb2d5e', border: 'none' }}
+                    >
+                      {isSubmitting ? 'Submitting...' : 'Add Lead'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBulkUploadModal && (
+        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
+          <div className="modal-dialog modal-lg modal-dialog-centered">
+            <div className="modal-content" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+              <div className="modal-header" style={{ background: 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)', color: 'white' }}>
+                <h5 className="modal-title d-flex align-items-center">
+                  <i className="fas fa-file-upload me-2"></i>
+                  Bulk Upload Leads
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={handleCloseBulkUploadModal}
+                ></button>
+              </div>
+
+              <div className="modal-body p-4">
+                <div className="alert alert-info mb-4">
+                  <h6 className="fw-bold mb-2">
+                    <i className="fas fa-info-circle me-2"></i>
+                    Instructions:
+                  </h6>
+                  <ul className="mb-0 small">
+                    <li>Step 1: Select Course, Training Center, Counselor, Source, and Highest Qualification below.</li>
+                    <li>Step 2: Upload an Excel file (.xlsx or .xls, max 10MB).</li>
+                    <li><strong>Required in Excel:</strong> Name, Mobile, WhatsApp, Gender.</li>
+                    <li>All imported leads use your selections above. You do not need those columns in Excel.</li>
+                    <li>Co-owner 1 and Co-owner 2 are optional; if selected, all imported leads are assigned accordingly.</li>
+                  </ul>
+                </div>
+
+                <div className="row g-3 mb-4">
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-book text-primary me-1"></i>
+                      Select Course <span className="text-danger">*</span>
+                    </label>
+                    <select
+                      className={`form-select ${bulkUploadFormErrors.courseId ? 'is-invalid' : ''}`}
+                      name="courseId"
+                      value={bulkUploadFormData.courseId}
+                      onChange={handleBulkUploadInputChange}
+                      disabled={bulkUploadLoading || loadingData}
+                    >
+                      <option value="">Select Course</option>
+                      {courses.map((course) => (
+                        <option key={course._id} value={course._id}>{course.name}</option>
+                      ))}
+                    </select>
+                    {bulkUploadFormErrors.courseId && (
+                      <div className="invalid-feedback d-block">{bulkUploadFormErrors.courseId}</div>
+                    )}
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-map-marker-alt text-primary me-1"></i>
+                      Select Training Center <span className="text-danger">*</span>
+                    </label>
+                    <select
+                      className={`form-select ${bulkUploadFormErrors.centerId ? 'is-invalid' : ''}`}
+                      name="centerId"
+                      value={bulkUploadFormData.centerId}
+                      onChange={handleBulkUploadInputChange}
+                      disabled={bulkUploadLoading || !bulkUploadFormData.courseId}
+                    >
+                      <option value="">
+                        {bulkUploadFormData.courseId ? 'Select Training Center' : 'Select course first'}
+                      </option>
+                      {bulkUploadCenters.map((center) => (
+                        <option key={center._id} value={center._id}>{center.name}</option>
+                      ))}
+                    </select>
+                    {bulkUploadFormErrors.centerId && (
+                      <div className="invalid-feedback d-block">{bulkUploadFormErrors.centerId}</div>
+                    )}
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-graduation-cap text-primary me-1"></i>
+                      Highest Qualification <span className="text-danger">*</span>
+                    </label>
+                    <select
+                      className={`form-select ${bulkUploadFormErrors.highestQualification ? 'is-invalid' : ''}`}
+                      name="highestQualification"
+                      value={bulkUploadFormData.highestQualification}
+                      onChange={handleBulkUploadInputChange}
+                      disabled={bulkUploadLoading || loadingData}
+                    >
+                      <option value="">Select Highest Qualification</option>
+                      {qualifications.map((qualification) => (
+                        <option key={qualification._id} value={qualification._id}>{qualification.name}</option>
+                      ))}
+                    </select>
+                    {bulkUploadFormErrors.highestQualification && (
+                      <div className="invalid-feedback d-block">{bulkUploadFormErrors.highestQualification}</div>
+                    )}
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-user-tie text-primary me-1"></i>
+                      Counselor Name <span className="text-danger">*</span>
+                    </label>
+                    <select
+                      className={`form-select ${bulkUploadFormErrors.counselorId ? 'is-invalid' : ''}`}
+                      name="counselorId"
+                      value={bulkUploadFormData.counselorId}
+                      onChange={handleBulkUploadInputChange}
+                      disabled={bulkUploadLoading}
+                    >
+                      <option value="">Select Counselor</option>
+                      {counselorOptions.map((counselor) => (
+                        <option key={counselor.value} value={counselor.value}>{counselor.label}</option>
+                      ))}
+                    </select>
+                    {bulkUploadFormErrors.counselorId && (
+                      <div className="invalid-feedback d-block">{bulkUploadFormErrors.counselorId}</div>
+                    )}
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-user-friends text-primary me-1"></i>
+                      Co-owner 1
+                    </label>
+                    <select
+                      className="form-select"
+                      name="leadCoOwnerId"
+                      value={bulkUploadFormData.leadCoOwnerId}
+                      onChange={handleBulkUploadInputChange}
+                      disabled={bulkUploadLoading}
+                    >
+                      <option value="">Select Co-owner 1</option>
+                      {counselorOptions.map((counselor) => (
+                        <option key={`bulk-co-${counselor.value}`} value={counselor.value}>{counselor.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-user-friends text-primary me-1"></i>
+                      Co-owner 2
+                    </label>
+                    <select
+                      className="form-select"
+                      name="leadCoOwner2Id"
+                      value={bulkUploadFormData.leadCoOwner2Id}
+                      onChange={handleBulkUploadInputChange}
+                      disabled={bulkUploadLoading}
+                    >
+                      <option value="">Select Co-owner 2</option>
+                      {counselorOptions.map((counselor) => (
+                        <option key={`bulk-co2-${counselor.value}`} value={counselor.value}>{counselor.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold">
+                      <i className="fas fa-tag text-primary me-1"></i>
+                      Source <span className="text-danger">*</span>
+                    </label>
+                    <select
+                      className={`form-select ${bulkUploadFormErrors.registeredBy ? 'is-invalid' : ''}`}
+                      name="registeredBy"
+                      value={bulkUploadFormData.registeredBy}
+                      onChange={handleBulkUploadInputChange}
+                      disabled={bulkUploadLoading}
+                    >
+                      <option value="">Select Third Party Source</option>
+                      {sources.map((source) => (
+                        <option key={source._id} value={source._id} className="text-capitalize">
+                          {source.name}
+                        </option>
+                      ))}
+                    </select>
+                    {bulkUploadFormErrors.registeredBy && (
+                      <div className="invalid-feedback d-block">{bulkUploadFormErrors.registeredBy}</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <label className="form-label fw-bold mb-3">
+                    <i className="fas fa-file-excel text-success me-2"></i>
+                    Select File <span className="text-danger">*</span>
+                  </label>
+                  {!isBulkUploadConfigComplete && (
+                    <div className="alert alert-warning py-2 small mb-2">
+                      Complete all required fields above before choosing a file.
+                    </div>
+                  )}
+                  <div className="input-group">
+                    <input
+                      type="file"
+                      id="bulkUploadFile"
+                      ref={bulkUploadFileInputRef}
+                      className="form-control"
+                      accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                      onChange={handleBulkFileChange}
+                      disabled={bulkUploadLoading || !isBulkUploadConfigComplete}
+                    />
+                    <button
+                      className="btn btn-outline-secondary"
+                      type="button"
+                      onClick={() => bulkUploadFileInputRef.current?.click()}
+                      disabled={bulkUploadLoading || !isBulkUploadConfigComplete}
+                    >
+                      <i className="fas fa-folder-open me-1"></i>
+                      Browse
+                    </button>
+                  </div>
+                  {bulkUploadFile && (
+                    <div className="mt-2">
+                      <small className="text-success">
+                        <i className="fas fa-check-circle me-1"></i>
+                        Selected: {bulkUploadFile.name} ({(bulkUploadFile.size / 1024).toFixed(2)} KB)
+                      </small>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mb-4">
+                  <button
+                    type="button"
+                    className="btn sampledownload btn-sm"
+                    onClick={downloadB2cLeadsSampleExcel}
+                  >
+                    <i className="fas fa-download me-1"></i>
+                    Download Sample
+                  </button>
+                </div>
+
+                {bulkUploadMessage && (
+                  <div className={`alert ${bulkUploadSuccess ? 'alert-success' : 'alert-danger'} mb-3`}>
+                    <i className={`fas ${bulkUploadSuccess ? 'fa-check-circle' : 'fa-exclamation-circle'} me-2`}></i>
+                    {bulkUploadMessage}
+                  </div>
+                )}
+
+                {bulkUploadErrors.length > 0 && (
+                  <div className="mb-3">
+                    <h6 className="fw-bold text-danger mb-2">
+                      <i className="fas fa-exclamation-triangle me-2"></i>
+                      Error Details:
+                    </h6>
+                    <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto', backgroundColor: '#f8f9fa' }}>
+                      <ul className="mb-0 small">
+                        {bulkUploadErrors.map((error, index) => (
+                          <li key={index} className="text-danger">{error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                <div className="d-flex justify-content-end gap-2 mt-4">
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary px-4"
+                    onClick={handleCloseBulkUploadModal}
+                    disabled={bulkUploadLoading}
+                  >
+                    <i className="fas fa-times me-1"></i>
+                    {bulkUploadSuccess ? 'Close' : 'Cancel'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn uploadLeads px-4 text-white"
+                    onClick={handleBulkUpload}
+                    disabled={!bulkUploadFile || bulkUploadLoading || !isBulkUploadConfigComplete}
+                    style={{ backgroundColor: '#fb2d5e', border: 'none' }}
+                  >
+                    {bulkUploadLoading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-upload me-1"></i>
+                        Upload Leads
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>
         {`
