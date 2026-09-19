@@ -146,7 +146,7 @@ const ViewCourses = () => {
   const handleArchivedChange = () => {
     const newArchived = !isArchived;
     setIsArchived(newArchived);
-    navigate(`/institute/viewcoursecopy?status=${!newArchived}`);
+    navigate(`/institute/viewcourse?status=${!newArchived}`);
   };
 
   // Handle toggle status - FIXED VERSION
@@ -293,12 +293,12 @@ const ViewCourses = () => {
       }
     });
 
-    navigate(`/institute/viewcoursecopy?${qs.stringify(queryParams)}`);
+    navigate(`/institute/viewcourse?${qs.stringify(queryParams)}`);
   };
 
   // Handle reset filters
   const handleResetFilters = () => {
-    navigate('/institute/viewcoursecopy');
+    navigate('/institute/viewcourse');
   };
 
   return (
@@ -568,7 +568,7 @@ const ViewCourses = () => {
                     {/* Action */}
                     <td style={{ ...tdStyle, textAlign: 'center', whiteSpace: 'nowrap' }}>
                       <Link
-                        to={`/institute/editcoursecopy/${course._id}`}
+                        to={`/institute/courses/edit/${course._id}`}
                         title="Edit"
                         style={{ ...actionIconBtnStyle, marginLeft: 0 }}
                         onMouseEnter={e => { e.currentTarget.style.background = '#FC2B5A'; e.currentTarget.style.color = 'white'; }}

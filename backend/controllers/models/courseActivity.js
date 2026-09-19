@@ -4,7 +4,7 @@ const { ObjectId } = Schema.Types;
 const courseActivitySchema = new Schema(
   {
     college: { type: ObjectId, ref: 'College', required: true, index: true },
-    course: { type: ObjectId, ref: 'coursescopy', required: true, index: true },
+    course: { type: ObjectId, ref: 'courses', required: true, index: true },
     name: { type: String, trim: true, required: true },
     color: { type: String, trim: true, default: '#2563eb' },
     createdBy: { type: ObjectId, ref: 'User', default: null },

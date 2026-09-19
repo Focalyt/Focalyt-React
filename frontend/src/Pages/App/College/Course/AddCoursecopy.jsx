@@ -1289,7 +1289,7 @@ const AddCourse = () => {
       });
       if (response.data.status) {
         alert("Course added successfully");
-        window.location.reload();
+        navigate('/institute/viewcourse');
       } else {
         alert(response.data.message || "Failed to add course");
       }

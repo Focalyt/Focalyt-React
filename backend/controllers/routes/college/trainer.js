@@ -32,7 +32,7 @@ const allowedDocumentExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', '
 
 const allowedExtensions = [...allowedVideoExtensions, ...allowedImageExtensions, ...allowedDocumentExtensions];
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable ,AssignmentQuestions, TrainingSession, SessionFeedback, SessionAttendance  } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable ,AssignmentQuestions, TrainingSession, SessionPlan, SessionFeedback, SessionAttendance  } = require("../../models");
 
 
 const destination = path.resolve(__dirname, '..', '..', '..', 'public', 'temp');
@@ -875,6 +875,27 @@ const uploadSessionFileToStorage = async (file, sessionId, docId) => {
 	return uploadResult.Key || key;
 };
 
+const findEvidenceDoc = (docs, docId) => {
+	if (!docs) return null;
+	const id = String(docId || '');
+	if (!id) return null;
+	try {
+		const bySubId = typeof docs.id === 'function' ? docs.id(id) : null;
+		if (bySubId) return bySubId;
+	} catch (_) { /* non-ObjectId doc keys fall through */ }
+	return [...docs].find((doc) => String(doc._id) === id || String(doc.id) === id) || null;
+};
+
+const mapEvidenceDocsForClient = (docs = []) => docs.map((doc) => {
+	const item = typeof doc.toObject === 'function' ? doc.toObject() : { ...doc };
+	return {
+		...item,
+		id: String(item._id || item.id || ''),
+		_id: String(item._id || item.id || ''),
+		fileUrl: item.fileUrl ? resolvePublicUrl(item.fileUrl) : '',
+	};
+});
+
 router.post('/uploadSessionDocument', isCollege, async (req, res) => {
 	try {
 		const college = req.college;
@@ -894,7 +915,13 @@ router.post('/uploadSessionDocument', isCollege, async (req, res) => {
 			return res.status(400).json({ status: false, message: 'File is required' });
 		}
 
-		const sessionDoc = await TrainingSession.findOne({
+		const sessionPlan = await SessionPlan.findOne({
+			_id: sessionId,
+			college: college._id,
+			isDeleted: false,
+		});
+
+		const sessionDoc = sessionPlan || await TrainingSession.findOne({
 			_id: sessionId,
 			college: college._id,
 		});
@@ -903,17 +930,17 @@ router.post('/uploadSessionDocument', isCollege, async (req, res) => {
 			return res.status(404).json({ status: false, message: 'Session not found' });
 		}
 
-		const evidenceDoc = sessionDoc.evidenceDocs.id(docId);
+		const evidenceDoc = findEvidenceDoc(sessionDoc.evidenceDocs, docId);
 		if (!evidenceDoc) {
 			return res.status(404).json({ status: false, message: 'Document slot not found in this session' });
 		}
 
 		const ext = getFileExtension(file.name);
-		const allowedForType = getAllowedExtensionsForDocType(evidenceDoc.type);
+		const allowedForType = getAllowedExtensionsForDocType(evidenceDoc.type || 'Document');
 		if (!allowedForType.includes(ext)) {
 			return res.status(400).json({
 				status: false,
-				message: `Invalid file for ${evidenceDoc.type}. Allowed: ${allowedForType.join(', ')}`,
+				message: `Invalid file for ${evidenceDoc.type || 'Document'}. Allowed: ${allowedForType.join(', ')}`,
 			});
 		}
 
@@ -923,9 +950,23 @@ router.post('/uploadSessionDocument', isCollege, async (req, res) => {
 		evidenceDoc.status = 'Uploaded';
 		evidenceDoc.fileName = file.name;
 		evidenceDoc.fileUrl = fileKey;
-		evidenceDoc.type = detectedType;
+		evidenceDoc.type = detectedType || evidenceDoc.type || 'Document';
+		evidenceDoc.uploadedBy = req.user?._id || null;
+		evidenceDoc.uploadedAt = new Date();
 
 		await sessionDoc.save();
+
+		if (sessionPlan) {
+			return res.status(200).json({
+				status: true,
+				message: 'Document uploaded successfully',
+				data: {
+					...sessionPlan.toObject(),
+					_id: sessionPlan._id,
+					evidenceDocs: mapEvidenceDocsForClient(sessionPlan.evidenceDocs),
+				},
+			});
+		}
 
 		const populatedSession = await TrainingSession.findById(sessionDoc._id)
 			.populate('trainer', 'name email mobile')
@@ -933,10 +974,7 @@ router.post('/uploadSessionDocument', isCollege, async (req, res) => {
 			.lean();
 
 		if (populatedSession?.evidenceDocs?.length) {
-			populatedSession.evidenceDocs = populatedSession.evidenceDocs.map((doc) => ({
-				...doc,
-				fileUrl: doc.fileUrl ? resolvePublicUrl(doc.fileUrl) : '',
-			}));
+			populatedSession.evidenceDocs = mapEvidenceDocsForClient(populatedSession.evidenceDocs);
 		}
 
 		return res.status(200).json({

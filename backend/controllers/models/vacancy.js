@@ -135,8 +135,6 @@ vacancySchema.methods.assignHr = async function () {
     const User = mongoose.model("User");
 
     const jobCategoryId = this._jobCategory;
-    const vacancyId = this._id;
-    const jobTitle = this.title;
 
     const categoryMatch = [{ "jobCategory.type": "any" }];
     if (jobCategoryId) {

@@ -8,7 +8,7 @@ const path = require("path");
 const { auth1, isAdmin, isCollege } = require("../../../helpers");
 const { resolveB2cProjectIds } = require("../../../helpers/b2cAccess");
 const moment = require("moment");
-const { Courses, CoursesCopy, College, Country, User, Qualification, CourseSectors, AppliedCourses, Center, Source } = require("../../models");
+const { Courses, College, Country, User, Qualification, CourseSectors, AppliedCourses, Center, Source } = require("../../models");
 const Candidate = require("../../models/candidateProfile");
 const readXlsxFile = require("read-excel-file/node");
 const CandidateVisitCalender = require("../../models/candidateVisitCalender");
@@ -435,7 +435,10 @@ router
 
 			// Parse JSON fields
 			body.docsRequired = JSON.parse(body.docsRequired || '[]');
+			body.classResourcesRequired = JSON.parse(body.classResourcesRequired || '[]');
+			body.labResourcesRequired = JSON.parse(body.labResourcesRequired || '[]');
 			body.questionAnswers = JSON.parse(body.questionAnswers || '[]');
+			body.courseStructure = normalizeCourseStructure(body.courseStructure);
 			body.createdBy = JSON.parse(body.createdBy || '{}');
 
 			// Upload files
@@ -575,7 +578,7 @@ router
 				body.center = JSON.parse(body.trainingCenter);
 			}
 
-			// Parse JSON fields for CoursesCopy
+			// Parse JSON fields
 			body.docsRequired = JSON.parse(body.docsRequired || '[]');
 			body.classResourcesRequired = JSON.parse(body.classResourcesRequired || '[]');
 			body.labResourcesRequired = JSON.parse(body.labResourcesRequired || '[]');
@@ -678,8 +681,7 @@ router
 			applyCourseFeeTypeRules(body);
 			normalizeCourseMedia(body);
 
-			// Save ONLY into coursescopy collection
-			const newCourse = await CoursesCopy.create(body);
+			const newCourse = await Courses.create(body);
 			res.json({ status: true, message: "Record added!", data: newCourse });
 
 		} catch (err) {
@@ -737,7 +739,7 @@ router
 			}
 			fields["status"] = status;
 
-			const courses = await CoursesCopy.find({
+			const courses = await Courses.find({
 				...fields,
 				college: college._id
 			}).populate("sectors");
@@ -759,7 +761,7 @@ router
 	router.put('/update_coursecopy_status/:courseId', async (req, res) => {
 		try {
 			const { courseId } = req.params;
-			const course = await CoursesCopy.findOne({ _id: courseId });
+			const course = await Courses.findOne({ _id: courseId });
 			if (!course) {
 				return res.status(404).json({ status: false, message: "Course not found" });
 			}
@@ -775,7 +777,7 @@ router
 	router.post('/:courseId/duplicatecoursecopy', async (req, res) => {
 		try {
 			const { courseId } = req.params;
-			const course = await CoursesCopy.findById(courseId).lean();
+			const course = await Courses.findById(courseId).lean();
 			if (!course) {
 				return res.status(404).json({ success: false, message: 'Course not found' });
 			}
@@ -794,7 +796,7 @@ router
 				}
 			}
 
-			const newCourse = await CoursesCopy.create(duplicateData);
+			const newCourse = await Courses.create(duplicateData);
 			return res.status(201).json({ success: true, message: 'Course duplicated successfully', data: newCourse });
 		} catch (err) {
 			console.error('Failed to duplicate coursecopy:', err);
@@ -807,7 +809,7 @@ router
 	.get(async (req, res) => {
 		try {
 			const { id } = req.params;
-			let course = await CoursesCopy.findById(id);
+			let course = await Courses.findById(id);
 			if (!course) throw req.ykError("course not found!");
 			const sectors = await CourseSectors.find({
 				status: true, _id: {
@@ -819,7 +821,7 @@ router
 					$nin: course.center
 				}
 			})
-			course = await CoursesCopy.findById(id).populate('sectors').populate('center');
+			course = await Courses.findById(id).populate('sectors').populate('center');
 			course.docsRequired = (course.docsRequired || []).filter(doc => doc.status === true);
 			course.classResourcesRequired = (course.classResourcesRequired || []).filter(doc => doc.status !== false);
 			course.labResourcesRequired = (course.labResourcesRequired || []).filter(doc => doc.status !== false);
@@ -861,7 +863,7 @@ router
 
 			const bucketName = process.env.AWS_BUCKET_NAME;
 
-			const existingCourse = await CoursesCopy.findById(courseId);
+			const existingCourse = await Courses.findById(courseId);
 			if (!existingCourse) {
 				return res.status(404).json({ status: false, message: "Course not found" });
 			}
@@ -995,8 +997,7 @@ router
 
 			applyCourseFeeTypeRules(body);
 
-			// Update ONLY in coursescopy collection
-			const updatedCourse = await CoursesCopy.findByIdAndUpdate(courseId, body, { new: true, runValidators: true });
+			const updatedCourse = await Courses.findByIdAndUpdate(courseId, body, { new: true, runValidators: true });
 
 			res.json({ status: true, message: "Record updated!", data: updatedCourse });
 		} catch (err) {

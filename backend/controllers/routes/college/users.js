@@ -1240,18 +1240,21 @@ router.get('/training-role-users', isCollege, async (req, res) => {
     const user = req.user;
     const roleType = String(req.query.roleType || '').toLowerCase();
 
-    const permissionKey = roleType === 'senior'
-      ? 'can_be_senior_trainer'
-      : roleType === 'trainer'
-        ? 'can_be_trainer'
-        : roleType === 'academic' || roleType === 'coordinator'
-          ? 'can_be_academic_coordinator'
-          : null;
+    // Session assign dropdown needs Trainer OR Senior Trainer ticks.
+    // Do not auto-include Admin users — only the explicit role checkboxes count.
+    const permissionKeysByRole = {
+      senior: ['can_be_senior_trainer'],
+      trainer: ['can_be_trainer', 'can_be_senior_trainer'],
+      session: ['can_be_trainer', 'can_be_senior_trainer'],
+      academic: ['can_be_academic_coordinator'],
+      coordinator: ['can_be_academic_coordinator'],
+    };
 
-    if (!permissionKey) {
+    const permissionKeys = permissionKeysByRole[roleType];
+    if (!permissionKeys) {
       return res.status(400).json({
         success: false,
-        message: 'roleType must be "senior", "trainer", or "academic"',
+        message: 'roleType must be "senior", "trainer", "session", or "academic"',
       });
     }
 
@@ -1264,30 +1267,28 @@ router.get('/training-role-users', isCollege, async (req, res) => {
     }
 
     const concernPersonIds = college._concernPerson?.map((cp) => cp._id) || [];
+    const roleFilter = permissionKeys.length === 1
+      ? { [`permissions.custom_permissions.${permissionKeys[0]}`]: true }
+      : { $or: permissionKeys.map((key) => ({ [`permissions.custom_permissions.${key}`]: true })) };
+
     const concernPersons = await User.find({
       _id: { $in: concernPersonIds },
       role: 2,
       status: true,
       isDeleted: false,
+      ...roleFilter,
     })
-      .select('_id name email mobile designation permissions status')
+      .select('_id name email mobile designation')
       .sort({ name: 1 })
       .lean();
 
-    // Users with the role permission OR Admin access
-    const filtered = concernPersons
-      .filter((u) => {
-        const isAdmin = u.permissions?.permission_type === 'Admin';
-        const hasRolePermission = u.permissions?.custom_permissions?.[permissionKey] === true;
-        return isAdmin || hasRolePermission;
-      })
-      .map((u) => ({
-        _id: u._id,
-        name: u.name,
-        email: u.email,
-        mobile: u.mobile,
-        designation: u.designation || '',
-      }));
+    const filtered = concernPersons.map((u) => ({
+      _id: u._id,
+      name: u.name,
+      email: u.email,
+      mobile: u.mobile,
+      designation: u.designation || '',
+    }));
 
     return res.status(200).json({
       success: true,

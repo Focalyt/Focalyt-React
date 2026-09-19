@@ -11,6 +11,7 @@ const materialItemSchema = new Schema(
     requirementLabel: { type: String, trim: true, default: '' },
     status: { type: String, trim: true, default: '' },
     fileUrl: { type: String, default: '' },
+    fileName: { type: String, default: '' },
     uploadedBy: { type: ObjectId, ref: 'User', default: null },
     uploadedAt: { type: Date, default: null },
   },
@@ -32,9 +33,37 @@ const totQuestionSchema = new Schema(
     question: { type: String, trim: true, default: '' },
     options: { type: [String], default: [] },
     correctIndex: { type: Number, default: 0 },
-    marks: { type: Number, default: 0 },
+    marks: { type: Number, default: 1 },
   },
   { _id: true }
+);
+
+const totAssignmentAnswerSchema = new Schema(
+  {
+    questionId: { type: String, default: '' },
+    selectedIndex: { type: Number, default: null },
+    isCorrect: { type: Boolean, default: false },
+    marksObtained: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
+const totAssignmentSubmissionSchema = new Schema(
+  {
+    trainer: { type: ObjectId, ref: 'User', default: null },
+    trainerName: { type: String, default: '' },
+    answers: { type: [totAssignmentAnswerSchema], default: [] },
+    score: { type: Number, default: 0 },
+    totalMarks: { type: Number, default: 0 },
+    percentage: { type: Number, default: 0 },
+    pass: { type: Boolean, default: false },
+    correctCount: { type: Number, default: 0 },
+    wrongCount: { type: Number, default: 0 },
+    attemptedCount: { type: Number, default: 0 },
+    unattemptedCount: { type: Number, default: 0 },
+    submittedAt: { type: Date, default: null },
+  },
+  { _id: false }
 );
 
 const subSessionItemSchema = new Schema(
@@ -51,7 +80,7 @@ const sessionPlanSchema = new Schema(
     vertical: { type: ObjectId, ref: 'Vertical', default: null, index: true },
     project: { type: ObjectId, ref: 'Project', default: null, index: true },
     center: { type: ObjectId, ref: 'Center', default: null, index: true },
-    course: { type: ObjectId, ref: 'coursescopy', default: null, index: true },
+    course: { type: ObjectId, ref: 'courses', default: null, index: true },
     batch: { type: ObjectId, ref: 'Batch', default: null, index: true },
 
     verticalName: { type: String, default: '' },
@@ -120,6 +149,8 @@ const sessionPlanSchema = new Schema(
     totStatus: { type: String, trim: true, default: '' },
     totQuestionBank: { type: [totQuestionSchema], default: [] },
     totQuestionBankLastUpdated: { type: Date, default: null },
+    totPassPercentage: { type: Number, default: 40 },
+    totAssignmentSubmission: { type: totAssignmentSubmissionSchema, default: undefined },
 
     workflowStatus: { type: String, trim: true, default: 'Scheduled', index: true },
 

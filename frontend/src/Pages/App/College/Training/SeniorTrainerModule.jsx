@@ -4,6 +4,7 @@ import DatePicker from 'react-date-picker';
 import Calendar from 'react-calendar';
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
+import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 const PINK = '#fa5579';
 const BLUE = '#2563eb';
@@ -118,6 +119,239 @@ const buildActivityHeadStyle = (activities = []) => {
 const countMaterials = (items = []) => {
   const mandatory = (items || []).filter((item) => item.requirement !== 'non_mandatory').length;
   return { total: (items || []).length, mandatory, optional: (items || []).length - mandatory };
+};
+
+const DOC_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
+const getDocFileUrl = (fileUrl) => resolveMediaUrl(DOC_BUCKET_URL, fileUrl);
+
+const formatDocDate = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const formatDocTime = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+};
+
+const getTotQuestionId = (question, index) => String(question?._id || question?.id || `tot-q-${index}`);
+const getTotQuestionMarks = (question) => {
+  const marks = Number(question?.marks);
+  return Number.isFinite(marks) && marks > 0 ? marks : 1;
+};
+const TOT_PASS_PERCENT_DEFAULT = 40;
+const getTotPassPercentage = (session) => {
+  const n = Number(session?.totPassPercentage);
+  return Number.isFinite(n) && n > 0 && n <= 100 ? n : TOT_PASS_PERCENT_DEFAULT;
+};
+
+const isUploadedMaterial = (item = {}) => (
+  Boolean(item.fileUrl || item.fileName)
+  || String(item.status || '').toLowerCase() === 'uploaded'
+);
+
+const collectTrainerSubmittedDocs = (session = {}) => {
+  const groups = [
+    { label: 'TOT completion proof', items: session.totCompletionProofs },
+    { label: 'TOT training proof', items: session.totTrainingProofs },
+    { label: 'Session document', items: session.evidenceDocs },
+  ];
+  return groups.flatMap(({ label, items }) => (
+    (items || []).map((item, index) => ({
+      id: String(item._id || item.id || `${label}-${index}`),
+      name: item.name || item.fileName || 'Untitled document',
+      type: item.type || 'Document',
+      fileUrl: item.fileUrl || '',
+      fileName: item.fileName || '',
+      group: label,
+      uploaded: isUploadedMaterial(item),
+      status: item.status || (isUploadedMaterial(item) ? 'Pending' : 'Not Uploaded'),
+      uploadedAt: item.uploadedAt || item.updatedAt || item.createdAt || item.uploadDate || null,
+    }))
+  ));
+};
+
+const getTrainerDocFileType = (fileUrl = '', docType = '') => {
+  const url = String(fileUrl).split('?')[0].toLowerCase();
+  const type = String(docType || '').toLowerCase();
+  if (/\.(jpe?g|png|gif|webp|bmp|svg)$/.test(url) || type === 'image') return 'image';
+  if (url.endsWith('.pdf') || type.includes('pdf')) return 'pdf';
+  if (/\.(mp4|mov|avi|mkv|webm)$/.test(url) || type === 'video') return 'video';
+  return 'file';
+};
+
+const normalizeDocReviewStatus = (status, uploaded) => {
+  const value = String(status || '').toLowerCase();
+  if (value === 'verified' || value === 'accepted' || value === 'approved') return 'Verified';
+  if (value === 'rejected') return 'Rejected';
+  if (uploaded || value === 'pending' || value === 'uploaded') return 'Pending';
+  return 'Not Uploaded';
+};
+
+const TrainerDocumentReviewModal = ({ doc, status, onClose, onAccept, onReject }) => {
+  const [showRejectForm, setShowRejectForm] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const fileUrl = doc?.fileUrl ? getDocFileUrl(doc.fileUrl) : '';
+  const fileType = getTrainerDocFileType(fileUrl || doc?.fileName, doc?.type);
+  const canReview = Boolean(doc?.uploaded) && status === 'Pending';
+
+  if (!doc) return null;
+
+  const renderPreview = () => {
+    if (!fileUrl) {
+      return (
+        <div className="st-reg-modal__empty">
+          <span>Not found</span>
+        </div>
+      );
+    }
+    if (fileType === 'image') {
+      return <img src={fileUrl} alt={doc.name} />;
+    }
+    if (fileType === 'pdf') {
+      return (
+        <iframe
+          src={`${fileUrl}#navpanes=0&toolbar=0`}
+          title={doc.name}
+        />
+      );
+    }
+    if (fileType === 'video') {
+      return <video src={fileUrl} controls />;
+    }
+    return (
+      <div className="st-reg-modal__empty">
+        <p>Click download to view this file</p>
+        <a href={fileUrl} target="_blank" rel="noopener noreferrer">Download & View</a>
+      </div>
+    );
+  };
+
+  return (
+    <div
+      className="st-reg-modal-overlay"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="st-reg-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="st-reg-modal__head">
+          <h3>{doc.name} Verification</h3>
+          <button type="button" className="st-reg-modal__close" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+
+        <div className="st-reg-modal__body">
+          <div className="st-reg-modal__preview">
+            <div className="st-reg-modal__preview-box">
+              {renderPreview()}
+            </div>
+          </div>
+
+          <div className="st-reg-modal__side">
+            <div className="st-reg-info-card">
+              <h4>Document Information</h4>
+              <div className="st-reg-info-row">
+                <strong>Document Name:</strong>
+                <span>{doc.name}</span>
+              </div>
+              <div className="st-reg-info-row">
+                <strong>Upload Date:</strong>
+                <span>{formatDocDate(doc.uploadedAt) || 'N/A'}</span>
+              </div>
+              <div className="st-reg-info-row">
+                <strong>Status:</strong>
+                <span>{status}</span>
+              </div>
+            </div>
+
+            {canReview && (
+              !showRejectForm ? (
+                <div className="st-reg-modal__actions">
+                  <button type="button" className="st-reg-btn st-reg-btn--approve" onClick={() => onAccept(doc)}>
+                    <i className="fas fa-check" /> Approve Document
+                  </button>
+                  <button type="button" className="st-reg-btn st-reg-btn--reject" onClick={() => setShowRejectForm(true)}>
+                    <i className="fas fa-times" /> Reject Document
+                  </button>
+                </div>
+              ) : (
+                <div className="st-reg-reject">
+                  <textarea
+                    rows={4}
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    placeholder="Please provide a detailed reason for rejection..."
+                  />
+                  <div className="st-reg-reject__btns">
+                    <button
+                      type="button"
+                      className="st-reg-btn st-reg-btn--reject"
+                      disabled={!rejectionReason.trim()}
+                      onClick={() => onReject(doc, rejectionReason.trim())}
+                    >
+                      Confirm Rejection
+                    </button>
+                    <button
+                      type="button"
+                      className="st-reg-btn st-reg-btn--ghost"
+                      onClick={() => { setShowRejectForm(false); setRejectionReason(''); }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const getTrainerMcqReview = (session = {}) => {
+  const questions = Array.isArray(session.totQuestionBank) ? session.totQuestionBank : [];
+  const submission = session.totAssignmentSubmission || null;
+  const answersById = new Map(
+    (submission?.answers || []).map((answer) => [String(answer.questionId), answer])
+  );
+  const reviewed = questions.map((question, index) => {
+    const id = getTotQuestionId(question, index);
+    const answer = answersById.get(id);
+    const selectedIndex = answer?.selectedIndex;
+    const hasAnswer = selectedIndex !== undefined && selectedIndex !== null && selectedIndex !== '';
+    return {
+      id,
+      question: question.question || 'Untitled question',
+      options: Array.isArray(question.options) ? question.options : [],
+      correctIndex: Number(question.correctIndex) || 0,
+      marks: getTotQuestionMarks(question),
+      selectedIndex: hasAnswer ? Number(selectedIndex) : null,
+      isCorrect: hasAnswer ? Number(selectedIndex) === Number(question.correctIndex) : false,
+    };
+  });
+  const totalMarks = Number(submission?.totalMarks) || reviewed.reduce((sum, item) => sum + item.marks, 0);
+  const score = Number(submission?.score);
+  const computedScore = reviewed.filter((item) => item.isCorrect).reduce((sum, item) => sum + item.marks, 0);
+  const finalScore = Number.isFinite(score) ? score : computedScore;
+  const percentage = Number(submission?.percentage);
+  const passPercent = getTotPassPercentage(session);
+  const computedPercentage = Number.isFinite(percentage)
+    ? percentage
+    : (totalMarks > 0 ? Math.round((finalScore / totalMarks) * 10000) / 100 : 0);
+  return {
+    questions: reviewed,
+    submitted: Boolean(submission?.submittedAt) || (submission?.answers || []).length > 0,
+    score: finalScore,
+    totalMarks,
+    percentage: computedPercentage,
+    passPercent,
+    pass: submission?.pass ?? (computedPercentage >= passPercent),
+    trainerName: submission?.trainerName || session.fieldTrainerName || session.totTrainerName || '',
+    submittedAt: submission?.submittedAt || null,
+  };
 };
 
 const loadCoordinatorSessions = (batchId) => {
@@ -976,96 +1210,325 @@ const SessionAssignModal = ({
 };
 
 const SeniorSessionCard = ({ session }) => {
-  const tone = STATUS_TONE[session.workflowStatus] || 'blue';
-  const activities = getSessionActivities(session);
-  const headStyle = buildActivityHeadStyle(activities);
-  const primaryColor = activities[0]?.color || BLUE;
+  const [collapsed, setCollapsed] = useState(false);
+  const [activeTab, setActiveTab] = useState('details');
+  const [selectedDoc, setSelectedDoc] = useState(null);
+  const [docStatuses, setDocStatuses] = useState({});
   const totSession = isTotSession(session);
-  const showTotDetails = session.includeTot === true || session.sessionType === SESSION_TYPE.TOT;
-  const evidenceCounts = countMaterials(session.evidenceDocs);
-  const learningCounts = countMaterials(session.learningMaterials);
-  const totProofCounts = countMaterials(session.totCompletionProofs);
-  const totMaterialCounts = countMaterials(session.totMaterials);
+  const trainerDocs = collectTrainerSubmittedDocs(session);
+  const evidenceDocs = session.evidenceDocs || [];
+  const displayDocs = trainerDocs.length
+    ? trainerDocs
+    : evidenceDocs.map((doc, index) => ({
+      id: String(doc._id || doc.id || index),
+      name: doc.name || 'Untitled document',
+      type: doc.type || 'Document',
+      fileUrl: doc.fileUrl || '',
+      fileName: doc.fileName || '',
+      group: 'Session document',
+      uploaded: Boolean(doc.fileUrl) || String(doc.status || '').toLowerCase() === 'uploaded',
+      status: doc.status || (doc.fileUrl ? 'Pending' : 'Not Uploaded'),
+      uploadedAt: doc.uploadedAt || doc.updatedAt || doc.createdAt || doc.uploadDate || null,
+    }));
+  const getDocStatus = (doc) => docStatuses[doc.id] || normalizeDocReviewStatus(doc.status, doc.uploaded);
+  const uploadedTrainerDocs = displayDocs.filter((doc) => getDocStatus(doc) !== 'Not Uploaded');
+  const mcqReview = getTrainerMcqReview(session);
+  const timeRange = `${session.startTime || '10:00'} - ${session.endTime || '12:00'}`;
+  const detailItems = [
+    ['fa-sitemap', 'Department', session.departmentName || session.verticalName || '-', 'blue'],
+    ['fa-project-diagram', 'Project', session.projectName || '-', 'blue'],
+    ['fa-building', 'Center', session.centerName || '-', 'blue'],
+    ['fa-book-open', 'Topic covered', session.topicCovered || session.title || '-', 'blue'],
+    ['fa-chalkboard', 'Training method', session.trainingMethod || 'Interactive Learning', 'blue'],
+    ['fa-calendar-alt', 'Session date', session.date || formatSessionDate(session.sessionDate) || '-', 'blue'],
+    ['fa-clock', 'Time', timeRange, 'blue'],
+    ['fa-graduation-cap', 'Course / trade', session.courseTrade || session.courseName || '-', 'pink'],
+    ['fa-hashtag', 'Batch code', session.batchCode || '-', 'pink'],
+    ['fa-user', 'Trainer', session.fieldTrainerName || session.trainerName || '-', 'pink'],
+  ];
+  const statItems = [
+    { icon: 'fa-users', val: String(session.studentCount ?? session.totalCandidates ?? 0), lbl: 'Total Candidates', cls: 'blue' },
+    { icon: 'fa-check-circle', val: String(session.presentCandidates ?? 0), lbl: 'Present', cls: 'green' },
+    { icon: 'fa-times-circle', val: String(session.absentCandidates ?? 0), lbl: 'Absent', cls: 'red' },
+    { icon: 'fa-percentage', val: session.attendance || `${session.attendancePercent ?? 0}%`, lbl: 'Attendance', cls: 'amber' },
+  ];
 
   return (
-    <article
-      className={`st-session-card${activities.length ? '' : ' st-session-card--no-activity'}`}
-      style={activities.length ? { borderLeftColor: primaryColor } : undefined}
-    >
-      <div className="st-session-card__label">
-        <i className="fas fa-eye" /> Session details
-      </div>
-      <div
-        className={`st-session-card__head${activities.length ? '' : ' st-session-card__head--neutral'}`}
-        style={headStyle}
-      >
-        <div>
-          <h4>{session.title}</h4>
-          <p>{session.topicCovered || 'No topic added'}</p>
-          <div className="st-session-card__badges">
-            {activities.map((activity) => (
-              <span key={activity.id} className="st-activity-badge" style={{ background: activity.color || BLUE }}>
-                {activity.name}
-              </span>
-            ))}
-            <span className={`st-type-badge st-type-badge--${totSession && session.sessionType === SESSION_TYPE.TOT && session.includeTot !== true ? 'tot' : 'student'}`}>
-              {session.sessionType === SESSION_TYPE.TOT && session.includeTot !== true ? 'TOT Session' : 'Student Session'}
-            </span>
-            {session.includeTot === true && (
-              <span className="st-type-badge st-type-badge--tot">TOT Linked</span>
+    <article className="sc-wrap">
+      <div className="sc-head">
+        <div className="sc-head-left">
+          <div className="sc-avatar">
+            <i className="fas fa-user" />
+          </div>
+          <div className="sc-head-text">
+            <div className="sc-trainer-name">{session.title}</div>
+            <span className="sc-session-badge sc-session-badge--plan">Academic Coordinator plan</span>
+            {totSession && session.includeTot === true && (
+              <span className="sc-session-badge sc-session-badge--plan">TOT Linked</span>
             )}
           </div>
         </div>
-        <span className={`st-status-pill st-status-pill--${tone}`}>
-          {session.workflowStatus}
-        </span>
-      </div>
 
-      <div className="st-session-card__grid">
-        <div><em>Date</em><strong>{session.date || formatSessionDate(session.sessionDate)}</strong></div>
-        {/* <div><em>Time</em><strong>{session.startTime || '—'} – {session.endTime || '—'}</strong></div> */}
-        <div><em>Method</em><strong>{session.trainingMethod || '—'}</strong></div>
-        <div><em>Senior Trainer</em><strong>{session.seniorTrainerName || 'Not assigned'}</strong></div>
-        <div><em>Field Trainer</em><strong>{session.fieldTrainerName || '—'}</strong></div>
-        {showTotDetails && (
-          <div><em>TOT Trainer</em><strong>{session.totTrainerName || '—'}</strong></div>
-        )}
-        {showTotDetails && (
-          <div><em>TOT Topic</em><strong>{getTotDisplayTopic(session) || '—'}</strong></div>
-        )}
-        {showTotDetails && (
-          <div>
-            <em>TOT Status</em>
-            <strong className={session.totStatus === 'completed' ? 'st-text--green' : 'st-text--amber'}>
-              {session.totStatus === 'completed' ? 'TOT Completed' : 'TOT Pending'}
-            </strong>
-          </div>
-        )}
-        <div><em>Batch</em><strong>{session.batchCode || '—'}</strong></div>
-        <div><em>Course</em><strong>{session.courseTrade || '—'}</strong></div>
-        {showTotDetails ? (
-          <>
-            <div><em>Documents</em><strong>{evidenceCounts.total || '—'}</strong></div>
-            <div><em>Learning material</em><strong>{learningCounts.total || '—'}</strong></div>
-            <div><em>TOT proofs</em><strong>{totProofCounts.total} defined</strong></div>
-            <div><em>TOT material</em><strong>{totMaterialCounts.total} item(s)</strong></div>
-          </>
-        ) : (
-          <>
-            <div><em>Documents</em><strong>{evidenceCounts.total || '—'}</strong></div>
-            <div><em>Learning material</em><strong>{learningCounts.total || '—'}</strong></div>
-          </>
-        )}
-      </div>
-
-      {session.notes && (
-        <div className="st-session-card__notes">
-          <i className="far fa-sticky-note" />
-          <p>{session.notes}</p>
+        <div className="sc-stats">
+          {statItems.map(({ icon, val, lbl, cls }) => (
+            <div key={lbl} className="sc-stat">
+              <div className={`sc-stat__icon sc-stat__icon--${cls}`}>
+                <i className={`fas ${icon}`} />
+              </div>
+              <div className="sc-stat__val">{val}</div>
+              <div className="sc-stat__lbl">{lbl}</div>
+            </div>
+          ))}
         </div>
-      )}
 
-      
+        <button
+          type="button"
+          className="sc-toggle-btn"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-label={collapsed ? 'Expand card' : 'Collapse card'}
+        >
+          <i className={`fas fa-chevron-${collapsed ? 'down' : 'up'}`} />
+        </button>
+      </div>
+
+      {!collapsed && (
+        <>
+          <nav className="sc-tabs" aria-label="Session sections">
+            <button
+              type="button"
+              className={`sc-tab${activeTab === 'details' ? ' sc-tab--active' : ''}`}
+              onClick={() => setActiveTab('details')}
+            >
+              <i className="far fa-list-alt" /> Session Details
+            </button>
+            <button
+              type="button"
+              className={`sc-tab${activeTab === 'evidence' ? ' sc-tab--active' : ''}`}
+              onClick={() => setActiveTab('evidence')}
+            >
+              <i className="far fa-image" /> Documents
+              {displayDocs.length > 0 && <span className="sc-tab-count">{uploadedTrainerDocs.length}/{displayDocs.length}</span>}
+            </button>
+            <button
+              type="button"
+              className={`sc-tab${activeTab === 'tot' ? ' sc-tab--active' : ''}`}
+              onClick={() => setActiveTab('tot')}
+            >
+              <i className="fas fa-question-circle" /> TOT MCQ
+              {mcqReview.questions.length > 0 && <span className="sc-tab-count">{mcqReview.questions.length}</span>}
+            </button>
+          </nav>
+
+          {activeTab === 'details' && (
+            <div className="sc-body">
+              <div className="sc-detail-grid">
+                {detailItems.map(([icon, label, value, tone]) => (
+                  <div key={label} className="sc-detail-item">
+                    <small>{label}</small>
+                    <strong>
+                      <span className={`sc-detail-icon sc-detail-icon--${tone}`}>
+                        <i className={`fas ${icon}`} />
+                      </span>
+                      <span className="sc-detail-value">{value}</span>
+                    </strong>
+                  </div>
+                ))}
+                <div className="sc-detail-item">
+                  <small>Student Feedback</small>
+                  <strong>
+                    <span className="sc-detail-icon sc-detail-icon--blue">
+                      <i className="far fa-star" />
+                    </span>
+                    <span className="sc-detail-value">No reviews yet</span>
+                  </strong>
+                </div>
+              </div>
+
+              <div className="sc-notes">
+                <span className="sc-detail-icon sc-detail-icon--blue">
+                  <i className="far fa-edit" />
+                </span>
+                <div>
+                  <small>Additional notes</small>
+                  <p>{session.notes || 'No notes added.'}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'evidence' && (
+            <div className="sc-body">
+              {displayDocs.length === 0 ? (
+                <div className="sc-evidence-empty">
+                  <i className="far fa-folder-open" />
+                  <p>No documents submitted by the trainer yet.</p>
+                </div>
+              ) : (
+                <div className="st-reg-docs-grid">
+                  {displayDocs.map((doc) => {
+                    const status = getDocStatus(doc);
+                    const fileUrl = doc.fileUrl ? getDocFileUrl(doc.fileUrl) : '';
+                    const fileType = getTrainerDocFileType(fileUrl || doc.fileName, doc.type);
+                    const hasFile = Boolean(fileUrl) && status !== 'Not Uploaded';
+                    const uploadDate = formatDocDate(doc.uploadedAt);
+                    const uploadTime = formatDocTime(doc.uploadedAt);
+                    return (
+                      <div key={doc.id} className="st-reg-doc-card">
+                        <div className="st-reg-doc-card__preview">
+                          {hasFile ? (
+                            fileType === 'image' ? (
+                              <img src={fileUrl} alt={doc.name} className="st-reg-doc-card__image" />
+                            ) : fileType === 'pdf' ? (
+                              <div className="st-reg-doc-card__icon">
+                                <i className="fa-solid fa-file" style={{ fontSize: 100, color: '#dc3545' }} />
+                                <p>PDF Document</p>
+                              </div>
+                            ) : (
+                              <div className="st-reg-doc-card__icon">
+                                <i className={`fas ${fileType === 'video' ? 'fa-video' : 'fa-file'}`} />
+                                <p>{fileType === 'video' ? 'Video' : 'Document'}</p>
+                              </div>
+                            )
+                          ) : (
+                            <div className="st-reg-doc-card__empty">
+                              <i className="fas fa-file-upload" />
+                              <p>No Document</p>
+                            </div>
+                          )}
+                          {hasFile && (
+                            <div className="st-reg-doc-card__overlay">
+                              <button type="button" className="st-reg-preview-btn" onClick={() => setSelectedDoc(doc)}>
+                                <i className="fas fa-search-plus" />
+                                {status === 'Pending' ? 'Review' : 'Preview'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <div className="st-reg-doc-card__info">
+                          <div className="st-reg-doc-card__header">
+                            <h4>{doc.name}</h4>
+                            {hasFile ? (
+                              <button
+                                type="button"
+                                className="st-reg-pill st-reg-pill--verify"
+                                onClick={() => setSelectedDoc(doc)}
+                              >
+                                <i className="fas fa-check" />
+                                {status === 'Pending' ? 'VERIFY' : 'PREVIEW'}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="st-reg-pill st-reg-pill--upload"
+                                onClick={() => setSelectedDoc(doc)}
+                              >
+                                <i className="fas fa-cloud-upload-alt" />
+                                UPLOAD
+                              </button>
+                            )}
+                          </div>
+                          <div className="st-reg-doc-card__meta">
+                            <span>
+                              <i className="fas fa-calendar-alt" />
+                              {uploadDate || 'Not uploaded'}
+                            </span>
+                            {uploadTime && (
+                              <span>
+                                <i className="fas fa-clock" />
+                                {uploadTime}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {selectedDoc && (
+                <TrainerDocumentReviewModal
+                  doc={selectedDoc}
+                  status={getDocStatus(selectedDoc)}
+                  onClose={() => setSelectedDoc(null)}
+                  onAccept={(doc) => {
+                    setDocStatuses((prev) => ({ ...prev, [doc.id]: 'Verified' }));
+                    setSelectedDoc(null);
+                  }}
+                  onReject={(doc) => {
+                    setDocStatuses((prev) => ({ ...prev, [doc.id]: 'Rejected' }));
+                    setSelectedDoc(null);
+                  }}
+                />
+              )}
+            </div>
+          )}
+
+          {activeTab === 'tot' && (
+            <div className="sc-body">
+              {mcqReview.questions.length === 0 ? (
+                <div className="sc-evidence-empty">
+                  <i className="fas fa-question-circle" />
+                  <p>No TOT MCQ question bank is attached to this session.</p>
+                </div>
+              ) : !mcqReview.submitted ? (
+                <div className="sc-evidence-empty">
+                  <i className="fas fa-hourglass-half" />
+                  <p>Trainer has not submitted MCQ answers yet. {mcqReview.questions.length} question(s) are waiting.</p>
+                </div>
+              ) : (
+                <div className="st-trainer-mcq">
+                  <div className={`st-trainer-mcq__score${mcqReview.pass === false ? ' st-trainer-mcq__score--fail' : ' st-trainer-mcq__score--pass'}`}>
+                    <strong>{mcqReview.score}/{mcqReview.totalMarks} marks · {mcqReview.percentage}%</strong>
+                    <span>
+                      {mcqReview.pass === false ? 'Needs improvement' : 'Pass'} · need {mcqReview.passPercent}%
+                      {mcqReview.trainerName ? ` · ${mcqReview.trainerName}` : ''}
+                      {mcqReview.submittedAt ? ` · ${new Date(mcqReview.submittedAt).toLocaleDateString('en-IN')}` : ''}
+                    </span>
+                  </div>
+                  {mcqReview.questions.map((question, qIndex) => (
+                    <div key={question.id} className="st-trainer-mcq__card">
+                      <div className="st-trainer-mcq__qhead">
+                        <strong>{qIndex + 1}. {question.question}</strong>
+                        <span>{question.selectedIndex === null ? 'Skipped' : (question.isCorrect ? 'Correct' : 'Wrong')}</span>
+                      </div>
+                      <div className="st-trainer-mcq__options">
+                        {question.options.map((option, optionIndex) => {
+                          const isChosen = question.selectedIndex === optionIndex;
+                          const isCorrect = question.correctIndex === optionIndex;
+                          const cls = isCorrect
+                            ? ' st-trainer-mcq__option--correct'
+                            : isChosen
+                              ? ' st-trainer-mcq__option--wrong'
+                              : '';
+                          return (
+                            <div key={`${question.id}-${optionIndex}`} className={`st-trainer-mcq__option${cls}`}>
+                              <span className="st-trainer-mcq__letter">{String.fromCharCode(65 + optionIndex)}</span>
+                              <span>{option || 'Option not set'}</span>
+                              {isChosen && <em>Trainer</em>}
+                              {isCorrect && <em>Correct</em>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <footer className="sc-foot">
+            <span className="sc-foot-note">
+              <i className="fas fa-info-circle" /> Referred session — review trainer documents and MCQ answers.
+            </span>
+            <div className="sc-foot-right">
+              <button type="button" className="sc-btn sc-btn--outline" onClick={() => setActiveTab('tot')}>
+                <i className="fas fa-clipboard-list" /> Assignment
+              </button>
+            </div>
+          </footer>
+        </>
+      )}
     </article>
   );
 };
@@ -1196,7 +1659,7 @@ const SeniorTrainerModule = () => {
     const fetchTrainers = async () => {
       setLoadingTrainers(true);
       try {
-        const res = await axios.get(`${backendUrl}/college/users/training-role-users?roleType=trainer`, {
+        const res = await axios.get(`${backendUrl}/college/users/training-role-users?roleType=session`, {
           headers: { 'x-auth': token },
         });
         if (cancelled) return;
@@ -1590,7 +2053,7 @@ const ST_CSS = `
   .st-header-date .react-date-picker { border: none; font-size: 13px; }
   .st-header-date .react-date-picker__wrapper { border: none; background: transparent; }
 
-  .st-filters, .st-toolbar, .st-calendar, .st-day-tt, .st-detail-panel, .st-session-card, .st-sessions-table-wrap, .st-empty-state {
+  .st-filters, .st-toolbar, .st-calendar, .st-day-tt, .st-session-card, .st-sessions-table-wrap, .st-empty-state {
     background: #fff; border: 1px solid #e2e8f0; border-radius: 18px;
     box-shadow: 0 10px 28px rgba(15,23,42,0.05);
   }
@@ -1871,7 +2334,13 @@ const ST_CSS = `
   .st-day-tt__side-meta em { font-style: normal; font-size: 10px; font-weight: 800; color: var(--event-color, ${BLUE}); }
   .st-day-tt__side-meta small { font-size: 10px; font-weight: 600; color: #64748b; }
 
-  .st-detail-panel { padding: 10px; min-height: auto; }
+  .st-detail-panel {
+    padding: 0;
+    min-height: auto;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
   .st-detail-empty { text-align: center; padding: 28px 16px; color: #64748b; }
   .st-detail-empty i { font-size: 26px; color: #cbd5e1; margin-bottom: 8px; }
   .st-detail-empty h4 { margin: 0 0 6px; color: #0f172a; font-size: 14px; }
@@ -1965,12 +2434,562 @@ const ST_CSS = `
     display: flex; gap: 8px; padding: 0 12px 12px; font-size: 11px; color: #475569; line-height: 1.45;
   }
   .st-session-card__notes i { color: ${GREEN}; margin-top: 2px; }
+  .st-trainer-submit {
+    border-top: 1px solid #eef2f7;
+    padding: 12px;
+    background: #fafbfc;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .st-trainer-submit__title {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: ${GREEN};
+  }
+  .st-trainer-submit__block h6 {
+    margin: 0 0 8px; font-size: 12px; font-weight: 800; color: #0f172a;
+  }
+  .st-trainer-submit__empty {
+    margin: 0; padding: 10px 12px; border: 1px dashed #cbd5e1; border-radius: 10px;
+    background: #fff; color: #64748b; font-size: 11px; font-weight: 600;
+  }
+  .st-trainer-docs { display: flex; flex-direction: column; gap: 8px; }
+  .st-trainer-doc {
+    display: flex; align-items: center; gap: 8px;
+    border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 10px; background: #fff;
+  }
+  .st-trainer-doc--uploaded { border-color: #bbf7d0; }
+  .st-trainer-doc__icon {
+    width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: #eff6ff; color: ${BLUE}; font-size: 12px;
+  }
+  .st-trainer-doc__meta { min-width: 0; flex: 1; }
+  .st-trainer-doc__meta strong {
+    display: block; font-size: 12px; font-weight: 800; color: #0f172a;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .st-trainer-doc__meta small { font-size: 10px; font-weight: 600; color: #94a3b8; }
+  .st-trainer-doc__btn {
+    border: 1px solid #bbf7d0; background: #ecfdf5; color: ${GREEN};
+    border-radius: 8px; padding: 5px 9px; font-size: 11px; font-weight: 800; cursor: pointer;
+  }
+  .st-trainer-doc__pending { font-size: 10px; font-weight: 800; color: ${AMBER}; }
+  .st-trainer-mcq__score {
+    display: flex; flex-direction: column; gap: 2px;
+    border-radius: 10px; padding: 8px 10px; margin-bottom: 8px;
+  }
+  .st-trainer-mcq__score strong { font-size: 12px; }
+  .st-trainer-mcq__score span { font-size: 10px; font-weight: 700; }
+  .st-trainer-mcq__score--pass { background: #ecfdf5; color: #047857; }
+  .st-trainer-mcq__score--fail { background: #fef2f2; color: #b91c1c; }
+  .st-trainer-mcq { display: flex; flex-direction: column; gap: 8px; }
+  .st-trainer-mcq__card {
+    border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; background: #fff;
+  }
+  .st-trainer-mcq__qhead {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px;
+  }
+  .st-trainer-mcq__qhead strong { font-size: 12px; font-weight: 800; color: #0f172a; line-height: 1.4; }
+  .st-trainer-mcq__qhead span { flex-shrink: 0; font-size: 10px; font-weight: 800; color: #64748b; }
+  .st-trainer-mcq__options { display: flex; flex-direction: column; gap: 6px; }
+  .st-trainer-mcq__option {
+    display: flex; align-items: center; gap: 8px;
+    border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 8px;
+    background: #f8fafc; font-size: 11px; font-weight: 600; color: #334155;
+  }
+  .st-trainer-mcq__option em {
+    margin-left: auto; font-style: normal; font-size: 9px; font-weight: 800; text-transform: uppercase;
+  }
+  .st-trainer-mcq__option--correct { border-color: #6ee7b7; background: #ecfdf5; color: #047857; }
+  .st-trainer-mcq__option--wrong { border-color: #fca5a5; background: #fef2f2; color: #b91c1c; }
+  .st-trainer-mcq__letter {
+    width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #e2e8f0; color: #475569; font-size: 10px; font-weight: 800;
+  }
+  .st-trainer-mcq__option--correct .st-trainer-mcq__letter { background: #a7f3d0; color: #047857; }
+  .st-trainer-mcq__option--wrong .st-trainer-mcq__letter { background: #fecaca; color: #b91c1c; }
   .st-session-card__source {
     padding: 8px 12px; border-top: 1px solid #eef2f7; font-size: 11px; font-weight: 700; color: #64748b;
     display: flex; align-items: center; gap: 6px; background: #fafbfc;
   }
   .st-text--green { color: ${GREEN}; }
   .st-text--amber { color: ${AMBER}; }
+
+  .sc-wrap {
+    background: #fff; border: 1px solid #bfdbfe;
+    border-radius: 10px; overflow: hidden;
+    margin-bottom: 10px;
+    box-shadow: 0 4px 14px rgba(37,99,235,0.08);
+  }
+  .sc-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; padding: 10px 12px; flex-wrap: nowrap; overflow: visible;
+    background: linear-gradient(105deg, #1264dc 0%, #1b8def 48%, #2bd2e9 100%);
+  }
+  .sc-head-left {
+    display: flex; align-items: center; gap: 8px;
+    min-width: 0; flex: 1 1 0; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 8px;
+    padding: 5px 8px;
+    background: rgba(255,255,255,0.13);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+  }
+  .sc-avatar {
+    width: 28px; height: 28px; border-radius: 7px; flex-shrink: 0;
+    background: rgba(255,255,255,0.22); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+  }
+  .sc-head-text { min-width: 0; overflow: hidden; }
+  .sc-trainer-name {
+    font-size: 12px; font-weight: 800; color: #fff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sc-toggle-btn {
+    border: 0; background: #fff; border-radius: 50%;
+    width: 30px; height: 30px; cursor: pointer; color: ${BLUE}; font-size: 12px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    box-shadow: 0 3px 10px rgba(15,23,42,0.12);
+  }
+  .sc-stats {
+    display: flex; align-items: stretch; gap: 5px;
+    flex-shrink: 0;
+  }
+  .sc-stat {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 4px 7px; gap: 2px; text-align: center;
+    min-height: 50px; min-width: 56px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.28);
+    background: rgba(255,255,255,0.16);
+    box-shadow: inset 0 -1px 0 rgba(255,255,255,0.16);
+  }
+  .sc-stat__icon {
+    width: 20px; height: 20px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; margin-bottom: 0;
+  }
+  .sc-stat__icon--blue  { background: rgba(219,234,254,0.95); color: #1d4ed8; }
+  .sc-stat__icon--green { background: rgba(209,250,229,0.95); color: #059669; }
+  .sc-stat__icon--red   { background: rgba(254,226,226,0.95); color: #dc2626; }
+  .sc-stat__icon--amber { background: rgba(254,243,199,0.95); color: #d97706; }
+  .sc-stat__val { font-size: 14px; font-weight: 900; color: #fff; line-height: 1; }
+  .sc-stat__lbl { font-size: 8px; color: rgba(255,255,255,0.86); font-weight: 700; white-space: nowrap; }
+  .sc-tabs {
+    display: flex; gap: 0; padding: 0 12px; border-bottom: 1px solid #e2e8f0; background: #fafbfc;
+  }
+  .sc-tab {
+    display: inline-flex; align-items: center; gap: 5px; height: 36px;
+    border: none; background: none; font-size: 12px; font-weight: 700;
+    color: #64748b; cursor: pointer; padding: 0 2px; margin-right: 16px; position: relative;
+  }
+  .sc-tab--active { color: ${BLUE}; }
+  .sc-tab--active::after {
+    content: ''; position: absolute; bottom: -1px; left: 0; right: 0;
+    height: 2px; border-radius: 2px 2px 0 0; background: ${BLUE};
+  }
+  .sc-tab-count {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 18px; height: 18px; padding: 0 5px; margin-left: 2px;
+    border-radius: 999px; background: #dbeafe; color: ${BLUE};
+    font-size: 10px; font-weight: 800;
+  }
+  .sc-tab--active .sc-tab-count { background: ${BLUE}; color: #fff; }
+  .sc-body { padding: 12px 14px 10px; }
+  .sc-detail-grid {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px 14px; margin-bottom: 10px;
+  }
+  .sc-detail-item small {
+    font-size: 9px; font-weight: 700; text-transform: uppercase; color: #94a3b8;
+    display: block; margin-bottom: 4px; letter-spacing: 0.03em;
+  }
+  .sc-detail-item strong {
+    font-size: 11px; font-weight: 700; color: #1e293b;
+    display: flex; align-items: center; gap: 6px;
+    min-width: 0;
+  }
+  .sc-detail-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .sc-detail-icon {
+    width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 10px;
+  }
+  .sc-detail-icon--blue { background: #dbeafe; color: #1d4ed8; }
+  .sc-detail-icon--pink { background: #fce7ef; color: ${PINK}; }
+  .sc-notes {
+    border-top: 1px dashed #e2e8f0;
+    display: flex; align-items: flex-start; gap: 8px;
+    background: #fafbfc; margin: 0 -14px -10px; padding: 10px 14px 12px;
+  }
+  .sc-notes small { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #94a3b8; display: block; margin-bottom: 2px; }
+  .sc-notes p { font-size: 11px; color: #334155; line-height: 1.45; margin: 0; }
+  .sc-evidence-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .sc-evidence-card {
+    border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px;
+    display: flex; flex-direction: column; gap: 8px; background: #fafbfc;
+  }
+  .sc-evidence-card__title {
+    font-size: 11px; font-weight: 700; color: #1e293b;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sc-evidence-icon {
+    width: 28px; height: 28px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+  }
+  .sc-evidence-icon--amber { background: #fef3c7; color: #d97706; }
+  .sc-evidence-icon--green { background: #d1fae5; color: #059669; }
+  .sc-evidence-type { color: #64748b; }
+  .sc-evidence-empty {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 8px; min-height: 120px; padding: 24px;
+    border: 1px dashed #cbd5e1; border-radius: 12px; background: #f8fafc;
+    color: #64748b; text-align: center;
+  }
+  .sc-evidence-empty i { font-size: 28px; color: #94a3b8; }
+  .sc-evidence-empty p { margin: 0; font-size: 12px; font-weight: 600; }
+  .ev-pending { color: #d97706; font-size: 10px; font-weight: 600; }
+  .sc-upload-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    margin-top: 4px; padding: 8px 12px; border-radius: 10px;
+    border: 1px solid #bfdbfe; background: #eff6ff; color: ${BLUE};
+    font-size: 11px; font-weight: 800; cursor: pointer;
+  }
+  .sc-upload-btn--full { width: 100%; justify-content: center; margin-top: auto; }
+  .sc-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 14px 22px; flex-wrap: wrap;
+    border-top: 1px solid #f1f5f9; background: #fafbfc;
+  }
+  .sc-foot-right { display: flex; gap: 10px; flex-wrap: wrap; }
+  .sc-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 10px 18px; border-radius: 12px; font-size: 12px; font-weight: 700;
+    cursor: pointer; border: 1.5px solid #e2e8f0; background: #fff; color: #334155;
+  }
+  .sc-btn--outline { background: #fff; color: ${BLUE}; border-color: #bfdbfe; }
+  .sc-btn--primary { background: ${BLUE}; color: #fff; border-color: ${BLUE}; }
+  .sc-session-badge {
+    display: inline-flex;
+    margin-top: 4px; margin-right: 6px;
+    border-radius: 999px; padding: 2px 8px;
+    font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .sc-session-badge--plan { background: #dbeafe; color: #1d4ed8; }
+  .sc-foot-note {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600; color: #64748b;
+  }
+  .sc-foot-note i { color: ${BLUE}; }
+
+  .st-reg-docs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 2rem;
+    padding: 4px 2px 12px;
+  }
+  .st-reg-doc-card {
+    background: #fff;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    position: relative;
+  }
+  .st-reg-doc-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+  }
+  .st-reg-doc-card__preview {
+    position: relative;
+    height: 200px;
+    overflow: hidden;
+    background: #f8f9fa;
+  }
+  .st-reg-doc-card__image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+  }
+  .st-reg-doc-card:hover .st-reg-doc-card__image { transform: scale(1.05); }
+  .st-reg-doc-card__icon,
+  .st-reg-doc-card__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #ccc;
+  }
+  .st-reg-doc-card__empty i { font-size: 3rem; }
+  .st-reg-doc-card__empty p,
+  .st-reg-doc-card__icon p {
+    margin: 10px 0 0;
+    font-size: 12px;
+    color: #999;
+  }
+  .st-reg-doc-card__icon i { color: #6c757d; font-size: 40px; }
+  .st-reg-doc-card__overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .st-reg-doc-card:hover .st-reg-doc-card__overlay { opacity: 1; }
+  .st-reg-preview-btn {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    border: none;
+    border-radius: 25px;
+    padding: 0.75rem 1.5rem;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
+  }
+  .st-reg-doc-card__info { padding: 1.5rem; }
+  .st-reg-doc-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+    gap: 0.75rem;
+  }
+  .st-reg-doc-card__header h4 {
+    margin: 0;
+    color: #333;
+    font-size: 0.9rem;
+    font-weight: 700;
+    line-height: 1.3;
+    flex: 1;
+  }
+  .st-reg-pill {
+    border: none;
+    border-radius: 20px;
+    padding: 0.5rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .st-reg-pill--upload {
+    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    color: #fff;
+    box-shadow: 0 3px 10px rgba(250, 112, 154, 0.4);
+  }
+  .st-reg-pill--verify {
+    background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+    color: #c62828;
+    box-shadow: 0 3px 10px rgba(255, 154, 158, 0.4);
+  }
+  .st-reg-doc-card__meta {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    color: #666;
+    font-size: 0.85rem;
+  }
+  .st-reg-doc-card__meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+  .st-reg-doc-card__meta i { color: #94a3b8; }
+
+  .st-reg-modal-overlay {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    backdrop-filter: blur(5px);
+    padding: 16px;
+  }
+  .st-reg-modal {
+    background: #fff;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 1100px;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+  }
+  .st-reg-modal__head {
+    padding: 1.5rem 2rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .st-reg-modal__head h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #fff;
+  }
+  .st-reg-modal__close {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.5rem;
+    cursor: pointer;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+  }
+  .st-reg-modal__close:hover { background: rgba(255,255,255,0.2); }
+  .st-reg-modal__body {
+    padding: 2rem;
+    display: flex;
+    gap: 2rem;
+    overflow-y: auto;
+    min-height: 0;
+  }
+  .st-reg-modal__preview {
+    flex: 2;
+    min-width: 0;
+  }
+  .st-reg-modal__preview-box {
+    background: #f8f9fa;
+    border-radius: 8px;
+    min-height: 500px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed #dee2e6;
+    overflow: hidden;
+    position: relative;
+  }
+  .st-reg-modal__preview-box img {
+    max-width: 100%;
+    max-height: 90%;
+    object-fit: contain;
+  }
+  .st-reg-modal__preview-box iframe,
+  .st-reg-modal__preview-box video {
+    width: 100%;
+    height: 500px;
+    border: none;
+    background: #fff;
+  }
+  .st-reg-modal__empty {
+    text-align: left;
+    width: 100%;
+    height: 100%;
+    min-height: 460px;
+    padding: 16px;
+    color: #212529;
+    font-size: 14px;
+  }
+  .st-reg-modal__side {
+    flex: 1;
+    min-width: 260px;
+    max-width: 340px;
+  }
+  .st-reg-info-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid #e9ecef;
+  }
+  .st-reg-info-card h4 {
+    margin: 0 0 1rem;
+    color: #495057;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 0.5rem;
+  }
+  .st-reg-info-row {
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .st-reg-info-row strong {
+    color: #495057;
+    min-width: 120px;
+    font-size: 0.92rem;
+  }
+  .st-reg-info-row span {
+    color: #212529;
+    font-size: 0.92rem;
+  }
+  .st-reg-modal__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .st-reg-btn {
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    width: 100%;
+  }
+  .st-reg-btn--approve { background: #198754; color: #fff; }
+  .st-reg-btn--reject { background: #dc3545; color: #fff; }
+  .st-reg-btn--ghost { background: #6c757d; color: #fff; }
+  .st-reg-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .st-reg-reject {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 8px;
+    padding: 1.5rem;
+  }
+  .st-reg-reject textarea {
+    width: 100%;
+    min-height: 100px;
+    padding: 10px;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+    resize: vertical;
+    font-family: inherit;
+    margin-bottom: 10px;
+  }
+  .st-reg-reject__btns { display: flex; gap: 8px; }
+
+  @media (max-width: 900px) {
+    .st-reg-modal__body { flex-direction: column; }
+    .st-reg-modal__side { max-width: none; }
+    .st-reg-modal__preview-box iframe, .st-reg-modal__preview-box video { height: 320px; }
+  }
 
   @media (max-width: 1100px) {
     .st-dual-calendars { grid-template-columns: 1fr; }
@@ -1980,6 +2999,10 @@ const ST_CSS = `
   @media (max-width: 768px) {
     .st-calendar__day { min-height: 50px; }
     .st-session-card__grid { grid-template-columns: 1fr; }
+    .sc-detail-grid { grid-template-columns: 1fr; }
+    .sc-evidence-grid { grid-template-columns: 1fr; }
+    .sc-stats { display: none; }
+    .sc-head { flex-wrap: wrap; }
   }
 
   /* ── Cute / modern visual pass (colors, shape, type only — no layout or logic changes) ── */
@@ -1988,7 +3011,7 @@ const ST_CSS = `
     font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
   }
   .st-header,
-  .st-filters, .st-toolbar, .st-calendar, .st-day-tt, .st-detail-panel,
+  .st-filters, .st-toolbar, .st-calendar, .st-day-tt,
   .st-session-card, .st-sessions-table-wrap, .st-empty-state {
     border-radius: 20px;
     border-color: #e8eef5;

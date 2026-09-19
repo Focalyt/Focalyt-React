@@ -1,5 +1,18 @@
 const { Schema, model } = require('mongoose');
 const { ObjectId } = Schema.Types;
+const { courseStructureSchemaFields } = require('../../helpers/courseStructure');
+
+const resourceRequiredSchema = {
+  Name: { type: String },
+  description: { type: String, default: '' },
+  uploadType: {
+    type: String,
+    enum: ['Image', 'PDF', 'Video', 'Document', 'Presentation'],
+    default: 'PDF'
+  },
+  mandatory: { type: Boolean, default: false },
+  status: { type: Boolean, default: true }
+};
 
 const courseSchema = new Schema({
   sectors: [{ type: ObjectId, ref: "CourseSectors" }],
@@ -74,6 +87,9 @@ const courseSchema = new Schema({
     }
   ],
 
+  classResourcesRequired: [resourceRequiredSchema],
+  labResourcesRequired: [resourceRequiredSchema],
+
   testimonialvideos: [{ type: String }],
   photos: [String],
   audios: [String],
@@ -109,7 +125,9 @@ const courseSchema = new Schema({
     type: ObjectId,
     ref: 'College',
     default: null
-  }
+  },
+
+  courseStructure: courseStructureSchemaFields,
 
 }, { timestamps: true });
 

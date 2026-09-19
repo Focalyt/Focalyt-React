@@ -6,7 +6,7 @@ import { HelmetProvider } from 'react-helmet-async';
 import Websocket from './utils/websocket'
 import { WhatsAppProvider } from './contexts/WhatsAppContext';
 
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import HomePage from '../src/Pages/Front/HomePage/HomePage';
@@ -94,10 +94,7 @@ import EditJob from './Pages/App/College/Job/EditJob';
 import AppliedEvents from './Pages/App/Candidate/Events/AppliedEvents';
 import CandidateManagementPortal from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal';
 import CandidateManagementPortal_old from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal_copy';
-import AddCourse from './Pages/App/College/Course/AddCourse';
 import AddCoursecopy from './Pages/App/College/Course/AddCoursecopy';
-import ViewCourses from './Pages/App/College/Course/ViewCourse';
-import EditCourse from './Pages/App/College/Course/EditCourse';
 import Registrations from './Pages/App/College/Course/Registrations';
 import AdmissionPost from './Pages/App/College/Course/AdmissionPost'; 
 import AccessManagement from './Pages/App/College/Settings/AccessManagement';
@@ -188,6 +185,12 @@ import Center from './Pages/App/Trainer/Center/Center';
 import Assignment from './Pages/App/Trainer/Assignment/Assignment';
 import CreateAssignment from './Pages/App/Trainer/Assignment/CreateAssignment';
 import StartLiveClass from './Pages/App/Trainer/LiveClass/StartLiveClass';
+
+const RedirectEditCourseCopy = () => {
+  const { id } = useParams();
+  return <Navigate to={`/institute/courses/edit/${id}`} replace />;
+};
+
 const Layout = () => {
   const location = useLocation();
   useEffect(() => {
@@ -319,17 +322,17 @@ const Layout = () => {
           <Route path="job/:id" element={<EditJob readOnly />}/>
           <Route path="editjob/:id" element={<EditJob/>}/>
           <Route path="candidatemanagment" element={<CandidateManagementPortal/>}/>
-          <Route path='addcourse' element={<AddCourse/>}/>
-          <Route path='addcoursecopy' element={<AddCoursecopy/>}/>
-          <Route path='editcoursecopy/:id' element={<Editcoursecopy/>}/>
-          <Route path='viewcoursecopy' element={<Viewcoursecopy/>}/>
-         <Route path='viewcourse' element={<ViewCourses/>}/>
+          <Route path='addcourse' element={<AddCoursecopy/>}/>
+          <Route path='addcoursecopy' element={<Navigate to="/institute/addcourse" replace />}/>
+          <Route path='editcoursecopy/:id' element={<RedirectEditCourseCopy />}/>
+          <Route path='viewcoursecopy' element={<Navigate to="/institute/viewcourse" replace />}/>
+          <Route path='viewcourse' element={<Viewcoursecopy/>}/>
           <Route path='registrationold' element={<Registrations/>}/>
           <Route path='admissionpost' element={<AdmissionPost/>}/>
-          {/* <Route path='editcourse' element={<EditCourse/>}/> */}
+          {/* <Route path='editcourse' element={<Editcoursecopy/>}/> */}
           <Route path='whatsapp' element={<Whatsapp/>}/>
-          <Route path="institute/courses/edit/:id" element={<EditCourse />} />
-          <Route path="courses/edit/:id" element={<EditCourse />} />
+          <Route path="institute/courses/edit/:id" element={<Editcoursecopy />} />
+          <Route path="courses/edit/:id" element={<Editcoursecopy />} />
           <Route path='accessManagement' element={<AccessManagement/>}/>
           <Route path='projectmanagment' element={<CandidateManagementPortal/>}/>
           <Route path='candidatemanagment_old' element={<CandidateManagementPortal_old/>}/>

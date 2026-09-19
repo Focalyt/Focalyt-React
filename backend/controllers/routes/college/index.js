@@ -14,7 +14,7 @@ const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
 const { applyHumanRemarksToDoc, humanRemarksSetPayload } = require("../../../helpers/aiRemark");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, CoursesCopy, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage, UploadCandidates, Placement, PlacementStatus, BatchMonitor, Source } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage, UploadCandidates, Placement, PlacementStatus, BatchMonitor, Source } = require("../../models");
 const { ReEnquire } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
@@ -8656,8 +8656,10 @@ router.put('/lead/bulk_course_change', [isCollege], async (req, res) => {
 
 router.get('/all_courses', async (req, res) => {
 	try {
-		const courses = await Courses.find({ status: true })
+		const courses = await Courses.find({ status: true, isDeleted: { $ne: true } })
 			.populate('trainers', 'name email mobile')
+			.populate('vertical', 'name')
+			.populate('project', 'name')
 			.sort({ createdAt: -1 });
 
 		res.json({ success: true, data: courses });
@@ -8692,10 +8694,10 @@ router.get('/all_courses_centerwise', async (req, res) => {
 	}
 });
 
-/** CoursesCopy list for Academic Coordinator session planning (includes courseStructure) */
+/** Main courses list for Academic Coordinator session planning (includes courseStructure) */
 router.get('/all_coursescopy', async (req, res) => {
 	try {
-		const courses = await CoursesCopy.find({ status: true, isDeleted: { $ne: true } })
+		const courses = await Courses.find({ status: true, isDeleted: { $ne: true } })
 			.populate('trainers', 'name email mobile')
 			.populate('vertical', 'name')
 			.populate('project', 'name')
@@ -8703,7 +8705,7 @@ router.get('/all_coursescopy', async (req, res) => {
 
 		res.json({ success: true, data: courses });
 	} catch (error) {
-		console.error('Error fetching coursecopy list:', error);
+		console.error('Error fetching course list:', error);
 		res.status(500).json({ success: false, message: 'Server error' });
 	}
 });
@@ -8715,7 +8717,7 @@ router.get('/all_coursescopy_centerwise', async (req, res) => {
 			return res.status(400).json({ success: false, message: 'centerId and projectId are required.' });
 		}
 
-		const courses = await CoursesCopy.find({
+		const courses = await Courses.find({
 			center: centerId,
 			project: projectId,
 			status: true,
@@ -8729,7 +8731,7 @@ router.get('/all_coursescopy_centerwise', async (req, res) => {
 
 		res.json({ success: true, data: courses });
 	} catch (error) {
-		console.error('Error fetching center-wise coursecopy list:', error);
+		console.error('Error fetching center-wise course list:', error);
 		res.status(500).json({ success: false, message: 'Server error' });
 	}
 });

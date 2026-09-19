@@ -1,7 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const { isCollege } = require('../../../helpers');
-const { SessionPlan, SessionActivityType, College, CoursesCopy, CourseActivity } = require('../../models');
+const { SessionPlan, SessionActivityType, College, Courses, CoursesCopy, CourseActivity } = require('../../models');
 const { normalizeCourseStructure } = require('../../../helpers/courseStructure');
 
 const router = express.Router();
@@ -45,13 +45,24 @@ const normalizeMaterials = (items = []) =>
     uploadedAt: toDate(item.uploadedAt),
   }));
 
+const TOT_PASS_PERCENT_DEFAULT = 40;
+
 const normalizeQuestions = (items = []) =>
-  (Array.isArray(items) ? items : []).map((item) => ({
-    question: item.question || '',
-    options: Array.isArray(item.options) ? item.options : [],
-    correctIndex: Number(item.correctIndex) || 0,
-    marks: Number(item.marks) || 0,
-  }));
+  (Array.isArray(items) ? items : []).map((item) => {
+    const marks = Number(item.marks);
+    return {
+      question: item.question || '',
+      options: Array.isArray(item.options) ? item.options : [],
+      correctIndex: Number(item.correctIndex) || 0,
+      marks: Number.isFinite(marks) && marks > 0 ? marks : 1,
+    };
+  });
+
+const normalizePassPercentage = (value, fallback = TOT_PASS_PERCENT_DEFAULT) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(100, Math.max(1, Math.round(n)));
+};
 
 const normalizeSubSessions = (items = []) =>
   (Array.isArray(items) ? items : [])
@@ -125,6 +136,8 @@ const mapSessionToClient = (doc) => {
     totStatus: session.totStatus || '',
     totQuestionBank: session.totQuestionBank || [],
     totQuestionBankLastUpdated: session.totQuestionBankLastUpdated || null,
+    totPassPercentage: normalizePassPercentage(session.totPassPercentage),
+    totAssignmentSubmission: session.totAssignmentSubmission || null,
     workflowStatus: session.workflowStatus || 'Scheduled',
     seniorTrainerId: session.seniorTrainer ? String(session.seniorTrainer) : '',
     seniorTrainerName: session.seniorTrainerName || '',
@@ -231,6 +244,9 @@ const buildSessionPayload = (body = {}, collegeId, userId, existing = null) => {
     totQuestionBankLastUpdated: body.totQuestionBankLastUpdated
       ? toDate(body.totQuestionBankLastUpdated)
       : (existing?.totQuestionBankLastUpdated || null),
+    totPassPercentage: body.totPassPercentage !== undefined
+      ? normalizePassPercentage(body.totPassPercentage)
+      : normalizePassPercentage(existing?.totPassPercentage),
 
     workflowStatus: body.workflowStatus || existing?.workflowStatus || 'Scheduled',
 
@@ -269,7 +285,8 @@ const applyCourseStructureToSession = async (payload, existing = null) => {
   let structure = payload.courseStructure || existing?.courseStructure || null;
 
   if (payload.course) {
-    const course = await CoursesCopy.findById(payload.course).select('courseStructure').lean();
+    const course = await Courses.findById(payload.course).select('courseStructure').lean()
+      || await CoursesCopy.findById(payload.course).select('courseStructure').lean();
     if (course?.courseStructure) {
       structure = course.courseStructure;
     }

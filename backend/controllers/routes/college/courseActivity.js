@@ -1,7 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const { isCollege } = require('../../../helpers');
-const { CourseActivity, CoursesCopy, College, SessionPlan } = require('../../models');
+const { CourseActivity, Courses, CoursesCopy, College, SessionPlan } = require('../../models');
 
 const router = express.Router();
 const { ObjectId } = mongoose.Types;
@@ -33,11 +33,13 @@ const mapActivity = (doc, sessionCount = 0) => {
 };
 
 const assertCourse = async (collegeId, courseId) => {
-  const course = await CoursesCopy.findOne({
+  const courseFilter = {
     _id: courseId,
     isDeleted: { $ne: true },
     $or: [{ college: collegeId }, { college: null }, { college: { $exists: false } }],
-  }).select('_id name').lean();
+  };
+  const course = await Courses.findOne(courseFilter).select('_id name').lean()
+    || await CoursesCopy.findOne(courseFilter).select('_id name').lean();
   if (!course) {
     const err = new Error('Course not found');
     err.statusCode = 404;

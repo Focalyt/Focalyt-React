@@ -23,6 +23,25 @@ const T = {
   mintTint: "#d1fae5",
 };
 
+const TOT_PASS_PERCENT_DEFAULT = 40;
+const TOT_MARKS_MAX = 100;
+
+const toPositiveMarks = (value, emptyValue = 0) => {
+  if (value === "" || value == null) return emptyValue;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : emptyValue;
+};
+
+const toPassPercentage = (value, emptyValue = TOT_PASS_PERCENT_DEFAULT) => {
+  if (value === "" || value == null) return emptyValue;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return emptyValue;
+  return Math.min(100, Math.max(1, Math.round(n)));
+};
+
+const sumTotMarks = (questions = []) =>
+  (questions || []).reduce((sum, question) => sum + toPositiveMarks(question?.marks, 0), 0);
+
 const STATUS_STYLE = {
   Scheduled: { fg: T.sky, bg: T.skyTint, dot: T.sky },
   "Sent to Senior Trainer": { fg: T.amber, bg: T.amberTint, dot: T.amber },
@@ -46,7 +65,7 @@ const getAuthToken = () => {
 const authHeaders = (token) => ({ "x-auth": token });
 
 const fetchCoursesApi = async (token) => {
-  const res = await axios.get(`${BACKEND_URL}/college/all_coursescopy`, {
+  const res = await axios.get(`${BACKEND_URL}/college/all_courses`, {
     headers: authHeaders(token),
   });
   return Array.isArray(res.data?.data) ? res.data.data : [];
@@ -131,6 +150,20 @@ const deleteSessionApi = async (token, sessionId) => {
   if (!res.data?.status) throw new Error(res.data?.message || "Failed to delete session");
 };
 
+const fetchSeniorTrainersApi = async (token) => {
+  const res = await axios.get(`${BACKEND_URL}/college/users/training-role-users`, {
+    headers: authHeaders(token),
+    params: { roleType: "senior" },
+  });
+  return (res.data?.data || [])
+    .filter((user) => user._id)
+    .map((user) => ({
+      id: String(user._id),
+      name: user.name || user.email || "Senior Trainer",
+      email: user.email || "",
+    }));
+};
+
 const splitList = (value) =>
   String(value || "")
     .split(",")
@@ -191,12 +224,14 @@ const mapApiSessionToUi = (api = {}) => {
     totTopic: api.totTopicCovered || "",
     totMethod: api.totTrainingMethod || "",
     totUseSameTopic: api.totUseSameTopics !== false,
+    totPassPercentage: toPassPercentage(api.totPassPercentage, TOT_PASS_PERCENT_DEFAULT),
     totQuestions: Array.isArray(api.totQuestionBank)
       ? api.totQuestionBank.map((q, i) => ({
           id: q.id || q._id || `totq-${i}`,
           question: q.question || "",
           options: Array.isArray(q.options) && q.options.length ? q.options : ["", "", "", ""],
           correctIndex: Number(q.correctIndex) || 0,
+          marks: toPositiveMarks(q.marks, 1),
         }))
       : [],
     studentMaterial: withIds(api.learningMaterials),
@@ -592,6 +627,9 @@ export default function AcademicCoordinatorMockup() {
         .ac-pill-btn { transition: background 120ms ease, color 120ms ease; cursor: pointer; }
         .ac-input { border: 1px solid ${T.line}; border-radius: 12px; padding: 10px 12px; font-size: 14px; font-family: inherit; outline: none; width: 100%; box-sizing: border-box; }
         .ac-input:focus { border-color: ${T.coral}; }
+        .ac-marks-input { -moz-appearance: textfield; appearance: textfield; }
+        .ac-marks-input::-webkit-outer-spin-button,
+        .ac-marks-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         .ac-scroll::-webkit-scrollbar { width: 6px; }
         .ac-scroll::-webkit-scrollbar-thumb { background: #d8dee8; border-radius: 6px; }
       `}</style>
@@ -895,6 +933,9 @@ function DetailPanel({ display, session, onEdit, onDelete, onRefer, activityType
   const colors = (session.activityIds || []).map((id) => (activityTypes || []).find((a) => a.id === id)?.color || T.mute);
   const gradient = colors.length > 1 ? `linear-gradient(90deg, ${colors.join(",")})` : colors[0];
   const isAssigned = session.status === "Assigned" || session.status === "In Progress" || session.status === "Completed";
+  const eligibilityTotal = sumTotMarks(session.totQuestions);
+  const eligibilityPassPercent = toPassPercentage(session.totPassPercentage, TOT_PASS_PERCENT_DEFAULT);
+  const eligibilityPass = eligibilityTotal > 0 ? Math.ceil((eligibilityTotal * eligibilityPassPercent) / 100) : 0;
 
   return (
     <div style={{ background: "#fff", border: `1px solid ${T.line}`, borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column" }}>
@@ -950,6 +991,15 @@ function DetailPanel({ display, session, onEdit, onDelete, onRefer, activityType
             <div style={{ fontSize: 11, color: T.mute }}>Learning material</div>
           </div>
         </div>
+
+        {session.tot && (session.totQuestions || []).length > 0 && (
+          <div style={{ background: T.mintTint, borderRadius: 12, padding: "10px 12px", marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#065f46", textTransform: "uppercase", marginBottom: 4 }}>Trainer eligibility MCQ</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#065f46" }}>
+              {session.totQuestions.length} question{session.totQuestions.length === 1 ? "" : "s"} · {eligibilityTotal} mark{eligibilityTotal === 1 ? "" : "s"} · pass {eligibilityPass} ({eligibilityPassPercent}%)
+            </div>
+          </div>
+        )}
 
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: T.mute, marginBottom: 8, textTransform: "uppercase" }}>Trainers</div>
@@ -1092,6 +1142,9 @@ function CreateModal({ display, step, setStep, onClose, onSave, saving, editing,
   const [totUseSameTopic, setTotUseSameTopic] = useState(editing?.totUseSameTopic !== false);
   const [totTopic, setTotTopic] = useState(editing?.totTopic || "");
   const [totMethod, setTotMethod] = useState(editing?.totMethod || "");
+  const [totPassPercentage, setTotPassPercentage] = useState(
+    toPassPercentage(editing?.totPassPercentage, TOT_PASS_PERCENT_DEFAULT)
+  );
   const [notes, setNotes] = useState(editing?.notes || "");
   const [studentMaterial, setStudentMaterial] = useState(editing?.studentMaterial || []);
   const [requiredDocuments, setRequiredDocuments] = useState(editing?.requiredDocuments || []);
@@ -1143,11 +1196,12 @@ function CreateModal({ display, step, setStep, onClose, onSave, saving, editing,
     question: "",
     options: ["", "", "", ""],
     correctIndex: 0,
+    marks: 1,
   });
 
   const [totQuestions, setTotQuestions] = useState(
     editing?.totQuestions && editing.totQuestions.length
-      ? editing.totQuestions
+      ? editing.totQuestions.map((q) => ({ ...q, marks: toPositiveMarks(q.marks, 1) }))
       : []
   );
 
@@ -1178,6 +1232,44 @@ function CreateModal({ display, step, setStep, onClose, onSave, saving, editing,
 
   const replaceAllQuestions = () => {
     setTotQuestions([createTotQuestion()]);
+  };
+
+  const handleTotMarksChange = (questionIndex, raw) => {
+    if (raw === "") {
+      updateTotQuestion(questionIndex, "marks", "");
+      return;
+    }
+    const parsed = parseInt(raw, 10);
+    if (!Number.isFinite(parsed)) return;
+    updateTotQuestion(questionIndex, "marks", Math.min(TOT_MARKS_MAX, Math.max(1, parsed)));
+  };
+
+  const bumpTotMarks = (questionIndex, delta) => {
+    setTotQuestions((prev) => prev.map((q, i) => (
+      i === questionIndex
+        ? { ...q, marks: Math.min(TOT_MARKS_MAX, Math.max(1, toPositiveMarks(q.marks, 1) + delta)) }
+        : q
+    )));
+  };
+
+  const totMarksTotal = sumTotMarks(totQuestions);
+  const totPassPercentValue = toPassPercentage(totPassPercentage, 0);
+  const totPassMarks = totMarksTotal > 0 && totPassPercentValue > 0
+    ? Math.ceil((totMarksTotal * totPassPercentValue) / 100)
+    : 0;
+
+  const handleTotPassPercentageChange = (raw) => {
+    if (raw === "") {
+      setTotPassPercentage("");
+      return;
+    }
+    const parsed = parseInt(raw, 10);
+    if (!Number.isFinite(parsed)) return;
+    setTotPassPercentage(Math.min(100, Math.max(1, parsed)));
+  };
+
+  const bumpTotPassPercentage = (delta) => {
+    setTotPassPercentage((prev) => Math.min(100, Math.max(1, toPassPercentage(prev, TOT_PASS_PERCENT_DEFAULT) + delta)));
   };
 
   const toggleActivity = (id) => {
@@ -1226,8 +1318,10 @@ function CreateModal({ display, step, setStep, onClose, onSave, saving, editing,
               question: q.question.trim(),
               options: q.options || [],
               correctIndex: q.correctIndex || 0,
+              marks: toPositiveMarks(q.marks, 1),
             }))
         : [],
+      totPassPercentage: includeTot ? toPassPercentage(totPassPercentage, TOT_PASS_PERCENT_DEFAULT) : undefined,
       notes: notes.trim(),
       workflowStatus: editing?.status || "Scheduled",
     });
@@ -1235,6 +1329,11 @@ function CreateModal({ display, step, setStep, onClose, onSave, saving, editing,
 
   return (
     <ModalShell onClose={onClose} width={640}>
+      <style>{`
+        .ac-marks-input { -moz-appearance: textfield; appearance: textfield; }
+        .ac-marks-input::-webkit-outer-spin-button,
+        .ac-marks-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+      `}</style>
       <div style={{ padding: "18px 22px 0" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ ...display, fontSize: 18, fontWeight: 700 }}>{editing ? "Edit session plan" : "New session plan"}</div>
@@ -1522,31 +1621,118 @@ function CreateModal({ display, step, setStep, onClose, onSave, saving, editing,
                   </div>
                 )}
 
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: T.mute }}>MCQ bank</div>
-                  <button
-                    type="button"
-                    onClick={replaceAllQuestions}
-                    style={{ border: `1px solid ${T.line}`, background: "#fff", color: T.ink, fontSize: 11, fontWeight: 700, borderRadius: 999, padding: "6px 10px", cursor: "pointer" }}
-                  >
-                    Replace all questions
-                  </button>
+                <div style={{ marginTop: 4 }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: T.mute }}>Trainer eligibility MCQ</div>
+                      <div style={{ fontSize: 11, color: T.mute, marginTop: 3, lineHeight: 1.45 }}>
+                        Set marks on each question and the pass percentage. Trainer must score this % or more to pass.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={replaceAllQuestions}
+                      style={{ border: `1px solid ${T.line}`, background: "#fff", color: T.ink, fontSize: 11, fontWeight: 700, borderRadius: 999, padding: "6px 10px", cursor: "pointer", whiteSpace: "nowrap" }}
+                    >
+                      Replace all questions
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: T.mute }}>Pass %</span>
+                      <div style={{ display: "flex", alignItems: "center", border: `1px solid ${T.line}`, borderRadius: 10, overflow: "hidden", background: "#fff" }}>
+                        <button
+                          type="button"
+                          onClick={() => bumpTotPassPercentage(-1)}
+                          aria-label="Decrease passing percentage"
+                          style={{ width: 28, height: 32, border: "none", background: T.page, color: T.ink, fontWeight: 700, cursor: "pointer" }}
+                        >
+                          −
+                        </button>
+                        <input
+                          className="ac-marks-input"
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={totPassPercentage === "" ? "" : toPassPercentage(totPassPercentage, TOT_PASS_PERCENT_DEFAULT)}
+                          onChange={(e) => handleTotPassPercentageChange(e.target.value)}
+                          style={{ width: 44, height: 32, border: "none", textAlign: "center", fontWeight: 700, fontSize: 13, outline: "none", color: T.ink }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => bumpTotPassPercentage(1)}
+                          aria-label="Increase passing percentage"
+                          style={{ width: 28, height: 32, border: "none", background: T.page, color: T.ink, fontWeight: 700, cursor: "pointer" }}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 700, background: T.page, color: T.ink, borderRadius: 999, padding: "5px 10px" }}>
+                      {totQuestions.length} question{totQuestions.length === 1 ? "" : "s"}
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 700, background: T.mintTint, color: T.mint, borderRadius: 999, padding: "5px 10px" }}>
+                      Total {totMarksTotal} mark{totMarksTotal === 1 ? "" : "s"}
+                    </span>
+                    {totMarksTotal > 0 && totPassPercentValue > 0 && (
+                      <span style={{ fontSize: 11, fontWeight: 700, background: T.amberTint, color: "#92400e", borderRadius: 999, padding: "5px 10px" }}>
+                        Pass {totPassMarks}+ ({totPassPercentValue}%)
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {totQuestions.length === 0 && (
+                    <div style={{ border: `1px dashed ${T.line}`, borderRadius: 12, padding: "14px 12px", background: "#f8fafc", color: T.mute, fontSize: 12, fontWeight: 600 }}>
+                      No eligibility questions yet. Add an MCQ and assign marks.
+                    </div>
+                  )}
                   {totQuestions.map((question, questionIndex) => (
                     <div key={question.id} style={{ border: `1px solid ${T.line}`, borderRadius: 12, padding: 12, background: "#fff" }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
                         <div style={{ fontSize: 13, fontWeight: 700 }}>Q{questionIndex + 1}</div>
-                        {totQuestions.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeTotQuestion(questionIndex)}
-                            style={{ border: "none", background: "transparent", color: T.coral, fontSize: 11, fontWeight: 700, cursor: "pointer" }}
-                          >
-                            Remove
-                          </button>
-                        )}
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: T.mute }}>Marks</span>
+                            <div style={{ display: "flex", alignItems: "center", border: `1px solid ${T.line}`, borderRadius: 10, overflow: "hidden", background: "#fff" }}>
+                              <button
+                                type="button"
+                                onClick={() => bumpTotMarks(questionIndex, -1)}
+                                aria-label={`Decrease marks for question ${questionIndex + 1}`}
+                                style={{ width: 28, height: 32, border: "none", background: T.page, color: T.ink, fontWeight: 700, cursor: "pointer" }}
+                              >
+                                −
+                              </button>
+                              <input
+                                className="ac-marks-input"
+                                type="number"
+                                min={1}
+                                max={TOT_MARKS_MAX}
+                                value={question.marks === "" ? "" : toPositiveMarks(question.marks, 1)}
+                                onChange={(e) => handleTotMarksChange(questionIndex, e.target.value)}
+                                style={{ width: 44, height: 32, border: "none", textAlign: "center", fontWeight: 700, fontSize: 13, outline: "none", color: T.ink }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => bumpTotMarks(questionIndex, 1)}
+                                aria-label={`Increase marks for question ${questionIndex + 1}`}
+                                style={{ width: 28, height: 32, border: "none", background: T.page, color: T.ink, fontWeight: 700, cursor: "pointer" }}
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                          {totQuestions.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeTotQuestion(questionIndex)}
+                              style={{ border: "none", background: "transparent", color: T.coral, fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <input
@@ -1621,8 +1807,54 @@ function CreateModal({ display, step, setStep, onClose, onSave, saving, editing,
 function ReferModal({ display, session, onClose, onSend }) {
   const [query, setQuery] = useState("");
   const [pickedId, setPickedId] = useState(null);
-  const filtered = [];
-  const picked = null;
+  const [trainers, setTrainers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      const token = getAuthToken();
+      if (!token) {
+        setLoading(false);
+        setError("Please sign in to load senior trainers");
+        return;
+      }
+      try {
+        const list = await fetchSeniorTrainersApi(token);
+        if (!cancelled) setTrainers(list);
+      } catch (err) {
+        if (!cancelled) setError(err.response?.data?.message || "Failed to load senior trainers");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const filtered = trainers.filter((trainer) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      (trainer.name || "").toLowerCase().includes(q)
+      || (trainer.email || "").toLowerCase().includes(q)
+    );
+  });
+  const picked = trainers.find((trainer) => trainer.id === pickedId) || null;
+
+  const handleSend = async () => {
+    if (!picked || sending) return;
+    setSending(true);
+    try {
+      await onSend(picked);
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <ModalShell onClose={onClose} width={440}>
@@ -1638,6 +1870,17 @@ function ReferModal({ display, session, onClose, onSend }) {
         </div>
         <input className="ac-input" placeholder="Search senior trainers" value={query} onChange={(e) => setQuery(e.target.value)} style={{ marginBottom: 10 }} />
         <div style={{ maxHeight: 220, overflow: "auto" }}>
+          {loading && (
+            <div style={{ fontSize: 13, color: T.mute, padding: "12px 4px" }}>Loading senior trainers…</div>
+          )}
+          {!loading && error && (
+            <div style={{ fontSize: 13, color: T.coral, padding: "12px 4px" }}>{error}</div>
+          )}
+          {!loading && !error && filtered.length === 0 && (
+            <div style={{ fontSize: 13, color: T.mute, padding: "12px 4px" }}>
+              No senior trainers found. Tick <strong>Senior Trainer</strong> on a user in User Management.
+            </div>
+          )}
           {filtered.map((t) => (
             <div
               key={t.id}
@@ -1645,7 +1888,7 @@ function ReferModal({ display, session, onClose, onSend }) {
               style={{ display: "flex", alignItems: "center", gap: 10, padding: 10, borderRadius: 12, cursor: "pointer", background: pickedId === t.id ? T.coralTint : "transparent" }}
             >
               <span style={{ width: 32, height: 32, borderRadius: 999, background: T.lilacTint, color: T.lilac, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700 }}>
-                {t.name[0]}
+                {(t.name || "?")[0]}
               </span>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{t.name}</div>
@@ -1655,11 +1898,11 @@ function ReferModal({ display, session, onClose, onSend }) {
           ))}
         </div>
         <button
-          disabled={!picked}
-          onClick={() => picked && onSend(picked)}
-          style={{ width: "100%", marginTop: 16, height: 44, borderRadius: 12, border: "none", background: T.coral, color: "#fff", fontSize: 14, fontWeight: 700, cursor: picked ? "pointer" : "not-allowed", opacity: picked ? 1 : 0.5 }}
+          disabled={!picked || sending}
+          onClick={handleSend}
+          style={{ width: "100%", marginTop: 16, height: 44, borderRadius: 12, border: "none", background: T.coral, color: "#fff", fontSize: 14, fontWeight: 700, cursor: picked && !sending ? "pointer" : "not-allowed", opacity: picked && !sending ? 1 : 0.5 }}
         >
-          {picked ? `➤ Send to ${picked.name}` : "Select a trainer"}
+          {sending ? "Sending..." : picked ? `➤ Send to ${picked.name}` : "Select a senior trainer"}
         </button>
       </div>
     </ModalShell>

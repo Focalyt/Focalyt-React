@@ -11,9 +11,23 @@ const BLUE = '#2563eb';
 const DOC_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
 const getDocFileUrl = (fileUrl) => resolveMediaUrl(DOC_BUCKET_URL, fileUrl);
 
-const getEvidenceFileType = (fileUrl, docType = '') => {
-  if (!fileUrl) return 'unknown';
-  const extension = fileUrl.split('?')[0].split('.').pop().toLowerCase();
+const formatDocDate = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const formatDocTime = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+};
+
+const getEvidenceFileType = (fileUrl, docType = '', fileName = '') => {
+  const source = String(fileUrl || fileName || '').split('?')[0].toLowerCase();
+  const extension = source.includes('.') ? source.split('.').pop() : '';
 
   if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(extension)) return 'image';
   if (extension === 'pdf') return 'pdf';
@@ -23,7 +37,7 @@ const getEvidenceFileType = (fileUrl, docType = '') => {
 
   const normalizedType = String(docType || '').toLowerCase();
   if (normalizedType === 'image') return 'image';
-  if (normalizedType === 'pdf') return 'pdf';
+  if (normalizedType.includes('pdf')) return 'pdf';
   if (normalizedType === 'video') return 'video';
   if (normalizedType === 'document') return 'document';
   return 'unknown';
@@ -38,56 +52,93 @@ const getAcceptForDocType = (docType = '') => {
   }
 };
 
-const EvidenceDocPreview = ({ doc }) => {
-  if (doc.status !== 'Uploaded' || !doc.fileUrl) return null;
+const DocumentPreviewModal = ({ doc, onClose, fileInputId }) => {
+  const fileUrl = doc?.fileUrl ? getDocFileUrl(doc.fileUrl) : '';
+  const fileType = getEvidenceFileType(fileUrl, doc?.type, doc?.fileName);
+  const hasFile = Boolean(fileUrl);
+  const statusLabel = hasFile ? (doc.status === 'Uploaded' ? 'Pending' : (doc.status || 'Pending')) : 'Not Uploaded';
 
-  const fileUrl = getDocFileUrl(doc.fileUrl);
-  if (!fileUrl) return null;
+  if (!doc) return null;
 
-  const fileType = getEvidenceFileType(fileUrl, doc.type);
-
-  if (fileType === 'image') {
+  const renderPreview = () => {
+    if (!fileUrl) {
+      return (
+        <div className="tm-reg-modal__empty">
+          <span>Not found</span>
+        </div>
+      );
+    }
+    if (fileType === 'image') {
+      return <img src={fileUrl} alt={doc.name} />;
+    }
+    if (fileType === 'pdf') {
+      return <iframe src={`${fileUrl}#navpanes=0&toolbar=0`} title={doc.name} />;
+    }
+    if (fileType === 'video') {
+      return <video src={fileUrl} controls />;
+    }
     return (
-      <div className="sc-evidence-preview">
-        <img src={fileUrl} alt={doc.name || 'Uploaded image'} className="sc-evidence-preview__img" />
+      <div className="tm-reg-modal__empty">
+        <p>Click download to view this file</p>
+        <a href={fileUrl} target="_blank" rel="noopener noreferrer">Download & View</a>
       </div>
     );
-  }
-
-  if (fileType === 'pdf') {
-    return (
-      <div className="sc-evidence-preview sc-evidence-preview--pdf">
-        <iframe
-          src={`${fileUrl}#navpanes=0&toolbar=0`}
-          title={doc.name || 'PDF preview'}
-          className="sc-evidence-preview__iframe"
-        />
-      </div>
-    );
-  }
-
-  if (fileType === 'video') {
-    return (
-      <div className="sc-evidence-preview">
-        <video controls className="sc-evidence-preview__video" src={fileUrl}>
-          <track kind="captions" />
-        </video>
-      </div>
-    );
-  }
+  };
 
   return (
-    <div className="sc-evidence-preview sc-evidence-preview--file">
-      <i className="fas fa-file-alt" />
-      <span>{doc.fileName || doc.name || 'Document file'}</span>
+    <div
+      className="tm-reg-modal-overlay"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="tm-reg-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="tm-reg-modal__head">
+          <h3>{doc.name} Verification</h3>
+          <button type="button" className="tm-reg-modal__close" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="tm-reg-modal__body">
+          <div className="tm-reg-modal__preview">
+            <div className="tm-reg-modal__preview-box">
+              {renderPreview()}
+            </div>
+          </div>
+          <div className="tm-reg-modal__side">
+            <div className="tm-reg-info-card">
+              <h4>Document Information</h4>
+              <div className="tm-reg-info-row">
+                <strong>Document Name:</strong>
+                <span>{doc.name}</span>
+              </div>
+              <div className="tm-reg-info-row">
+                <strong>Upload Date:</strong>
+                <span>{formatDocDate(doc.uploadedAt) || 'N/A'}</span>
+              </div>
+              <div className="tm-reg-info-row">
+                <strong>Status:</strong>
+                <span>{statusLabel}</span>
+              </div>
+            </div>
+            <div className="tm-reg-modal__actions">
+              {fileUrl && (
+                <a
+                  href={fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="tm-reg-btn tm-reg-btn--approve"
+                >
+                  <i className="fas fa-download" /> Download Document
+                </a>
+              )}
+              {fileInputId && (
+                <label htmlFor={fileInputId} className="tm-reg-btn tm-reg-btn--reject">
+                  <i className="fas fa-cloud-upload-alt" /> {hasFile ? 'Replace Document' : 'Upload Document'}
+                </label>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
-};
-
-const openEvidenceFile = (doc) => {
-  const fileUrl = getDocFileUrl(doc.fileUrl);
-  if (!fileUrl) return;
-  window.open(fileUrl, '_blank', 'noopener,noreferrer');
 };
 
 const FILTER_OPTIONS = {
@@ -143,6 +194,7 @@ const mapApiSessionToClient = (session, context = {}) => ({
     status: doc.status || 'Pending',
     fileName: doc.fileName || '',
     fileUrl: doc.fileUrl || '',
+    uploadedAt: doc.uploadedAt || doc.updatedAt || doc.createdAt || null,
   })),
   batch: String(session.batch?._id || session.batch || context.batch || ''),
   course: context.course || '',
@@ -3003,6 +3055,173 @@ const AttendanceManagementModal = ({
   );
 };
 
+const getTotQuestionId = (question, index) => String(question?._id || question?.id || `tot-q-${index}`);
+const getTotQuestionMarks = (question) => {
+  const marks = Number(question?.marks);
+  return Number.isFinite(marks) && marks > 0 ? marks : 1;
+};
+const TOT_PASS_PERCENT_DEFAULT = 40;
+const getTotPassPercentage = (session) => {
+  const n = Number(session?.totPassPercentage);
+  return Number.isFinite(n) && n > 0 && n <= 100 ? n : TOT_PASS_PERCENT_DEFAULT;
+};
+
+const TotMcqAssignmentModal = ({ session, notify, onClose }) => {
+  const questions = Array.isArray(session?.totQuestionBank) ? session.totQuestionBank : [];
+  const [selected, setSelected] = useState({});
+  const [result, setResult] = useState(null);
+  const submitted = Boolean(result);
+  const totalMarks = questions.reduce((sum, question) => sum + getTotQuestionMarks(question), 0);
+  const passPercent = getTotPassPercentage(session);
+  const passMarks = totalMarks > 0 ? Math.ceil((totalMarks * passPercent) / 100) : 0;
+  const attempted = questions.filter((question, index) => selected[getTotQuestionId(question, index)] !== undefined).length;
+
+  const handleSubmit = () => {
+    if (!questions.length) return;
+    if (!attempted) {
+      notify('Select at least one answer before submitting');
+      return;
+    }
+
+    let score = 0;
+    let correctCount = 0;
+    let wrongCount = 0;
+    questions.forEach((question, index) => {
+      const chosen = selected[getTotQuestionId(question, index)];
+      if (chosen === undefined) return;
+      if (Number(chosen) === Number(question.correctIndex)) {
+        score += getTotQuestionMarks(question);
+        correctCount += 1;
+      } else {
+        wrongCount += 1;
+      }
+    });
+
+    const percentage = totalMarks > 0 ? Math.round((score / totalMarks) * 10000) / 100 : 0;
+    setResult({
+      score,
+      totalMarks,
+      percentage,
+      pass: percentage >= passPercent,
+      passPercent,
+      passMarks,
+      correctCount,
+      wrongCount,
+      attempted,
+      unattempted: Math.max(questions.length - attempted, 0),
+    });
+    notify('TOT assignment submitted');
+  };
+
+  const handleRetake = () => {
+    setSelected({});
+    setResult(null);
+  };
+
+  return (
+    <div className="session-modal-backdrop">
+      <div className="session-modal tot-assign-modal" role="dialog" aria-modal="true" aria-labelledby="tot-assign-title">
+        <div className="session-modal__head">
+          <div>
+            <h5 id="tot-assign-title">TOT MCQ Assignment</h5>
+            <span>
+              {session?.title || 'Session'}
+              {questions.length
+                ? ` · ${questions.length} question${questions.length === 1 ? '' : 's'} · ${totalMarks} mark${totalMarks === 1 ? '' : 's'} · pass ${passPercent}%`
+                : ''}
+            </span>
+          </div>
+          <button type="button" className="session-modal__close" onClick={onClose} aria-label="Close">
+            <i className="fas fa-times" />
+          </button>
+        </div>
+
+        <div className="session-modal__body">
+          {!questions.length ? (
+            <div className="sc-evidence-empty">
+              <i className="fas fa-question-circle" />
+              <p>No TOT MCQ questions are attached to this session yet.</p>
+            </div>
+          ) : (
+            <div className="tot-assign">
+              <div className="tot-assign__head">
+                <span className={`tot-assign__status tot-assign__status--${submitted ? (result.pass ? 'pass' : 'fail') : 'pending'}`}>
+                  {submitted
+                    ? (result.pass ? 'Submitted · Pass' : 'Submitted · Needs improvement')
+                    : `${attempted}/${questions.length} answered · pass ${passPercent}%`}
+                </span>
+              </div>
+
+              {submitted && (
+                <div className={`tot-assign__result tot-assign__result--${result.pass ? 'pass' : 'fail'}`}>
+                  <strong>{result.score}/{result.totalMarks} marks · {result.percentage}%</strong>
+                  <span>
+                    {result.correctCount} correct · {result.wrongCount} wrong · {result.unattempted} skipped
+                    {` · need ${result.passPercent || passPercent}% to pass`}
+                  </span>
+                </div>
+              )}
+
+              <div className="tot-assign__list">
+                {questions.map((question, qIndex) => {
+                  const questionId = getTotQuestionId(question, qIndex);
+                  const chosen = selected[questionId];
+                  const marks = getTotQuestionMarks(question);
+                  return (
+                    <div key={questionId} className="tot-assign__card">
+                      <div className="tot-assign__qhead">
+                        <strong>{qIndex + 1}. {question.question || 'Untitled question'}</strong>
+                        <span>{marks} mark{marks === 1 ? '' : 's'}</span>
+                      </div>
+                      <div className="tot-assign__options">
+                        {(question.options || []).map((option, optionIndex) => {
+                          const isChosen = chosen === optionIndex;
+                          const isCorrect = Number(question.correctIndex) === optionIndex;
+                          const reviewClass = submitted
+                            ? (isCorrect ? ' tot-assign__option--correct' : isChosen ? ' tot-assign__option--wrong' : '')
+                            : (isChosen ? ' tot-assign__option--chosen' : '');
+                          return (
+                            <label key={`${questionId}-${optionIndex}`} className={`tot-assign__option${reviewClass}`}>
+                              <input
+                                type="radio"
+                                name={`tot-mcq-${session?.id || 'session'}-${questionId}`}
+                                checked={isChosen}
+                                disabled={submitted}
+                                onChange={() => setSelected((prev) => ({ ...prev, [questionId]: optionIndex }))}
+                              />
+                              <span className="tot-assign__letter">{String.fromCharCode(65 + optionIndex)}</span>
+                              <span>{option || 'Option not set'}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="session-modal__foot">
+          <button type="button" className="sc-btn" onClick={onClose}>Close</button>
+          {questions.length > 0 && (
+            submitted ? (
+              <button type="button" className="sc-btn sc-btn--outline" onClick={handleRetake}>
+                <i className="fas fa-redo" /> Retake assignment
+              </button>
+            ) : (
+              <button type="button" className="sc-btn sc-btn--primary" onClick={handleSubmit}>
+                <i className="fas fa-paper-plane" /> Submit assignment
+              </button>
+            )
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const SessionCard = ({
   basicDetails,
   session,
@@ -3020,6 +3239,8 @@ const SessionCard = ({
   const [activeTab, setActiveTab] = useState('details');
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [totModalOpen, setTotModalOpen] = useState(false);
+  const [selectedDoc, setSelectedDoc] = useState(null);
   const activeSession = session || hydrateSession(DUMMY_SESSIONS[0], 0, basicDetails);
   const sessionMeta = useMemo(
     () => getSessionAttendanceMeta(activeSession),
@@ -3102,6 +3323,14 @@ const SessionCard = ({
         />
       )}
 
+      {totModalOpen && (
+        <TotMcqAssignmentModal
+          session={activeSession}
+          notify={notify}
+          onClose={() => setTotModalOpen(false)}
+        />
+      )}
+
       {!collapsed && (
         <>
           <nav className="sc-tabs" aria-label="Session sections">
@@ -3121,7 +3350,7 @@ const SessionCard = ({
             </button>
           </nav>
 
-          {activeTab === 'details' ? (
+          {activeTab === 'details' && (
             <div className="sc-body">
               <div className="sc-detail-grid">
                 {detailItems.map(([icon, label, value, tone]) => (
@@ -3154,41 +3383,10 @@ const SessionCard = ({
                   <p>{activeSession.notes || 'No notes added.'}</p>
                 </div>
               </div>
-
-              {activeSession.totQuestionBank?.length > 0 && (
-                <div className="sc-tot-question-bank">
-                  <div className="sc-tot-question-bank__head">
-                    <h4><i className="fas fa-question-circle" /> TOT MCQ question bank</h4>
-                    <span className="sc-tot-question-bank__meta">
-                      {activeSession.totQuestionBank.length} question{activeSession.totQuestionBank.length === 1 ? '' : 's'}
-                      {activeSession.totQuestionBankLastUpdated ? ` · Updated ${new Date(activeSession.totQuestionBankLastUpdated).toLocaleDateString('en-IN')}` : ''}
-                    </span>
-                  </div>
-                  <div className="sc-tot-question-list">
-                    {activeSession.totQuestionBank.map((question, qIndex) => (
-                      <div key={question.id || qIndex} className="sc-tot-question-card">
-                        <div className="sc-tot-question-card__header">
-                          <strong>{qIndex + 1}. {question.question || 'Untitled question'}</strong>
-                          <span>{question.marks || 0} mark{question.marks === 1 ? '' : 's'}</span>
-                        </div>
-                        <div className="sc-tot-question-options">
-                          {(question.options || []).map((option, optionIndex) => (
-                            <div
-                              key={optionIndex}
-                              className={`sc-tot-question-option${question.correctIndex === optionIndex ? ' sc-tot-question-option--correct' : ''}`}
-                            >
-                              <span className="sc-tot-question-option__label">{String.fromCharCode(65 + optionIndex)}</span>
-                              <span>{option || 'Option not set'}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
-          ) : (
+          )}
+
+          {activeTab === 'evidence' && (
             <div className="sc-body">
               {evidenceDocs.length === 0 ? (
                 <div className="sc-evidence-empty">
@@ -3196,60 +3394,101 @@ const SessionCard = ({
                   <p>No documents defined for this session plan yet. Upload files here once documents are listed.</p>
                 </div>
               ) : (
-                <div className="sc-evidence-grid">
+                <div className="tm-reg-docs-grid">
                   {evidenceDocs.map((doc) => {
                     const docKey = String(doc._id || doc.id);
-                    const icon = doc.type === 'Image' ? 'fa-image' : doc.type === 'Video' ? 'fa-video' : doc.type === 'PDF' ? 'fa-file-pdf' : 'fa-file-alt';
-                    const tone = doc.status === 'Uploaded' ? 'green' : 'amber';
-                    const isUploaded = doc.status === 'Uploaded' && doc.fileUrl;
+                    const inputId = `${activeSession.id}-${docKey}`;
+                    const fileUrl = doc.fileUrl ? getDocFileUrl(doc.fileUrl) : '';
+                    const fileType = getEvidenceFileType(fileUrl, doc.type, doc.fileName);
+                    const hasFile = Boolean(fileUrl) || (doc.status === 'Uploaded' && Boolean(doc.fileName));
+                    const uploadDate = formatDocDate(doc.uploadedAt);
+                    const uploadTime = formatDocTime(doc.uploadedAt);
                     return (
-                      <div key={docKey} className={`sc-evidence-card${isUploaded ? ' sc-evidence-card--uploaded' : ''}`}>
-                        {isUploaded ? (
-                          <>
-                            <EvidenceDocPreview doc={doc} />
-                            <strong className="sc-evidence-card__title">{doc.name}</strong>
-                            <div className="sc-evidence-actions">
-                              <button type="button" className="sc-upload-btn" onClick={() => openEvidenceFile(doc)}>
-                                <i className="fas fa-eye" /> View
+                      <div key={docKey} className="tm-reg-doc-card">
+                        <div className="tm-reg-doc-card__preview">
+                          {hasFile ? (
+                            fileType === 'image' && fileUrl ? (
+                              <img src={fileUrl} alt={doc.name} className="tm-reg-doc-card__image" />
+                            ) : fileType === 'pdf' ? (
+                              <div className="tm-reg-doc-card__icon">
+                                <i className="fa-solid fa-file" style={{ fontSize: 100, color: '#dc3545' }} />
+                                <p>PDF Document</p>
+                              </div>
+                            ) : (
+                              <div className="tm-reg-doc-card__icon">
+                                <i className={`fas ${fileType === 'video' ? 'fa-video' : 'fa-file'}`} />
+                                <p>{fileType === 'video' ? 'Video' : 'Document'}</p>
+                              </div>
+                            )
+                          ) : (
+                            <div className="tm-reg-doc-card__empty">
+                              <i className="fas fa-file-upload" />
+                              <p>No Document</p>
+                            </div>
+                          )}
+                          {hasFile && (
+                            <div className="tm-reg-doc-card__overlay">
+                              <button type="button" className="tm-reg-preview-btn" onClick={() => setSelectedDoc(doc)}>
+                                <i className="fas fa-search-plus" />
+                                Preview
                               </button>
-                              <input
-                                id={`${activeSession.id}-${docKey}`}
-                                type="file"
-                                className="sc-file-input"
-                                accept={getAcceptForDocType(doc.type)}
-                                onChange={(e) => onEvidenceUpload(activeSession.id, docKey, e.target.files?.[0])}
-                              />
-                              <label className="sc-upload-btn" htmlFor={`${activeSession.id}-${docKey}`}>
-                                <i className="fas fa-upload" /> Replace
+                            </div>
+                          )}
+                        </div>
+                        <div className="tm-reg-doc-card__info">
+                          <div className="tm-reg-doc-card__header">
+                            <h4>{doc.name || 'Untitled document'}</h4>
+                            {hasFile ? (
+                              <button
+                                type="button"
+                                className="tm-reg-pill tm-reg-pill--verify"
+                                onClick={() => setSelectedDoc(doc)}
+                              >
+                                <i className="fas fa-check" />
+                                VERIFY
+                              </button>
+                            ) : (
+                              <label htmlFor={inputId} className="tm-reg-pill tm-reg-pill--upload">
+                                <i className="fas fa-cloud-upload-alt" />
+                                UPLOAD
                               </label>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className={`sc-evidence-icon sc-evidence-icon--${tone}`}>
-                              <i className={`fas ${icon}`} />
-                            </div>
-                            <strong className="sc-evidence-card__title">{doc.name}</strong>
-                            <small className="sc-evidence-type">{doc.type}</small>
-                            <small className="ev-pending">
-                              <i className="fas fa-clock" /> Pending
-                            </small>
-                            <input
-                              id={`${activeSession.id}-${docKey}`}
-                              type="file"
-                              className="sc-file-input"
-                              accept={getAcceptForDocType(doc.type)}
-                              onChange={(e) => onEvidenceUpload(activeSession.id, docKey, e.target.files?.[0])}
-                            />
-                            <label className="sc-upload-btn sc-upload-btn--full" htmlFor={`${activeSession.id}-${docKey}`}>
-                              <i className="fas fa-upload" /> Upload
-                            </label>
-                          </>
-                        )}
+                            )}
+                          </div>
+                          <div className="tm-reg-doc-card__meta">
+                            <span>
+                              <i className="fas fa-calendar-alt" />
+                              {uploadDate || 'Not uploaded'}
+                            </span>
+                            {uploadTime && (
+                              <span>
+                                <i className="fas fa-clock" />
+                                {uploadTime}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <input
+                          id={inputId}
+                          type="file"
+                          className="sc-file-input"
+                          accept={getAcceptForDocType(doc.type)}
+                          onChange={(e) => {
+                            onEvidenceUpload(activeSession.id, docKey, e.target.files?.[0]);
+                            e.target.value = '';
+                            setSelectedDoc(null);
+                          }}
+                        />
                       </div>
                     );
                   })}
                 </div>
+              )}
+              {selectedDoc && (
+                <DocumentPreviewModal
+                  doc={selectedDoc}
+                  fileInputId={`${activeSession.id}-${String(selectedDoc._id || selectedDoc.id)}`}
+                  onClose={() => setSelectedDoc(null)}
+                />
               )}
             </div>
           )}
@@ -3266,6 +3505,13 @@ const SessionCard = ({
               </span>
             )}
             <div className="sc-foot-right">
+              <button
+                type="button"
+                className="sc-btn sc-btn--outline"
+                onClick={() => setTotModalOpen(true)}
+              >
+                <i className="fas fa-clipboard-list" /> Assignment
+              </button>
               <button
                 type="button"
                 className="sc-btn sc-btn--outline"
@@ -4254,6 +4500,8 @@ const TrainerModule = () => {
                     ...doc,
                     status: 'Uploaded',
                     fileName: file.name,
+                    fileUrl: URL.createObjectURL(file),
+                    uploadedAt: new Date().toISOString(),
                     type: getEvidenceTypeFromFile(file),
                     name: doc.name?.trim() || getEvidenceDisplayName(file.name),
                   }
@@ -6088,6 +6336,13 @@ const PORTAL_CSS = `
     content: ''; position: absolute; bottom: -1px; left: 0; right: 0;
     height: 2px; border-radius: 2px 2px 0 0; background: ${BLUE};
   }
+  .sc-tab-count {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 18px; height: 18px; padding: 0 5px; margin-left: 2px;
+    border-radius: 999px; background: #dbeafe; color: ${BLUE};
+    font-size: 10px; font-weight: 800;
+  }
+  .sc-tab--active .sc-tab-count { background: ${BLUE}; color: #fff; }
   .sc-body { padding: 12px 14px 10px; }
   .sc-detail-grid {
     display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px 14px; margin-bottom: 10px;
@@ -6207,6 +6462,343 @@ const PORTAL_CSS = `
   }
   .sc-evidence-empty i { font-size: 28px; color: #94a3b8; }
   .sc-evidence-empty p { margin: 0; font-size: 12px; font-weight: 600; }
+
+  .tm-reg-docs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 2rem;
+    padding: 4px 2px 12px;
+  }
+  .tm-reg-doc-card {
+    background: #fff;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    position: relative;
+  }
+  .tm-reg-doc-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+  }
+  .tm-reg-doc-card__preview {
+    position: relative;
+    height: 200px;
+    overflow: hidden;
+    background: #f8f9fa;
+  }
+  .tm-reg-doc-card__image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+  }
+  .tm-reg-doc-card:hover .tm-reg-doc-card__image { transform: scale(1.05); }
+  .tm-reg-doc-card__icon,
+  .tm-reg-doc-card__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #ccc;
+  }
+  .tm-reg-doc-card__empty i { font-size: 3rem; }
+  .tm-reg-doc-card__empty p,
+  .tm-reg-doc-card__icon p {
+    margin: 10px 0 0;
+    font-size: 12px;
+    color: #999;
+  }
+  .tm-reg-doc-card__icon i { color: #6c757d; font-size: 40px; }
+  .tm-reg-doc-card__overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .tm-reg-doc-card:hover .tm-reg-doc-card__overlay { opacity: 1; }
+  .tm-reg-preview-btn {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    border: none;
+    border-radius: 25px;
+    padding: 0.75rem 1.5rem;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
+  }
+  .tm-reg-doc-card__info { padding: 1.5rem; }
+  .tm-reg-doc-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+    gap: 0.75rem;
+  }
+  .tm-reg-doc-card__header h4 {
+    margin: 0;
+    color: #333;
+    font-size: 0.9rem;
+    font-weight: 700;
+    line-height: 1.3;
+    flex: 1;
+  }
+  .tm-reg-pill {
+    border: none;
+    border-radius: 20px;
+    padding: 0.5rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .tm-reg-pill--upload {
+    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    color: #fff;
+    box-shadow: 0 3px 10px rgba(250, 112, 154, 0.4);
+  }
+  .tm-reg-pill--verify {
+    background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+    color: #c62828;
+    box-shadow: 0 3px 10px rgba(255, 154, 158, 0.4);
+  }
+  .tm-reg-doc-card__meta {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    color: #666;
+    font-size: 0.85rem;
+  }
+  .tm-reg-doc-card__meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+  .tm-reg-doc-card__meta i { color: #94a3b8; }
+  .tm-reg-modal-overlay {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    backdrop-filter: blur(5px);
+    padding: 16px;
+  }
+  .tm-reg-modal {
+    background: #fff;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 1100px;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+  }
+  .tm-reg-modal__head {
+    padding: 1.5rem 2rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .tm-reg-modal__head h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #fff;
+  }
+  .tm-reg-modal__close {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.5rem;
+    cursor: pointer;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+  }
+  .tm-reg-modal__close:hover { background: rgba(255,255,255,0.2); }
+  .tm-reg-modal__body {
+    padding: 2rem;
+    display: flex;
+    gap: 2rem;
+    overflow-y: auto;
+    min-height: 0;
+  }
+  .tm-reg-modal__preview { flex: 2; min-width: 0; }
+  .tm-reg-modal__preview-box {
+    background: #f8f9fa;
+    border-radius: 8px;
+    min-height: 500px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed #dee2e6;
+    overflow: hidden;
+    position: relative;
+  }
+  .tm-reg-modal__preview-box img {
+    max-width: 100%;
+    max-height: 90%;
+    object-fit: contain;
+  }
+  .tm-reg-modal__preview-box iframe,
+  .tm-reg-modal__preview-box video {
+    width: 100%;
+    height: 500px;
+    border: none;
+    background: #fff;
+  }
+  .tm-reg-modal__empty {
+    text-align: left;
+    width: 100%;
+    height: 100%;
+    min-height: 460px;
+    padding: 16px;
+    color: #212529;
+    font-size: 14px;
+  }
+  .tm-reg-modal__side {
+    flex: 1;
+    min-width: 260px;
+    max-width: 340px;
+  }
+  .tm-reg-info-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid #e9ecef;
+  }
+  .tm-reg-info-card h4 {
+    margin: 0 0 1rem;
+    color: #495057;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 0.5rem;
+  }
+  .tm-reg-info-row {
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .tm-reg-info-row strong {
+    color: #495057;
+    min-width: 120px;
+    font-size: 0.92rem;
+  }
+  .tm-reg-info-row span { color: #212529; font-size: 0.92rem; }
+  .tm-reg-modal__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .tm-reg-btn {
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    width: 100%;
+    text-decoration: none;
+  }
+  .tm-reg-btn--approve { background: #198754; color: #fff; }
+  .tm-reg-btn--reject { background: #dc3545; color: #fff; }
+  @media (max-width: 900px) {
+    .tm-reg-modal__body { flex-direction: column; }
+    .tm-reg-modal__side { max-width: none; }
+    .tm-reg-modal__preview-box iframe,
+    .tm-reg-modal__preview-box video { height: 320px; }
+  }
+
+  .tot-assign-modal { width: min(760px, 100%); }
+  .tot-assign { display: flex; flex-direction: column; gap: 12px; }
+  .tot-assign__head {
+    display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+  }
+  .tot-assign__head h4 {
+    margin: 0; font-size: 14px; font-weight: 800; color: #0f172a;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .tot-assign__head h4 i { color: ${BLUE}; }
+  .tot-assign__head p { margin: 4px 0 0; font-size: 12px; font-weight: 600; color: #64748b; }
+  .tot-assign__status {
+    flex-shrink: 0; border-radius: 999px; padding: 5px 10px;
+    font-size: 11px; font-weight: 800;
+  }
+  .tot-assign__status--pending { background: #eff6ff; color: ${BLUE}; }
+  .tot-assign__status--pass { background: #d1fae5; color: #047857; }
+  .tot-assign__status--fail { background: #fee2e2; color: #b91c1c; }
+  .tot-assign__result {
+    display: flex; flex-direction: column; gap: 2px;
+    border-radius: 12px; padding: 10px 12px;
+  }
+  .tot-assign__result strong { font-size: 13px; }
+  .tot-assign__result span { font-size: 11px; font-weight: 700; }
+  .tot-assign__result--pass { background: #ecfdf5; color: #047857; }
+  .tot-assign__result--fail { background: #fef2f2; color: #b91c1c; }
+  .tot-assign__list { display: flex; flex-direction: column; gap: 10px; }
+  .tot-assign__card {
+    border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px;
+    background: #fff;
+  }
+  .tot-assign__qhead {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+    margin-bottom: 10px;
+  }
+  .tot-assign__qhead strong { font-size: 13px; font-weight: 800; color: #0f172a; line-height: 1.4; }
+  .tot-assign__qhead span { flex-shrink: 0; font-size: 11px; font-weight: 800; color: #64748b; }
+  .tot-assign__options { display: flex; flex-direction: column; gap: 8px; }
+  .tot-assign__option {
+    display: flex; align-items: center; gap: 8px;
+    border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 10px;
+    background: #f8fafc; cursor: pointer; font-size: 12px; font-weight: 600; color: #334155;
+  }
+  .tot-assign__option input { accent-color: ${BLUE}; }
+  .tot-assign__option:has(input:disabled) { cursor: default; }
+  .tot-assign__option--chosen { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+  .tot-assign__option--correct { border-color: #6ee7b7; background: #ecfdf5; color: #047857; }
+  .tot-assign__option--wrong { border-color: #fca5a5; background: #fef2f2; color: #b91c1c; }
+  .tot-assign__letter {
+    width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #e2e8f0; color: #475569; font-size: 11px; font-weight: 800;
+  }
+  .tot-assign__option--chosen .tot-assign__letter { background: #dbeafe; color: ${BLUE}; }
+  .tot-assign__option--correct .tot-assign__letter { background: #a7f3d0; color: #047857; }
+  .tot-assign__option--wrong .tot-assign__letter { background: #fecaca; color: #b91c1c; }
+  .tot-assign__actions { display: flex; justify-content: flex-end; padding-top: 4px; }
   .ev-uploaded { color: #059669; }
   .ev-pending  { color: #d97706; }
   .sc-file-name { font-size: 11px; color: #64748b; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

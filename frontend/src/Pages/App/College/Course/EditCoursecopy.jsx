@@ -1345,7 +1345,7 @@ const EditCourse = () => {
       if (response.data.status) {
         setSubmitSuccess(true);
         alert('Course updated successfully');
-        navigate('/institute/viewcoursecopy');
+        navigate('/institute/viewcourse');
       } else {
         alert(response.data.message || 'Failed to update course');
       }
