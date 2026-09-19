@@ -1479,7 +1479,6 @@ function CreateModal({ display, step, setStep, onClose, onSave, saving, editing,
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {[
               { label: "Student learning material", items: studentMaterial, setter: setStudentMaterial, type: "PDF" },
-              { label: "Required documents", items: requiredDocuments, setter: setRequiredDocuments, type: "Document" },
               { label: "Standard TLM", items: standardTlm, setter: setStandardTlm, type: "PDF" },
               { label: "Trainer-based TLM", items: trainerTlm, setter: setTrainerTlm, type: "PDF" },
             ].map(({ label, items, setter, type }) => (

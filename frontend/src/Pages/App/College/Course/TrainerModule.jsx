@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import axios from 'axios';
 import DatePicker from 'react-date-picker';
 import 'react-date-picker/dist/DatePicker.css';
@@ -1867,7 +1867,7 @@ const ActionToolbar = ({ quickSearch, onSearchChange, onSearch, onAddSession, no
       </div>
       <div className="tm-toolbar__secondary">
         <button type="button" className="tm-btn tm-btn--ghost" onClick={() => setShowMore((v) => !v)}>
-          <i className="fas fa-ellipsis-h" /> More Actions
+          <i className="fas fa-ellipsis-v" /> More Actions
         </button>
         {showMore && (
           <div className="tm-toolbar__menu">
@@ -3282,6 +3282,42 @@ const TotMcqAssignmentModal = ({ session, notify, token, backendUrl, onSubmitted
   );
 };
 
+const MarkSessionDoneModal = ({ session, remark, submitting, onRemarkChange, onClose, onSubmit }) => (
+  <div className="session-modal-backdrop">
+    <div className="session-modal session-modal--done" role="dialog" aria-modal="true" aria-labelledby="mark-session-done-title">
+      <div className="session-modal__head">
+        <div>
+          <h5 id="mark-session-done-title">Mark Session Done</h5>
+          <span>{session?.title || 'Session'}</span>
+        </div>
+        <button type="button" className="session-modal__close" onClick={onClose} aria-label="Close">
+          <i className="fas fa-times" />
+        </button>
+      </div>
+      <div className="session-modal__body">
+        <label className="sc-done-label" htmlFor="session-done-remark">
+          Remark <span className="sc-done-required">*</span>
+        </label>
+        <textarea
+          id="session-done-remark"
+          className="sc-done-remark"
+          rows={3}
+          value={remark}
+          onChange={(e) => onRemarkChange(e.target.value)}
+          placeholder="Write a remark..."
+        />
+      </div>
+      <div className="session-modal__foot">
+        <button type="button" className="sc-btn" onClick={onClose} disabled={submitting}>Cancel</button>
+        <button type="button" className="sc-btn sc-btn--primary" onClick={onSubmit} disabled={submitting}>
+          <i className={`fas ${submitting ? 'fa-spinner fa-spin' : 'fa-check'}`} />
+          {submitting ? 'Submitting...' : 'Submit'}
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
 const SessionCard = ({
   basicDetails,
   session,
@@ -3296,6 +3332,7 @@ const SessionCard = ({
   onEditSession,
   onOpenAttendance,
   onAssignmentSubmitted,
+  onMarkSessionDone,
   isCoordinatorPlan = false,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
@@ -3303,6 +3340,12 @@ const SessionCard = ({
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
   const [totModalOpen, setTotModalOpen] = useState(false);
+  const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
+  const moreBtnRef = useRef(null);
+  const menuRef = useRef(null);
+  const [doneModalOpen, setDoneModalOpen] = useState(false);
+  const [doneRemark, setDoneRemark] = useState('');
+  const [doneSubmitting, setDoneSubmitting] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const activeSession = session || hydrateSession(DUMMY_SESSIONS[0], 0, basicDetails);
   const sessionMeta = useMemo(
@@ -3336,9 +3379,140 @@ const SessionCard = ({
     { icon: 'fa-percentage', val: liveStats.attendance || '0%', lbl: 'Attendance', cls: 'amber' },
   ]), [liveStats]);
   const evidenceDocs = activeSession.evidenceDocs || [];
+  const assignmentLabel = activeSession?.totAssignmentSubmission?.submittedAt
+    ? (getPendingTotQuestions(activeSession).length
+      ? `ToT · ${getPendingTotQuestions(activeSession).length} new`
+      : `ToT · ${activeSession.totAssignmentSubmission.pass ? 'Pass' : 'Fail'} ${Number(activeSession.totAssignmentSubmission.percentage) || 0}%`)
+    : 'ToT';
+
+  const closeActionsMenu = () => setActionsMenuOpen(false);
+
+  const toggleActionsMenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setActionsMenuOpen((open) => !open);
+  };
+
+  useEffect(() => {
+    if (!actionsMenuOpen) return undefined;
+    const onPointerDown = (event) => {
+      const target = event.target;
+      if (moreBtnRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setActionsMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('touchstart', onPointerDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('touchstart', onPointerDown);
+    };
+  }, [actionsMenuOpen]);
+
+  const closeDoneModal = () => {
+    setDoneModalOpen(false);
+    setDoneSubmitting(false);
+  };
+
+  const submitSessionDone = async () => {
+    const remark = doneRemark.trim();
+    if (!remark) {
+      notify('Please enter a remark before submitting.');
+      return;
+    }
+    if (typeof onMarkSessionDone !== 'function') {
+      notify('Unable to mark session done.');
+      return;
+    }
+    try {
+      setDoneSubmitting(true);
+      await onMarkSessionDone(activeSession, remark);
+      closeDoneModal();
+    } catch (error) {
+      notify(error?.response?.data?.message || error?.message || 'Failed to mark session done');
+      setDoneSubmitting(false);
+    }
+  };
+
+  const renderSessionActionsDropdown = () => {
+    if (!actionsMenuOpen) return null;
+    return (
+      <div ref={menuRef} className="sc-actions-dropdown is-open" role="menu">
+          {!isCoordinatorPlan && (
+            <button
+              type="button"
+              className="sc-actions-item"
+              role="menuitem"
+              onClick={() => {
+                closeActionsMenu();
+                onEditSession(activeSession);
+              }}
+            >
+              <i className="far fa-edit" aria-hidden="true" />
+              Edit Session
+            </button>
+          )}
+          <button
+            type="button"
+            className="sc-actions-item"
+            role="menuitem"
+            title={assignmentLabel}
+            onClick={() => {
+              closeActionsMenu();
+              setTotModalOpen(true);
+            }}
+          >
+            <i className="fas fa-clipboard-list" aria-hidden="true" />
+            ToT
+          </button>
+          <button
+            type="button"
+            className="sc-actions-item"
+            role="menuitem"
+            disabled={!sessionMeta.countable}
+            title={sessionMeta.countable ? 'Mark attendance for this session' : sessionMeta.label}
+            onClick={() => {
+              if (!sessionMeta.countable) {
+                notify(sessionMeta.label || 'Attendance cannot be marked on Sunday.');
+                return;
+              }
+              closeActionsMenu();
+              onOpenAttendance(activeSession, 'register');
+            }}
+          >
+            <i className="fas fa-user-check" aria-hidden="true" />
+            Mark Attendance
+          </button>
+          <button
+            type="button"
+            className="sc-actions-item"
+            role="menuitem"
+            onClick={() => {
+              closeActionsMenu();
+              onOpenAttendance(activeSession, 'summary');
+            }}
+          >
+            <i className="fas fa-chart-bar" aria-hidden="true" />
+            View Attendance
+          </button>
+          <button
+            type="button"
+            className="sc-actions-item"
+            role="menuitem"
+            onClick={() => {
+              closeActionsMenu();
+              setDoneRemark(activeSession.completionRemark || activeSession.doneRemark || '');
+              setDoneModalOpen(true);
+            }}
+          >
+            <i className="fas fa-check-circle" aria-hidden="true" />
+            Mark Session Done
+          </button>
+        </div>
+    );
+  };
 
   return (
-    <article className="sc-wrap">
+    <article className={`sc-wrap${actionsMenuOpen ? ' sc-wrap--menu' : ''}`}>
       <div className="sc-head">
         <div className="sc-head-left">
           <div className="sc-avatar">
@@ -3367,14 +3541,28 @@ const SessionCard = ({
           ))}
         </div>
 
-        <button
-          type="button"
-          className="sc-toggle-btn"
-          onClick={() => setCollapsed((c) => !c)}
-          aria-label={collapsed ? 'Expand card' : 'Collapse card'}
-        >
-          <i className={`fas fa-chevron-${collapsed ? 'down' : 'up'}`} />
-        </button>
+        <div className="sc-head-controls">
+          <button
+            ref={moreBtnRef}
+            type="button"
+            className="sc-toggle-btn"
+            onClick={toggleActionsMenu}
+            title="More actions"
+            aria-label="More actions"
+            aria-expanded={actionsMenuOpen}
+          >
+            <i className="fas fa-ellipsis-v" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="sc-toggle-btn"
+            onClick={() => setCollapsed((c) => !c)}
+            aria-label={collapsed ? 'Expand card' : 'Collapse card'}
+          >
+            <i className={`fas fa-chevron-${collapsed ? 'down' : 'up'}`} />
+          </button>
+          {renderSessionActionsDropdown()}
+        </div>
       </div>
 
       {feedbackModalOpen && (
@@ -3394,6 +3582,17 @@ const SessionCard = ({
           backendUrl={backendUrl}
           onSubmitted={onAssignmentSubmitted}
           onClose={() => setTotModalOpen(false)}
+        />
+      )}
+
+      {doneModalOpen && (
+        <MarkSessionDoneModal
+          session={activeSession}
+          remark={doneRemark}
+          submitting={doneSubmitting}
+          onRemarkChange={setDoneRemark}
+          onClose={closeDoneModal}
+          onSubmit={submitSessionDone}
         />
       )}
 
@@ -3419,14 +3618,13 @@ const SessionCard = ({
           {activeTab === 'details' && (
             <div className="sc-body">
               <div className="sc-detail-grid">
-                {detailItems.map(([icon, label, value, tone]) => (
+                {detailItems.map(([icon, label, tone]) => (
                   <div key={label} className="sc-detail-item">
                     <small>{label}</small>
                     <strong>
                       <span className={`sc-detail-icon sc-detail-icon--${tone}`}>
                         <i className={`fas ${icon}`} />
                       </span>
-                      <span className="sc-detail-value">{value}</span>
                     </strong>
                   </div>
                 ))}
@@ -3559,50 +3757,13 @@ const SessionCard = ({
             </div>
           )}
 
-          <footer className="sc-foot">
-            {!isCoordinatorPlan && (
-              <button type="button" className="sc-btn" onClick={() => onEditSession(activeSession)}>
-                <i className="far fa-edit" /> Edit Session
-              </button>
-            )}
-            {isCoordinatorPlan && (
+          {isCoordinatorPlan && (
+            <footer className="sc-foot">
               <span className="sc-foot-note">
                 <i className="fas fa-info-circle" /> Session plan is read-only — manage attendance and documents only.
               </span>
-            )}
-            <div className="sc-foot-right">
-              <button
-                type="button"
-                className="sc-btn sc-btn--outline"
-                onClick={() => setTotModalOpen(true)}
-              >
-                <i className="fas fa-clipboard-list" />
-                {activeSession?.totAssignmentSubmission?.submittedAt
-                  ? (getPendingTotQuestions(activeSession).length
-                    ? `Assignment · ${getPendingTotQuestions(activeSession).length} new`
-                    : `Result · ${activeSession.totAssignmentSubmission.pass ? 'Pass' : 'Fail'} ${Number(activeSession.totAssignmentSubmission.percentage) || 0}%`)
-                  : 'Assignment'}
-              </button>
-              <button
-                type="button"
-                className="sc-btn sc-btn--outline"
-                disabled={!sessionMeta.countable}
-                title={sessionMeta.countable ? 'Mark attendance for this session' : sessionMeta.label}
-                onClick={() => {
-                  if (!sessionMeta.countable) {
-                    notify(sessionMeta.label || 'Attendance cannot be marked on Sunday.');
-                    return;
-                  }
-                  onOpenAttendance(activeSession, 'register');
-                }}
-              >
-                <i className="fas fa-user-check" /> Mark Attendance
-              </button>
-              <button type="button" className="sc-btn sc-btn--primary" onClick={() => onOpenAttendance(activeSession, 'summary')}>
-                <i className="fas fa-chart-bar" /> View Attendance
-              </button>
-            </div>
-          </footer>
+            </footer>
+          )}
         </>
       )}
     </article>
@@ -4555,6 +4716,24 @@ const TrainerModule = () => {
     });
     notify(`Session marked ${status}`);
   };
+
+  const markSessionDone = (targetSession, remark) => {
+    if (!targetSession?.id) return;
+    if (isCoordinatorPlanSession(targetSession)) {
+      notify('Session plan is read-only. Contact Academic Coordinator to update the plan.');
+      return;
+    }
+    setSessions((prev) => {
+      const next = prev.map((item) => (
+        item.id === targetSession.id
+          ? { ...item, status: 'Completed', completionRemark: remark }
+          : item
+      ));
+      persistSessions(next, resolveSessionBatchId(next.find((item) => item.id === targetSession.id), filters.batch));
+      return next;
+    });
+    notify('Session marked done');
+  };
   const uploadEvidenceFile = async (sessionId, docId, file) => {
     if (!file) return;
 
@@ -4923,6 +5102,7 @@ const TrainerModule = () => {
                           onEvidenceUpload={uploadEvidenceFile}
                           onEditSession={openEditSessionModal}
                           onOpenAttendance={openAttendanceModal}
+                          onMarkSessionDone={markSessionDone}
                           onAssignmentSubmitted={(savedSession) => {
                             if (!savedSession?.id && !savedSession?._id) return;
                             const sessionId = String(savedSession.id || savedSession._id);
@@ -6130,6 +6310,7 @@ const PORTAL_CSS = `
     margin-bottom: 10px;
     box-shadow: 0 4px 14px rgba(37,99,235,0.08);
   }
+  .sc-wrap--menu { overflow: visible; }
 
   /* Head — compact single line */
   .sc-head {
@@ -6374,16 +6555,29 @@ const PORTAL_CSS = `
   }
   .sc-status-menu__item:hover,
   .sc-status-menu__item--active { background: #eff6ff; color: ${BLUE}; }
+  .sc-head-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    position: relative;
+  }
   .sc-toggle-btn {
     border: 0; background: #fff; border-radius: 50%;
-    width: 30px; height: 30px; cursor: pointer; color: ${BLUE}; font-size: 12px;
-    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: 30px; height: 30px; min-width: 30px; min-height: 30px;
+    cursor: pointer; color: ${BLUE}; font-size: 12px;
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
     box-shadow: 0 3px 10px rgba(15,23,42,0.12);
+    overflow: hidden;
+    line-height: 1;
+    padding: 0;
   }
+  .sc-toggle-btn i { font-size: 12px; line-height: 1; }
   .sc-toggle-btn:hover { background: #eff6ff; }
   .sc-stats {
     display: flex; align-items: stretch; gap: 5px;
-    flex-shrink: 0;
+    flex-shrink: 1;
+    min-width: 0;
   }
   .sc-stat {
     display: flex; flex-direction: column; align-items: center;
@@ -6916,7 +7110,43 @@ const PORTAL_CSS = `
     gap: 12px; padding: 14px 22px; flex-wrap: wrap;
     border-top: 1px solid #f1f5f9; background: #fafbfc;
   }
-  .sc-foot-right { display: flex; gap: 10px; flex-wrap: wrap; }
+  .sc-actions-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 36px;
+    z-index: 8;
+    display: flex;
+    flex-direction: column;
+    width: max-content;
+    min-width: 188px;
+    max-width: 240px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 6px;
+    box-shadow: 0 16px 40px rgba(15,23,42,0.16);
+  }
+  .sc-actions-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border: none;
+    background: none;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #334155;
+    cursor: pointer;
+    text-align: left;
+  }
+  .sc-actions-item:hover { background: #f8fafc; color: ${BLUE}; }
+  .sc-actions-item:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .sc-actions-item i { width: 16px; color: ${BLUE}; }
   .sc-btn {
     display: inline-flex; align-items: center; gap: 7px;
     padding: 10px 18px; border-radius: 12px; font-size: 12px; font-weight: 700;
@@ -6939,6 +7169,56 @@ const PORTAL_CSS = `
     background: #fff; border-radius: 20px;
     box-shadow: 0 28px 80px rgba(15,23,42,0.28);
     display: flex; flex-direction: column;
+  }
+  .session-modal.session-modal--done {
+    width: min(360px, calc(100% - 24px));
+    max-height: none;
+    border-radius: 14px;
+  }
+  .session-modal--done .session-modal__head,
+  .session-modal--done .session-modal__foot {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .session-modal--done .session-modal__head h5 { font-size: 14px; }
+  .session-modal--done .session-modal__head span { font-size: 11px; }
+  .session-modal--done .session-modal__close {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+  }
+  .session-modal--done .session-modal__body { padding: 12px; }
+  .session-modal--done .sc-btn {
+    padding: 7px 12px;
+    font-size: 11px;
+    border-radius: 8px;
+  }
+  .sc-done-label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #334155;
+  }
+  .sc-done-required { color: #dc2626; }
+  .sc-done-remark {
+    width: 100%;
+    min-height: 72px;
+    max-height: 120px;
+    resize: vertical;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #0f172a;
+    outline: none;
+    background: #f8fafc;
+  }
+  .sc-done-remark:focus {
+    border-color: ${BLUE};
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
   }
   .session-modal__head,
   .session-modal__foot {
@@ -7962,8 +8242,7 @@ const PORTAL_CSS = `
     .sc-head-right { flex-wrap: wrap; }
     .sc-detail-grid { grid-template-columns: 1fr; gap: 10px; }
     .sc-evidence-grid { grid-template-columns: 1fr; }
-    .sc-foot { flex-direction: column; }
-    .sc-foot-right { width: 100%; flex-direction: column; }
+    .sc-foot { flex-direction: column; align-items: stretch; }
     .sc-btn { width: 100%; justify-content: center; }
     .session-form-grid { grid-template-columns: 1fr; }
     .session-evidence-row { grid-template-columns: 1fr; }

@@ -133,6 +133,8 @@ const Lead = () => {
   const [datePreset, setDatePreset] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [counselorId, setCounselorId] = useState('');
+  const [counselorOptions, setCounselorOptions] = useState([]);
   const [remarkModal, setRemarkModal] = useState(null);
 
   const fetchLeads = useCallback(async () => {
@@ -161,6 +163,7 @@ const Lead = () => {
         if (activeFilter === 'all') params.createdToDate = new Date(`${toDate}T00:00:00`).toISOString();
         else params.aiCallToDate = new Date(`${toDate}T00:00:00`).toISOString();
       }
+      if (counselorId) params.counselor = JSON.stringify([counselorId]);
 
       const response = await axios.get(`${backendUrl}/college/appliedCandidates`, {
         headers: { 'x-auth': token },
@@ -180,11 +183,30 @@ const Lead = () => {
     } finally {
       setLoading(false);
     }
-  }, [token, page, search, activeFilter, fromDate, toDate]);
+  }, [token, page, search, activeFilter, fromDate, toDate, counselorId]);
 
   useEffect(() => {
     fetchLeads();
   }, [fetchLeads]);
+
+  useEffect(() => {
+    if (!token) return;
+    const fetchCounselors = async () => {
+      try {
+        const res = await axios.get(`${backendUrl}/college/filters-data`, {
+          headers: { 'x-auth': token },
+        });
+        if (!res.data?.status) return;
+        const activeCounselors = (res.data.counselors || []).filter(
+          (c) => c?.status === true || c?.status === 'active' || c?.status == null
+        );
+        setCounselorOptions(activeCounselors.map((c) => ({ value: c._id, label: c.name })));
+      } catch {
+        setCounselorOptions([]);
+      }
+    };
+    fetchCounselors();
+  }, [token]);
 
   const rows = useMemo(() => leads.map((lead) => {
     const aiStatus = normalizeStatus(lead?._aiLeadStatus?.title);
@@ -195,7 +217,9 @@ const Lead = () => {
       name: lead?._candidate?.name || 'Unknown',
       mobile: lead?._candidate?.mobile || '—',
       course: lead?._course?.name || '—',
-      counselor: lead?.counsellor?.name || lead?.leadAssignment?.[lead.leadAssignment.length - 1]?.counsellorName || '—',
+      counselor: lead?.counsellor?.name
+        || lead?.leadAssignment?.[lead.leadAssignment?.length - 1]?.counsellorName
+        || '—',
       aiCalled: isAiCallCompleted(lead),
       aiStatus,
       aiDisposition: lead?.aiVoice?.lastDisposition || '',
@@ -315,6 +339,21 @@ const Lead = () => {
         {(fromDate || toDate) && (
           <button type="button" className="ai-human-chip" onClick={clearDates}>Clear dates</button>
         )}
+        <label className="ai-human-date-field">
+          Counsellor
+          <select
+            value={counselorId}
+            onChange={(e) => {
+              setCounselorId(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">All</option>
+            {counselorOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <div className="ai-human-stats">
@@ -365,6 +404,7 @@ const Lead = () => {
             <thead>
               <tr>
                 <th>Lead</th>
+                <th>Counsellor</th>
                 <th>Date</th>
                 <th>AI Call</th>
                 <th>AI Status</th>
@@ -382,8 +422,10 @@ const Lead = () => {
                       <strong>{row.name}</strong>
                       <span>{row.mobile}</span>
                       <small>{row.course}</small>
-                      <small>Counselor: {row.counselor}</small>
                     </div>
+                  </td>
+                  <td>
+                    <span className="ai-human-status">{row.counselor}</span>
                   </td>
                   <td>
                     <div className="ai-human-lead">
@@ -478,7 +520,8 @@ const Lead = () => {
         .ai-human-dates { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
         .ai-human-dates__label { font-size: 12px; font-weight: 700; color: #6b7280; margin-right: 4px; }
         .ai-human-date-field { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #6b7280; }
-        .ai-human-date-field input { border: 1px solid #e5e7eb; border-radius: 10px; padding: 8px 10px; font-weight: 600; color: #111827; }
+        .ai-human-date-field input, .ai-human-date-field select { border: 1px solid #e5e7eb; border-radius: 10px; padding: 8px 10px; font-weight: 600; color: #111827; background: #fff; }
+        .ai-human-date-field select { min-width: 180px; }
         .ai-human-search button, .ai-human-pager button, .ai-human-modal__card button {
           border: none; background: rgb(250, 85, 121); color: #fff; border-radius: 10px; padding: 10px 14px; font-weight: 600;
         }
