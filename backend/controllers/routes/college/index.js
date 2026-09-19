@@ -2542,13 +2542,27 @@ router.route("/appliedCandidatesDetails").get(isCollege, async (req, res) => {
 router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 	try {
 		const user = req.user;
-		const college = await College.findOne({
-			'_concernPerson._id': user._id
-		});
+		const college = (user.college && user.college._id)
+			? user.college
+			: await College.findOne({
+				'_concernPerson._id': user._id
+			});
 
 		const page = parseInt(req.query.page) || 1;
 		const limit = parseInt(req.query.limit) || 20;
 		const skip = (page - 1) * limit;
+		const countOnly = req.query.countOnly === 'true' || req.query.countsOnly === 'true';
+
+		if (!college?._id) {
+			return res.status(200).json({
+				success: true,
+				data: [],
+				totalCount: 0,
+				totalPages: 0,
+				page,
+				limit,
+			});
+		}
 
 		// Extract filter parameters
 		const {
@@ -2636,44 +2650,54 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			await syncAppliedCourseFollowupDates();
 		}
 
-		// Build optimized pipeline with only essential fields
+		const pipelineFilters = {
+			name, courseType, status, leadStatus, aiLeadStatus,
+			createdFromDate, createdToDate,
+			modifiedFromDate, modifiedToDate,
+			nextActionFromDate, nextActionToDate,
+			projectsArray, verticalsArray, courseArray, centerArray, batchArray, subStatuses,
+			registeredByMe: registeredByMe || null,
+			ownerIds: ownerArray,
+			counselorIds: ownerArray.length > 0 ? [] : counselorArray,
+			followupAppliedIds,
+			approvalStatus,
+			hasFollowUpCall,
+			hasFollowUpVisit,
+			leadSourceFilter,
+		};
+
+		const countPipeline = buildSimplifiedPipeline({
+			teamMemberIds,
+			college,
+			filters: pipelineFilters,
+			pagination: { skip: 0, limit: 1 },
+			forCount: true,
+		});
+
+		if (countOnly) {
+			const totalCountResult = await AppliedCourses.aggregate(countPipeline);
+			const totalCount = totalCountResult[0]?.total || 0;
+			return res.status(200).json({
+				success: true,
+				count: 0,
+				totalCount,
+				page,
+				limit,
+				totalPages: Math.ceil(totalCount / limit),
+				data: [],
+			});
+		}
+
 		const pipeline = buildSimplifiedPipeline({
 			teamMemberIds,
 			college,
-			filters: {
-				name, courseType, status, leadStatus, aiLeadStatus,
-				createdFromDate, createdToDate,
-				modifiedFromDate, modifiedToDate,
-				nextActionFromDate, nextActionToDate,
-				projectsArray, verticalsArray, courseArray, centerArray, batchArray, subStatuses,
-				registeredByMe: registeredByMe || null,
-				ownerIds: ownerArray,
-				counselorIds: ownerArray.length > 0 ? [] : counselorArray,
-				followupAppliedIds,
-				approvalStatus,
-				hasFollowUpCall,
-				hasFollowUpVisit,
-				leadSourceFilter,
-			},
+			filters: pipelineFilters,
 			pagination: { skip, limit }
 		});
 
-
-		// Execute queries in parallel
 		const [results, totalCountResult] = await Promise.all([
 			AppliedCourses.aggregate(pipeline),
-			AppliedCourses.aggregate([
-				...pipeline.slice(0, -2), // Remove sort and pagination
-				{ $count: "total" }
-			])
-			// Calculate filter counts in parallel
-			// calculateOptimizedFilterCounts(teamMemberIds, college._id, {
-			//     name, courseType, 
-			//     createdFromDate, createdToDate,
-			//     modifiedFromDate, modifiedToDate,
-			//     nextActionFromDate, nextActionToDate,
-			//     projectsArray, verticalsArray, courseArray, centerArray
-			// })
+			AppliedCourses.aggregate(countPipeline)
 		]);
 
 		const totalCount = totalCountResult[0]?.total || 0;
@@ -3677,7 +3701,7 @@ function applyAiLeadStatusMatch(baseMatch, aiLeadStatus) {
 	return { $and: [baseMatch, clause] };
 }
 
-function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }) {
+function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, forCount = false }) {
 	const pipeline = [];
 	let baseMatch = {};
 	filters.leadStatus = String(filters.leadStatus);
@@ -3790,11 +3814,16 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 		baseMatch = { $and: [baseMatch, ...followupSlotFilters] };
 	}
 
+	if (filters.centerArray && filters.centerArray.length > 0) {
+		baseMatch._center = { $in: filters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+	}
+	if (filters.batchArray && filters.batchArray.length > 0) {
+		baseMatch.batch = { $in: filters.batchArray.map(id => new mongoose.Types.ObjectId(id)) };
+	}
+
 	pipeline.push({ $match: baseMatch });
 
-	// Essential lookups only - get minimal required data
-	pipeline.push(
-		// Course lookup with college filter
+	const courseLookupStages = [
 		{
 			$lookup: {
 				from: 'courses',
@@ -3810,15 +3839,16 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 							college: 1,
 							project: 1,
 							vertical: 1,
-							docsRequired: 1 // Only for doc counts
+							docsRequired: 1
 						}
 					}
 				]
 			}
 		},
 		{ $unwind: '$_course' },
+	];
 
-		// Candidate lookup - only essential fields
+	const candidateLookupStages = [
 		{
 			$lookup: {
 				from: 'candidateprofiles',
@@ -3838,6 +3868,17 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 			}
 		},
 		{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } },
+	];
+
+	const needsNameSearch = Boolean(filters.name && String(filters.name).trim());
+
+	pipeline.push(...courseLookupStages);
+	if (!forCount || needsNameSearch) {
+		pipeline.push(...candidateLookupStages);
+	}
+
+	if (!forCount) {
+	pipeline.push(
 
 		// Status lookup - only title and milestone
 		{
@@ -3922,6 +3963,7 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 		},
 		{ $unwind: { path: '$leadCoOwner2', preserveNullAndEmptyArrays: true } }
 	);
+	}
 
 	// Apply additional filters
 	const additionalFilters = {};
@@ -3938,12 +3980,6 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 	if (filters.courseArray.length > 0) {
 		additionalFilters['_course._id'] = { $in: filters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
 	}
-	if (filters.centerArray && filters.centerArray.length > 0) {
-		additionalFilters['_center._id'] = { $in: filters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
-	}
-	if (filters.batchArray && filters.batchArray.length > 0) {
-		additionalFilters['batch'] = { $in: filters.batchArray.map(id => new mongoose.Types.ObjectId(id)) };
-	}
 
 	// Name search
 	if (filters.name && filters.name.trim()) {
@@ -3958,6 +3994,11 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination }
 
 	if (Object.keys(additionalFilters).length > 0) {
 		pipeline.push({ $match: additionalFilters });
+	}
+
+	if (forCount) {
+		pipeline.push({ $count: 'total' });
+		return pipeline;
 	}
 
 	// Project only essential fields
@@ -5131,51 +5172,55 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 
 
 
-		// Single aggregation to get all counts
-		const [allCount, statusCounts, movedInKYCCount, approvalStatusCounts, aiStatusCounts] = await Promise.all([
-			AppliedCourses.aggregate([...basePipeline, { $count: "total" }]),
+		const [facetResult, movedInKYCCount] = await Promise.all([
 			AppliedCourses.aggregate([
 				...basePipeline,
 				{
-					$group: {
-						_id: "$_leadStatus",
-						count: { $sum: 1 }
-					}
-				}
-			]),
-			AppliedCourses.aggregate([...movedInKYCPipeline, { $count: "total" }]),
-			AppliedCourses.aggregate([
-				...basePipeline,
-				{
-					$addFields: {
-						effectiveApprovalStatus: {
-							$switch: {
-								branches: [
-									{ case: { $eq: ['$approval.status', 'APPROVED'] }, then: 'approved' },
-									{ case: { $eq: ['$approval.status', 'REJECTED'] }, then: 'rejected' },
-								],
-								default: 'pending',
+					$facet: {
+						allCount: [{ $count: 'total' }],
+						statusCounts: [{
+							$group: {
+								_id: '$_leadStatus',
+								count: { $sum: 1 }
+							}
+						}],
+						approvalStatusCounts: [
+							{
+								$addFields: {
+									effectiveApprovalStatus: {
+										$switch: {
+											branches: [
+												{ case: { $eq: ['$approval.status', 'APPROVED'] }, then: 'approved' },
+												{ case: { $eq: ['$approval.status', 'REJECTED'] }, then: 'rejected' },
+											],
+											default: 'pending',
+										},
+									},
+								},
 							},
-						},
-					},
-				},
-				{
-					$group: {
-						_id: '$effectiveApprovalStatus',
-						count: { $sum: 1 },
-					},
-				},
-			]),
-			AppliedCourses.aggregate([
-				...basePipeline,
-				{
-					$group: {
-						_id: { $ifNull: ['$_aiLeadStatus', new mongoose.Types.ObjectId(UNTOUCH_LEAD_STATUS_ID)] },
-						count: { $sum: 1 }
+							{
+								$group: {
+									_id: '$effectiveApprovalStatus',
+									count: { $sum: 1 },
+								},
+							},
+						],
+						aiStatusCounts: [{
+							$group: {
+								_id: { $ifNull: ['$_aiLeadStatus', new mongoose.Types.ObjectId(UNTOUCH_LEAD_STATUS_ID)] },
+								count: { $sum: 1 }
+							}
+						}],
 					}
 				}
 			]),
+			AppliedCourses.aggregate([...movedInKYCPipeline, { $count: 'total' }]),
 		]);
+		const faceted = facetResult[0] || {};
+		const allCount = faceted.allCount || [];
+		const statusCounts = faceted.statusCounts || [];
+		const approvalStatusCounts = faceted.approvalStatusCounts || [];
+		const aiStatusCounts = faceted.aiStatusCounts || [];
 
 		// Process results
 		const counts = { all: allCount[0]?.total || 0 };
@@ -9156,206 +9201,105 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 			projectsArray, verticalsArray, courseArray, centerArray, batchArray
 		}));
 
-		let aggregate = [];
 		let baseMatch = {
 			...buildFollowupCounselorMatch(user, counselorArray, ownerArray),
 			...buildFollowupDateMatch(rangeFrom, rangeTo, { useAllTime, useActivityFilter }),
 		};
 
-		let group = [{
-			$group: {
-				_id: "$status",
-				count: { $sum: 1 }
-			}
-		},
-		{
-			$project: {
-				k: "$_id",
-				v: "$count",
-				_id: 0
-			}
-		},
-		{
-			$group: {
-				_id: null,
-				counts: { $push: { k: "$k", v: "$v" } }
-			}
-		},
-		{
-			$replaceRoot: {
-				newRoot: { $arrayToObject: "$counts" }
-			}
-		}]
-
-
-
-
-
-		aggregate.push(
+		let aggregate = [
 			{ $match: baseMatch },
-			{
-				$lookup: {
-					from: 'appliedcourses',
-					localField: 'appliedCourseId',
-					foreignField: '_id',
-					as: "appliedCourseId"
-				}
-			},
-			{
-				$unwind: {
-					path: '$appliedCourseId',
-					preserveNullAndEmptyArrays: true
-				}
-			},
-			{
-				$lookup: {
-					from: 'candidateprofiles',
-					localField: 'appliedCourseId._candidate',
-					foreignField: '_id',
-					as: 'candidate'
-				}
-			},
-			{
-				$unwind: {
-					path: '$candidate',
-					preserveNullAndEmptyArrays: true
-				}
-			},
-			{
-				$lookup: {
-					from: 'courses',
-					localField: 'appliedCourseId._course',
-					foreignField: '_id',
-					as: 'courseData'
-				}
-			},
-			{
-				$unwind: {
-					path: '$courseData',
-					preserveNullAndEmptyArrays: true
-				}
-			},
-			{
-				$lookup: {
-					from: 'verticals',
-					localField: 'courseData.vertical',
-					foreignField: '_id',
-					as: 'verticalData'
-				}
-			},
-			{
-				$unwind: {
-					path: '$verticalData',
-					preserveNullAndEmptyArrays: true
-				}
-			},
-			{
-				$lookup: {
-					from: 'projects',
-					localField: 'courseData.project',
-					foreignField: '_id',
-					as: 'projectData'
-				}
-			},
-			{
-				$unwind: {
-					path: '$projectData',
-					preserveNullAndEmptyArrays: true
-				}
-			},
-			{
-				$lookup: {
-					from: 'centers',
-					localField: 'appliedCourseId._center',
-					foreignField: '_id',
-					as: 'centerData'
-				}
-			},
-			{
-				$unwind: {
-					path: '$centerData',
-					preserveNullAndEmptyArrays: true
-				}
-			},
-			{
-				$lookup: {
-					from: 'users',
-					localField: 'counsellorId',
-					foreignField: '_id',
-					as: 'counselorData'
-				}
-			},
-			{
-				$unwind: {
-					path: '$counselorData',
-					preserveNullAndEmptyArrays: true
-				}
-			},
+		];
 
-			{
-				$group: {
-					_id: '$_id',
-					appliedCourseId: { $first: '$appliedCourseId._id' },
-					followupDate: { $first: '$followupDate' },
-					remarks: { $first: '$remarks' },
-					_course: { $first: '$courseData' },
-					center: { $first: '$centerData._id' },
-					status: { $first: '$status' },
-					followUpType: { $first: '$followUpType' },
-					leadCreatedAt: { $first: '$appliedCourseId.createdAt' },
-					batch: { $first: '$appliedCourseId.batch' },
+		const needsFollowupJoins = projectsArray.length > 0
+			|| verticalsArray.length > 0
+			|| courseArray.length > 0
+			|| centerArray.length > 0
+			|| batchArray.length > 0
+			|| Boolean(createdFromDate || createdToDate);
+
+		if (needsFollowupJoins) {
+			aggregate.push(
+				{
+					$lookup: {
+						from: 'appliedcourses',
+						localField: 'appliedCourseId',
+						foreignField: '_id',
+						as: 'appliedCourseId',
+						pipeline: [{ $project: { _course: 1, _center: 1, batch: 1, createdAt: 1 } }]
+					}
+				},
+				{
+					$unwind: {
+						path: '$appliedCourseId',
+						preserveNullAndEmptyArrays: true
+					}
+				},
+				{
+					$lookup: {
+						from: 'courses',
+						localField: 'appliedCourseId._course',
+						foreignField: '_id',
+						as: 'courseData',
+						pipeline: [{ $project: { project: 1, vertical: 1 } }]
+					}
+				},
+				{
+					$unwind: {
+						path: '$courseData',
+						preserveNullAndEmptyArrays: true
+					}
+				}
+			);
+
+			const additionalMatches = {};
+			if (projectsArray.length > 0) {
+				additionalMatches['courseData.project'] = { $in: projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+			if (verticalsArray.length > 0) {
+				additionalMatches['courseData.vertical'] = { $in: verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+			if (courseArray.length > 0) {
+				additionalMatches['appliedCourseId._course'] = { $in: courseArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+			if (centerArray.length > 0) {
+				additionalMatches['appliedCourseId._center'] = { $in: centerArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+			if (batchArray.length > 0) {
+				additionalMatches['appliedCourseId.batch'] = { $in: batchArray.map(id => new mongoose.Types.ObjectId(id)) };
+			}
+			if (createdFromDate || createdToDate) {
+				additionalMatches['appliedCourseId.createdAt'] = {};
+				if (createdFromDate) {
+					additionalMatches['appliedCourseId.createdAt'].$gte = new Date(createdFromDate);
+				}
+				if (createdToDate) {
+					const toDate = new Date(createdToDate);
+					toDate.setHours(23, 59, 59, 999);
+					additionalMatches['appliedCourseId.createdAt'].$lte = toDate;
 				}
 			}
-
-		)
-
-		let additionalMatches = {}
-
-		// Sector filter (multi-select - using projects array)
-		if (projectsArray.length > 0) {
-			additionalMatches['_course.project'] = { $in: projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
-		}
-
-		// Verticals filter (multi-select)
-		if (verticalsArray.length > 0) {
-			additionalMatches['_course.vertical'] = { $in: verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
-		}
-
-		// Course filter (multi-select)
-		if (courseArray.length > 0) {
-			additionalMatches['_course._id'] = { $in: courseArray.map(id => new mongoose.Types.ObjectId(id)) };
-		}
-
-		// Center filter (multi-select)
-		if (centerArray.length > 0) {
-			additionalMatches['center'] = { $in: centerArray.map(id => new mongoose.Types.ObjectId(id)) };
-		}
-		if (batchArray.length > 0) {
-			additionalMatches['batch'] = { $in: batchArray.map(id => new mongoose.Types.ObjectId(id)) };
-		}
-		if (createdFromDate || createdToDate) {
-			additionalMatches.leadCreatedAt = {};
-			if (createdFromDate) {
-				additionalMatches.leadCreatedAt.$gte = new Date(createdFromDate);
-			}
-			if (createdToDate) {
-				const toDate = new Date(createdToDate);
-				toDate.setHours(23, 59, 59, 999);
-				additionalMatches.leadCreatedAt.$lte = toDate;
+			if (Object.keys(additionalMatches).length > 0) {
+				aggregate.push({ $match: additionalMatches });
 			}
 		}
-		if (Object.keys(additionalMatches).length > 0) {
-			aggregate.push({ $match: additionalMatches });
-		}
 
+		aggregate.push({
+			$group: {
+				_id: {
+					status: '$status',
+					type: {
+						$cond: [
+							{ $eq: [{ $toLower: { $ifNull: ['$followUpType', 'Call'] } }, 'visit'] },
+							'visit',
+							'call',
+						],
+					},
+				},
+				count: { $sum: 1 },
+			}
+		});
 
-
-
-
-
-
-		const followupCounts = await B2cFollowup.aggregate(aggregate
-		);
+		const followupCounts = await B2cFollowup.aggregate(aggregate);
 
 		const emptyBucket = () => ({ done: 0, planned: 0, missed: 0 });
 		const byType = {
@@ -9367,19 +9311,20 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 		let missedCount = 0
 
 		followupCounts.forEach(item => {
-			const typeKey = String(item.followUpType || 'Call').toLowerCase() === 'visit' ? 'visit' : 'call';
-			const statusKey = String(item.status || '').toLowerCase();
+			const typeKey = item?._id?.type === 'visit' ? 'visit' : 'call';
+			const statusKey = String(item?._id?.status || '').toLowerCase();
+			const countVal = Number(item.count) || 0;
 			if (statusKey === 'done' || statusKey === 'planned' || statusKey === 'missed') {
-				byType[typeKey][statusKey] += 1;
+				byType[typeKey][statusKey] += countVal;
 			}
-			if (item.status == 'done') {
-				doneCount++
+			if (statusKey === 'done') {
+				doneCount += countVal
 			}
-			if (item.status == 'planned') {
-				plannedCount++
+			if (statusKey === 'planned') {
+				plannedCount += countVal
 			}
-			if (item.status == 'missed') {
-				missedCount++
+			if (statusKey === 'missed') {
+				missedCount += countVal
 			}
 		})
 
@@ -9390,7 +9335,6 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 			call: byType.call,
 			visit: byType.visit,
 		}
-
 
 		// console.log("followupCounts", followupCounts[0])
 		return res.json({ success: true, data: count });
@@ -10762,6 +10706,21 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 				applyKycFilter: true
 			});
 			listTotalCount = filteredListCounts.all || 0;
+		}
+
+		if (req.query.countOnly === 'true' || req.query.countsOnly === 'true') {
+			return res.status(200).json({
+				success: true,
+				count: 0,
+				page,
+				limit,
+				pendingKycCount: crmFilterCounts.pendingKyc || 0,
+				doneKycCount: crmFilterCounts.doneKyc || 0,
+				totalCount: listTotalCount,
+				totalPages: Math.ceil((listTotalCount || 0) / limit) || 0,
+				data: [],
+				crmFilterCounts
+			});
 		}
 
 		const allFilteredResults = await AppliedCourses
@@ -12802,6 +12761,22 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			ownerArray,
 			batchArray
 		});
+
+		if (req.query.countOnly === 'true' || req.query.countsOnly === 'true') {
+			const totalCount = (status && crmFilterCounts[status] != null)
+				? crmFilterCounts[status]
+				: (crmFilterCounts.all || 0);
+			return res.status(200).json({
+				success: true,
+				count: 0,
+				page,
+				limit,
+				totalCount,
+				totalPages: Math.ceil(totalCount / limit) || 0,
+				data: [],
+				crmFilterCounts
+			});
+		}
 
 		const allFilteredResults = await AppliedCourses
 			.aggregate(aggregationPipeline)

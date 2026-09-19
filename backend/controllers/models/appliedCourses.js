@@ -699,4 +699,12 @@ appliedCoursesSchema.methods.bulkMarkAttendance = async function(attendanceData)
   }
 };
 
+appliedCoursesSchema.index({ kycStage: 1, kyc: 1, admissionDone: 1, updatedAt: -1 });
+appliedCoursesSchema.index({ counsellor: 1, updatedAt: -1 });
+appliedCoursesSchema.index({ leadCoOwner: 1, updatedAt: -1 });
+appliedCoursesSchema.index({ registeredBy: 1, updatedAt: -1 });
+appliedCoursesSchema.index({ _course: 1 });
+appliedCoursesSchema.index({ _center: 1, updatedAt: -1 });
+appliedCoursesSchema.index({ createdAt: -1 });
+
 module.exports = model("AppliedCourses", appliedCoursesSchema);
