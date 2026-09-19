@@ -2650,6 +2650,28 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			await syncAppliedCourseFollowupDates();
 		}
 
+		const [collegeCourseIds, candidateIds] = await Promise.all([
+			resolveB2cCollegeCourseIds(college._id, {
+				courseArray,
+				projectsArray,
+				verticalsArray,
+				courseType,
+			}),
+			name ? resolveB2cCandidateSearchIds(name) : Promise.resolve(null),
+		]);
+
+		if (!collegeCourseIds.length || (Array.isArray(candidateIds) && candidateIds.length === 0)) {
+			return res.status(200).json({
+				success: true,
+				count: 0,
+				totalCount: 0,
+				page,
+				limit,
+				totalPages: 0,
+				data: [],
+			});
+		}
+
 		const pipelineFilters = {
 			name, courseType, status, leadStatus, aiLeadStatus,
 			createdFromDate, createdToDate,
@@ -2664,6 +2686,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			hasFollowUpCall,
 			hasFollowUpVisit,
 			leadSourceFilter,
+			collegeCourseIds,
+			candidateIds: candidateIds || undefined,
 		};
 
 		const countPipeline = buildSimplifiedPipeline({
@@ -2673,10 +2697,10 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			pagination: { skip: 0, limit: 1 },
 			forCount: true,
 		});
+		const countMatch = countPipeline[0]?.$match || {};
 
 		if (countOnly) {
-			const totalCountResult = await AppliedCourses.aggregate(countPipeline);
-			const totalCount = totalCountResult[0]?.total || 0;
+			const totalCount = await AppliedCourses.countDocuments(countMatch);
 			return res.status(200).json({
 				success: true,
 				count: 0,
@@ -2695,12 +2719,10 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			pagination: { skip, limit }
 		});
 
-		const [results, totalCountResult] = await Promise.all([
+		const [results, totalCount] = await Promise.all([
 			AppliedCourses.aggregate(pipeline),
-			AppliedCourses.aggregate(countPipeline)
+			AppliedCourses.countDocuments(countMatch),
 		]);
-
-		const totalCount = totalCountResult[0]?.total || 0;
 
 
 		const appliedIds = results.map(r => r._id);
@@ -3701,6 +3723,42 @@ function applyAiLeadStatusMatch(baseMatch, aiLeadStatus) {
 	return { $and: [baseMatch, clause] };
 }
 
+async function resolveB2cCollegeCourseIds(collegeId, filters = {}) {
+	if (!collegeId) return [];
+	const courseMatch = { college: collegeId };
+	if (filters.courseArray?.length > 0) {
+		courseMatch._id = { $in: filters.courseArray.map((id) => new mongoose.Types.ObjectId(id)) };
+	}
+	if (filters.projectsArray?.length > 0) {
+		courseMatch.project = { $in: filters.projectsArray.map((id) => new mongoose.Types.ObjectId(id)) };
+	}
+	if (filters.verticalsArray?.length > 0) {
+		courseMatch.vertical = { $in: filters.verticalsArray.map((id) => new mongoose.Types.ObjectId(id)) };
+	}
+	if (filters.courseType) {
+		courseMatch.courseFeeType = { $regex: new RegExp(filters.courseType, 'i') };
+	}
+	const rows = await Courses.find(courseMatch).select('_id').lean();
+	return rows.map((row) => row._id);
+}
+
+async function resolveB2cCandidateSearchIds(name) {
+	const searchTerm = String(name || '').trim();
+	if (!searchTerm) return null;
+	const searchRegex = new RegExp(searchTerm, 'i');
+	const or = [
+		{ name: searchRegex },
+		{ email: searchRegex },
+		{ mobile: searchTerm },
+	];
+	const asNum = parseInt(searchTerm, 10);
+	if (!Number.isNaN(asNum)) {
+		or.push({ mobile: asNum });
+	}
+	const rows = await CandidateProfile.find({ $or: or }).select('_id').lean();
+	return rows.map((row) => row._id);
+}
+
 function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, forCount = false }) {
 	const pipeline = [];
 	let baseMatch = {};
@@ -3820,10 +3878,27 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, 
 	if (filters.batchArray && filters.batchArray.length > 0) {
 		baseMatch.batch = { $in: filters.batchArray.map(id => new mongoose.Types.ObjectId(id)) };
 	}
+	if (Array.isArray(filters.collegeCourseIds)) {
+		baseMatch._course = { $in: filters.collegeCourseIds };
+	}
+	if (Array.isArray(filters.candidateIds)) {
+		baseMatch._candidate = { $in: filters.candidateIds };
+	}
 
 	pipeline.push({ $match: baseMatch });
 
-	const courseLookupStages = [
+	if (forCount) {
+		pipeline.push({ $count: 'total' });
+		return pipeline;
+	}
+
+	pipeline.push(
+		{ $sort: { updatedAt: -1 } },
+		{ $skip: pagination.skip },
+		{ $limit: pagination.limit }
+	);
+
+	pipeline.push(
 		{
 			$lookup: {
 				from: 'courses',
@@ -3831,7 +3906,6 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, 
 				foreignField: '_id',
 				as: '_course',
 				pipeline: [
-					{ $match: { college: college._id } },
 					{
 						$project: {
 							name: 1,
@@ -3845,10 +3919,7 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, 
 				]
 			}
 		},
-		{ $unwind: '$_course' },
-	];
-
-	const candidateLookupStages = [
+		{ $unwind: { path: '$_course', preserveNullAndEmptyArrays: true } },
 		{
 			$lookup: {
 				from: 'candidateprofiles',
@@ -3868,17 +3939,6 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, 
 			}
 		},
 		{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } },
-	];
-
-	const needsNameSearch = Boolean(filters.name && String(filters.name).trim());
-
-	pipeline.push(...courseLookupStages);
-	if (!forCount || needsNameSearch) {
-		pipeline.push(...candidateLookupStages);
-	}
-
-	if (!forCount) {
-	pipeline.push(
 
 		// Status lookup - only title and milestone
 		{
@@ -3963,45 +4023,7 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, 
 		},
 		{ $unwind: { path: '$leadCoOwner2', preserveNullAndEmptyArrays: true } }
 	);
-	}
 
-	// Apply additional filters
-	const additionalFilters = {};
-
-	if (filters.courseType) {
-		additionalFilters['_course.courseFeeType'] = { $regex: new RegExp(filters.courseType, 'i') };
-	}
-	if (filters.projectsArray.length > 0) {
-		additionalFilters['_course.project'] = { $in: filters.projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
-	}
-	if (filters.verticalsArray.length > 0) {
-		additionalFilters['_course.vertical'] = { $in: filters.verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
-	}
-	if (filters.courseArray.length > 0) {
-		additionalFilters['_course._id'] = { $in: filters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
-	}
-
-	// Name search
-	if (filters.name && filters.name.trim()) {
-		const searchTerm = filters.name.trim();
-		const searchRegex = new RegExp(filters.name.trim(), 'i');
-		additionalFilters.$or = [
-			{ '_candidate.name': searchRegex },
-			{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
-			{ '_candidate.email': searchRegex }
-		];
-	}
-
-	if (Object.keys(additionalFilters).length > 0) {
-		pipeline.push({ $match: additionalFilters });
-	}
-
-	if (forCount) {
-		pipeline.push({ $count: 'total' });
-		return pipeline;
-	}
-
-	// Project only essential fields
 	pipeline.push({
 		$project: {
 			_id: 1,
@@ -4030,13 +4052,6 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, 
 			aiVoice: 1,
 		}
 	});
-
-	// Sort and pagination
-	pipeline.push(
-		{ $sort: { updatedAt: -1 } },
-		{ $skip: pagination.skip },
-		{ $limit: pagination.limit }
-	);
 
 	return pipeline;
 }
@@ -4962,53 +4977,39 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			await syncAppliedCourseFollowupDates();
 		}
 
-		// Get all statuses once
+		const [collegeCourseIds, candidateIds] = await Promise.all([
+			resolveB2cCollegeCourseIds(collegeId, appliedFilters),
+			appliedFilters.name ? resolveB2cCandidateSearchIds(appliedFilters.name) : Promise.resolve(null),
+		]);
+
+		if (!collegeCourseIds.length || (Array.isArray(candidateIds) && candidateIds.length === 0)) {
+			return res.status(200).json({
+				success: true,
+				crmFilterCount: { all: 0 },
+				aiCrmFilterCount: { all: 0 },
+				approvalCounts: { total: 0, approved: 0, pending: 0, rejected: 0 },
+			});
+		}
+
 		const allStatuses = await Status.find({}).select('_id title milestone').lean();
 
-		// Build base pipeline
-		let basePipeline = [
-			{
-				$match: {
-					kycStage: { $ne: true },
-					kyc: { $ne: true },
-					admissionDone: { $ne: true },
-				}
-			},
-			{
-				$lookup: {
-					from: 'courses',
-					localField: '_course',
-					foreignField: '_id',
-					as: '_course',
-					pipeline: [
-						{ $match: { college: collegeId } },
-						{ $project: { courseFeeType: 1, college: 1, project: 1, vertical: 1 } }
-					]
-				}
-			},
-			{ $unwind: '$_course' }
-		];
+		const baseMatch = {
+			kycStage: { $ne: true },
+			kyc: { $ne: true },
+			admissionDone: { $ne: true },
+			_course: { $in: collegeCourseIds },
+		};
+		const kycMatch = {
+			kycStage: { $in: [true] },
+			_course: { $in: collegeCourseIds },
+		};
+		if (Array.isArray(candidateIds)) {
+			baseMatch._candidate = { $in: candidateIds };
+			kycMatch._candidate = { $in: candidateIds };
+		}
 
-		let movedInKYCPipeline = [
-			{
-				$match: {
-					kycStage: { $in: [true] },
-				}
-			},
-			{
-				$lookup: {
-					from: 'courses',
-					localField: '_course',
-					foreignField: '_id',
-					as: '_course',
-					pipeline: [
-						{ $match: { college: collegeId } },
-						{ $project: { courseFeeType: 1, college: 1, project: 1, vertical: 1 } }
-					]
-				}
-			},
-			{ $unwind: '$_course' }
-		];
+		let basePipeline = [{ $match: baseMatch }];
+		let movedInKYCPipeline = [{ $match: kycMatch }];
 
 		// if (appliedFilters.leadStatus === '6894825c9fc1425f4d5e2fc5') {
 		// 	basePipeline[0].$match.kycStage = { $in: [true] };
@@ -5079,91 +5080,10 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			movedInKYCPipeline[0].$match = { ...movedInKYCPipeline[0].$match, ...dateFilters };
 		}
 
-		// Apply course-related filters (after course lookup)
-		if (appliedFilters.courseType || appliedFilters.projectsArray?.length > 0 ||
-			appliedFilters.verticalsArray?.length > 0 || appliedFilters.courseArray?.length > 0) {
-
-			const filterMatch = {};
-			if (appliedFilters.courseType) {
-				filterMatch['_course.courseFeeType'] = { $regex: new RegExp(appliedFilters.courseType, 'i') };
-			}
-			if (appliedFilters.projectsArray?.length > 0) {
-				filterMatch['_course.project'] = { $in: appliedFilters.projectsArray.map(id => new mongoose.Types.ObjectId(id)) };
-			}
-			if (appliedFilters.verticalsArray?.length > 0) {
-				filterMatch['_course.vertical'] = { $in: appliedFilters.verticalsArray.map(id => new mongoose.Types.ObjectId(id)) };
-			}
-			if (appliedFilters.courseArray?.length > 0) {
-				filterMatch['_course._id'] = { $in: appliedFilters.courseArray.map(id => new mongoose.Types.ObjectId(id)) };
-			}
-
-			basePipeline.push({ $match: filterMatch });
-			movedInKYCPipeline.push({ $match: filterMatch });
-		}
-
-		// Apply center and counselor filters (can be applied directly on AppliedCourses fields)
-		if (appliedFilters.centerArray?.length > 0 || appliedFilters.counselorArray?.length > 0) {
-			const directFilterMatch = {};
-			// Add center filter
-			if (appliedFilters.centerArray?.length > 0) {
-				directFilterMatch['_center'] = { $in: appliedFilters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
-			}
-			// Add counselor filter
-			if (appliedFilters.counselorArray?.length > 0) {
-				directFilterMatch['counsellor'] = { $in: appliedFilters.counselorArray.map(id => new mongoose.Types.ObjectId(id)) };
-			}
-
-			basePipeline.push({ $match: directFilterMatch });
-			movedInKYCPipeline.push({ $match: directFilterMatch });
-		}
-
-		// Add candidate lookup for name search
-		if (appliedFilters.name && appliedFilters.name.trim()) {
-			basePipeline.push(
-				{
-					$lookup: {
-						from: 'candidateprofiles',
-						localField: '_candidate',
-						foreignField: '_id',
-						as: '_candidate',
-						pipeline: [{ $project: { name: 1, email: 1, mobile: 1 } }]
-					}
-				},
-				{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } }
-			);
-			movedInKYCPipeline.push(
-				{
-					$lookup: {
-						from: 'candidateprofiles',
-						localField: '_candidate',
-						foreignField: '_id',
-						as: '_candidate',
-						pipeline: [{ $project: { name: 1, email: 1, mobile: 1 } }]
-					}
-				},
-				{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } }
-			);
-
-			const searchTerm = appliedFilters.name.trim();
-			const searchRegex = new RegExp(appliedFilters.name.trim(), 'i');
-			basePipeline.push({
-				$match: {
-					$or: [
-						{ '_candidate.name': searchRegex },
-						{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
-						{ '_candidate.email': searchRegex }
-					]
-				}
-			});
-			movedInKYCPipeline.push({
-				$match: {
-					$or: [
-						{ '_candidate.name': searchRegex },
-						{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
-						{ '_candidate.email': searchRegex }
-					]
-				}
-			});
+		if (appliedFilters.centerArray?.length > 0) {
+			const centerIds = appliedFilters.centerArray.map(id => new mongoose.Types.ObjectId(id));
+			basePipeline[0].$match._center = { $in: centerIds };
+			movedInKYCPipeline[0].$match._center = { $in: centerIds };
 		}
 
 
@@ -14353,129 +14273,29 @@ router.get('/dashbord-data', isCollege, async (req, res) => {
 router.get('/filters-data', [isCollege], async (req, res) => {
 	try {
 		const user = req.user;
-		// Find the college for the current user
-		const college = await College.findOne({ '_concernPerson._id': user._id }).populate('_concernPerson._id');
+		const collegeIdFromUser = user?.college?._id || user?.college;
+		const college = collegeIdFromUser
+			? await College.findById(collegeIdFromUser)
+				.select('_concernPerson')
+				.populate('_concernPerson._id', 'name status isDeleted')
+			: await College.findOne({ '_concernPerson._id': user._id })
+				.select('_concernPerson')
+				.populate('_concernPerson._id', 'name status isDeleted');
 		if (!college) {
 			return res.status(404).json({ status: false, message: 'College not found' });
 		}
+		const collegeId = college._id;
 
-		// Aggregation: Only applied courses for this college
-		const appliedCourses = await AppliedCourses.aggregate([
-			{
-				$lookup: {
-					from: 'courses',
-					localField: '_course',
-					foreignField: '_id',
-					as: '_course'
-				}
-			},
-			{ $unwind: '$_course' },
-			{
-				$match: {
-					'_course.college': college._id
-				}
-			},
-			{
-				$lookup: {
-					from: 'centers',
-					localField: '_center',
-					foreignField: '_id',
-					as: '_center'
-				}
-			},
-			{ $unwind: { path: '$_center', preserveNullAndEmptyArrays: true } },
-			{
-				$lookup: {
-					from: 'verticals',
-					localField: '_course.vertical',
-					foreignField: '_id',
-					as: 'verticals'
-				}
-			},
-			{
-				$lookup: {
-					from: 'projects',
-					localField: '_course.project',
-					foreignField: '_id',
-					as: 'projects'
-				}
-			}
+		const [allVerticals, allProjects, allCourses, allCenters] = await Promise.all([
+			Vertical.find({ college: collegeId, status: { $ne: false } }).select('_id name').lean(),
+			Project.find({ college: collegeId, status: 'active' }).select('_id name vertical').lean(),
+			Courses.find({ college: collegeId, isDeleted: { $ne: true } }).select('_id name vertical project').lean(),
+			Center.find({ college: collegeId, status: true }).select('_id name').lean(),
 		]);
-
-		// Unique sets
-		const verticalSet = new Map();
-		const projectSet = new Map();
-		const courseSet = new Map();
-		const centerSet = new Map();
-
-		appliedCourses.forEach(ac => {
-			// Verticals
-			if (Array.isArray(ac.verticals)) {
-				ac.verticals.forEach(v => {
-					if (v && v._id && !verticalSet.has(v._id.toString())) {
-						verticalSet.set(v._id.toString(), { _id: v._id, name: v.name });
-					}
-				});
-			}
-			// Projects
-			if (Array.isArray(ac.projects)) {
-				ac.projects.forEach(p => {
-					if (p && p._id && !projectSet.has(p._id.toString())) {
-						projectSet.set(p._id.toString(), { _id: p._id, name: p.name, vertical: p.vertical || null });
-					}
-				});
-			}
-			// Courses
-			if (ac._course && ac._course._id && !courseSet.has(ac._course._id.toString())) {
-				courseSet.set(ac._course._id.toString(), { _id: ac._course._id, name: ac._course.name });
-			}
-			// Centers
-			if (ac._center && ac._center._id && !centerSet.has(ac._center._id.toString())) {
-				centerSet.set(ac._center._id.toString(), { _id: ac._center._id, name: ac._center.name });
-			}
-			// Counselors (last assignment)
-
-		});
-
-		const counselors = [];
-		college._concernPerson.forEach((person) => {
-			const concernUser = person?._id;
-			if (!concernUser?._id || !concernUser?.name) return;
-			if (concernUser.status !== true) return;
-			if (concernUser.isDeleted === true) return;
-
-			counselors.push({
-				_id: concernUser._id,
-				name: concernUser.name,
-				status: concernUser.status
-			});
-		});
-
-
-		// Include departments/projects with no AppliedCourses (e.g. HR jobs).
-		const [allVerticals, allProjects] = await Promise.all([
-			Vertical.find({ college: college._id, status: { $ne: false } }).select('_id name').lean(),
-			Project.find({ college: college._id, status: 'active' }).select('_id name vertical').lean(),
-		]);
-		allVerticals.forEach((v) => {
-			if (v && v._id && !verticalSet.has(String(v._id))) {
-				verticalSet.set(String(v._id), { _id: v._id, name: v.name });
-			}
-		});
-		allProjects.forEach((p) => {
-			if (!p || !p._id) return;
-			const key = String(p._id);
-			const existing = projectSet.get(key);
-			if (!existing) {
-				projectSet.set(key, { _id: p._id, name: p.name, vertical: p.vertical || null });
-			} else if (!existing.vertical && p.vertical) {
-				existing.vertical = p.vertical;
-			}
-		});
 
 		const access = getB2cAccessScope(user);
-		let verticals = Array.from(verticalSet.values());
-		let projects = Array.from(projectSet.values());
+		let verticals = allVerticals.map((v) => ({ _id: v._id, name: v.name }));
+		let projects = allProjects.map((p) => ({ _id: p._id, name: p.name, vertical: p.vertical || null }));
 		if (access.verticalIds.length) {
 			verticals = verticals.filter((v) => access.verticalIds.includes(String(v._id)));
 		}
@@ -14483,13 +14303,26 @@ router.get('/filters-data', [isCollege], async (req, res) => {
 			projects = projects.filter((p) => access.projectIds.includes(String(p._id)));
 		}
 
+		const counselors = [];
+		(college._concernPerson || []).forEach((person) => {
+			const concernUser = person?._id;
+			if (!concernUser?._id || !concernUser?.name) return;
+			if (concernUser.status !== true) return;
+			if (concernUser.isDeleted === true) return;
+			counselors.push({
+				_id: concernUser._id,
+				name: concernUser.name,
+				status: concernUser.status,
+			});
+		});
+
 		res.json({
 			status: true,
 			verticals,
 			projects,
-			courses: Array.from(courseSet.values()),
-			centers: Array.from(centerSet.values()),
-			counselors
+			courses: allCourses.map((c) => ({ _id: c._id, name: c.name })),
+			centers: allCenters.map((c) => ({ _id: c._id, name: c.name })),
+			counselors,
 		});
 	} catch (err) {
 		console.error('Error in /filters-data:', err);

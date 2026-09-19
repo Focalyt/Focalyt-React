@@ -972,10 +972,22 @@ const CRMDashboard = () => {
   useEffect(() => {
     const fetchFilterOptions = async () => {
       try {
+        const headers = { 'x-auth': token };
+        axios.get(`${backendUrl}/college/all_courses`, { headers })
+          .then((coursesMetaRes) => {
+            if (coursesMetaRes?.data?.success) {
+              setAllCoursesMeta(coursesMetaRes.data.data || []);
+            }
+          })
+          .catch((metaErr) => {
+            console.error('Failed to fetch courses meta:', metaErr);
+          });
 
-        const res = await axios.get(`${backendUrl}/college/filters-data`, {
-          headers: { 'x-auth': token }
-        });
+        const [res, centersRes] = await Promise.all([
+          axios.get(`${backendUrl}/college/filters-data`, { headers }),
+          axios.get(`${backendUrl}/college/list_all_centers`, { headers }).catch(() => null),
+        ]);
+
         if (res.data.status) {
           setVerticalOptions(res.data.verticals.map(v => ({ value: v._id, label: v.name })));
           setProjectOptions(res.data.projects.map(p => ({
@@ -984,47 +996,20 @@ const CRMDashboard = () => {
             vertical: p.vertical?._id || p.vertical || null,
           })));
           setCourseOptions(res.data.courses.map(c => ({ value: c._id, label: c.name })));
-          // setCenterOptions(res.data.centers.map(c => ({ value: c._id, label: c.name })));
-          // Fetch ALL centers (not just from AppliedCourses) to show aligned centers
-          try {
-            const centersRes = await axios.get(`${backendUrl}/college/list_all_centers`, {
-              headers: { 'x-auth': token }
-            });
-            if (centersRes.data.success && centersRes.data.data) {
-              const allCentersMapped = centersRes.data.data.map(c => ({ 
-                value: c._id, 
-                label: c.name 
-              }));
-              // console.log('Ã°Å¸ÂÂ¢ ALL CENTERS DEBUG - All centers from list_all_centers:', allCentersMapped);
-              setCenterOptions(allCentersMapped);
-            } else {
-              // Fallback to centers from filters-data if list_all_centers fails
-              const centersMapped = res.data.centers.map(c => ({ value: c._id, label: c.name }));
-              // console.log('Ã°Å¸ÂÂ¢ CENTERS DEBUG - Mapped centers for filter (fallback):', centersMapped);
-              setCenterOptions(centersMapped);
-            }
-          } catch (centerErr) {
-            console.error('Failed to fetch all centers, using filters-data centers:', centerErr);
-            // Fallback to centers from filters-data
-            const centersMapped = res.data.centers.map(c => ({ value: c._id, label: c.name }));
-            setCenterOptions(centersMapped);
+
+          if (centersRes?.data?.success && centersRes.data.data) {
+            setCenterOptions(centersRes.data.data.map(c => ({
+              value: c._id,
+              label: c.name
+            })));
+          } else {
+            setCenterOptions((res.data.centers || []).map(c => ({ value: c._id, label: c.name })));
           }
-          
+
           const activeCounselors = (res.data.counselors || []).filter(
             (c) => c?.status === true || c?.status === 'active'
           );
           setCounselorOptions(activeCounselors.map(c => ({ value: c._id, label: c.name })));
-        }
-
-        try {
-          const coursesMetaRes = await axios.get(`${backendUrl}/college/all_courses`, {
-            headers: { 'x-auth': token }
-          });
-          if (coursesMetaRes.data?.success) {
-            setAllCoursesMeta(coursesMetaRes.data.data || []);
-          }
-        } catch (metaErr) {
-          console.error('Failed to fetch courses meta:', metaErr);
         }
       } catch (err) {
         console.error('Failed to fetch filter options:', err);
@@ -1327,7 +1312,10 @@ const CRMDashboard = () => {
   const [aiSupervisionSearchTerm, setAiSupervisionSearchTerm] = useState('');
   const [aiSupervisionQueueFilter, setAiSupervisionQueueFilter] = useState('all');
   const [isAiFabOpen, setIsAiFabOpen] = useState(false);
-  const [aiFabSubstatuses, setAiFabSubstatuses] = useState([]);
+  const [aiFabSubstatuses, setAiFabSubstatuses] = useState([
+    { _id: '64ab1234abcd5678ef901235', title: 'New Lead' },
+    { _id: '6a3f5a53cfccaeeb28a4d1a3', title: 'Not Connected' },
+  ]);
   const [aiFabBusy, setAiFabBusy] = useState(false);
   const [aiCallSource, setAiCallSource] = useState('');
   const [aiCallTotalCount, setAiCallTotalCount] = useState(0);
@@ -1339,6 +1327,10 @@ const CRMDashboard = () => {
   const aiFabWrapRef = useRef(null);
   const AI_FAB_NEW_LEAD_ID = '64ab1234abcd5678ef901235';
   const AI_FAB_NOT_CONNECTED_ID = '6a3f5a53cfccaeeb28a4d1a3';
+  const AI_FAB_DEFAULTS = [
+    { _id: AI_FAB_NEW_LEAD_ID, title: 'New Lead' },
+    { _id: AI_FAB_NOT_CONNECTED_ID, title: 'Not Connected' },
+  ];
 
   const hasAiAlreadyGoneThroughLead = useCallback((profile) => {
     const id = String(profile?._id || profile?.lead_id || '');
@@ -3792,15 +3784,7 @@ const CRMDashboard = () => {
           count: r.count || 0,  // agar backend me count nahi hai to 0
         })));
 
-        const aiStatus = status.find((item) => String(item._id) === '64ab1234abcd5678ef901234');
-        const aiSubstatusIds = ['64ab1234abcd5678ef901235', '6a3f5a53cfccaeeb28a4d1a3'];
-        setAiFabSubstatuses(
-          aiSubstatusIds
-            .map((id) => (aiStatus?.substatuses || []).find((sub) => String(sub._id) === id))
-            .filter(Boolean)
-            .map((sub) => ({ _id: sub._id, title: sub.title }))
-        );
-
+        setAiFabSubstatuses(AI_FAB_DEFAULTS);
 
       }
     } catch (error) {
@@ -4971,6 +4955,8 @@ console.log('API Response:', response.data);
       && !cycle?.course
       && !cycle?.center
       && !cycle?.batch
+      && !cycle?.owner
+      && !cycle?.counsellor
       && departmentAllowsHr
       && projectAllowsHr;
 
@@ -14092,10 +14078,6 @@ useEffect(() => {
     });
     setCurrentPage(1);
     fetchProfileData(filterData, 1, next);
-    fetchRegistrationCrmFilterCounts(filterData, 1, null, next);
-    fetchDashboardCounts(filterData, next);
-    fetchKycCounts(filterData, next);
-    fetchMilestoneCounts(filterData, next);
   };
 
   useEffect(() => {
