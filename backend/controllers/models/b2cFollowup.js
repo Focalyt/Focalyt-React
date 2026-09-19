@@ -16,4 +16,9 @@ const B2cFollowupSchema = new Schema({
   createdBy: { type: Types.ObjectId, ref: 'User' },
 }, { timestamps: true });
 
+B2cFollowupSchema.index({ appliedCourseId: 1, status: 1, followupDate: -1 });
+B2cFollowupSchema.index({ counsellorId: 1, status: 1 });
+B2cFollowupSchema.index({ createdBy: 1, status: 1 });
+B2cFollowupSchema.index({ collegeId: 1, status: 1 });
+
 module.exports = mongoose.model('B2cFollowup', B2cFollowupSchema);

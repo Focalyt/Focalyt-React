@@ -3285,6 +3285,7 @@ const CRMDashboard = () => {
       const queryParams = new URLSearchParams({
         page: '1',
         limit: '1',
+        countOnly: 'true',
         ...dateParts,
         ...buildListFilterQueryParts(fd, cycleOverride || cycleFilters),
       });
@@ -3311,6 +3312,7 @@ const CRMDashboard = () => {
       const queryParams = new URLSearchParams({
         page: '1',
         limit: '1',
+        countOnly: 'true',
         ...dateParts,
         ...buildListFilterQueryParts(fd, cycleOverride || cycleFilters),
       });
@@ -4796,9 +4798,39 @@ console.log('API Response:', response.data);
         ...(filters?.aiLeadStatus && { aiLeadStatus: filters.aiLeadStatus }),
       };
       const followupParams = new URLSearchParams({ allTime: 'true', ...listParts, ...sharedFilterParts });
-      const followupRes = await axios.get(`${backendUrl}/college/followupcounts?${followupParams}`, {
+      const followupPromise = axios.get(`${backendUrl}/college/followupcounts?${followupParams}`, {
         headers: { 'x-auth': token },
       });
+
+      const referPromise = userData?._id
+        ? axios.get(`${backendUrl}/college/appliedCandidates?${new URLSearchParams({
+          page: '1',
+          countOnly: 'true',
+          registeredByMe: userData._id,
+          ...listParts,
+          ...sharedFilterParts,
+        })}`, {
+          headers: { 'x-auth': token },
+        })
+        : Promise.resolve(null);
+
+      const noFollowupPromise = axios.get(`${backendUrl}/college/appliedCandidates?${new URLSearchParams({
+        page: '1',
+        countOnly: 'true',
+        hasFollowUpCall: 'false',
+        hasFollowUpVisit: 'false',
+        ...listParts,
+        ...sharedFilterParts,
+      })}`, {
+        headers: { 'x-auth': token },
+      });
+
+      const [followupRes, referRes, noFollowupRes] = await Promise.all([
+        followupPromise,
+        referPromise,
+        noFollowupPromise,
+      ]);
+
       if (followupRes.data?.success && followupRes.data?.data) {
         const fc = followupRes.data.data;
         setFollowupDashCounts({
@@ -4815,31 +4847,10 @@ console.log('API Response:', response.data);
         });
       }
 
-      if (userData?._id) {
-        const referParams = new URLSearchParams({
-          page: '1',
-          registeredByMe: userData._id,
-          ...listParts,
-          ...sharedFilterParts,
-        });
-        const referRes = await axios.get(`${backendUrl}/college/appliedCandidates?${referParams}`, {
-          headers: { 'x-auth': token },
-        });
-        if (referRes.data?.success) {
-          setMyReferLeadsCount(referRes.data.totalCount || 0);
-        }
+      if (referRes?.data?.success) {
+        setMyReferLeadsCount(referRes.data.totalCount || 0);
       }
 
-      const noFollowupParams = new URLSearchParams({
-        page: '1',
-        hasFollowUpCall: 'false',
-        hasFollowUpVisit: 'false',
-        ...listParts,
-        ...sharedFilterParts,
-      });
-      const noFollowupRes = await axios.get(`${backendUrl}/college/appliedCandidates?${noFollowupParams}`, {
-        headers: { 'x-auth': token },
-      });
       if (noFollowupRes.data?.success) {
         setNoFollowupLeadsCount(noFollowupRes.data.totalCount || 0);
       }
@@ -4939,86 +4950,94 @@ console.log('API Response:', response.data);
       }
     }
 
+    const cycle = cycleOverride || cycleFilters;
+    const hrDepartmentIds = new Set(
+      (verticalOptions || [])
+        .filter((opt) => isHrDepartmentLabel(opt.label))
+        .map((opt) => String(opt.value))
+    );
+    const selectedDepartmentId = cycle?.department ? String(cycle.department) : '';
+    const departmentAllowsHr = !selectedDepartmentId || hrDepartmentIds.has(selectedDepartmentId);
+    const selectedProject = (projectOptions || []).find((opt) => String(opt.value) === String(cycle?.project || ''));
+    const selectedProjectVertical = String(selectedProject?.vertical?._id || selectedProject?.vertical || '');
+    const projectAllowsHr = !cycle?.project || hrDepartmentIds.has(selectedProjectVertical);
+    const shouldMergeHrLeads = listEndpoint === 'appliedCandidates'
+      && Number(page) === 1
+      && !filters.leadStatus
+      && !filters.subStatuses
+      && !filters.approvalStatus
+      && !filters.followupStatus
+      && !filters.aiLeadStatus
+      && !cycle?.course
+      && !cycle?.center
+      && !cycle?.batch
+      && departmentAllowsHr
+      && projectAllowsHr;
+
     try {
-      const response = await axios.get(`${backendUrl}/college/${listEndpoint}?${queryParams}`, {
-        headers: { 'x-auth': token }
-      });
+      const listParts = shouldMergeHrLeads
+        ? buildListFilterQueryParts(formDataRef.current || formData, cycle)
+        : null;
+      const hrParams = shouldMergeHrLeads ? {
+        page: 1,
+        limit: 100,
+        search: filters.name || undefined,
+        startDate: toHrFilterYmd(filters.createdFromDate),
+        endDate: toHrFilterYmd(filters.createdToDate),
+        createdFromDate: toHrFilterYmd(filters.createdFromDate),
+        createdToDate: toHrFilterYmd(filters.createdToDate),
+        modifiedFromDate: toHrFilterYmd(filters.modifiedFromDate),
+        modifiedToDate: toHrFilterYmd(filters.modifiedToDate),
+        nextActionFromDate: toHrFilterYmd(filters.nextActionFromDate),
+        nextActionToDate: toHrFilterYmd(filters.nextActionToDate),
+        owner: listParts.owner,
+        counselor: listParts.counselor,
+        department: selectedDepartmentId && hrDepartmentIds.has(selectedDepartmentId)
+          ? selectedDepartmentId
+          : undefined,
+        project: cycle?.project || undefined,
+      } : null;
+      if (hrParams) {
+        if (filters.hasFollowUpCall === true || filters.hasFollowUpCall === 'yes') {
+          hrParams.hasFollowUpCall = 'true';
+        } else if (filters.hasFollowUpCall === false || filters.hasFollowUpCall === 'no') {
+          hrParams.hasFollowUpCall = 'false';
+        }
+        if (filters.hasFollowUpVisit === true || filters.hasFollowUpVisit === 'yes') {
+          hrParams.hasFollowUpVisit = 'true';
+        } else if (filters.hasFollowUpVisit === false || filters.hasFollowUpVisit === 'no') {
+          hrParams.hasFollowUpVisit = 'false';
+        }
+        if (activeLeadViewTab === 'noFollowup') {
+          hrParams.hasFollowUpCall = 'false';
+          hrParams.hasFollowUpVisit = 'false';
+        }
+      }
+
+      const [response, hrRes] = await Promise.all([
+        axios.get(`${backendUrl}/college/${listEndpoint}?${queryParams}`, {
+          headers: { 'x-auth': token }
+        }),
+        hrParams
+          ? axios.get(`${backendUrl}/college/hr/leads`, {
+            headers: { 'x-auth': token },
+            params: hrParams,
+          }).catch((hrErr) => {
+            console.error('Error fetching HR leads for B2C list:', hrErr);
+            return null;
+          })
+          : Promise.resolve(null),
+      ]);
 
       if (response.data.success && response.data.data) {
         const data = response.data;
         let profiles = Array.isArray(data.data) ? [...data.data] : [];
-        const cycle = cycleOverride || cycleFilters;
-        const hrDepartmentIds = new Set(
-          (verticalOptions || [])
-            .filter((opt) => isHrDepartmentLabel(opt.label))
-            .map((opt) => String(opt.value))
-        );
-        const selectedDepartmentId = cycle?.department ? String(cycle.department) : '';
-        const departmentAllowsHr = !selectedDepartmentId || hrDepartmentIds.has(selectedDepartmentId);
-        const selectedProject = (projectOptions || []).find((opt) => String(opt.value) === String(cycle?.project || ''));
-        const selectedProjectVertical = String(selectedProject?.vertical?._id || selectedProject?.vertical || '');
-        const projectAllowsHr = !cycle?.project || hrDepartmentIds.has(selectedProjectVertical);
-        const shouldMergeHrLeads = listEndpoint === 'appliedCandidates'
-          && Number(page) === 1
-          && !filters.leadStatus
-          && !filters.subStatuses
-          && !filters.approvalStatus
-          && !filters.followupStatus
-          && !filters.aiLeadStatus
-          && !cycle?.course
-          && !cycle?.center
-          && !cycle?.batch
-          && departmentAllowsHr
-          && projectAllowsHr;
 
-        if (shouldMergeHrLeads) {
-          try {
-            const listParts = buildListFilterQueryParts(formDataRef.current || formData, cycle);
-            const hrParams = {
-              page: 1,
-              limit: 100,
-              search: filters.name || undefined,
-              startDate: toHrFilterYmd(filters.createdFromDate),
-              endDate: toHrFilterYmd(filters.createdToDate),
-              createdFromDate: toHrFilterYmd(filters.createdFromDate),
-              createdToDate: toHrFilterYmd(filters.createdToDate),
-              modifiedFromDate: toHrFilterYmd(filters.modifiedFromDate),
-              modifiedToDate: toHrFilterYmd(filters.modifiedToDate),
-              nextActionFromDate: toHrFilterYmd(filters.nextActionFromDate),
-              nextActionToDate: toHrFilterYmd(filters.nextActionToDate),
-              owner: listParts.owner,
-              counselor: listParts.counselor,
-              department: selectedDepartmentId && hrDepartmentIds.has(selectedDepartmentId)
-                ? selectedDepartmentId
-                : undefined,
-              project: cycle?.project || undefined,
-            };
-            if (filters.hasFollowUpCall === true || filters.hasFollowUpCall === 'yes') {
-              hrParams.hasFollowUpCall = 'true';
-            } else if (filters.hasFollowUpCall === false || filters.hasFollowUpCall === 'no') {
-              hrParams.hasFollowUpCall = 'false';
-            }
-            if (filters.hasFollowUpVisit === true || filters.hasFollowUpVisit === 'yes') {
-              hrParams.hasFollowUpVisit = 'true';
-            } else if (filters.hasFollowUpVisit === false || filters.hasFollowUpVisit === 'no') {
-              hrParams.hasFollowUpVisit = 'false';
-            }
-            if (activeLeadViewTab === 'noFollowup') {
-              hrParams.hasFollowUpCall = 'false';
-              hrParams.hasFollowUpVisit = 'false';
-            }
-
-            const hrRes = await axios.get(`${backendUrl}/college/hr/leads`, {
-              headers: { 'x-auth': token },
-              params: hrParams,
-            });
-            const hrLeads = hrRes.data?.success ? (hrRes.data?.data?.leads || []) : [];
-            const hrProfiles = hrLeads.map(mapHrLeadToB2cProfile);
-            const hrIds = new Set(hrProfiles.map((item) => String(item._id)));
-            profiles = [...hrProfiles, ...profiles.filter((item) => !hrIds.has(String(item._id)))];
-          } catch (hrErr) {
-            console.error('Error fetching HR leads for B2C list:', hrErr);
-          }
+        if (hrRes?.data?.success) {
+          const hrLeads = hrRes.data?.data?.leads || [];
+          const hrProfiles = hrLeads.map(mapHrLeadToB2cProfile);
+          const hrIds = new Set(hrProfiles.map((item) => String(item._id)));
+          profiles = [...hrProfiles, ...profiles.filter((item) => !hrIds.has(String(item._id)))];
         }
 
         setAllProfiles(profiles);
@@ -5028,13 +5047,17 @@ console.log('API Response:', response.data);
         if (milestoneFilter === 'kycDone' || shouldFetchKycCandidates) {
           applyKycFilterCounts(data.crmFilterCounts);
         }
-        const activeCycle = cycleOverride || cycleFilters;
+        if (!silent) setIsLoadingProfiles(false);
+
+        const activeCycle = cycle;
+        const countJobs = [];
         if (!(milestoneFilter === 'kycDone' || milestoneFilter === 'admission' || shouldFetchKycCandidates)) {
-          await fetchRegistrationCrmFilterCounts(filters, page, null, activeCycle);
+          countJobs.push(fetchRegistrationCrmFilterCounts(filters, page, null, activeCycle));
         }
-        await fetchDashboardCounts(filters, activeCycle);
-        await fetchKycCounts(filters, activeCycle);
-        await fetchMilestoneCounts(filters, activeCycle);
+        countJobs.push(fetchDashboardCounts(filters, activeCycle));
+        countJobs.push(fetchKycCounts(filters, activeCycle));
+        countJobs.push(fetchMilestoneCounts(filters, activeCycle));
+        await Promise.all(countJobs);
       } else {
         console.error('Failed to fetch profile data', response.data.message);
       }
