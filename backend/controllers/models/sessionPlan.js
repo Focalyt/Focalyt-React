@@ -151,6 +151,7 @@ const sessionPlanSchema = new Schema(
     totQuestionBankLastUpdated: { type: Date, default: null },
     totPassPercentage: { type: Number, default: 40 },
     totAssignmentSubmission: { type: totAssignmentSubmissionSchema, default: undefined },
+    totAssignmentSubmissions: { type: [totAssignmentSubmissionSchema], default: [] },
 
     workflowStatus: { type: String, trim: true, default: 'Scheduled', index: true },
 

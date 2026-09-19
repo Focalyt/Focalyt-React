@@ -64,6 +64,116 @@ const normalizePassPercentage = (value, fallback = TOT_PASS_PERCENT_DEFAULT) => 
   return Math.min(100, Math.max(1, Math.round(n)));
 };
 
+const getQuestionMarks = (question) => {
+  const marks = Number(question?.marks);
+  return Number.isFinite(marks) && marks > 0 ? marks : 1;
+};
+
+const getQuestionId = (question, index) => String(question?._id || question?.id || `tot-q-${index}`);
+
+const scoreTotAssignment = (questions = [], selectedAnswers = [], passPercentage = TOT_PASS_PERCENT_DEFAULT) => {
+  const answersById = new Map(
+    (Array.isArray(selectedAnswers) ? selectedAnswers : []).map((item) => [
+      String(item.questionId || item.id || ''),
+      item,
+    ])
+  );
+
+  let score = 0;
+  let correctCount = 0;
+  let wrongCount = 0;
+  let attemptedCount = 0;
+  const totalMarks = questions.reduce((sum, question) => sum + getQuestionMarks(question), 0);
+
+  const answers = questions.map((question, index) => {
+    const questionId = getQuestionId(question, index);
+    const marks = getQuestionMarks(question);
+    const chosen = answersById.get(questionId);
+    const selectedIndex = chosen?.selectedIndex;
+    const hasAnswer = selectedIndex !== undefined && selectedIndex !== null && selectedIndex !== '';
+    if (!hasAnswer) {
+      return {
+        questionId,
+        selectedIndex: null,
+        isCorrect: false,
+        marksObtained: 0,
+      };
+    }
+
+    attemptedCount += 1;
+    const isCorrect = Number(selectedIndex) === Number(question.correctIndex);
+    if (isCorrect) {
+      score += marks;
+      correctCount += 1;
+    } else {
+      wrongCount += 1;
+    }
+
+    return {
+      questionId,
+      selectedIndex: Number(selectedIndex),
+      isCorrect,
+      marksObtained: isCorrect ? marks : 0,
+    };
+  });
+
+  const percentage = totalMarks > 0 ? Math.round((score / totalMarks) * 10000) / 100 : 0;
+  const passPercent = normalizePassPercentage(passPercentage);
+
+  return {
+    answers,
+    score,
+    totalMarks,
+    percentage,
+    pass: percentage >= passPercent,
+    correctCount,
+    wrongCount,
+    attemptedCount,
+    unattemptedCount: Math.max(questions.length - attemptedCount, 0),
+  };
+};
+
+const toPlainTotSubmission = (item) => {
+  if (!item) return null;
+  return typeof item.toObject === 'function' ? item.toObject() : { ...item };
+};
+
+const collectTotSubmissions = (session = {}) => {
+  const list = [];
+  const seen = new Set();
+  const push = (item) => {
+    const plain = toPlainTotSubmission(item);
+    if (!plain) return;
+    if (!plain.submittedAt && !(plain.answers || []).length) return;
+    const key = plain.submittedAt
+      ? new Date(plain.submittedAt).toISOString()
+      : `${plain.percentage}:${(plain.answers || []).length}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    list.push(plain);
+  };
+  (session.totAssignmentSubmissions || []).forEach(push);
+  push(session.totAssignmentSubmission);
+  return list.sort((a, b) => new Date(a.submittedAt || 0) - new Date(b.submittedAt || 0));
+};
+
+const answeredQuestionIds = (session = {}) => {
+  const ids = new Set();
+  collectTotSubmissions(session).forEach((submission) => {
+    (submission.answers || []).forEach((answer) => {
+      if (answer?.questionId) ids.add(String(answer.questionId));
+    });
+  });
+  return ids;
+};
+
+const pendingTotQuestions = (session = {}) => {
+  const answered = answeredQuestionIds(session);
+  return (session.totQuestionBank || []).filter((question, index) => (
+    !answered.has(getQuestionId(question, index))
+  ));
+};
+
 const normalizeSubSessions = (items = []) =>
   (Array.isArray(items) ? items : [])
     .map((item) => ({
@@ -138,6 +248,7 @@ const mapSessionToClient = (doc) => {
     totQuestionBankLastUpdated: session.totQuestionBankLastUpdated || null,
     totPassPercentage: normalizePassPercentage(session.totPassPercentage),
     totAssignmentSubmission: session.totAssignmentSubmission || null,
+    totAssignmentSubmissions: collectTotSubmissions(session),
     workflowStatus: session.workflowStatus || 'Scheduled',
     seniorTrainerId: session.seniorTrainer ? String(session.seniorTrainer) : '',
     seniorTrainerName: session.seniorTrainerName || '',
@@ -581,6 +692,125 @@ router.patch('/:id', async (req, res) => {
   } catch (err) {
     console.error('PATCH /college/session-plans/:id', err);
     return res.status(400).json({ status: false, message: err.message || 'Failed to update session' });
+  }
+});
+
+// POST /college/session-plans/:id/tot-assignment
+router.post('/:id/tot-assignment', async (req, res) => {
+  try {
+    const college = await resolveCollege(req);
+    const session = await SessionPlan.findOne({
+      _id: req.params.id,
+      college: college._id,
+      isDeleted: false,
+    });
+    if (!session) {
+      return res.status(404).json({ status: false, message: 'Session not found' });
+    }
+
+    const questions = pendingTotQuestions(session);
+    if (!questions.length) {
+      const alreadySubmitted = Boolean(session.totAssignmentSubmission?.submittedAt)
+        || collectTotSubmissions(session).length > 0;
+      return res.status(alreadySubmitted ? 409 : 400).json({
+        status: false,
+        message: alreadySubmitted
+          ? 'Assignment already submitted. Retake is not allowed until new questions are added.'
+          : 'No TOT MCQ questions are attached to this session',
+        data: mapSessionToClient(session),
+      });
+    }
+
+    const scored = scoreTotAssignment(
+      questions,
+      req.body?.answers,
+      session.totPassPercentage
+    );
+    if (!scored.attemptedCount) {
+      return res.status(400).json({ status: false, message: 'Select at least one answer before submitting' });
+    }
+
+    const history = collectTotSubmissions(session);
+    const submission = {
+      trainer: req.user?._id || null,
+      trainerName: req.user?.name || '',
+      answers: scored.answers,
+      score: scored.score,
+      totalMarks: scored.totalMarks,
+      percentage: scored.percentage,
+      pass: scored.pass,
+      correctCount: scored.correctCount,
+      wrongCount: scored.wrongCount,
+      attemptedCount: scored.attemptedCount,
+      unattemptedCount: scored.unattemptedCount,
+      submittedAt: new Date(),
+    };
+    session.totAssignmentSubmissions = [...history, submission];
+    session.totAssignmentSubmission = submission;
+    session.totStatus = scored.pass ? 'Passed' : 'Failed';
+    await session.save();
+
+    return res.json({
+      status: true,
+      message: scored.pass ? 'Assignment submitted. You passed.' : 'Assignment submitted. You did not pass.',
+      data: mapSessionToClient(session),
+    });
+  } catch (err) {
+    console.error('POST /college/session-plans/:id/tot-assignment', err);
+    return res.status(400).json({ status: false, message: err.message || 'Failed to submit assignment' });
+  }
+});
+
+// POST /college/session-plans/:id/tot-questions — append only, never deletes existing MCQs
+router.post('/:id/tot-questions', async (req, res) => {
+  try {
+    const college = await resolveCollege(req);
+    const session = await SessionPlan.findOne({
+      _id: req.params.id,
+      college: college._id,
+      isDeleted: false,
+    });
+    if (!session) {
+      return res.status(404).json({ status: false, message: 'Session not found' });
+    }
+
+    const incoming = Array.isArray(req.body?.questions)
+      ? req.body.questions
+      : (req.body?.question || req.body?.options ? [req.body] : []);
+    const additions = incoming
+      .map((item) => ({
+        question: String(item.question || '').trim(),
+        options: Array.isArray(item.options) ? item.options.map((option) => String(option || '')) : ['', '', '', ''],
+        correctIndex: Number(item.correctIndex) || 0,
+        marks: Number(item.marks) > 0 ? Number(item.marks) : 1,
+      }))
+      .filter((item) => item.question && item.options.some((option) => option.trim()));
+
+    const passProvided = req.body?.totPassPercentage !== undefined && req.body?.totPassPercentage !== null && req.body?.totPassPercentage !== '';
+    if (!additions.length && !passProvided) {
+      return res.status(400).json({ status: false, message: 'Enter a question and at least one option' });
+    }
+
+    if (additions.length) {
+      session.totQuestionBank = [...(session.totQuestionBank || []), ...additions];
+      session.totQuestionBankLastUpdated = new Date();
+      session.includeTot = true;
+    }
+    if (passProvided) {
+      session.totPassPercentage = normalizePassPercentage(req.body.totPassPercentage);
+    }
+    await session.save();
+
+    return res.json({
+      status: true,
+      message: additions.length
+        ? (additions.length === 1 ? 'MCQ added' : `${additions.length} MCQs added`)
+        : 'Passing percentage updated',
+      data: mapSessionToClient(session),
+    });
+  } catch (err) {
+    console.error('POST /college/session-plans/:id/tot-questions', err);
+    return res.status(400).json({ status: false, message: err.message || 'Failed to add MCQ' });
   }
 });
 

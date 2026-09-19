@@ -3066,56 +3066,106 @@ const getTotPassPercentage = (session) => {
   return Number.isFinite(n) && n > 0 && n <= 100 ? n : TOT_PASS_PERCENT_DEFAULT;
 };
 
-const TotMcqAssignmentModal = ({ session, notify, onClose }) => {
-  const questions = Array.isArray(session?.totQuestionBank) ? session.totQuestionBank : [];
+const mapTotSubmissionToResult = (submission, session) => {
+  if (!submission) return null;
+  const submitted = Boolean(submission.submittedAt) || (Array.isArray(submission.answers) && submission.answers.length > 0);
+  if (!submitted) return null;
+  const percentage = Number(submission.percentage);
+  const passPercent = getTotPassPercentage(session);
+  return {
+    score: Number(submission.score) || 0,
+    totalMarks: Number(submission.totalMarks) || 0,
+    percentage: Number.isFinite(percentage) ? percentage : 0,
+    pass: submission.pass === true,
+    passPercent,
+    submittedAt: submission.submittedAt || null,
+  };
+};
+
+const getTotSubmissionHistory = (session = {}) => {
+  const list = [];
+  const seen = new Set();
+  const push = (item) => {
+    const mapped = mapTotSubmissionToResult(item, session);
+    if (!mapped) return;
+    const key = mapped.submittedAt ? new Date(mapped.submittedAt).toISOString() : `${mapped.percentage}:${mapped.score}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    list.push(mapped);
+  };
+  (session.totAssignmentSubmissions || []).forEach(push);
+  push(session.totAssignmentSubmission);
+  return list.sort((a, b) => new Date(a.submittedAt || 0) - new Date(b.submittedAt || 0));
+};
+
+const getPendingTotQuestions = (session = {}) => {
+  const answered = new Set();
+  const collect = (submission) => {
+    (submission?.answers || []).forEach((answer) => {
+      if (answer?.questionId) answered.add(String(answer.questionId));
+    });
+  };
+  (session.totAssignmentSubmissions || []).forEach(collect);
+  collect(session.totAssignmentSubmission);
+  return (session.totQuestionBank || []).filter((question, index) => !answered.has(getTotQuestionId(question, index)));
+};
+
+const TotMcqAssignmentModal = ({ session, notify, token, backendUrl, onSubmitted, onClose }) => {
+  const history = getTotSubmissionHistory(session);
+  const questions = getPendingTotQuestions(session);
   const [selected, setSelected] = useState({});
-  const [result, setResult] = useState(null);
-  const submitted = Boolean(result);
+  const [result, setResult] = useState(() => history[history.length - 1] || null);
+  const [submitting, setSubmitting] = useState(false);
+  const showQuiz = questions.length > 0;
+  const submitted = Boolean(result) && !showQuiz;
   const totalMarks = questions.reduce((sum, question) => sum + getTotQuestionMarks(question), 0);
   const passPercent = getTotPassPercentage(session);
-  const passMarks = totalMarks > 0 ? Math.ceil((totalMarks * passPercent) / 100) : 0;
   const attempted = questions.filter((question, index) => selected[getTotQuestionId(question, index)] !== undefined).length;
 
-  const handleSubmit = () => {
-    if (!questions.length) return;
+  const handleSubmit = async () => {
+    if (!questions.length || submitting || submitted) return;
     if (!attempted) {
       notify('Select at least one answer before submitting');
       return;
     }
+    if (!token || !backendUrl || !session?.id) {
+      notify('Unable to submit assignment. Please sign in again.');
+      return;
+    }
 
-    let score = 0;
-    let correctCount = 0;
-    let wrongCount = 0;
-    questions.forEach((question, index) => {
-      const chosen = selected[getTotQuestionId(question, index)];
-      if (chosen === undefined) return;
-      if (Number(chosen) === Number(question.correctIndex)) {
-        score += getTotQuestionMarks(question);
-        correctCount += 1;
-      } else {
-        wrongCount += 1;
+    setSubmitting(true);
+    try {
+      const answers = questions.map((question, index) => {
+        const questionId = getTotQuestionId(question, index);
+        return {
+          questionId,
+          selectedIndex: selected[questionId],
+        };
+      }).filter((item) => item.selectedIndex !== undefined);
+
+      const res = await axios.post(
+        `${backendUrl}/college/session-plans/${session.id}/tot-assignment`,
+        { answers },
+        { headers: { 'x-auth': token } }
+      );
+      const savedSession = res.data?.data || {};
+      const savedResult = mapTotSubmissionToResult(savedSession.totAssignmentSubmission, savedSession);
+      if (savedResult) setResult(savedResult);
+      if (typeof onSubmitted === 'function') onSubmitted(savedSession);
+      notify(res.data?.message || (savedResult?.pass ? 'Assignment submitted. You passed.' : 'Assignment submitted.'));
+    } catch (err) {
+      const savedSession = err.response?.data?.data;
+      if (err.response?.status === 409 && savedSession?.totAssignmentSubmission) {
+        const savedResult = mapTotSubmissionToResult(savedSession.totAssignmentSubmission, savedSession);
+        if (savedResult) setResult(savedResult);
+        if (typeof onSubmitted === 'function') onSubmitted(savedSession);
+        notify(err.response?.data?.message || 'Assignment already submitted');
+        return;
       }
-    });
-
-    const percentage = totalMarks > 0 ? Math.round((score / totalMarks) * 10000) / 100 : 0;
-    setResult({
-      score,
-      totalMarks,
-      percentage,
-      pass: percentage >= passPercent,
-      passPercent,
-      passMarks,
-      correctCount,
-      wrongCount,
-      attempted,
-      unattempted: Math.max(questions.length - attempted, 0),
-    });
-    notify('TOT assignment submitted');
-  };
-
-  const handleRetake = () => {
-    setSelected({});
-    setResult(null);
+      notify(err.response?.data?.message || 'Failed to submit assignment');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -3137,30 +3187,43 @@ const TotMcqAssignmentModal = ({ session, notify, onClose }) => {
         </div>
 
         <div className="session-modal__body">
-          {!questions.length ? (
+          {history.length > 0 && (
+            <div className="tot-assign__history">
+              <strong>Previous results</strong>
+              {history.map((item, index) => (
+                <div
+                  key={`${item.submittedAt || index}`}
+                  className={`tot-assign__history-row tot-assign__history-row--${item.pass ? 'pass' : 'fail'}`}
+                >
+                  <span>Attempt {index + 1}</span>
+                  <span>{item.pass ? 'Pass' : 'Fail'} · {item.percentage}%</span>
+                  <span>{item.submittedAt ? new Date(item.submittedAt).toLocaleDateString('en-IN') : ''}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {!questions.length && !history.length ? (
             <div className="sc-evidence-empty">
               <i className="fas fa-question-circle" />
               <p>No TOT MCQ questions are attached to this session yet.</p>
             </div>
+          ) : submitted ? (
+            <div className={`tot-assign__outcome tot-assign__outcome--${result.pass ? 'pass' : 'fail'}`}>
+              <span className={`tot-assign__status tot-assign__status--${result.pass ? 'pass' : 'fail'}`}>
+                {result.pass ? 'Pass' : 'Fail'}
+              </span>
+              <em>{result.percentage}%</em>
+              <strong>{result.pass ? 'You passed this assignment' : 'You did not pass this assignment'}</strong>
+              <p>Passing score is {result.passPercent || passPercent}%. Retake is not allowed.</p>
+            </div>
           ) : (
             <div className="tot-assign">
               <div className="tot-assign__head">
-                <span className={`tot-assign__status tot-assign__status--${submitted ? (result.pass ? 'pass' : 'fail') : 'pending'}`}>
-                  {submitted
-                    ? (result.pass ? 'Submitted · Pass' : 'Submitted · Needs improvement')
-                    : `${attempted}/${questions.length} answered · pass ${passPercent}%`}
+                <span className="tot-assign__status tot-assign__status--pending">
+                  {history.length ? `${questions.length} new question${questions.length === 1 ? '' : 's'} · ` : ''}
+                  {attempted}/{questions.length} answered · pass {passPercent}%
                 </span>
               </div>
-
-              {submitted && (
-                <div className={`tot-assign__result tot-assign__result--${result.pass ? 'pass' : 'fail'}`}>
-                  <strong>{result.score}/{result.totalMarks} marks · {result.percentage}%</strong>
-                  <span>
-                    {result.correctCount} correct · {result.wrongCount} wrong · {result.unattempted} skipped
-                    {` · need ${result.passPercent || passPercent}% to pass`}
-                  </span>
-                </div>
-              )}
 
               <div className="tot-assign__list">
                 {questions.map((question, qIndex) => {
@@ -3176,17 +3239,15 @@ const TotMcqAssignmentModal = ({ session, notify, onClose }) => {
                       <div className="tot-assign__options">
                         {(question.options || []).map((option, optionIndex) => {
                           const isChosen = chosen === optionIndex;
-                          const isCorrect = Number(question.correctIndex) === optionIndex;
-                          const reviewClass = submitted
-                            ? (isCorrect ? ' tot-assign__option--correct' : isChosen ? ' tot-assign__option--wrong' : '')
-                            : (isChosen ? ' tot-assign__option--chosen' : '');
                           return (
-                            <label key={`${questionId}-${optionIndex}`} className={`tot-assign__option${reviewClass}`}>
+                            <label
+                              key={`${questionId}-${optionIndex}`}
+                              className={`tot-assign__option${isChosen ? ' tot-assign__option--chosen' : ''}`}
+                            >
                               <input
                                 type="radio"
                                 name={`tot-mcq-${session?.id || 'session'}-${questionId}`}
                                 checked={isChosen}
-                                disabled={submitted}
                                 onChange={() => setSelected((prev) => ({ ...prev, [questionId]: optionIndex }))}
                               />
                               <span className="tot-assign__letter">{String.fromCharCode(65 + optionIndex)}</span>
@@ -3205,16 +3266,15 @@ const TotMcqAssignmentModal = ({ session, notify, onClose }) => {
 
         <div className="session-modal__foot">
           <button type="button" className="sc-btn" onClick={onClose}>Close</button>
-          {questions.length > 0 && (
-            submitted ? (
-              <button type="button" className="sc-btn sc-btn--outline" onClick={handleRetake}>
-                <i className="fas fa-redo" /> Retake assignment
-              </button>
-            ) : (
-              <button type="button" className="sc-btn sc-btn--primary" onClick={handleSubmit}>
-                <i className="fas fa-paper-plane" /> Submit assignment
-              </button>
-            )
+          {questions.length > 0 && !submitted && (
+            <button
+              type="button"
+              className="sc-btn sc-btn--primary"
+              disabled={submitting}
+              onClick={handleSubmit}
+            >
+              <i className="fas fa-paper-plane" /> {submitting ? 'Submitting...' : 'Submit assignment'}
+            </button>
           )}
         </div>
       </div>
@@ -3229,10 +3289,13 @@ const SessionCard = ({
   students = [],
   attendanceRecordsBySession = {},
   notify,
+  token,
+  backendUrl,
   onStatusChange,
   onEvidenceUpload,
   onEditSession,
   onOpenAttendance,
+  onAssignmentSubmitted,
   isCoordinatorPlan = false,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
@@ -3327,6 +3390,9 @@ const SessionCard = ({
         <TotMcqAssignmentModal
           session={activeSession}
           notify={notify}
+          token={token}
+          backendUrl={backendUrl}
+          onSubmitted={onAssignmentSubmitted}
           onClose={() => setTotModalOpen(false)}
         />
       )}
@@ -3510,7 +3576,12 @@ const SessionCard = ({
                 className="sc-btn sc-btn--outline"
                 onClick={() => setTotModalOpen(true)}
               >
-                <i className="fas fa-clipboard-list" /> Assignment
+                <i className="fas fa-clipboard-list" />
+                {activeSession?.totAssignmentSubmission?.submittedAt
+                  ? (getPendingTotQuestions(activeSession).length
+                    ? `Assignment · ${getPendingTotQuestions(activeSession).length} new`
+                    : `Result · ${activeSession.totAssignmentSubmission.pass ? 'Pass' : 'Fail'} ${Number(activeSession.totAssignmentSubmission.percentage) || 0}%`)
+                  : 'Assignment'}
               </button>
               <button
                 type="button"
@@ -4846,10 +4917,21 @@ const TrainerModule = () => {
                           attendanceRecordsBySession={attendanceRecordsBySession}
                           studentReviews={getSessionStudentReviews(session, sessionFeedbackBySession)}
                           notify={notify}
+                          token={token}
+                          backendUrl={backendUrl}
                           onStatusChange={updateSessionStatus}
                           onEvidenceUpload={uploadEvidenceFile}
                           onEditSession={openEditSessionModal}
                           onOpenAttendance={openAttendanceModal}
+                          onAssignmentSubmitted={(savedSession) => {
+                            if (!savedSession?.id && !savedSession?._id) return;
+                            const sessionId = String(savedSession.id || savedSession._id);
+                            setSessions((prev) => prev.map((item) => (
+                              String(item.id) === sessionId
+                                ? { ...item, ...savedSession, id: sessionId }
+                                : item
+                            )));
+                          }}
                           isCoordinatorPlan={isCoordinatorPlanSession(session)}
                         />
                       ))}
@@ -6768,6 +6850,25 @@ const PORTAL_CSS = `
   .tot-assign__result span { font-size: 11px; font-weight: 700; }
   .tot-assign__result--pass { background: #ecfdf5; color: #047857; }
   .tot-assign__result--fail { background: #fef2f2; color: #b91c1c; }
+  .tot-assign__outcome {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; gap: 8px; min-height: 280px; border-radius: 16px; padding: 36px 20px;
+  }
+  .tot-assign__outcome em {
+    font-style: normal; font-size: 48px; font-weight: 800; line-height: 1;
+  }
+  .tot-assign__outcome strong { font-size: 18px; font-weight: 800; }
+  .tot-assign__outcome p { margin: 0; font-size: 13px; font-weight: 600; opacity: 0.85; }
+  .tot-assign__outcome--pass { background: #ecfdf5; color: #047857; }
+  .tot-assign__outcome--fail { background: #fef2f2; color: #b91c1c; }
+  .tot-assign__history { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .tot-assign__history strong { font-size: 12px; font-weight: 800; color: #0f172a; }
+  .tot-assign__history-row {
+    display: flex; justify-content: space-between; gap: 8px; border-radius: 8px; padding: 8px 10px;
+    font-size: 12px; font-weight: 700;
+  }
+  .tot-assign__history-row--pass { background: #ecfdf5; color: #047857; }
+  .tot-assign__history-row--fail { background: #fef2f2; color: #b91c1c; }
   .tot-assign__list { display: flex; flex-direction: column; gap: 10px; }
   .tot-assign__card {
     border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px;

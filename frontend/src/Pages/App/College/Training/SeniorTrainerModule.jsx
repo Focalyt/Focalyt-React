@@ -87,6 +87,34 @@ const patchCoordinatorSessionApi = async (backendUrl, token, sessionId, payload)
   return res.data.data;
 };
 
+const addTotQuestionApi = async (backendUrl, token, sessionId, payload) => {
+  const res = await axios.post(
+    `${backendUrl}/college/session-plans/${sessionId}/tot-questions`,
+    payload,
+    { headers: authHeaders(token) }
+  );
+  if (!res.data?.status) throw new Error(res.data?.message || 'Failed to add MCQ');
+  return res.data.data;
+};
+
+const getTotSubmissionHistory = (session = {}) => {
+  const list = [];
+  const seen = new Set();
+  const push = (item) => {
+    if (!item) return;
+    if (!item.submittedAt && !(item.answers || []).length) return;
+    const key = item.submittedAt
+      ? new Date(item.submittedAt).toISOString()
+      : `${item.percentage}:${(item.answers || []).length}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    list.push(item);
+  };
+  (session.totAssignmentSubmissions || []).forEach(push);
+  push(session.totAssignmentSubmission);
+  return list.sort((a, b) => new Date(a.submittedAt || 0) - new Date(b.submittedAt || 0));
+};
+
 const getSessionActivities = (session = {}) => {
   if (Array.isArray(session.sessionActivities) && session.sessionActivities.length) {
     return session.sessionActivities;
@@ -144,10 +172,21 @@ const getTotQuestionMarks = (question) => {
   return Number.isFinite(marks) && marks > 0 ? marks : 1;
 };
 const TOT_PASS_PERCENT_DEFAULT = 40;
-const getTotPassPercentage = (session) => {
-  const n = Number(session?.totPassPercentage);
-  return Number.isFinite(n) && n > 0 && n <= 100 ? n : TOT_PASS_PERCENT_DEFAULT;
+const TOT_MARKS_MAX = 100;
+const toPositiveMarks = (value, emptyValue = 0) => {
+  if (value === '' || value == null) return emptyValue;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : emptyValue;
 };
+const toPassPercentage = (value, emptyValue = TOT_PASS_PERCENT_DEFAULT) => {
+  if (value === '' || value == null) return emptyValue;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return emptyValue;
+  return Math.min(100, Math.max(1, Math.round(n)));
+};
+const sumTotMarks = (questions = []) =>
+  (questions || []).reduce((sum, question) => sum + toPositiveMarks(question?.marks, 0), 0);
+const getTotPassPercentage = (session) => toPassPercentage(session?.totPassPercentage, TOT_PASS_PERCENT_DEFAULT);
 
 const isUploadedMaterial = (item = {}) => (
   Boolean(item.fileUrl || item.fileName)
@@ -313,7 +352,8 @@ const TrainerDocumentReviewModal = ({ doc, status, onClose, onAccept, onReject }
 
 const getTrainerMcqReview = (session = {}) => {
   const questions = Array.isArray(session.totQuestionBank) ? session.totQuestionBank : [];
-  const submission = session.totAssignmentSubmission || null;
+  const history = getTotSubmissionHistory(session);
+  const submission = history[history.length - 1] || session.totAssignmentSubmission || null;
   const answersById = new Map(
     (submission?.answers || []).map((answer) => [String(answer.questionId), answer])
   );
@@ -330,8 +370,9 @@ const getTrainerMcqReview = (session = {}) => {
       marks: getTotQuestionMarks(question),
       selectedIndex: hasAnswer ? Number(selectedIndex) : null,
       isCorrect: hasAnswer ? Number(selectedIndex) === Number(question.correctIndex) : false,
+      attempted: answersById.has(id),
     };
-  });
+  }).filter((item) => item.attempted);
   const totalMarks = Number(submission?.totalMarks) || reviewed.reduce((sum, item) => sum + item.marks, 0);
   const score = Number(submission?.score);
   const computedScore = reviewed.filter((item) => item.isCorrect).reduce((sum, item) => sum + item.marks, 0);
@@ -1209,7 +1250,219 @@ const SessionAssignModal = ({
   );
 };
 
-const SeniorSessionCard = ({ session }) => {
+const createSeniorMcqDraft = () => ({
+  id: `st-mcq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  question: '',
+  options: ['', '', '', ''],
+  correctIndex: 0,
+  marks: 1,
+});
+
+const SeniorAddMcqForm = ({ session, token, backendUrl, onAdded }) => {
+  const existingCount = Array.isArray(session?.totQuestionBank) ? session.totQuestionBank.length : 0;
+  const [drafts, setDrafts] = useState([createSeniorMcqDraft()]);
+  const [passPercentage, setPassPercentage] = useState(TOT_PASS_PERCENT_DEFAULT);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setDrafts([createSeniorMcqDraft()]);
+    setPassPercentage(TOT_PASS_PERCENT_DEFAULT);
+    setError('');
+  }, [session?.id, existingCount]);
+
+  const totMarksTotal = sumTotMarks(drafts);
+  const totPassPercentValue = toPassPercentage(passPercentage, 0);
+  const totPassMarks = totMarksTotal > 0 && totPassPercentValue > 0
+    ? Math.ceil((totMarksTotal * totPassPercentValue) / 100)
+    : 0;
+
+  const bumpPassPercentage = (delta) => {
+    setPassPercentage((prev) => Math.min(100, Math.max(1, toPassPercentage(prev) + delta)));
+  };
+
+  const handlePassPercentageChange = (raw) => {
+    if (raw === '') {
+      setPassPercentage('');
+      return;
+    }
+    setPassPercentage(toPassPercentage(raw));
+  };
+
+  const updateDraft = (index, field, value) => {
+    setDrafts((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+  };
+
+  const updateDraftOption = (questionIndex, optionIndex, value) => {
+    setDrafts((prev) => prev.map((item, i) => {
+      if (i !== questionIndex) return item;
+      const options = [...item.options];
+      options[optionIndex] = value;
+      return { ...item, options };
+    }));
+  };
+
+  const handleMarksChange = (index, raw) => {
+    if (raw === '') {
+      updateDraft(index, 'marks', '');
+      return;
+    }
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return;
+    updateDraft(index, 'marks', Math.min(TOT_MARKS_MAX, Math.max(1, Math.round(n))));
+  };
+
+  const bumpMarks = (index, delta) => {
+    setDrafts((prev) => prev.map((item, i) => {
+      if (i !== index) return item;
+      const next = Math.min(TOT_MARKS_MAX, Math.max(1, toPositiveMarks(item.marks, 1) + delta));
+      return { ...item, marks: next };
+    }));
+  };
+
+  const addDraft = () => {
+    setDrafts((prev) => [...prev, createSeniorMcqDraft()]);
+    setError('');
+  };
+
+  const removeDraft = (index) => {
+    setDrafts((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
+  };
+
+  const handleSave = async () => {
+    if (saving) return;
+    const additions = drafts
+      .map((item) => ({
+        question: String(item.question || '').trim(),
+        options: Array.isArray(item.options) ? item.options : ['', '', '', ''],
+        correctIndex: Number(item.correctIndex) || 0,
+        marks: toPositiveMarks(item.marks, 1),
+      }))
+      .filter((item) => item.question && item.options.some((option) => option.trim()));
+
+    if (!additions.length) {
+      setError('Add a question with at least one option');
+      return;
+    }
+    if (!token || !backendUrl || !session?.id) {
+      setError('Unable to save these questions');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    try {
+      const saved = await addTotQuestionApi(backendUrl, token, session.id, {
+        questions: additions,
+        totPassPercentage: toPassPercentage(passPercentage),
+      });
+      if (typeof onAdded === 'function') onAdded(saved);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to add MCQ');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="st-add-mcq">
+      <div className="st-add-mcq__head">
+        <div>
+          <strong>New MCQ</strong>
+          <span>These questions are separate from the trainer’s previous attempt. Set marks and pass % for this new set only.</span>
+        </div>
+      </div>
+
+      <div className="st-add-mcq__meta">
+        <div className="st-add-mcq__stepper-wrap">
+          <span>Pass %</span>
+          <div className="st-add-mcq__stepper">
+            <button type="button" onClick={() => bumpPassPercentage(-1)}>−</button>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={passPercentage === '' ? '' : toPassPercentage(passPercentage)}
+              onChange={(e) => handlePassPercentageChange(e.target.value)}
+            />
+            <button type="button" onClick={() => bumpPassPercentage(1)}>+</button>
+          </div>
+        </div>
+        <span className="st-add-mcq__chip">{drafts.length} question{drafts.length === 1 ? '' : 's'}</span>
+        <span className="st-add-mcq__chip st-add-mcq__chip--mint">Total {totMarksTotal} mark{totMarksTotal === 1 ? '' : 's'}</span>
+        {totMarksTotal > 0 && totPassPercentValue > 0 && (
+          <span className="st-add-mcq__chip st-add-mcq__chip--amber">Pass {totPassMarks}+ ({totPassPercentValue}%)</span>
+        )}
+      </div>
+
+      <div className="st-add-mcq__list">
+        {drafts.map((question, questionIndex) => (
+          <div key={question.id} className="st-add-mcq__card">
+            <div className="st-add-mcq__card-head">
+              <strong>Q{questionIndex + 1}</strong>
+              <div className="st-add-mcq__card-tools">
+                <div className="st-add-mcq__stepper-wrap">
+                  <span>Marks</span>
+                  <div className="st-add-mcq__stepper">
+                    <button type="button" onClick={() => bumpMarks(questionIndex, -1)}>−</button>
+                    <input
+                      type="number"
+                      min={1}
+                      max={TOT_MARKS_MAX}
+                      value={question.marks === '' ? '' : toPositiveMarks(question.marks, 1)}
+                      onChange={(e) => handleMarksChange(questionIndex, e.target.value)}
+                    />
+                    <button type="button" onClick={() => bumpMarks(questionIndex, 1)}>+</button>
+                  </div>
+                </div>
+                {drafts.length > 1 && (
+                  <button type="button" className="st-add-mcq__remove" onClick={() => removeDraft(questionIndex)}>
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+            <input
+              className="st-add-mcq__input"
+              value={question.question}
+              onChange={(e) => updateDraft(questionIndex, 'question', e.target.value)}
+              placeholder="Type the question"
+            />
+            {(question.options || ['', '', '', '']).map((option, optionIndex) => (
+              <label key={`${question.id}-opt-${optionIndex}`} className="st-add-mcq__option">
+                <input
+                  type="radio"
+                  name={`st-mcq-correct-${question.id}`}
+                  checked={Number(question.correctIndex) === optionIndex}
+                  onChange={() => updateDraft(questionIndex, 'correctIndex', optionIndex)}
+                />
+                <input
+                  className="st-add-mcq__input"
+                  value={option}
+                  onChange={(e) => updateDraftOption(questionIndex, optionIndex, e.target.value)}
+                  placeholder={`Option ${String.fromCharCode(65 + optionIndex)}`}
+                />
+              </label>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      <button type="button" className="st-add-mcq__add" onClick={addDraft}>
+        + Add MCQ question
+      </button>
+
+      {error && <div className="st-add-mcq__error">{error}</div>}
+      <div className="st-add-mcq__actions">
+        <button type="button" className="sc-btn sc-btn--primary" disabled={saving} onClick={handleSave}>
+          {saving ? 'Saving...' : 'Save new MCQ'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const SeniorSessionCard = ({ session, token, backendUrl, onSessionUpdated }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
   const [selectedDoc, setSelectedDoc] = useState(null);
@@ -1314,8 +1567,17 @@ const SeniorSessionCard = ({ session }) => {
               className={`sc-tab${activeTab === 'tot' ? ' sc-tab--active' : ''}`}
               onClick={() => setActiveTab('tot')}
             >
-              <i className="fas fa-question-circle" /> TOT MCQ
-              {mcqReview.questions.length > 0 && <span className="sc-tab-count">{mcqReview.questions.length}</span>}
+              <i className="fas fa-user-check" /> Candidate Response
+              {mcqReview.submitted && mcqReview.questions.length > 0 && (
+                <span className="sc-tab-count">{mcqReview.questions.length}</span>
+              )}
+            </button>
+            <button
+              type="button"
+              className={`sc-tab${activeTab === 'newMcq' ? ' sc-tab--active' : ''}`}
+              onClick={() => setActiveTab('newMcq')}
+            >
+              <i className="fas fa-plus" /> New MCQ
             </button>
           </nav>
 
@@ -1467,16 +1729,26 @@ const SeniorSessionCard = ({ session }) => {
             <div className="sc-body">
               {mcqReview.questions.length === 0 ? (
                 <div className="sc-evidence-empty">
-                  <i className="fas fa-question-circle" />
-                  <p>No TOT MCQ question bank is attached to this session.</p>
-                </div>
-              ) : !mcqReview.submitted ? (
-                <div className="sc-evidence-empty">
                   <i className="fas fa-hourglass-half" />
-                  <p>Trainer has not submitted MCQ answers yet. {mcqReview.questions.length} question(s) are waiting.</p>
+                  <p>No candidate response yet. The trainer has not submitted MCQ answers.</p>
                 </div>
               ) : (
                 <div className="st-trainer-mcq">
+                  {getTotSubmissionHistory(session).length > 1 && (
+                    <div className="st-mcq-history">
+                      <strong>Previous results</strong>
+                      {getTotSubmissionHistory(session).map((item, index) => (
+                        <div
+                          key={`${item.submittedAt || index}`}
+                          className={`st-mcq-history__row${item.pass ? ' st-mcq-history__row--pass' : ' st-mcq-history__row--fail'}`}
+                        >
+                          <span>Attempt {index + 1}</span>
+                          <span>{item.pass ? 'Pass' : 'Fail'} · {item.percentage}%</span>
+                          <span>{item.submittedAt ? new Date(item.submittedAt).toLocaleDateString('en-IN') : ''}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <div className={`st-trainer-mcq__score${mcqReview.pass === false ? ' st-trainer-mcq__score--fail' : ' st-trainer-mcq__score--pass'}`}>
                     <strong>{mcqReview.score}/{mcqReview.totalMarks} marks · {mcqReview.percentage}%</strong>
                     <span>
@@ -1517,13 +1789,24 @@ const SeniorSessionCard = ({ session }) => {
             </div>
           )}
 
+          {activeTab === 'newMcq' && (
+            <div className="sc-body">
+              <SeniorAddMcqForm
+                session={session}
+                token={token}
+                backendUrl={backendUrl}
+                onAdded={onSessionUpdated}
+              />
+            </div>
+          )}
+
           <footer className="sc-foot">
             <span className="sc-foot-note">
               <i className="fas fa-info-circle" /> Referred session — review trainer documents and MCQ answers.
             </span>
             <div className="sc-foot-right">
-              <button type="button" className="sc-btn sc-btn--outline" onClick={() => setActiveTab('tot')}>
-                <i className="fas fa-clipboard-list" /> Assignment
+              <button type="button" className="sc-btn sc-btn--outline" onClick={() => setActiveTab('newMcq')}>
+                <i className="fas fa-plus" /> New MCQ
               </button>
             </div>
           </footer>
@@ -1983,7 +2266,20 @@ const SeniorTrainerModule = () => {
 
         <div className="st-detail-panel">
           {selectedSession ? (
-            <SeniorSessionCard session={selectedSession} />
+            <SeniorSessionCard
+              session={selectedSession}
+              token={token}
+              backendUrl={backendUrl}
+              onSessionUpdated={(savedSession) => {
+                if (!savedSession?.id && !savedSession?._id) return;
+                const sessionId = String(savedSession.id || savedSession._id);
+                setSessions((prev) => prev.map((item) => (
+                  String(item.id) === sessionId
+                    ? { ...item, ...savedSession, id: sessionId }
+                    : item
+                )));
+              }}
+            />
           ) : (
             <div className="st-detail-empty">
               <i className="fas fa-hand-pointer" />
@@ -2510,6 +2806,57 @@ const ST_CSS = `
   }
   .st-trainer-mcq__option--correct .st-trainer-mcq__letter { background: #a7f3d0; color: #047857; }
   .st-trainer-mcq__option--wrong .st-trainer-mcq__letter { background: #fecaca; color: #b91c1c; }
+  .st-add-mcq {
+    margin-bottom: 14px; border: 1px solid #dbeafe; background: #f8fbff;
+    border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .st-add-mcq__head strong { display: block; font-size: 13px; font-weight: 800; color: #0f172a; }
+  .st-add-mcq__head span { display: block; margin-top: 3px; font-size: 11px; font-weight: 600; color: #64748b; line-height: 1.45; }
+  .st-add-mcq__meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .st-add-mcq__stepper-wrap { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: #64748b; }
+  .st-add-mcq__stepper {
+    display: flex; align-items: center; border: 1px solid #e2e8f0; border-radius: 10px;
+    overflow: hidden; background: #fff;
+  }
+  .st-add-mcq__stepper button {
+    width: 28px; height: 32px; border: none; background: #f6f8fc; color: #1e293b;
+    font-weight: 700; cursor: pointer;
+  }
+  .st-add-mcq__stepper button:disabled { opacity: 0.45; cursor: not-allowed; }
+  .st-add-mcq__stepper input {
+    width: 44px; height: 32px; border: none; text-align: center; font-weight: 700;
+    font-size: 13px; outline: none; color: #1e293b;
+  }
+  .st-add-mcq__chip { font-size: 11px; font-weight: 700; background: #f6f8fc; color: #1e293b; border-radius: 999px; padding: 5px 10px; }
+  .st-add-mcq__chip--mint { background: #d1fae5; color: #059669; }
+  .st-add-mcq__chip--amber { background: #fef3c7; color: #92400e; }
+  .st-add-mcq__list { display: flex; flex-direction: column; gap: 12px; }
+  .st-add-mcq__card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; background: #fff; display: flex; flex-direction: column; gap: 8px; }
+  .st-add-mcq__card--locked { background: #f8fafc; }
+  .st-add-mcq__card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .st-add-mcq__card-head strong { font-size: 13px; font-weight: 800; color: #0f172a; }
+  .st-add-mcq__card-tools { display: flex; align-items: center; gap: 10px; }
+  .st-add-mcq__remove { border: none; background: transparent; color: #fa5579; font-size: 11px; font-weight: 700; cursor: pointer; }
+  .st-add-mcq__input {
+    width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px;
+    font-size: 13px; outline: none; background: #fff;
+  }
+  .st-add-mcq__input:disabled { background: #f8fafc; color: #334155; }
+  .st-add-mcq__option { display: flex; align-items: center; gap: 8px; }
+  .st-add-mcq__add {
+    width: 100%; border: 1px dashed #cbd5e1; background: #f8fafc; color: #1e293b;
+    font-size: 13px; font-weight: 600; border-radius: 12px; padding: 10px 12px; cursor: pointer; text-align: left;
+  }
+  .st-add-mcq__error { font-size: 12px; font-weight: 700; color: #b91c1c; }
+  .st-add-mcq__actions { display: flex; justify-content: flex-end; }
+  .st-mcq-history { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+  .st-mcq-history strong { font-size: 12px; font-weight: 800; color: #0f172a; }
+  .st-mcq-history__row {
+    display: flex; justify-content: space-between; gap: 8px; border-radius: 8px; padding: 6px 8px;
+    font-size: 11px; font-weight: 700;
+  }
+  .st-mcq-history__row--pass { background: #ecfdf5; color: #047857; }
+  .st-mcq-history__row--fail { background: #fef2f2; color: #b91c1c; }
   .st-session-card__source {
     padding: 8px 12px; border-top: 1px solid #eef2f7; font-size: 11px; font-weight: 700; color: #64748b;
     display: flex; align-items: center; gap: 6px; background: #fafbfc;
@@ -2579,6 +2926,7 @@ const ST_CSS = `
   .sc-stat__lbl { font-size: 8px; color: rgba(255,255,255,0.86); font-weight: 700; white-space: nowrap; }
   .sc-tabs {
     display: flex; gap: 0; padding: 0 12px; border-bottom: 1px solid #e2e8f0; background: #fafbfc;
+    overflow-x: auto;
   }
   .sc-tab {
     display: inline-flex; align-items: center; gap: 5px; height: 36px;
