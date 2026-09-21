@@ -7,6 +7,17 @@ import 'react-calendar/dist/Calendar.css';
 import moment from 'moment';
 import { resolveMediaUrl } from '../../../../../utils/resolveMediaUrl';
 import Student from '../../../../Layouts/App/College/ProjectManagement/Student';
+
+const DOC_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
+
+const getDocFileUrl = (fileUrl) => resolveMediaUrl(DOC_BUCKET_URL, fileUrl);
+
+const getDocFileKey = (uploadOrDoc) => {
+  if (!uploadOrDoc) return '';
+  if (typeof uploadOrDoc === 'string') return uploadOrDoc.trim();
+  return String(uploadOrDoc.fileUrl || uploadOrDoc.fileURL || uploadOrDoc.url || '').trim();
+};
+
 const useNavHeight = (dependencies = []) => {
   const navRef = useRef(null);
   const [navHeight, setNavHeight] = useState(140); // Default fallback
@@ -1545,12 +1556,6 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     }
   };
 
-  const getDocFileKey = (uploadOrDoc) => {
-    if (!uploadOrDoc) return '';
-    if (typeof uploadOrDoc === 'string') return uploadOrDoc;
-    return uploadOrDoc.fileUrl || uploadOrDoc.fileURL || uploadOrDoc.url || '';
-  };
-
   const getLatestUpload = (doc) => {
     if (Array.isArray(doc?.uploads) && doc.uploads.length > 0) {
       return doc.uploads[doc.uploads.length - 1];
@@ -1643,10 +1648,6 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
       })))
       : matched;
   };
-
-  const DOC_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
-  const getDocFileUrl = (fileUrl) => resolveMediaUrl(DOC_BUCKET_URL, getDocFileKey(fileUrl) || fileUrl);
-
 
   const [user, setUser] = useState({
     image: '',
