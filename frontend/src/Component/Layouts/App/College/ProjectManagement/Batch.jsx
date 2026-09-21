@@ -274,6 +274,7 @@ const MultiSelectCheckbox = ({
 const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter = null, onBackToCenters = null, selectedProject = null, onBackToProjects = null, selectedVertical = null, onBackToVerticals = null }) => {
 
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
   const token = userData.token;
 
@@ -1544,9 +1545,26 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     }
   };
 
+  const getDocFileKey = (uploadOrDoc) => {
+    if (!uploadOrDoc) return '';
+    if (typeof uploadOrDoc === 'string') return uploadOrDoc;
+    return uploadOrDoc.fileUrl || uploadOrDoc.fileURL || uploadOrDoc.url || '';
+  };
+
+  const getLatestUpload = (doc) => {
+    if (Array.isArray(doc?.uploads) && doc.uploads.length > 0) {
+      return doc.uploads[doc.uploads.length - 1];
+    }
+    if (getDocFileKey(doc) && doc?.status !== 'Not Uploaded') {
+      return doc;
+    }
+    return null;
+  };
+
   const getFileType = (fileUrl) => {
     if (!fileUrl) return 'unknown';
-    const extension = fileUrl.split('.').pop().toLowerCase();
+    const cleanUrl = String(fileUrl).split('?')[0];
+    const extension = cleanUrl.split('.').pop().toLowerCase();
 
     if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(extension)) {
       return 'image';
@@ -1561,21 +1579,73 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   };
 
   const filterDocuments = (documents = []) => {
-    // Ensure documents is always an array
     if (!Array.isArray(documents)) return [];
     if (statusFilter === 'all') return documents;
 
-    return documents.filter(doc => {
-      if (!doc.uploads || doc.uploads.length === 0) return statusFilter === 'none';
-
-      const lastUpload = doc.uploads[doc.uploads.length - 1];
-      if (!lastUpload || !lastUpload.status) return false;
-
-      return lastUpload.status.toLowerCase() === statusFilter;
+    return documents.filter((doc) => {
+      const lastUpload = getLatestUpload(doc);
+      if (!lastUpload) return statusFilter === 'none';
+      return String(lastUpload.status || '').toLowerCase() === statusFilter;
     });
   };
-  const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
-  const getDocFileUrl = (fileUrl) => resolveMediaUrl(bucketUrl, fileUrl);
+
+  const buildProfileDocumentsList = (profile) => {
+    const uploadedDocs = Array.isArray(profile?.uploadedDocs) ? profile.uploadedDocs : [];
+    const requiredDocs = profile?._course?.docsRequired || [];
+
+    if (
+      uploadedDocs.length > 0 &&
+      uploadedDocs.some((d) => (d.Name || d.name) && Array.isArray(d.uploads))
+    ) {
+      return uploadedDocs.map((doc) => ({
+        ...doc,
+        Name: doc.Name || doc.name || 'Document',
+        uploads: Array.isArray(doc.uploads) ? doc.uploads : [],
+      }));
+    }
+
+    if (!requiredDocs.length) {
+      return uploadedDocs
+        .filter((d) => getDocFileKey(d))
+        .map((d, index) => ({
+          _id: d._id || d.docsId || index,
+          Name: d.Name || d.name || `Document ${index + 1}`,
+          status: d.status,
+          uploads: [d],
+        }));
+    }
+
+    const uploadsByDocId = new Map();
+    uploadedDocs.forEach((d) => {
+      const key = String(d.docsId || '');
+      if (!key) return;
+      if (!uploadsByDocId.has(key)) uploadsByDocId.set(key, []);
+      uploadsByDocId.get(key).push(d);
+    });
+
+    const matched = requiredDocs.map((reqDoc) => {
+      const docObj = reqDoc?.toObject ? reqDoc.toObject() : reqDoc;
+      const matchingUploads = uploadsByDocId.get(String(docObj._id)) || [];
+      return {
+        _id: docObj._id,
+        Name: docObj.Name || docObj.name || 'Document',
+        uploads: matchingUploads,
+        ...(matchingUploads.length === 0 ? { status: 'Not Uploaded' } : {}),
+      };
+    });
+
+    const unmatched = uploadedDocs.filter((d) => getDocFileKey(d) && !d.docsId);
+    return unmatched.length
+      ? matched.concat(unmatched.map((d, index) => ({
+        _id: d._id || `extra-${index}`,
+        Name: d.Name || d.name || `Document ${index + 1}`,
+        uploads: [d],
+      })))
+      : matched;
+  };
+
+  const DOC_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
+  const getDocFileUrl = (fileUrl) => resolveMediaUrl(DOC_BUCKET_URL, getDocFileKey(fileUrl) || fileUrl);
 
 
   const [user, setUser] = useState({
@@ -1800,23 +1870,13 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   };
 
 
-  const openDocumentModal = (document) => {
-    // Check if this is the same document that was already open
-    const isSameDocument = selectedDocument && selectedDocument._id === document._id;
-
-    setSelectedDocument(document);
+  const openDocumentModal = (doc) => {
+    setSelectedDocument(doc);
+    setCurrentPreviewUpload(getLatestUpload(doc));
     setShowDocumentModal(true);
-
-    // Only reset zoom and rotation if it's a NEW document or first time opening modal
-    if (!isSameDocument) {
-      setDocumentZoom(1);
-      setDocumentRotation(0);
-      setIsNewModalOpen(true);
-    } else {
-      setIsNewModalOpen(false);
-    }
-
-    document.body?.classNameList.add('no-scroll');
+    setDocumentZoom(1);
+    setDocumentRotation(0);
+    setIsNewModalOpen(true);
   };
 
 
@@ -1880,9 +1940,8 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   const closeDocumentModal = () => {
     setShowDocumentModal(false);
     setSelectedDocument(null);
-
+    setCurrentPreviewUpload(null);
     setIsNewModalOpen(false);
-    // // Only reset when actually closing modal
     setDocumentZoom(1);
     setDocumentRotation(0);
   };
@@ -3585,11 +3644,11 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                       {(activeTab[profileIndex] || 0) === 4 && (
                                         <div className="tab-pane active" id='studentsDocuments'>
                                           {(() => {
-                                            const documentsToDisplay = profile.uploadedDocs || [];
-                                            const totalRequired = profile?.docCounts?.totalRequired || 0;
+                                            const documentsToDisplay = buildProfileDocumentsList(profile);
+                                            const totalRequired = profile?.docCounts?.totalRequired || documentsToDisplay.length || 0;
 
                                             // If no documents are required, show a message
-                                            if (totalRequired === 0) {
+                                            if (totalRequired === 0 && documentsToDisplay.length === 0) {
                                               return (
                                                 <div className="col-12 text-center py-5">
                                                   <div className="text-muted">
@@ -3751,19 +3810,16 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                                     }
 
                                                     return filteredDocs.map((doc, index) => {
-                                                      // Check if this is a document with upload data or just uploaded file info
-                                                      const latestUpload = doc.uploads && doc.uploads.length > 0
-                                                        ? doc.uploads[doc.uploads.length - 1]
-                                                        : (doc.fileUrl && doc.status !== "Not Uploaded" ? doc : null);
+                                                      const latestUpload = getLatestUpload(doc);
+                                                      const fileUrl = getDocFileUrl(getDocFileKey(latestUpload) || getDocFileKey(doc));
 
                                                       return (
                                                         <div key={doc._id || index} className="document-card-enhanced">
                                                           <div className="document-image-container">
-                                                            {latestUpload || (doc.fileUrl && doc.status !== "Not Uploaded") ? (
+                                                            {fileUrl ? (
                                                               <>
                                                                 {(() => {
-                                                                  const fileUrl = getDocFileUrl(latestUpload?.fileUrl || doc.fileUrl);
-                                                                  const fileType = getFileType(fileUrl);
+                                                                  const fileType = getFileType(fileUrl || getDocFileKey(latestUpload) || getDocFileKey(doc));
 
                                                                   if (fileType === 'image') {
                                                                     return (
@@ -3844,23 +3900,17 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                                                             <div className="document-header">
                                                               <h4 className="document-title">{doc.Name || `Document ${index + 1}`}</h4>
                                                               <div className="document-actions">
-                                                                {(!latestUpload) ? (
-                                                                  <button className="action-btn upload-btn" title="Upload Document" onClick={() => {
-                                                                    setSelectedProfile(profile); // Set the current profile
-                                                                    openUploadModal(doc);        // Open the upload modal
-                                                                  }}>
-                                                                    <i className="fas fa-cloud-upload-alt"></i>
-                                                                    Upload
-                                                                  </button>
-                                                                ) : (
+                                                                {fileUrl ? (
                                                                   <button
                                                                     className="action-btn verify-btn"
                                                                     onClick={() => openDocumentModal(doc)}
-                                                                    title="Verify Document"
+                                                                    title="Preview Document"
                                                                   >
                                                                     <i className="fas fa-search"></i>
                                                                     PREVIEW
                                                                   </button>
+                                                                ) : (
+                                                                  <span className="text-muted" style={{ fontSize: '12px' }}>Not uploaded</span>
                                                                 )}
                                                               </div>
                                                             </div>
@@ -4247,6 +4297,73 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
               </div>
             </div>
           )}
+
+          {showDocumentModal && selectedDocument && (() => {
+            const latestUpload = currentPreviewUpload || getLatestUpload(selectedDocument);
+            const fileUrl = getDocFileUrl(getDocFileKey(latestUpload) || getDocFileKey(selectedDocument));
+            const fileType = getFileType(fileUrl || getDocFileKey(latestUpload) || getDocFileKey(selectedDocument));
+
+            return (
+              <div className="document-modal-overlay" onClick={closeDocumentModal}>
+                <div className="document-modal-content" onClick={(e) => e.stopPropagation()}>
+                  <div className="modal-header">
+                    <h3>{selectedDocument.Name || 'Document'} Preview</h3>
+                    <button type="button" className="close-btn" onClick={closeDocumentModal}>&times;</button>
+                  </div>
+                  <div className="modal-body">
+                    <div className="document-preview-section">
+                      <div className="document-preview-container">
+                        {fileUrl ? (
+                          fileType === 'image' ? (
+                            <img
+                              src={fileUrl}
+                              alt={selectedDocument.Name || 'Document'}
+                              style={{
+                                transform: `scale(${documentZoom}) rotate(${documentRotation}deg)`,
+                                transition: 'transform 0.3s ease',
+                                maxWidth: '100%',
+                                objectFit: 'contain'
+                              }}
+                            />
+                          ) : fileType === 'pdf' ? (
+                            <iframe
+                              src={fileUrl}
+                              title="PDF Document"
+                              width="100%"
+                              height="500"
+                              style={{ border: 'none' }}
+                            />
+                          ) : (
+                            <div className="document-preview" style={{ textAlign: 'center', padding: '40px' }}>
+                              <p>Preview is not available for this file type.</p>
+                              <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+                                Open Document
+                              </a>
+                            </div>
+                          )
+                        ) : (
+                          <div className="no-document">
+                            <p>Document URL is missing for this file.</p>
+                          </div>
+                        )}
+                      </div>
+                      {fileUrl && (
+                        <DocumentControls
+                          onZoomIn={() => setDocumentZoom((z) => z + 0.1)}
+                          onZoomOut={() => setDocumentZoom((z) => Math.max(0.2, z - 0.1))}
+                          onRotate={() => setDocumentRotation((r) => r + 90)}
+                          onReset={() => { setDocumentZoom(1); setDocumentRotation(0); }}
+                          onDownload={fileUrl}
+                          zoomLevel={documentZoom}
+                          fileType={fileType}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {isTrainerDropdownOpen && (
             <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
