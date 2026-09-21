@@ -1272,7 +1272,19 @@ const SessionAssignModal = ({
   const handleSave = async () => {
     setSaving(true);
     try {
-      await onSave(session.id, { center, course, batch, assignDate, trainerId });
+      const centerName = centerOptions.find((option) => String(option.value) === String(center))?.label || '';
+      const courseName = linkedCourseOptions.find((option) => String(option.value) === String(course))?.label || '';
+      const batchCode = batchOptions.find((option) => String(option.value) === String(batch))?.label || '';
+      await onSave(session.id, {
+        center,
+        course,
+        batch,
+        assignDate,
+        trainerId,
+        centerName,
+        courseName,
+        batchCode,
+      });
       onClose();
     } finally {
       setSaving(false);
@@ -1593,82 +1605,130 @@ const SeniorAddMcqForm = ({ session, token, backendUrl, onAdded }) => {
   );
 };
 
-const createTlmItem = (overrides = {}) => ({
-  id: `tlm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-  name: 'Standard TLM',
-  type: 'PDF',
-  fileName: '',
-  fileUrl: '',
-  uploadedAt: '',
-  ...overrides,
-});
+const mapStandardTlmItems = (session) => (
+  (Array.isArray(session?.standardTlm) ? session.standardTlm : [])
+    .filter((item) => item && String(item.name || '').trim())
+    .map((item, index) => ({
+      id: String(item.id || item._id || `tlm-${index}`),
+      name: String(item.name).trim(),
+      type: item.type || 'PDF',
+      fileName: item.fileName || '',
+      fileUrl: item.fileUrl || '',
+      uploadedAt: item.uploadedAt || '',
+    }))
+);
 
-const SeniorTlmPanel = ({ session }) => {
-  const [items, setItems] = useState(() => {
-    const existing = Array.isArray(session?.standardTlm) ? session.standardTlm : [];
-    if (existing.length) {
-      return existing.map((item, index) => ({
-        id: String(item.id || item._id || `tlm-${index}`),
-        name: item.name || 'Standard TLM',
-        type: item.type || 'PDF',
-        fileName: item.fileName || '',
-        fileUrl: item.fileUrl || '',
-        uploadedAt: item.uploadedAt || '',
+const getTlmPreviewUrl = (fileUrl) => {
+  if (!fileUrl) return '';
+  const value = String(fileUrl);
+  if (value.startsWith('blob:') || value.startsWith('data:') || /^https?:\/\//i.test(value)) return value;
+  return getDocFileUrl(value);
+};
+
+const SeniorTlmPanel = ({ session, token, backendUrl, onUpdated }) => {
+  const planItems = useMemo(() => mapStandardTlmItems(session), [session]);
+  const [uploadsById, setUploadsById] = useState({});
+
+  useEffect(() => {
+    setUploadsById({});
+  }, [session?.id]);
+
+  const items = useMemo(
+    () => planItems.map((item) => ({ ...item, ...(uploadsById[item.id] || {}) })),
+    [planItems, uploadsById]
+  );
+
+  const uploadToItem = async (id, file) => {
+    if (!file) return;
+    const localUrl = URL.createObjectURL(file);
+    setUploadsById((prev) => ({
+      ...prev,
+      [id]: {
+        fileName: file.name,
+        fileUrl: localUrl,
+        uploadedAt: new Date().toISOString(),
+        uploading: true,
+        error: '',
+      },
+    }));
+
+    if (!token || !backendUrl || !session?.id) {
+      setUploadsById((prev) => ({
+        ...prev,
+        [id]: { ...(prev[id] || {}), uploading: false, error: 'Unable to save this file' },
+      }));
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await axios.post(
+        `${backendUrl}/college/session-plans/${session.id}/standard-tlm/${encodeURIComponent(id)}`,
+        formData,
+        { headers: { 'x-auth': token } }
+      );
+      if (!res.data?.status) {
+        throw new Error(res.data?.message || 'Failed to upload study material');
+      }
+      onUpdated?.(res.data.data);
+      setUploadsById((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    } catch (err) {
+      setUploadsById((prev) => ({
+        ...prev,
+        [id]: {
+          ...(prev[id] || {}),
+          uploading: false,
+          error: err.response?.data?.message || err.message || 'Failed to upload',
+        },
       }));
     }
-    return [createTlmItem({ name: 'pdf' })];
-  });
-
-  const typeFromFile = (file) => {
-    const name = file?.name?.toLowerCase() || '';
-    const mime = file?.type || '';
-    if (mime.startsWith('image/') || /\.(jpe?g|png|gif|webp)$/i.test(name)) return 'Image';
-    if (mime.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm)$/i.test(name)) return 'Video';
-    if (mime === 'application/pdf' || name.endsWith('.pdf')) return 'PDF';
-    return 'Document';
   };
 
-  const uploadToItem = (id, file) => {
-    if (!file) return;
-    setItems((prev) => prev.map((item) => (
-      item.id === id
-        ? {
-          ...item,
-          name: file.name.replace(/\.[^/.]+$/, '') || item.name || 'Standard TLM',
-          type: typeFromFile(file),
-          fileName: file.name,
-          fileUrl: URL.createObjectURL(file),
-          uploadedAt: new Date().toISOString(),
-        }
-        : item
-    )));
-  };
-
-  const addSlot = () => {
-    setItems((prev) => [...prev, createTlmItem({ name: 'pdf' })]);
-  };
-
-  const removeItem = (id) => {
-    setItems((prev) => (prev.length <= 1 ? [createTlmItem({ name: 'pdf' })] : prev.filter((item) => item.id !== id)));
-  };
+  if (!items.length) {
+    return (
+      <div className="st-tlm">
+        <div className="st-tlm__head">
+          <div>
+            <strong>Standard TLM</strong>
+            <span>Upload study material here. Assigned trainers will see these files on their session tab.</span>
+          </div>
+        </div>
+        <div className="sc-evidence-empty">
+          <i className="far fa-folder-open" />
+          <p>No Standard TLM items in this session plan yet.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="st-tlm">
-      
+      <div className="st-tlm__head">
+        <div>
+          <strong>Standard TLM</strong>
+          <span>Upload the file for each name. After you assign this session, the trainer can study these documents.</span>
+        </div>
+      </div>
 
       <div className="st-reg-docs-grid">
         {items.map((item) => {
           const inputId = `tlm-upload-${item.id}`;
-          const hasFile = Boolean(item.fileUrl || item.fileName);
-          const fileType = getTrainerDocFileType(item.fileUrl || item.fileName, item.type);
+          const previewUrl = getTlmPreviewUrl(item.fileUrl);
+          const hasFile = Boolean(previewUrl || item.fileName);
+          const fileType = getTrainerDocFileType(previewUrl || item.fileName, item.type);
           const uploadDate = formatDocDate(item.uploadedAt);
           const uploadTime = formatDocTime(item.uploadedAt);
           return (
             <div key={item.id} className="st-reg-doc-card">
               <div className="st-reg-doc-card__preview">
                 {hasFile ? (
-                  fileType === 'image' && item.fileUrl ? (
-                    <img src={item.fileUrl} alt={item.name} className="st-reg-doc-card__image" />
+                  fileType === 'image' && previewUrl ? (
+                    <img src={previewUrl} alt={item.name} className="st-reg-doc-card__image" />
                   ) : fileType === 'pdf' ? (
                     <div className="st-reg-doc-card__icon">
                       <i className="fa-solid fa-file" style={{ fontSize: 100, color: '#dc3545' }} />
@@ -1689,8 +1749,13 @@ const SeniorTlmPanel = ({ session }) => {
               </div>
               <div className="st-reg-doc-card__info">
                 <div className="st-reg-doc-card__header">
-                  <h4>{item.name || 'pdf'}</h4>
-                  {hasFile ? (
+                  <div>
+                    <h4>{item.name}</h4>
+                    <small className="st-tlm__type">{item.type || 'PDF'}</small>
+                  </div>
+                  {item.uploading ? (
+                    <span className="st-reg-pill st-reg-pill--verify">Saving...</span>
+                  ) : hasFile ? (
                     <label htmlFor={inputId} className="st-reg-pill st-reg-pill--verify">
                       <i className="fas fa-sync-alt" />
                       REPLACE
@@ -1705,7 +1770,7 @@ const SeniorTlmPanel = ({ session }) => {
                 <div className="st-reg-doc-card__meta">
                   <span>
                     <i className="fas fa-calendar-alt" />
-                    {uploadDate || 'Not uploaded'}
+                    {item.uploading ? 'Uploading...' : (uploadDate || 'Not uploaded')}
                   </span>
                   {uploadTime ? (
                     <span>
@@ -1713,15 +1778,14 @@ const SeniorTlmPanel = ({ session }) => {
                       {uploadTime}
                     </span>
                   ) : null}
-                  <button type="button" className="st-tlm__remove" onClick={() => removeItem(item.id)}>
-                    Remove
-                  </button>
                 </div>
+                {item.error ? <p className="st-tlm__error">{item.error}</p> : null}
               </div>
               <input
                 id={inputId}
                 type="file"
                 className="sc-file-input"
+                disabled={item.uploading}
                 onChange={(e) => {
                   uploadToItem(item.id, e.target.files?.[0]);
                   e.target.value = '';
@@ -1910,6 +1974,11 @@ const SeniorSessionCard = ({ session, token, backendUrl, onSessionUpdated }) => 
               onClick={() => setActiveTab('tlm')}
             >
               <i className="fas fa-book" /> TLM
+              {(session.standardTlm || []).filter((item) => item?.name).length > 0 && (
+                <span className="sc-tab-count">
+                  {(session.standardTlm || []).filter((item) => item?.name).length}
+                </span>
+              )}
             </button>
           </nav>
 
@@ -2060,7 +2129,13 @@ const SeniorSessionCard = ({ session, token, backendUrl, onSessionUpdated }) => 
 
           {activeTab === 'tlm' && (
             <div className="sc-body">
-              <SeniorTlmPanel session={session} />
+              <SeniorTlmPanel
+                key={session.id}
+                session={session}
+                token={token}
+                backendUrl={backendUrl}
+                onUpdated={onSessionUpdated}
+              />
             </div>
           )}
 
@@ -2338,7 +2413,16 @@ const SeniorTrainerModule = () => {
 
   const handleCloseEditModal = useCallback(() => setEditSessionId(''), []);
 
-  const handleModalSave = useCallback(async (sessionId, { center, course, batch, assignDate, trainerId }) => {
+  const handleModalSave = useCallback(async (sessionId, {
+    center,
+    course,
+    batch,
+    assignDate,
+    trainerId,
+    centerName,
+    courseName,
+    batchCode,
+  }) => {
     const trainerName = trainerId
       ? (trainerOptions.find((trainer) => String(trainer.value) === String(trainerId))?.label || '')
       : '';
@@ -2352,6 +2436,10 @@ const SeniorTrainerModule = () => {
         center: center || session.center,
         course: course || session.course,
         batch: batch || session.batch,
+        centerName: centerName || session.centerName,
+        courseName: courseName || session.courseName,
+        courseTrade: courseName || session.courseTrade,
+        batchCode: batchCode || session.batchCode,
         fieldTrainerId: trainerId,
         fieldTrainerName: trainerName || session.fieldTrainerName || '',
         sessionDate: assignDate || session.sessionDate,
@@ -2375,6 +2463,9 @@ const SeniorTrainerModule = () => {
           center: center || undefined,
           course: course || undefined,
           batch: batch || undefined,
+          centerName: centerName || undefined,
+          courseName: courseName || undefined,
+          batchCode: batchCode || undefined,
           fieldTrainerId: trainerId,
           fieldTrainerName: trainerName,
           sessionDate: assignDate || undefined,
@@ -2383,6 +2474,7 @@ const SeniorTrainerModule = () => {
         });
       } catch (err) {
         console.error('Failed to save assignment', err);
+        throw err;
       }
     }
   }, [trainerOptions, backendUrl, token]);
@@ -2629,6 +2721,7 @@ const SeniorTrainerModule = () => {
         <div className="st-detail-panel">
           {selectedSession ? (
             <SeniorSessionCard
+              key={selectedSession.id}
               session={selectedSession}
               token={token}
               backendUrl={backendUrl}
@@ -3388,6 +3481,21 @@ const ST_CSS = `
   .st-tlm__head strong { display: block; font-size: 13px; font-weight: 800; color: #0f172a; }
   .st-tlm__head span { display: block; margin-top: 2px; font-size: 11px; font-weight: 600; color: #64748b; line-height: 1.4; }
   .st-tlm .sc-file-input { display: none; }
+  .st-tlm__type {
+    display: block;
+    margin-top: 2px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .st-tlm__error {
+    margin: 6px 0 0;
+    font-size: 11px;
+    font-weight: 700;
+    color: #dc2626;
+  }
   .st-tlm__remove {
     margin-left: auto;
     border: none; background: transparent; color: #dc2626; font-size: 11px; font-weight: 800; cursor: pointer;

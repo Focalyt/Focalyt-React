@@ -89,6 +89,9 @@ const sessionPlanSchema = new Schema(
     courseName: { type: String, default: '' },
     batchCode: { type: String, default: '' },
     studentCount: { type: Number, default: 0 },
+    presentCandidates: { type: Number, default: 0 },
+    absentCandidates: { type: Number, default: 0 },
+    attendancePercent: { type: Number, default: 0 },
 
     title: { type: String, trim: true, required: true },
     sessionType: { type: String, trim: true, default: 'student' },
@@ -166,6 +169,9 @@ const sessionPlanSchema = new Schema(
     referredAt: { type: Date, default: null },
     assignedAt: { type: Date, default: null },
     completedAt: { type: Date, default: null },
+    completionRemark: { type: String, default: '' },
+    completedBy: { type: ObjectId, ref: 'User', default: null },
+    completedByName: { type: String, default: '' },
 
     isDeleted: { type: Boolean, default: false, index: true },
     status: { type: Boolean, default: true },

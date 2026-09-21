@@ -1029,10 +1029,17 @@ router.get('/batch-students/:batchId', authorizeTrainingAccess, async (req, res)
 				(trainerId) => String(trainerId) === String(req.user._id)
 			);
 			if (!isTrainerAssigned) {
-				return res.status(403).json({
-					success: false,
-					message: 'You are not assigned to this batch',
+				const assignedPlan = await SessionPlan.exists({
+					batch: batchId,
+					fieldTrainer: req.user._id,
+					isDeleted: false,
 				});
+				if (!assignedPlan) {
+					return res.status(403).json({
+						success: false,
+						message: 'You are not assigned to this batch',
+					});
+				}
 			}
 		}
 
@@ -1108,11 +1115,18 @@ const assertBatchTrainingAccess = async (req, res, batchId) => {
 			(trainerId) => String(trainerId) === String(req.user._id)
 		);
 		if (!isTrainerAssigned) {
-			res.status(403).json({
-				status: false,
-				message: 'You are not assigned to this batch',
+			const assignedPlan = await SessionPlan.exists({
+				batch: batchId,
+				fieldTrainer: req.user._id,
+				isDeleted: false,
 			});
-			return null;
+			if (!assignedPlan) {
+				res.status(403).json({
+					status: false,
+					message: 'You are not assigned to this batch',
+				});
+				return null;
+			}
 		}
 	}
 
@@ -1189,12 +1203,30 @@ router.post('/session-attendance/save', authorizeTrainingAccess, async (req, res
 			});
 		}
 
-		const sessionDoc = await TrainingSession.findById(sessionId);
+		let sessionKind = 'training';
+		let sessionDoc = await TrainingSession.findById(sessionId);
+		if (!sessionDoc) {
+			sessionDoc = await SessionPlan.findOne({
+				_id: sessionId,
+				college: req.college._id,
+				isDeleted: false,
+			});
+			sessionKind = sessionDoc ? 'plan' : '';
+		}
+
 		if (!sessionDoc) {
 			return res.status(404).json({ status: false, message: 'Session not found' });
 		}
 
-		const batchDoc = await assertBatchTrainingAccess(req, res, sessionDoc.batch);
+		const batchId = sessionDoc.batch;
+		if (!batchId) {
+			return res.status(400).json({
+				status: false,
+				message: 'This session has no batch. Assign a batch before marking attendance.',
+			});
+		}
+
+		const batchDoc = await assertBatchTrainingAccess(req, res, batchId);
 		if (!batchDoc) return;
 
 		if (String(sessionDoc.college) !== String(req.college._id)) {
@@ -1204,13 +1236,26 @@ router.post('/session-attendance/save', authorizeTrainingAccess, async (req, res
 			});
 		}
 
-		const attendanceDate = normalizeAttendanceDate(sessionDoc.sessionDate);
+		if (
+			sessionKind === 'plan'
+			&& user.role === 4
+			&& sessionDoc.fieldTrainer
+			&& String(sessionDoc.fieldTrainer) !== String(user._id)
+		) {
+			return res.status(403).json({
+				status: false,
+				message: 'This session is not assigned to you',
+			});
+		}
+
+		const rawDate = sessionDoc.sessionDate || new Date();
+		const attendanceDate = normalizeAttendanceDate(rawDate);
 		const allowedStatuses = ['Present', 'Absent', 'Not Marked'];
 		const appliedCourseIds = rows.map((row) => String(row.appliedCourseId || row.id)).filter(Boolean);
 
 		const enrollments = await AppliedCourses.find({
 			_id: { $in: appliedCourseIds },
-			batch: sessionDoc.batch,
+			batch: batchId,
 		})
 			.populate('_candidate', 'name mobile')
 			.lean();
@@ -1241,7 +1286,7 @@ router.post('/session-attendance/save', authorizeTrainingAccess, async (req, res
 					{ session: sessionId, appliedCourse: appliedCourseId },
 					{
 						$set: {
-							batch: sessionDoc.batch,
+							batch: batchId,
 							candidate: enrollment._candidate?._id || enrollment._candidate,
 							status,
 							remarks: (row.remarks || '').trim(),
@@ -1270,10 +1315,14 @@ router.post('/session-attendance/save', authorizeTrainingAccess, async (req, res
 		const total = rows.length;
 		const attendancePercent = total > 0 ? Number(((present / total) * 100).toFixed(1)) : 0;
 
-		sessionDoc.totalCandidates = total;
 		sessionDoc.presentCandidates = present;
 		sessionDoc.absentCandidates = absent;
 		sessionDoc.attendancePercent = attendancePercent;
+		if (sessionKind === 'training') {
+			sessionDoc.totalCandidates = total;
+		} else {
+			sessionDoc.studentCount = total;
+		}
 		await sessionDoc.save();
 
 		const savedRecords = await SessionAttendance.find({ session: sessionId })
@@ -1286,21 +1335,126 @@ router.post('/session-attendance/save', authorizeTrainingAccess, async (req, res
 			.lean();
 
 		const mappedRows = savedRecords.map(mapAttendanceRowForClient);
-		const populatedSession = await TrainingSession.findById(sessionDoc._id)
-			.populate('trainer', 'name email mobile')
-			.populate('batch', 'name')
-			.lean();
+		const sessionPayload = {
+			_id: sessionDoc._id,
+			id: String(sessionDoc._id),
+			totalCandidates: total,
+			presentCandidates: present,
+			absentCandidates: absent,
+			attendancePercent,
+			studentCount: total,
+		};
 
 		return res.status(200).json({
 			status: true,
 			message: 'Attendance saved successfully',
 			data: {
-				session: populatedSession,
+				session: sessionPayload,
 				rows: mappedRows,
 			},
 		});
 	} catch (error) {
 		console.error('Error saving session attendance:', error);
+		return res.status(500).json({
+			status: false,
+			message: error.message || 'Server error',
+		});
+	}
+});
+
+router.post('/session-done', authorizeTrainingAccess, async (req, res) => {
+	try {
+		const user = req.user;
+		const sessionId = String(req.body?.sessionId || '').trim();
+		const remark = String(req.body?.remark || req.body?.completionRemark || '').trim();
+
+		if (!sessionId) {
+			return res.status(400).json({ status: false, message: 'sessionId is required' });
+		}
+		if (!remark) {
+			return res.status(400).json({ status: false, message: 'Remark is required' });
+		}
+
+		let sessionKind = 'training';
+		let sessionDoc = await TrainingSession.findById(sessionId);
+		if (!sessionDoc) {
+			sessionDoc = await SessionPlan.findOne({
+				_id: sessionId,
+				college: req.college._id,
+				isDeleted: false,
+			});
+			sessionKind = sessionDoc ? 'plan' : '';
+		}
+
+		if (!sessionDoc) {
+			return res.status(404).json({ status: false, message: 'Session not found' });
+		}
+
+		if (String(sessionDoc.college) !== String(req.college._id)) {
+			return res.status(403).json({
+				status: false,
+				message: 'You do not have permission to update this session',
+			});
+		}
+
+		if (sessionDoc.batch) {
+			const batchDoc = await assertBatchTrainingAccess(req, res, sessionDoc.batch);
+			if (!batchDoc) return;
+		}
+
+		if (
+			sessionKind === 'plan'
+			&& user.role === 4
+			&& sessionDoc.fieldTrainer
+			&& String(sessionDoc.fieldTrainer) !== String(user._id)
+		) {
+			return res.status(403).json({
+				status: false,
+				message: 'This session is not assigned to you',
+			});
+		}
+
+		const markedCount = await SessionAttendance.countDocuments({
+			session: sessionId,
+			status: { $in: ['Present', 'Absent'] },
+		});
+		const present = Number(sessionDoc.presentCandidates) || 0;
+		const absent = Number(sessionDoc.absentCandidates) || 0;
+		if (!markedCount && present + absent <= 0) {
+			return res.status(400).json({
+				status: false,
+				message: 'Save attendance before marking this session done',
+			});
+		}
+
+		const completedAt = new Date();
+		const completedByName = user.name || '';
+		sessionDoc.completionRemark = remark;
+		sessionDoc.completedAt = completedAt;
+		sessionDoc.completedBy = user._id || null;
+		sessionDoc.completedByName = completedByName;
+		if (sessionKind === 'plan') {
+			sessionDoc.workflowStatus = 'Completed';
+		} else {
+			sessionDoc.status = 'Completed';
+		}
+		await sessionDoc.save();
+
+		return res.status(200).json({
+			status: true,
+			message: 'Session marked done',
+			data: {
+				id: String(sessionDoc._id),
+				_id: sessionDoc._id,
+				status: 'Completed',
+				workflowStatus: sessionKind === 'plan' ? 'Completed' : (sessionDoc.workflowStatus || 'Completed'),
+				completionRemark: remark,
+				completedAt,
+				completedByName,
+			},
+		});
+	} catch (error) {
+		console.error('Error marking session done:', error);
 		return res.status(500).json({
 			status: false,
 			message: error.message || 'Server error',

@@ -3,7 +3,7 @@ const { ObjectId } = Schema.Types;
 
 const sessionAttendanceSchema = new Schema(
   {
-    session: { type: ObjectId, ref: 'TrainingSession', required: true },
+    session: { type: ObjectId, required: true },
     batch: { type: ObjectId, ref: 'Batch', required: true },
     appliedCourse: { type: ObjectId, ref: 'AppliedCourses', required: true },
     candidate: { type: ObjectId, ref: 'CandidateProfile' },

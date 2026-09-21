@@ -1,8 +1,12 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const path = require('path');
+const uuid = require('uuid/v1');
 const { isCollege } = require('../../../helpers');
-const { SessionPlan, SessionActivityType, College, Courses, CoursesCopy, CourseActivity } = require('../../models');
+const { SessionPlan, SessionActivityType, College, Courses, CoursesCopy, CourseActivity, Batch } = require('../../models');
 const { normalizeCourseStructure } = require('../../../helpers/courseStructure');
+const { bucketName } = require('../../../config');
+const s3 = require('../../../helpers/objectStorage');
 
 const router = express.Router();
 const { ObjectId } = mongoose.Types;
@@ -41,9 +45,61 @@ const normalizeMaterials = (items = []) =>
     requirementLabel: item.requirementLabel || '',
     status: item.status || '',
     fileUrl: item.fileUrl || '',
+    fileName: item.fileName || '',
     uploadedBy: toObjectId(item.uploadedBy),
     uploadedAt: toDate(item.uploadedAt),
   }));
+
+const mergeMaterialUploads = (incoming = [], existing = []) => {
+  const existingList = Array.isArray(existing) ? existing : [];
+  return (Array.isArray(incoming) ? incoming : []).map((item, index) => {
+    const match = existingList.find((old) => {
+      const incomingId = String(item.id || item._id || '');
+      if (incomingId && (String(old.id || '') === incomingId || String(old._id || '') === incomingId)) return true;
+      return false;
+    }) || existingList[index];
+    if (!match) return item;
+    return {
+      ...item,
+      fileUrl: item.fileUrl || match.fileUrl || '',
+      fileName: item.fileName || match.fileName || '',
+      status: item.status || match.status || '',
+      uploadedBy: item.uploadedBy || match.uploadedBy || null,
+      uploadedAt: item.uploadedAt || match.uploadedAt || null,
+    };
+  });
+};
+
+const findMaterialItem = (items, itemId) => {
+  const id = String(itemId || '');
+  if (!id || !items) return null;
+  try {
+    const bySubId = typeof items.id === 'function' ? items.id(id) : null;
+    if (bySubId) return bySubId;
+  } catch (_) { /* non-ObjectId keys fall through */ }
+  return [...items].find((item) => String(item._id) === id || String(item.id) === id) || null;
+};
+
+const inferTlmTypeFromFile = (fileName = '', mimeType = '') => {
+  const ext = path.extname(fileName).toLowerCase().replace('.', '');
+  const mime = String(mimeType || '').toLowerCase();
+  if (mime.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) return 'Image';
+  if (mime.startsWith('video/') || ['mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv'].includes(ext)) return 'Video';
+  if (mime === 'application/pdf' || ext === 'pdf') return 'PDF';
+  return 'Document';
+};
+
+const getUploadedTlmFile = (req) => {
+  const uploaded = req.file || req.files?.file;
+  if (!uploaded) return null;
+  const buffer = uploaded.buffer || uploaded.data;
+  if (!buffer || !buffer.length) return null;
+  return {
+    buffer,
+    originalName: uploaded.originalname || uploaded.name || 'tlm-file',
+    mimeType: uploaded.mimetype || 'application/octet-stream',
+  };
+};
 
 const TOT_PASS_PERCENT_DEFAULT = 40;
 
@@ -206,6 +262,9 @@ const mapSessionToClient = (doc) => {
     courseTrade: session.courseName || '',
     batchCode: session.batchCode || '',
     studentCount: session.studentCount || 0,
+    presentCandidates: session.presentCandidates || 0,
+    absentCandidates: session.absentCandidates || 0,
+    attendancePercent: session.attendancePercent || 0,
     title: session.title || '',
     sessionType: session.sessionType || 'student',
     sessionNumber: session.sessionNumber || '',
@@ -259,6 +318,9 @@ const mapSessionToClient = (doc) => {
     referredAt: session.referredAt || null,
     assignedAt: session.assignedAt || null,
     completedAt: session.completedAt || null,
+    completionRemark: session.completionRemark || '',
+    completedByName: session.completedByName || '',
+    status: session.workflowStatus === 'Completed' ? 'Completed' : 'Pending',
     createdAt: session.createdAt || null,
     updatedAt: session.updatedAt || null,
     courseStructure: normalizeCourseStructure(session.courseStructure),
@@ -308,8 +370,12 @@ const buildSessionPayload = (body = {}, collegeId, userId, existing = null) => {
     trainingMethod: body.trainingMethod || existing?.trainingMethod || '',
     classroomLabResources: body.classroomLabResources || existing?.classroomLabResources || '',
 
-    standardTlm: body.standardTlm ? normalizeMaterials(body.standardTlm) : (existing?.standardTlm || []),
-    trainerBasedTlm: body.trainerBasedTlm ? normalizeMaterials(body.trainerBasedTlm) : (existing?.trainerBasedTlm || []),
+    standardTlm: body.standardTlm
+      ? mergeMaterialUploads(normalizeMaterials(body.standardTlm), existing?.standardTlm)
+      : (existing?.standardTlm || []),
+    trainerBasedTlm: body.trainerBasedTlm
+      ? mergeMaterialUploads(normalizeMaterials(body.trainerBasedTlm), existing?.trainerBasedTlm)
+      : (existing?.trainerBasedTlm || []),
     notes: body.notes || existing?.notes || '',
 
     sessionDate: body.sessionDate !== undefined ? toDate(body.sessionDate) : (existing?.sessionDate || null),
@@ -671,6 +737,23 @@ router.patch('/:id', async (req, res) => {
       existing.fieldTrainerName = body.fieldTrainerName || '';
       existing.assignedAt = body.fieldTrainerId ? new Date() : null;
     }
+    if (body.center !== undefined) {
+      existing.center = toObjectId(body.center);
+      if (body.centerName !== undefined) existing.centerName = body.centerName || '';
+    }
+    if (body.course !== undefined) {
+      existing.course = toObjectId(body.course);
+      if (body.courseName !== undefined || body.courseTrade !== undefined) {
+        existing.courseName = body.courseName || body.courseTrade || '';
+      }
+    }
+    if (body.batch !== undefined) {
+      existing.batch = toObjectId(body.batch);
+      if (body.batchCode !== undefined) existing.batchCode = body.batchCode || '';
+    }
+    if (body.centerName !== undefined && body.center === undefined) existing.centerName = body.centerName || '';
+    if (body.courseName !== undefined && body.course === undefined) existing.courseName = body.courseName || '';
+    if (body.batchCode !== undefined && body.batch === undefined) existing.batchCode = body.batchCode || '';
     if (body.sessionDate !== undefined) {
       existing.sessionDate = toDate(body.sessionDate);
     }
@@ -682,6 +765,13 @@ router.patch('/:id', async (req, res) => {
       existing.totTrainerName = body.totTrainerName || '';
     }
     if (body.totStatus !== undefined) existing.totStatus = body.totStatus;
+
+    if (existing.batch && existing.fieldTrainer) {
+      await Batch.updateOne(
+        { _id: existing.batch },
+        { $addToSet: { trainers: existing.fieldTrainer } }
+      );
+    }
 
     await existing.save();
     return res.json({
@@ -811,6 +901,60 @@ router.post('/:id/tot-questions', async (req, res) => {
   } catch (err) {
     console.error('POST /college/session-plans/:id/tot-questions', err);
     return res.status(400).json({ status: false, message: err.message || 'Failed to add MCQ' });
+  }
+});
+
+// POST /college/session-plans/:id/standard-tlm/:itemId — senior trainer uploads study material
+router.post('/:id/standard-tlm/:itemId', async (req, res) => {
+  try {
+    const college = await resolveCollege(req);
+    const session = await SessionPlan.findOne({
+      _id: req.params.id,
+      college: college._id,
+      isDeleted: false,
+    });
+    if (!session) {
+      return res.status(404).json({ status: false, message: 'Session not found' });
+    }
+
+    const itemId = String(req.params.itemId || req.body?.itemId || req.query?.itemId || '').trim();
+    const file = getUploadedTlmFile(req);
+    if (!itemId) {
+      return res.status(400).json({ status: false, message: 'itemId is required' });
+    }
+    if (!file) {
+      return res.status(400).json({ status: false, message: 'File is required' });
+    }
+
+    const tlmItem = findMaterialItem(session.standardTlm, itemId);
+    if (!tlmItem) {
+      return res.status(404).json({ status: false, message: 'Standard TLM item not found in this session' });
+    }
+
+    const key = `TrainingSession/${session._id}/standard-tlm/${itemId}/${uuid()}-${file.originalName}`;
+    await s3.upload({
+      Bucket: bucketName,
+      Key: key,
+      Body: file.buffer,
+      ContentType: file.mimeType,
+    }).promise();
+
+    tlmItem.status = 'Uploaded';
+    tlmItem.fileName = file.originalName;
+    tlmItem.fileUrl = key;
+    tlmItem.type = inferTlmTypeFromFile(file.originalName, file.mimeType) || tlmItem.type || 'Document';
+    tlmItem.uploadedBy = req.user?._id || null;
+    tlmItem.uploadedAt = new Date();
+    await session.save();
+
+    return res.json({
+      status: true,
+      message: 'Study material uploaded',
+      data: mapSessionToClient(session),
+    });
+  } catch (err) {
+    console.error('POST /college/session-plans/:id/standard-tlm', err);
+    return res.status(400).json({ status: false, message: err.message || 'Failed to upload study material' });
   }
 });
 
