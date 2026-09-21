@@ -3421,26 +3421,27 @@ const ST_CSS = `
   .sc-stat__val { font-size: 14px; font-weight: 900; color: #fff; line-height: 1; }
   .sc-stat__lbl { font-size: 8px; color: rgba(255,255,255,0.86); font-weight: 700; white-space: nowrap; }
   .sc-tabs {
-    display: flex; gap: 0; padding: 0 12px; border-bottom: 1px solid #e2e8f0; background: #fafbfc;
-    overflow-x: auto;
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    padding: 10px 12px 0; background: #fff; overflow-x: auto;
   }
   .sc-tab {
-    display: inline-flex; align-items: center; gap: 5px; height: 36px;
-    border: none; background: none; font-size: 12px; font-weight: 700;
-    color: #64748b; cursor: pointer; padding: 0 2px; margin-right: 16px; position: relative;
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid #e2e8f0; background: #fff; color: #334155;
+    font-size: 12px; font-weight: 700; cursor: pointer;
+    padding: 8px 14px; border-radius: 999px; white-space: nowrap;
   }
-  .sc-tab--active { color: ${BLUE}; }
-  .sc-tab--active::after {
-    content: ''; position: absolute; bottom: -1px; left: 0; right: 0;
-    height: 2px; border-radius: 2px 2px 0 0; background: ${BLUE};
+  .sc-tab:hover { border-color: #fd2b5a; color: #fd2b5a; }
+  .sc-tab--active {
+    background: #fd2b5a; border-color: #fd2b5a; color: #fff;
   }
+  .sc-tab--active:hover { color: #fff; }
   .sc-tab-count {
     display: inline-flex; align-items: center; justify-content: center;
-    min-width: 18px; height: 18px; padding: 0 5px; margin-left: 2px;
-    border-radius: 999px; background: #dbeafe; color: ${BLUE};
+    min-width: 18px; height: 18px; padding: 0 5px;
+    border-radius: 999px; background: #fce7ef; color: #fd2b5a;
     font-size: 10px; font-weight: 800;
   }
-  .sc-tab--active .sc-tab-count { background: ${BLUE}; color: #fff; }
+  .sc-tab--active .sc-tab-count { background: rgba(255,255,255,0.22); color: #fff; }
   .sc-body { padding: 12px 14px 10px; }
   .sc-detail-grid {
     display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px 14px; margin-bottom: 10px;

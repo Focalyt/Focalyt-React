@@ -3257,38 +3257,17 @@ const SessionCard = ({
   const reviewSummary = useMemo(() => computeReviewSummary(studentReviews), [studentReviews]);
   const statusTone = activeSession.status === 'Completed' ? 'green' : 'amber';
   const statusIcon = activeSession.status === 'Completed' ? 'fa-check-circle' : 'fa-clock';
-  const timeRange = formatSessionTimeRange(activeSession);
-  const detailItems = useMemo(() => {
-    const s = activeSession || {};
-    const b = basicDetails || {};
-    const unitLabel = s.unitNumber && s.unitName
-      ? `${s.unitNumber}. ${s.unitName}`
-      : (s.unitName || s.unitNumber);
-    const chapterLabel = s.chapterNumber && s.chapterName
-      ? `${s.chapterNumber}. ${s.chapterName}`
-      : (s.chapterName || s.chapterNumber);
-    const items = [
-      ['fa-heading', 'Session name', pickDetailText(s.title, s.name), 'blue'],
-      ['fa-sitemap', 'Department', pickDetailText(s.departmentName, s.verticalName, b.departmentName, b.verticalName), 'blue'],
-      ['fa-project-diagram', 'Project', pickDetailText(s.projectName, b.projectName), 'blue'],
-      ['fa-building', 'Center', pickDetailText(s.centerName, b.centerName), 'blue'],
-      ['fa-book-open', 'Topic covered', pickDetailText(s.topicCovered, s.subTopics, s.title, s.name), 'blue'],
-      ['fa-chalkboard', 'Training method', pickDetailText(s.trainingMethod), 'blue'],
-      ['fa-calendar-alt', 'Session date', pickDetailText(s.date, formatSessionDate(s.sessionDate), s.dateLabel), 'blue'],
-      ['fa-clock', 'Time', pickDetailText(timeRange), 'blue'],
-      ['fa-graduation-cap', 'Course / trade', pickDetailText(s.courseTrade, s.courseName, b.courseTrade, b.courseName), 'pink'],
-      ['fa-hashtag', 'Batch code', pickDetailText(s.batchCode, b.batchCode), 'pink'],
-      ['fa-user', 'Trainer', pickDetailText(s.fieldTrainerName, s.trainerName, b.trainerName), 'pink'],
-    ];
-    if (pickDetailText(unitLabel) !== '-') {
-      items.splice(5, 0, ['fa-layer-group', 'Unit', pickDetailText(unitLabel), 'blue']);
-    }
-    if (pickDetailText(chapterLabel) !== '-') {
-      const insertAt = items.findIndex((item) => item[1] === 'Unit') + 1 || 5;
-      items.splice(insertAt > 0 ? insertAt : 5, 0, ['fa-bookmark', 'Chapter', pickDetailText(chapterLabel), 'blue']);
-    }
-    return items;
-  }, [activeSession, basicDetails, timeRange]);
+  const detailItems = useMemo(() => ([
+    ['fa-sitemap', 'Department', activeSession.departmentName || basicDetails.departmentName || '-', 'blue'],
+    ['fa-project-diagram', 'Project', activeSession.projectName || basicDetails.projectName || '-', 'blue'],
+    ['fa-building', 'Center', activeSession.centerName || basicDetails.centerName || '-', 'blue'],
+    ['fa-book-open', 'Topic covered', activeSession.topicCovered || activeSession.title, 'blue'],
+    ['fa-chalkboard', 'Training method', activeSession.trainingMethod || 'Interactive Learning', 'blue'],
+    ['fa-calendar-alt', 'Session date', activeSession.date || formatSessionDate(activeSession.sessionDate), 'blue'],
+    ['fa-graduation-cap', 'Course / trade', activeSession.courseTrade || basicDetails.courseTrade, 'pink'],
+    ['fa-hashtag', 'Batch code', activeSession.batchCode || basicDetails.batchCode, 'pink'],
+    ['fa-user', 'Trainer', activeSession.trainerName || basicDetails.trainerName, 'pink'],
+  ]), [activeSession, basicDetails]);
   const statItems = useMemo(() => ([
     { icon: 'fa-users', val: liveStats.totalCandidates || '0', lbl: 'Total Candidates', cls: 'blue' },
     { icon: 'fa-check-circle', val: liveStats.presentCandidates || '0', lbl: 'Present', cls: 'green' },
@@ -3619,7 +3598,7 @@ const SessionCard = ({
                       <span className={`sc-detail-icon sc-detail-icon--${tone || 'blue'}`}>
                         <i className={`fas ${icon}`} />
                       </span>
-                      <span className="sc-detail-value" title={value}>{value || '-'}</span>
+                      <span className="sc-detail-value">{value || '-'}</span>
                     </strong>
                   </div>
                 ))}
@@ -6649,25 +6628,27 @@ const PORTAL_CSS = `
   .sc-stat__val { font-size: 14px; font-weight: 900; color: #fff; line-height: 1; }
   .sc-stat__lbl { font-size: 8px; color: rgba(255,255,255,0.86); font-weight: 700; white-space: nowrap; }
   .sc-tabs {
-    display: flex; gap: 0; padding: 0 12px; border-bottom: 1px solid #e2e8f0; background: #fafbfc;
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    padding: 10px 12px 0; background: #fff;
   }
   .sc-tab {
-    display: inline-flex; align-items: center; gap: 5px; height: 36px;
-    border: none; background: none; font-size: 12px; font-weight: 700;
-    color: #64748b; cursor: pointer; padding: 0 2px; margin-right: 16px; position: relative;
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid #e2e8f0; background: #fff; color: #334155;
+    font-size: 12px; font-weight: 700; cursor: pointer;
+    padding: 8px 14px; border-radius: 999px; white-space: nowrap;
   }
-  .sc-tab--active { color: ${BLUE}; }
-  .sc-tab--active::after {
-    content: ''; position: absolute; bottom: -1px; left: 0; right: 0;
-    height: 2px; border-radius: 2px 2px 0 0; background: ${BLUE};
+  .sc-tab:hover { border-color: #fd2b5a; color: #fd2b5a; }
+  .sc-tab--active {
+    background: #fd2b5a; border-color: #fd2b5a; color: #fff;
   }
+  .sc-tab--active:hover { color: #fff; }
   .sc-tab-count {
     display: inline-flex; align-items: center; justify-content: center;
-    min-width: 18px; height: 18px; padding: 0 5px; margin-left: 2px;
-    border-radius: 999px; background: #dbeafe; color: ${BLUE};
+    min-width: 18px; height: 18px; padding: 0 5px;
+    border-radius: 999px; background: #fce7ef; color: #fd2b5a;
     font-size: 10px; font-weight: 800;
   }
-  .sc-tab--active .sc-tab-count { background: ${BLUE}; color: #fff; }
+  .sc-tab--active .sc-tab-count { background: rgba(255,255,255,0.22); color: #fff; }
   .sc-body { padding: 12px 14px 10px; }
   .sc-detail-grid {
     display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px 14px; margin-bottom: 10px;
