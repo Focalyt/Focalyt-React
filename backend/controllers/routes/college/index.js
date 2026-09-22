@@ -3742,19 +3742,63 @@ async function resolveB2cCollegeCourseIds(collegeId, filters = {}) {
 	return rows.map((row) => row._id);
 }
 
+function escapeRegexLiteral(value) {
+	return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function isB2cPhoneSearchTerm(searchTerm) {
+	const trimmed = String(searchTerm || '').trim();
+	if (!trimmed)
+	 return false;
+	const digits = trimmed.replace(/\D/g, '');
+	return digits.length >= 10 && digits.length <= 15 && /^[\d+\s\-()]+$/.test(trimmed);
+}
+
+function buildB2cPhoneValueVariants(searchTerm) {
+	const digits = String(searchTerm || '').replace(/\D/g, '');
+	const last10 = digits.slice(-10);
+	const values = new Set();
+	[last10, digits, `91${last10}`].forEach((value) => {
+		if (!value) return;
+		values.add(value);
+		const asNumber = Number(value);
+		if (Number.isFinite(asNumber) && asNumber <= Number.MAX_SAFE_INTEGER) {
+			values.add(asNumber);
+		}
+	});
+	return [...values];
+}
+
+function buildB2cCandidateSearchOr(searchTerm, fieldPrefix = '') {
+	const trimmed = String(searchTerm || '').trim();
+	if (!trimmed) return null;
+	const nameField = `${fieldPrefix}name`;
+	const emailField = `${fieldPrefix}email`;
+	const mobileField = `${fieldPrefix}mobile`;
+	const whatsappField = `${fieldPrefix}whatsapp`;
+
+	if (isB2cPhoneSearchTerm(trimmed)) {
+		const or = [];
+		buildB2cPhoneValueVariants(trimmed).forEach((value) => {
+			or.push({ [mobileField]: value });
+			or.push({ [whatsappField]: value });
+		});
+		return or;
+	}
+
+	const searchRegex = new RegExp(escapeRegexLiteral(trimmed), 'i');
+	return [
+		{ [nameField]: searchRegex },
+		{ [emailField]: searchRegex },
+		{ [mobileField]: trimmed },
+	];
+}
+
 async function resolveB2cCandidateSearchIds(name) {
 	const searchTerm = String(name || '').trim();
 	if (!searchTerm) return null;
-	const searchRegex = new RegExp(searchTerm, 'i');
-	const or = [
-		{ name: searchRegex },
-		{ email: searchRegex },
-		{ mobile: searchTerm },
-	];
-	const asNum = parseInt(searchTerm, 10);
-	if (!Number.isNaN(asNum)) {
-		or.push({ mobile: asNum });
-	}
+	const or = buildB2cCandidateSearchOr(searchTerm);
+	if (!or?.length) return [];
 	const rows = await CandidateProfile.find({ $or: or }).select('_id').lean();
 	return rows.map((row) => row._id);
 }
@@ -3932,13 +3976,14 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, 
 							_id: 1,
 							name: 1,
 							email: 1,
-							mobile: 1
+							mobile: 1,
+							whatsapp: 1
 						}
 					}
 				]
 			}
 		},
-		{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: true } },
+		{ $unwind: { path: '$_candidate', preserveNullAndEmptyArrays: !Array.isArray(filters.candidateIds) } },
 
 		// Status lookup - only title and milestone
 		{
@@ -4230,15 +4275,10 @@ function buildSimplifiedPipelineWithWhatsApp({ teamMemberIds, college, filters, 
 		additionalFilters['batch'] = { $in: filters.batchArray.map(id => new mongoose.Types.ObjectId(id)) };
 	}
 
-	// Name search
+	// Name search — phone queries match mobile/whatsapp only, not name/email regex
 	if (filters.name && filters.name.trim()) {
-		const searchTerm = filters.name.trim();
-		const searchRegex = new RegExp(filters.name.trim(), 'i');
-		additionalFilters.$or = [
-			{ '_candidate.name': searchRegex },
-			{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
-			{ '_candidate.email': searchRegex }
-		];
+		const searchOr = buildB2cCandidateSearchOr(filters.name.trim(), '_candidate.');
+		if (searchOr?.length) additionalFilters.$or = searchOr;
 	}
 
 	if (Object.keys(additionalFilters).length > 0) {
@@ -4828,15 +4868,10 @@ function downloadPipeline({ teamMemberIds, college, filters }) {
 		additionalFilters['_center._id'] = { $in: filters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
 	}
 
-	// Name search
+	// Name search — phone queries match mobile/whatsapp only, not name/email regex
 	if (filters.name && filters.name.trim()) {
-		const searchTerm = filters.name.trim();
-		const searchRegex = new RegExp(filters.name.trim(), 'i');
-		additionalFilters.$or = [
-			{ '_candidate.name': searchRegex },
-			{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
-			{ '_candidate.email': searchRegex }
-		];
+		const searchOr = buildB2cCandidateSearchOr(filters.name.trim(), '_candidate.');
+		if (searchOr?.length) additionalFilters.$or = searchOr;
 	}
 
 	if (Object.keys(additionalFilters).length > 0) {
@@ -10550,21 +10585,14 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			additionalMatches['batch'] = { $in: batchArray.map(id => new mongoose.Types.ObjectId(id)) };
 		}
 
-		// Name search filter
+		// Name search filter — phone queries match mobile/whatsapp only
 		if (name && name.trim()) {
-			const searchTerm = name.trim();
-			const searchRegex = new RegExp(searchTerm, 'i');
-
-			additionalMatches.$or = additionalMatches.$or ? [
-				...additionalMatches.$or,
-				{ '_candidate.name': searchRegex },
-				{ '_candidate.mobile': parseInt(searchTerm) || searchTerm }, // Try both number and string
-				{ '_candidate.email': searchRegex }
-			] : [
-				{ '_candidate.name': searchRegex },
-				{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
-				{ '_candidate.email': searchRegex }
-			];
+			const searchOr = buildB2cCandidateSearchOr(name.trim(), '_candidate.');
+			if (searchOr?.length) {
+				additionalMatches.$or = additionalMatches.$or
+					? [...additionalMatches.$or, ...searchOr]
+					: searchOr;
+			}
 		}
 
 		// Add additional match stage if any filters are applied
@@ -11013,18 +11041,12 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 		}
 
 		if (appliedFilters.name && appliedFilters.name.trim()) {
-			const searchTerm = appliedFilters.name.trim();
-			const searchRegex = new RegExp(appliedFilters.name.trim(), 'i');
-			additionalMatches.$or = additionalMatches.$or ? [
-				...additionalMatches.$or,
-				{ '_candidate.name': searchRegex },
-				{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
-				{ '_candidate.email': searchRegex }
-			] : [
-				{ '_candidate.name': searchRegex },
-				{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
-				{ '_candidate.email': searchRegex }
-			];
+			const searchOr = buildB2cCandidateSearchOr(appliedFilters.name.trim(), '_candidate.');
+			if (searchOr?.length) {
+				additionalMatches.$or = additionalMatches.$or
+					? [...additionalMatches.$or, ...searchOr]
+					: searchOr;
+			}
 		}
 
 		if (Object.keys(additionalMatches).length > 0) {
@@ -12637,21 +12659,12 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			additionalMatches['_course._id'] = { $in: courseArray.map(id => new mongoose.Types.ObjectId(id)) };
 		}
 		if (name && name.trim()) {
-			const searchTerm = name.trim();
-			const searchRegex = new RegExp(searchTerm, 'i');
-
-			additionalMatches.$or = additionalMatches.$or ? [
-				...additionalMatches.$or,
-				{ '_candidate.name': searchRegex },
-				{ '_candidate.mobile': searchRegex },
-				{ '_candidate.mobile': parseInt(searchTerm) || searchTerm }, // Try both number and string
-				{ '_candidate.email': searchRegex }
-			] : [
-				{ '_candidate.name': searchRegex },
-				{ '_candidate.mobile': searchRegex },
-				{ '_candidate.mobile': parseInt(searchTerm) || searchTerm },
-				{ '_candidate.email': searchRegex }
-			];
+			const searchOr = buildB2cCandidateSearchOr(name.trim(), '_candidate.');
+			if (searchOr?.length) {
+				additionalMatches.$or = additionalMatches.$or
+					? [...additionalMatches.$or, ...searchOr]
+					: searchOr;
+			}
 		}
 		if (Object.keys(additionalMatches).length > 0) {
 			aggregationPipeline.push({ $match: additionalMatches });
@@ -13214,18 +13227,12 @@ async function calculateAdmissionFilterCounts(teamMembers, collegeId, appliedFil
 			additionalMatches['batch'] = { $in: appliedFilters.batchArray.map(id => new mongoose.Types.ObjectId(id)) };
 		}
 		if (appliedFilters.name && appliedFilters.name.trim()) {
-			const searchTerm = appliedFilters.name.trim();
-			const searchRegex = new RegExp(appliedFilters.name.trim(), 'i');
-			additionalMatches.$or = additionalMatches.$or ? [
-				...additionalMatches.$or,
-				{ '_candidate.name': searchRegex },
-				{ '_candidate.mobile': parseInt(searchTerm) || searchRegex },
-				{ '_candidate.email': searchRegex }
-			] : [
-				{ '_candidate.name': searchRegex },
-				{ '_candidate.mobile': parseInt(searchTerm) || searchRegex },
-				{ '_candidate.email': searchRegex }
-			];
+			const searchOr = buildB2cCandidateSearchOr(appliedFilters.name.trim(), '_candidate.');
+			if (searchOr?.length) {
+				additionalMatches.$or = additionalMatches.$or
+					? [...additionalMatches.$or, ...searchOr]
+					: searchOr;
+			}
 		}
 		if (Object.keys(additionalMatches).length > 0) {
 			basePipeline.push({ $match: additionalMatches });

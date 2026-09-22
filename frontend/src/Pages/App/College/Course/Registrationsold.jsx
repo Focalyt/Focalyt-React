@@ -25,6 +25,42 @@ const getProfileGroupRootId = (profile) => {
   return String(profile.crossSaleRootId || profile.parentAppliedCourseId || profile._id || '');
 };
 
+const getSearchDigits = (value) => String(value ?? '').replace(/\D/g, '');
+
+const isPhoneSearchQuery = (query) => {
+  const trimmed = String(query || '').trim();
+  if (!trimmed) return false;
+  const digits = getSearchDigits(trimmed);
+  return digits.length >= 10 && digits.length <= 15 && /^[\d+\s\-()]+$/.test(trimmed);
+};
+
+const profileMatchesQuickSearch = (profile, query) => {
+  const trimmed = String(query || '').trim();
+  if (!trimmed) return true;
+  const candidate = profile?._candidate;
+  if (!candidate) return false;
+
+  if (isPhoneSearchQuery(trimmed)) {
+    const last10 = getSearchDigits(trimmed).slice(-10);
+    const phones = [
+      candidate.mobile,
+      candidate.whatsapp,
+      profile.mobile,
+      profile.whatsapp,
+    ]
+      .map((value) => getSearchDigits(value))
+      .filter((value) => value.length >= 10);
+    return phones.some((phone) => phone === last10 || phone.slice(-10) === last10);
+  }
+
+  const needle = trimmed.toLowerCase();
+  return (
+    String(candidate.name || '').toLowerCase().includes(needle) ||
+    String(candidate.email || '').toLowerCase().includes(needle) ||
+    String(candidate.mobile || '').toLowerCase().includes(needle)
+  );
+};
+
 const pickFirstNonEmpty = (...vals) => vals.find((v) => v != null && String(v).trim() !== '') || '';
 
 const toHrFilterYmd = (value) => {
@@ -34,6 +70,161 @@ const toHrFilterYmd = (value) => {
 };
 
 const isHrDepartmentLabel = (label) => String(label || '').trim().toLowerCase() === 'hr';
+
+const getHrDepartmentIds = (verticalOptions = []) => new Set(
+  (verticalOptions || [])
+    .filter((opt) => isHrDepartmentLabel(opt.label))
+    .map((opt) => String(opt.value))
+);
+
+const shouldIncludeHrLeads = ({
+  cycle = {},
+  filters = {},
+  verticalOptions = [],
+  projectOptions = [],
+  listEndpoint,
+  page,
+} = {}) => {
+  const hrDepartmentIds = getHrDepartmentIds(verticalOptions);
+  const selectedDepartmentId = cycle?.department ? String(cycle.department) : '';
+  const departmentAllowsHr = !selectedDepartmentId || hrDepartmentIds.has(selectedDepartmentId);
+  const selectedProject = (projectOptions || []).find((opt) => String(opt.value) === String(cycle?.project || ''));
+  const selectedProjectVertical = String(selectedProject?.vertical?._id || selectedProject?.vertical || '');
+  const projectAllowsHr = !cycle?.project || hrDepartmentIds.has(selectedProjectVertical);
+  const listOk = !listEndpoint || listEndpoint === 'appliedCandidates';
+  const pageOk = page == null || Number(page) === 1;
+  return Boolean(
+    listOk
+    && pageOk
+    && departmentAllowsHr
+    && projectAllowsHr
+    && !filters?.approvalStatus
+    && !filters?.aiLeadStatus
+    && !filters?.subStatuses
+    && !filters?.followupStatus
+    && !cycle?.course
+    && !cycle?.center
+    && !cycle?.batch
+  );
+};
+
+const buildHrRequestParams = ({
+  filters = {},
+  cycle = {},
+  extra = {},
+  verticalOptions = [],
+  crmFilters = [],
+  listParts = {},
+} = {}) => {
+  const hrDepartmentIds = getHrDepartmentIds(verticalOptions);
+  const selectedDepartmentId = cycle?.department ? String(cycle.department) : '';
+  const selectedStatus = (crmFilters || []).find((item) => String(item._id) === String(filters?.leadStatus || ''));
+  const params = {
+    page: extra.page || 1,
+    limit: extra.limit || 100,
+    search: filters?.name || undefined,
+    startDate: toHrFilterYmd(filters?.createdFromDate),
+    endDate: toHrFilterYmd(filters?.createdToDate),
+    createdFromDate: toHrFilterYmd(filters?.createdFromDate),
+    createdToDate: toHrFilterYmd(filters?.createdToDate),
+    modifiedFromDate: toHrFilterYmd(filters?.modifiedFromDate),
+    modifiedToDate: toHrFilterYmd(filters?.modifiedToDate),
+    nextActionFromDate: toHrFilterYmd(filters?.nextActionFromDate),
+    nextActionToDate: toHrFilterYmd(filters?.nextActionToDate),
+    owner: listParts.owner,
+    counselor: listParts.counselor,
+    scopeToViewer: 'true',
+    department: selectedDepartmentId && hrDepartmentIds.has(selectedDepartmentId)
+      ? selectedDepartmentId
+      : undefined,
+    project: cycle?.project || undefined,
+    statusTitle: selectedStatus?.name && selectedStatus._id !== 'all' ? selectedStatus.name : undefined,
+  };
+  if (filters?.hasFollowUpCall === true || filters?.hasFollowUpCall === 'yes') params.hasFollowUpCall = 'true';
+  else if (filters?.hasFollowUpCall === false || filters?.hasFollowUpCall === 'no') params.hasFollowUpCall = 'false';
+  if (filters?.hasFollowUpVisit === true || filters?.hasFollowUpVisit === 'yes') params.hasFollowUpVisit = 'true';
+  else if (filters?.hasFollowUpVisit === false || filters?.hasFollowUpVisit === 'no') params.hasFollowUpVisit = 'false';
+  if (extra.leadViewTab === 'noFollowup') {
+    params.hasFollowUpCall = 'false';
+    params.hasFollowUpVisit = 'false';
+  }
+  return params;
+};
+
+const normalizeStatusTitle = (value) => String(value || '').trim().toLowerCase();
+
+const addCountValue = (entry, amount) => {
+  const n = Number(amount) || 0;
+  if (entry && typeof entry === 'object') {
+    return { ...entry, count: (Number(entry.count) || 0) + n };
+  }
+  return { count: (Number(entry) || 0) + n };
+};
+
+const mergeHrCountsIntoB2cCrm = (b2cCounts = {}, hrPayload = {}, statusFilters = []) => {
+  const next = { ...(b2cCounts || {}) };
+  const hrCounts = hrPayload?.counts || {};
+  const byTitle = hrPayload?.countsByTitle || {};
+  const hrAll = Number(hrCounts.all || 0);
+  if (!hrAll) {
+    return {
+      crmFilterCount: next,
+      aiCrmFilterCount: null,
+      approvalCounts: null,
+      followups: hrPayload?.followups || null,
+    };
+  }
+
+  next.all = (Number(next.all) || 0) + hrAll;
+
+  const filters = Array.isArray(statusFilters) ? statusFilters : [];
+  const titleToId = new Map(
+    filters
+      .filter((item) => item?._id && item._id !== 'all')
+      .map((item) => [normalizeStatusTitle(item.name || item.title), String(item._id)])
+  );
+  const untouchId = [...titleToId.entries()].find(([title]) => title.includes('untouch'))?.[1];
+
+  Object.entries(byTitle).forEach(([title, amount]) => {
+    const id = titleToId.get(normalizeStatusTitle(title))
+      || (normalizeStatusTitle(title).includes('untouch') ? untouchId : null);
+    if (!id) return;
+    next[id] = addCountValue(next[id], amount);
+  });
+
+  const noneCount = Number(hrCounts.none || 0);
+  if (noneCount && untouchId) {
+    const alreadyInUntouch = Number(byTitle.untouch || byTitle['untouch lead'] || 0);
+    if (alreadyInUntouch < noneCount) {
+      next[untouchId] = addCountValue(next[untouchId], noneCount - alreadyInUntouch);
+    }
+  }
+
+  const statusSum = Object.entries(next).reduce((sum, [key, value]) => {
+    if (key === 'all' || key === 'null') return sum;
+    if (value && typeof value === 'object') return sum + (Number(value.count) || 0);
+    return sum + (Number(value) || 0);
+  }, 0);
+  next.all = Math.max(Number(next.all) || 0, statusSum);
+
+  const aiCrmFilterCount = { all: Number(next.all) || 0 };
+  if (untouchId) {
+    const b2cUntouch = b2cCounts?.[untouchId];
+    aiCrmFilterCount[untouchId] = addCountValue(b2cUntouch, hrAll);
+  }
+
+  return {
+    crmFilterCount: next,
+    aiCrmFilterCount,
+    approvalCounts: {
+      total: (Number(b2cCounts?.all) || 0) + hrAll,
+      approved: 0,
+      pending: (Number(b2cCounts?.all) || 0) + hrAll,
+      rejected: 0,
+    },
+    followups: hrPayload?.followups || null,
+  };
+};
 
 const mapHrLeadToB2cProfile = (lead) => {
   const owner = lead?.leadOwner && typeof lead.leadOwner === 'object'
@@ -3527,6 +3718,7 @@ const CRMDashboard = () => {
     { _id: '', name: '', count: 0, milestone: '' },
 
   ]);
+
   const performanceFilters = useMemo(
     () => crmFilters.filter((f) => f._id && f._id !== 'all'),
     [crmFilters]
@@ -4750,7 +4942,7 @@ console.log('API Response:', response.data);
 
     if (approvalCountsFromApi) {
       setApprovalCounts({
-        total: approvalCountsFromApi.total ?? allCount,
+        total: Math.max(Number(approvalCountsFromApi.total) || 0, allCount),
         approved: approvalCountsFromApi.approved ?? 0,
         pending: approvalCountsFromApi.pending ?? 0,
         rejected: approvalCountsFromApi.rejected ?? 0,
@@ -4829,6 +5021,47 @@ console.log('API Response:', response.data);
             missed: fc.visit?.missed ?? 0,
           },
         });
+      }
+
+      if (shouldIncludeHrLeads({
+        cycle,
+        filters,
+        verticalOptions,
+        projectOptions,
+        listEndpoint: 'appliedCandidates',
+      })) {
+        try {
+          const hrCountRes = await axios.get(`${backendUrl}/college/hr/leads/counts`, {
+            headers: { 'x-auth': token },
+            params: {
+              ...buildHrRequestParams({
+                filters: { ...filters, leadStatus: undefined },
+                cycle,
+                verticalOptions,
+                crmFilters,
+                listParts,
+              }),
+              statusTitle: undefined,
+            },
+          });
+          const hrFollowups = hrCountRes.data?.data?.followups;
+          if (hrCountRes.data?.success && hrFollowups) {
+            setFollowupDashCounts((prev) => ({
+              call: {
+                done: (prev.call?.done || 0) + (hrFollowups.call?.done || 0),
+                planned: (prev.call?.planned || 0) + (hrFollowups.call?.planned || 0),
+                missed: (prev.call?.missed || 0) + (hrFollowups.call?.missed || 0),
+              },
+              visit: {
+                done: (prev.visit?.done || 0) + (hrFollowups.visit?.done || 0),
+                planned: (prev.visit?.planned || 0) + (hrFollowups.visit?.planned || 0),
+                missed: (prev.visit?.missed || 0) + (hrFollowups.visit?.missed || 0),
+              },
+            }));
+          }
+        } catch (hrCountErr) {
+          console.error('Error fetching HR followup counts for B2C dashboard:', hrCountErr);
+        }
       }
 
       if (referRes?.data?.success) {
@@ -4935,69 +5168,29 @@ console.log('API Response:', response.data);
     }
 
     const cycle = cycleOverride || cycleFilters;
-    const hrDepartmentIds = new Set(
-      (verticalOptions || [])
-        .filter((opt) => isHrDepartmentLabel(opt.label))
-        .map((opt) => String(opt.value))
-    );
-    const selectedDepartmentId = cycle?.department ? String(cycle.department) : '';
-    const departmentAllowsHr = !selectedDepartmentId || hrDepartmentIds.has(selectedDepartmentId);
-    const selectedProject = (projectOptions || []).find((opt) => String(opt.value) === String(cycle?.project || ''));
-    const selectedProjectVertical = String(selectedProject?.vertical?._id || selectedProject?.vertical || '');
-    const projectAllowsHr = !cycle?.project || hrDepartmentIds.has(selectedProjectVertical);
-    const shouldMergeHrLeads = listEndpoint === 'appliedCandidates'
-      && Number(page) === 1
-      && !filters.leadStatus
-      && !filters.subStatuses
-      && !filters.approvalStatus
-      && !filters.followupStatus
-      && !filters.aiLeadStatus
-      && !cycle?.course
-      && !cycle?.center
-      && !cycle?.batch
-      && !cycle?.owner
-      && !cycle?.counsellor
-      && departmentAllowsHr
-      && projectAllowsHr;
+    const shouldMergeHrLeads = shouldIncludeHrLeads({
+      cycle,
+      filters,
+      verticalOptions,
+      projectOptions,
+      listEndpoint,
+      page,
+    });
 
     try {
-      const listParts = shouldMergeHrLeads
-        ? buildListFilterQueryParts(formDataRef.current || formData, cycle)
+      const hrParams = shouldMergeHrLeads
+        ? buildHrRequestParams({
+          filters,
+          cycle,
+          extra: { leadViewTab: activeLeadViewTab },
+          verticalOptions,
+          crmFilters,
+          listParts: buildListFilterQueryParts(formDataRef.current || formData, cycle),
+        })
         : null;
-      const hrParams = shouldMergeHrLeads ? {
-        page: 1,
-        limit: 100,
-        search: filters.name || undefined,
-        startDate: toHrFilterYmd(filters.createdFromDate),
-        endDate: toHrFilterYmd(filters.createdToDate),
-        createdFromDate: toHrFilterYmd(filters.createdFromDate),
-        createdToDate: toHrFilterYmd(filters.createdToDate),
-        modifiedFromDate: toHrFilterYmd(filters.modifiedFromDate),
-        modifiedToDate: toHrFilterYmd(filters.modifiedToDate),
-        nextActionFromDate: toHrFilterYmd(filters.nextActionFromDate),
-        nextActionToDate: toHrFilterYmd(filters.nextActionToDate),
-        owner: listParts.owner,
-        counselor: listParts.counselor,
-        department: selectedDepartmentId && hrDepartmentIds.has(selectedDepartmentId)
-          ? selectedDepartmentId
-          : undefined,
-        project: cycle?.project || undefined,
-      } : null;
-      if (hrParams) {
-        if (filters.hasFollowUpCall === true || filters.hasFollowUpCall === 'yes') {
-          hrParams.hasFollowUpCall = 'true';
-        } else if (filters.hasFollowUpCall === false || filters.hasFollowUpCall === 'no') {
-          hrParams.hasFollowUpCall = 'false';
-        }
-        if (filters.hasFollowUpVisit === true || filters.hasFollowUpVisit === 'yes') {
-          hrParams.hasFollowUpVisit = 'true';
-        } else if (filters.hasFollowUpVisit === false || filters.hasFollowUpVisit === 'no') {
-          hrParams.hasFollowUpVisit = 'false';
-        }
-        if (activeLeadViewTab === 'noFollowup') {
-          hrParams.hasFollowUpCall = 'false';
-          hrParams.hasFollowUpVisit = 'false';
-        }
+      if (hrParams && activeLeadViewTab === 'noFollowup') {
+        hrParams.hasFollowUpCall = 'false';
+        hrParams.hasFollowUpVisit = 'false';
       }
 
       const [response, hrRes] = await Promise.all([
@@ -5021,7 +5214,10 @@ console.log('API Response:', response.data);
 
         if (hrRes?.data?.success) {
           const hrLeads = hrRes.data?.data?.leads || [];
-          const hrProfiles = hrLeads.map(mapHrLeadToB2cProfile);
+          const searchQuery = String(filters.name || '').trim();
+          const hrProfiles = hrLeads
+            .map(mapHrLeadToB2cProfile)
+            .filter((item) => !searchQuery || profileMatchesQuickSearch(item, searchQuery));
           const hrIds = new Set(hrProfiles.map((item) => String(item._id)));
           profiles = [...hrProfiles, ...profiles.filter((item) => !hrIds.has(String(item._id)))];
         }
@@ -5551,9 +5747,56 @@ console.log('API Response:', response.data);
 
       if (response.data.success && response.data) {
         const data = response.data;
-        // Debug log to verify counts received
-       
-        updateCrmFiltersFromBackend(data.crmFilterCount, filteredTotalCount, data.approvalCounts, data.aiCrmFilterCount)
+        let crmFilterCount = data.crmFilterCount || { all: 0 };
+        let approvalCounts = data.approvalCounts;
+        let aiCrmFilterCount = data.aiCrmFilterCount;
+
+        if (shouldIncludeHrLeads({
+          cycle,
+          filters,
+          verticalOptions,
+          projectOptions,
+          listEndpoint: 'appliedCandidates',
+        })) {
+          try {
+            const hrCountRes = await axios.get(`${backendUrl}/college/hr/leads/counts`, {
+              headers: { 'x-auth': token },
+              params: {
+                ...buildHrRequestParams({
+                  filters: { ...filters, leadStatus: undefined },
+                  cycle,
+                  verticalOptions,
+                  crmFilters,
+                  listParts: buildListFilterQueryParts(fd, cycle),
+                }),
+                statusTitle: undefined,
+              },
+            });
+            if (hrCountRes.data?.success) {
+              const hrAll = Number(hrCountRes.data?.data?.counts?.all || 0);
+              const merged = mergeHrCountsIntoB2cCrm(crmFilterCount, hrCountRes.data.data, crmFilters);
+              crmFilterCount = merged.crmFilterCount;
+              if (hrAll) {
+                approvalCounts = {
+                  total: (Number(approvalCounts?.total) || 0) + hrAll,
+                  approved: Number(approvalCounts?.approved) || 0,
+                  pending: (Number(approvalCounts?.pending) || 0) + hrAll,
+                  rejected: Number(approvalCounts?.rejected) || 0,
+                };
+                const untouchFilter = (crmFilters || []).find((item) => normalizeStatusTitle(item.name).includes('untouch'));
+                aiCrmFilterCount = { ...(aiCrmFilterCount || {}) };
+                aiCrmFilterCount.all = (Number(aiCrmFilterCount.all) || 0) + hrAll;
+                if (untouchFilter?._id) {
+                  aiCrmFilterCount[untouchFilter._id] = addCountValue(aiCrmFilterCount[untouchFilter._id], hrAll);
+                }
+              }
+            }
+          } catch (hrCountErr) {
+            console.error('Error fetching HR CRM counts for B2C:', hrCountErr);
+          }
+        }
+
+        updateCrmFiltersFromBackend(crmFilterCount, filteredTotalCount, approvalCounts, aiCrmFilterCount)
 
       } else {
         console.error('Failed to fetch crm filter counts', response.data.message);
@@ -6721,7 +6964,10 @@ console.log('API Response:', response.data);
 
   const openProfileKycTab = openProfileDocumentsTab;
 
-  const performanceTotalCount = approvalCounts.total || crmFilters[0]?.count || 0;
+  const performanceTotalCount = performanceFilters.reduce(
+    (sum, filter) => sum + (Number(filter.count) || 0),
+    0
+  ) || Number(crmFilters.find((filter) => filter._id === 'all')?.count) || Number(approvalCounts?.total) || 0;
   const aiPerformanceTotalCount = typeof aiStatusCounts.all === 'number'
     ? aiStatusCounts.all
     : performanceTotalCount;
@@ -14831,6 +15077,10 @@ useEffect(() => {
   const displayedProfiles = React.useMemo(() => {
     if (!Array.isArray(allProfiles)) return [];
     let result = allProfiles;
+    const searchQuery = String(filterData?.name || '').trim();
+    if (searchQuery) {
+      result = result.filter((profile) => profileMatchesQuickSearch(profile, searchQuery));
+    }
 
     if (selectedFollowupBucket?.startsWith('visit:')) {
       const bucket = selectedFollowupBucket.split(':')[1];
@@ -14838,7 +15088,7 @@ useEffect(() => {
     }
 
     return result;
-  }, [allProfiles, selectedFollowupBucket]);
+  }, [allProfiles, selectedFollowupBucket, filterData?.name]);
 
   const leadDisplayGroups = useMemo(() => {
     const byRoot = new Map();
@@ -14865,6 +15115,10 @@ useEffect(() => {
       } else {
         merged = group.membersFromList;
       }
+      const searchQuery = String(filterData?.name || '').trim();
+      if (searchQuery) {
+        merged = merged.filter((profile) => profileMatchesQuickSearch(profile, searchQuery));
+      }
       const unique = [...new Map(merged.map((p) => [String(p._id), p])).values()];
       const sorted = unique.sort((a, b) => {
         const aPrimary = !a.parentAppliedCourseId;
@@ -14873,8 +15127,8 @@ useEffect(() => {
         return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
       });
       return { ...group, leads: sorted };
-    });
-  }, [displayedProfiles, crossSaleCache]);
+    }).filter((group) => group.leads?.length);
+  }, [displayedProfiles, crossSaleCache, filterData?.name]);
 
   const crossSaleAllCourses = useMemo(() => {
     const collegeId = userData?.college || userData?.collegeId;
@@ -14901,6 +15155,7 @@ useEffect(() => {
 
   useEffect(() => {
     if (!displayedProfiles.length) return;
+    if (isPhoneSearchQuery(filterData?.name)) return;
     const rootIds = [...new Set(displayedProfiles.map((p) => getProfileGroupRootId(p)).filter(Boolean))];
     rootIds.forEach((rootId) => {
       if (crossSaleCache[rootId]) return;
@@ -14908,7 +15163,7 @@ useEffect(() => {
       if (sample) fetchCrossSaleGroup(sample);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displayedProfiles, fetchCrossSaleGroup]);
+  }, [displayedProfiles, fetchCrossSaleGroup, filterData?.name]);
 
   useEffect(() => {
     if (!showCrossSaleModal || !crossSaleForm.leadStatus) {
@@ -16975,7 +17230,7 @@ useEffect(() => {
                                 value={filterData.name}
                                 onChange={handleFilterChange}
                                 onKeyDown={(e) => {
-                                  if (e.key === 'Enter') fetchProfileData();
+                                  if (e.key === 'Enter') fetchProfileData(filterData, 1);
                                 }}
                                 style={{
                                   width: isMobile ? '100%' : '200px',
@@ -17023,7 +17278,7 @@ useEffect(() => {
                             <button
                               type="button"
                               className="btn btn-sm btn-primary adm-cycle-action-btn adm-cycle-action-btn--search"
-                              onClick={() => fetchProfileData()}
+                              onClick={() => fetchProfileData(filterData, 1)}
                               style={{
                                 background: 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)',
                                 borderColor: 'rgb(250, 85, 121)',
@@ -18037,6 +18292,13 @@ useEffect(() => {
                             >
                               Clear milestone filter
                             </button>
+                          </div>
+                        )}
+                        {!isLoadingProfiles && !selectedKycFilter && !selectedMilestoneFilter && filterData.name && leadDisplayGroups.length === 0 && (
+                          <div className="col-12 text-center py-4">
+                            <p className="text-muted mb-0">
+                              No lead found for <strong>{filterData.name}</strong>
+                            </p>
                           </div>
                         )}
                         {!isLoadingProfiles && leadDisplayGroups && leadDisplayGroups.length > 0 && leadDisplayGroups.map((group, groupIndex) => {
