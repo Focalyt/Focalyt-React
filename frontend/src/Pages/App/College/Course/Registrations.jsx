@@ -24,6 +24,42 @@ const getProfileGroupRootId = (profile) => {
   return String(profile.crossSaleRootId || profile.parentAppliedCourseId || profile._id || '');
 };
 
+const getSearchDigits = (value) => String(value ?? '').replace(/\D/g, '');
+
+const isPhoneSearchQuery = (query) => {
+  const trimmed = String(query || '').trim();
+  if (!trimmed) return false;
+  const digits = getSearchDigits(trimmed);
+  return digits.length >= 10 && digits.length <= 15 && /^[\d+\s\-()]+$/.test(trimmed);
+};
+
+const profileMatchesQuickSearch = (profile, query) => {
+  const trimmed = String(query || '').trim();
+  if (!trimmed) return true;
+  const candidate = profile?._candidate;
+  if (!candidate) return false;
+
+  if (isPhoneSearchQuery(trimmed)) {
+    const last10 = getSearchDigits(trimmed).slice(-10);
+    const phones = [
+      candidate.mobile,
+      candidate.whatsapp,
+      profile.mobile,
+      profile.whatsapp,
+    ]
+      .map((value) => getSearchDigits(value))
+      .filter((value) => value.length >= 10);
+    return phones.some((phone) => phone === last10 || phone.slice(-10) === last10);
+  }
+
+  const needle = trimmed.toLowerCase();
+  return (
+    String(candidate.name || '').toLowerCase().includes(needle) ||
+    String(candidate.email || '').toLowerCase().includes(needle) ||
+    String(candidate.mobile || '').toLowerCase().includes(needle)
+  );
+};
+
 const pickFirstNonEmpty = (...vals) => vals.find((v) => v != null && String(v).trim() !== '') || '';
 
 const MultiSelectCheckbox = ({
@@ -14334,6 +14370,10 @@ useEffect(() => {
   const displayedProfiles = React.useMemo(() => {
     if (!Array.isArray(allProfiles)) return [];
     let result = allProfiles;
+    const searchQuery = String(filterData?.name || '').trim();
+    if (searchQuery) {
+      result = result.filter((profile) => profileMatchesQuickSearch(profile, searchQuery));
+    }
 
     if (selectedFollowupBucket?.startsWith('visit:')) {
       const bucket = selectedFollowupBucket.split(':')[1];
@@ -14341,7 +14381,7 @@ useEffect(() => {
     }
 
     return result;
-  }, [allProfiles, selectedFollowupBucket]);
+  }, [allProfiles, selectedFollowupBucket, filterData?.name]);
 
   const leadDisplayGroups = useMemo(() => {
     const byRoot = new Map();
@@ -14368,6 +14408,10 @@ useEffect(() => {
       } else {
         merged = group.membersFromList;
       }
+      const searchQuery = String(filterData?.name || '').trim();
+      if (searchQuery) {
+        merged = merged.filter((profile) => profileMatchesQuickSearch(profile, searchQuery));
+      }
       const unique = [...new Map(merged.map((p) => [String(p._id), p])).values()];
       const sorted = unique.sort((a, b) => {
         const aPrimary = !a.parentAppliedCourseId;
@@ -14376,8 +14420,8 @@ useEffect(() => {
         return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
       });
       return { ...group, leads: sorted };
-    });
-  }, [displayedProfiles, crossSaleCache]);
+    }).filter((group) => group.leads?.length);
+  }, [displayedProfiles, crossSaleCache, filterData?.name]);
 
   const crossSaleAllCourses = useMemo(() => {
     const collegeId = userData?.college || userData?.collegeId;
@@ -14404,6 +14448,7 @@ useEffect(() => {
 
   useEffect(() => {
     if (!displayedProfiles.length) return;
+    if (isPhoneSearchQuery(filterData?.name)) return;
     const rootIds = [...new Set(displayedProfiles.map((p) => getProfileGroupRootId(p)).filter(Boolean))];
     rootIds.forEach((rootId) => {
       if (crossSaleCache[rootId]) return;
@@ -14411,7 +14456,7 @@ useEffect(() => {
       if (sample) fetchCrossSaleGroup(sample);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displayedProfiles, fetchCrossSaleGroup]);
+  }, [displayedProfiles, fetchCrossSaleGroup, filterData?.name]);
 
   useEffect(() => {
     if (!showCrossSaleModal || !crossSaleForm.leadStatus) {
@@ -16464,7 +16509,7 @@ useEffect(() => {
                                 value={filterData.name}
                                 onChange={handleFilterChange}
                                 onKeyDown={(e) => {
-                                  if (e.key === 'Enter') fetchProfileData();
+                                  if (e.key === 'Enter') fetchProfileData(filterData, 1);
                                 }}
                                 style={{
                                   width: isMobile ? '100%' : '200px',
@@ -16512,7 +16557,7 @@ useEffect(() => {
                             <button
                               type="button"
                               className="btn btn-sm btn-primary adm-cycle-action-btn adm-cycle-action-btn--search"
-                              onClick={() => fetchProfileData()}
+                              onClick={() => fetchProfileData(filterData, 1)}
                               style={{
                                 background: 'linear-gradient(135deg, #fc567b 13%, #fc567b 50%)',
                                 borderColor: 'rgb(250, 85, 121)',
@@ -17515,6 +17560,13 @@ useEffect(() => {
                             >
                               Clear milestone filter
                             </button>
+                          </div>
+                        )}
+                        {!isLoadingProfiles && !selectedKycFilter && !selectedMilestoneFilter && filterData.name && leadDisplayGroups.length === 0 && (
+                          <div className="col-12 text-center py-4">
+                            <p className="text-muted mb-0">
+                              No lead found for <strong>{filterData.name}</strong>
+                            </p>
                           </div>
                         )}
                         {!isLoadingProfiles && leadDisplayGroups && leadDisplayGroups.length > 0 && leadDisplayGroups.map((group, groupIndex) => {

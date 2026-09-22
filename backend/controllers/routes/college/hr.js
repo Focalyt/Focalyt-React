@@ -2,7 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const moment = require('moment');
 const router = express.Router();
-const { isCollege } = require('../../../helpers');
+const { isCollege, getAllTeamMembers } = require('../../../helpers');
 const StatusHr = require('../../models/statusHr');
 const College = require('../../models/college');
 const User = require('../../models/users');
@@ -423,6 +423,24 @@ const parseYesNo = (value) => {
   return null;
 };
 
+const hrLeadOwnerId = (lead) => String(
+  lead?.leadOwner?._id || lead?.leadOwner || lead?.assignedTo?._id || lead?.assignedTo || ''
+);
+
+const hrLeadPersonIds = (lead) => [
+  hrLeadOwnerId(lead),
+  String(lead?.leadCoOwner?._id || lead?.leadCoOwner || ''),
+].filter(Boolean);
+
+const resolveHrViewerTeamIds = async (user) => {
+  if (!user?._id) return [];
+  const isAdmin = user?.permissions?.permission_type === 'Admin';
+  if (isAdmin) return [user._id];
+  const team = await getAllTeamMembers(user._id);
+  if (Array.isArray(team) && team.length) return team;
+  return [user._id];
+};
+
 const dayRange = (from, to) => {
   const range = {};
   if (from) {
@@ -438,12 +456,18 @@ const dayRange = (from, to) => {
 
 const exactInsensitive = (value) => new RegExp(`^${String(value).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
 
+const normalizeBodyKey = (key) => String(key || '').trim().toLowerCase().replace(/[\s_\-]+/g, '');
+
 const pickBodyValue = (body, keys) => {
+  if (!body || typeof body !== 'object') return undefined;
+  const entries = Object.entries(body);
   for (const key of keys) {
-    const value = body?.[key];
-    if (value !== undefined && value !== null && String(value).trim() !== '') {
-      return value;
-    }
+    const wanted = normalizeBodyKey(key);
+    const hit = entries.find(([bodyKey, value]) => {
+      if (value === undefined || value === null || String(value).trim() === '') return false;
+      return normalizeBodyKey(bodyKey) === wanted;
+    });
+    if (hit) return hit[1];
   }
   return undefined;
 };
@@ -477,11 +501,13 @@ const resolveNamedProjectAndDepartment = async ({ projectName, departmentName, c
   const result = { projectId: null, departmentId: null };
 
   if (departmentName) {
-    const collegeScoped = collegeId
+    const departmentId = toCollegeObjectId(departmentName);
+    const collegeScoped = !departmentId && collegeId
       ? await Vertical.findOne({ name: exactInsensitive(departmentName), college: collegeId })
       : null;
-    const department = collegeScoped
-      || await Vertical.findOne({ name: exactInsensitive(departmentName) });
+    const department = departmentId
+      ? await Vertical.findById(departmentId)
+      : (collegeScoped || await Vertical.findOne({ name: exactInsensitive(departmentName) }));
     if (!department) {
       return { error: 'department_not_found' };
     }
@@ -489,11 +515,16 @@ const resolveNamedProjectAndDepartment = async ({ projectName, departmentName, c
   }
 
   if (projectName) {
-    const collegeQuery = { name: exactInsensitive(projectName) };
-    if (collegeId) collegeQuery.college = collegeId;
-    const collegeScoped = await Project.findOne(collegeQuery);
-    const project = collegeScoped
-      || await Project.findOne({ name: exactInsensitive(projectName) });
+    const projectId = toCollegeObjectId(projectName);
+    let project = null;
+    if (projectId) {
+      project = await Project.findById(projectId);
+    } else {
+      const collegeQuery = { name: exactInsensitive(projectName) };
+      if (collegeId) collegeQuery.college = collegeId;
+      project = await Project.findOne(collegeQuery)
+        || await Project.findOne({ name: exactInsensitive(projectName) });
+    }
     if (!project) {
       return { error: 'project_not_found' };
     }
@@ -708,22 +739,61 @@ const collegeCandidateMatch = (collegeId, extra = {}) => {
   return match;
 };
 
-const queryAppliedLeads = async (query, collegeId) => {
+const escapeRegexLiteral = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const isHrPhoneSearchTerm = (searchTerm) => {
+  const trimmed = String(searchTerm || '').trim();
+  if (!trimmed) return false;
+  const digits = trimmed.replace(/\D/g, '');
+  return digits.length >= 10 && digits.length <= 15 && /^[\d+\s\-()]+$/.test(trimmed);
+};
+
+const buildHrCandidateSearchOr = (searchTerm) => {
+  const trimmed = String(searchTerm || '').trim();
+  if (!trimmed) return null;
+  if (isHrPhoneSearchTerm(trimmed)) {
+    const digits = trimmed.replace(/\D/g, '');
+    const last10 = digits.slice(-10);
+    const or = [];
+    [last10, digits, `91${last10}`].forEach((value) => {
+      if (!value) return;
+      or.push({ mobile: value }, { whatsapp: value });
+      const asNumber = Number(value);
+      if (Number.isFinite(asNumber) && asNumber <= Number.MAX_SAFE_INTEGER) {
+        or.push({ mobile: asNumber }, { whatsapp: asNumber });
+      }
+    });
+    return or;
+  }
+  const searchRegex = new RegExp(escapeRegexLiteral(trimmed), 'i');
+  return [{ name: searchRegex }, { email: searchRegex }, { mobile: trimmed }];
+};
+
+const leadMatchesHrSearch = (lead, searchTerm) => {
+  const trimmed = String(searchTerm || '').trim();
+  if (!trimmed) return true;
+  if (isHrPhoneSearchTerm(trimmed)) {
+    const last10 = trimmed.replace(/\D/g, '').slice(-10);
+    const phones = [lead?.mobile, lead?.whatsapp]
+      .map((value) => String(value ?? '').replace(/\D/g, ''))
+      .filter((value) => value.length >= 10);
+    return phones.some((phone) => phone === last10 || phone.slice(-10) === last10);
+  }
+  const needle = trimmed.toLowerCase();
+  return (
+    String(lead?.fullName || '').toLowerCase().includes(needle) ||
+    String(lead?.email || '').toLowerCase().includes(needle) ||
+    String(lead?.mobile || '').toLowerCase().includes(needle)
+  );
+};
+
+const queryAppliedLeads = async (query, collegeId, viewer = null) => {
   const candMatch = collegeCandidateMatch(collegeId);
   const extraClauses = [];
   const q = String(query.search || '').trim();
   if (q) {
-    const digits = q.replace(/\D/g, '');
-    const searchOr = [
-      { name: new RegExp(q, 'i') },
-      { email: new RegExp(q, 'i') },
-    ];
-    if (digits) {
-      searchOr.push({ mobile: digits });
-      const asNumber = Number(digits);
-      if (!Number.isNaN(asNumber)) searchOr.push({ mobile: asNumber });
-    }
-    extraClauses.push({ $or: searchOr });
+    const searchOr = buildHrCandidateSearchOr(q);
+    if (searchOr?.length) extraClauses.push({ $or: searchOr });
   }
   if (query.city) {
     extraClauses.push({ 'personalInfo.currentAddress.city': new RegExp(String(query.city).trim(), 'i') });
@@ -732,12 +802,22 @@ const queryAppliedLeads = async (query, collegeId) => {
 
   const collegeIdObj = toCollegeObjectId(collegeId);
   const candidateIds = await CandidateProfile.find(candMatch).distinct('_id');
+  // Default list: college jobs OR candidates that belong to this college.
+  // Search must NOT use that $or — it was returning every HR job in the college
+  // even when the phone/name did not match.
+  if (q && !candidateIds.length) {
+    return { leads: [], statusIndex: await loadStatusIndex(collegeId) };
+  }
   const applyMatch = {
     isDeleted: { $ne: true },
-    $or: [
-      ...(collegeIdObj ? [{ college: collegeIdObj }] : []),
-      { _candidate: { $in: candidateIds.length ? candidateIds : [new mongoose.Types.ObjectId()] } },
-    ],
+    ...(q
+      ? { _candidate: { $in: candidateIds } }
+      : {
+        $or: [
+          ...(collegeIdObj ? [{ college: collegeIdObj }] : []),
+          { _candidate: { $in: candidateIds.length ? candidateIds : [new mongoose.Types.ObjectId()] } },
+        ],
+      }),
   };
 
   const createdRange = dayRange(query.createdFromDate || query.startDate, query.createdToDate || query.endDate);
@@ -758,6 +838,9 @@ const queryAppliedLeads = async (query, collegeId) => {
 
   const statusIndex = await loadStatusIndex(collegeId);
   let leads = applies.map((item) => mapApplyToLead(item, statusIndex));
+  if (q) {
+    leads = leads.filter((lead) => leadMatchesHrSearch(lead, q));
+  }
 
   if (query.leadStatus && query.leadStatus !== 'all') {
     if (query.leadStatus === 'none') {
@@ -770,11 +853,28 @@ const queryAppliedLeads = async (query, collegeId) => {
     leads = leads.filter((lead) => String(lead.leadSubstatus || '') === String(query.subStatus));
   }
 
+  const statusTitle = String(query.statusTitle || '').trim().toLowerCase();
+  if (statusTitle && statusTitle !== 'all') {
+    leads = leads.filter((lead) => {
+      const title = String(lead.leadStatus?.title || '').trim().toLowerCase();
+      if (title) return title === statusTitle;
+      return statusTitle.includes('untouch');
+    });
+  }
+
   const ownerIds = parseIdList(query.owner).map(String);
   const counselorIds = parseIdList(query.counselor).map(String);
-  const ownerFilter = [...ownerIds, ...counselorIds];
-  if (ownerFilter.length) {
-    leads = leads.filter((lead) => ownerFilter.includes(String(lead.leadOwner?._id || lead.leadOwner || '')));
+  // Match B2C: Owner = primary owner only; Counsellor = owner OR co-owner.
+  if (ownerIds.length) {
+    leads = leads.filter((lead) => ownerIds.includes(hrLeadOwnerId(lead)));
+  } else if (counselorIds.length) {
+    leads = leads.filter((lead) => counselorIds.some((id) => hrLeadPersonIds(lead).includes(id)));
+  } else if (parseYesNo(query.scopeToViewer) === true && viewer?._id) {
+    const teamIds = await resolveHrViewerTeamIds(viewer);
+    if (teamIds.length) {
+      const teamSet = new Set(teamIds.map((id) => String(id)));
+      leads = leads.filter((lead) => hrLeadPersonIds(lead).some((id) => teamSet.has(id)));
+    }
   }
 
   if (query.project && mongoose.Types.ObjectId.isValid(String(query.project))) {
@@ -909,12 +1009,12 @@ const buildMatch = (query = {}, collegeId) => {
         { assignedTo: { $in: ownerIds } },
       ],
     });
-  }
-  if (counselorIds.length) {
+  } else if (counselorIds.length) {
     extraClauses.push({
       $or: [
         { assignedTo: { $in: counselorIds } },
         { leadOwner: { $in: counselorIds } },
+        { leadCoOwner: { $in: counselorIds } },
       ],
     });
   }
@@ -951,7 +1051,7 @@ router.get('/leads', isCollege, async (req, res) => {
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
     const skip = (page - 1) * limit;
-    const { leads } = await queryAppliedLeads(req.query, req.user?.college?._id);
+    const { leads } = await queryAppliedLeads(req.query, req.user?.college?._id, req.user);
     const total = leads.length;
     const paged = leads.slice(skip, skip + limit);
 
@@ -980,9 +1080,10 @@ router.get('/leads/counts', isCollege, async (req, res) => {
       leadStatus: 'all',
       followupType: undefined,
       followupBucket: undefined,
-    }, req.user?.college?._id);
+    }, req.user?.college?._id, req.user);
 
     const counts = { all: leads.length, none: 0 };
+    const countsByTitle = {};
     const roles = new Set();
     const followups = {
       call: { done: 0, planned: 0, missed: 0 },
@@ -995,6 +1096,8 @@ router.get('/leads/counts', isCollege, async (req, res) => {
       const key = lead.leadStatus?._id ? String(lead.leadStatus._id) : 'none';
       counts[key] = (counts[key] || 0) + 1;
       if (key === 'none') counts.none += 1;
+      const title = String(lead.leadStatus?.title || 'untouch').trim().toLowerCase();
+      countsByTitle[title] = (countsByTitle[title] || 0) + 1;
 
       (lead.followups || []).forEach((item) => {
         const bucketKey = item?.type === 'Visit' ? 'visit' : 'call';
@@ -1008,6 +1111,7 @@ router.get('/leads/counts', isCollege, async (req, res) => {
       success: true,
       data: {
         counts,
+        countsByTitle,
         followups,
         roles: [...roles].sort((a, b) => a.localeCompare(b)),
       },
@@ -1416,17 +1520,19 @@ router.route("/digitalhrleads").post(async (req, res) => {
       let city = pickBodyValue(req.body, ['city']);
       let applyingFor = pickBodyValue(req.body, ['applyingFor', 'applying_for']);
       let experience = pickBodyValue(req.body, ['experience']);
-      let qualification = pickBodyValue(req.body, ['qualification', 'education_level', 'educationLevel']);
-      let dob = pickBodyValue(req.body, ['dob', 'date_of_birth', 'dateOfBirth']);
+      let qualification = pickBodyValue(req.body, ['qualification', 'education_level', 'educationLevel', 'education']);
+      let dob = pickBodyValue(req.body, ['dob', 'date_of_birth', 'dateOfBirth', 'date of birth']);
       let source = pickBodyValue(req.body, ['source']);
       let remark = pickBodyValue(req.body, ['remark', 'Remarks', 'remarks']);
       let status = pickBodyValue(req.body, ['status']);
-      let subStatus = pickBodyValue(req.body, ['subStatus', 'sub_status', 'sub status']);
+      let subStatus = pickBodyValue(req.body, ['subStatus', 'sub_status', 'sub status', 'substatus']);
       let college = pickBodyValue(req.body, ['college', 'CollegeId', 'collegeId', 'college_id']);
-      const projectName = String(pickBodyValue(req.body, ['project_name', 'projectName', 'project name']) || '').trim();
-      const departmentName = String(pickBodyValue(req.body, ['department_name', 'departmentName', 'department name']) || '').trim();
-      const maritalStatus = String(pickBodyValue(req.body, ['marital_status', 'maritalStatus']) || '').trim();
-      const incomingJobId = pickBodyValue(req.body, ['jobId', '_job', 'job_id']);
+      const projectName = String(pickBodyValue(req.body, ['project_name', 'projectName', 'project name', 'project']) || '').trim();
+      const departmentName = String(pickBodyValue(req.body, ['department_name', 'departmentName', 'department name', 'department']) || '').trim();
+      const maritalStatus = String(pickBodyValue(req.body, ['marital_status', 'maritalStatus', 'marital', 'marital status']) || '').trim();
+      const incomingJobId = pickBodyValue(req.body, ['jobId', '_job', 'job_id', 'job id']);
+      const incomingOwnerId = pickBodyValue(req.body, ['owner', 'leadOwner', 'lead_owner', 'lead owner']);
+      const incomingCounselorId = pickBodyValue(req.body, ['counselor', 'counsellor', 'assignedTo', 'assigned_to']);
 
       console.log("[DigitalHRLead] POST /digitalhrleads →", {
           fullname,
@@ -1588,6 +1694,22 @@ router.route("/digitalhrleads").post(async (req, res) => {
           namedRefs.departmentId = vacancy.vertical;
       }
 
+      const excelOwnerId = toCollegeObjectId(incomingOwnerId);
+      const excelCounselorId = toCollegeObjectId(incomingCounselorId);
+      let resolvedOwnerId = jobOwner.hrId || undefined;
+      let resolvedCoOwnerId;
+      if (excelOwnerId) {
+          const ownerUser = await User.findById(excelOwnerId).select('_id').lean();
+          if (ownerUser) resolvedOwnerId = ownerUser._id;
+      }
+      if (excelCounselorId && String(excelCounselorId) !== String(excelOwnerId || '')) {
+          const counselorUser = await User.findById(excelCounselorId).select('_id').lean();
+          if (counselorUser) {
+              if (!resolvedOwnerId) resolvedOwnerId = counselorUser._id;
+              else resolvedCoOwnerId = counselorUser._id;
+          }
+      }
+
       const mobileNumber = parseInt(mobile, 10);
       const mobileValues = mobileLookupValues(mobile);
       const existingUser = await User.findOne({
@@ -1744,8 +1866,9 @@ router.route("/digitalhrleads").post(async (req, res) => {
           resume: isActualMediaFile(resumeUrl) ? resumeUrl : '',
           leadStatus: statusId?._id || null,
           leadSubstatus: subStatusId?._id || null,
-          leadOwner: jobOwner.hrId || undefined,
-          assignedTo: jobOwner.hrId || undefined,
+          leadOwner: resolvedOwnerId || undefined,
+          assignedTo: resolvedOwnerId || undefined,
+          leadCoOwner: resolvedCoOwnerId || undefined,
           logs: [{
               action: 'Lead created',
               remarks: 'Imported from digital job apply',
