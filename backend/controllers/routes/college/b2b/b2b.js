@@ -308,16 +308,29 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 		return bounds;
 	};
 
+	/** 00:00 today in IST. A follow-up dated today is not a passed date. */
+	const getStartOfTodayIST = () => {
+		const parts = new Intl.DateTimeFormat('en-CA', {
+			timeZone: 'Asia/Kolkata',
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit',
+		}).formatToParts(new Date());
+		const y = parts.find((p) => p.type === 'year').value;
+		const m = parts.find((p) => p.type === 'month').value;
+		const d = parts.find((p) => p.type === 'day').value;
+		return new Date(`${y}-${m}-${d}T00:00:00+05:30`);
+	};
+
 	/**
 	 * Close current Call/Visit follow-up before replace/clear.
-	 * - mode 'replace': overdue → Missed (keep history), still-future → Rescheduled
+	 * - mode 'replace': scheduled date before today (IST) → Missed; today or later → Rescheduled
 	 * - mode 'done': Completed (status change without new follow-up)
-	 * - forceMissed: always Missed on replace
+	 * Same-day updates stay out of Missed even after the clock time has passed.
 	 */
 	const completeCurrentFollowupForType = async (lead, followUpType, options = {}) => {
 		if (!lead) return;
 		const mode = options.mode === 'done' ? 'done' : 'replace';
-		const forceMissed = Boolean(options.forceMissed);
 		const normalizedType = String(followUpType || 'Call').trim().toLowerCase();
 		const rawId = normalizedType === 'visit' ? lead.followUpVisit : lead.followUpCall;
 		const currentFollowUpId = rawId?._id || rawId;
@@ -332,13 +345,11 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 
 		let nextStatus = 'Completed';
 		if (mode === 'replace') {
-			if (forceMissed) {
-				nextStatus = 'Missed';
-			} else {
-				const sched = current.scheduledDate ? new Date(current.scheduledDate) : null;
-				const stillPlanned = sched && !Number.isNaN(sched.getTime()) && sched.getTime() > Date.now();
-				nextStatus = stillPlanned ? 'Rescheduled' : 'Missed';
-			}
+			const sched = current.scheduledDate ? new Date(current.scheduledDate) : null;
+			const dateHasPassed = sched
+				&& !Number.isNaN(sched.getTime())
+				&& sched.getTime() < getStartOfTodayIST().getTime();
+			nextStatus = dateHasPassed ? 'Missed' : 'Rescheduled';
 		}
 
 		await FollowUp.findByIdAndUpdate(currentFollowUpId, {

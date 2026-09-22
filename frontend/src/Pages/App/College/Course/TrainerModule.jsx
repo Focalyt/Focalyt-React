@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import DatePicker from 'react-date-picker';
 import 'react-date-picker/dist/DatePicker.css';
@@ -52,11 +53,13 @@ const getAcceptForDocType = (docType = '') => {
   }
 };
 
-const DocumentPreviewModal = ({ doc, onClose, fileInputId }) => {
+const DocumentPreviewModal = ({ doc, onClose, fileInputId, title }) => {
   const fileUrl = doc?.fileUrl ? getDocFileUrl(doc.fileUrl) : '';
   const fileType = getEvidenceFileType(fileUrl, doc?.type, doc?.fileName);
   const hasFile = Boolean(fileUrl);
-  const statusLabel = hasFile ? (doc.status === 'Uploaded' ? 'Pending' : (doc.status || 'Pending')) : 'Not Uploaded';
+  const statusLabel = !hasFile
+    ? 'Not Uploaded'
+    : (!fileInputId ? 'Ready to study' : (doc.status === 'Uploaded' ? 'Pending' : (doc.status || 'Pending')));
 
   if (!doc) return null;
 
@@ -92,7 +95,7 @@ const DocumentPreviewModal = ({ doc, onClose, fileInputId }) => {
     >
       <div className="tm-reg-modal" onClick={(e) => e.stopPropagation()}>
         <div className="tm-reg-modal__head">
-          <h3>{doc.name} Verification</h3>
+          <h3>{title || `${doc.name} Verification`}</h3>
           <button type="button" className="tm-reg-modal__close" onClick={onClose} aria-label="Close">&times;</button>
         </div>
         <div className="tm-reg-modal__body">
@@ -210,7 +213,10 @@ const mapApiSessionToClient = (session, context = {}) => ({
   presentCandidates: String(session.presentCandidates ?? 0),
   absentCandidates: String(session.absentCandidates ?? 0),
   attendance: `${session.attendancePercent ?? 0}%`,
-  status: 'Pending',
+  status: session.status === 'Completed' || session.workflowStatus === 'Completed' ? 'Completed' : 'Pending',
+  completionRemark: session.completionRemark || '',
+  completedAt: session.completedAt || null,
+  completedByName: session.completedByName || '',
 });
 const getEvidenceTypeFromFile = (file) => {
   const mime = file?.type || '';
@@ -288,6 +294,22 @@ const loadStoredSessions = (batchId) => {
 const persistStoredSessions = (batchId, list) => {
   if (!batchId) return;
   localStorage.setItem(`${SESSIONS_STORAGE_PREFIX}${batchId}`, JSON.stringify(list));
+};
+
+const persistTrainerSessionDone = (session, remark, extra = {}) => {
+  const sid = String(session?.id || session?._id || '');
+  if (!sid) return;
+  const payload = {
+    status: 'Completed',
+    completionRemark: remark,
+    completedAt: extra.completedAt || new Date().toISOString(),
+    completedByName: extra.completedByName || '',
+  };
+  try {
+    localStorage.setItem(`trainerSessionDone:${sid}`, JSON.stringify(payload));
+  } catch {
+    /* ignore quota */
+  }
 };
 
 const loadAssignedCoordinatorSessions = (batchId, trainerId) => {
@@ -1049,6 +1071,33 @@ const deriveSessionAttendanceStats = (session, attendanceRecordsBySession = {}, 
     attendance: session?.attendance || '0%',
   };
 };
+
+const isSessionAttendanceDone = (session) => {
+  const present = Number(session?.presentCandidates) || 0;
+  const absent = Number(session?.absentCandidates) || 0;
+  return present + absent > 0;
+};
+
+const pickDetailText = (...values) => {
+  for (const value of values) {
+    const text = String(value == null ? '' : value).trim();
+    if (text && text !== '-' && text !== 'null' && text !== 'undefined') return text;
+  }
+  return '-';
+};
+
+const formatSessionTimeRange = (session = {}) => {
+  const start = String(session.startTime || '').trim();
+  const end = String(session.endTime || '').trim();
+  if (start && end) return `${start} - ${end}`;
+  if (start) return start;
+  if (end) return end;
+  const duration = String(session.duration || '').trim();
+  if (duration) return duration;
+  const hours = String(session.hours || '').trim();
+  if (hours) return `${hours} hrs`;
+  return '-';
+};
 const buildStudentSessionHistory = (student, sessions = [], attendanceRecordsBySession = {}) => {
   const history = [];
 
@@ -1184,7 +1233,6 @@ const getStudentPerformanceProfile = (student, sessions, attendanceRecordsBySess
     attendance: attendanceDisplay,
     attendanceNum,
     attLevel: getAttendanceLevel(attendanceDisplay),
-    performanceLabel: getPerformanceLabel(getAttendanceLevel(attendanceDisplay)),
     totalSessions: batchAttendance.totalCountableSessions || student.totalSessions || sessionHistory.length || 0,
     presentSessions: batchAttendance.presentSessions || student.presentSessions || presentFromHistory,
     absentSessions: batchAttendance.absentSessions || student.absentSessions || absentFromHistory,
@@ -1192,39 +1240,8 @@ const getStudentPerformanceProfile = (student, sessions, attendanceRecordsBySess
     excludedSessions: batchAttendance.excludedSessions,
     sessionHistory,
     attendanceBreakdown,
-    metrics: [
-      { label: 'Class Participation', value: student.participationScore, icon: 'fa-users', tone: 'blue' },
-      { label: 'Engagement', value: student.engagementScore, icon: 'fa-bolt', tone: 'pink' },
-      { label: 'Internal Assessment', value: student.assessmentScore, icon: 'fa-file-alt', tone: 'green' },
-      { label: 'Practical Performance', value: student.practicalScore, icon: 'fa-tools', tone: 'amber' },
-    ],
   };
 };
-const PERFORMANCE_FIELDS = [
-  { key: 'participationScore', label: 'Class Participation', icon: 'fa-users', placeholder: 'Enter class participation %' },
-  { key: 'engagementScore', label: 'Engagement', icon: 'fa-bolt', placeholder: 'Enter engagement %' },
-  { key: 'assessmentScore', label: 'Internal Assessment', icon: 'fa-file-alt', placeholder: 'Enter assessment %' },
-  { key: 'practicalScore', label: 'Practical Performance', icon: 'fa-tools', placeholder: 'Enter practical score %' },
-];
-const createPerformanceDraft = (student) => ({
-  studentId: student?.id || '',
-  studentName: student?.name || '',
-  participationScore: student?.participationScore ?? '',
-  engagementScore: student?.engagementScore ?? '',
-  assessmentScore: student?.assessmentScore ?? '',
-  practicalScore: student?.practicalScore ?? '',
-  trainerRemark: student?.trainerRemark || '',
-});
-const hasPerformanceData = (student) =>
-  PERFORMANCE_FIELDS.some(({ key }) => student?.[key] !== '' && student?.[key] != null)
-  || Boolean(student?.trainerRemark?.trim());
-const clampScore = (value) => {
-  if (value === '' || value == null) return '';
-  const num = Number(value);
-  if (Number.isNaN(num)) return '';
-  return Math.min(100, Math.max(0, Math.round(num)));
-};
-const formatMetricValue = (value) => (value !== '' && value != null ? `${value}%` : 'Not added');
 
 const ATTENDANCE_STATUSES = ['Present', 'Absent', 'Not Marked'];
 
@@ -1343,10 +1360,12 @@ const createSessionAttendanceRows = (session, students = [], existingRows = [], 
     || getTodayInputValue();
 
   return students.map((student, index) => {
-    const existing = existingById.get(String(student.id));
+    const existing = existingById.get(String(student.id))
+      || existingById.get(String(student.appliedCourseId || ''));
     const dummyStatus = getDummyStatusForDate(student.id, dateKey, index);
     return {
       id: student.id,
+      appliedCourseId: student.appliedCourseId || student.id,
       name: student.name,
       mobile: student.mobile || '-',
       status: existing?.status || (useDummyStatuses ? dummyStatus : 'Not Marked'),
@@ -1502,11 +1521,6 @@ const getAttendanceLevel = (attendance = '') => {
   if (num >= 85) return 'high';
   if (num >= 70) return 'mid';
   return 'low';
-};
-const getPerformanceLabel = (level) => {
-  if (level === 'high') return 'Excellent';
-  if (level === 'mid') return 'Good';
-  return 'Needs Focus';
 };
 
 const TrainerHero = ({ reportDate, onDateChange, basicDetails, sessionCount, studentCount }) => (
@@ -1885,7 +1899,7 @@ const ActionToolbar = ({ quickSearch, onSearchChange, onSearch, onAddSession, no
 
 
 
-const StudentCard = ({ student, batchAttendance, onView, onAttendance, onAddPerformance }) => {
+const StudentCard = ({ student, batchAttendance, onView, onAttendance }) => {
   const attendanceLabel = batchAttendance?.percentage != null
     ? `${batchAttendance.percentage}%`
     : student.attendance;
@@ -1896,8 +1910,6 @@ const StudentCard = ({ student, batchAttendance, onView, onAttendance, onAddPerf
       : 'From admission record';
   const attendanceNum = parseFloat(batchAttendance?.percentage ?? student.attendance) || 0;
   const attLevel = getAttendanceLevel(attendanceLabel);
-  const statusTone = student.status === 'Active' ? 'active' : 'risk';
-  const performanceAdded = hasPerformanceData(student);
   const detailItems = [
     ['fa-phone', 'Mobile', student.mobile],
     ['fa-envelope', 'Email', student.email || '-'],
@@ -1963,19 +1975,6 @@ const StudentCard = ({ student, batchAttendance, onView, onAttendance, onAddPerf
           ))}
         </div>
 
-        <div className="st-card__meta">
-          
-          <div className="st-card__meta-item">
-            <div className="st-card__meta-icon st-card__meta-icon--pink">
-              <i className="fas fa-chart-line" />
-            </div>
-            <div>
-              <span>Performance</span>
-              <strong>{performanceAdded ? getPerformanceLabel(attLevel) : 'Not added'}</strong>
-            </div>
-          </div>
-        </div>
-
         <div className="st-card__actions">
           <button type="button" className="st-card__btn st-card__btn--primary" onClick={() => onView(student)}>
             <i className="fas fa-user" /> View Profile
@@ -1983,20 +1982,13 @@ const StudentCard = ({ student, batchAttendance, onView, onAttendance, onAddPerf
           <button type="button" className="st-card__btn st-card__btn--ghost" onClick={() => onAttendance(student)}>
             <i className="fas fa-clipboard-list" /> View Attendance
           </button>
-          <button
-            type="button"
-            className="st-card__btn st-card__btn--performance"
-            onClick={() => onAddPerformance(student)}
-          >
-            <i className="fas fa-chart-bar" /> {performanceAdded ? 'Edit Performance' : 'Add Performance'}
-          </button>
         </div>
       </div>
     </article>
   );
 };
 
-const StudentTable = ({ students, sessions, attendanceRecordsBySession, onView, onAttendance, onAddPerformance }) => {
+const StudentTable = ({ students, sessions, attendanceRecordsBySession, onView, onAttendance }) => {
   if (!students.length) return null;
 
   return (
@@ -2025,7 +2017,6 @@ const StudentTable = ({ students, sessions, attendanceRecordsBySession, onView, 
                 : 'From admission record';
             const attendanceLevel = getAttendanceLevel(attendanceLabel);
             const statusTone = student.status === 'Active' ? 'active' : 'risk';
-            const performanceAdded = hasPerformanceData(student);
 
             return (
               <tr key={student.id}>
@@ -2069,9 +2060,6 @@ const StudentTable = ({ students, sessions, attendanceRecordsBySession, onView, 
                   <button type="button" className="st-table-btn st-table-btn--ghost" onClick={() => onAttendance(student)}>
                     View Attendance
                   </button>
-                  <button type="button" className="st-table-btn st-table-btn--performance" onClick={() => onAddPerformance(student)}>
-                    {performanceAdded ? 'Edit Perf' : 'Add Perf'}
-                  </button>
                 </td>
               </tr>
             );
@@ -2082,7 +2070,7 @@ const StudentTable = ({ students, sessions, attendanceRecordsBySession, onView, 
   );
 };
 
-const StudentProfileModal = ({ student, sessions, attendanceRecordsBySession, basicDetails, onClose, onEditPerformance, onOpenAttendance }) => {
+const StudentProfileModal = ({ student, sessions, attendanceRecordsBySession, basicDetails, onClose, onOpenAttendance }) => {
   const profile = useMemo(
     () => getStudentPerformanceProfile(student, sessions, attendanceRecordsBySession, basicDetails),
     [student, sessions, attendanceRecordsBySession, basicDetails]
@@ -2138,11 +2126,6 @@ const StudentProfileModal = ({ student, sessions, attendanceRecordsBySession, ba
               <strong>{profile.absentSessions}</strong>
               <span>Absent Sessions</span>
             </div>
-            <div className="st-profile-stat">
-              <div className="st-profile-stat__icon st-profile-stat__icon--blue"><i className="fas fa-star" /></div>
-              <strong>{profile.performanceLabel}</strong>
-              <span>Performance</span>
-            </div>
           </div>
 
           <div className="st-profile-section">
@@ -2152,29 +2135,6 @@ const StudentProfileModal = ({ student, sessions, attendanceRecordsBySession, ba
                 <div key={label} className="st-profile-info-item">
                   <span><i className={`fas ${icon}`} /> {label}</span>
                   <strong>{value}</strong>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="st-profile-section">
-            <h4><i className="fas fa-chart-bar" /> Performance Breakdown</h4>
-            <div className="st-profile-metrics">
-              {profile.metrics.map(({ label, value, icon, tone }) => (
-                <div key={label} className="st-profile-metric">
-                  <div className="st-profile-metric__head">
-                    <span>
-                      <i className={`fas ${icon} st-profile-metric__icon st-profile-metric__icon--${tone}`} />
-                      {label}
-                    </span>
-                    <strong>{formatMetricValue(value)}</strong>
-                  </div>
-                  <div className="st-card__progress">
-                    <div
-                      className={`st-card__progress-fill st-card__progress-fill--${Number(value) >= 85 ? 'high' : Number(value) >= 70 ? 'mid' : 'low'}`}
-                      style={{ width: `${value !== '' && value != null ? Math.min(Number(value) || 0, 100) : 0}%` }}
-                    />
-                  </div>
                 </div>
               ))}
             </div>
@@ -2196,85 +2156,10 @@ const StudentProfileModal = ({ student, sessions, attendanceRecordsBySession, ba
               <i className="fas fa-clipboard-list" /> View Attendance
             </button>
           </div>
-
-          <div className="st-profile-section">
-            <h4><i className="fas fa-comment-dots" /> Trainer Remark</h4>
-            <p className="st-profile-remark">{profile.trainerRemark || 'No remark added yet.'}</p>
-          </div>
         </div>
 
         <div className="st-profile-modal__foot">
-          <button type="button" className="sc-btn sc-btn--primary" onClick={() => onEditPerformance(student)}>
-            <i className="fas fa-edit" /> {hasPerformanceData(student) ? 'Edit Performance' : 'Add Performance'}
-          </button>
           <button type="button" className="sc-btn" onClick={onClose}>Close</button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const StudentPerformanceModal = ({ draft, onClose, onSave, onFieldChange }) => {
-  if (!draft) return null;
-
-  const isEdit = hasPerformanceData({
-    participationScore: draft.participationScore,
-    engagementScore: draft.engagementScore,
-    assessmentScore: draft.assessmentScore,
-    practicalScore: draft.practicalScore,
-    trainerRemark: draft.trainerRemark,
-  });
-
-  return (
-    <div className="st-perf-backdrop">
-      <div className="st-perf-modal" role="dialog" aria-modal="true">
-        <div className="st-perf-modal__head">
-          <div>
-            <h5>{isEdit ? 'Edit Performance' : 'Add Performance'}</h5>
-            <span>{draft.studentName} · {draft.studentId}</span>
-          </div>
-          <button type="button" className="session-modal__close" onClick={onClose} aria-label="Close">
-            <i className="fas fa-times" />
-          </button>
-        </div>
-
-        <div className="st-perf-modal__body">
-          <p className="st-perf-modal__hint">
-            Enter performance scores for this student. Values should be between 0 and 100.
-          </p>
-          <div className="session-form-grid">
-            {PERFORMANCE_FIELDS.map(({ key, label, icon, placeholder }) => (
-              <label key={key} className="session-field">
-                <span><i className={`fas ${icon}`} /> {label}</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  className="dbr-input session-field__control"
-                  placeholder={placeholder}
-                  value={draft[key]}
-                  onChange={(e) => onFieldChange(key, e.target.value)}
-                />
-              </label>
-            ))}
-          </div>
-          <label className="session-field session-field--full">
-            <span><i className="fas fa-comment-dots" /> Trainer Remark</span>
-            <textarea
-              className="dbr-textarea session-field__control"
-              rows="4"
-              placeholder="Write trainer remark for this student..."
-              value={draft.trainerRemark}
-              onChange={(e) => onFieldChange('trainerRemark', e.target.value)}
-            />
-          </label>
-        </div>
-
-        <div className="st-perf-modal__foot">
-          <button type="button" className="sc-btn" onClick={onClose}>Cancel</button>
-          <button type="button" className="sc-btn sc-btn--primary" onClick={onSave}>
-            <i className="fas fa-save" /> Save Performance
-          </button>
         </div>
       </div>
     </div>
@@ -2667,7 +2552,8 @@ const AttendanceManagementModal = ({
         <div className="attendance-modal__head">
           <div>
             <h3 id="attendance-dashboard-title">
-              <i className="fas fa-clipboard-list" /> Attendance Register
+              <i className={`fas ${view === 'summary' ? 'fa-edit' : 'fa-clipboard-list'}`} />
+              {view === 'summary' ? 'Mark Attendance' : 'Attendance Register'}
               {focusedStudent ? ` - ${focusedStudent.name}` : ''}
             </h3>
             <p>
@@ -2675,7 +2561,7 @@ const AttendanceManagementModal = ({
               {activeSession ? ` | Focus session: ${activeSession.title} (${sessionDate})` : ''}
             </p>
           </div>
-          <button type="button" className="attendance-close-btn" onClick={onClose} aria-label="Close attendance register">
+          <button type="button" className="attendance-close-btn" onClick={onClose} aria-label="Close attendance">
             <i className="fas fa-times" />
           </button>
         </div>
@@ -2685,17 +2571,17 @@ const AttendanceManagementModal = ({
             <div className="attendance-view-toggle" role="group" aria-label="Attendance view type">
               <button
                 type="button"
-                className={view === 'register' ? 'attendance-toggle attendance-toggle--active' : 'attendance-toggle'}
-                onClick={() => onViewChange('register')}
-              >
-                <i className="fas fa-clipboard-list" /> Attendance Register
-              </button>
-              <button
-                type="button"
                 className={view === 'summary' ? 'attendance-toggle attendance-toggle--active' : 'attendance-toggle'}
                 onClick={() => onViewChange('summary')}
               >
                 <i className="fas fa-edit" /> Mark Attendance
+              </button>
+              <button
+                type="button"
+                className={view === 'register' ? 'attendance-toggle attendance-toggle--active' : 'attendance-toggle'}
+                onClick={() => onViewChange('register')}
+              >
+                <i className="fas fa-clipboard-list" /> Attendance Register
               </button>
             </div>
           </div>
@@ -3039,12 +2925,7 @@ const AttendanceManagementModal = ({
 
         <div className="attendance-modal__foot">
           <button type="button" className="sc-btn" onClick={onClose}>Close</button>
-          {!readOnly && activeSession && view === 'summary' && (
-            <button type="button" className="sc-btn sc-btn--primary" onClick={onSave} disabled={saving}>
-              <i className={`fas ${saving ? 'fa-spinner fa-spin' : 'fa-save'}`} /> {saving ? 'Saving...' : 'Save Attendance'}
-            </button>
-          )}
-          {!readOnly && activeSession && view === 'register' && (
+          {!readOnly && activeSession && (
             <button type="button" className="sc-btn sc-btn--primary" onClick={onSave} disabled={saving}>
               <i className={`fas ${saving ? 'fa-spinner fa-spin' : 'fa-save'}`} /> {saving ? 'Saving...' : 'Save Attendance'}
             </button>
@@ -3109,6 +2990,22 @@ const getPendingTotQuestions = (session = {}) => {
   collect(session.totAssignmentSubmission);
   return (session.totQuestionBank || []).filter((question, index) => !answered.has(getTotQuestionId(question, index)));
 };
+
+const sessionHasTotAssignment = (session = {}) => (
+  Array.isArray(session.totQuestionBank) && session.totQuestionBank.length > 0
+);
+
+const hasTrainerPassedTot = (session = {}) => {
+  if (String(session.totStatus || '').toLowerCase() === 'passed') return true;
+  if (session.totAssignmentSubmission?.pass === true) return true;
+  return getTotSubmissionHistory(session).some((item) => item.pass === true);
+};
+
+const isSessionTotUnlocked = (session = {}) => (
+  !sessionHasTotAssignment(session) || hasTrainerPassedTot(session)
+);
+
+const TOT_LOCK_MESSAGE = 'Pass the ToT assignment for this session first.';
 
 const TotMcqAssignmentModal = ({ session, notify, token, backendUrl, onSubmitted, onClose }) => {
   const history = getTotSubmissionHistory(session);
@@ -3347,6 +3244,7 @@ const SessionCard = ({
   const [doneRemark, setDoneRemark] = useState('');
   const [doneSubmitting, setDoneSubmitting] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState(null);
+  const [selectedStudyDoc, setSelectedStudyDoc] = useState(null);
   const activeSession = session || hydrateSession(DUMMY_SESSIONS[0], 0, basicDetails);
   const sessionMeta = useMemo(
     () => getSessionAttendanceMeta(activeSession),
@@ -3377,6 +3275,18 @@ const SessionCard = ({
     { icon: 'fa-percentage', val: liveStats.attendance || '0%', lbl: 'Attendance', cls: 'amber' },
   ]), [liveStats]);
   const evidenceDocs = activeSession.evidenceDocs || [];
+  const studyMaterials = (activeSession.standardTlm || [])
+    .filter((item) => item && String(item.name || '').trim())
+    .map((item, index) => ({
+      id: String(item.id || item._id || `tlm-${index}`),
+      name: String(item.name).trim(),
+      type: item.type || 'PDF',
+      fileName: item.fileName || '',
+      fileUrl: item.fileUrl || '',
+      uploadedAt: item.uploadedAt || '',
+      status: item.status || (item.fileUrl ? 'Uploaded' : 'Not Uploaded'),
+    }));
+  const uploadedStudyCount = studyMaterials.filter((item) => item.fileUrl).length;
   const assignmentLabel = activeSession?.totAssignmentSubmission?.submittedAt
     ? (getPendingTotQuestions(activeSession).length
       ? `ToT · ${getPendingTotQuestions(activeSession).length} new`
@@ -3406,6 +3316,27 @@ const SessionCard = ({
     };
   }, [actionsMenuOpen]);
 
+  const totUnlocked = isSessionTotUnlocked(activeSession);
+  const totLockTitle = totUnlocked ? '' : TOT_LOCK_MESSAGE;
+  const attendanceDone = isSessionAttendanceDone(activeSession);
+  const canMarkAttendance = totUnlocked && sessionMeta.countable;
+  const canViewAttendance = totUnlocked;
+  const canMarkSessionDone = totUnlocked && (
+    attendanceDone || activeSession.status === 'Completed' || activeSession.workflowStatus === 'Completed'
+  );
+  const displayStatItems = totUnlocked
+    ? statItems
+    : [
+      { icon: 'fa-users', val: '0', lbl: 'Total Candidates', cls: 'blue' },
+      { icon: 'fa-check-circle', val: '0', lbl: 'Present', cls: 'green' },
+      { icon: 'fa-times-circle', val: '0', lbl: 'Absent', cls: 'red' },
+      { icon: 'fa-percentage', val: '0%', lbl: 'Attendance', cls: 'amber' },
+    ];
+
+  useEffect(() => {
+    if (!totUnlocked && activeTab === 'evidence') setActiveTab('details');
+  }, [totUnlocked, activeTab]);
+
   const closeDoneModal = () => {
     setDoneModalOpen(false);
     setDoneSubmitting(false);
@@ -3415,6 +3346,10 @@ const SessionCard = ({
     const remark = doneRemark.trim();
     if (!remark) {
       notify('Please enter a remark before submitting.');
+      return;
+    }
+    if (!canMarkSessionDone) {
+      notify(totUnlocked ? 'Save attendance before marking this session done.' : TOT_LOCK_MESSAGE);
       return;
     }
     if (typeof onMarkSessionDone !== 'function') {
@@ -3466,15 +3401,23 @@ const SessionCard = ({
             type="button"
             className="sc-actions-item"
             role="menuitem"
-            disabled={!sessionMeta.countable}
-            title={sessionMeta.countable ? 'Mark attendance for this session' : sessionMeta.label}
+            disabled={!canMarkAttendance}
+            title={
+              !totUnlocked
+                ? totLockTitle
+                : (sessionMeta.countable ? 'Mark attendance for this session' : sessionMeta.label)
+            }
             onClick={() => {
+              if (!totUnlocked) {
+                notify(TOT_LOCK_MESSAGE);
+                return;
+              }
               if (!sessionMeta.countable) {
                 notify(sessionMeta.label || 'Attendance cannot be marked on Sunday.');
                 return;
               }
               closeActionsMenu();
-              onOpenAttendance(activeSession, 'register');
+              onOpenAttendance(activeSession, 'summary');
             }}
           >
             <i className="fas fa-user-check" aria-hidden="true" />
@@ -3484,9 +3427,15 @@ const SessionCard = ({
             type="button"
             className="sc-actions-item"
             role="menuitem"
+            disabled={!canViewAttendance}
+            title={totUnlocked ? 'View attendance for this session' : totLockTitle}
             onClick={() => {
+              if (!totUnlocked) {
+                notify(TOT_LOCK_MESSAGE);
+                return;
+              }
               closeActionsMenu();
-              onOpenAttendance(activeSession, 'summary');
+              onOpenAttendance(activeSession, 'register');
             }}
           >
             <i className="fas fa-chart-bar" aria-hidden="true" />
@@ -3496,7 +3445,21 @@ const SessionCard = ({
             type="button"
             className="sc-actions-item"
             role="menuitem"
+            disabled={!canMarkSessionDone}
+            title={
+              !totUnlocked
+                ? totLockTitle
+                : (canMarkSessionDone ? 'Mark this session done' : 'Save attendance before marking this session done')
+            }
             onClick={() => {
+              if (!totUnlocked) {
+                notify(TOT_LOCK_MESSAGE);
+                return;
+              }
+              if (!canMarkSessionDone) {
+                notify('Save attendance before marking this session done.');
+                return;
+              }
               closeActionsMenu();
               setDoneRemark(activeSession.completionRemark || activeSession.doneRemark || '');
               setDoneModalOpen(true);
@@ -3527,9 +3490,9 @@ const SessionCard = ({
           </div>
         </div>
 
-        <div className="sc-stats">
-          {statItems.map(({ icon, val, lbl, cls }) => (
-            <div key={lbl} className="sc-stat">
+        <div className="sc-stats" title={totUnlocked ? undefined : totLockTitle}>
+          {displayStatItems.map(({ icon, val, lbl, cls }) => (
+            <div key={lbl} className={`sc-stat${totUnlocked ? '' : ' sc-stat--locked'}`}>
               <div className={`sc-stat__icon sc-stat__icon--${cls}`}>
                 <i className={`fas ${icon}`} />
               </div>
@@ -3604,12 +3567,24 @@ const SessionCard = ({
             >
               <i className="far fa-list-alt" /> Session Details
             </button>
+            {totUnlocked && (
+              <button
+                type="button"
+                className={`sc-tab${activeTab === 'evidence' ? ' sc-tab--active' : ''}`}
+                onClick={() => setActiveTab('evidence')}
+              >
+                <i className="far fa-image" /> Documents
+              </button>
+            )}
             <button
               type="button"
-              className={`sc-tab${activeTab === 'evidence' ? ' sc-tab--active' : ''}`}
-              onClick={() => setActiveTab('evidence')}
+              className={`sc-tab${activeTab === 'tlm' ? ' sc-tab--active' : ''}`}
+              onClick={() => setActiveTab('tlm')}
             >
-              <i className="far fa-image" /> Documents
+              <i className="fas fa-book" /> Study material
+              {studyMaterials.length > 0 && (
+                <span className="sc-tab-count">{uploadedStudyCount}/{studyMaterials.length}</span>
+              )}
             </button>
           </nav>
 
@@ -3620,7 +3595,7 @@ const SessionCard = ({
                   <div key={label} className="sc-detail-item">
                     <small>{label}</small>
                     <strong>
-                      <span className={`sc-detail-icon sc-detail-icon--${tone}`}>
+                      <span className={`sc-detail-icon sc-detail-icon--${tone || 'blue'}`}>
                         <i className={`fas ${icon}`} />
                       </span>
                       <span className="sc-detail-value">{value || '-'}</span>
@@ -3643,13 +3618,13 @@ const SessionCard = ({
                 </span>
                 <div>
                   <small>Additional notes</small>
-                  <p>{activeSession.notes || 'No notes added.'}</p>
+                  <p>{pickDetailText(activeSession.notes) === '-' ? 'No notes added.' : activeSession.notes}</p>
                 </div>
               </div>
             </div>
           )}
 
-          {activeTab === 'evidence' && (
+          {totUnlocked && activeTab === 'evidence' && (
             <div className="sc-body">
               {evidenceDocs.length === 0 ? (
                 <div className="sc-evidence-empty">
@@ -3756,10 +3731,105 @@ const SessionCard = ({
             </div>
           )}
 
+          {activeTab === 'tlm' && (
+            <div className="sc-body">
+              <div className="tm-study-head">
+                <strong>Study material</strong>
+                <span>Senior trainer uploaded these documents for you to study before the session.</span>
+              </div>
+              {studyMaterials.length === 0 ? (
+                <div className="sc-evidence-empty">
+                  <i className="far fa-folder-open" />
+                  <p>No study material yet. It will appear here after the senior trainer uploads Standard TLM.</p>
+                </div>
+              ) : (
+                <div className="tm-reg-docs-grid">
+                  {studyMaterials.map((doc) => {
+                    const fileUrl = doc.fileUrl ? getDocFileUrl(doc.fileUrl) : '';
+                    const fileType = getEvidenceFileType(fileUrl, doc.type, doc.fileName);
+                    const hasFile = Boolean(fileUrl);
+                    const uploadDate = formatDocDate(doc.uploadedAt);
+                    const uploadTime = formatDocTime(doc.uploadedAt);
+                    return (
+                      <div key={doc.id} className="tm-reg-doc-card">
+                        <div className="tm-reg-doc-card__preview">
+                          {hasFile ? (
+                            fileType === 'image' && fileUrl ? (
+                              <img src={fileUrl} alt={doc.name} className="tm-reg-doc-card__image" />
+                            ) : fileType === 'pdf' ? (
+                              <div className="tm-reg-doc-card__icon">
+                                <i className="fa-solid fa-file" style={{ fontSize: 100, color: '#dc3545' }} />
+                                <p>PDF Document</p>
+                              </div>
+                            ) : (
+                              <div className="tm-reg-doc-card__icon">
+                                <i className={`fas ${fileType === 'video' ? 'fa-video' : 'fa-file'}`} />
+                                <p>{fileType === 'video' ? 'Video' : 'Document'}</p>
+                              </div>
+                            )
+                          ) : (
+                            <div className="tm-reg-doc-card__empty">
+                              <i className="fas fa-book-open" />
+                              <p>Not uploaded yet</p>
+                            </div>
+                          )}
+                          {hasFile && (
+                            <div className="tm-reg-doc-card__overlay">
+                              <button type="button" className="tm-reg-preview-btn" onClick={() => setSelectedStudyDoc(doc)}>
+                                <i className="fas fa-search-plus" />
+                                Preview
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <div className="tm-reg-doc-card__info">
+                          <div className="tm-reg-doc-card__header">
+                            <h4>{doc.name}</h4>
+                            {hasFile ? (
+                              <button
+                                type="button"
+                                className="tm-reg-pill tm-reg-pill--verify"
+                                onClick={() => setSelectedStudyDoc(doc)}
+                              >
+                                <i className="fas fa-book-open" />
+                                OPEN
+                              </button>
+                            ) : (
+                              <span className="tm-reg-pill tm-reg-pill--wait">Waiting</span>
+                            )}
+                          </div>
+                          <div className="tm-reg-doc-card__meta">
+                            <span>
+                              <i className="fas fa-calendar-alt" />
+                              {uploadDate || 'Not uploaded'}
+                            </span>
+                            {uploadTime && (
+                              <span>
+                                <i className="fas fa-clock" />
+                                {uploadTime}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {selectedStudyDoc && (
+                <DocumentPreviewModal
+                  doc={selectedStudyDoc}
+                  title={selectedStudyDoc.name}
+                  onClose={() => setSelectedStudyDoc(null)}
+                />
+              )}
+            </div>
+          )}
+
           {isCoordinatorPlan && (
             <footer className="sc-foot">
               <span className="sc-foot-note">
-                <i className="fas fa-info-circle" /> Session plan is read-only — manage attendance and documents only.
+                <i className="fas fa-info-circle" /> Session plan is read-only — study the TLM, then manage attendance and documents.
               </span>
             </footer>
           )}
@@ -3801,7 +3871,7 @@ const TrainerModule = () => {
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [attendanceModal, setAttendanceModal] = useState({
     isOpen: false,
-    view: 'register',
+    view: 'summary',
     sessionId: '',
     focusStudentId: '',
   });
@@ -3812,7 +3882,6 @@ const TrainerModule = () => {
   const [attendanceRecordsBySession, setAttendanceRecordsBySession] = useState({});
   const [attendanceSaving, setAttendanceSaving] = useState(false);
   const [studentProfileModal, setStudentProfileModal] = useState({ isOpen: false, student: null });
-  const [performanceModal, setPerformanceModal] = useState({ isOpen: false, draft: null });
   const [referSessionModal, setReferSessionModal] = useState({
     isOpen: false,
     counselorId: '',
@@ -4716,21 +4785,69 @@ const TrainerModule = () => {
     notify(`Session marked ${status}`);
   };
 
-  const markSessionDone = (targetSession, remark) => {
+  const markSessionDone = async (targetSession, remark) => {
     if (!targetSession?.id) return;
-    if (isCoordinatorPlanSession(targetSession)) {
-      notify('Session plan is read-only. Contact Academic Coordinator to update the plan.');
+    const trimmed = String(remark || '').trim();
+    if (!trimmed) {
+      notify('Please enter a remark before submitting.');
       return;
     }
-    setSessions((prev) => {
-      const next = prev.map((item) => (
-        item.id === targetSession.id
-          ? { ...item, status: 'Completed', completionRemark: remark }
-          : item
-      ));
-      persistSessions(next, resolveSessionBatchId(next.find((item) => item.id === targetSession.id), filters.batch));
-      return next;
-    });
+    if (!token) {
+      notify('Please sign in to mark session done');
+      return;
+    }
+    if (
+      !isSessionAttendanceDone(targetSession)
+      && targetSession.status !== 'Completed'
+      && targetSession.workflowStatus !== 'Completed'
+    ) {
+      notify('Save attendance before marking this session done.');
+      return;
+    }
+
+    const applyLocal = (extra = {}) => {
+      const completedAt = extra.completedAt || new Date().toISOString();
+      const completedByName = extra.completedByName || trainerProfile.name || '';
+      persistTrainerSessionDone(targetSession, trimmed, { completedAt, completedByName });
+      setSessions((prev) => {
+        const next = prev.map((item) => (
+          String(item.id) === String(targetSession.id)
+            ? {
+              ...item,
+              status: 'Completed',
+              workflowStatus: item.workflowStatus ? 'Completed' : item.workflowStatus,
+              completionRemark: trimmed,
+              completedAt,
+              completedByName,
+            }
+            : item
+        ));
+        if (!isCoordinatorPlanSession(targetSession)) {
+          persistSessions(
+            next,
+            resolveSessionBatchId(next.find((item) => String(item.id) === String(targetSession.id)), filters.batch)
+          );
+        }
+        return next;
+      });
+    };
+
+    const isDbSession = /^[a-f\d]{24}$/i.test(String(targetSession.id));
+    if (!isDbSession) {
+      applyLocal();
+      notify('Session marked done');
+      return;
+    }
+
+    const response = await axios.post(
+      `${backendUrl}/college/trainer/session-done`,
+      { sessionId: targetSession.id, remark: trimmed },
+      { headers: { 'x-auth': token } }
+    );
+    if (!response.data?.status) {
+      throw new Error(response.data?.message || 'Failed to mark session done');
+    }
+    applyLocal(response.data.data || {});
     notify('Session marked done');
   };
   const uploadEvidenceFile = async (sessionId, docId, file) => {
@@ -4809,29 +4926,48 @@ const TrainerModule = () => {
       notify(error.response?.data?.message || 'Failed to upload document');
     }
   };
-  const openAttendanceModal = (session, view = 'summary') => {
-    const attendanceStudents = students.length
-      ? students
-      : DUMMY_STUDENTS.map((student) => ({ ...student, isDummy: true }));
-
-    if (!attendanceStudents.length) {
-      notify('No students available for attendance.');
+  const openAttendanceModal = async (session, view = 'summary') => {
+    if (!isSessionTotUnlocked(session)) {
+      notify(TOT_LOCK_MESSAGE);
       return;
     }
-
     const meta = getSessionAttendanceMeta(session);
     if (!meta.countable && view === 'summary') {
       notify(meta.label || 'Attendance cannot be marked on Sunday.');
       return;
     }
 
-    const useDummyStatuses = !students.length;
+    const batchId = session?.batch || session?.batchId || filters.batch || '';
+    let attendanceStudents = (students || []).filter((student) => !student.isDummy && !String(student.id).startsWith('ST'));
+
+    if (!attendanceStudents.length && batchId && token) {
+      try {
+        const res = await axios.get(
+          `${backendUrl}/college/trainer/batch-students/${batchId}?page=1&limit=500`,
+          { headers: { 'x-auth': token }, timeout: 15000 }
+        );
+        if (res.data.success && Array.isArray(res.data.data)) {
+          attendanceStudents = res.data.data.map(mapAppliedCourseToStudent);
+          setStudents(attendanceStudents);
+        }
+      } catch (error) {
+        notify(error.response?.data?.message || 'Failed to load batch students');
+        return;
+      }
+    }
+
+    if (!attendanceStudents.length) {
+      notify(batchId
+        ? 'No students are assigned to this batch yet.'
+        : 'This session has no batch. Assign a batch before marking attendance.');
+      return;
+    }
+
     setAttendanceRecordsBySession((prev) => {
-      const existing = prev[session.id];
-      if (existing?.length) return prev;
+      const existing = (prev[session.id] || []).filter((row) => !row.isDummy && !String(row.id).startsWith('ST'));
       return {
         ...prev,
-        [session.id]: createSessionAttendanceRows(session, attendanceStudents, existing, { useDummyStatuses }),
+        [session.id]: createSessionAttendanceRows(session, attendanceStudents, existing),
       };
     });
     setAttendanceModal({
@@ -4839,7 +4975,7 @@ const TrainerModule = () => {
       view: view === 'register' ? 'register' : 'summary',
       sessionId: session.id,
       focusStudentId: '',
-      usingDummyStudents: useDummyStatuses,
+      usingDummyStudents: false,
     });
   };
 
@@ -4863,42 +4999,6 @@ const TrainerModule = () => {
   const closeStudentProfile = () => {
     setStudentProfileModal({ isOpen: false, student: null });
   };
-  const openPerformanceModal = (student) => {
-    setPerformanceModal({ isOpen: true, draft: createPerformanceDraft(student) });
-  };
-  const closePerformanceModal = () => {
-    setPerformanceModal({ isOpen: false, draft: null });
-  };
-  const updatePerformanceDraft = (field, value) => {
-    setPerformanceModal((prev) => (
-      prev.draft ? { ...prev, draft: { ...prev.draft, [field]: value } } : prev
-    ));
-  };
-  const savePerformanceDraft = () => {
-    const { draft } = performanceModal;
-    if (!draft?.studentId) return;
-
-    const updatedPerformance = {
-      participationScore: clampScore(draft.participationScore),
-      engagementScore: clampScore(draft.engagementScore),
-      assessmentScore: clampScore(draft.assessmentScore),
-      practicalScore: clampScore(draft.practicalScore),
-      trainerRemark: draft.trainerRemark.trim(),
-    };
-
-    setStudents((prev) => prev.map((student) => (
-      student.id === draft.studentId ? { ...student, ...updatedPerformance } : student
-    )));
-
-    setStudentProfileModal((prev) => (
-      prev.isOpen && prev.student?.id === draft.studentId
-        ? { ...prev, student: { ...prev.student, ...updatedPerformance } }
-        : prev
-    ));
-
-    notify(`Performance saved for ${draft.studentName}`);
-    closePerformanceModal();
-  };
   const setAttendanceView = (view) => {
     setAttendanceModal((prev) => ({ ...prev, view }));
   };
@@ -4916,6 +5016,16 @@ const TrainerModule = () => {
       return;
     }
 
+    if (attendanceModal.usingDummyStudents || attendanceRows.some((row) => row.isDummy)) {
+      notify('Load the batch students before saving attendance.');
+      return;
+    }
+
+    if (!token) {
+      notify('Please sign in to save attendance');
+      return;
+    }
+
     setAttendanceSaving(true);
     try {
       const response = await axios.post(
@@ -4923,68 +5033,56 @@ const TrainerModule = () => {
         {
           sessionId: attendanceModal.sessionId,
           rows: attendanceRows.map((row) => ({
-            appliedCourseId: row.id,
+            appliedCourseId: row.appliedCourseId || row.id,
             status: row.status,
             remarks: row.remarks || '',
           })),
         },
-        { headers: { 'x-auth': token }}
+        { headers: { 'x-auth': token } }
       );
 
       if (!response.data?.status) {
         throw new Error(response.data?.message || 'Failed to save attendance');
       }
 
-      const savedRows = response.data.data?.rows || attendanceRows;
+      const savedRows = response.data.data?.rows || [];
       const savedSession = response.data.data?.session;
+      const savedById = new Map(
+        savedRows.map((row) => [String(row.appliedCourseId || row.id), row])
+      );
 
       setAttendanceRecordsBySession((prev) => ({
         ...prev,
-        [attendanceModal.sessionId]: savedRows.map((row) => ({
-          id: row.appliedCourseId || row.id,
-          name: row.name,
-          mobile: row.mobile || '-',
-          status: row.status || 'Not Marked',
-          remarks: row.remarks || '',
-          attendancePercent: '-',
-        })),
+        [attendanceModal.sessionId]: attendanceRows.map((row) => {
+          const saved = savedById.get(String(row.appliedCourseId || row.id));
+          return {
+            ...row,
+            status: saved?.status || 'Not Marked',
+            remarks: saved?.remarks || '',
+          };
+        }),
       }));
 
-      if (savedSession) {
-        setSessions((prev) => prev.map((session) => (
-          session.id === attendanceModal.sessionId
-            ? mapApiSessionToClient(savedSession, {
-              batch: filters.batch,
-              courseTrade: activeBasicDetails.courseTrade,
-              batchCode: activeBasicDetails.batchCode,
-              departmentName: activeBasicDetails.departmentName,
-              projectName: activeBasicDetails.projectName,
-              centerName: activeBasicDetails.centerName,
-              trainerName: trainerProfile.name,
-            })
-            : session
-        )));
-      } else {
-        const stats = summarizeAttendanceRows(attendanceRows);
-        setSessions((prev) => {
-          const next = prev.map((session) => (
-            session.id === attendanceModal.sessionId
-              ? {
-                ...session,
-                totalCandidates: String(stats.total),
-                presentCandidates: String(stats.present),
-                absentCandidates: String(stats.absent),
-                attendance: `${stats.attendance}%`,
-              }
-              : session
-          ));
-          persistSessions(
-            next,
-            resolveSessionBatchId(next.find((session) => session.id === attendanceModal.sessionId), filters.batch)
-          );
-          return next;
-        });
-      }
+      const stats = savedSession
+        ? {
+          total: savedSession.totalCandidates ?? savedSession.studentCount ?? attendanceRows.length,
+          present: savedSession.presentCandidates ?? 0,
+          absent: savedSession.absentCandidates ?? 0,
+          attendance: savedSession.attendancePercent ?? 0,
+        }
+        : summarizeAttendanceRows(attendanceRows);
+
+      setSessions((prev) => prev.map((session) => (
+        String(session.id) === String(attendanceModal.sessionId)
+          ? {
+            ...session,
+            totalCandidates: String(stats.total),
+            presentCandidates: String(stats.present),
+            absentCandidates: String(stats.absent),
+            attendance: `${stats.attendance}%`,
+          }
+          : session
+      )));
 
       notify('Attendance saved');
       closeAttendanceModal();
@@ -5144,7 +5242,7 @@ const TrainerModule = () => {
               </div>
               <div>
                 <h3>Student Overview</h3>
-                <p>Track attendance and performance for enrolled candidates</p>
+                <p>Track attendance for enrolled candidates</p>
               </div>
             </div>
             
@@ -5161,7 +5259,6 @@ const TrainerModule = () => {
               attendanceRecordsBySession={attendanceRecordsBySession}
               onView={openStudentProfile}
               onAttendance={openStudentAttendanceRegister}
-              onAddPerformance={openPerformanceModal}
             />
           )}
             </>
@@ -5223,17 +5320,7 @@ const TrainerModule = () => {
           attendanceRecordsBySession={attendanceRecordsBySession}
           basicDetails={activeBasicDetails}
           onClose={closeStudentProfile}
-          onEditPerformance={openPerformanceModal}
           onOpenAttendance={openStudentAttendanceRegister}
-        />
-      )}
-
-      {performanceModal.isOpen && performanceModal.draft && (
-        <StudentPerformanceModal
-          draft={performanceModal.draft}
-          onClose={closePerformanceModal}
-          onSave={savePerformanceDraft}
-          onFieldChange={updatePerformanceDraft}
         />
       )}
 
@@ -5255,10 +5342,11 @@ const TrainerModule = () => {
         />
       )}
 
-      {toast && (
+      {toast && createPortal(
         <div className="dbr-toast">
           <i className="fas fa-check-circle me-2" />{toast}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -5561,7 +5649,6 @@ const PORTAL_CSS = `
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .st-card__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .st-card__actions .st-card__btn--performance { grid-column: 1 / -1; }
   .st-card__btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     border-radius: 10px; padding: 9px 10px; font-size: 11px; font-weight: 800;
@@ -5571,12 +5658,6 @@ const PORTAL_CSS = `
   .st-card__btn--primary:hover { filter: brightness(0.96); transform: translateY(-1px); }
   .st-card__btn--ghost { background: #fff; color: ${BLUE}; border-color: rgba(37,99,235,0.2); }
   .st-card__btn--ghost:hover { background: #eff6ff; transform: translateY(-1px); }
-  .st-card__btn--performance {
-    background: linear-gradient(90deg, #db2777, ${PINK});
-    color: #fff;
-    border-color: ${PINK};
-  }
-  .st-card__btn--performance:hover { filter: brightness(0.96); transform: translateY(-1px); }
 
   .st-student-table-wrap {
     overflow-x: auto; margin-bottom: 14px;
@@ -5621,40 +5702,6 @@ const PORTAL_CSS = `
   .st-table-btn--primary { background: ${PINK}; color: #fff; border-color: ${PINK}; }
   .st-table-btn--ghost { background: #fff; color: ${BLUE}; border-color: rgba(37,99,235,0.2); }
   .st-table-btn--ghost:hover { background: #eff6ff; }
-  .st-table-btn--performance { background: linear-gradient(90deg, #db2777, ${PINK}); color: #fff; border-color: ${PINK}; }
-
-  /* Student performance form modal */
-  .st-perf-backdrop {
-    position: fixed; inset: 0; z-index: 10000;
-    background: rgba(15,23,42,0.55);
-    display: flex; align-items: center; justify-content: center;
-    padding: 20px;
-  }
-  .st-perf-modal {
-    width: min(760px, 100%);
-    max-height: calc(100vh - 40px);
-    background: #fff;
-    border-radius: 16px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 30px 80px rgba(15,23,42,0.28);
-  }
-  .st-perf-modal__head,
-  .st-perf-modal__foot {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    padding: 16px 18px; border-bottom: 1px solid #e2e8f0;
-  }
-  .st-perf-modal__foot { border-top: 1px solid #e2e8f0; border-bottom: 0; justify-content: flex-end; }
-  .st-perf-modal__head h5 { margin: 0; font-size: 18px; font-weight: 900; color: #0f172a; }
-  .st-perf-modal__head span { color: #64748b; font-size: 12px; font-weight: 800; }
-  .st-perf-modal__body { overflow-y: auto; padding: 18px; }
-  .st-perf-modal__hint {
-    margin: 0 0 14px; padding: 12px 14px; border-radius: 10px;
-    background: #fff5f7; border: 1px solid #fbcfe8;
-    color: #64748b; font-size: 12px; font-weight: 600;
-  }
-  .st-perf-modal__body .session-field span i { margin-right: 6px; color: ${PINK}; }
 
   /* Refer session modal */
   .st-refer-backdrop {
@@ -5761,7 +5808,7 @@ const PORTAL_CSS = `
     padding: 14px 20px; border-top: 1px solid #e2e8f0; background: #fafbfc;
   }
   .st-profile-stats {
-    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px;
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px;
   }
   .st-profile-stat {
     display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px;
@@ -5800,28 +5847,6 @@ const PORTAL_CSS = `
   .st-profile-info-item strong {
     display: block; font-size: 13px; font-weight: 800; color: #0f172a;
     word-break: break-word;
-  }
-  .st-profile-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  .st-profile-metric {
-    background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px;
-  }
-  .st-profile-metric__head {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    margin-bottom: 8px; font-size: 12px; font-weight: 800; color: #334155;
-  }
-  .st-profile-metric__head span { display: inline-flex; align-items: center; gap: 8px; }
-  .st-profile-metric__icon {
-    width: 28px; height: 28px; border-radius: 8px;
-    display: inline-flex; align-items: center; justify-content: center; font-size: 11px;
-  }
-  .st-profile-metric__icon--blue  { background: #dbeafe; color: #1d4ed8; }
-  .st-profile-metric__icon--pink  { background: #fce7f3; color: ${PINK}; }
-  .st-profile-metric__icon--green { background: #d1fae5; color: #059669; }
-  .st-profile-metric__icon--amber { background: #fef3c7; color: #d97706; }
-  .st-profile-remark {
-    margin: 0; padding: 14px 16px; border-radius: 12px;
-    background: #fff5f7; border: 1px solid #fbcfe8;
-    color: #475569; font-size: 13px; line-height: 1.55;
   }
   .st-profile-table-wrap {
     border: 1px solid #e2e8f0; border-radius: 12px; overflow: auto;
@@ -5898,7 +5923,7 @@ const PORTAL_CSS = `
   .dbr-section-card { position: relative; background: #fff; border: 1px solid #dee2e6; border-radius: 10px; padding: 20px 16px 16px; }
   .dbr-section-card__label { position: absolute; top: -10px; left: 14px; background: #fff; padding: 0 8px; font-size: 13px; font-weight: 700; color: #334155; }
   .dbr-points-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-  .dbr-toast { position: fixed; bottom: 20px; right: 20px; background: #1e293b; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 600; z-index: 500; display: flex; align-items: center; gap: 8px; }
+  .dbr-toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #1e293b; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 600; z-index: 11000; display: flex; align-items: center; gap: 8px; box-shadow: 0 12px 32px rgba(15,23,42,0.28); }
   .me-2 { margin-right: 8px; }
   .mt-2 { margin-top: 8px; }
   .mt-3 { margin-top: 12px; }
@@ -6587,6 +6612,10 @@ const PORTAL_CSS = `
     background: rgba(255,255,255,0.16);
     box-shadow: inset 0 -1px 0 rgba(255,255,255,0.16);
   }
+  .sc-stat--locked {
+    opacity: 0.55;
+    filter: grayscale(0.35);
+  }
   .sc-stat__icon {
     width: 20px; height: 20px; border-radius: 6px;
     display: flex; align-items: center; justify-content: center;
@@ -6636,7 +6665,11 @@ const PORTAL_CSS = `
   .sc-detail-value {
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    white-space: normal;
+    word-break: break-word;
     min-width: 0;
   }
   .sc-detail-icon {
@@ -6852,6 +6885,28 @@ const PORTAL_CSS = `
     background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
     color: #c62828;
     box-shadow: 0 3px 10px rgba(255, 154, 158, 0.4);
+  }
+  .tm-reg-pill--wait {
+    background: #f1f5f9;
+    color: #64748b;
+    box-shadow: none;
+  }
+  .tm-study-head {
+    margin-bottom: 12px;
+  }
+  .tm-study-head strong {
+    display: block;
+    font-size: 13px;
+    font-weight: 800;
+    color: #0f172a;
+  }
+  .tm-study-head span {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
+    line-height: 1.4;
   }
   .tm-reg-doc-card__meta {
     display: flex;
@@ -7147,6 +7202,11 @@ const PORTAL_CSS = `
     opacity: 0.45;
     cursor: not-allowed;
   }
+  .sc-actions-item:disabled:hover {
+    background: none;
+    color: #334155;
+  }
+  .sc-actions-item:disabled i { color: #94a3b8; }
   .sc-actions-item i { width: 16px; color: ${BLUE}; }
   .sc-btn {
     display: inline-flex; align-items: center; gap: 7px;
@@ -8198,7 +8258,7 @@ const PORTAL_CSS = `
   .dbr-section-card { position: relative; background: #fff; border: 1px solid #dee2e6; border-radius: 10px; padding: 20px 16px 16px; }
   .dbr-section-card__label { position: absolute; top: -10px; left: 14px; background: #fff; padding: 0 8px; font-size: 13px; font-weight: 700; color: #334155; }
   .dbr-points-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-  .dbr-toast { position: fixed; bottom: 20px; right: 20px; background: #1e293b; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 600; z-index: 200; display: flex; align-items: center; gap: 8px; }
+  .dbr-toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #1e293b; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 600; z-index: 11000; display: flex; align-items: center; gap: 8px; box-shadow: 0 12px 32px rgba(15,23,42,0.28); }
   .me-2 { margin-right: 8px; }
   .mt-2 { margin-top: 8px; }
   .mt-3 { margin-top: 12px; }
@@ -8229,11 +8289,8 @@ const PORTAL_CSS = `
     .st-card__actions { grid-template-columns: 1fr; }
     .st-profile-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .st-profile-info-grid { grid-template-columns: 1fr; }
-    .st-profile-metrics { grid-template-columns: 1fr; }
     .st-profile-backdrop { padding: 10px; align-items: flex-start; }
     .st-profile-modal { max-height: calc(100vh - 20px); }
-    .st-perf-backdrop { padding: 10px; align-items: flex-start; }
-    .st-perf-modal { max-height: calc(100vh - 20px); }
     .st-refer-backdrop { padding: 10px; align-items: flex-start; }
     .st-refer-modal { max-height: calc(100vh - 20px); }
     .dbr-filter-pill { max-width: 100%; }

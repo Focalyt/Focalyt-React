@@ -43,6 +43,11 @@ const trainingSessionSchema = new Schema(
 
     trainer: { type: ObjectId, ref: 'User' },
     createdBy: { type: ObjectId, ref: 'User' },
+    status: { type: String, trim: true, default: 'Pending' },
+    completionRemark: { type: String, default: '' },
+    completedAt: { type: Date, default: null },
+    completedBy: { type: ObjectId, ref: 'User', default: null },
+    completedByName: { type: String, default: '' },
   },
   { timestamps: true }
 );
