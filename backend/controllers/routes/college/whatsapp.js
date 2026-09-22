@@ -3,7 +3,7 @@ const router = express.Router();
 const axios = require('axios');
 const uuid = require('uuid/v1');
 const multer = require('multer');
-const { College, WhatsAppMessage, WhatsAppTemplate, Candidate, CandidateProfile, AppliedCourses, Courses, DripMarketingJob, Lead } = require('../../models');
+const { College, WhatsAppMessage, WhatsAppTemplate, Candidate, CandidateProfile, AppliedCourses, Courses, DripMarketingJob, Lead, Vertical } = require('../../models');
 const B2BDepartment = require('../../models/b2b/b2bDepartment');
 const { isCollege } = require('../../../helpers');
 const mongoose = require('mongoose');
@@ -136,14 +136,25 @@ router.get('/templates', [isCollege], async (req, res) => {
 							template.carouselMedia = dbTemplate.carouselMedia;
 						}
 
-						// Department-wise metadata from local DB
+						// Department/vertical metadata from local DB
 						if (dbTemplate.b2bDepartment) {
 							template.b2bDepartment = dbTemplate.b2bDepartment;
+							template.departmentType = 'b2b';
 							try {
 								const dept = await B2BDepartment.findById(dbTemplate.b2bDepartment).select('name isActive').lean();
 								if (dept) {
 									template.b2bDepartmentName = dept.name;
 									template.b2bDepartmentDetails = dept;
+								}
+							} catch (_) { /* ignore */ }
+						}
+						if (dbTemplate.vertical) {
+							template.vertical = dbTemplate.vertical;
+							template.departmentType = 'b2c';
+							try {
+								const vert = await Vertical.findById(dbTemplate.vertical).select('name status').lean();
+								if (vert) {
+									template.verticalName = vert.name;
 								}
 							} catch (_) { /* ignore */ }
 						}
@@ -194,10 +205,16 @@ router.get('/templates', [isCollege], async (req, res) => {
 		});
 
 		let data = templatesWithMedia;
-		const departmentFilter = req.query.b2bDepartment || req.query.department;
+		const departmentFilter = req.query.b2bDepartment || req.query.department || req.query.vertical;
 		if (departmentFilter && mongoose.Types.ObjectId.isValid(departmentFilter)) {
 			const deptId = String(departmentFilter);
-			data = templatesWithMedia.filter((t) => String(t.b2bDepartment || '') === deptId);
+			data = data.filter((t) => String(t.b2bDepartment || '') === deptId || String(t.vertical || '') === deptId);
+		}
+		const leadType = String(req.query.leadType || '').toLowerCase();
+		if (leadType === 'b2b') {
+			data = data.filter((t) => t.b2bDepartment && !t.vertical);
+		} else if (leadType === 'b2c') {
+			data = data.filter((t) => t.vertical && !t.b2bDepartment);
 		}
 
 		res.json({
@@ -279,10 +296,7 @@ router.post('/sync-templates', isCollege, async (req, res) => {
 // Create WhatsApp template
 router.post('/create-template', isCollege, upload.array('file', 5), async (req, res) => {
 	try {
-		const { name, language, category, components, base64File, carouselFiles, b2bDepartment } = req.body;
-
-   
-	
+		const { name, language, category, components, base64File, carouselFiles, b2bDepartment, vertical } = req.body;
 
 		// Validate required fields
 		if (!name || !language || !category || !components) {
@@ -292,19 +306,42 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 			});
 		}
 
-		if (!b2bDepartment || !mongoose.Types.ObjectId.isValid(b2bDepartment)) {
+		const hasB2bDepartment = Boolean(b2bDepartment && mongoose.Types.ObjectId.isValid(b2bDepartment));
+		const hasVertical = Boolean(vertical && mongoose.Types.ObjectId.isValid(vertical));
+
+		if (hasB2bDepartment && hasVertical) {
 			return res.status(400).json({
 				success: false,
-				message: 'Valid B2B department is required'
+				message: 'Select either a B2B department or a B2C vertical, not both'
 			});
 		}
 
-		const departmentDoc = await B2BDepartment.findById(b2bDepartment).select('_id name isActive');
-		if (!departmentDoc || departmentDoc.isActive === false) {
+		if (!hasB2bDepartment && !hasVertical) {
 			return res.status(400).json({
 				success: false,
-				message: 'B2B department not found or inactive'
+				message: 'Valid B2B department or B2C vertical is required'
 			});
+		}
+
+		let departmentDoc = null;
+		let verticalDoc = null;
+
+		if (hasB2bDepartment) {
+			departmentDoc = await B2BDepartment.findById(b2bDepartment).select('_id name isActive');
+			if (!departmentDoc || departmentDoc.isActive === false) {
+				return res.status(400).json({
+					success: false,
+					message: 'B2B department not found or inactive'
+				});
+			}
+		} else {
+			verticalDoc = await Vertical.findById(vertical).select('_id name status');
+			if (!verticalDoc || verticalDoc.status === false) {
+				return res.status(400).json({
+					success: false,
+					message: 'B2C vertical not found or inactive'
+				});
+			}
 		}
 
 		// Validate category
@@ -897,7 +934,8 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 					carouselMedia: savedCarouselMedia,
 					headerMedia: savedHeaderMedia, // Save header media
 					variableMappings: variableMappings, // Save variable mappings
-					b2bDepartment: departmentDoc._id,
+					b2bDepartment: departmentDoc?._id || null,
+					vertical: verticalDoc?._id || null,
 				};
 
 				const templateDoc = await WhatsAppTemplate.findOneAndUpdate(
@@ -906,7 +944,7 @@ router.post('/create-template', isCollege, upload.array('file', 5), async (req, 
 					{ upsert: true, new: true, setDefaultsOnInsert: true }
 				);
 				
-				console.log(`✓ Template metadata saved to database: ${templateDoc._id} (department: ${departmentDoc.name})`);
+				console.log(`✓ Template metadata saved to database: ${templateDoc._id} (${departmentDoc ? `department: ${departmentDoc.name}` : `vertical: ${verticalDoc.name}`})`);
 				if (savedHeaderMedia) {
 					console.log(`  - Header media: ${savedHeaderMedia.mediaType} at ${savedHeaderMedia.s3Url}`);
 				}
@@ -4557,7 +4595,145 @@ function previewFromWhatsappMessage(msg) {
 	return text || 'Message';
 }
 
+function escapeRegex(value) {
+	return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+async function findLeadsByPhones(collegeId, phoneKeys) {
+	const uniquePhones = [...new Set((phoneKeys || []).filter(Boolean))];
+	if (!uniquePhones.length) return new Map();
+
+	const variants = [...new Set(uniquePhones.flatMap((phone) => phoneMatchVariants(phone)))];
+	const leads = await Lead.find({
+		$or: [
+			{ mobile: { $in: variants } },
+			{ whatsapp: { $in: variants } }
+		]
+	})
+		.select('concernPersonName businessName mobile whatsapp email city state designation leadOwner createdAt updatedAt')
+		.sort({ updatedAt: -1 })
+		.limit(Math.max(uniquePhones.length * 3, 50))
+		.lean();
+
+	const leadByPhone = new Map();
+	leads.forEach((lead) => {
+		const keys = [last10PhoneDigits(lead.whatsapp), last10PhoneDigits(lead.mobile)].filter(Boolean);
+		keys.forEach((key) => {
+			if (!leadByPhone.has(key)) leadByPhone.set(key, lead);
+		});
+	});
+	return leadByPhone;
+}
+
+async function findLeadPhonesBySearch(collegeId, search) {
+	const q = String(search || '').trim();
+	if (!q) return [];
+
+	const college = await College.findById(collegeId).select('_concernPerson').lean();
+	const concernIds = (college?._concernPerson || []).map((p) => p?._id).filter(Boolean);
+	const leadQuery = {
+		$or: [
+			{ concernPersonName: { $regex: escapeRegex(q), $options: 'i' } },
+			{ businessName: { $regex: escapeRegex(q), $options: 'i' } }
+		]
+	};
+	if (concernIds.length) {
+		leadQuery.$and = [{
+			$or: [
+				{ leadAddedBy: { $in: concernIds } },
+				{ leadOwner: { $in: concernIds } },
+				{ leadCoOwner: { $in: concernIds } }
+			]
+		}];
+	}
+
+	const leads = await Lead.find(leadQuery)
+		.select('mobile whatsapp')
+		.limit(200)
+		.lean();
+
+	return [...new Set(leads.flatMap((lead) => (
+		[last10PhoneDigits(lead.whatsapp), last10PhoneDigits(lead.mobile)].filter((key) => key && key.length === 10)
+	)))];
+}
+
+function conversationPhoneKey(doc) {
+	const raw = doc?.direction === 'incoming' ? doc?.from : doc?.to;
+	const key = last10PhoneDigits(raw);
+	return key && key.length === 10 ? key : '';
+}
+
+async function findRecentWhatsappMessages(collegeObjectId, fetchLimit) {
+	const query = {
+		collegeId: collegeObjectId
+	};
+	const finder = () => WhatsAppMessage.find(query)
+		.select('from to direction sentAt message messageType status')
+		.sort({ sentAt: -1 })
+		.limit(fetchLimit)
+		.lean();
+
+	try {
+		return await finder().hint({ collegeId: 1, sentAt: -1 });
+	} catch (error) {
+		console.warn('WhatsApp conversations index hint skipped:', error.message);
+		return finder();
+	}
+}
+
+async function unreadCountsByPhones(collegeId, phoneKeys) {
+	const fromVariants = [...new Set((phoneKeys || []).flatMap((phone) => phoneMatchVariants(phone)))];
+	if (!fromVariants.length) return new Map();
+
+	const rows = await WhatsAppMessage.aggregate([
+		{
+			$match: {
+				collegeId: new mongoose.Types.ObjectId(collegeId),
+				direction: 'incoming',
+				from: { $in: fromVariants },
+				$or: [{ readAt: null }, { readAt: { $exists: false } }]
+			}
+		},
+		{ $group: { _id: '$from', count: { $sum: 1 } } }
+	]);
+
+	const unreadByPhone = new Map();
+	rows.forEach((row) => {
+		const key = last10PhoneDigits(row._id);
+		if (!key) return;
+		unreadByPhone.set(key, (unreadByPhone.get(key) || 0) + (row.count || 0));
+	});
+	return unreadByPhone;
+}
+
+function mapConversationRows(conversations, leadByPhone, unreadByPhone) {
+	return conversations.map((conv) => {
+		const last = {
+			message: conv.lastText,
+			direction: conv.lastDirection,
+			messageType: conv.lastMessageType,
+			sentAt: conv.lastMessageAt,
+			status: conv.lastStatus
+		};
+		return {
+			phone: conv._id,
+			unreadCount: unreadByPhone.get(conv._id) || 0,
+			lastMessageAt: conv.lastMessageAt,
+			lastMessage: {
+				text: previewFromWhatsappMessage(last),
+				rawText: conv.lastText || '',
+				direction: conv.lastDirection || 'outgoing',
+				messageType: conv.lastMessageType || 'text',
+				sentAt: conv.lastMessageAt,
+				status: conv.lastStatus || (conv.lastDirection === 'incoming' ? 'received' : 'sent')
+			},
+			lead: leadByPhone.get(conv._id) || null
+		};
+	});
+}
+
 router.get('/conversations', [isCollege], async (req, res) => {
+	const startedAt = Date.now();
 	try {
 		const collegeId = req.collegeId || req.college?._id || req.user?.college?._id;
 		if (!collegeId) {
@@ -4568,178 +4744,73 @@ router.get('/conversations', [isCollege], async (req, res) => {
 		const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 80, 1), 200);
 		const search = String(req.query.search || '').trim();
 		const unreadOnly = String(req.query.unreadOnly || '') === 'true';
+		const skip = (page - 1) * limit;
+		const searchDigits = search.replace(/\D/g, '');
+		const collegeObjectId = new mongoose.Types.ObjectId(collegeId);
+		const needed = skip + limit + 1;
+		const fetchLimit = search ? 1200 : Math.min(800, Math.max(needed * 3, 250));
 
-		const conversations = await WhatsAppMessage.aggregate([
-			{ $match: { collegeId: new mongoose.Types.ObjectId(collegeId) } },
-			{
-				$addFields: {
-					contactRaw: {
-						$toString: {
-							$cond: [
-								{ $eq: ['$direction', 'incoming'] },
-								{ $ifNull: ['$from', ''] },
-								{ $ifNull: ['$to', ''] }
-							]
-						}
-					}
-				}
-			},
-			{
-				$addFields: {
-					phoneDigits: {
-						$replaceAll: {
-							input: {
-								$replaceAll: {
-									input: {
-										$replaceAll: {
-											input: '$contactRaw',
-											find: '+',
-											replacement: ''
-										}
-									},
-									find: ' ',
-									replacement: ''
-								}
-							},
-							find: '-',
-							replacement: ''
-						}
-					}
-				}
-			},
-			{
-				$addFields: {
-					phoneKey: {
-						$cond: [
-							{ $gte: [{ $strLenCP: '$phoneDigits' }, 10] },
-							{
-								$substrCP: [
-									'$phoneDigits',
-									{ $subtract: [{ $strLenCP: '$phoneDigits' }, 10] },
-									10
-								]
-							},
-							'$phoneDigits'
-						]
-					}
-				}
-			},
-			{ $match: { phoneKey: { $regex: /^\d{10}$/ } } },
-			{ $sort: { sentAt: -1 } },
-			{
-				$group: {
-					_id: '$phoneKey',
-					lastMessage: { $first: '$$ROOT' },
-					lastMessageAt: { $first: '$sentAt' },
-					unreadCount: {
-						$sum: {
-							$cond: [
-								{
-									$and: [
-										{ $eq: ['$direction', 'incoming'] },
-										{
-											$or: [
-												{ $eq: ['$readAt', null] },
-												{ $eq: [{ $type: '$readAt' }, 'missing'] }
-											]
-										}
-									]
-								},
-								1,
-								0
-							]
-						}
-					}
-				}
-			},
-			{ $sort: { lastMessageAt: -1 } }
-		]);
+		const tFind = Date.now();
+		const messages = await findRecentWhatsappMessages(collegeObjectId, fetchLimit);
+		const findMs = Date.now() - tFind;
 
-		const phoneKeys = conversations.map((c) => c._id).filter(Boolean);
-		const phoneOr = [];
-		phoneKeys.forEach((phone) => {
-			phoneMatchVariants(phone).forEach((variant) => {
-				phoneOr.push({ mobile: variant });
-				phoneOr.push({ whatsapp: variant });
+		const ordered = [];
+		const seen = new Set();
+		for (const msg of messages) {
+			const phone = conversationPhoneKey(msg);
+			if (!phone || seen.has(phone)) continue;
+			seen.add(phone);
+			ordered.push({
+				_id: phone,
+				lastMessageAt: msg.sentAt,
+				lastText: msg.message,
+				lastDirection: msg.direction,
+				lastMessageType: msg.messageType,
+				lastStatus: msg.status
 			});
-		});
-
-		const leadByPhone = new Map();
-		if (phoneOr.length) {
-			const college = await College.findById(collegeId).select('_concernPerson').lean();
-			const concernIds = (college?._concernPerson || []).map((p) => p?._id).filter(Boolean);
-			const leadQuery = { $or: phoneOr };
-			if (concernIds.length) {
-				leadQuery.$and = [{
-					$or: [
-						{ leadAddedBy: { $in: concernIds } },
-						{ leadOwner: { $in: concernIds } },
-						{ leadCoOwner: { $in: concernIds } }
-					]
-				}];
-			}
-			const leads = await Lead.find(leadQuery)
-				.select('concernPersonName businessName mobile whatsapp email city state designation leadOwner createdAt updatedAt')
-				.sort({ updatedAt: -1 })
-				.lean();
-
-			leads.forEach((lead) => {
-				const keys = [last10PhoneDigits(lead.whatsapp), last10PhoneDigits(lead.mobile)].filter(Boolean);
-				keys.forEach((key) => {
-					if (!leadByPhone.has(key)) leadByPhone.set(key, lead);
-				});
-			});
+			if (!search && !unreadOnly && ordered.length >= needed) break;
 		}
 
-		let rows = conversations.map((conv) => {
-			const phone = conv._id;
-			const last = conv.lastMessage || {};
-			const lead = leadByPhone.get(phone) || null;
-			return {
-				phone,
-				unreadCount: conv.unreadCount || 0,
-				lastMessageAt: conv.lastMessageAt,
-				lastMessage: {
-					text: previewFromWhatsappMessage(last),
-					rawText: last.message || '',
-					direction: last.direction || 'outgoing',
-					messageType: last.messageType || 'text',
-					sentAt: last.sentAt || conv.lastMessageAt,
-					status: last.status || (last.direction === 'incoming' ? 'received' : 'sent')
-				},
-				lead
-			};
-		});
-
-		if (unreadOnly) {
-			rows = rows.filter((row) => row.unreadCount > 0);
-		}
-
+		let rows = ordered;
 		if (search) {
 			const q = search.toLowerCase();
-			const qDigits = search.replace(/\D/g, '');
-			rows = rows.filter((row) => {
-				const name = String(row.lead?.concernPersonName || '').toLowerCase();
-				const biz = String(row.lead?.businessName || '').toLowerCase();
-				const preview = String(row.lastMessage?.text || '').toLowerCase();
-				const phone = String(row.phone || '');
-				return name.includes(q)
-					|| biz.includes(q)
-					|| preview.includes(q)
-					|| (qDigits && phone.includes(qDigits));
+			const leadPhones = !searchDigits
+				? new Set(await findLeadPhonesBySearch(collegeId, search))
+				: new Set();
+			rows = ordered.filter((row) => {
+				const phone = String(row._id || '');
+				const preview = String(row.lastText || '').toLowerCase();
+				return (searchDigits && phone.includes(searchDigits))
+					|| leadPhones.has(phone)
+					|| preview.includes(q);
 			});
 		}
 
-		const total = rows.length;
-		const start = (page - 1) * limit;
-		const paged = rows.slice(start, start + limit);
+		const hasMore = rows.length > skip + limit;
+		const conversations = rows.slice(skip, skip + limit);
+		const phones = conversations.map((c) => c._id);
+
+		const tJoin = Date.now();
+		const [leadByPhone, unreadByPhone] = await Promise.all([
+			findLeadsByPhones(collegeId, phones),
+			unreadCountsByPhones(collegeId, phones)
+		]);
+		const joinMs = Date.now() - tJoin;
+
+		let paged = mapConversationRows(conversations, leadByPhone, unreadByPhone);
+		if (unreadOnly) {
+			paged = paged.filter((row) => row.unreadCount > 0);
+		}
+
+		const total = skip + paged.length + (hasMore ? 1 : 0);
+		console.log(`WhatsApp conversations fetched in ${Date.now() - startedAt}ms find=${findMs}ms join=${joinMs}ms scanned=${messages.length} unique=${ordered.length} rows=${paged.length}`);
 
 		return res.json({
 			success: true,
 			data: paged,
 			pagination: {
 				currentPage: page,
-				totalPages: Math.max(Math.ceil(total / limit), 1),
+				totalPages: Math.max(page + (hasMore ? 1 : 0), 1),
 				total,
 				limit
 			}

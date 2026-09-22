@@ -165,6 +165,9 @@ const B2BLeadSchema = new mongoose.Schema({
   timestamps: true // adds createdAt and updatedAt
 });
 
+B2BLeadSchema.index({ mobile: 1 });
+B2BLeadSchema.index({ whatsapp: 1 });
+
 B2BLeadSchema.statics.normalizeApproval = normalizeB2BApproval;
 B2BLeadSchema.statics.approvalNeedsRepair = approvalNeedsRepair;
 

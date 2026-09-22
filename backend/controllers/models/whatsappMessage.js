@@ -88,6 +88,7 @@ const whatsappMessageSchema = new mongoose.Schema({
 });
 
 // Index for better query performance
+whatsappMessageSchema.index({ collegeId: 1, sentAt: -1 });
 whatsappMessageSchema.index({ collegeId: 1, to: 1, sentAt: -1 });
 whatsappMessageSchema.index({ collegeId: 1, from: 1, sentAt: -1 });
 whatsappMessageSchema.index({ from: 1, sentAt: -1 });

@@ -5241,27 +5241,46 @@ const WhatsApp = () => {
     });
   }, []);
 
+  const conversationsRequestRef = useRef(0);
+  const conversationsInFlightRef = useRef(false);
+  const conversationsAbortRef = useRef(null);
+
   const fetchWhatsappConversations = useCallback(async (page = 1, search = '', silent = false) => {
     if (!token) return;
+    if (silent && conversationsInFlightRef.current) return;
+    if (conversationsAbortRef.current) {
+      conversationsAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    conversationsAbortRef.current = controller;
+    const requestId = ++conversationsRequestRef.current;
+    conversationsInFlightRef.current = true;
     try {
       if (!silent) setLoadingConversations(true);
       const response = await axios.get(`${backendUrl}/college/whatsapp/conversations`, {
         headers: { 'x-auth': token },
+        signal: controller.signal,
         params: {
           page,
           limit: 80,
           search: search || undefined
         }
       });
+      if (requestId !== conversationsRequestRef.current) return;
       if (response.data?.success) {
         setChatConversations(response.data.data || []);
         setConversationPage(response.data.pagination?.currentPage || page);
         setConversationTotalPages(response.data.pagination?.totalPages || 1);
       }
     } catch (error) {
+      if (axios.isCancel?.(error) || error.code === 'ERR_CANCELED' || error.name === 'CanceledError') return;
+      if (requestId !== conversationsRequestRef.current) return;
       console.error('Failed to fetch WhatsApp conversations:', error.response?.data || error.message);
     } finally {
-      if (!silent) setLoadingConversations(false);
+      if (requestId === conversationsRequestRef.current) {
+        conversationsInFlightRef.current = false;
+        if (!silent) setLoadingConversations(false);
+      }
     }
   }, [backendUrl, token]);
 
@@ -5775,7 +5794,7 @@ const WhatsApp = () => {
       if (document.visibilityState === 'visible') {
         fetchWhatsappConversations(conversationPage, chatListSearch, true);
       }
-    }, 12000);
+    }, 30000);
     return () => clearInterval(timer);
   }, [fetchWhatsappConversations, conversationPage, chatListSearch]);
 
