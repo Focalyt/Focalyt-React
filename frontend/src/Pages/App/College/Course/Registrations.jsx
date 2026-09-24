@@ -1551,7 +1551,7 @@ const CRMDashboard = () => {
         })
     )];
     const numValue = parseInt(String(input1Value || '').trim(), 10);
-    const MAX_AI_CALL_BATCH = 20;
+    const MAX_AI_CALL_BATCH = 100;
     if (!aiCallSource) {
       toast.info('Pick New Lead or Not Connected first');
       return;
@@ -16308,7 +16308,7 @@ useEffect(() => {
                                   e.preventDefault();
                                 }
                                 const maxValue = bulkMode === 'AiCall'
-                                  ? Math.min(20, aiCallTotalCount || 0)
+                                  ? Math.min(100, aiCallTotalCount || 0)
                                   : (crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0);
                                 if (e.key === 'Enter' && bulkMode === 'whatsapp' && input1Value) {
                                   e.preventDefault();
@@ -16324,7 +16324,7 @@ useEffect(() => {
                               }}
                               onChange={(e) => {
                                 const maxValue = bulkMode === 'AiCall'
-                                  ? Math.min(20, aiCallTotalCount || 0)
+                                  ? Math.min(100, aiCallTotalCount || 0)
                                   : (crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0);
                                 let inputValue = e.target.value.replace(/[^0-9]/g, '');
                                 if (inputValue === '') {
