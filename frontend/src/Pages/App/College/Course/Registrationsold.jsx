@@ -6491,7 +6491,16 @@ console.log('API Response:', response.data);
 
   const getProfileAiLifetimeCall = (profile) => {
     const count = Number(profile?.aiVoice?.lifetimeCallCount);
-    return Number.isFinite(count) && count > 0 ? String(count) : '0';
+    if (Number.isFinite(count) && count > 0) return String(count);
+    const ai = profile?.aiVoice || {};
+    const alreadyCalled = Boolean(
+      String(profile?.aiRemark || '').trim()
+      || ai.lastWebhookAt
+      || String(ai.lastCallHistoryId || '').trim()
+      || String(ai.recordingUrl || '').trim()
+      || ['CALL_COMPLETED', 'CALL_FAILED', 'CALL_TRANSFERED'].includes(String(ai.lastEvent || '').toUpperCase())
+    );
+    return alreadyCalled ? '1' : '0';
   };
 
   const handleUpdateLeadOwner = async (profile, newOwnerId) => {
