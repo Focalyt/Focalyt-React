@@ -2936,6 +2936,8 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					lastCancelAt: aiVoiceDoc.lastCancelAt || null,
 					lastFailureReason: aiVoiceDoc.lastFailureReason || '',
 					recordingUrl: aiVoiceDoc.recordingUrl || '',
+					lifetimeCallCount: Number(aiVoiceDoc.lifetimeCallCount || 0),
+					lifetimeCallField: aiVoiceDoc.lifetimeCallField || '',
 				},
 				remarks: doc.remarks,
 				aiRemark: doc.aiRemark || '',

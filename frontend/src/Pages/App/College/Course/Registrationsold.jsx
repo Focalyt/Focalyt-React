@@ -6489,6 +6489,11 @@ console.log('API Response:', response.data);
     || 'N/A'
   );
 
+  const getProfileAiLifetimeCall = (profile) => {
+    const count = Number(profile?.aiVoice?.lifetimeCallCount);
+    return Number.isFinite(count) && count > 0 ? String(count) : '0';
+  };
+
   const handleUpdateLeadOwner = async (profile, newOwnerId) => {
     if (!profile?._id || !token) return;
     const currentId = getProfileLeadOwnerId(profile);
@@ -19593,6 +19598,10 @@ useEffect(() => {
                                                 <div className="info-label">LEAD SOURCE</div>
                                                 <div className="info-value">{getProfileLeadSourceLabel(profile)}</div>
                                               </div>
+                                              <div className="info-group">
+                                                <div className="info-label">AI LIFETIME CALL</div>
+                                                <div className="info-value">{getProfileAiLifetimeCall(profile)}</div>
+                                              </div>
                                             </div>
 
                                             <div className="info-card">
@@ -19694,6 +19703,10 @@ useEffect(() => {
                                                     <div className="info-group">
                                                       <div className="info-label">LEAD SOURCE</div>
                                                       <div className="info-value">{getProfileLeadSourceLabel(profile)}</div>
+                                                    </div>
+                                                    <div className="info-group">
+                                                      <div className="info-label">AI LIFETIME CALL</div>
+                                                      <div className="info-value">{getProfileAiLifetimeCall(profile)}</div>
                                                     </div>
                                                     <div className="info-group">
                                                       <div className="info-label">COURSE / JOB NAME</div>
@@ -19959,6 +19972,12 @@ useEffect(() => {
                                                     <div className="info-group">
                                                       <div className="info-label">LEAD SOURCE</div>
                                                       <div className="info-value">{getProfileLeadSourceLabel(profile)}</div>
+                                                    </div>
+                                                  </div>
+                                                  <div className="col-xl- col-3">
+                                                    <div className="info-group">
+                                                      <div className="info-label">AI LIFETIME CALL</div>
+                                                      <div className="info-value">{getProfileAiLifetimeCall(profile)}</div>
                                                     </div>
                                                   </div>
                                                   {/* <div className="col-xl- col-3">

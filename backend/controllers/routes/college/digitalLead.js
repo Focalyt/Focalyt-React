@@ -100,12 +100,23 @@ async function initiateVoiceCallForLead({ applied, candidate, course, center, so
             customField,
             callInitTime,
         });
-        await recordVoiceCallAttempt(applied._id, {
+        const remoteLifetime = extractVoicexLifetimeCall(result?.data);
+        const queuedPatch = {
             'aiVoice.lastEvent': 'MAKE_CALL_QUEUED',
             'aiVoice.lastMakeCallAt': new Date(),
             'aiVoice.lastMakeCallStatus': 'queued',
             'aiVoice.lastMakeCallError': '',
-        }, {
+        };
+        if (remoteLifetime) {
+            queuedPatch['aiVoice.lifetimeCallCount'] = remoteLifetime.count;
+            queuedPatch['aiVoice.lifetimeCallField'] = remoteLifetime.field;
+            console.log('[VoiceX] lifetime call from make_call', {
+                leadId: String(applied._id),
+                field: remoteLifetime.field,
+                count: remoteLifetime.count,
+            });
+        }
+        await recordVoiceCallAttempt(applied._id, queuedPatch, {
             action: 'AI counselor call initiated',
             remarks: voicex.toE164(candidate?.mobile),
             timestamp: new Date(),
@@ -1281,6 +1292,55 @@ const VOICEX_STATUS_MAP = [
     { titles: ['PROSPECT'], match: /^(prospect)$/i },
 ];
 
+const LIFETIME_CALL_KEYS = new Set([
+    'lifetimecall', 'lifetimecalls', 'ailifetimecall', 'ailifetimecalls',
+    'totalcall', 'totalcalls', 'callcount', 'callscount',
+    'attemptcount', 'callattempt', 'callattempts',
+    'retrycount', 'numberofcalls', 'totalattempts', 'dialcount',
+    'totaldial', 'totaldials',
+]);
+
+function normalizeFieldKey(key) {
+    return String(key || '').toLowerCase().replace(/[\s_-]/g, '');
+}
+
+function parseNonNegativeInt(value) {
+    if (typeof value === 'number' && Number.isFinite(value) && value >= 0) return Math.floor(value);
+    if (typeof value === 'string' && /^\d+$/.test(value.trim())) return Number(value.trim());
+    return null;
+}
+
+function isLifetimeCallKey(key) {
+    const norm = normalizeFieldKey(key);
+    if (!norm || norm.includes('status') || norm.includes('history') || norm.includes('url')) return false;
+    if (LIFETIME_CALL_KEYS.has(norm)) return true;
+    const hasCall = norm.includes('call') || norm.includes('dial') || norm.includes('attempt');
+    const hasMeasure = norm.includes('count') || norm.includes('lifetime') || norm.includes('total') || norm.includes('attempt');
+    return hasCall && hasMeasure;
+}
+
+function extractVoicexLifetimeCall(payload) {
+    const buckets = [
+        payload,
+        payload?.customer_crm_data,
+        payload?.callHistory,
+        payload?.scheduleInfo,
+        payload?.custom_field,
+        payload?.scheduleInfo?.customParam,
+        payload?.data,
+        payload?.result,
+    ];
+    for (const bucket of buckets) {
+        if (!bucket || typeof bucket !== 'object' || Array.isArray(bucket)) continue;
+        for (const [key, value] of Object.entries(bucket)) {
+            if (!isLifetimeCallKey(key)) continue;
+            const count = parseNonNegativeInt(value);
+            if (count != null) return { count, field: key };
+        }
+    }
+    return null;
+}
+
 function firstCrmValue(obj, keys) {
     if (!obj || typeof obj !== 'object') return '';
     const lowerKeyToValue = {};
@@ -1427,6 +1487,33 @@ router.post("/voicex-webhook", async (req, res) => {
                 doc.aiVoice.lastIdempotencyKey = idempotencyKey;
                 doc.aiVoice.lastWebhookAt = new Date();
                 doc.aiVoice.recordingUrl = recordingUrl;
+                const remoteLifetime = extractVoicexLifetimeCall(payload);
+                const historyId = String(callHistoryId || '');
+                console.log('[VoiceX webhook] payload keys', {
+                    event,
+                    appliedId: String(doc._id),
+                    top: Object.keys(payload),
+                    crm: Object.keys(crm || {}),
+                    callHistory: Object.keys(payload.callHistory || {}),
+                    lifetimeField: remoteLifetime ? remoteLifetime.field : null,
+                    lifetimeCount: remoteLifetime ? remoteLifetime.count : null,
+                });
+                if (remoteLifetime) {
+                    doc.aiVoice.lifetimeCallCount = remoteLifetime.count;
+                    doc.aiVoice.lifetimeCallField = remoteLifetime.field;
+                    if (historyId) doc.aiVoice.lastCountedCallId = historyId;
+                    console.log('[VoiceX webhook] lifetime call field', {
+                        appliedId: String(doc._id),
+                        field: remoteLifetime.field,
+                        count: remoteLifetime.count,
+                    });
+                } else if (['CALL_COMPLETED', 'CALL_FAILED', 'CALL_TRANSFERED'].includes(event)) {
+                    const alreadyCounted = historyId && String(doc.aiVoice.lastCountedCallId || '') === historyId;
+                    if (!alreadyCounted) {
+                        doc.aiVoice.lifetimeCallCount = Number(doc.aiVoice.lifetimeCallCount || 0) + 1;
+                        if (historyId) doc.aiVoice.lastCountedCallId = historyId;
+                    }
+                }
                 if (['CALL_COMPLETED', 'CALL_FAILED', 'CALL_TRANSFERED'].includes(event)) {
                     doc.aiVoice.lastMakeCallStatus = 'done';
                 } else if (event === 'MAKE_CALL_CANCELLED') {
