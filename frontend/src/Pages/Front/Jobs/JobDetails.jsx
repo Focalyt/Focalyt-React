@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import axios from 'axios';
 import FrontLayout from '../../../Component/Layouts/Front';
+import { buildJobApplyTarget, usePublicApply } from '../../../Component/PublicApplyModal/PublicApplyModal';
 
 function JobDetails() {
     const { jobId } = useParams();
-    const navigate = useNavigate();
     const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
     
@@ -15,6 +15,7 @@ function JobDetails() {
     const [error, setError] = useState(null);
     const [activeTab, setActiveTab] = useState('pills-home');
     const videoRef = useRef(null);
+    const { openApply } = usePublicApply();
 
     useEffect(() => {
         const fetchJobDetails = async () => {
@@ -107,8 +108,7 @@ function JobDetails() {
     };
 
     const handleApplyNow = () => {
-        const returnUrl = `/candidate/job/${jobId}`;
-        navigate(`/candidate/login?returnUrl=${returnUrl}`);
+        openApply(buildJobApplyTarget(job, bucketUrl));
     };
 
     if (loading) return <FrontLayout><div className="text-center py-5">Loading job details...</div></FrontLayout>;

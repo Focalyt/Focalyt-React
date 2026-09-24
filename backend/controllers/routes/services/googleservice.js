@@ -162,8 +162,6 @@ async function getGoogleAuthToken(data) {
     };
   }
 
-  console.log('Received authorization code:', code.substring(0, 20) + '...');
-
   try {
     const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
       client_id: clientId,
@@ -268,8 +266,6 @@ async function getAllGoogleCalendarEvents(data, options = {}) {
     let timeMin = startDate ? new Date(startDate) : new Date().toISOString();
     let timeMax = endDate ? new Date(endDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-console.log(timeMin, timeMax,'timeMin, timeMax');
-
   if (!user || !user.googleAuthToken) {
     return { error: 'User or Google Auth Token is missing' };
   }
@@ -291,7 +287,6 @@ console.log(timeMin, timeMax,'timeMin, timeMax');
       if (newTokenData && newTokenData.accessToken) {
         accessToken = newTokenData.accessToken;
         expiresAt = newTokenData.expiresAt;
-        console.log('Token refreshed successfully');
       } else {
         console.error('Token refresh returned invalid data:', newTokenData);
         return { error: 'Failed to refresh access token - invalid response' };
@@ -341,7 +336,6 @@ console.log(timeMin, timeMax,'timeMin, timeMax');
     // Test authentication first
     try {
       const calendarList = await calendar.calendarList.list({ maxResults: 1 });
-      console.log('Authentication test passed');
     } catch (authError) {
       console.error('Authentication test failed:', authError.message);
       return { error: 'Authentication failed during test: ' + authError.message };
@@ -393,7 +387,6 @@ console.log(timeMin, timeMax,'timeMin, timeMax');
 
       // Safety check to prevent infinite loops
       if (totalFetched >= absoluteMax) {
-        console.log(`Reached maximum limit of ${absoluteMax} events`);
         break;
       }
 
@@ -424,11 +417,9 @@ console.log(timeMin, timeMax,'timeMin, timeMax');
     
     // Handle specific error cases with retry logic
     if (error.code === 401 || error.status === 401) {
-      console.log('Got 401, attempting token refresh...');
       try {
         const newTokenData = await getNewGoogleAccessToken({ refreshToken, user });
         if (newTokenData && newTokenData.accessToken) {
-          console.log('Re-attempting with refreshed token...');
           oauth2Client.setCredentials({
             access_token: newTokenData.accessToken,
             refresh_token: refreshToken,
@@ -464,16 +455,7 @@ async function createGoogleCalendarEvent(data) {
   let expiresAt = user.googleAuthToken.expiresAt;
   const refreshToken = user.googleAuthToken.refreshToken;
 
-  console.log('Token Debug Info:');
-  console.log('- Access Token:', accessToken ? `${accessToken.substring(0, 20)}...` : 'MISSING');
-  console.log('- Expires At:', expiresAt, '(Type:', typeof expiresAt, ')');
-  console.log('- Refresh Token:', refreshToken ? `${refreshToken.substring(0, 20)}...` : 'MISSING');
-  console.log('- Current Time:', Date.now());
-
   let expiryTimestamp = parseGoogleExpiryTimestamp(expiresAt);
-
-  console.log('- Parsed Expiry Timestamp:', expiryTimestamp);
-  console.log('- Is Expired:', expiryTimestamp < Date.now());
 
   // Check if token is expired and refresh if needed (with 5 minute buffer)
   const bufferTime = 5 * 60 * 1000; // 5 minutes in milliseconds
@@ -483,7 +465,6 @@ async function createGoogleCalendarEvent(data) {
       if (newTokenData && newTokenData.accessToken) {
         accessToken = newTokenData.accessToken;
         expiresAt = newTokenData.expiresAt;
-        console.log('Token refreshed successfully');
       } else {
         console.error('Token refresh returned invalid data:', newTokenData);
         return { error: 'Failed to refresh access token - invalid response' };
@@ -522,12 +503,6 @@ async function createGoogleCalendarEvent(data) {
     credentials.expiry_date = expiryTimestamp;
   }
 
-  console.log('Setting credentials:', {
-    access_token: accessToken ? `${accessToken.substring(0, 20)}...` : 'MISSING',
-    refresh_token: refreshToken ? `${refreshToken.substring(0, 20)}...` : 'MISSING',
-    expiry_date: credentials.expiry_date
-  });
-
   oauth2Client.setCredentials(credentials);
 
   // Create calendar instance with OAuth2 client
@@ -537,14 +512,11 @@ async function createGoogleCalendarEvent(data) {
   });
 
   try {
-    console.log('Creating calendar event with data:', JSON.stringify(event, null, 2));
-    
     // Test authentication first with a simple request
     try {
       const calendarList = await calendar.calendarList.list({
         maxResults: 1
       });
-      console.log('Authentication test passed');
     } catch (authError) {
       console.error('Authentication test failed:', authError.message);
       return { error: 'Authentication failed during test: ' + authError.message };
@@ -561,7 +533,6 @@ async function createGoogleCalendarEvent(data) {
 
     const newEvent = await calendar.events.insert(insertParams);
 
-    console.log('Event created successfully:', newEvent.data.id);
     return { 
       success: true, 
       event: newEvent.data 
@@ -582,12 +553,9 @@ async function createGoogleCalendarEvent(data) {
     
     // Handle specific error cases
     if (error.code === 401 || error.status === 401) {
-      // Try to refresh token one more time
-      console.log('Got 401, attempting token refresh...');
       try {
         const newTokenData = await getNewGoogleAccessToken({ refreshToken, user });
         if (newTokenData && newTokenData.accessToken) {
-          console.log('Re-attempting with refreshed token...');
           oauth2Client.setCredentials({
             access_token: newTokenData.accessToken,
             refresh_token: refreshToken,
@@ -638,7 +606,6 @@ async function validateAndRefreshGoogleToken(user) {
   // Check if token needs refresh (with 5 minute buffer)
   const bufferTime = 5 * 60 * 1000;
   if (expiryTimestamp < (Date.now() + bufferTime)) {
-    console.log('Refreshing expired token...');
     const newTokenData = await getNewGoogleAccessToken({ refreshToken, user });
     return newTokenData;
   }

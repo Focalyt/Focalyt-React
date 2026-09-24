@@ -39,9 +39,10 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage }).single('file');
 const {
-  Country, EducationBoard, State, City, College, Qualification, SubQualification, Skill, University, User, Vacancy, QualificationCourse, CourseSectors, Center
+  Country, EducationBoard, State, City, College, Qualification, SubQualification, Skill, University, User, Vacancy, QualificationCourse, CourseSectors, Center, Courses, AppliedCourses, AppliedJobs, ReEnquire
 } = require('../../models');
 const Candidate = require('../../models/candidateProfile');
+const { mobileLookupValues, markLeadDuplicateOnReapply, ensureCandidateUser } = require('../../../helpers/b2cDuplicate');
 
 module.exports.getProfileDetail = async (req, res) => {
   try {
@@ -162,21 +163,16 @@ module.exports.sendCandidateOtp = async (req, res) => {
   try {
 
     const { mobile } = req.body;
+    const mobileValues = mobileLookupValues(mobile);
 
-    const user = await User.findOne({ mobile, role: 3 });
-    let newUser = false
-    if (!user) {
-      newUser = true
-
-    }
+    const user = await User.findOne({ mobile: { $in: mobileValues }, role: { $in: [3, '3'] } });
+    const candidate = await Candidate.findOne({ mobile: { $in: mobileValues }, isDeleted: { $ne: true } }).select('_id');
+    const newUser = !user && !candidate;
 
     const url = msg91Url.replace("<<template>>", templateId).replace("<<mobile>>", mobile).replace("<<auth>>", authKey)
     const data = await axios.get(url);
     if (data.data.type !== 'success') throw req.ykError(data.data.message);
     return res.send({ status: true, message: 'OTP sent successfully!', newUser });
-    // const auth=authKey;
-    // const user = await Candidate.findOne({ mobile }).select('_id');
-    //  if (!user && user !== '') throw req.ykError('No user found!');
   } catch (err) {
     return req.errFunc(err);
   }
@@ -527,14 +523,18 @@ module.exports.otpCandidateLogin = async (req, res) => {
   try {
     console.log(req.body)
     const { mobile } = req.body;
-    const user = await User.findOne({ mobile, role: '3' });
-    const token = await user.generateAuthToken();
-    if (!user || user === null) {
-      throw req.ykError('Login failed!');
+    const mobileValues = mobileLookupValues(mobile);
+    let user = await User.findOne({ mobile: { $in: mobileValues }, role: { $in: [3, '3'] } });
+    const candidate = await Candidate.findOne({ mobile: { $in: mobileValues } }, " _id name email mobile source ").populate('highestQualification');
+    if (!user && candidate) {
+      user = await ensureCandidateUser(candidate, 'Website Apply');
     }
-    const candidate = await Candidate.findOne({ mobile }, " _id ").populate('highestQualification');
-    if (!candidate || candidate === null) {
-      throw req.ykError('Login failed!');
+    if (!user) {
+      return res.status(200).send({ status: false, message: 'User not found. Please apply without login.' });
+    }
+    const token = await user.generateAuthToken();
+    if (!candidate) {
+      return res.status(200).send({ status: false, message: 'Candidate not found.' });
     }
     let userData;
     if (user && user.role === 3) {
@@ -1109,5 +1109,120 @@ module.exports.centerList = async (req, res) => {
 
   } catch (err) {
     return req.errFunc(err);
+  }
+};
+
+module.exports.publicApply = async (req, res) => {
+  try {
+    const { mobile, kind, id, source, isNewUser } = req.body || {};
+    const applySource = source || 'Website Apply';
+    const digits = String(mobile || '').replace(/\D/g, '').slice(-10);
+    if (!/^[6-9]\d{9}$/.test(digits)) {
+      return res.send({ status: false, message: 'Valid mobile number is required.' });
+    }
+    if (!id) {
+      return res.send({ status: false, message: 'Application target is required.' });
+    }
+
+    const mobileValues = mobileLookupValues(digits);
+    const candidate = await Candidate.findOne({
+      mobile: { $in: mobileValues },
+      isDeleted: { $ne: true },
+    });
+    if (!candidate) {
+      return res.send({ status: false, message: 'Candidate not found. Please complete registration.' });
+    }
+
+    await ensureCandidateUser(candidate, applySource);
+
+    const existingNumber = isNewUser !== true && isNewUser !== 'true';
+    const leadLog = {
+      action: 'Lead created',
+      remarks: applySource,
+      timestamp: new Date(),
+    };
+
+    if (kind === 'job') {
+      const vacancy = await Vacancy.findById(id).select('_id _company collegeAcNo').lean();
+      if (!vacancy) {
+        return res.send({ status: false, message: 'Job not found.' });
+      }
+
+      await Candidate.findOneAndUpdate(
+        { _id: candidate._id },
+        { $addToSet: { appliedJobs: { jobId: vacancy._id } } }
+      );
+
+      const collegeId = Array.isArray(vacancy.collegeAcNo) && vacancy.collegeAcNo[0]
+        ? vacancy.collegeAcNo[0]
+        : undefined;
+
+      await AppliedJobs.create({
+        _candidate: candidate._id,
+        _job: vacancy._id,
+        _company: vacancy._company,
+        college: collegeId,
+        source: applySource,
+        logs: [leadLog],
+      });
+
+      return res.send({
+        status: true,
+        duplicate: existingNumber,
+        applied: true,
+        message: existingNumber
+          ? 'Application submitted. Existing number recorded as Duplicate in CRM.'
+          : 'Application submitted successfully.',
+      });
+    }
+
+    const course = await Courses.findById(id).select('_id college name').lean();
+    if (!course) {
+      return res.send({ status: false, message: 'Course not found.' });
+    }
+
+    const previousApply = await AppliedCourses.findOne({
+      _candidate: candidate._id,
+      _course: course._id,
+    }).sort({ createdAt: 1 });
+
+    if (previousApply) {
+      await ReEnquire.create({
+        candidate: candidate._id,
+        appliedCourse: previousApply._id,
+        course: course._id,
+        reEnquireDate: new Date(),
+        counselorName: previousApply.counsellor,
+        source: applySource,
+      });
+    }
+
+    await Candidate.findOneAndUpdate(
+      { _id: candidate._id },
+      { $addToSet: { appliedCourses: { courseId: course._id } } }
+    );
+
+    const applied = await AppliedCourses.create({
+      _candidate: candidate._id,
+      _course: course._id,
+      logs: [leadLog],
+    });
+
+    if (existingNumber) {
+      await markLeadDuplicateOnReapply(applied, applySource, course.college);
+    }
+
+    return res.send({
+      status: true,
+      duplicate: existingNumber,
+      applied: true,
+      appliedId: applied._id,
+      message: existingNumber
+        ? 'Application submitted. Existing number recorded as Duplicate in CRM.'
+        : 'Application submitted successfully.',
+    });
+  } catch (err) {
+    console.error('publicApply error', err);
+    return res.send({ status: false, message: err.message || 'Failed to submit application.' });
   }
 };

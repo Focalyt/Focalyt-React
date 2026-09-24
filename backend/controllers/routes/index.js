@@ -38,6 +38,7 @@ router.post('/verifyOtp', commonFunc.verifyOtp);
 router.post('/otpCandidateLogin', commonFunc.otpCandidateLogin);
 router.post('/otpCompanyLogin', commonFunc.otpCompanyLogin);
 router.post('/otpTrainerLogin', commonFunc.loginAsTrainer);
+router.post('/publicApply', commonFunc.publicApply);
 
 router.use('/', frontRoutes);
 router.use('/', conversionTrakingRoutes);

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { Helmet } from 'react-helmet-async';
 import FrontLayout from '../../../Component/Layouts/Front';
+import { buildCourseApplyTarget, usePublicApply } from '../../../Component/PublicApplyModal/PublicApplyModal';
 
 function CourseDetails() {
     const { courseId } = useParams();
@@ -13,6 +14,7 @@ function CourseDetails() {
     const coursePhotos = course?.photos || []; // Ensure it's an array
     const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
     const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+    const { openApply } = usePublicApply();
 
     useEffect(() => {
         const fetchCourseDetails = async () => {
@@ -208,8 +210,13 @@ function CourseDetails() {
                     <div className="row">
                         <div
                             className="col-xxl-6 col-xl-6 col-lg-6 col-md-12 col-sm-12 col-12 mx-auto text-center border-bottom mb-3">
-                            <a href="/candidate/login?returnUrl=/candidate/course/<%=course._id%>"
-                                className="btn btn_cta_apply">Apply Now</a>
+                            <button
+                                type="button"
+                                className="btn btn_cta_apply"
+                                onClick={() => openApply(buildCourseApplyTarget(course, bucketUrl))}
+                            >
+                                Apply Now
+                            </button>
                         </div>
                         <div className="col-xxl-8 col-xl-8 col-lg-8 col-md-12 col-sm-12 col-12 mx-auto text-center">
                             <ul className="nav nav-pills mb-3  mx-auto text-center" id="pills-tab" role="tablist">

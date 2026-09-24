@@ -6,10 +6,12 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch } from "@fortawesome/free-solid-svg-icons";
 import FrontLayout from "../../../Component/Layouts/Front";
 import { resolveMediaUrl } from "../../../utils/resolveMediaUrl";
+import { buildCourseApplyTarget, usePublicApply } from "../../../Component/PublicApplyModal/PublicApplyModal";
 
 const THUMB_FALLBACK = "/Assets/public_assets/images/newjoblisting/course_img.svg";
 
 export function CourseCard({ course, bucketUrl, onPlayVideo, onShare, onRequestCallback }) {
+  const { openApply } = usePublicApply();
   const thumb = resolveMediaUrl(bucketUrl, course?.thumbnail) || THUMB_FALLBACK;
   const videoUrl =
     course?.videos?.[0] ? resolveMediaUrl(bucketUrl, course.videos[0]) : "";
@@ -86,12 +88,13 @@ export function CourseCard({ course, bucketUrl, onPlayVideo, onShare, onRequestC
         </div>
 
         <div className="course-action-btns">
-          <a
+          <button
+            type="button"
             className="btn cta-callnow btn-bg-color shr--width"
-            href={`/candidate/login?returnUrl=/candidate/course/${course._id}`}
+            onClick={() => openApply(buildCourseApplyTarget(course, bucketUrl))}
           >
             Apply Now
-          </a>
+          </button>
           <button
             type="button"
             className="btn cta-callnow shr--width"

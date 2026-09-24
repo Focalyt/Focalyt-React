@@ -1557,6 +1557,7 @@ const CandidateViewJobs = () => {
   const { JobId } = useParams();
   const [searchParams] = useSearchParams();
   const fromOffer = searchParams.get('fromOffer') === 'true';
+  const autoOpenApply = searchParams.get('apply') === '1';
   const [jobDetails, setJobDetails] = useState(null);
   const [address, setAddress] = useState('');
   const [highestQualificationdata, sethighestQualificationdata] = useState([]);
@@ -1866,6 +1867,10 @@ const CandidateViewJobs = () => {
         setTimeout(() => {
           applyJob();
         }, 500);
+      } else if (autoOpenApply && !data.isApplied) {
+        setTimeout(() => {
+          setShowApplyModal(true);
+        }, 300);
       }
     } catch (error) {
       console.error('Error fetching job details:', error);

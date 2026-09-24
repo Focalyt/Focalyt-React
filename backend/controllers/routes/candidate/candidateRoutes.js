@@ -106,6 +106,7 @@ const cashBackLogic = require("../../models/cashBackLogic");
 const { sendNotification } = require('../services/notification');
 const kycDocument = require("../../models/kycDocument");
 const { CandidateValidators } = require('../../../helpers/validators');
+const { recordDuplicateReapply } = require('../../../helpers/b2cDuplicate');
 
 
 // Facebook API Configuration
@@ -349,23 +350,20 @@ router.post("/course/:courseId/apply", [isCandidate, authenti], async (req, res)
       }
     }
 
-    const alreadyApplied = await AppliedCourses.findOne({ _candidate: candidate._id, _course: courseId }).lean();
+    const alreadyApplied = await AppliedCourses.findOne({ _candidate: candidate._id, _course: courseId });
 
     // Check if already applied
     if (alreadyApplied) {
 
-      const reEnquire = await ReEnquire.create({
-        candidate: candidate._id,
-        appliedCourse: alreadyApplied._id,
-        course: courseId,
-        reEnquireDate: new Date(),
-        counselorName:  alreadyApplied.counsellor,
+      await recordDuplicateReapply({
+        candidate,
+        applied: alreadyApplied,
+        courseId,
         source: 'Candidate Portal',
+        collegeId: course.college,
       });
 
-     
-
-      return res.status(400).json({ status: false, msg: "Already applied." });
+      return res.status(400).json({ status: false, duplicate: true, msg: "Already applied." });
     };
 
     const updateData = {

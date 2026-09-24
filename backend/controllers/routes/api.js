@@ -164,6 +164,7 @@ commonRoutes.post("/sendOtptoAddLead", commonFunc.sendOtptoAddLead);
 commonRoutes.post("/otpCollegeLogin", commonFunc.loginAsCollege);
 commonRoutes.post("/otpTrainerLogin", commonFunc.loginAsTrainer);
 commonRoutes.post("/sendCandidateOtp", commonFunc.sendCandidateOtp);
+commonRoutes.post("/publicApply", commonFunc.publicApply);
 commonRoutes.get("/sectorList", commonFunc.sectorList);
 commonRoutes.get("/centerList", commonFunc.centerList);
 commonRoutes.get("/boards", commonFunc.educationBoardList);
@@ -226,10 +227,7 @@ commonRoutes.post("/getgoogleauth", async (req, res) => {
       });
     }
 
-	console.log(req.body,'req.body');
-
     const userData = await getGoogleAuthToken(req.body);
-	console.log(userData,'userData');
 
 	if (userData.error) {
 		return res.status(400).json({ 
@@ -388,7 +386,6 @@ commonRoutes.post("/creategooglecalendarevent", async (req, res) => {
 				};
 
 		const newEvent = await createGoogleCalendarEvent(calendarData);
-		console.log(newEvent, 'newEvent');
 
 		if (newEvent.error) {
 			return res.status(400).json({ 
@@ -415,9 +412,6 @@ commonRoutes.post("/creategooglecalendarevent", async (req, res) => {
 commonRoutes.post("/getb2bcalendarevents", async (req, res) => {
 	try {
 		const {user, accessToken, startDate, endDate } = req.body;
-
-		console.log(startDate, endDate,'startDate, endDate');
-		
 
 		if (!accessToken) {
 			return res.status(400).json({ 

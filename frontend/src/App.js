@@ -5,6 +5,7 @@ import { HelmetProvider } from 'react-helmet-async';
 
 import Websocket from './utils/websocket'
 import { WhatsAppProvider } from './contexts/WhatsAppContext';
+import { PublicApplyProvider } from './Component/PublicApplyModal/PublicApplyModal';
 
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
@@ -222,6 +223,7 @@ const Layout = () => {
   
 
   return (
+    <PublicApplyProvider>
     <>
       {/* <FrontHeader /> */}
       <Routes>
@@ -438,6 +440,7 @@ const Layout = () => {
 
 
     </>
+    </PublicApplyProvider>
   );
 };
 

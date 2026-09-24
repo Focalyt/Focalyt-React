@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { trackMetaConversion } from "../../../../utils/conversionTrakingRoutes";
 import moment from 'moment';
@@ -8,6 +8,8 @@ import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 const CourseDetails = () => {
 
   const { courseId } = useParams();
+  const [searchParams] = useSearchParams();
+  const autoOpenApply = searchParams.get('apply') === '1';
   const [course, setCourse] = useState(null);
   const [candidate, setCandidate] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -26,6 +28,7 @@ const CourseDetails = () => {
 
 
   const videoRef = useRef(null);
+  const didAutoOpenApply = useRef(false);
   const navigate = useNavigate();
 
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
@@ -314,6 +317,14 @@ const CourseDetails = () => {
     applyModal.style.display = 'block';
     document.body.classList.add('modal-open');
   };
+
+  useEffect(() => {
+    if (didAutoOpenApply.current) return;
+    if (loading || !course || isApplied || !autoOpenApply) return;
+    didAutoOpenApply.current = true;
+    const timer = setTimeout(() => openApplyModal(), 250);
+    return () => clearTimeout(timer);
+  }, [loading, course, isApplied, autoOpenApply, centerRequired]);
 
   if (loading) {
     return <div className="loading">Loading...</div>;

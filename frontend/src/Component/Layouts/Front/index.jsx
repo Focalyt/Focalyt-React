@@ -87,7 +87,6 @@ const FrontLayout = ({ children }) => {
         }
       </style>
     </div>
-    
   );
 };
 

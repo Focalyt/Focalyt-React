@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { Check, Clock, Heart, Play } from "lucide-react";
 import FrontLayout from "../../../Component/Layouts/Front";
 import { resolveMediaUrl } from "../../../utils/resolveMediaUrl";
+import { usePublicApply } from "../../../Component/PublicApplyModal/PublicApplyModal";
 
 const THUMB_FALLBACK = "/Assets/public_assets/images/newjoblisting/course_img.svg";
 
@@ -71,6 +72,7 @@ function PerkIcon({ type }) {
 
 function CourseCard({ course, featured }) {
   const [saved, setSaved] = useState(false);
+  const { openApply } = usePublicApply();
 
   return (
     <article className={`htl-card${featured ? " is-featured" : ""}`}>
@@ -142,9 +144,24 @@ function CourseCard({ course, featured }) {
           {course.extraFee ? <p className="htl-taxes">{course.extraFee}</p> : null}
           {course.duration ? <p className="htl-night">{course.duration}</p> : null}
         </div>
-        <Link to={course.applyHref} className="htl-login">
+        <button
+          type="button"
+          className="htl-login"
+          onClick={() =>
+            openApply({
+              kind: "course",
+              id: course.id,
+              name: course.name,
+              image: course.image,
+              location: course.location,
+              extra: course.distance,
+              badge: course.isFree ? "Free Course" : "Paid Course",
+              applyPath: `/candidate/course/${course.id}?apply=1`,
+            })
+          }
+        >
           Apply Now
-        </Link>
+        </button>
       </div>
     </article>
   );
@@ -434,6 +451,9 @@ const LandingPage = () => {
   cursor: pointer;
   font-family: inherit;
   text-decoration: none;
+  display: block;
+  width: 100%;
+  text-align: left;
 }
 .foc-hotel-listing .htl-login:hover {
   text-decoration: underline;

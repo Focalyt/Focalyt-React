@@ -10,6 +10,7 @@ import CompanyPartners from '../CompanyPartners/CompanyPartners';
 import ChatbotWidget from '../../../Component/ChatbotWidget/ChatbotWidget';
 import { Link } from 'react-router-dom';
 import { resolveMediaUrl } from '../../../utils/resolveMediaUrl';
+import { buildJobApplyTarget, usePublicApply } from '../../../Component/PublicApplyModal/PublicApplyModal';
 
 const THUMB_FALLBACK = "/Assets/public_assets/images/newjoblisting/course_img.svg";
 
@@ -37,6 +38,7 @@ function resolveJobVideoUrl(bucketUrl, job) {
 }
 
 export function JobCard({ job, thumbUrl, bucketUrl, onPlayVideo, onShare }) {
+  const { openApply } = usePublicApply();
   const loc = job?.city ? `(${job.city.name}, ${job.state?.name || "NA"})` : "NA";
   const lastDate = job?.validity
     ? moment(job.validity).utcOffset("+05:30").format("DD MMM YYYY")
@@ -105,9 +107,13 @@ export function JobCard({ job, thumbUrl, bucketUrl, onPlayVideo, onShare }) {
         </div>
 
         <div className="course-action-btns">
-          <a className="btn cta-callnow btn-bg-color shr--width" href={`/candidate/login?returnUrl=/candidate/job/${job._id}`}>
+          <button
+            type="button"
+            className="btn cta-callnow btn-bg-color shr--width"
+            onClick={() => openApply(buildJobApplyTarget(job, bucketUrl))}
+          >
             Apply Now
-          </a>
+          </button>
           <button
             type="button"
             className="btn cta-callnow shr--width"
@@ -129,6 +135,7 @@ export function JobCard({ job, thumbUrl, bucketUrl, onPlayVideo, onShare }) {
 }
 
 function Jobs() {
+  const { openApply } = usePublicApply();
   const [courses, setCourses] = useState([]);
   const [uniqueSectors, setUniqueSectors] = useState([]);
   const [activeFilter, setActiveFilter] = useState("all");
@@ -1067,7 +1074,8 @@ function Jobs() {
   // Handle job application confirmation
   const handleJobConfirmYes = () => {
     if (selectedJob) {
-      window.location.href = `/candidate/login?returnUrl=/candidate/job/${selectedJob._id}`;
+      openApply(buildJobApplyTarget(selectedJob, bucketUrl));
+      setShowJobConfirm(false);
     }
   };
 
@@ -2335,6 +2343,11 @@ img.group1 {
     font-size: 12px;
     letter-spacing: 0.02em;
     transition: .2s;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
 }
 .foc-jobs-page .btn.cta-callnow.btn-bg-color {
     background: var(--home-card-cta, #0d2146);
@@ -4314,12 +4327,13 @@ button.close span {
                     <div className="compare-cell">Action</div>
                     {compareJobs.map((job) => (
                       <div key={job._id} className="compare-cell">
-                        <a
-                          href={`/candidate/login?returnUrl=/candidate/job/${job._id}`}
+                        <button
+                          type="button"
                           className="btn btn-primary btn-sm"
+                          onClick={() => openApply(buildJobApplyTarget(job, bucketUrl))}
                         >
                           Apply
-                        </a>
+                        </button>
                       </div>
                     ))}
                   </div>

@@ -22,6 +22,7 @@ const {sendSms, sendMail} = require('../../helpers')
 
 const { sendNotification } = require('./services/notification');
 const { CandidateValidators } = require('../../helpers/validators')
+const { recordDuplicateReapply } = require('../../helpers/b2cDuplicate')
 const { updateSpreadSheetValues } = require("./services/googleservice")
 const { candidateProfileCashBack, candidateVideoCashBack, candidateApplyCashBack, checkCandidateCashBack, candidateReferalCashBack } = require('./services/cashback')
 
@@ -549,9 +550,19 @@ commonRoutes.post("/applycourse/:id", async (req, res) => {
 			return res.send({ status: false, msg: "Candidate not found!" });
 		}
 
-		if (candidate.appliedCourses && candidate.appliedCourses.includes(courseId)) {
-			req.flash("error", "Already Applied");
-			return res.send({ status: false, msg: "Already Applied" });
+		const alreadyApplied = await AppliedCourses.findOne({
+			_candidate: candidate._id,
+			_course: courseId,
+		});
+		if (alreadyApplied) {
+			await recordDuplicateReapply({
+				candidate,
+				applied: alreadyApplied,
+				courseId,
+				source: 'Leads From ChatBot',
+				collegeId: course.college,
+			});
+			return res.send({ status: false, duplicate: true, msg: "Already Applied" });
 		} else {
 			let apply = await Candidate.findOneAndUpdate({ mobile: candidateMobile },
 				{ $addToSet: { appliedCourses: courseId } },
