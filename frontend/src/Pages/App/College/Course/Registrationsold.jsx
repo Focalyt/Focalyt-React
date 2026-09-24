@@ -1513,6 +1513,11 @@ const CRMDashboard = () => {
   const [aiCallLabel, setAiCallLabel] = useState('');
   const [aiCallLeads, setAiCallLeads] = useState([]);
   const [aiCallSentIds, setAiCallSentIds] = useState([]);
+  const [aiCallDateFrom, setAiCallDateFrom] = useState('');
+  const [aiCallDateTo, setAiCallDateTo] = useState('');
+  const [showAiCallDateModal, setShowAiCallDateModal] = useState(false);
+  const [aiCallDateDraftFrom, setAiCallDateDraftFrom] = useState('');
+  const [aiCallDateDraftTo, setAiCallDateDraftTo] = useState('');
   const [aiCallingProfileId, setAiCallingProfileId] = useState(null);
   const [aiCancellingProfileId, setAiCancellingProfileId] = useState(null);
   const aiFabWrapRef = useRef(null);
@@ -1698,6 +1703,11 @@ const CRMDashboard = () => {
     setAiCallTotalCount(0);
     setAiCallLabel('');
     setAiCallLeads([]);
+    setAiCallDateFrom('');
+    setAiCallDateTo('');
+    setShowAiCallDateModal(false);
+    setAiCallDateDraftFrom('');
+    setAiCallDateDraftTo('');
   }, []);
 
   const handleAiFabQueue = useCallback(async (substatus) => {
@@ -16984,6 +16994,161 @@ useEffect(() => {
                     <div className="adm-cycle-toolbar__outer d-flex gap-2 align-items-center justify-content-between">
                       <div className="adm-cycle-toolbar__actions d-flex flex-nowrap gap-2 align-items-center">
                         {showBulkInputs ? (
+                          bulkMode === 'AiCall' ? (
+                            <div className="modal show fade d-block ai-call-date-modal" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}>
+                              <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '440px' }}>
+                                <div className="modal-content ai-call-date-modal__card">
+                                  <div className="ai-call-date-modal__head">
+                                    <div>
+                                      <p className="ai-call-date-modal__kicker">Call AI</p>
+                                      <h5 className="ai-call-date-modal__title">{aiCallLabel || 'Queue AI calls'}</h5>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      className="ai-call-date-modal__close"
+                                      aria-label="Close"
+                                      onClick={closeAiCallBulk}
+                                    >
+                                      <i className="fas fa-times"></i>
+                                    </button>
+                                  </div>
+                                  <div className="ai-call-date-modal__body">
+                                    <div className="ai-call-date-modal__leads">
+                                      <label className="ai-call-date-modal__field">
+                                        <span>How many leads</span>
+                                        <input
+                                          type="text"
+                                          inputMode="numeric"
+                                          placeholder="How many leads"
+                                          value={input1Value}
+                                          onKeyDown={(e) => {
+                                            if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab' && e.key !== 'Enter') {
+                                              e.preventDefault();
+                                            }
+                                            if (e.key === 'Enter' && input1Value) {
+                                              e.preventDefault();
+                                              handleAiCallDispatch();
+                                            }
+                                          }}
+                                          onChange={(e) => {
+                                            const maxValue = Math.min(20, aiCallTotalCount || 0);
+                                            let inputValue = e.target.value.replace(/[^0-9]/g, '');
+                                            if (inputValue === '') {
+                                              setInput1Value('');
+                                              return;
+                                            }
+                                            const numValue = parseInt(inputValue, 10);
+                                            if (numValue < 1 || isNaN(numValue)) {
+                                              inputValue = '1';
+                                            } else if (numValue > maxValue) {
+                                              inputValue = maxValue.toString();
+                                            }
+                                            setInput1Value(inputValue);
+                                          }}
+                                        />
+                                      </label>
+                                      <div className="ai-call-date-modal__total" title={`Total ${aiCallLabel} leads`}>
+                                        <span>Available</span>
+                                        <strong>{aiCallTotalCount || 0}</strong>
+                                      </div>
+                                    </div>
+                                    <div className="ai-call-date-modal__presets">
+                                      {[
+                                        { id: 'today', label: 'Today' },
+                                        { id: 'yesterday', label: 'Yesterday' },
+                                        { id: '7days', label: 'Last 7 days' },
+                                        { id: 'month', label: 'This month' },
+                                      ].map((preset) => (
+                                        <button
+                                          key={preset.id}
+                                          type="button"
+                                          className="ai-call-date-modal__preset"
+                                          onClick={() => {
+                                            const today = new Date();
+                                            const toYmd = (date) => {
+                                              const y = date.getFullYear();
+                                              const m = String(date.getMonth() + 1).padStart(2, '0');
+                                              const d = String(date.getDate()).padStart(2, '0');
+                                              return `${y}-${m}-${d}`;
+                                            };
+                                            let from = new Date(today);
+                                            let to = new Date(today);
+                                            if (preset.id === 'yesterday') {
+                                              from.setDate(from.getDate() - 1);
+                                              to.setDate(to.getDate() - 1);
+                                            } else if (preset.id === '7days') {
+                                              from.setDate(from.getDate() - 6);
+                                            } else if (preset.id === 'month') {
+                                              from = new Date(today.getFullYear(), today.getMonth(), 1);
+                                            }
+                                            setAiCallDateFrom(toYmd(from));
+                                            setAiCallDateTo(toYmd(to));
+                                          }}
+                                        >
+                                          {preset.label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                    <div className="ai-call-date-modal__fields">
+                                      <label className="ai-call-date-modal__field">
+                                        <span>From</span>
+                                        <input
+                                          type="date"
+                                          value={aiCallDateDraftFrom || aiCallDateFrom}
+                                          max={aiCallDateTo || undefined}
+                                          onChange={(e) => {
+                                            const next = e.target.value;
+                                            setAiCallDateFrom(next);
+                                            if (aiCallDateTo && next && next > aiCallDateTo) {
+                                              setAiCallDateTo(next);
+                                            }
+                                          }}
+                                        />
+                                      </label>
+                                      <span className="ai-call-date-modal__arrow" aria-hidden="true">
+                                        <i className="fas fa-arrow-right"></i>
+                                      </span>
+                                      <label className="ai-call-date-modal__field">
+                                        <span>To</span>
+                                        <input
+                                          type="date"
+                                          value={aiCallDateTo}
+                                          min={aiCallDateFrom || undefined}
+                                          onChange={(e) => {
+                                            const next = e.target.value;
+                                            setAiCallDateTo(next);
+                                            if (aiCallDateFrom && next && next < aiCallDateFrom) {
+                                              setAiCallDateFrom(next);
+                                            }
+                                          }}
+                                        />
+                                      </label>
+                                    </div>
+                                  </div>
+                                  <div className="ai-call-date-modal__foot">
+                                    <button
+                                      type="button"
+                                      className="ai-call-date-modal__clear"
+                                      onClick={() => {
+                                        setAiCallDateFrom('');
+                                        setAiCallDateTo('');
+                                      }}
+                                    >
+                                      Clear dates
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="ai-call-date-modal__apply"
+                                      disabled={aiFabBusy || !input1Value}
+                                      onClick={handleAiCallDispatch}
+                                    >
+                                      {aiFabBusy ? 'Queuing...' : 'Call AI'}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
                           <div className="d-flex align-items-center gap-2">
                           <div style={{
                             display: "flex",
@@ -17077,34 +17242,8 @@ useEffect(() => {
                               }}
                             />
                           </div>
-                          {bulkMode === 'AiCall' && (
-                            <>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-primary"
-                                disabled={aiFabBusy || !input1Value}
-                                onClick={handleAiCallDispatch}
-                                style={{
-                                  padding: '6px 10px',
-                                  fontSize: '11px',
-                                  fontWeight: 600,
-                                  whiteSpace: 'nowrap'
-                                }}
-                              >
-                                {aiFabBusy ? 'Queuing...' : 'Call AI'}
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-secondary"
-                                onClick={closeAiCallBulk}
-                                title="Cancel AI call"
-                                style={{ padding: '6px 8px', fontSize: '11px' }}
-                              >
-                                <i className="fas fa-times"></i>
-                              </button>
-                            </>
-                          )}
                           </div>
+                          )
                         ) : (
                           <>
                             <button className="btn btn-sm btn-outline-primary" style={{
@@ -33382,6 +33521,185 @@ max-width: 600px;
           display: flex;
           gap: 20px;
           flex-wrap: wrap;
+        }
+
+        .ai-call-range {
+          display: inline-flex;
+          align-items: center;
+          height: 32px;
+          padding: 0 12px 0 4px;
+          gap: 8px;
+          background: linear-gradient(180deg, #ffffff 0%, #f4f8ff 100%);
+          border: 1px solid #c9dafc;
+          border-radius: 999px;
+          box-shadow: 0 1px 2px rgba(37, 99, 235, 0.1);
+          cursor: pointer;
+        }
+        .ai-call-range.is-set {
+          border-color: #3b82f6;
+          background: #eff6ff;
+        }
+        .ai-call-range__icon {
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+          color: #fff;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 11px;
+          flex-shrink: 0;
+        }
+        .ai-call-range__label {
+          font-size: 12px;
+          font-weight: 600;
+          color: #1e3a8a;
+          white-space: nowrap;
+        }
+        .ai-call-date-modal { z-index: 1060; }
+        .ai-call-date-modal__card {
+          border: none;
+          border-radius: 18px;
+          overflow: hidden;
+          box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+        }
+        .ai-call-date-modal__head {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          padding: 18px 18px 8px;
+          background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+        }
+        .ai-call-date-modal__kicker {
+          margin: 0;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: #3b82f6;
+        }
+        .ai-call-date-modal__title {
+          margin: 2px 0 0;
+          font-size: 18px;
+          font-weight: 700;
+          color: #0f172a;
+        }
+        .ai-call-date-modal__close {
+          width: 30px;
+          height: 30px;
+          border: none;
+          border-radius: 50%;
+          background: #fff;
+          color: #64748b;
+          box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+        }
+        .ai-call-date-modal__body { padding: 8px 18px 4px; }
+        .ai-call-date-modal__leads {
+          display: flex;
+          align-items: flex-end;
+          gap: 10px;
+          margin-bottom: 16px;
+        }
+        .ai-call-date-modal__leads .ai-call-date-modal__field { flex: 1; }
+        .ai-call-date-modal__total {
+          min-width: 92px;
+          height: 40px;
+          padding: 0 12px;
+          border-radius: 10px;
+          background: #eff6ff;
+          border: 1px solid #dbeafe;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+        }
+        .ai-call-date-modal__total span {
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: #64748b;
+          line-height: 1;
+        }
+        .ai-call-date-modal__total strong {
+          font-size: 14px;
+          color: #1d4ed8;
+          line-height: 1.2;
+        }
+        .ai-call-date-modal__presets {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-bottom: 16px;
+        }
+        .ai-call-date-modal__preset {
+          border: 1px solid #dbeafe;
+          background: #f8fbff;
+          color: #1d4ed8;
+          border-radius: 999px;
+          padding: 6px 12px;
+          font-size: 12px;
+          font-weight: 600;
+        }
+        .ai-call-date-modal__preset:hover { background: #dbeafe; }
+        .ai-call-date-modal__fields {
+          display: flex;
+          align-items: flex-end;
+          gap: 10px;
+        }
+        .ai-call-date-modal__field {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          margin: 0;
+        }
+        .ai-call-date-modal__field span {
+          font-size: 11px;
+          font-weight: 700;
+          color: #64748b;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
+        .ai-call-date-modal__field input {
+          height: 40px;
+          border: 1px solid #dbe3f0;
+          border-radius: 10px;
+          padding: 0 10px;
+          font-size: 13px;
+          font-weight: 600;
+          color: #0f172a;
+          background: #f8fafc;
+        }
+        .ai-call-date-modal__arrow {
+          height: 40px;
+          display: inline-flex;
+          align-items: center;
+          color: #93c5fd;
+        }
+        .ai-call-date-modal__foot {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+          padding: 16px 18px 18px;
+        }
+        .ai-call-date-modal__clear,
+        .ai-call-date-modal__apply {
+          height: 36px;
+          border-radius: 10px;
+          padding: 0 16px;
+          font-size: 13px;
+          font-weight: 700;
+        }
+        .ai-call-date-modal__clear {
+          border: 1px solid #e2e8f0;
+          background: #fff;
+          color: #475569;
+        }
+        .ai-call-date-modal__apply {
+          border: none;
+          background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+          color: #fff;
         }
       `}</style>
       </div>
