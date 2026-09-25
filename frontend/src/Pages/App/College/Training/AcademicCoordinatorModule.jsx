@@ -135,33 +135,11 @@ const updateSessionApi = async (token, sessionId, payload) => {
   return res.data.data;
 };
 
-const patchSessionApi = async (token, sessionId, payload) => {
-  const res = await axios.patch(`${BACKEND_URL}/college/session-plans/${sessionId}`, payload, {
-    headers: authHeaders(token),
-  });
-  if (!res.data?.status) throw new Error(res.data?.message || "Failed to update session");
-  return res.data.data;
-};
-
 const deleteSessionApi = async (token, sessionId) => {
   const res = await axios.delete(`${BACKEND_URL}/college/session-plans/${sessionId}`, {
     headers: authHeaders(token),
   });
   if (!res.data?.status) throw new Error(res.data?.message || "Failed to delete session");
-};
-
-const fetchSeniorTrainersApi = async (token) => {
-  const res = await axios.get(`${BACKEND_URL}/college/users/training-role-users`, {
-    headers: authHeaders(token),
-    params: { roleType: "senior" },
-  });
-  return (res.data?.data || [])
-    .filter((user) => user._id)
-    .map((user) => ({
-      id: String(user._id),
-      name: user.name || user.email || "Senior Trainer",
-      email: user.email || "",
-    }));
 };
 
 const splitList = (value) =>
@@ -303,9 +281,7 @@ export default function AcademicCoordinatorMockup() {
   const [sessions, setSessions] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [activityFilter, setActivityFilter] = useState("All");
-  const [modal, setModal] = useState(null); // 'create' | 'refer' | 'activity'
+  const [modal, setModal] = useState(null); // 'create' | 'activity'
   const [createStep, setCreateStep] = useState(0);
   const [editingSession, setEditingSession] = useState(null);
   const [savingSession, setSavingSession] = useState(false);
@@ -432,40 +408,6 @@ export default function AcademicCoordinatorMockup() {
     }
   }, [persistActivityTypes]);
 
-  const loadCourseWorkspace = useCallback(async (courseId) => {
-    const token = getAuthToken();
-    if (!token || !courseId) {
-      setActivityTypes([]);
-      setSessions([]);
-      setSelectedId(null);
-      return;
-    }
-    setTypesLoading(true);
-    try {
-      const [types, sessionRows] = await Promise.all([
-        fetchActivityTypesApi(token, courseId),
-        fetchSessionsApi(token, courseId),
-      ]);
-      setActivityTypes(types);
-      setSessions(sessionRows.map(mapApiSessionToUi));
-      setSelectedId(null);
-    } catch (err) {
-      console.error("Failed to load course workspace", err);
-      setActivityTypes([]);
-      setSessions([]);
-      setToast({ type: "error", message: err.response?.data?.message || "Failed to load course data" });
-    } finally {
-      setTypesLoading(false);
-    }
-  }, []);
-
-  const handleCourseChange = (courseId) => {
-    setSelectedCourseId(courseId);
-    if (courseId) sessionStorage.setItem(COURSE_STORAGE_KEY, courseId);
-    else sessionStorage.removeItem(COURSE_STORAGE_KEY);
-    loadCourseWorkspace(courseId);
-  };
-
   const display = { fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" };
   const body = { fontFamily: "'Inter', system-ui, sans-serif" };
 
@@ -490,12 +432,10 @@ export default function AcademicCoordinatorMockup() {
 
   const filteredSessions = useMemo(() => {
     return sessions.filter((s) => {
-      if (statusFilter !== "All" && s.status !== statusFilter) return false;
-      if (activityFilter !== "All" && !(s.activityIds || []).includes(activityFilter)) return false;
       if (search && !(s.name.toLowerCase().includes(search.toLowerCase()))) return false;
       return true;
     });
-  }, [sessions, statusFilter, activityFilter, search]);
+  }, [sessions, search]);
 
   const grouped = useMemo(() => {
     const noUnit = filteredSessions.filter((s) => !s.unit);
@@ -578,25 +518,6 @@ export default function AcademicCoordinatorMockup() {
     }
   }
 
-  async function referSession(trainer) {
-    const token = getAuthToken();
-    if (!token || !selectedId) return;
-    try {
-      const saved = await patchSessionApi(token, selectedId, {
-        workflowStatus: "Sent to Senior Trainer",
-        seniorTrainerId: trainer.id,
-        seniorTrainerName: trainer.name,
-      });
-      const mapped = mapApiSessionToUi(saved);
-      setSessions((prev) => prev.map((s) => (s.id === mapped.id ? mapped : s)));
-      setModal(null);
-      setToast({ type: "success", message: `Referred to ${trainer.name}` });
-    } catch (err) {
-      console.error("Failed to refer session", err);
-      setToast({ type: "error", message: err.response?.data?.message || "Failed to refer session" });
-    }
-  }
-
   const canBeAcademicCoordinator =
     (permissions?.custom_permissions?.can_be_academic_coordinator && permissions?.permission_type === "Custom") ||
     permissions?.permission_type === "Admin";
@@ -642,20 +563,6 @@ export default function AcademicCoordinatorMockup() {
             <div style={{ ...display, fontSize: 19, fontWeight: 700 }}>Academic Coordinator</div>
           </div>
         </div>
-        <select
-          className="ac-input"
-          value={selectedCourseId}
-          onChange={(e) => handleCourseChange(e.target.value)}
-          style={{ width: 280, height: 40, padding: "8px 12px", fontWeight: 600 }}
-        >
-          <option value="">Select course</option>
-          {courses.map((course) => (
-            <option key={course._id} value={String(course._id)}>
-              {course.name || "Untitled course"}
-            </option>
-          ))}
-        </select>
-
       </div>
 
       {/* BODY */}
@@ -663,10 +570,6 @@ export default function AcademicCoordinatorMockup() {
         <Workspace
           display={display}
           distribution={distribution}
-          statusFilter={statusFilter}
-          setStatusFilter={setStatusFilter}
-          activityFilter={activityFilter}
-          setActivityFilter={setActivityFilter}
           search={search}
           setSearch={setSearch}
           grouped={grouped}
@@ -677,10 +580,9 @@ export default function AcademicCoordinatorMockup() {
           onNewPlan={() => openCreate(null)}
           onEdit={() => openCreate(selected)}
           onDelete={() => deleteSession(selected.id)}
-          onRefer={() => setModal("refer")}
           onManageActivities={() => {
             if (!selectedCourseId) {
-              setToast({ type: "error", message: "Select a course first" });
+              setToast({ type: "error", message: "No course available" });
               return;
             }
             setModal("activity");
@@ -700,14 +602,6 @@ export default function AcademicCoordinatorMockup() {
           editing={editingSession}
           activityTypes={activityTypes}
           courseStructure={courseStructure}
-        />
-      )}
-      {modal === "refer" && selected && (
-        <ReferModal
-          display={display}
-          session={selected}
-          onClose={() => setModal(null)}
-          onSend={referSession}
         />
       )}
       {modal === "activity" && (
@@ -730,10 +624,9 @@ export default function AcademicCoordinatorMockup() {
 ---------------------------------------------------------------- */
 function Workspace(props) {
   const {
-    display, distribution, statusFilter, setStatusFilter,
-    activityFilter, setActivityFilter, search, setSearch, grouped,
+    display, distribution, search, setSearch, grouped,
     selectedId, setSelectedId, selected, activityTypes, onNewPlan, onEdit,
-    onDelete, onRefer, onManageActivities,
+    onDelete, onManageActivities,
   } = props;
 
   return (
@@ -775,7 +668,7 @@ function Workspace(props) {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Search */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
         <div style={{ position: "relative", flex: "1 1 220px", minWidth: 200 }}>
           <input
@@ -787,33 +680,6 @@ function Workspace(props) {
           />
           <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: T.mute, fontSize: 13 }}>⌕</span>
         </div>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {["All", "Scheduled", "Sent to Senior Trainer", "Assigned"].map((s) => (
-            <span
-              key={s}
-              className="ac-pill-btn"
-              onClick={() => setStatusFilter(s)}
-              style={{
-                fontSize: 12, fontWeight: 600, padding: "7px 12px", borderRadius: 999,
-                background: statusFilter === s ? T.ink : "#fff", color: statusFilter === s ? "#fff" : T.mute,
-                border: `1px solid ${statusFilter === s ? T.ink : T.line}`,
-              }}
-            >
-              {s === "Sent to Senior Trainer" ? "Sent" : s}
-            </span>
-          ))}
-        </div>
-        <select
-          className="ac-input"
-          value={activityFilter}
-          onChange={(e) => setActivityFilter(e.target.value)}
-          style={{ width: 180, height: 40 }}
-        >
-          <option value="All">All activities</option>
-          {(activityTypes || []).map((a) => (
-            <option key={a.id} value={a.id}>{a.name}</option>
-          ))}
-        </select>
       </div>
 
       {/* Master-detail */}
@@ -831,7 +697,6 @@ function Workspace(props) {
           session={selected}
           onEdit={onEdit}
           onDelete={onDelete}
-          onRefer={onRefer}
           activityTypes={activityTypes}
         />
       </div>
@@ -920,7 +785,7 @@ function TocPanel({ display, grouped, selectedId, setSelectedId, onCreateFirst, 
   );
 }
 
-function DetailPanel({ display, session, onEdit, onDelete, onRefer, activityTypes }) {
+function DetailPanel({ display, session, onEdit, onDelete, activityTypes }) {
   if (!session) {
     return (
       <div style={{ background: "#fff", border: `1px solid ${T.line}`, borderRadius: 16, padding: 30, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 260, textAlign: "center" }}>
@@ -1051,14 +916,6 @@ function DetailPanel({ display, session, onEdit, onDelete, onRefer, activityType
         >
           Delete
         </button>
-        {session.status === "Scheduled" && (
-          <button
-            onClick={onRefer}
-            style={{ flex: 1.4, height: 40, borderRadius: 12, border: "none", background: T.coral, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
-          >
-            Refer session
-          </button>
-        )}
       </div>
     </div>
   );
@@ -1795,114 +1652,6 @@ function CreateModal({ display, step, setStep, onClose, onSave, saving, editing,
             {saving ? "Saving..." : "Save plan"}
           </button>
         )}
-      </div>
-    </ModalShell>
-  );
-}
-
-/* ---------------------------------------------------------------
-   Refer modal (§5.10)
----------------------------------------------------------------- */
-function ReferModal({ display, session, onClose, onSend }) {
-  const [query, setQuery] = useState("");
-  const [pickedId, setPickedId] = useState(null);
-  const [trainers, setTrainers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [sending, setSending] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      const token = getAuthToken();
-      if (!token) {
-        setLoading(false);
-        setError("Please sign in to load senior trainers");
-        return;
-      }
-      try {
-        const list = await fetchSeniorTrainersApi(token);
-        if (!cancelled) setTrainers(list);
-      } catch (err) {
-        if (!cancelled) setError(err.response?.data?.message || "Failed to load senior trainers");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    load();
-    return () => { cancelled = true; };
-  }, []);
-
-  const filtered = trainers.filter((trainer) => {
-    const q = query.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      (trainer.name || "").toLowerCase().includes(q)
-      || (trainer.email || "").toLowerCase().includes(q)
-    );
-  });
-  const picked = trainers.find((trainer) => trainer.id === pickedId) || null;
-
-  const handleSend = async () => {
-    if (!picked || sending) return;
-    setSending(true);
-    try {
-      await onSend(picked);
-    } finally {
-      setSending(false);
-    }
-  };
-
-  return (
-    <ModalShell onClose={onClose} width={440}>
-      <div style={{ padding: 22 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-          <div style={{ ...display, fontSize: 17, fontWeight: 700 }}>
-            Refer "{session.name}"
-          </div>
-          <span onClick={onClose} style={{ cursor: "pointer", color: T.mute, fontSize: 18 }}>×</span>
-        </div>
-        <div style={{ background: T.amberTint, color: "#92400e", fontSize: 12, fontWeight: 600, borderRadius: 12, padding: "10px 14px", marginBottom: 14 }}>
-          They will set the date and field trainer.
-        </div>
-        <input className="ac-input" placeholder="Search senior trainers" value={query} onChange={(e) => setQuery(e.target.value)} style={{ marginBottom: 10 }} />
-        <div style={{ maxHeight: 220, overflow: "auto" }}>
-          {loading && (
-            <div style={{ fontSize: 13, color: T.mute, padding: "12px 4px" }}>Loading senior trainers…</div>
-          )}
-          {!loading && error && (
-            <div style={{ fontSize: 13, color: T.coral, padding: "12px 4px" }}>{error}</div>
-          )}
-          {!loading && !error && filtered.length === 0 && (
-            <div style={{ fontSize: 13, color: T.mute, padding: "12px 4px" }}>
-              No senior trainers found. Tick <strong>Senior Trainer</strong> on a user in User Management.
-            </div>
-          )}
-          {filtered.map((t) => (
-            <div
-              key={t.id}
-              onClick={() => setPickedId(t.id)}
-              style={{ display: "flex", alignItems: "center", gap: 10, padding: 10, borderRadius: 12, cursor: "pointer", background: pickedId === t.id ? T.coralTint : "transparent" }}
-            >
-              <span style={{ width: 32, height: 32, borderRadius: 999, background: T.lilacTint, color: T.lilac, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700 }}>
-                {(t.name || "?")[0]}
-              </span>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{t.name}</div>
-                <div style={{ fontSize: 11, color: T.mute }}>{t.email}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <button
-          disabled={!picked || sending}
-          onClick={handleSend}
-          style={{ width: "100%", marginTop: 16, height: 44, borderRadius: 12, border: "none", background: T.coral, color: "#fff", fontSize: 14, fontWeight: 700, cursor: picked && !sending ? "pointer" : "not-allowed", opacity: picked && !sending ? 1 : 0.5 }}
-        >
-          {sending ? "Sending..." : picked ? `➤ Send to ${picked.name}` : "Select a senior trainer"}
-        </button>
       </div>
     </ModalShell>
   );

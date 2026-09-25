@@ -41,8 +41,6 @@ const AddCourse = () => {
   const sectorRef = useRef(null);
   const verticalRef = useRef(null);
   const projectRef = useRef(null);
-  const centerRef = useRef(null);
-  const choicesInstance = useRef(null);
   const searchableChoicesInstances = useRef({});
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -61,7 +59,6 @@ const AddCourse = () => {
 
   // State for data from API
   const [sectors, setSectors] = useState([]);
-  const [centers, setCenters] = useState([]);
   const [selectedVideos, setSelectedVideos] = useState([]);
   const [selectedPhotos, setSelectedPhotos] = useState([]);
   const [selectedBrochure, setSelectedBrochure] = useState(null);
@@ -100,7 +97,6 @@ const AddCourse = () => {
       trainingMode: '',
       onlineTrainingTiming: '',
       offlineTrainingTiming: '',
-      center: [],
       address: '',
       city: '',
       state: '',
@@ -173,8 +169,7 @@ const AddCourse = () => {
   const [showProjectFields, setShowProjectFields] = useState(false);
   const [showTrainingFields, setShowTrainingFields] = useState({
     online: false,
-    offline: false,
-    trainingCenter: false
+    offline: false
   });
   const [showAddressFields, setShowAddressFields] = useState({
     appLink: false,
@@ -191,34 +186,7 @@ const AddCourse = () => {
     else toast.success(message);
   };
 
-  // Fetch centers when project changes
-  useEffect(() => {
-    if (!formData.project) {
-      setCenters([]); // Clear centers if project is empty     
-      return; // Exit early if no project is selected
-    }
-
-    const fetchCenters = async () => {
-      try {
-        const response = await axios.get(`${backendUrl}/college/list-centers?projectId=${formData.project}`, {
-          headers: { 'x-auth': token },
-        });
-
-        if (response.data.success) {
-          setCenters(sortOptionsByName(response.data.data)); // Set the centers
-        } else {
-          setCenters([]); // Handle case where no data is returned
-        }
-      } catch (error) {
-        console.error("Error fetching centers:", error);
-        setCenters([]); // Fallback in case of error
-      }
-    };
-
-    fetchCenters(); // Trigger the fetch function when project changes
-  }, [formData.project, backendUrl, token]); // Re-run the effect whenever the project changes
-
-  // Fetch sectors and centers data on component mount
+  // Fetch sectors data on component mount
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -311,66 +279,6 @@ const AddCourse = () => {
       });
     };
   }, [sectors, verticals, projects, formData.sectors, formData.vertical, formData.project]);
-
-  // Consolidated Choices.js management - FIXED VERSION
-  useEffect(() => {
-    // Cleanup previous instance
-    const cleanupChoices = () => {
-      if (choicesInstance.current) {
-        try {
-          // Check if the instance has a valid element before destroying
-          if (choicesInstance.current.passedElement &&
-            choicesInstance.current.passedElement.element) {
-            choicesInstance.current.destroy();
-          }
-        } catch (error) {
-          console.warn('Error destroying Choices instance:', error);
-        }
-        choicesInstance.current = null;
-      }
-    };
-
-    // Initialize Choices.js when training center field is visible and centers are available
-    if (showTrainingFields.trainingCenter &&
-      centerRef.current &&
-      centers.length > 0) {
-
-      // Clean up any existing instance first
-      cleanupChoices();
-
-      try {
-        // Initialize new Choices instance
-        choicesInstance.current = new Choices(centerRef.current, {
-          removeItemButton: true,
-          searchEnabled: true,
-          searchPlaceholderValue: 'Search training center',
-          itemSelectText: '',
-          placeholder: false,
-          allowHTML: false,
-          shouldSort: false,
-          maxItemCount: -1,
-          duplicateItemsAllowed: false,
-          delimiter: ',',
-          paste: true,
-          maxItems: null,
-          silent: false
-        });
-
-        // Set selected values if any
-        if (formData.trainingCenter && formData.trainingCenter.length > 0) {
-          choicesInstance.current.setChoiceByValue(formData.trainingCenter);
-        }
-      } catch (error) {
-        console.error('Error initializing Choices:', error);
-      }
-    } else {
-      // Clean up if field is not visible or no centers available
-      cleanupChoices();
-    }
-
-    // Cleanup function
-    return cleanupChoices;
-  }, [showTrainingFields.trainingCenter, centers, formData.trainingCenter]);
 
   // Fetch verticals on mount
   useEffect(() => {
@@ -492,8 +400,7 @@ const AddCourse = () => {
   const handleTrainingModeChange = (value) => {
     setShowTrainingFields({
       online: value === 'Online' || value === 'Blended',
-      offline: value === 'Offline' || value === 'Blended',
-      trainingCenter: value === 'Offline' || value === 'Blended'
+      offline: value === 'Offline' || value === 'Blended'
     });
   };
 
@@ -512,15 +419,6 @@ const AddCourse = () => {
       isContact: value === 'true'
     });
     setShowContactInfo(value === 'true');
-  };
-
-  // Handle multi-select training center field
-  const handlecenterChange = (selectedOptions) => {
-    const selectedValues = Array.from(selectedOptions).map(option => option.value);
-    setFormData({
-      ...formData,
-      center: selectedValues ? [selectedValues] : []
-    });
   };
 
   // Validate file based on type
@@ -716,7 +614,6 @@ const AddCourse = () => {
       trainingMode: '',
       onlineTrainingTiming: '',
       offlineTrainingTiming: '',
-      trainingCenter: [],
       address: '',
       city: '',
       state: '',
@@ -763,8 +660,7 @@ const AddCourse = () => {
     setShowProjectFields(false);
     setShowTrainingFields({
       online: false,
-      offline: false,
-      trainingCenter: false
+      offline: false
     });
     setShowAddressFields({
       appLink: false,
@@ -1217,10 +1113,6 @@ const AddCourse = () => {
           const sectorValues = Array.isArray(value) ? value : (value ? [value] : []);
           sectorValues.forEach((v) => form.append('sectors', v));
         }
-        // Keep center as array format
-        else if (key === 'center' && Array.isArray(value)) {
-          value.forEach(v => form.append(`center`, v));
-        }
         // Handle other arrays (if any)
         else if (Array.isArray(value)) {
           value.forEach(v => form.append(`${key}[]`, v));
@@ -1628,29 +1520,6 @@ const AddCourse = () => {
                             value={formData.offlineTrainingTiming}
                             onChange={handleChange}
                           ></textarea>
-                        </div>
-                      )}
-
-                      {/* Training Center (conditional) */}
-                      {showTrainingFields.trainingCenter && (
-                        <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="trainingCenterblock">
-                          <label htmlFor="trainingCenter">Training Center</label>
-                          <select
-                            className="form-control"
-                            name="center"
-                            id="center"
-                            multiple
-                            ref={centerRef}
-                            onChange={(e) => handlecenterChange(e.target.selectedOptions)}
-                          >
-                            {Array.isArray(centers) && centers.length > 0 ? (
-                              centers.map((center, i) => (
-                                <option key={center._id || i} value={center._id}>{center.name}</option>
-                              ))
-                            ) : (
-                              <option disabled>No training centers available</option>
-                            )}
-                          </select>
                         </div>
                       )}
 

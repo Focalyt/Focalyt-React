@@ -441,9 +441,9 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     zeroPeriodEndDate: '', // Zero Period End Date
     maxStudents: 0, // Changed from 'students' to 'maxStudents'
     status: '', // Default to 'active'
-    courseId: selectedCourse._id, // Course ID (using selectedCourseData)
-    centerId: selectedCenter._id, // Center ID (using selectedCenterData)
-    createdBy: userData._id, // Assuming 'user' contains current logged-in user's ID
+    courseId: selectedCourse?._id || '', // Course ID (using selectedCourseData)
+    centerId: selectedCenter?._id || '', // Center ID (using selectedCenterData)
+    createdBy: userData?._id || '', // Assuming 'user' contains current logged-in user's ID
   });
 
   // Sub-tab states
@@ -1349,9 +1349,9 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
         zeroPeriodEndDate: null, // Zero Period End Date
         maxStudents: 0, // Changed from 'students' to 'maxStudents'
         status: 'active', // Default to 'active'
-        courseId: selectedCourse._id, // Course ID (using selectedCourseData)
-        centerId: selectedCenter._id, // Center ID (using selectedCenterData)
-        createdBy: userData._id, // Assuming 'user' contains current logged-in user's ID
+        courseId: selectedCourse?._id || '', // Course ID (using selectedCourseData)
+        centerId: selectedCenter?._id || '', // Center ID (using selectedCenterData)
+        createdBy: userData?._id || '', // Assuming 'user' contains current logged-in user's ID
       });
   };
 
@@ -2018,7 +2018,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                 {onBackToCenters && selectedCenter && (
                   <>
                     <span>/</span>
-                    <button type="button" onClick={onBackToCenters}>{selectedCenter.name || 'Center'}</button>
+                    <button type="button" onClick={onBackToCenters}>{selectedCenter?.name || 'Center'}</button>
                   </>
                 )}
                 {onBackToCourses && selectedCourse && (
