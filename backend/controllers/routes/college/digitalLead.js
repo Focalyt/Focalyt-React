@@ -182,6 +182,7 @@ async function loadLeadForVoiceCall(appliedCourseId) {
 const UNTOUCH_STATUS_ID = new mongoose.Types.ObjectId('64ab1234abcd5678ef901234');
 const DUPLICATE_SUBSTATUS_ID = new mongoose.Types.ObjectId('6a48e6b7d668a7671542801a');
 const NOT_CONNECTED_SUBSTATUS_ID = new mongoose.Types.ObjectId('6a3f5a53cfccaeeb28a4d1a3');
+const NEW_LEAD_SUBSTATUS_ID = new mongoose.Types.ObjectId('64ab1234abcd5678ef901235');
 
 const B2C_REGISTRATION_MATCH = {
     kycStage: { $ne: true },
@@ -250,7 +251,7 @@ async function resolveUntouchNotConnectedIds() {
     return { statusIds, subStatusIds };
 }
 
-const VOICEX_DISPATCH_MAX = 20;
+const VOICEX_DISPATCH_MAX = 100;
 
 async function resolveCollegeIdFromUser(user) {
     if (!user?._id) return null;
@@ -289,6 +290,59 @@ async function fetchUntouchNotConnectedLeads(collegeId) {
         _leadSubStatus: { $in: subStatusIds },
         ...aiCallNotAttemptedMatch(),
     };
+    if (collegeId) {
+        const courseIds = await courseIdsForCollege(collegeId);
+        if (!courseIds.length) return [];
+        match._course = { $in: courseIds };
+    }
+    return AppliedCourses.aggregate([
+        { $match: match },
+        ...leadListLookups(),
+    ]);
+}
+
+async function resolveUntouchNewLeadIds() {
+    const statuses = await Status.find({ title: { $regex: /^untouch$/i } }).select('_id substatuses').lean();
+    const statusIds = [];
+    const subStatusIds = [];
+    for (const status of statuses) {
+        statusIds.push(status._id);
+        for (const sub of status.substatuses || []) {
+            if (/^new\s*lead$/i.test(String(sub.title || '').trim())) {
+                subStatusIds.push(sub._id);
+            }
+        }
+    }
+    if (!statusIds.length) statusIds.push(UNTOUCH_STATUS_ID);
+    if (!subStatusIds.length) subStatusIds.push(NEW_LEAD_SUBSTATUS_ID);
+    return { statusIds, subStatusIds };
+}
+
+function parseIstDateRange(fromRaw, toRaw) {
+    const from = String(fromRaw || '').trim();
+    const to = String(toRaw || '').trim();
+    const day = /^\d{4}-\d{2}-\d{2}$/;
+    if (!day.test(from) && !day.test(to)) return null;
+    const startKey = day.test(from) ? from : to;
+    const endKey = day.test(to) ? to : from;
+    const [startDay, endDay] = startKey <= endKey ? [startKey, endKey] : [endKey, startKey];
+    return {
+        start: new Date(`${startDay}T00:00:00.000+05:30`),
+        end: new Date(`${endDay}T23:59:59.999+05:30`),
+    };
+}
+
+async function fetchUntouchNewLeadLeads(collegeId, range) {
+    const { statusIds, subStatusIds } = await resolveUntouchNewLeadIds();
+    const match = {
+        ...B2C_REGISTRATION_MATCH,
+        _leadStatus: { $in: statusIds },
+        _leadSubStatus: { $in: subStatusIds },
+        ...aiCallNotAttemptedMatch(),
+    };
+    if (range?.start && range?.end) {
+        match.createdAt = { $gte: range.start, $lte: range.end };
+    }
     if (collegeId) {
         const courseIds = await courseIdsForCollege(collegeId);
         if (!courseIds.length) return [];
@@ -1255,6 +1309,27 @@ router.get("/b2c-today", isCollege, async (req, res) => {
     }
 });
 
+// B2C leads in Untouch + New Lead that have not been sent to the AI agent.
+router.get("/untouch-new-lead", isCollege, async (req, res) => {
+    try {
+        const collegeId = await resolveCollegeIdFromUser(req.user);
+        const range = parseIstDateRange(req.query.from, req.query.to);
+        const leads = await fetchUntouchNewLeadLeads(collegeId, range);
+
+        return res.json({
+            status: true,
+            count: leads.length,
+            data: leads,
+        });
+    } catch (err) {
+        return res.status(500).json({
+            status: false,
+            msg: "Failed to get Untouch / New Lead leads",
+            error: err.message,
+        });
+    }
+});
+
 // B2C leads currently in Untouch + Not Connected.
 router.get("/untouch-not-connected", isCollege, async (req, res) => {
     try {
@@ -1607,14 +1682,17 @@ router.post("/voicex-dispatch", isCollege, async (req, res) => {
 
         const collegeId = await resolveCollegeIdFromUser(req.user);
         let pool = [];
+        const range = parseIstDateRange(req.body.from, req.body.to);
         if (source === 'b2c-today') {
             pool = await fetchB2cTodayLeads(collegeId);
+        } else if (source === 'untouch-new-lead') {
+            pool = await fetchUntouchNewLeadLeads(collegeId, range);
         } else if (source === 'untouch-not-connected') {
             pool = await fetchUntouchNotConnectedLeads(collegeId);
         } else if (!selectedLeadIds.length) {
             return res.status(400).json({
                 status: false,
-                msg: "source must be b2c-today or untouch-not-connected",
+                msg: "source must be b2c-today, untouch-new-lead, or untouch-not-connected",
             });
         }
 

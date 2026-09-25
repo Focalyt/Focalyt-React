@@ -1710,14 +1710,42 @@ const CRMDashboard = () => {
     setAiCallDateDraftTo('');
   }, []);
 
+  const loadAiCallQueue = useCallback(async (source, label, from, to) => {
+    const params = {};
+    if (source === 'untouch-new-lead') {
+      if (from) params.from = from;
+      if (to) params.to = to;
+    }
+    const listPath = source === 'untouch-new-lead'
+      ? 'untouch-new-lead'
+      : source === 'b2c-today'
+        ? 'b2c-today'
+        : 'untouch-not-connected';
+    const listRes = await axios.get(`${backendUrl}/college/digitalLead/${listPath}`, {
+      headers: { 'x-auth': token },
+      params,
+    });
+    const leads = (Array.isArray(listRes.data?.data) ? listRes.data.data : []).filter(
+      (row) => !aiCallSentIds.some((id) => String(id) === String(row.lead_id || ''))
+    );
+    setAiCallSource(source);
+    setAiCallTotalCount(leads.length);
+    setAiCallLabel(label);
+    setAiCallLeads(leads);
+    setSelectedProfiles([]);
+    setBulkMode('AiCall');
+    setShowBulkInputs(true);
+    return leads.length;
+  }, [aiCallSentIds, backendUrl, token]);
+
   const handleAiFabQueue = useCallback(async (substatus) => {
     const source = String(substatus?._id) === AI_FAB_NEW_LEAD_ID
-      ? 'b2c-today'
+      ? 'untouch-new-lead'
       : String(substatus?._id) === AI_FAB_NOT_CONNECTED_ID
         ? 'untouch-not-connected'
         : '';
-    const label = source === 'b2c-today'
-      ? "today's B2C"
+    const label = source === 'untouch-new-lead'
+      ? 'Untouch / New Lead'
       : source === 'untouch-not-connected'
         ? 'Untouch / Not Connected'
         : substatus?.title || 'AI';
@@ -1734,35 +1762,57 @@ const CRMDashboard = () => {
 
     setAiFabBusy(true);
     try {
-      const listPath = source === 'b2c-today' ? 'b2c-today' : 'untouch-not-connected';
-      const listRes = await axios.get(`${backendUrl}/college/digitalLead/${listPath}`, {
-        headers: { 'x-auth': token },
-      });
-      console.log('listRes', listRes);
-      const leads = (Array.isArray(listRes.data?.data) ? listRes.data.data : []).filter(
-        (row) => !aiCallSentIds.some((id) => String(id) === String(row.lead_id || ''))
-      );
-      const total = leads.length;
+      if (source === 'untouch-not-connected') {
+        const listRes = await axios.get(`${backendUrl}/college/digitalLead/untouch-not-connected`, {
+          headers: { 'x-auth': token },
+        });
+        const leads = (Array.isArray(listRes.data?.data) ? listRes.data.data : []).filter(
+          (row) => !aiCallSentIds.some((id) => String(id) === String(row.lead_id || ''))
+        );
+        const total = leads.length;
+        if (!total) {
+          toast.info(`No remaining ${label} leads to send to AI`);
+          return;
+        }
+        setAiCallSource(source);
+        setAiCallTotalCount(total);
+        setAiCallLabel(label);
+        setAiCallLeads(leads);
+        setSelectedProfiles([]);
+        setBulkMode('AiCall');
+        setShowBulkInputs(true);
+        setInput1Value('');
+        setAiCallDateFrom('');
+        setAiCallDateTo('');
+        toast.info(`Type how many of ${total} remaining ${label} lead(s) to call, or tick leads in the list`);
+        return;
+      }
+
+      const total = await loadAiCallQueue(source, label, '', '');
+      setAiCallDateFrom('');
+      setAiCallDateTo('');
+      setInput1Value('');
       if (!total) {
         toast.info(`No remaining ${label} leads to send to AI`);
         return;
       }
-
-      setAiCallSource(source);
-      setAiCallTotalCount(total);
-      setAiCallLabel(label);
-      setAiCallLeads(leads);
-      setSelectedProfiles([]);
-      setBulkMode('AiCall');
-      setShowBulkInputs(true);
-      setInput1Value('');
-      toast.info(`Type how many of ${total} remaining ${label} lead(s) to call, or tick leads in the list`);
+      toast.info(`Type how many of ${total} remaining ${label} lead(s) to call`);
     } catch (err) {
       toast.error(err.response?.data?.msg || err.message || 'Failed to load AI call leads');
     } finally {
       setAiFabBusy(false);
     }
-  }, [aiCallSentIds, aiFabBusy, backendUrl, token]);
+  }, [aiCallSentIds, aiFabBusy, backendUrl, loadAiCallQueue, token]);
+
+  const applyAiCallDates = useCallback((from, to) => {
+    setAiCallDateFrom(from || '');
+    setAiCallDateTo(to || '');
+    if (aiCallSource !== 'untouch-new-lead') return;
+    loadAiCallQueue(aiCallSource, aiCallLabel || 'Untouch / New Lead', from || '', to || '')
+      .catch((err) => {
+        toast.error(err.response?.data?.msg || err.message || 'Failed to load AI call leads');
+      });
+  }, [aiCallLabel, aiCallSource, loadAiCallQueue]);
 
   const handleAiCallDispatch = useCallback(async () => {
     const selectedIds = [...new Set(
@@ -1777,7 +1827,7 @@ const CRMDashboard = () => {
         })
     )];
     const numValue = parseInt(String(input1Value || '').trim(), 10);
-    const MAX_AI_CALL_BATCH = 20;
+    const MAX_AI_CALL_BATCH = 100;
     if (!aiCallSource) {
       toast.info('Pick New Lead or Not Connected first');
       return;
@@ -1807,6 +1857,8 @@ const CRMDashboard = () => {
         source: aiCallSource,
         limit: numValue,
         ...(idsToSend.length ? { leadIds: idsToSend } : {}),
+        ...(aiCallSource === 'untouch-new-lead' && aiCallDateFrom ? { from: aiCallDateFrom } : {}),
+        ...(aiCallSource === 'untouch-new-lead' && aiCallDateTo ? { to: aiCallDateTo } : {}),
       };
       const dispatchRes = await axios.post(
         `${backendUrl}/college/digitalLead/voicex-dispatch`,
@@ -1834,7 +1886,7 @@ const CRMDashboard = () => {
     } finally {
       setAiFabBusy(false);
     }
-  }, [aiCallLabel, aiCallLeads, aiCallSentIds, aiCallSource, aiFabBusy, allProfiles, backendUrl, closeAiCallBulk, hasAiAlreadyGoneThroughLead, input1Value, selectedProfiles, token]);
+  }, [aiCallDateFrom, aiCallDateTo, aiCallLabel, aiCallLeads, aiCallSentIds, aiCallSource, aiFabBusy, allProfiles, backendUrl, closeAiCallBulk, hasAiAlreadyGoneThroughLead, input1Value, selectedProfiles, token]);
 
   useEffect(() => {
     if (!isAiFabOpen) return undefined;
@@ -14379,6 +14431,31 @@ useEffect(() => {
   useEffect(() => {
     if (bulkMode !== 'AiCall' || !aiCallSource) return;
 
+    if (aiCallSource === 'untouch-new-lead') {
+      const untouchId = '64ab1234abcd5678ef901234';
+      const newLeadId = AI_FAB_NEW_LEAD_ID;
+      if (String(filterData.leadStatus || '') === untouchId && String(filterData.subStatuses || '') === newLeadId) {
+        return;
+      }
+      const untouchIndex = crmFilters.findIndex((f) => String(f._id) === untouchId);
+      if (untouchIndex >= 0) setActiveCrmFilter(untouchIndex);
+      const newFilterData = {
+        ...filterData,
+        leadStatus: untouchId,
+        subStatuses: newLeadId,
+        followupStatus: '',
+      };
+      delete newFilterData.kyc;
+      setSelectedFollowupBucket('');
+      setSelectedApprovalFilter(null);
+      setSelectedKycFilter(null);
+      setSelectedMilestoneFilter(null);
+      setFilterData(newFilterData);
+      setCurrentPage(1);
+      fetchProfileData(newFilterData, 1);
+      return;
+    }
+
     if (aiCallSource === 'b2c-today') {
       if (headerDatePreset === 'today') return;
       const today = new Date();
@@ -16994,7 +17071,7 @@ useEffect(() => {
                     <div className="adm-cycle-toolbar__outer d-flex gap-2 align-items-center justify-content-between">
                       <div className="adm-cycle-toolbar__actions d-flex flex-nowrap gap-2 align-items-center">
                         {showBulkInputs ? (
-                          bulkMode === 'AiCall' ? (
+                          bulkMode === 'AiCall' && aiCallSource === 'untouch-new-lead' ? (
                             <div className="modal show fade d-block ai-call-date-modal" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}>
                               <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '440px' }}>
                                 <div className="modal-content ai-call-date-modal__card">
@@ -17031,7 +17108,7 @@ useEffect(() => {
                                             }
                                           }}
                                           onChange={(e) => {
-                                            const maxValue = Math.min(20, aiCallTotalCount || 0);
+                                            const maxValue = Math.min(100, aiCallTotalCount || 0);
                                             let inputValue = e.target.value.replace(/[^0-9]/g, '');
                                             if (inputValue === '') {
                                               setInput1Value('');
@@ -17081,8 +17158,12 @@ useEffect(() => {
                                             } else if (preset.id === 'month') {
                                               from = new Date(today.getFullYear(), today.getMonth(), 1);
                                             }
-                                            setAiCallDateFrom(toYmd(from));
-                                            setAiCallDateTo(toYmd(to));
+                                            if (aiCallSource === 'untouch-new-lead') {
+                                              applyAiCallDates(toYmd(from), toYmd(to));
+                                            } else {
+                                              setAiCallDateFrom(toYmd(from));
+                                              setAiCallDateTo(toYmd(to));
+                                            }
                                           }}
                                         >
                                           {preset.label}
@@ -17098,9 +17179,12 @@ useEffect(() => {
                                           max={aiCallDateTo || undefined}
                                           onChange={(e) => {
                                             const next = e.target.value;
-                                            setAiCallDateFrom(next);
-                                            if (aiCallDateTo && next && next > aiCallDateTo) {
-                                              setAiCallDateTo(next);
+                                            const nextTo = aiCallDateTo && next && next > aiCallDateTo ? next : aiCallDateTo;
+                                            if (aiCallSource === 'untouch-new-lead') {
+                                              applyAiCallDates(next, nextTo);
+                                            } else {
+                                              setAiCallDateFrom(next);
+                                              if (nextTo !== aiCallDateTo) setAiCallDateTo(nextTo);
                                             }
                                           }}
                                         />
@@ -17116,9 +17200,12 @@ useEffect(() => {
                                           min={aiCallDateFrom || undefined}
                                           onChange={(e) => {
                                             const next = e.target.value;
-                                            setAiCallDateTo(next);
-                                            if (aiCallDateFrom && next && next < aiCallDateFrom) {
-                                              setAiCallDateFrom(next);
+                                            const nextFrom = aiCallDateFrom && next && next < aiCallDateFrom ? next : aiCallDateFrom;
+                                            if (aiCallSource === 'untouch-new-lead') {
+                                              applyAiCallDates(nextFrom, next);
+                                            } else {
+                                              setAiCallDateTo(next);
+                                              if (nextFrom !== aiCallDateFrom) setAiCallDateFrom(nextFrom);
                                             }
                                           }}
                                         />
@@ -17130,8 +17217,12 @@ useEffect(() => {
                                       type="button"
                                       className="ai-call-date-modal__clear"
                                       onClick={() => {
-                                        setAiCallDateFrom('');
-                                        setAiCallDateTo('');
+                                        if (aiCallSource === 'untouch-new-lead') {
+                                          applyAiCallDates('', '');
+                                        } else {
+                                          setAiCallDateFrom('');
+                                          setAiCallDateTo('');
+                                        }
                                       }}
                                     >
                                       Clear dates
@@ -17180,7 +17271,7 @@ useEffect(() => {
                                   e.preventDefault();
                                 }
                                 const maxValue = bulkMode === 'AiCall'
-                                  ? Math.min(20, aiCallTotalCount || 0)
+                                  ? Math.min(100, aiCallTotalCount || 0)
                                   : (crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0);
                                 if (e.key === 'Enter' && bulkMode === 'whatsapp' && input1Value) {
                                   e.preventDefault();
@@ -17196,7 +17287,7 @@ useEffect(() => {
                               }}
                               onChange={(e) => {
                                 const maxValue = bulkMode === 'AiCall'
-                                  ? Math.min(20, aiCallTotalCount || 0)
+                                  ? Math.min(100, aiCallTotalCount || 0)
                                   : (crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0);
                                 let inputValue = e.target.value.replace(/[^0-9]/g, '');
                                 if (inputValue === '') {
@@ -17242,6 +17333,33 @@ useEffect(() => {
                               }}
                             />
                           </div>
+                          {bulkMode === 'AiCall' && (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-primary"
+                                disabled={aiFabBusy || !input1Value}
+                                onClick={handleAiCallDispatch}
+                                style={{
+                                  padding: '6px 10px',
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                {aiFabBusy ? 'Queuing...' : 'Call AI'}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-secondary"
+                                onClick={closeAiCallBulk}
+                                title="Cancel AI call"
+                                style={{ padding: '6px 8px', fontSize: '11px' }}
+                              >
+                                <i className="fas fa-times"></i>
+                              </button>
+                            </>
+                          )}
                           </div>
                           )
                         ) : (
