@@ -94,6 +94,8 @@ import ViewJob from './Pages/App/College/Job/ViewJob';
 import EditJob from './Pages/App/College/Job/EditJob';
 import AppliedEvents from './Pages/App/Candidate/Events/AppliedEvents';
 import CandidateManagementPortal from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal';
+import NewTrainingCenters from './Pages/App/College/ProjectMangement/NewTrainingCenters';
+import NewTrainingCourses from './Pages/App/College/ProjectMangement/NewTrainingCourses';
 import CandidateManagementPortal_old from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal_copy';
 import AddCoursecopy from './Pages/App/College/Course/AddCoursecopy';
 import Registrations from './Pages/App/College/Course/Registrations';
@@ -324,6 +326,8 @@ const Layout = () => {
           <Route path="job/:id" element={<EditJob readOnly />}/>
           <Route path="editjob/:id" element={<EditJob/>}/>
           <Route path="candidatemanagment" element={<CandidateManagementPortal/>}/>
+          <Route path="new-training/centers" element={<NewTrainingCenters/>}/>
+          <Route path="new-training/courses" element={<NewTrainingCourses/>}/>
           <Route path='addcourse' element={<AddCoursecopy/>}/>
           <Route path='addcoursecopy' element={<Navigate to="/institute/addcourse" replace />}/>
           <Route path='editcoursecopy/:id' element={<RedirectEditCourseCopy />}/>

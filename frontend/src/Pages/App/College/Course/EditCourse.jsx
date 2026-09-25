@@ -1737,39 +1737,48 @@ const EditCourse = () => {
             <div className="col-xl-12 col-lg-12">
               <div className="card">
                 <div className="card-header border border-top-0 border-left-0 border-right-0">
-                  <h4 className="card-title pb-1">Documents Required</h4>
+                  <h4 className="card-title pb-1">Student Documents Required</h4>
                 </div>
                 <div className="card-content">
                   <div className="card-body">
                     <div id="documentContainer">
                       {docsRequired.map((doc, index) => (
                         <div className="row requiredDocsRow" key={doc._id || index}>
-                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1 doc-item">
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
                             <label>Document Name</label>
-                            <div className="input-group">
-                              <input
-                                type="text"
-                                className="form-control docsName"
-                                value={doc.name || ''}
-                                onChange={(e) => updateDocumentField(index, e.target.value,'name')}
-                              />
-                              <div className="input-group-append">
-                                <button
-                                  className="btn btn-danger remove-doc"
-                                  type="button"
-                                  onClick={() => doc._id ? disableDocument(doc._id) : removeDocumentField(index)}
-                                >
-                                  X
-                                </button>
-                              </div>
-                            </div>
+                            <input
+                              type="text"
+                              className="form-control docsName"
+                              value={doc.name || ''}
+                              onChange={(e) => updateDocumentField(index, e.target.value,'name')}
+                            />
                           </div>
-                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1 doc-item">
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
                             <label>Mandatory</label>
-                            <select name="mandatory-doc" className="form-control" value={doc.mandatory} onChange={(e) => updateDocumentField(index, e.target.value,'mandatory')}>
+                            <select name="mandatory-doc" className="form-control" value={String(!!doc.mandatory)} onChange={(e) => updateDocumentField(index, e.target.value,'mandatory')}>
                               <option value="true">Yes</option>
                               <option value="false">No</option>
                             </select>
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1 d-flex align-items-end">
+                            <button
+                              type="button"
+                              onClick={() => doc._id ? disableDocument(doc._id) : removeDocumentField(index)}
+                              style={{
+                                background: 'white',
+                                color: '#ef4444',
+                                border: '1.5px solid #ef4444',
+                                borderRadius: '8px',
+                                padding: '8px 14px',
+                                fontWeight: 600,
+                                fontSize: '13px',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              <i className="fa fa-trash" style={{ marginRight: '5px' }}></i>
+                              Remove
+                            </button>
                           </div>
                         </div>
                       ))}

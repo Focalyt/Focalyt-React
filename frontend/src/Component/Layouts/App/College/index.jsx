@@ -1164,6 +1164,18 @@ function CollegeLayout({ children }) {
                   <span className="menu-title">{t('training_management')}</span>
                 </a>
               </li>
+                  <li className={`nav-item ${location.pathname === '/institute/new-training/centers' ? 'active' : ''}`}>
+                    <Link to="/institute/new-training/centers" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faBuilding} />
+                      <span className="menu-title">Centers</span>
+                    </Link>
+                  </li>
+                  <li className={`nav-item ${location.pathname === '/institute/new-training/courses' ? 'active' : ''}`}>
+                    <Link to="/institute/new-training/courses" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faGraduationCap} />
+                      <span className="menu-title">Courses</span>
+                    </Link>
+                  </li>
               <li className={`nav-item ${location.pathname === '/institute/trainerManagement' ? 'active' : ''}`}>
                     <Link to="/institute/trainerManagement" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faUserTie} />

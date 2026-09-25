@@ -139,11 +139,14 @@ function EditJob({ readOnly = false }) {
   const [questionAnswers, setQuestionAnswers] = useState([
     { question: 'Do you offer safe working environment ?', answer: 'Yes we do offer as we are ISO certified' },
   ]);
+  const [docsRequired, setDocsRequired] = useState([]);
 
   const [existingVideo, setExistingVideo] = useState('');
   const [existingThumbnail, setExistingThumbnail] = useState('');
   const [jobVideo, setJobVideo] = useState(null);
   const [jobVideoThumbnail, setJobVideoThumbnail] = useState(null);
+  const [videoPreview, setVideoPreview] = useState('');
+  const [thumbnailPreview, setThumbnailPreview] = useState('');
 
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -382,6 +385,14 @@ function EditJob({ readOnly = false }) {
         }
         setExistingVideo(jd.jobVideo || '');
         setExistingThumbnail(jd.jobVideoThumbnail || '');
+        if (Array.isArray(jd.docsRequired) && jd.docsRequired.length) {
+          setDocsRequired(
+            jd.docsRequired.map((doc) => ({
+              name: doc.Name || doc.name || '',
+              mandatory: !!doc.mandatory,
+            }))
+          );
+        }
       } catch (err) {
         console.error('Failed loading job:', err.message);
         alert(err.response?.data?.message || (readOnly ? 'Unable to load this job' : 'Unable to load this job for editing'));
@@ -500,9 +511,36 @@ function EditJob({ readOnly = false }) {
     }
   }, []);
 
+  const revealNewRow = (selector) => {
+    window.setTimeout(() => {
+      document.querySelector(selector)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 40);
+  };
+
+  const addDocumentField = () => {
+    setDocsRequired((prev) => [...prev, { name: '', mandatory: false }]);
+    revealNewRow('#studentDocsRequired .requiredDocsRow.qa-row-enter');
+  };
+
+  const removeDocumentField = (index) =>
+    setDocsRequired((prev) => prev.filter((_, i) => i !== index));
+
+  const updateDocumentField = (index, value, field) => {
+    setDocsRequired((prev) =>
+      prev.map((doc, i) => {
+        if (i !== index) return doc;
+        if (field === 'name') return { ...doc, name: value };
+        if (field === 'mandatory') return { ...doc, mandatory: value === 'true' };
+        return doc;
+      })
+    );
+  };
+
   // ---------- Q&A rows ----------
-  const addQuestionAnswer = () =>
+  const addQuestionAnswer = () => {
     setQuestionAnswers((prev) => [...prev, { question: '', answer: '' }]);
+    revealNewRow('#editJobForm .qa-row.qa-row-enter');
+  };
 
   const removeQuestionAnswer = (index) =>
     setQuestionAnswers((prev) => prev.filter((_, i) => i !== index));
@@ -572,15 +610,35 @@ function EditJob({ readOnly = false }) {
 
   const handleVideoChange = (e) => {
     const file = e.target.files[0];
-    if (validateVideoFile(file)) setJobVideo(file);
+    if (validateVideoFile(file)) setJobVideo(file || null);
     else e.target.value = '';
   };
 
   const handleThumbnailChange = (e) => {
     const file = e.target.files[0];
-    if (validateImageFile(file)) setJobVideoThumbnail(file);
+    if (validateImageFile(file)) setJobVideoThumbnail(file || null);
     else e.target.value = '';
   };
+
+  useEffect(() => {
+    if (!jobVideo) {
+      setVideoPreview('');
+      return undefined;
+    }
+    const url = URL.createObjectURL(jobVideo);
+    setVideoPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [jobVideo]);
+
+  useEffect(() => {
+    if (!jobVideoThumbnail) {
+      setThumbnailPreview('');
+      return undefined;
+    }
+    const url = URL.createObjectURL(jobVideoThumbnail);
+    setThumbnailPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [jobVideoThumbnail]);
 
   const getKeyFromS3Url = (url) => {
     const s3BaseUrl = 'https://mipie-bucket.s3.ap-south-1.amazonaws.com/';
@@ -811,30 +869,42 @@ function EditJob({ readOnly = false }) {
   };
 
   return (
-    <div className="content-body">
-      <form onSubmit={handleSubmit}>
-        <section id="Concerned-Person">
-          <div className="row">
-            <div className="col-xl-12 px-3 text-right">
-              <button
-                type="button"
-                className="btn btn-outline-primary mr-2"
-                onClick={() => navigate('/institute/viewjob')}
-              >
-                All Job Details
-              </button>
-              {!readOnly && (
-                <button
-                  type="submit"
-                  className="btn btn-success text-white"
-                  disabled={loading}
-                >
-                  {loading ? 'Saving...' : 'Update Job'}
-                </button>
-              )}
-            </div>
+    <div className="content-body" id="editJobPage">
+      <div className="job-page-header">
+        <div className="job-page-header__main">
+          <div className="job-page-header__icon">
+            <i className="fa fa-briefcase"></i>
           </div>
-        </section>
+          <div>
+            <h2>{readOnly ? 'View Job' : 'Edit Job'}</h2>
+            <p>
+              <a href="/institute/dashboard">Home</a>
+              <span>›</span>
+              <span>{readOnly ? 'View Job' : 'Edit Job'}</span>
+            </p>
+          </div>
+        </div>
+        <div className="job-page-header__actions">
+          <button
+            type="button"
+            className="job-page-header__link"
+            onClick={() => navigate('/institute/viewjob')}
+          >
+            All Job Details
+          </button>
+          {!readOnly && (
+            <button
+              type="button"
+              className="job-page-header__save"
+              disabled={loading}
+              onClick={handleSubmit}
+            >
+              {loading ? 'Saving...' : 'Update Job'}
+            </button>
+          )}
+        </div>
+      </div>
+      <form onSubmit={handleSubmit} id="editJobForm">
         <fieldset disabled={readOnly} style={readOnly ? { border: 0, padding: 0, margin: 0 } : undefined}>
         <section>
           <div className="row">
@@ -1058,18 +1128,15 @@ function EditJob({ readOnly = false }) {
 
                     <div className={`col-xl-4 ${errors.location ? 'error' : ''}`} id="loc-field">
                       <label htmlFor="work-loc">Work Location<span className="mandatory"> *</span></label>
-                      <div className="input-group mb-2">
-                        <div className="input-group-prepend bg-locat">
-                          <div className="input-group-text bg-intext">
-                            <img src={resolveMediaUrl('/images/isist.png')} alt="" />
-                          </div>
-                        </div>
+                      <div className="work-location-field">
+                        <i className="fas fa-location-dot" aria-hidden="true"></i>
                         <input
                           type="text"
                           ref={workLocRef}
                           className="form-control"
                           value={form.place}
                           id="work-loc"
+                          placeholder="Search work location"
                           onChange={(e) => updateField('place', e.target.value)}
                         />
                       </div>
@@ -1617,33 +1684,105 @@ function EditJob({ readOnly = false }) {
             </div>
           </div>
 
+          <section id="studentDocsRequired">
+            <div className="row">
+              <div className="col-xl-12 col-lg-12 px-3">
+                <div className="card mt-1">
+                  <div className="card-header border border-top-0 border-left-0 border-right-0">
+                    <h4 className="card-title pb-1">Student Documents Required</h4>
+                  </div>
+                  <div className="card-content">
+                    <div className="card-body">
+                      <div id="documentContainer">
+                        {docsRequired.map((doc, index) => (
+                          <div className={`row requiredDocsRow${index === docsRequired.length - 1 ? ' qa-row-enter' : ''}`} key={index}>
+                            <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                              <label>Document Name</label>
+                              <input
+                                type="text"
+                                className="form-control docsName"
+                                value={doc.name}
+                                onChange={(e) => updateDocumentField(index, e.target.value, 'name')}
+                              />
+                            </div>
+                            <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                              <label>Mandatory</label>
+                              <select
+                                name="mandatory-doc"
+                                className="form-control"
+                                value={String(!!doc.mandatory)}
+                                onChange={(e) => updateDocumentField(index, e.target.value, 'mandatory')}
+                              >
+                                <option value="true">Yes</option>
+                                <option value="false">No</option>
+                              </select>
+                            </div>
+                            <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1 d-flex align-items-end">
+                              <button
+                                type="button"
+                                onClick={() => removeDocumentField(index)}
+                                style={{
+                                  background: 'white',
+                                  color: '#ef4444',
+                                  border: '1.5px solid #ef4444',
+                                  borderRadius: '8px',
+                                  padding: '8px 14px',
+                                  fontWeight: 600,
+                                  fontSize: '13px',
+                                  cursor: 'pointer',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                <i className="fa fa-trash" style={{ marginRight: '5px' }}></i>
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="d-flex justify-content-end mt-1">
+                        <button
+                          type="button"
+                          className="btn btn-success text-white add-another-button"
+                          onClick={addDocumentField}
+                        >
+                          {docsRequired.length > 0 ? 'Add Another' : 'Add Document'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* ---------- Questions & Answers ---------- */}
           <div className="row">
             <div className="col-xl-12 col-lg-12 px-3">
               <div className="card mt-1">
                 <div className="card-body">
                   {questionAnswers.map((qa, index) => (
-                    <div className="row" key={index}>
-                      <div className="col-xl-6 mb-1">
+                    <div className={`row qa-row${index === questionAnswers.length - 1 ? ' qa-row-enter' : ''}`} key={index}>
+                      <div className="col-12 col-xl-6 mb-1">
                         <label>Question</label>
                         <textarea
                           className="form-control"
-                          rows={1}
+                          rows={2}
                           value={qa.question}
                           onChange={(e) => updateQuestionAnswer(index, 'question', e.target.value)}
                         />
                       </div>
-                      <div className="col-xl-6 mb-1">
+                      <div className="col-12 col-xl-6 mb-1">
                         <label>Answer</label>
                         <textarea
                           className="form-control"
-                          rows={1}
+                          rows={2}
                           value={qa.answer}
                           onChange={(e) => updateQuestionAnswer(index, 'answer', e.target.value)}
                         />
                       </div>
                       {questionAnswers.length > 1 && (
-                        <div className="col-xl-12 mb-1 text-right">
+                        <div className="col-12 mb-2 d-flex justify-content-end">
                           <button
                             type="button"
                             className="btn btn-outline-danger btn-sm"
@@ -1655,8 +1794,8 @@ function EditJob({ readOnly = false }) {
                       )}
                     </div>
                   ))}
-                  <div className="col-xl-12 mb-1 text-right">
-                    <button type="button" className="btn btn-success text-white" onClick={addQuestionAnswer}>
+                  <div className="d-flex justify-content-end mt-1">
+                    <button type="button" className="btn btn-success text-white add-another-button" onClick={addQuestionAnswer}>
                       + Add Another
                     </button>
                   </div>
@@ -1690,72 +1829,102 @@ function EditJob({ readOnly = false }) {
                         onChange={(e) => updateField('duties', e.target.value)}
                       />
                     </div>
-
-                    <div className="col-xl-3 mb-1">
-                      <label>Add Video JD</label>
-                      {existingVideo ? (
-                        <div className="video-preview-container position-relative">
-                          <video style={{ maxHeight: 150, width: 250 }} controls>
-                            <source src={existingVideo} type="video/mp4" />
-                            Your browser does not support the video tag.
-                          </video>
-                          <button
-                            type="button"
-                            className="btn btn-danger btn-sm remove-video-btn"
-                            onClick={removeExistingVideo}
-                          >
-                            ✖
-                          </button>
-                        </div>
-                      ) : (
-                        <input
-                          className="form-control"
-                          type="file"
-                          accept="video/mp4, video/mov, video/avi"
-                          onChange={handleVideoChange}
-                        />
-                      )}
-                    </div>
-
-                    <div className="col-xl-3 mb-1">
-                      <label>Add Thumbnail JD</label>
-                      {existingThumbnail ? (
-                        <div className="thumbnail-preview-container position-relative">
-                          <img src={existingThumbnail} alt="" style={{ maxWidth: 150 }} />
-                          <button
-                            type="button"
-                            className="btn btn-danger btn-sm remove-video-btn"
-                            onClick={removeExistingThumbnail}
-                          >
-                            ✖
-                          </button>
-                        </div>
-                      ) : (
-                        <input
-                          className="form-control"
-                          type="file"
-                          accept="image/*"
-                          onChange={handleThumbnailChange}
-                        />
-                      )}
-                    </div>
                   </div>
-
-                  {!readOnly && (
-                  <div className="col-xl-12 mb-1 text-right">
-                    <button
-                      type="submit"
-                      className="btn btn-success waves-effect waves-light text-white"
-                      disabled={loading}
-                    >
-                      {loading ? 'Saving...' : 'Update Job'}
-                    </button>
-                  </div>
-                  )}
                 </div>
               </div>
             </div>
           </div>
+
+          <section id="jobAddDocs">
+            <div className="row">
+              <div className="col-xl-12 col-lg-12 px-3">
+                <div className="card mt-1">
+                  <div className="card-header border border-top-0 border-left-0 border-right-0">
+                    <h4 className="card-title pb-1">Add Docs</h4>
+                  </div>
+                  <div className="card-body">
+                    <div className="row">
+                      <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                        <div className="job-upload-card">
+                          <h5>Videos</h5>
+                          <div className="job-upload-preview">
+                            {videoPreview || existingVideo ? (
+                              <div className="position-relative w-100">
+                                <video controls style={{ width: '100%', maxHeight: '130px', borderRadius: '5px' }}>
+                                  <source src={videoPreview || existingVideo} type="video/mp4" />
+                                </video>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-danger position-absolute"
+                                  style={{ right: '5px', top: '5px', zIndex: 10 }}
+                                  onClick={() => (videoPreview ? setJobVideo(null) : removeExistingVideo())}
+                                >
+                                  <i className="fa fa-times"></i>
+                                </button>
+                              </div>
+                            ) : (
+                              <p>No videos uploaded</p>
+                            )}
+                          </div>
+                          <label htmlFor="jobVideo">{videoPreview || existingVideo ? 'Replace Video' : 'Add Video'}</label>
+                          <input
+                            id="jobVideo"
+                            accept="video/mp4, video/mov, video/avi"
+                            type="file"
+                            onChange={handleVideoChange}
+                          />
+                        </div>
+                      </div>
+                      <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                        <div className="job-upload-card">
+                          <h5>Thumbnails</h5>
+                          <div className="job-upload-preview">
+                            {thumbnailPreview || existingThumbnail ? (
+                              <div className="position-relative w-100">
+                                <img
+                                  src={thumbnailPreview || existingThumbnail}
+                                  alt="Thumbnail"
+                                  style={{ width: '100%', maxHeight: '130px', objectFit: 'cover', borderRadius: '5px' }}
+                                />
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-danger position-absolute"
+                                  style={{ right: '5px', top: '5px', zIndex: 10 }}
+                                  onClick={() => (thumbnailPreview ? setJobVideoThumbnail(null) : removeExistingThumbnail())}
+                                >
+                                  <i className="fa fa-times"></i>
+                                </button>
+                              </div>
+                            ) : (
+                              <p>No thumbnails uploaded</p>
+                            )}
+                          </div>
+                          <label htmlFor="jobThumbnail">{thumbnailPreview || existingThumbnail ? 'Replace Thumbnail' : 'Add New Thumbnail'}</label>
+                          <input
+                            id="jobThumbnail"
+                            accept="image/*"
+                            type="file"
+                            onChange={handleThumbnailChange}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    {!readOnly && (
+                      <div className="col-xl-12 mb-1 px-0 text-right">
+                        <button
+                          type="submit"
+                          className="btn btn-success waves-effect waves-light text-white"
+                          disabled={loading}
+                        >
+                          {loading ? 'Saving...' : 'Update Job'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
         </section>
         </fieldset>
       </form>
@@ -1900,6 +2069,190 @@ function EditJob({ readOnly = false }) {
         </div>
       )}
       <style>{`
+        #editJobPage,
+        #editJobPage label,
+        #editJobPage .form-control,
+        #editJobPage .card-title,
+        #editJobPage button,
+        #editJobPage p,
+        #editJobPage h2,
+        #editJobPage h4,
+        #editJobPage h5,
+        #editJobPage textarea,
+        #editJobPage select,
+        #editJobPage option {
+          font-family: 'Open Sans', sans-serif !important;
+        }
+        #editJobPage {
+          background: #f1f5f9;
+          min-height: 100vh;
+        }
+        #editJobPage .job-page-header {
+          background: linear-gradient(90deg, #E11D48, #ff5770);
+          border-radius: 16px;
+          padding: 24px 32px;
+          margin: 0 12px 28px;
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          box-shadow: 0 10px 25px rgba(252, 43, 90, 0.35);
+        }
+        #editJobPage .job-page-header__main,
+        #editJobPage .job-page-header__actions {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        #editJobPage .job-page-header__icon {
+          background: rgba(255,255,255,0.2);
+          border-radius: 12px;
+          padding: 10px 14px;
+          font-size: 22px;
+        }
+        #editJobPage .job-page-header h2 {
+          margin: 0 !important;
+          font-weight: 700 !important;
+          font-size: 22px !important;
+          letter-spacing: -0.02em;
+          color: white !important;
+        }
+        #editJobPage .job-page-header p {
+          margin: 4px 0 0 !important;
+          opacity: 0.85;
+          font-size: 13px !important;
+          line-height: 1.4 !important;
+          color: white !important;
+        }
+        #editJobPage .job-page-header p a {
+          color: rgba(255,255,255,0.85);
+          text-decoration: none;
+        }
+        #editJobPage .job-page-header p span {
+          margin: 0 8px;
+          opacity: 0.7;
+        }
+        #editJobPage .job-page-header__link {
+          background: rgba(255,255,255,0.16);
+          color: white !important;
+          border: 1.5px solid rgba(255,255,255,0.7);
+          border-radius: 10px;
+          padding: 8px 16px;
+          font-size: 13px !important;
+          font-weight: 600;
+        }
+        #editJobPage .job-page-header__save,
+        #editJobPage button[type="submit"] {
+          background: white !important;
+          color: #E11D48 !important;
+          border: none !important;
+          border-radius: 10px !important;
+          padding: 8px 16px !important;
+          font-size: 13px !important;
+          font-weight: 700 !important;
+        }
+        #editJobPage .card {
+          border-radius: 16px !important;
+          border: none !important;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04) !important;
+          margin-bottom: 24px !important;
+        }
+        #editJobPage .card-header {
+          display: flex !important;
+          align-items: center !important;
+          border-bottom: 1px solid #f1f5f9 !important;
+          padding: 20px 24px 16px !important;
+          background: transparent !important;
+        }
+        #editJobPage .card-title {
+          font-size: 0.95rem !important;
+          font-weight: 700 !important;
+          color: #1e293b !important;
+          letter-spacing: -0.01em !important;
+          margin-bottom: 0 !important;
+          padding-left: 14px !important;
+          position: relative !important;
+        }
+        #editJobPage .card-title::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 4px;
+          height: 18px;
+          background: linear-gradient(135deg, #FC2B5A, #764ba2);
+          border-radius: 4px;
+        }
+        #editJobPage .card-body {
+          padding: 20px 24px 24px !important;
+        }
+        #editJobPage label {
+          font-size: 12px !important;
+          font-weight: 600 !important;
+          color: #64748b !important;
+          margin-bottom: 6px !important;
+          text-transform: uppercase !important;
+          letter-spacing: 0.05em !important;
+        }
+        #editJobPage .mandatory {
+          color: #ef4444 !important;
+          font-size: 12px !important;
+          text-transform: none !important;
+        }
+        #editJobPage .form-control,
+        #editJobPage textarea.form-control,
+        #editJobPage select.form-control {
+          border: 1.5px solid #e2e8f0 !important;
+          border-radius: 10px !important;
+          padding: 9px 14px !important;
+          height: auto !important;
+          min-height: 42px !important;
+          font-size: 14px !important;
+          color: #1e293b !important;
+          background: #f8fafc !important;
+          box-shadow: none !important;
+        }
+        #editJobPage .form-control:focus {
+          border-color: #FC2B5A !important;
+          box-shadow: 0 0 0 3px rgba(252, 43, 90, 0.12) !important;
+          background: #ffffff !important;
+        }
+        #editJobPage .add-another-button {
+          transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease !important;
+        }
+        #editJobPage .add-another-button:hover {
+          transform: translateY(-1px);
+          filter: brightness(1.05);
+        }
+        #editJobPage .add-another-button:active {
+          transform: scale(0.98);
+        }
+        @keyframes qaSlideIn {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        #editJobPage .qa-row-enter {
+          animation: qaSlideIn 0.35s ease;
+        }
+        #editJobPage .work-location-field {
+          position: relative;
+          margin-bottom: 8px;
+        }
+        #editJobPage .work-location-field i {
+          position: absolute;
+          left: 14px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: #E11D48;
+          font-size: 16px;
+          z-index: 2;
+          pointer-events: none;
+        }
+        #editJobPage .work-location-field .form-control {
+          padding-left: 38px !important;
+        }
         #jd-info,
         #jd-info .card,
         #jd-info .card-body,
@@ -1917,6 +2270,158 @@ function EditJob({ readOnly = false }) {
         fieldset[disabled] .form-check-input {
           background-color: #f3f3f3 !important;
           pointer-events: none;
+        }
+
+        #studentDocsRequired .card {
+          border-radius: 16px !important;
+          border: none !important;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04) !important;
+        }
+        #studentDocsRequired .card-header {
+          display: flex !important;
+          align-items: center !important;
+          border-bottom: 1px solid #f1f5f9 !important;
+          padding: 20px 24px 16px !important;
+          background-color: transparent !important;
+        }
+        #studentDocsRequired .card-title {
+          font-family: 'Open Sans', sans-serif !important;
+          font-size: 0.95rem !important;
+          font-weight: 700 !important;
+          color: #1e293b !important;
+          letter-spacing: -0.01em !important;
+          margin-bottom: 0 !important;
+          padding-left: 14px !important;
+          position: relative !important;
+        }
+        #studentDocsRequired .card-title::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 4px;
+          height: 18px;
+          background: linear-gradient(135deg, #FC2B5A, #764ba2);
+          border-radius: 4px;
+        }
+        #studentDocsRequired label {
+          font-family: 'Open Sans', sans-serif !important;
+          font-size: 12px !important;
+          font-weight: 600 !important;
+          color: #64748b !important;
+          margin-bottom: 6px !important;
+          text-transform: uppercase !important;
+          letter-spacing: 0.05em !important;
+        }
+        #studentDocsRequired .form-control {
+          font-family: 'Open Sans', sans-serif !important;
+          border: 1.5px solid #e2e8f0 !important;
+          border-radius: 10px !important;
+          padding: 9px 14px !important;
+          height: auto !important;
+          min-height: 42px !important;
+          font-size: 14px !important;
+          color: #1e293b !important;
+          background: #f8fafc !important;
+          box-shadow: none !important;
+        }
+        #studentDocsRequired .add-another-button {
+          background: linear-gradient(135deg, #10b981, #059669) !important;
+          border: none !important;
+          border-radius: 10px !important;
+          padding: 9px 20px !important;
+          font-weight: 600 !important;
+          font-size: 13px !important;
+          font-family: 'Open Sans', sans-serif !important;
+          color: white !important;
+          box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3) !important;
+        }
+        #studentDocsRequired .requiredDocsRow {
+          border-bottom: 1px solid #f1f5f9 !important;
+          padding-bottom: 12px !important;
+          margin-bottom: 4px !important;
+        }
+
+        #jobAddDocs .card {
+          border-radius: 16px !important;
+          border: none !important;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04) !important;
+        }
+        #jobAddDocs .card-header {
+          display: flex !important;
+          align-items: center !important;
+          border-bottom: 1px solid #f1f5f9 !important;
+          padding: 20px 24px 16px !important;
+          background: transparent !important;
+        }
+        #jobAddDocs .card-title {
+          font-family: 'Open Sans', sans-serif !important;
+          font-size: 0.95rem !important;
+          font-weight: 700 !important;
+          color: #1e293b !important;
+          margin-bottom: 0 !important;
+          padding-left: 14px !important;
+          position: relative !important;
+        }
+        #jobAddDocs .card-title::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 4px;
+          height: 18px;
+          background: linear-gradient(135deg, #FC2B5A, #764ba2);
+          border-radius: 4px;
+        }
+        #jobAddDocs .job-upload-card {
+          border-radius: 14px;
+          border: 2px dashed #cbd5e1;
+          background: #fafbfc;
+          padding: 8px 10px 12px;
+          height: 100%;
+        }
+        #jobAddDocs .job-upload-card h5 {
+          font-size: 13px !important;
+          font-weight: 700 !important;
+          color: #475569 !important;
+          text-transform: uppercase !important;
+          letter-spacing: 0.06em !important;
+          text-align: center;
+          margin: 8px 0 10px !important;
+        }
+        #jobAddDocs .job-upload-preview {
+          height: 140px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #64748b;
+          font-size: 14px;
+          text-align: center;
+        }
+        #jobAddDocs .job-upload-preview p {
+          margin: 0 !important;
+          color: #64748b !important;
+          font-size: 14px !important;
+          line-height: 1.4 !important;
+        }
+        #jobAddDocs label {
+          font-family: 'Open Sans', sans-serif !important;
+          font-size: 12px !important;
+          font-weight: 600 !important;
+          color: #64748b !important;
+          margin: 8px 0 6px !important;
+          text-transform: uppercase !important;
+          letter-spacing: 0.05em !important;
+        }
+        #jobAddDocs input[type="file"] {
+          font-size: 12px !important;
+          border: 1.5px solid #e2e8f0 !important;
+          border-radius: 8px !important;
+          padding: 6px 10px !important;
+          background: white !important;
+          width: 100% !important;
         }
       `}</style>
     </div>

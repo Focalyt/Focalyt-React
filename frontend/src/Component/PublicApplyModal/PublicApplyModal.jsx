@@ -169,6 +169,7 @@ function PublicApplyModal() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [mobileTab, setMobileTab] = useState("apply");
 
   const resetForm = useCallback(() => {
     setFullName("");
@@ -196,6 +197,7 @@ function PublicApplyModal() {
 
   useEffect(() => {
     if (!target) return undefined;
+    setMobileTab(target.openTab === "detail" ? "detail" : "apply");
     resetForm();
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -240,6 +242,8 @@ function PublicApplyModal() {
   if (!target) return null;
 
   const isCourse = target.kind !== "job";
+  const details = target.details;
+  const split = Boolean(details);
   const validateMobile = () => /^[6-9]\d{9}$/.test(mobile);
   const validateEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 
@@ -292,6 +296,32 @@ function PublicApplyModal() {
       setSuccess(res.data?.newUser ? "OTP sent. Complete your details to continue." : "OTP sent. Number found in user table.");
     } catch (err) {
       setError(err.response?.data?.message || "Failed to send OTP. Please try again.");
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setError("");
+    setSuccess("");
+    if (!validateMobile()) {
+      setError("Please enter a valid 10-digit mobile number.");
+      return;
+    }
+    setSendingOtp(true);
+    try {
+      const res = await axios.post(`${backendUrl}/api/resendOTP`, { mobile });
+      if (!res.data?.status) {
+        const errorMsg = res.data?.message;
+        setError(typeof errorMsg === "string" ? errorMsg : "Failed to resend OTP.");
+        return;
+      }
+      setOtp("");
+      setOtpVerified(false);
+      setSuccess("OTP resent successfully.");
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || err.message;
+      setError(typeof errorMsg === "string" ? errorMsg : "Error resending OTP.");
     } finally {
       setSendingOtp(false);
     }
@@ -441,7 +471,8 @@ function PublicApplyModal() {
   return createPortal(
     <div className="pam-overlay" onClick={closeApply} role="presentation">
       <div
-        className="pam-card"
+        className={`pam-card${split ? " is-split" : ""}`}
+        data-tab={split ? mobileTab : undefined}
         role="dialog"
         aria-modal="true"
         aria-labelledby="pam-title"
@@ -451,39 +482,108 @@ function PublicApplyModal() {
           <X size={18} />
         </button>
 
-        <div className="pam-head">
-          <div>
-            <h2 id="pam-title">Apply Now</h2>
-            <p>
-              {isCourse
-                ? "Fill in your details to enroll in this course."
-                : "Fill in your details to apply for this job."}
-            </p>
+        {split ? (
+          <div className="pam-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mobileTab === "detail"}
+              className={mobileTab === "detail" ? "is-active" : ""}
+              onClick={() => setMobileTab("detail")}
+            >
+              View detail
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mobileTab === "apply"}
+              className={mobileTab === "apply" ? "is-active" : ""}
+              onClick={() => setMobileTab("apply")}
+            >
+              Apply
+            </button>
           </div>
-          <ApplyIllustration />
-        </div>
+        ) : null}
 
-        <div className="pam-item">
-          <img
-            src={target.image || THUMB_FALLBACK}
-            alt=""
-            onError={(e) => {
-              e.currentTarget.src = THUMB_FALLBACK;
-            }}
-          />
-          <div>
-            <strong>{target.name}</strong>
-            <span>
+        {split ? (
+          <aside className="pam-detail">
+            <img
+              className="pam-detail__img"
+              src={target.image || THUMB_FALLBACK}
+              alt=""
+              onError={(e) => {
+                e.currentTarget.src = THUMB_FALLBACK;
+              }}
+            />
+            <p className="pam-detail__kicker">Course details</p>
+            <h2 id="pam-title">{target.name}</h2>
+            <p className="pam-detail__meta">
               {target.location || "NA"}
               {target.extra ? ` | ${target.extra}` : ""}
-            </span>
-            {target.badge ? <em>{target.badge}</em> : null}
+            </p>
+            {details.tag || target.badge ? <span className="pam-detail__tag">{details.tag || target.badge}</span> : null}
+            {Array.isArray(details.perks) && details.perks.length ? (
+              <ul className="pam-detail__perks">
+                {details.perks.map((perk) => (
+                  <li key={perk.text}>{perk.text}</li>
+                ))}
+              </ul>
+            ) : null}
+            {details.description ? <p className="pam-detail__desc">{details.description}</p> : null}
+            <div className="pam-detail__price">
+              <strong>{details.isFree || details.price === "Free" ? "Free" : details.price ? `₹ ${details.price}` : target.badge}</strong>
+              {details.duration ? <span>{details.duration}</span> : null}
+              {details.extraFee ? <span>{details.extraFee}</span> : null}
+              {details.ratingCount ? <span>{details.ratingCount}</span> : null}
+            </div>
+          </aside>
+        ) : (
+          <>
+            <div className="pam-head">
+              <div>
+                <h2 id="pam-title">Apply Now</h2>
+                <p>
+                  {isCourse
+                    ? "Fill in your details to enroll in this course."
+                    : "Fill in your details to apply for this job."}
+                </p>
+              </div>
+              <ApplyIllustration />
+            </div>
+
+            <div className="pam-item">
+              <img
+                src={target.image || THUMB_FALLBACK}
+                alt=""
+                onError={(e) => {
+                  e.currentTarget.src = THUMB_FALLBACK;
+                }}
+              />
+              <div>
+                <strong>{target.name}</strong>
+                <span>
+                  {target.location || "NA"}
+                  {target.extra ? ` | ${target.extra}` : ""}
+                </span>
+                {target.badge ? <em>{target.badge}</em> : null}
+              </div>
+            </div>
+          </>
+        )}
+
+        <div className={split ? "pam-register" : undefined}>
+        {split ? (
+          <div className="pam-head">
+            <div>
+              <h2>Register</h2>
+              <p>Fill in your details to enroll in this course.</p>
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <form className="pam-form" onSubmit={handleSubmit}>
-          <label>
-            Full Name <i>*</i>
+          <label className="pam-line">
+            <span>Full Name <i>*</i></span>
             <Field icon={User}>
               <input
                 type="text"
@@ -495,8 +595,8 @@ function PublicApplyModal() {
             </Field>
           </label>
 
-          <label>
-            Email Address <i>*</i>
+          <label className="pam-line">
+            <span>Email Address <i>*</i></span>
             <Field icon={Mail}>
               <input
                 type="email"
@@ -507,9 +607,9 @@ function PublicApplyModal() {
             </Field>
           </label>
 
-          <label>
-            Mobile Number <i>*</i>
-            <div className="pam-mobile">
+          <label className="pam-line">
+            <span>Mobile Number <i>*</i></span>
+            <div className={`pam-mobile${otpSent ? " is-full" : ""}`}>
               <Field icon={Phone}>
                 <span className="pam-cc">+91</span>
                 <input
@@ -522,48 +622,60 @@ function PublicApplyModal() {
                   onChange={(e) => setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
                 />
               </Field>
-              <button type="button" className="pam-otp-btn" onClick={handleSendOtp} disabled={sendingOtp || otpVerified}>
-                {sendingOtp ? "Sending..." : otpSent ? "Resend OTP" : "Send OTP"}
-              </button>
+              {!otpSent ? (
+                <button type="button" className="pam-otp-btn" onClick={handleSendOtp} disabled={sendingOtp}>
+                  {sendingOtp ? "Sending..." : "Send OTP"}
+                </button>
+              ) : null}
             </div>
           </label>
 
-          <label>
-            Enter OTP <i>*</i>
-            <div className="pam-mobile">
-              <Field icon={ShieldCheck}>
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder="Enter 4-digit OTP"
-                  value={otp}
-                  onChange={(e) => {
-                    setOtp(e.target.value.replace(/\D/g, "").slice(0, 6));
-                    setOtpVerified(false);
-                  }}
-                />
-              </Field>
-              <button
-                type="button"
-                className="pam-verify-btn"
-                onClick={handleVerifyOtp}
-                disabled={!otpSent || verifying || otpVerified}
-              >
-                {otpVerified ? "Verified" : verifying ? "Verifying..." : "Verify"}
-              </button>
-            </div>
-          </label>
+          {otpSent ? (
+            <label className="pam-line">
+              <span>Enter OTP <i>*</i></span>
+              <div className={`pam-mobile${otpVerified ? " is-full" : ""}`}>
+                <Field icon={ShieldCheck}>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="Enter 4-digit OTP"
+                    value={otp}
+                    disabled={otpVerified}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  />
+                </Field>
+                {!otpVerified ? (
+                  <button
+                    type="button"
+                    className="pam-verify-btn"
+                    onClick={handleVerifyOtp}
+                    disabled={verifying}
+                  >
+                    {verifying ? "Verifying..." : "Verify"}
+                  </button>
+                ) : null}
+              </div>
+            </label>
+          ) : null}
 
-          <label>
-            Date of Birth <i>*</i>
+          {otpSent && !otpVerified ? (
+            <button type="button" className="pam-resend-btn" onClick={handleResendOtp} disabled={sendingOtp}>
+              {sendingOtp ? "Sending..." : "Resend OTP"}
+            </button>
+          ) : null}
+
+          {otpVerified ? (
+          <>
+          <label className="pam-line">
+            <span>Date of Birth <i>*</i></span>
             <Field icon={Calendar}>
               <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
             </Field>
           </label>
 
-          <label>
-            Gender <i>*</i>
+          <label className="pam-line">
+            <span>Gender <i>*</i></span>
             <div className="pam-select-wrap">
               <select value={gender} onChange={(e) => setGender(e.target.value)}>
                 <option value="">Select gender</option>
@@ -574,8 +686,8 @@ function PublicApplyModal() {
             </div>
           </label>
 
-          <label>
-            Address <i>*</i>
+          <label className="pam-line">
+            <span>Address <i>*</i></span>
             <Field icon={MapPin}>
               <input
                 ref={addressRef}
@@ -594,18 +706,21 @@ function PublicApplyModal() {
             <span>I confirm that the above information is correct and I agree to be contacted.</span>
           </label>
 
-          {error ? <p className="pam-alert pam-alert--error">{error}</p> : null}
-          {success ? <p className="pam-alert pam-alert--ok">{success}</p> : null}
-
           <button type="submit" className="pam-submit" disabled={submitting}>
             {submitting ? "Submitting..." : "Submit Application"}
             <span aria-hidden="true">→</span>
           </button>
+          </>
+          ) : null}
+
+          {error ? <p className="pam-alert pam-alert--error">{error}</p> : null}
+          {success ? <p className="pam-alert pam-alert--ok">{success}</p> : null}
         </form>
 
         <p className="pam-safe">
           <Lock size={13} /> Your data is safe with us
         </p>
+        </div>
       </div>
 
       <style>{`
@@ -630,6 +745,117 @@ function PublicApplyModal() {
   position: relative;
   font-family: inherit;
   color: #0f172a;
+}
+.pam-card.is-split {
+  width: min(980px, 100%);
+  display: grid;
+  grid-template-columns: minmax(260px, 360px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  margin: 0 auto;
+  overflow: hidden;
+  height: calc(100vh - 120px);
+  max-height: calc(100vh - 120px);
+}
+.pam-overlay:has(.pam-card.is-split) {
+  overflow: hidden;
+  align-items: center;
+}
+.pam-detail {
+  background: #f8fafc;
+  border-right: 1px solid #e2e8f0;
+  padding: 22px 20px 20px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.pam-detail__img {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  border-radius: 14px;
+  background: #dbeafe;
+  display: block;
+}
+.pam-detail__kicker {
+  margin: 14px 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #2563eb;
+}
+.pam-detail h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.25;
+}
+.pam-detail__meta {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+.pam-detail__tag {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #1d4ed8;
+  background: #fff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.pam-detail__perks {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.pam-detail__perks li {
+  font-size: 13px;
+  color: #334155;
+  padding-left: 14px;
+  position: relative;
+}
+.pam-detail__perks li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #2563eb;
+}
+.pam-detail__desc {
+  margin: 14px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #475569;
+}
+.pam-detail__price {
+  margin-top: 16px;
+  display: grid;
+  gap: 2px;
+}
+.pam-detail__price strong {
+  font-size: 22px;
+}
+.pam-detail__price span {
+  font-size: 12px;
+  color: #64748b;
+}
+.pam-register {
+  padding: 22px 22px 18px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.pam-card.is-split .pam-close {
+  z-index: 2;
+  background: #fff;
 }
 .pam-close {
   position: absolute;
@@ -664,6 +890,25 @@ function PublicApplyModal() {
   font-size: 14px;
   line-height: 1.4;
   max-width: 230px;
+}
+.pam-register .pam-head p {
+  max-width: none;
+  white-space: nowrap;
+}
+.pam-line {
+  display: flex !important;
+  align-items: center;
+  gap: 12px;
+}
+.pam-line > span {
+  flex: 0 0 132px;
+  white-space: nowrap;
+}
+.pam-line .pam-field,
+.pam-line .pam-mobile,
+.pam-line .pam-select-wrap {
+  flex: 1;
+  min-width: 0;
 }
 .pam-item {
   margin-top: 14px;
@@ -752,24 +997,45 @@ function PublicApplyModal() {
   grid-template-columns: 1fr auto;
   gap: 8px;
 }
-.pam-otp-btn, .pam-verify-btn {
+.pam-mobile.is-full {
+  grid-template-columns: 1fr;
+}
+.pam-resend-btn {
+  justify-self: end;
   border: 0;
-  border-radius: 12px;
-  min-width: 108px;
+  background: transparent;
+  color: #2563eb;
   font-weight: 700;
   font-size: 13px;
   cursor: pointer;
+  padding: 0;
+}
+.pam-resend-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.pam-otp-btn, .pam-verify-btn {
+  border-radius: 12px;
+  min-width: 96px;
+  min-height: 44px;
+  padding: 0 14px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
 }
 .pam-otp-btn {
+  border: 0;
   background: #2563eb;
   color: #fff;
 }
 .pam-verify-btn {
-  background: #e2e8f0;
-  color: #334155;
+  border: 1px solid #2563eb;
+  background: #fff;
+  color: #2563eb;
 }
 .pam-otp-btn:disabled, .pam-verify-btn:disabled {
-  opacity: 0.7;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 .pam-select-wrap select { appearance: none; background-image: linear-gradient(45deg, transparent 50%, #94a3b8 50%), linear-gradient(135deg, #94a3b8 50%, transparent 50%); background-position: calc(100% - 16px) 18px, calc(100% - 10px) 18px; background-size: 6px 6px, 6px 6px; background-repeat: no-repeat; }
@@ -810,10 +1076,48 @@ function PublicApplyModal() {
 .pam-alert { margin: 0; font-size: 13px; border-radius: 10px; padding: 8px 10px; }
 .pam-alert--error { background: #fef2f2; color: #b91c1c; }
 .pam-alert--ok { background: #ecfdf5; color: #047857; }
+.pam-tabs { display: none; }
+@media (max-width: 820px) {
+  .pam-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 16px 16px 0;
+  }
+  .pam-tabs button {
+    border: 1px solid #dbe3ee;
+    background: #fff;
+    color: #475569;
+    border-radius: 999px;
+    min-height: 40px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .pam-tabs button.is-active {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #fff;
+  }
+  .pam-card.is-split {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: calc(100vh - 100px);
+    max-height: calc(100vh - 100px);
+  }
+  .pam-card.is-split[data-tab="detail"] .pam-register { display: none; }
+  .pam-card.is-split[data-tab="apply"] .pam-detail { display: none; }
+  .pam-detail { border-right: 0; border-bottom: 0; max-height: none; }
+}
 @media (max-width: 520px) {
   .pam-card { padding: 18px 14px 14px; border-radius: 18px; }
+  .pam-card.is-split { padding: 0; }
   .pam-head h2 { font-size: 24px; }
-  .pam-mobile { grid-template-columns: 1fr; }
+  .pam-mobile { grid-template-columns: minmax(0, 1fr) auto; }
+  .pam-otp-btn, .pam-verify-btn { min-width: 0; padding: 0 12px; }
+  .pam-register { padding: 18px 14px 14px; }
+  .pam-line { flex-direction: column; align-items: stretch; }
+  .pam-line > span { flex-basis: auto; }
 }
       `}</style>
     </div>,

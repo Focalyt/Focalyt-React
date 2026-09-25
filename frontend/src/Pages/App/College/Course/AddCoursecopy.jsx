@@ -2167,7 +2167,7 @@ const AddCourse = () => {
                     <div id="documentContainer">
                       {docsRequired.map((doc, index) => (
                         <div className="row requiredDocsRow" key={index}>
-                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
                             <label>Document Name</label>
                             <input
                               type="text"
@@ -2176,15 +2176,14 @@ const AddCourse = () => {
                               onChange={(e) => updateDocumentField(index, e.target.value,'name')}
                             />
                           </div>
-                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1">
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
                             <label>Mandatory</label>
-                            <select name="mandatory-doc" className="form-control" value={doc.mandatory} onChange={(e) => updateDocumentField(index, e.target.value,'mandatory')}>
-                              <option value="">Select Mandatory</option>
+                            <select name="mandatory-doc" className="form-control" value={String(!!doc.mandatory)} onChange={(e) => updateDocumentField(index, e.target.value,'mandatory')}>
                               <option value="true">Yes</option>
                               <option value="false">No</option>
                             </select>
                           </div>
-                          <div className="col-xl-1 col-sm-12 col-12 mb-1 d-flex align-items-end">
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1 d-flex align-items-end">
                             <button
                               type="button"
                               onClick={() => removeDocumentField(index)}
@@ -2813,7 +2812,23 @@ const AddCourse = () => {
           min-height: 100vh;
         }
 
+        #addCourseForm,
+        #addCourseForm label,
+        #addCourseForm .form-control,
+        #addCourseForm .card-title,
+        #addCourseForm button,
+        #addCourseForm p,
+        #addCourseForm li,
+        #addCourseForm h4,
+        #addCourseForm h5,
+        .course-structure-level {
+          font-family: 'Open Sans', sans-serif !important;
+        }
+
         #course-info .card,
+        #course-structure .card,
+        #classResourceRequired .card,
+        #labResourceRequired .card,
         #docsRequired .card,
         #add-docs .card,
         #testimonial-videos .card,

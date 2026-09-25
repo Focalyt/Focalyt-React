@@ -1,0 +1,839 @@
+import React, { useState, useEffect } from 'react';
+import Center from './Center';
+import axios from 'axios';
+import './listView.css';
+const Project = ({ selectedVertical = null, onBackToVerticals = null, stopAtCenter = false }) => {
+  const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
+
+  // Safe session storage access with fallback
+  const getUserData = () => {
+    try {
+      const userStr = sessionStorage.getItem("user");
+      if (!userStr || userStr === "undefined" || userStr === "null") {
+        return {};
+      }
+      return JSON.parse(userStr);
+    } catch (error) {
+      console.error("Error parsing user data from sessionStorage:", error);
+      return {};
+    }
+  };
+
+  const userData = getUserData();
+  const token = userData.token;
+
+  const [permissions, setPermissions] = useState();
+  useEffect(() => {
+    updatedPermission()
+  }, [])
+
+  const updatedPermission = async () => {
+    const respose = await axios.get(`${backendUrl}/college/permission`, {
+      headers: { 'x-auth': token }
+    });
+    if (respose.data.status) {
+      setPermissions(respose.data.permissions);
+    }
+  }
+
+  const [activeProjectTab, setActiveProjectTab] = useState('Active Projects');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [newUser, setNewUser] = useState('');
+  const [newRole, setNewRole] = useState('Viewer');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState(null);
+
+  // New states for center view
+  const [showCenters, setShowCenters] = useState(false);
+  const [selectedProjectForCenters, setSelectedProjectForCenters] = useState(null);
+
+  // Form states
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    vertical: selectedVertical?.id || '',
+    status: 'active',
+  });
+
+  // Sample verticals for dropdown
+  const availableVerticals = [
+    { id: 1, code: 'FFTL', name: 'Focalyt Future Technology Labs' },
+    { id: 2, code: 'GSE', name: 'Guest Service Associates' }
+  ];
+
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Update form data when selectedVertical changes
+  useEffect(() => {
+    if (selectedVertical) {
+      setFormData(prev => ({
+        ...prev,
+        vertical: selectedVertical.id
+      }));
+    }
+  }, [selectedVertical]);
+
+  const filteredProjects = projects.filter(project => {
+    // Status filter based on activeProjectTab
+    if (activeProjectTab === 'Active Projects' && project.status?.toLowerCase() !== 'active') {
+      return false;
+    }
+    if (activeProjectTab === 'Inactive Projects' && project.status?.toLowerCase() !== 'inactive') {
+      return false;
+    }
+
+    // Search filter on name, code, or vertical (case-insensitive)
+    const search = searchQuery.toLowerCase();
+    const nameMatch = project.name?.toLowerCase().includes(search) || false;
+    const codeMatch = project.code?.toLowerCase().includes(search) || false;
+    const verticalMatch = project.vertical?.toLowerCase().includes(search) || false;
+
+    return nameMatch || codeMatch || verticalMatch;
+  });
+
+  const resetForm = () => {
+    setFormData({
+      code: '',
+      name: '',
+      description: '',
+      vertical: selectedVertical?.id || '',
+      status: 'active',
+      priority: 'medium'
+    });
+  };
+
+  const handleAdd = () => {
+    setEditingProject(null);
+    resetForm();
+    setShowAddForm(true);
+  };
+
+  const handleEdit = (project) => {
+    setEditingProject(project);
+    setFormData({
+      code: project.code || '',
+      name: project.name || '',
+      description: project.description || '',
+      vertical: project.vertical || '',
+      status: project.status || 'active',
+      priority: project.priority || 'medium'
+    });
+    setShowEditForm(true);
+  };
+
+  const handleDelete = (project) => {
+    setProjectToDelete(project);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!projectToDelete || !token) return;
+
+    try {
+      const response = await fetch(`${backendUrl}/college/delete_project/${projectToDelete._id}`, {
+        method: 'DELETE',
+        headers: {
+          'x-auth': token,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete project');
+      }
+
+      // Backend delete successful, local state update karo
+      fetchProjects();
+
+      // Modal close karo
+      setShowDeleteModal(false);
+      setProjectToDelete(null);
+
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert(error.message || 'Something went wrong while deleting');
+    }
+  };
+
+  const fetchProjects = async () => {
+    // Get verticalId from selectedVertical prop or URL (for refresh cases)
+    const verticalId = selectedVertical?.id || new URLSearchParams(window.location.search).get('verticalId');
+
+    if (!verticalId) {
+      console.warn('No verticalId available from selectedVertical or URL');
+      setProjects([]);
+      setError('No vertical context available');
+      return;
+    }
+
+    // Token check karo
+    if (!token) {
+      console.warn('No authentication token available');
+      setError('Authentication required');
+      return;
+    }
+
+    console.log('Fetching projects for verticalId:', verticalId);
+    setLoading(true);
+    setError(null);
+
+    try {
+      const url = `${backendUrl}/college/list-projects?vertical=${verticalId}`;
+      console.log('Fetching from URL:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'x-auth': token,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('Response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Response error:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText || 'Failed to fetch projects'}`);
+      }
+
+      // Response text pehle check karo
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+
+      if (!responseText || responseText.trim() === '') {
+        console.warn('Empty response received');
+        setProjects([]);
+        return;
+      }
+
+      // Ab safely JSON parse karo
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError);
+        console.error('Response text that failed to parse:', responseText);
+        throw new Error('Invalid JSON response from server');
+      }
+
+      console.log('Parsed data:', data);
+
+      if (data && data.success && Array.isArray(data.data)) {
+        setProjects(data.data);
+        console.log('Projects set successfully:', data.data.length, 'projects');
+      } else if (data && data.data && Array.isArray(data.data)) {
+        // Agar success field nahi hai but data array hai
+        setProjects(data.data);
+        console.log('Projects set (no success field):', data.data.length, 'projects');
+      } else {
+        console.warn('Unexpected data format:', data);
+        setProjects([]);
+        setError('No projects found for this vertical');
+      }
+    } catch (err) {
+      console.error('Fetch projects error:', err);
+      setError(err.message || 'Failed to load projects');
+      setProjects([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!token) return;
+
+    // Get verticalId from selectedVertical prop or URL
+    const verticalId = selectedVertical?.id || new URLSearchParams(window.location.search).get('verticalId');
+
+    console.log('useEffect for fetching projects:', { selectedVertical: !!selectedVertical, verticalId, token: !!token });
+
+    if (verticalId) {
+      // Small delay add karo to ensure component properly mounted hai
+      const timeoutId = setTimeout(() => {
+        fetchProjects();
+      }, 100);
+
+      return () => clearTimeout(timeoutId);
+    } else {
+      console.log('No verticalId available, not fetching projects');
+      setProjects([]);
+      setLoading(false);
+    }
+  }, [selectedVertical?.id, token]); // Dependencies ko specific rakho
+
+  const handleSubmit = async () => {
+    console.log('selectedVertical', selectedVertical);
+
+    if (!formData.name?.trim() || !formData.vertical?.toString().trim()) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    if (!token) {
+      alert('Authentication token not found. Please login again.');
+      return;
+    }
+
+    try {
+      console.log('formData', JSON.stringify(formData));
+
+      if (editingProject) {
+        // Edit existing project - PUT request
+        const response = await fetch(`${backendUrl}/college/edit_project/${editingProject._id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-auth': token
+          },
+          body: JSON.stringify(formData),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to update project');
+        }
+
+        fetchProjects();
+        setShowEditForm(false);
+      } else {
+        // Add new project - POST request
+        const response = await fetch(`${backendUrl}/college/add_project`, {
+          method: 'POST',
+          headers: {
+            'x-auth': token,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to add project');
+        }
+
+        fetchProjects();
+        setShowAddForm(false);
+      }
+
+      resetForm();
+      setEditingProject(null);
+    } catch (error) {
+      console.error('Submit error:', error);
+      alert(error.message || 'Something went wrong');
+    }
+  };
+
+  const handleShare = (project) => {
+    setSelectedProject(project);
+    setShowShareModal(true);
+  };
+  // URL-based state management for project component
+  const getProjectState = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const stage = urlParams.get('stage') || 'project';
+    const projectId = urlParams.get('projectId');
+
+    return { stage, projectId };
+  };
+
+  const updateProjectURL = (stage, project = null) => {
+    const url = new URL(window.location);
+    url.searchParams.set('stage', stage);
+    if (project) {
+      url.searchParams.set('projectId', project._id || project.id);
+    } else {
+      url.searchParams.delete('projectId');
+    }
+    window.history.replaceState({}, '', url);
+  };
+
+  useEffect(() => {
+    // URL-based restoration logic - only run when projects are loaded
+    const { stage, projectId } = getProjectState();
+
+    console.log('Project component - URL restoration:', { stage, projectId, projectsLoaded: projects.length > 0 });
+
+    // Don't make any decisions until projects are loaded
+    if (projects.length === 0) {
+      console.log('Projects not loaded yet, skipping URL restoration');
+      return;
+    }
+
+    if ((stage === "center" || stage === "course" || stage === "batch") && projectId) {
+      // We have projectId in URL and projects are loaded, find the project
+      const foundProject = projects.find(p => (p._id || p.id) === projectId);
+      if (foundProject) {
+        setSelectedProjectForCenters(foundProject);
+        setShowCenters(true);
+        console.log('Found project from URL and restored to center/course/batch view:', foundProject.name);
+      } else {
+        // Project not found, reset to project view
+        console.warn('Project not found, resetting to project view');
+        updateProjectURL('project');
+        setShowCenters(false);
+      }
+    } else if (stage === 'project') {
+      // User is on project page - keep them there
+      setShowCenters(false);
+      console.log('Staying on project view (no URL change needed)');
+    } else {
+      // Any other stage - default to project view
+      setShowCenters(false);
+      updateProjectURL('project');
+      console.log('Redirecting to project view from unknown stage:', stage);
+    }
+  }, [projects]); // Added projects as dependency
+
+  // New function to handle project click for centers
+  const handleProjectClick = (project) => {
+    setSelectedProjectForCenters(project);
+    setShowCenters(true);
+    updateProjectURL('center', project);
+  };
+
+  // Function to go back to projects view
+  const handleBackToProjects = () => {
+    setShowCenters(false);
+    setSelectedProjectForCenters(null);
+    updateProjectURL('project');
+  };
+
+  const closeModal = () => {
+    setShowAddForm(false);
+    setShowEditForm(false);
+    resetForm();
+    setEditingProject(null);
+  };
+
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'high': return 'bg-danger';
+      default: return 'bg-secondary';
+    }
+  };
+
+  const getProgressPercentage = (completed, total) => {
+    if (!total || total === 0) return 0;
+    return Math.round((completed / total) * 100);
+  };
+
+  const DeleteModal = () => {
+    if (!showDeleteModal || !projectToDelete) return null;
+
+    return (
+      <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div className="modal-dialog modal-dialog-centered">
+          <div className="modal-content">
+            <div className="modal-header bg-danger text-white">
+              <h5 className="modal-title">Confirm Delete</h5>
+              <button type="button" className="btn-close btn-close-white" onClick={() => setShowDeleteModal(false)}></button>
+            </div>
+            <div className="modal-body">
+              <p>Are you sure you want to delete the project <strong>{projectToDelete.name} ({projectToDelete.code})</strong>?</p>
+              <p className="text-muted">This action cannot be undone and will remove all associated data.</p>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setShowDeleteModal(false)}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-danger" onClick={confirmDelete}>
+                Delete Project
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Early return conditions with better error handling
+  if (!token) {
+    return (
+      <div className="container py-4">
+        <div className="alert alert-warning">
+          <i className="bi bi-exclamation-triangle me-2"></i>
+          Authentication required. Please login again.
+        </div>
+      </div>
+    );
+  }
+
+  if (!selectedVertical) {
+    return (
+      <div className="container py-4">
+        <div className="alert alert-warning">
+          <i className="bi bi-exclamation-triangle me-2"></i>
+          No vertical selected. Please select a vertical first.
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) return (
+    <div className="container py-4">
+      <div className="text-center">
+        <div className="spinner-border" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+        <p className="mt-2">Loading projects...</p>
+      </div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="container py-4">
+      <div className="alert alert-danger">
+        <i className="bi bi-exclamation-circle me-2"></i>
+        {error}
+        <button className="btn btn-sm btn-outline-danger ms-2" onClick={fetchProjects}>
+          Retry
+        </button>
+      </div>
+    </div>
+  );
+
+  // If showing centers, render the Center component
+  if (showCenters && selectedProjectForCenters) {
+    return (
+      <div className="vt-screen-enter">
+        <Center
+          selectedProject={selectedProjectForCenters}
+          onBackToProjects={handleBackToProjects}
+          onBackToVerticals={onBackToVerticals}
+          selectedVertical={selectedVertical}
+          stopAtCenter={stopAtCenter}
+        />
+      </div>
+    );
+  }
+
+  const canEditProject = (permissions?.custom_permissions?.can_add_project && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin';
+
+  return (
+    <div className="container py-4 vt-page vt-screen-enter">
+      <div className="vt-shell">
+      <div className="vt-head">
+        <div>
+          <p className="vt-kicker">Training</p>
+          <div className="vt-crumb">
+            <button type="button" onClick={onBackToVerticals}>{selectedVertical?.name || 'Unknown'}</button>
+            <span>/</span>
+            <strong>Projects</strong>
+          </div>
+        </div>
+        <div className="vt-head-actions">
+          {onBackToVerticals && (
+            <button type="button" className="vt-back" onClick={onBackToVerticals} title="Back to Verticals">
+              <i className="bi bi-arrow-left"></i> Back
+            </button>
+          )}
+          {canEditProject && (
+            <button type="button" className="vt-add" onClick={handleAdd}>Add Project</button>
+          )}
+        </div>
+      </div>
+
+      <div className="vt-toolbar">
+        <div className="vt-tabs">
+          {['Active Projects', 'Inactive Projects', 'All Projects'].map(tab => (
+            <button
+              type="button"
+              key={tab}
+              className={activeProjectTab === tab ? 'is-active' : ''}
+              onClick={() => setActiveProjectTab(tab)}
+            >
+              {tab.replace(' Projects', '')}
+            </button>
+          ))}
+        </div>
+        <input
+          type="text"
+          className="vt-search"
+          placeholder="Search projects..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+
+      {filteredProjects.length > 0 ? (
+      <div className="table-responsive">
+        <table className="vt-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Description</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredProjects.map(project => (
+              <tr key={project.id || project._id} className="vt-row" title="Open centers" onClick={() => handleProjectClick(project)}>
+                <td>
+                  <span className="vt-name">
+                    <span className="vt-avatar">{(project.name || '?').charAt(0).toUpperCase()}</span>
+                    {project.name || 'Unnamed Project'}
+                    <i className="bi bi-chevron-right vt-go"></i>
+                  </span>
+                </td>
+                <td className="vt-desc">{project.description || '—'}</td>
+                <td>
+                  <span className={`vt-pill ${project.status === 'active' ? 'is-active' : ''}`}>{project.status || '—'}</span>
+                </td>
+                <td className="vt-date">{project.createdAt ? new Date(project.createdAt).toLocaleDateString('en-GB') : '—'}</td>
+                <td onClick={(e) => e.stopPropagation()}>
+                  {canEditProject && (
+                    <div className="vt-actions">
+                      <button type="button" title="Edit" onClick={() => handleEdit(project)}>
+                        <i className="bi bi-pencil"></i>
+                      </button>
+                      <button type="button" className="is-danger" title="Delete" onClick={() => handleDelete(project)}>
+                        <i className="bi bi-trash"></i>
+                      </button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      ) : !loading && (
+        <div className="vt-empty">
+          <i className="bi bi-kanban"></i>
+          <h5>No projects found</h5>
+          <p>{selectedVertical ? `No projects found for ${selectedVertical.name}` : 'Try another filter or search.'}</p>
+        </div>
+      )}
+      </div>
+
+      {/* Add/Edit Modal */}
+      {(showAddForm || showEditForm) && (
+        <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg">
+            <div className="modal-content">
+              <div className="modal-header bg-primary text-white">
+                <h5 className="modal-title">{editingProject ? 'Edit Project' : 'Add New Project'}</h5>
+                <button type="button" className="btn-close btn-close-white" onClick={closeModal}></button>
+              </div>
+              <div className="modal-body">
+                <div className="row">
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Project Name *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={formData.name || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Enter project name"
+                    />
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Description</label>
+                    <textarea
+                      className="form-control"
+                      rows="3"
+                      value={formData.description || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Enter project description"
+                    ></textarea>
+                  </div>
+                </div>
+                <div className="row">
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label">Status</label>
+                    <select
+                      className="form-select"
+                      value={formData.status || 'active'}
+                      onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={closeModal}>
+                  Cancel
+                </button>
+                <button type="button" className="btn btn-primary" onClick={handleSubmit}>
+                  {editingProject ? 'Update Project' : 'Add Project'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteModal />
+
+      {/* Share Modal */}
+      {showShareModal && selectedProject && (
+        <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg" onClick={() => setShowShareModal(false)}>
+            <div className="modal-content" onClick={e => e.stopPropagation()}>
+              <div className="modal-header bg-primary text-white">
+                <h5 className="modal-title">Manage Access - {selectedProject.code || 'Project'}</h5>
+                <button type="button" className="btn-close btn-close-white" onClick={() => setShowShareModal(false)}></button>
+              </div>
+              <div className="modal-body">
+                <div className="row mb-3">
+                  <div className="col-md-8">
+                    <input
+                      type="email"
+                      className="form-control"
+                      placeholder="Add user email"
+                      value={newUser}
+                      onChange={(e) => setNewUser(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <select
+                      className="form-select"
+                      value={newRole}
+                      onChange={(e) => setNewRole(e.target.value)}
+                    >
+                      <option value="Viewer">Viewer</option>
+                      <option value="Contributor">Contributor</option>
+                      <option value="Project Manager">Project Manager</option>
+                      <option value="Admin">Admin</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="mb-3">
+                  <textarea className="form-control" placeholder="Add message (optional)" rows={2}></textarea>
+                </div>
+                <div className="form-check mb-4">
+                  <input type="checkbox" className="form-check-input" id="notifyCheck" defaultChecked />
+                  <label className="form-check-label">Notify people</label>
+                </div>
+                <button type="button" className="btn btn-primary">Send</button>
+
+                <hr />
+
+                <h6 className="mb-3">Current Access</h6>
+                <ul className="list-group">
+                  {(selectedProject.access || []).map((a, index) => (
+                    <li key={index} className="list-group-item d-flex justify-content-between align-items-center">
+                      <div>
+                        <strong>{a.name || 'Unknown User'}</strong>
+                      </div>
+                      <select className="form-select w-auto">
+                        <option value="Viewer" selected={a.role === 'Viewer'}>Viewer</option>
+                        <option value="Contributor" selected={a.role === 'Contributor'}>Contributor</option>
+                        <option value="Project Manager" selected={a.role === 'Project Manager'}>Project Manager</option>
+                        <option value="Admin" selected={a.role === 'Admin'}>Admin</option>
+                      </select>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-secondary" onClick={() => setShowShareModal(false)}>Done</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+<style>
+{`
+/* ================= Base Styles ================= */
+
+.searchBar {
+  height: 30px;
+  width: 25%;
+}
+
+.centerBtnResponsive {
+  display: flex;
+}
+
+/* ================= 992px ================= */
+
+@media (max-width: 992px) {
+
+  .mobileHead {
+    display: block !important;
+  }
+
+  .btnPosition {
+    justify-content: space-between;
+  }
+
+  .subBtnRes {
+    white-space: nowrap;
+    padding: 0.25rem 0.5rem;
+    font-size: 12px;
+  }
+
+  .visibility {
+    display: none !important;
+  }
+}
+
+/* ================= 768px ================= */
+
+@media (max-width: 768px) {
+
+  .AddPRoject {
+    margin-left: 10px;
+  }
+
+  .verticals {
+    font-size: 15px;
+  }
+
+  .allCenter {
+    display: block !important;
+  }
+
+  .allCenterBtn {
+    margin-bottom: 10px !important;
+  }
+
+  .visibility {
+    display: none !important;
+  }
+}
+
+/* ================= 525px ================= */
+
+@media (max-width: 525px) {
+  .searchBar {
+    width: 85px !important;
+  }
+}
+
+/* ================= 450px ================= */
+
+@media (max-width: 450px) {
+
+  .navBTn {
+    padding: 4px;
+    width: 80px;
+    border: 1px solid #d5d5d5;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: clamp(12px, 1.8vw, 15px);
+  }
+}
+`}
+</style>
+    </div>
+  );
+};
+
+export default Project;

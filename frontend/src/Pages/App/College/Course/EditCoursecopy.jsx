@@ -1370,20 +1370,34 @@ const EditCourse = () => {
 
   return (
     <div className="content-body">
-      {/* Header */}
-      <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
-        <div className="content-header-left col-md-9 col-12 mb-2">
-          <div className="row breadcrumbs-top">
-            <div className="col-12">
-              <h3 className="content-header-title float-left mb-0">Edit Course</h3>
-              <div className="breadcrumb-wrapper col-12">
-                <ol className="breadcrumb">
-                  <li className="breadcrumb-item"><a href="/institute/dashboard">Home</a></li>
-                  <li className="breadcrumb-item active">Edit Course</li>
-                </ol>
-              </div>
-            </div>
-          </div>
+      <div style={{
+        background: 'linear-gradient(90deg, #E11D48 , #ff5770 )',
+        borderRadius: '16px',
+        padding: '24px 32px',
+        marginBottom: '28px',
+        color: 'white',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '16px',
+        boxShadow: '0 10px 25px rgba(252, 43, 90, 0.35)'
+      }}>
+        <div style={{
+          background: 'rgba(255,255,255,0.2)',
+          borderRadius: '12px',
+          padding: '10px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <i className="fa fa-graduation-cap" style={{ fontSize: '22px' }}></i>
+        </div>
+        <div>
+          <h2 style={{ margin: 0, fontWeight: 700, fontSize: '22px', letterSpacing: '-0.02em' }}>Edit Course</h2>
+          <p style={{ margin: '4px 0 0', opacity: 0.8, fontSize: '13px' }}>
+            <a href="/institute/dashboard" style={{ color: 'rgba(255,255,255,0.85)', textDecoration: 'none' }}>Home</a>
+            <span style={{ margin: '0 8px', opacity: 0.6 }}>›</span>
+            <span>Edit Course</span>
+          </p>
         </div>
       </div>
 
@@ -1926,6 +1940,71 @@ const EditCourse = () => {
           </div>
         </section>
 
+        <section id="course-structure">
+          <div className="row">
+            <div className="col-xl-12 col-lg-12">
+              <div className="card">
+                <div className="card-header border border-top-0 border-left-0 border-right-0">
+                  <h4 className="card-title pb-1">Course Structure</h4>
+                </div>
+                <div className="card-content">
+                  <div className="card-body">
+                    <p className="course-structure-hint">
+                      Choose which levels Academic Coordinator will use when creating session plans.
+                      Session is always required.
+                    </p>
+
+                    <div className="course-structure-path-preview" aria-live="polite">
+                      <span className="course-structure-path-preview__label">Planning path</span>
+                      <strong>{structurePathLabel}</strong>
+                    </div>
+
+                    <div className="course-structure-levels">
+                      <button
+                        type="button"
+                        className={`course-structure-level${structureLevels.unit ? ' is-active' : ''}`}
+                        onClick={() => toggleStructureLevel('unit')}
+                        aria-pressed={structureLevels.unit}
+                      >
+                        <i className="fas fa-layer-group" aria-hidden="true" /> Unit
+                      </button>
+                      <span className="course-structure-arrow" aria-hidden="true">
+                        <i className="fas fa-chevron-right" />
+                      </span>
+                      <button
+                        type="button"
+                        className={`course-structure-level${structureLevels.chapter ? ' is-active' : ''}`}
+                        onClick={() => toggleStructureLevel('chapter')}
+                        aria-pressed={structureLevels.chapter}
+                        title="Toggle chapter level"
+                      >
+                        <i className="fas fa-book" aria-hidden="true" /> Chapter
+                      </button>
+                      <span className="course-structure-arrow" aria-hidden="true">
+                        <i className="fas fa-chevron-right" />
+                      </span>
+                      <button
+                        type="button"
+                        className="course-structure-level is-active is-locked"
+                        aria-pressed="true"
+                        disabled
+                        title="Session level is always required"
+                      >
+                        <i className="fas fa-play-circle" aria-hidden="true" /> Session
+                        <span className="course-structure-level__badge">Required</span>
+                      </button>
+                    </div>
+
+                    <ul className="course-structure-rules">
+                      <li>Session is mandatory for every course.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Class Resource Required Section */}
         <section id="classResourceRequired">
           <div className="row">
@@ -2100,39 +2179,48 @@ const EditCourse = () => {
             <div className="col-xl-12 col-lg-12">
               <div className="card">
                 <div className="card-header border border-top-0 border-left-0 border-right-0">
-                  <h4 className="card-title pb-1">Documents Required</h4>
+                  <h4 className="card-title pb-1">Student Documents Required</h4>
                 </div>
                 <div className="card-content">
                   <div className="card-body">
                     <div id="documentContainer">
                       {docsRequired.map((doc, index) => (
                         <div className="row requiredDocsRow" key={doc._id || index}>
-                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1 doc-item">
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
                             <label>Document Name</label>
-                            <div className="input-group">
-                              <input
-                                type="text"
-                                className="form-control docsName"
-                                value={doc.name || ''}
-                                onChange={(e) => updateDocumentField(index, e.target.value,'name')}
-                              />
-                              <div className="input-group-append">
-                                <button
-                                  className="btn btn-danger remove-doc"
-                                  type="button"
-                                  onClick={() => doc._id ? disableDocument(doc._id) : removeDocumentField(index)}
-                                >
-                                  X
-                                </button>
-                              </div>
-                            </div>
+                            <input
+                              type="text"
+                              className="form-control docsName"
+                              value={doc.name || ''}
+                              onChange={(e) => updateDocumentField(index, e.target.value,'name')}
+                            />
                           </div>
-                          <div className="col-xl-3 col-xl-lg-3 col-md-2 col-sm-12 col-12 mb-1 doc-item">
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
                             <label>Mandatory</label>
-                            <select name="mandatory-doc" className="form-control" value={doc.mandatory} onChange={(e) => updateDocumentField(index, e.target.value,'mandatory')}>
+                            <select name="mandatory-doc" className="form-control" value={String(!!doc.mandatory)} onChange={(e) => updateDocumentField(index, e.target.value,'mandatory')}>
                               <option value="true">Yes</option>
                               <option value="false">No</option>
                             </select>
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1 d-flex align-items-end">
+                            <button
+                              type="button"
+                              onClick={() => doc._id ? disableDocument(doc._id) : removeDocumentField(index)}
+                              style={{
+                                background: 'white',
+                                color: '#ef4444',
+                                border: '1.5px solid #ef4444',
+                                borderRadius: '8px',
+                                padding: '8px 14px',
+                                fontWeight: 600,
+                                fontSize: '13px',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              <i className="fa fa-trash" style={{ marginRight: '5px' }}></i>
+                              Remove
+                            </button>
                           </div>
                         </div>
                       ))}
@@ -2494,72 +2582,6 @@ const EditCourse = () => {
           </div>
         </section>
 
-        {/* Course Structure — UI only */}
-        <section id="course-structure">
-          <div className="row">
-            <div className="col-xl-12 col-lg-12">
-              <div className="card">
-                <div className="card-header border border-top-0 border-left-0 border-right-0">
-                  <h4 className="card-title pb-1">Course Structure</h4>
-                </div>
-                <div className="card-content">
-                  <div className="card-body">
-                    <p className="course-structure-hint">
-                      Choose which levels Academic Coordinator will use when creating session plans.
-                      Session is always required.
-                    </p>
-
-                    <div className="course-structure-path-preview" aria-live="polite">
-                      <span className="course-structure-path-preview__label">Planning path</span>
-                      <strong>{structurePathLabel}</strong>
-                    </div>
-
-                    <div className="course-structure-levels">
-                      <button
-                        type="button"
-                        className={`course-structure-level${structureLevels.unit ? ' is-active' : ''}`}
-                        onClick={() => toggleStructureLevel('unit')}
-                        aria-pressed={structureLevels.unit}
-                      >
-                        <i className="fas fa-layer-group" aria-hidden="true" /> Unit
-                      </button>
-                      <span className="course-structure-arrow" aria-hidden="true">
-                        <i className="fas fa-chevron-right" />
-                      </span>
-                      <button
-                        type="button"
-                        className={`course-structure-level${structureLevels.chapter ? ' is-active' : ''}`}
-                        onClick={() => toggleStructureLevel('chapter')}
-                        aria-pressed={structureLevels.chapter}
-                        title="Toggle chapter level"
-                      >
-                        <i className="fas fa-book" aria-hidden="true" /> Chapter
-                      </button>
-                      <span className="course-structure-arrow" aria-hidden="true">
-                        <i className="fas fa-chevron-right" />
-                      </span>
-                      <button
-                        type="button"
-                        className="course-structure-level is-active is-locked"
-                        aria-pressed="true"
-                        disabled
-                        title="Session level is always required"
-                      >
-                        <i className="fas fa-play-circle" aria-hidden="true" /> Session
-                        <span className="badge badge-primary ms-2">REQUIRED</span>
-                      </button>
-                    </div>
-
-                    <p className="course-structure-note">
-                      Session is mandatory for every course.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
         {/* Extra Features Section */}
         <section id="extra-features">
           <div className="row">
@@ -2789,39 +2811,356 @@ const EditCourse = () => {
 
         {/* Submit Buttons */}
         <div className="row mt-3 mb-5">
-          <div className="col-lg-12 col-md-12 col-sm-12 col-12 text-right">
+          <div className="col-lg-12 col-md-12 col-sm-12 col-12" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
             <button
               type="button"
               onClick={resetForm}
-              className="btn btn-danger waves-effect waves-light mr-2"
               disabled={isSubmitting}
+              style={{
+                background: 'white',
+                color: '#ef4444',
+                border: '2px solid #ef4444',
+                borderRadius: '10px',
+                padding: '10px 28px',
+                fontWeight: 600,
+                fontSize: '14px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={e => { e.target.style.background = '#ef4444'; e.target.style.color = 'white'; }}
+              onMouseLeave={e => { e.target.style.background = 'white'; e.target.style.color = '#ef4444'; }}
             >
+              <i className="fa fa-refresh" style={{ marginRight: '6px' }}></i>
               Reset
             </button>
             <button
               type="submit"
-              className="btn btn-success px-lg-4 waves-effect waves-light ms-2"
               disabled={isSubmitting}
+              style={{
+                background: 'linear-gradient(90deg, #E11D48 , #ff5770 )',
+                color: 'white',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '10px 32px',
+                fontWeight: 600,
+                fontSize: '14px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(252, 43, 90, 0.4)',
+                transition: 'all 0.2s',
+              }}
             >
-              {isSubmitting ? 'Saving...' : 'Save'}
+              <i className="fa fa-save" style={{ marginRight: '6px' }}></i>
+              {isSubmitting ? 'Saving...' : 'Save Course'}
             </button>
           </div>
         </div>
       </form>
-      <style>
-        {
-          `
-          #videos{
+      <style>{`
+        #editCourseForm,
+        #editCourseForm label,
+        #editCourseForm .form-control,
+        #editCourseForm .card-title,
+        #editCourseForm button,
+        #editCourseForm p,
+        #editCourseForm li,
+        #editCourseForm h4,
+        #editCourseForm h5 {
+          font-family: 'Open Sans', sans-serif !important;
+        }
+
+        .content-body {
+          background: #f1f5f9;
+          min-height: 100vh;
+        }
+
+        #course-info .card,
+        #course-structure .card,
+        #classResourceRequired .card,
+        #labResourceRequired .card,
+        #docsRequired .card,
+        #add-docs .card,
+        #testimonial-videos .card,
+        #extra-features .card,
+        #counselor-info .card,
+        #faq-section .card {
+          border-radius: 16px !important;
+          border: none !important;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04) !important;
+          margin-bottom: 24px !important;
+        }
+
+        .card .card-header {
+          display: flex !important;
+          align-items: center !important;
+          flex-wrap: wrap !important;
+          justify-content: space-between !important;
+          border-bottom: 1px solid #f1f5f9 !important;
+          padding: 20px 24px 16px !important;
+          background-color: transparent !important;
+        }
+
+        .card .card-header .card-title {
+          font-size: 0.95rem !important;
+          font-weight: 700 !important;
+          color: #1e293b !important;
+          letter-spacing: -0.01em !important;
+          margin-bottom: 0 !important;
+          padding-left: 14px !important;
+          position: relative !important;
+        }
+        .card .card-header .card-title::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 4px;
+          height: 18px;
+          background: linear-gradient(135deg, #FC2B5A, #764ba2);
+          border-radius: 4px;
+        }
+
+        .card-body {
+          padding: 20px 24px 24px !important;
+        }
+
+        .course-structure-hint {
+          font-size: 13px !important;
+          color: #64748b !important;
+          margin-bottom: 14px !important;
+          line-height: 1.5 !important;
+        }
+        .course-structure-path-preview {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+          padding: 10px 14px;
+          margin-bottom: 14px;
+          border-radius: 10px;
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+        }
+        .course-structure-path-preview__label {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: #64748b;
+        }
+        .course-structure-path-preview strong {
+          font-size: 14px;
+          color: #1d4ed8;
+        }
+        .course-structure-levels {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 12px;
+        }
+        .course-structure-arrow {
+          color: #94a3b8;
+          font-size: 12px;
+          line-height: 1;
+        }
+        .course-structure-level {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 16px;
+          border-radius: 999px;
+          border: 1.5px solid #e2e8f0;
+          background: #f8fafc;
+          color: #64748b;
+          font-size: 13px;
+          font-weight: 700;
+          font-family: 'Open Sans', sans-serif;
+          cursor: pointer;
+          user-select: none;
+          transition: border-color 0.15s, background 0.15s, color 0.15s;
+        }
+        .course-structure-level:hover:not(:disabled) {
+          border-color: #93c5fd;
+          background: #f0f9ff;
+        }
+        .course-structure-level.is-active {
+          border-color: #2563eb;
+          background: #eff6ff;
+          color: #1d4ed8;
+        }
+        .course-structure-level.is-locked {
+          cursor: not-allowed;
+          opacity: 1;
+        }
+        .course-structure-level.is-disabled,
+        .course-structure-level:disabled:not(.is-locked) {
+          opacity: 0.45;
+          cursor: not-allowed;
+          border-color: #e2e8f0;
+          background: #f1f5f9;
+          color: #94a3b8;
+        }
+        .course-structure-level__badge {
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0.03em;
+          text-transform: uppercase;
+          padding: 2px 7px;
+          border-radius: 999px;
+          background: #dbeafe;
+          color: #1d4ed8;
+        }
+        .course-structure-rules {
+          margin: 0 !important;
+          padding-left: 18px !important;
+          color: #64748b !important;
+          font-size: 12px !important;
+          line-height: 1.6 !important;
+        }
+
+        label {
+          font-size: 12px !important;
+          font-weight: 600 !important;
+          color: #64748b;
+          margin-bottom: 6px !important;
+          text-transform: uppercase !important;
+          letter-spacing: 0.05em !important;
+        }
+
+        .form-control {
+          border: 1.5px solid #e2e8f0 !important;
+          border-radius: 10px !important;
+          padding: 9px 14px !important;
+          height: auto !important;
+          min-height: 42px !important;
+          font-size: 14px !important;
+          color: #1e293b !important;
+          background: #f8fafc !important;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease !important;
+          box-shadow: none !important;
+        }
+        .form-control:focus {
+          border-color: #FC2B5A !important;
+          box-shadow: 0 0 0 3px rgba(252, 43, 90, 0.12) !important;
+          background: #ffffff !important;
+          outline: none !important;
+        }
+        .form-control.is-invalid {
+          border-color: #ef4444 !important;
+          background: #fff8f8 !important;
+        }
+        .invalid-feedback {
+          font-size: 12px !important;
+          color: #ef4444 !important;
+          margin-top: 4px !important;
+        }
+
+        .add-another-button, .add-button {
+          background: linear-gradient(135deg, #10b981, #059669) !important;
+          border: none !important;
+          border-radius: 10px !important;
+          padding: 9px 20px !important;
+          font-weight: 600 !important;
+          font-size: 13px !important;
+          color: white !important;
+          box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3) !important;
+        }
+
+        .uploadedVideos.card,
+        .uploadedPhotos.card,
+        .brouchers.card,
+        .thumbnails.card {
+          border-radius: 14px !important;
+          border: 2px dashed #cbd5e1 !important;
+          box-shadow: none !important;
+          background: #fafbfc !important;
+          transition: border-color 0.2s !important;
+        }
+        .uploadedVideos.card:hover,
+        .uploadedPhotos.card:hover,
+        .brouchers.card:hover,
+        .thumbnails.card:hover {
+          border-color: #FC2B5A !important;
+        }
+        .uploadedVideos h5,
+        .uploadedPhotos h5,
+        .brouchers h5,
+        .thumbnails h5 {
+          font-size: 13px !important;
+          font-weight: 700 !important;
+          color: #475569 !important;
+          text-transform: uppercase !important;
+          letter-spacing: 0.06em !important;
+        }
+
+        input[type="file"] {
+          font-size: 12px !important;
+          border: 1.5px solid #e2e8f0 !important;
+          border-radius: 8px !important;
+          padding: 6px 10px !important;
+          background: white !important;
+          cursor: pointer !important;
+          width: 100% !important;
+        }
+
+        .requiredDocsRow {
+          border-bottom: 1px solid #f1f5f9 !important;
+          padding-bottom: 12px !important;
+          margin-bottom: 4px !important;
+        }
+
+        .ck-editor__editable_inline {
+          min-height: 120px !important;
+          border-radius: 0 0 8px 8px !important;
+          font-size: 14px !important;
+        }
+        .ck.ck-editor__top .ck-sticky-panel .ck-toolbar {
+          border-radius: 8px 8px 0 0 !important;
+        }
+
+        .questionanswerrow {
+          background: #fafbfc !important;
+          border-radius: 12px !important;
+          padding: 16px !important;
+          border: 1px solid #f1f5f9 !important;
+        }
+
+        .btn-sm.btn-danger {
+          background: #ef4444 !important;
+          border: none !important;
+          border-radius: 6px !important;
+        }
+
+        .choices__inner {
+          border: 1.5px solid #e2e8f0 !important;
+          border-radius: 10px !important;
+          background: #f8fafc !important;
+          font-size: 14px !important;
+        }
+        .choices__list--dropdown {
+          border-radius: 10px !important;
+          border: 1.5px solid #e2e8f0 !important;
+          box-shadow: 0 4px 16px rgba(0,0,0,0.08) !important;
+        }
+
+        .alert-success {
+          border-radius: 10px !important;
+          border: none !important;
+          background: #d1fae5 !important;
+          color: #065f46 !important;
+          font-weight: 600 !important;
+        }
+
+        .form-check-inline input[type="radio"] {
+          accent-color: #FC2B5A !important;
+          cursor: pointer !important;
+        }
+
+        #videos{
           width:100%;
-           font-size:12px
-                  }
-           .newPhotos{
-           width:70px;
-           height:70px
-           }
-          .ck-editor__editable_inline {
-            height: 100px;
-          }
+          font-size:12px;
+        }
           
           .choices__list--multiple .choices__item {
             position: relative !important;
@@ -2847,101 +3186,7 @@ const EditCourse = () => {
             border-left: 1px solid #aaa;
             color: #333;
           }
-
-          .course-structure-hint {
-            font-size: 13px;
-            color: #64748b;
-            margin-bottom: 14px;
-            line-height: 1.5;
-          }
-          .course-structure-path-preview {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-            padding: 10px 14px;
-            margin-bottom: 14px;
-            border-radius: 10px;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-          }
-          .course-structure-path-preview__label {
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-            color: #64748b;
-          }
-          .course-structure-path-preview strong {
-            font-size: 14px;
-            color: #1d4ed8;
-          }
-          .course-structure-levels {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 12px;
-          }
-          .course-structure-arrow {
-            color: #94a3b8;
-            font-size: 12px;
-            line-height: 1;
-          }
-          .course-structure-level {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 16px;
-            border-radius: 999px;
-            border: 1.5px solid #e2e8f0;
-            background: #f8fafc;
-            color: #64748b;
-            font-size: 13px;
-            font-weight: 700;
-            cursor: pointer;
-            user-select: none;
-            transition: border-color 0.15s, background 0.15s, color 0.15s;
-          }
-          .course-structure-level:hover:not(:disabled) {
-            border-color: #93c5fd;
-            background: #f0f9ff;
-          }
-          .course-structure-level.is-active {
-            border-color: #2563eb;
-            background: #eff6ff;
-            color: #1d4ed8;
-          }
-          .course-structure-level.is-locked {
-            cursor: not-allowed;
-            opacity: 1;
-          }
-          .course-structure-level.is-disabled,
-          .course-structure-level:disabled:not(.is-locked) {
-            opacity: 0.45;
-            cursor: not-allowed;
-            border-color: #e2e8f0;
-            background: #f1f5f9;
-            color: #94a3b8;
-          }
-          .course-structure-level__badge {
-            font-size: 10px;
-            font-weight: 800;
-            letter-spacing: 0.03em;
-            text-transform: uppercase;
-            padding: 2px 7px;
-            border-radius: 999px;
-            background: #dbeafe;
-            color: #1d4ed8;
-          }
-          .course-structure-rules {
-            margin: 0;
-            padding-left: 18px;
-            color: #64748b;
-          }
-          `
-        }
-      </style>
+      `}</style>
     </div >
   );
 };

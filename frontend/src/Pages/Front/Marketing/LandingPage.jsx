@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import moment from "moment";
-import { Link } from "react-router-dom";
 import { Check, Clock, Heart, Play } from "lucide-react";
 import FrontLayout from "../../../Component/Layouts/Front";
 import { resolveMediaUrl } from "../../../utils/resolveMediaUrl";
@@ -58,8 +57,35 @@ function mapCourse(course, bucketUrl) {
         ? `Reg. charges ₹ ${formatFee(course.registrationCharges)}`
         : "",
     duration: course?.duration || "",
-    applyHref: `/candidate/login?returnUrl=/candidate/course/${course?._id}`,
-    detailsHref: `/coursedetails/${course?._id}`,
+    description: String(course?.shareDescription || course?.description || "")
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+  };
+}
+
+function applyPayload(course, openTab) {
+  return {
+    openTab,
+    kind: "course",
+    id: course.id,
+    name: course.name,
+    image: course.image,
+    location: course.location,
+    extra: course.distance,
+    badge: course.isFree ? "Free Course" : "Paid Course",
+    applyPath: `/candidate/course/${course.id}?apply=1`,
+    details: {
+      perks: course.perks,
+      tag: course.tag,
+      price: course.price,
+      isFree: course.isFree,
+      extraFee: course.extraFee,
+      duration: course.duration,
+      description: course.description,
+      ratingLabel: course.ratingLabel,
+      ratingCount: course.ratingCount,
+    },
   };
 }
 
@@ -99,10 +125,10 @@ function CourseCard({ course, featured }) {
             <Play size={14} fill="#1a1d2e" stroke="none" />
           </a>
         ) : null}
-        <Link to={course.detailsHref} className="htl-photos">
+        <button type="button" className="htl-photos" onClick={() => openApply(applyPayload(course, "detail"))}>
           {course.mediaCount}
           <span aria-hidden>→</span>
-        </Link>
+        </button>
       </div>
 
       <div className="htl-body">
@@ -131,34 +157,10 @@ function CourseCard({ course, featured }) {
       </div>
 
       <div className="htl-aside">
-        <div className="htl-rating">
-          <div className="htl-rating-top">
-            <span className="htl-rating-label">{course.ratingLabel}</span>
-          </div>
-          {course.ratingCount ? <p className="htl-rating-count">{course.ratingCount}</p> : null}
-        </div>
-        <div className="htl-price-block">
-          <p className={`htl-price${course.isFree ? " is-free" : ""}`}>
-            {!course.isFree && course.price !== "—" ? <span className="htl-currency">₹</span> : null} {course.price}
-          </p>
-          {course.extraFee ? <p className="htl-taxes">{course.extraFee}</p> : null}
-          {course.duration ? <p className="htl-night">{course.duration}</p> : null}
-        </div>
         <button
           type="button"
           className="htl-login"
-          onClick={() =>
-            openApply({
-              kind: "course",
-              id: course.id,
-              name: course.name,
-              image: course.image,
-              location: course.location,
-              extra: course.distance,
-              badge: course.isFree ? "Free Course" : "Paid Course",
-              applyPath: `/candidate/course/${course.id}?apply=1`,
-            })
-          }
+          onClick={() => openApply(applyPayload(course, "apply"))}
         >
           Apply Now
         </button>
@@ -397,66 +399,25 @@ const LandingPage = () => {
   padding: 16px 18px 18px;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  text-align: right;
+  justify-content: flex-end;
   border-top: 1px solid #eef0f3;
 }
-.foc-hotel-listing .htl-rating-top {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-}
-.foc-hotel-listing .htl-rating-label {
-  color: var(--htl-blue);
-  font-weight: 800;
-  font-size: 16px;
-}
-.foc-hotel-listing .htl-rating-count {
-  margin: 4px 0 0;
-  font-size: 12px;
-  color: var(--htl-muted);
-}
-.foc-hotel-listing .htl-price-block {
-  margin-top: 22px;
-}
-.foc-hotel-listing .htl-price {
-  margin: 0;
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
-}
-.foc-hotel-listing .htl-price.is-free {
-  font-size: 22px;
-}
-.foc-hotel-listing .htl-currency {
-  font-size: 18px;
-  font-weight: 700;
-}
-.foc-hotel-listing .htl-taxes,
-.foc-hotel-listing .htl-night {
-  margin: 4px 0 0;
-  font-size: 12px;
-  color: var(--htl-muted);
-}
 .foc-hotel-listing .htl-login {
-  margin-top: auto;
-  padding-top: 18px;
   border: none;
-  background: none;
-  color: var(--htl-blue);
-  font-size: 12.5px;
-  font-weight: 600;
+  background: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
   font-family: inherit;
-  text-decoration: none;
-  display: block;
+  border-radius: 12px;
+  min-height: 44px;
   width: 100%;
-  text-align: left;
+  padding: 0 16px;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.28);
 }
 .foc-hotel-listing .htl-login:hover {
-  text-decoration: underline;
+  filter: brightness(1.06);
 }
 .foc-hotel-listing .htl-similar {
   margin: 12px 0 0;
@@ -470,7 +431,7 @@ const LandingPage = () => {
     padding: 108px 24px 64px;
   }
   .foc-hotel-listing .htl-card {
-    grid-template-columns: 248px 1fr 220px;
+    grid-template-columns: 248px 1fr 168px;
     min-height: 232px;
   }
   .foc-hotel-listing .htl-media {
@@ -484,11 +445,8 @@ const LandingPage = () => {
   }
   .foc-hotel-listing .htl-aside {
     border-top: none;
-    padding: 14px 18px 16px;
-    justify-content: space-between;
-  }
-  .foc-hotel-listing .htl-price-block {
-    margin-top: 8px;
+    padding: 14px 16px;
+    justify-content: center;
   }
 }
 
