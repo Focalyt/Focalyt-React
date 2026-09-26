@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import moment from "moment";
-import { Check, Clock, Heart, Play } from "lucide-react";
+import { Check, Clock, Heart, Play, Search } from "lucide-react";
 import FrontLayout from "../../../Component/Layouts/Front";
 import { resolveMediaUrl } from "../../../utils/resolveMediaUrl";
 import { usePublicApply } from "../../../Component/PublicApplyModal/PublicApplyModal";
@@ -171,16 +171,30 @@ function CourseCard({ course, featured }) {
 
 const LandingPage = () => {
   const [courses, setCourses] = useState([]);
+  const [uniqueSectors, setUniqueSectors] = useState([]);
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [feeFilter, setFeeFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
   useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute("data-foc-theme", "sky-magenta");
+    root.style.setProperty("--front-layout-bg", "var(--foc-color-bg)");
+    return () => {
+      root.style.removeProperty("--front-layout-bg");
+    };
+  }, []);
+
+  useEffect(() => {
     const fetchData = async () => {
       try {
         const response = await axios.get(`${backendUrl}/courses`);
         setCourses(response.data.courses ?? []);
+        setUniqueSectors(response.data.uniqueSectors ?? []);
       } catch (err) {
         console.error("Error fetching course data:", err);
         setError("Failed to load courses.");
@@ -191,29 +205,156 @@ const LandingPage = () => {
     fetchData();
   }, [backendUrl]);
 
-  const cards = courses.map((course) => mapCourse(course, bucketUrl));
+  const getFilteredCourses = () => {
+    if (!Array.isArray(courses)) return [];
+    let filtered = [...courses];
+
+    if (activeFilter !== "all") {
+      const sectorId = activeFilter.replace("id_", "");
+      filtered = filtered.filter(
+        (course) =>
+          course.sectors &&
+          Array.isArray(course.sectors) &&
+          course.sectors.some((s) => s && s.toString() === sectorId)
+      );
+    }
+
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter((course) => {
+        const nameMatch = course.name?.toLowerCase().includes(term);
+        const qualificationMatch = course.qualification?.toLowerCase().includes(term);
+        const durationMatch = course.duration?.toLowerCase().includes(term);
+        const cityMatch = course.city?.toLowerCase().includes(term);
+        const stateMatch = course.state?.toLowerCase().includes(term);
+        const modeMatch = course.trainingMode?.toLowerCase().includes(term);
+        const typeMatch = course.courseType?.toLowerCase().includes(term);
+        const sectorMatch = course.sectorNames?.some((name) =>
+          name.toLowerCase().includes(term)
+        );
+        return (
+          nameMatch ||
+          qualificationMatch ||
+          durationMatch ||
+          cityMatch ||
+          stateMatch ||
+          modeMatch ||
+          typeMatch ||
+          sectorMatch
+        );
+      });
+    }
+
+    if (feeFilter !== "all") {
+      filtered = filtered.filter(
+        (course) => course.courseFeeType?.toLowerCase() === feeFilter
+      );
+    }
+
+    filtered.sort((a, b) => {
+      const seqA = Number.isFinite(Number(a.sequence)) ? Number(a.sequence) : 50;
+      const seqB = Number.isFinite(Number(b.sequence)) ? Number(b.sequence) : 50;
+      return seqA - seqB;
+    });
+
+    return filtered;
+  };
+
+  const filteredCourses = getFilteredCourses();
+  const cards = filteredCourses.map((course) => mapCourse(course, bucketUrl));
   const featured = cards[0];
   const similar = cards.slice(1);
+  const selectedSectorName =
+    activeFilter === "all"
+      ? "All"
+      : uniqueSectors.find((s) => `id_${s._id}` === activeFilter)?.name || "All";
 
   return (
     <FrontLayout>
       <div className="foc-hotel-listing">
-        <div className="htl-wrap">
-          {loading ? <p className="htl-status">Loading courses…</p> : null}
-          {!loading && error ? <p className="htl-status">{error}</p> : null}
-          {!loading && !error && !cards.length ? <p className="htl-status">No courses found.</p> : null}
+        <section className="htl-section htl-grid-bg">
+          <div className="htl-wrap">
+            <div className="courses-filters">
+              <div className="courses-filters__row">
+                <div className="courses-filters__label">
+                  <span className="courses-filters__tag">Filter by Sector</span>
+                  <span className="courses-filters__active">{selectedSectorName}</span>
+                </div>
+                <div className="courses-search">
+                  <input
+                    type="text"
+                    className="courses-search__input"
+                    placeholder="Search courses..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  <span className="courses-search__icon">
+                    <Search size={14} />
+                  </span>
+                </div>
+              </div>
 
-          {featured ? <CourseCard course={featured} featured /> : null}
+              <div className="courses-filters__chips">
+                <button
+                  type="button"
+                  className={`filter-chip${activeFilter === "all" ? " active" : ""}`}
+                  onClick={() => setActiveFilter("all")}
+                >
+                  All <span className="filter-chip__count">{courses.length}</span>
+                </button>
+                {uniqueSectors.map((sector) => {
+                  const count = courses.filter((c) =>
+                    c.sectors?.some((s) => s && s.toString() === sector._id.toString())
+                  ).length;
+                  return (
+                    <button
+                      key={sector._id}
+                      type="button"
+                      className={`filter-chip${activeFilter === `id_${sector._id}` ? " active" : ""}`}
+                      onClick={() => setActiveFilter(`id_${sector._id}`)}
+                    >
+                      {sector.name} <span className="filter-chip__count">{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
 
-          {similar.length ? (
-            <>
-              <h2 className="htl-similar">Similar Courses around {featured?.name}</h2>
-              {similar.map((course) => (
-                <CourseCard key={course.id} course={course} />
-              ))}
-            </>
-          ) : null}
-        </div>
+              <div className="courses-filters__fee">
+                <span className="courses-filters__fee-label">Course Type:</span>
+                {["all", "paid", "free"].map((fee) => (
+                  <button
+                    key={fee}
+                    type="button"
+                    className={`filter-chip filter-chip--sm${feeFilter === fee ? " active" : ""}`}
+                    onClick={() => setFeeFilter(fee)}
+                  >
+                    {fee === "all" ? "All" : fee.charAt(0).toUpperCase() + fee.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {loading ? <p className="htl-status">Loading courses…</p> : null}
+            {!loading && error ? <p className="htl-status">{error}</p> : null}
+            {!loading && !error && !cards.length ? (
+              <div className="htl-empty">
+                <h3>No courses found</h3>
+                <p>Try adjusting your search or filters.</p>
+              </div>
+            ) : null}
+
+            {featured ? <CourseCard course={featured} featured /> : null}
+
+            {similar.length ? (
+              <>
+                <h2 className="htl-similar">Similar Courses around {featured?.name}</h2>
+                {similar.map((course) => (
+                  <CourseCard key={course.id} course={course} />
+                ))}
+              </>
+            ) : null}
+          </div>
+        </section>
       </div>
 
       <style>{`
@@ -226,18 +367,161 @@ const LandingPage = () => {
   --htl-teal: #0a8a86;
   --htl-green: #1b8a3e;
   --htl-gold: #b0892e;
-  background: #f3f3f3;
+  --cyan: var(--foc-cyan);
+  --red: var(--foc-magenta);
+  --bg: var(--foc-color-bg);
+  --surface: var(--foc-color-surface);
+  --border: rgba(4, 25, 45, .12);
+  --text: var(--foc-color-text);
+  --muted: var(--foc-color-text-muted);
+  --muted2: var(--foc-color-text-muted-2);
+  --orb1: rgba(27,167,255,.14);
+  --orb2: rgba(255,45,170,.12);
+  --grid-line: rgba(6,20,38,.055);
+  --cyan-soft: rgba(27,167,255,.085);
+  --r: var(--foc-radius-lg);
+  --ease: var(--foc-ease);
+  background: var(--bg);
   min-height: 100%;
-  padding: 96px 16px 48px;
+  padding-top: 88px;
+  position: relative;
+  overflow-x: hidden;
   font-family: var(--foc-font-sans);
   color: var(--htl-text);
+}
+.foc-hotel-listing .htl-section {
+  padding: 48px 0 64px;
+  background: var(--bg) !important;
+  position: relative;
+}
+.foc-hotel-listing .htl-grid-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 18% 12%, var(--orb1) 0%, transparent 55%),
+    radial-gradient(circle at 82% 28%, var(--orb2) 0%, transparent 60%),
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: auto, auto, 48px 48px, 48px 48px;
+  opacity: .9;
+  pointer-events: none;
 }
 .foc-hotel-listing .htl-wrap {
   width: 100%;
   max-width: 980px;
   margin: 0 auto;
+  padding: 0 16px;
   display: grid;
   gap: 16px;
+  position: relative;
+  z-index: 1;
+}
+.foc-hotel-listing .courses-filters {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 18px;
+  margin-bottom: 8px;
+}
+.foc-hotel-listing .courses-filters__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.foc-hotel-listing .courses-filters__tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  display: block;
+}
+.foc-hotel-listing .courses-filters__active {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.foc-hotel-listing .courses-search {
+  position: relative;
+  min-width: 220px;
+  flex: 1;
+  max-width: 360px;
+}
+.foc-hotel-listing .courses-search__input {
+  width: 100%;
+  padding: 10px 14px 10px 36px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+}
+.foc-hotel-listing .courses-search__input:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px var(--cyan-soft);
+}
+.foc-hotel-listing .courses-search__icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  display: flex;
+  pointer-events: none;
+}
+.foc-hotel-listing .courses-filters__chips,
+.foc-hotel-listing .courses-filters__fee {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.foc-hotel-listing .courses-filters__fee { margin-top: 12px; }
+.foc-hotel-listing .courses-filters__fee-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted2);
+  margin-right: 4px;
+}
+.foc-hotel-listing .filter-chip {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: .2s var(--ease);
+}
+.foc-hotel-listing .filter-chip--sm { padding: 6px 12px; font-size: 11px; }
+.foc-hotel-listing .filter-chip.active {
+  background: linear-gradient(90deg, var(--cyan), var(--red));
+  color: var(--foc-color-text-inverse);
+  border-color: transparent;
+}
+.foc-hotel-listing .filter-chip__count {
+  margin-left: 6px;
+  opacity: .85;
+  font-size: 11px;
+}
+.foc-hotel-listing .htl-empty {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--muted);
+}
+.foc-hotel-listing .htl-empty h3 {
+  color: var(--text);
+  margin: 0 0 8px;
 }
 .foc-hotel-listing .htl-status {
   margin: 24px 0;
@@ -427,8 +711,8 @@ const LandingPage = () => {
 }
 
 @media (min-width: 860px) {
-  .foc-hotel-listing {
-    padding: 108px 24px 64px;
+  .foc-hotel-listing .htl-wrap {
+    padding: 0 24px;
   }
   .foc-hotel-listing .htl-card {
     grid-template-columns: 248px 1fr 168px;
@@ -451,8 +735,13 @@ const LandingPage = () => {
 }
 
 @media (max-width: 479px) {
-  .foc-hotel-listing {
-    padding: 84px 10px 32px;
+  .foc-hotel-listing .htl-wrap {
+    padding: 0 10px;
+  }
+  .foc-hotel-listing .courses-search {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
   }
   .foc-hotel-listing .htl-similar {
     font-size: 18px;
