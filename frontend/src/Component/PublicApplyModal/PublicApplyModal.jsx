@@ -147,6 +147,7 @@ function PublicApplyModal() {
   const { target, closeApply } = usePublicApply();
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const addressRef = useRef(null);
+  const submittingRef = useRef(false);
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -191,6 +192,7 @@ function PublicApplyModal() {
     setSendingOtp(false);
     setVerifying(false);
     setSubmitting(false);
+    submittingRef.current = false;
     setError("");
     setSuccess("");
   }, []);
@@ -206,12 +208,17 @@ function PublicApplyModal() {
     };
   }, [target, resetForm]);
 
+  const showProfileFields = Boolean(target) && otpVerified && isNewUser;
+
   useEffect(() => {
-    if (!target) return undefined;
+    if (!showProfileFields) return undefined;
     let autocomplete;
+    let timer;
+    let cancelled = false;
     const bind = () => {
+      if (cancelled) return;
       if (!window.google?.maps?.places || !addressRef.current) {
-        window.setTimeout(bind, 200);
+        timer = window.setTimeout(bind, 200);
         return;
       }
       autocomplete = new window.google.maps.places.Autocomplete(addressRef.current, {
@@ -233,11 +240,13 @@ function PublicApplyModal() {
     };
     bind();
     return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
       if (autocomplete && window.google?.maps?.event) {
         window.google.maps.event.clearInstanceListeners(autocomplete);
       }
     };
-  }, [target]);
+  }, [showProfileFields]);
 
   if (!target) return null;
 
@@ -293,7 +302,7 @@ function PublicApplyModal() {
       setOtpSent(true);
       setOtpVerified(false);
       setOtp("");
-      setSuccess(res.data?.newUser ? "OTP sent. Complete your details to continue." : "OTP sent. Number found in user table.");
+      setSuccess("OTP sent to your mobile number.");
     } catch (err) {
       setError(err.response?.data?.message || "Failed to send OTP. Please try again.");
     } finally {
@@ -342,7 +351,11 @@ function PublicApplyModal() {
         return;
       }
       setOtpVerified(true);
-      setSuccess("Mobile number verified.");
+      setSuccess(
+        isNewUser
+          ? "Mobile number verified. Complete your details to continue."
+          : "Mobile number verified. Submit your application."
+      );
     } catch (err) {
       setError(err.response?.data?.message || "OTP verification failed.");
     } finally {
@@ -372,6 +385,30 @@ function PublicApplyModal() {
     window.setTimeout(() => closeApply(), 1200);
   };
 
+  const submitExistingApplication = async () => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    setError("");
+    setSuccess("Submitting your application...");
+    try {
+      await loginAndContinue({ treatAsExisting: true });
+    } catch (err) {
+      const errorMsg = err.response?.data?.error || err.response?.data?.message || err.message;
+      const message = typeof errorMsg === "string" ? errorMsg : "Something went wrong. Please try again.";
+      if (/candidate not found|complete registration/i.test(message)) {
+        setIsNewUser(true);
+        setSuccess("Mobile number verified. Complete your details to continue.");
+        setError("");
+      } else {
+        setError(message);
+        setSuccess("");
+      }
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -379,6 +416,10 @@ function PublicApplyModal() {
 
     if (!otpVerified) {
       setError("Please verify the OTP before submitting.");
+      return;
+    }
+    if (!isNewUser) {
+      await submitExistingApplication();
       return;
     }
     if (!confirmed) {
@@ -583,31 +624,6 @@ function PublicApplyModal() {
 
         <form className="pam-form" onSubmit={handleSubmit}>
           <label className="pam-line">
-            <span>Full Name <i>*</i></span>
-            <Field icon={User}>
-              <input
-                type="text"
-                maxLength={30}
-                placeholder="Enter your full name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-              />
-            </Field>
-          </label>
-
-          <label className="pam-line">
-            <span>Email Address <i>*</i></span>
-            <Field icon={Mail}>
-              <input
-                type="email"
-                placeholder="Enter your email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </Field>
-          </label>
-
-          <label className="pam-line">
             <span>Mobile Number <i>*</i></span>
             <div className={`pam-mobile${otpSent ? " is-full" : ""}`}>
               <Field icon={Phone}>
@@ -665,8 +681,33 @@ function PublicApplyModal() {
             </button>
           ) : null}
 
-          {otpVerified ? (
+          {otpVerified && isNewUser ? (
           <>
+          <label className="pam-line">
+            <span>Full Name <i>*</i></span>
+            <Field icon={User}>
+              <input
+                type="text"
+                maxLength={30}
+                placeholder="Enter your full name"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+              />
+            </Field>
+          </label>
+
+          <label className="pam-line">
+            <span>Email Address <i>*</i></span>
+            <Field icon={Mail}>
+              <input
+                type="email"
+                placeholder="Enter your email address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </Field>
+          </label>
+
           <label className="pam-line">
             <span>Date of Birth <i>*</i></span>
             <Field icon={Calendar}>
@@ -711,6 +752,13 @@ function PublicApplyModal() {
             <span aria-hidden="true">→</span>
           </button>
           </>
+          ) : null}
+
+          {otpVerified && !isNewUser ? (
+            <button type="submit" className="pam-submit" disabled={submitting}>
+              {submitting ? "Submitting..." : "Submit Application"}
+              <span aria-hidden="true">→</span>
+            </button>
           ) : null}
 
           {error ? <p className="pam-alert pam-alert--error">{error}</p> : null}
