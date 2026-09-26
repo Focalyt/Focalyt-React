@@ -119,9 +119,14 @@ const serializeLead = (doc) => {
     lead.subStatusTitle = '';
   }
 
+  const savedDocs = Array.isArray(lead.documents) ? lead.documents : [];
   const docsByKey = {};
-  (lead.documents || []).forEach((item) => {
-    if (item?.key && isActualMediaFile(item.fileUrl)) docsByKey[item.key] = item;
+  const docsByName = {};
+  savedDocs.forEach((item) => {
+    if (!item || !isActualMediaFile(item.fileUrl)) return;
+    if (item.key) docsByKey[String(item.key)] = item;
+    const nameKey = String(item.name || item.Name || '').trim().toLowerCase();
+    if (nameKey) docsByName[nameKey] = item;
   });
   if (isActualMediaFile(lead.resume) && !docsByKey.resume?.fileUrl) {
     docsByKey.resume = {
@@ -130,18 +135,33 @@ const serializeLead = (doc) => {
       fileUrl: lead.resume,
       uploadedAt: lead.updatedAt || lead.createdAt || null,
     };
+    docsByName['resume / cv'] = docsByKey.resume;
   }
-  lead.documents = HR_DOCUMENT_TYPES.map((type) => {
-    const saved = docsByKey[type.key] || {};
+  const mapLeadDocument = (type) => {
+    const saved = docsByKey[String(type.key)]
+      || docsByName[String(type.name || '').trim().toLowerCase()]
+      || {};
     const raw = saved.fileUrl || (type.key === 'resume' ? lead.resume : '') || '';
     const fileUrl = isActualMediaFile(raw) ? (resolvePublicUrl(raw) || raw) : '';
     return {
-      key: type.key,
+      key: String(type.key),
+      _id: type._id || type.key,
       name: type.name,
+      Name: type.name,
+      mandatory: !!type.mandatory,
       fileUrl,
       uploadedAt: fileUrl ? (saved.uploadedAt || null) : null,
     };
-  });
+  };
+  const requiredDocs = Array.isArray(lead.docsRequired) ? lead.docsRequired : [];
+  lead.documents = requiredDocs.length
+    ? requiredDocs.map((doc) => mapLeadDocument({
+      key: doc._id || doc.Name || doc.name,
+      _id: doc._id,
+      name: doc.Name || doc.name || 'Document',
+      mandatory: doc.mandatory,
+    }))
+    : HR_DOCUMENT_TYPES.map((type) => mapLeadDocument(type));
   const summary = buildFollowupSummary(lead.followups);
   lead.followupCounts = summary.counts;
   lead.nextCallFollowup = summary.nextCall;
@@ -644,7 +664,7 @@ const APPLY_LEAD_POPULATE = [
   },
   {
     path: '_job',
-    select: 'title hr',
+    select: 'title hr docsRequired',
     populate: [
       { path: 'hr', select: 'name email' },
       { path: 'vertical', select: 'name' },
@@ -718,9 +738,17 @@ const mapApplyToLead = (apply, statusIndex) => {
     maritalStatus: candidate.maritalStatus || '',
     resume: resumeUrl,
     documents: apply.documents || [],
+    docsRequired: (Array.isArray(job.docsRequired) ? job.docsRequired : [])
+      .filter((doc) => doc && doc.status !== false && (doc.Name || doc.name))
+      .map((doc) => ({
+        _id: doc._id,
+        Name: doc.Name || doc.name,
+        mandatory: !!doc.mandatory,
+      })),
     leadStatus: statusDoc || null,
     leadSubstatus: sub?._id || apply.leadSubstatus || null,
     leadOwner,
+    hasStoredLeadOwner: Boolean(apply.leadOwner || apply.assignedTo || apply.leadCoOwner),
     leadCoOwner: apply.leadCoOwner || null,
     assignedTo: apply.assignedTo || leadOwner,
     followups: apply.followups || [],
@@ -792,6 +820,9 @@ const queryAppliedLeads = async (query, collegeId, viewer = null) => {
   const extraClauses = [];
   const q = String(query.search || '').trim();
   if (q) {
+    // A website apply often has no college on the candidate profile.
+    // Search by number or name anyway, then match applied jobs.
+    delete candMatch.college;
     const searchOr = buildHrCandidateSearchOr(q);
     if (searchOr?.length) extraClauses.push({ $or: searchOr });
   }
@@ -873,7 +904,10 @@ const queryAppliedLeads = async (query, collegeId, viewer = null) => {
     const teamIds = await resolveHrViewerTeamIds(viewer);
     if (teamIds.length) {
       const teamSet = new Set(teamIds.map((id) => String(id)));
-      leads = leads.filter((lead) => hrLeadPersonIds(lead).some((id) => teamSet.has(id)));
+      leads = leads.filter((lead) => {
+        if (!lead.hasStoredLeadOwner) return true;
+        return hrLeadPersonIds(lead).some((id) => teamSet.has(id));
+      });
     }
   }
 
@@ -2157,10 +2191,7 @@ router.post('/leads/:id/documents', isCollege, async (req, res) => {
     }
 
     const key = String(req.body.key || req.body.documentKey || '').trim();
-    const docType = HR_DOCUMENT_TYPES.find((item) => item.key === key);
-    if (!docType) {
-      return res.status(400).json({ success: false, message: 'Invalid document type' });
-    }
+    const name = String(req.body.name || req.body.Name || '').trim();
 
     const file = req.files?.file || req.files?.document || req.files?.resume;
     if (!file) {
@@ -2170,6 +2201,22 @@ router.post('/leads/:id/documents', isCollege, async (req, res) => {
     const loaded = await loadAppliedLead(id, req.user?.college?._id);
     if (!loaded) {
       return res.status(404).json({ success: false, message: 'Lead not found' });
+    }
+
+    const required = Array.isArray(loaded.lead?.docsRequired) ? loaded.lead.docsRequired : [];
+    const match = required.find((doc) => {
+      const id = String(doc._id || '');
+      const docName = String(doc.Name || doc.name || '').trim().toLowerCase();
+      return (key && id === key)
+        || (name && docName === name.toLowerCase())
+        || (key && docName === key.toLowerCase());
+    });
+    const fallback = HR_DOCUMENT_TYPES.find((item) => item.key === key);
+    const docType = match
+      ? { key: String(match._id || match.Name || match.name), name: match.Name || match.name }
+      : fallback;
+    if (!docType) {
+      return res.status(400).json({ success: false, message: 'Invalid document type' });
     }
 
     const uploadedKey = await uploadSinglefile(file);

@@ -5,6 +5,7 @@ const { bucketName, mimetypes } = require("../../../config");
 const s3 = require("../../../helpers/objectStorage");
 const {
 	Skill,
+	Company,
 	Industry,
 	Vacancy,
 	VacancyType,
@@ -41,6 +42,7 @@ const SKIP_KEYS = new Set([
 	"isPublic",
 	"collegeAcNo",
 	"questionsAnswers",
+	"docsRequired",
 	"isEdit",
 	"isedited",
 	"_id",
@@ -151,9 +153,41 @@ const parseJobPayload = async (req, { includeFiles = true } = {}) => {
 		}
 	}
 
+	if (body.docsRequired !== undefined) {
+		try {
+			const parsed = typeof body.docsRequired === "string" ? JSON.parse(body.docsRequired || "[]") : body.docsRequired;
+			jobDetails.docsRequired = (Array.isArray(parsed) ? parsed : [])
+				.map((item) => ({
+					Name: String(item?.Name || item?.name || "").trim(),
+					mandatory: toBoolean(item?.mandatory),
+					status: item?.status === undefined ? true : toBoolean(item.status),
+				}))
+				.filter((item) => item.Name);
+		} catch (err) {
+			console.warn("Unable to parse docsRequired:", err.message);
+		}
+	}
+
 	if (!jobDetails.displayCompanyName) {
 		jobDetails.displayCompanyName = req.college?.name || "";
 	}
+
+	if (!jobDetails._company) {
+		const error = new Error("Please select a company.");
+		error.statusCode = 400;
+		throw error;
+	}
+	const company = await Company.findOne({
+		_id: jobDetails._company,
+		status: true,
+		isDeleted: { $ne: true },
+	}).select("_id");
+	if (!company) {
+		const error = new Error("Selected company was not found.");
+		error.statusCode = 400;
+		throw error;
+	}
+	jobDetails._company = company._id;
 
 	return { jobDetails, body };
 };
@@ -191,11 +225,12 @@ const uploadJobFile = async (file, folder, title) => {
 
 router.get("/form-data", async (req, res) => {
 	try {
-		const [industry, qualification, subQualification, state] = await Promise.all([
+		const [industry, qualification, subQualification, state, companies] = await Promise.all([
 			Industry.find({ status: true }).select("name").sort({ name: 1 }).lean(),
 			Qualification.find({ status: true }).select("name").sort({ name: 1 }).lean(),
 			SubQualification.find({ status: true }).select("name _qualification").sort({ name: 1 }).lean(),
 			State.find({ countryId: "101", status: { $ne: false } }).select("name stateId").sort({ name: 1 }).lean(),
+			Company.find({ status: true, isDeleted: { $ne: true } }).select("name").sort({ name: 1 }).lean(),
 		]);
 
 		return res.json({
@@ -205,6 +240,7 @@ router.get("/form-data", async (req, res) => {
 				qualification,
 				subQualification,
 				state,
+				companies,
 				college: {
 					_id: req.college?._id,
 					name: req.college?.name || "",

@@ -236,6 +236,39 @@ const mapHrLeadToB2cProfile = (lead) => {
   const jobName = lead?.applyingFor || '';
   const projectName = lead?.projectName || lead?.project?.name || '';
   const departmentName = lead?.departmentName || lead?.department?.name || '';
+  const savedDocs = Array.isArray(lead?.documents) ? lead.documents : [];
+  const jobDocs = (Array.isArray(lead?.docsRequired) ? lead.docsRequired : [])
+    .filter((doc) => doc && (doc.Name || doc.name))
+    .map((doc) => ({
+      _id: doc._id || doc.key,
+      Name: doc.Name || doc.name,
+      mandatory: !!doc.mandatory,
+    }));
+  const uploadedDocs = jobDocs.map((doc) => {
+    const nameKey = String(doc.Name || '').trim().toLowerCase();
+    const saved = savedDocs.find((item) => (
+      String(item?.key || item?._id || '') === String(doc._id)
+      || String(item?.name || item?.Name || '').trim().toLowerCase() === nameKey
+    ));
+    const fileUrl = saved?.fileUrl || '';
+    const uploads = fileUrl
+      ? [{
+        _id: saved._id || doc._id,
+        docsId: doc._id,
+        fileUrl,
+        status: 'Uploaded',
+        uploadedAt: saved.uploadedAt || null,
+      }]
+      : [];
+    return {
+      _id: doc._id,
+      Name: doc.Name,
+      mandatory: doc.mandatory,
+      uploads,
+      ...(uploads.length ? {} : { status: 'Not Uploaded' }),
+    };
+  });
+  const uploadedCount = uploadedDocs.filter((doc) => doc.uploads.length > 0).length;
 
   return {
     _id: lead?._id,
@@ -259,6 +292,7 @@ const mapHrLeadToB2cProfile = (lead) => {
       name: jobName,
       projectName,
       typeOfProject: departmentName,
+      docsRequired: jobDocs,
     },
     _center: null,
     project: lead?.project || null,
@@ -285,6 +319,16 @@ const mapHrLeadToB2cProfile = (lead) => {
     createdAt: lead?.createdAt,
     updatedAt: lead?.updatedAt,
     documents: lead?.documents || [],
+    uploadedDocs,
+    docCounts: {
+      totalRequired: jobDocs.length,
+      uploadedCount,
+      verifiedCount: 0,
+      pendingVerificationCount: 0,
+      RejectedCount: 0,
+      notUploadedCount: jobDocs.length - uploadedCount,
+      uploadPercentage: jobDocs.length ? Math.round((uploadedCount / jobDocs.length) * 100) : 0,
+    },
   };
 };
 
@@ -1396,6 +1440,8 @@ const CRMDashboard = () => {
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(true);
 
   const [viewMode, setViewMode] = useState('grid');
+  const [showAppliedJobs, setShowAppliedJobs] = useState(false);
+  const showAppliedJobsRef = useRef(false);
   const [isMobile, setIsMobile] = useState(false);
   const [allProfiles, setAllProfiles] = useState([]);
   const [totalPages, setTotalPages] = useState(1);
@@ -2321,6 +2367,37 @@ const CRMDashboard = () => {
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
+
+      if (selectedProfile?.isHrJobLead) {
+        formData.append('key', selectedDocumentForUpload._id || '');
+        formData.append('name', selectedDocumentForUpload.Name || selectedDocumentForUpload.name || '');
+        const response = await axios.post(
+          `${backendUrl}/college/hr/leads/${selectedProfile._id}/documents`,
+          formData,
+          {
+            headers: {
+              'x-auth': token,
+              'Content-Type': 'multipart/form-data',
+            },
+            onUploadProgress: (event) => {
+              if (!event.total) return;
+              setUploadProgress(Math.round((event.loaded * 100) / event.total));
+            },
+          }
+        );
+        if (response.data?.success) {
+          alert('Document uploaded successfully');
+          if (response.data.data) {
+            mergeProfileUpdateInState(mapHrLeadToB2cProfile(response.data.data));
+          }
+          closeUploadModal();
+          await refreshProfilesAfterDocumentChange();
+        } else {
+          alert(response.data?.message || 'Failed to upload file');
+        }
+        return;
+      }
+
       formData.append('doc', selectedDocumentForUpload._id);
 
       const response = await axios.put(`${backendUrl}/college/upload_docs/${selectedProfile._id}`, formData, {
@@ -5030,6 +5107,40 @@ console.log('API Response:', response.data);
     if (!token) return;
     try {
       const cycle = cycleOverride || cycleFilters;
+      if (showAppliedJobsRef.current) {
+        const hrCountRes = await axios.get(`${backendUrl}/college/hr/leads/counts`, {
+          headers: { 'x-auth': token },
+          params: {
+            ...buildHrRequestParams({
+              filters: { ...filters, leadStatus: undefined },
+              cycle,
+              verticalOptions,
+              crmFilters,
+              listParts: buildListFilterQueryParts(formDataRef.current || formData, cycle),
+            }),
+            statusTitle: undefined,
+          },
+        });
+        const hrFollowups = hrCountRes.data?.data?.followups;
+        setFollowupDashCounts(hrFollowups ? {
+          call: {
+            done: hrFollowups.call?.done || 0,
+            planned: hrFollowups.call?.planned || 0,
+            missed: hrFollowups.call?.missed || 0,
+          },
+          visit: {
+            done: hrFollowups.visit?.done || 0,
+            planned: hrFollowups.visit?.planned || 0,
+            missed: hrFollowups.visit?.missed || 0,
+          },
+        } : {
+          call: { done: 0, planned: 0, missed: 0 },
+          visit: { done: 0, planned: 0, missed: 0 },
+        });
+        setMyReferLeadsCount(0);
+        setNoFollowupLeadsCount(0);
+        return;
+      }
       const listParts = buildListFilterQueryParts(formDataRef.current || formData, cycle);
       const sharedFilterParts = {
         ...buildLeadDateQueryParts(filters),
@@ -5085,47 +5196,6 @@ console.log('API Response:', response.data);
         });
       }
 
-      if (shouldIncludeHrLeads({
-        cycle,
-        filters,
-        verticalOptions,
-        projectOptions,
-        listEndpoint: 'appliedCandidates',
-      })) {
-        try {
-          const hrCountRes = await axios.get(`${backendUrl}/college/hr/leads/counts`, {
-            headers: { 'x-auth': token },
-            params: {
-              ...buildHrRequestParams({
-                filters: { ...filters, leadStatus: undefined },
-                cycle,
-                verticalOptions,
-                crmFilters,
-                listParts,
-              }),
-              statusTitle: undefined,
-            },
-          });
-          const hrFollowups = hrCountRes.data?.data?.followups;
-          if (hrCountRes.data?.success && hrFollowups) {
-            setFollowupDashCounts((prev) => ({
-              call: {
-                done: (prev.call?.done || 0) + (hrFollowups.call?.done || 0),
-                planned: (prev.call?.planned || 0) + (hrFollowups.call?.planned || 0),
-                missed: (prev.call?.missed || 0) + (hrFollowups.call?.missed || 0),
-              },
-              visit: {
-                done: (prev.visit?.done || 0) + (hrFollowups.visit?.done || 0),
-                planned: (prev.visit?.planned || 0) + (hrFollowups.visit?.planned || 0),
-                missed: (prev.visit?.missed || 0) + (hrFollowups.visit?.missed || 0),
-              },
-            }));
-          }
-        } catch (hrCountErr) {
-          console.error('Error fetching HR followup counts for B2C dashboard:', hrCountErr);
-        }
-      }
-
       if (referRes?.data?.success) {
         setMyReferLeadsCount(referRes.data.totalCount || 0);
       }
@@ -5158,6 +5228,46 @@ console.log('API Response:', response.data);
     if (!token) {
       console.warn('No token found in session storage.');
       if (!silent) setIsLoadingProfiles(false);
+      return;
+    }
+
+    if (showAppliedJobsRef.current) {
+      const cycle = cycleOverride || cycleFilters;
+      try {
+        const hrParams = buildHrRequestParams({
+          filters,
+          cycle,
+          extra: { page, limit: 20, leadViewTab: activeLeadViewTab },
+          verticalOptions,
+          crmFilters,
+          listParts: buildListFilterQueryParts(formDataRef.current || formData, cycle),
+        });
+        if (activeLeadViewTab === 'noFollowup') {
+          hrParams.hasFollowUpCall = 'false';
+          hrParams.hasFollowUpVisit = 'false';
+        }
+        const hrRes = await axios.get(`${backendUrl}/college/hr/leads`, {
+          headers: { 'x-auth': token },
+          params: hrParams,
+        });
+        const payload = hrRes.data?.data || {};
+        const profiles = (payload.leads || []).map(mapHrLeadToB2cProfile);
+        setAllProfiles(profiles);
+        setTotalPages(payload.pagination?.totalPages || 1);
+        setPageSize(payload.pagination?.limit || 20);
+        setKycCounts({ all: 0, pendingDocs: 0, pendingVerification: 0, rejected: 0, verified: 0 });
+        setMilestoneCounts({ admission: 0 });
+        await Promise.all([
+          fetchRegistrationCrmFilterCounts(filters, page, null, cycle),
+          fetchDashboardCounts(filters, cycle),
+        ]);
+      } catch (error) {
+        console.error('Error fetching applied job leads:', error);
+        setAllProfiles([]);
+        setTotalPages(1);
+      } finally {
+        if (!silent) setIsLoadingProfiles(false);
+      }
       return;
     }
 
@@ -5230,59 +5340,15 @@ console.log('API Response:', response.data);
     }
 
     const cycle = cycleOverride || cycleFilters;
-    const shouldMergeHrLeads = shouldIncludeHrLeads({
-      cycle,
-      filters,
-      verticalOptions,
-      projectOptions,
-      listEndpoint,
-      page,
-    });
 
     try {
-      const hrParams = shouldMergeHrLeads
-        ? buildHrRequestParams({
-          filters,
-          cycle,
-          extra: { leadViewTab: activeLeadViewTab },
-          verticalOptions,
-          crmFilters,
-          listParts: buildListFilterQueryParts(formDataRef.current || formData, cycle),
-        })
-        : null;
-      if (hrParams && activeLeadViewTab === 'noFollowup') {
-        hrParams.hasFollowUpCall = 'false';
-        hrParams.hasFollowUpVisit = 'false';
-      }
-
-      const [response, hrRes] = await Promise.all([
-        axios.get(`${backendUrl}/college/${listEndpoint}?${queryParams}`, {
-          headers: { 'x-auth': token }
-        }),
-        hrParams
-          ? axios.get(`${backendUrl}/college/hr/leads`, {
-            headers: { 'x-auth': token },
-            params: hrParams,
-          }).catch((hrErr) => {
-            console.error('Error fetching HR leads for B2C list:', hrErr);
-            return null;
-          })
-          : Promise.resolve(null),
-      ]);
+      const response = await axios.get(`${backendUrl}/college/${listEndpoint}?${queryParams}`, {
+        headers: { 'x-auth': token }
+      });
 
       if (response.data.success && response.data.data) {
         const data = response.data;
-        let profiles = Array.isArray(data.data) ? [...data.data] : [];
-
-        if (hrRes?.data?.success) {
-          const hrLeads = hrRes.data?.data?.leads || [];
-          const searchQuery = String(filters.name || '').trim();
-          const hrProfiles = hrLeads
-            .map(mapHrLeadToB2cProfile)
-            .filter((item) => !searchQuery || profileMatchesQuickSearch(item, searchQuery));
-          const hrIds = new Set(hrProfiles.map((item) => String(item._id)));
-          profiles = [...hrProfiles, ...profiles.filter((item) => !hrIds.has(String(item._id)))];
-        }
+        const profiles = Array.isArray(data.data) ? [...data.data] : [];
 
         setAllProfiles(profiles);
         setTotalPages(data.totalPages);
@@ -5780,6 +5846,41 @@ console.log('API Response:', response.data);
     const cycle = cycleOverride || cycleFilters;
     const fd = formDataRef.current || formData;
 
+    if (showAppliedJobsRef.current) {
+      try {
+        const hrCountRes = await axios.get(`${backendUrl}/college/hr/leads/counts`, {
+          headers: { 'x-auth': token },
+          params: {
+            ...buildHrRequestParams({
+              filters: { ...filters, leadStatus: undefined },
+              cycle,
+              verticalOptions,
+              crmFilters,
+              listParts: buildListFilterQueryParts(fd, cycle),
+            }),
+            statusTitle: undefined,
+          },
+        });
+        const hrData = hrCountRes.data?.data || {};
+        const hrAll = Number(hrData.counts?.all || 0);
+        const merged = mergeHrCountsIntoB2cCrm({ all: 0 }, hrData, crmFilters);
+        const untouchFilter = (crmFilters || []).find((item) => normalizeStatusTitle(item.name).includes('untouch'));
+        const aiCrmFilterCount = { all: hrAll };
+        if (untouchFilter?._id) {
+          aiCrmFilterCount[untouchFilter._id] = addCountValue(0, hrAll);
+        }
+        updateCrmFiltersFromBackend(
+          merged.crmFilterCount,
+          filteredTotalCount,
+          { total: hrAll, approved: 0, pending: hrAll, rejected: 0 },
+          aiCrmFilterCount
+        );
+      } catch (hrCountErr) {
+        console.error('Error fetching applied job CRM counts:', hrCountErr);
+      }
+      return;
+    }
+
     // Prepare query parameters
     const queryParams = new URLSearchParams({
       page: page.toString(),
@@ -5809,54 +5910,9 @@ console.log('API Response:', response.data);
 
       if (response.data.success && response.data) {
         const data = response.data;
-        let crmFilterCount = data.crmFilterCount || { all: 0 };
-        let approvalCounts = data.approvalCounts;
-        let aiCrmFilterCount = data.aiCrmFilterCount;
-
-        if (shouldIncludeHrLeads({
-          cycle,
-          filters,
-          verticalOptions,
-          projectOptions,
-          listEndpoint: 'appliedCandidates',
-        })) {
-          try {
-            const hrCountRes = await axios.get(`${backendUrl}/college/hr/leads/counts`, {
-              headers: { 'x-auth': token },
-              params: {
-                ...buildHrRequestParams({
-                  filters: { ...filters, leadStatus: undefined },
-                  cycle,
-                  verticalOptions,
-                  crmFilters,
-                  listParts: buildListFilterQueryParts(fd, cycle),
-                }),
-                statusTitle: undefined,
-              },
-            });
-            if (hrCountRes.data?.success) {
-              const hrAll = Number(hrCountRes.data?.data?.counts?.all || 0);
-              const merged = mergeHrCountsIntoB2cCrm(crmFilterCount, hrCountRes.data.data, crmFilters);
-              crmFilterCount = merged.crmFilterCount;
-              if (hrAll) {
-                approvalCounts = {
-                  total: (Number(approvalCounts?.total) || 0) + hrAll,
-                  approved: Number(approvalCounts?.approved) || 0,
-                  pending: (Number(approvalCounts?.pending) || 0) + hrAll,
-                  rejected: Number(approvalCounts?.rejected) || 0,
-                };
-                const untouchFilter = (crmFilters || []).find((item) => normalizeStatusTitle(item.name).includes('untouch'));
-                aiCrmFilterCount = { ...(aiCrmFilterCount || {}) };
-                aiCrmFilterCount.all = (Number(aiCrmFilterCount.all) || 0) + hrAll;
-                if (untouchFilter?._id) {
-                  aiCrmFilterCount[untouchFilter._id] = addCountValue(aiCrmFilterCount[untouchFilter._id], hrAll);
-                }
-              }
-            }
-          } catch (hrCountErr) {
-            console.error('Error fetching HR CRM counts for B2C:', hrCountErr);
-          }
-        }
+        const crmFilterCount = data.crmFilterCount || { all: 0 };
+        const approvalCounts = data.approvalCounts;
+        const aiCrmFilterCount = data.aiCrmFilterCount;
 
         updateCrmFiltersFromBackend(crmFilterCount, filteredTotalCount, approvalCounts, aiCrmFilterCount)
 
@@ -5888,17 +5944,19 @@ console.log('API Response:', response.data);
 
       let leadId;
       let updateTarget;
+      let visibleProfile = null;
 
       if (showPanel === 'Whatsapp' && selectedProfile) {
         // WhatsApp panel ke liye selectedProfile ki full detail fetch karo
         leadId = selectedProfile._id;
+        visibleProfile = selectedProfile;
         updateTarget = 'whatsapp';
       } else if (leadDetailsVisible !== null && leadDetailsVisible !== undefined) {
         const group = leadDisplayGroups[leadDetailsVisible];
         const activeLeadId = group
           ? (activeCourseByGroup[group.rootId] || group.leads?.[0]?._id)
           : null;
-        const visibleProfile = group?.leads?.find(
+        visibleProfile = group?.leads?.find(
           (p) => String(p._id) === String(activeLeadId)
         ) || group?.leads?.[0] || displayedProfiles[leadDetailsVisible] || allProfiles[leadDetailsVisible];
         leadId = visibleProfile?._id || selectedProfile?._id;
@@ -5909,19 +5967,24 @@ console.log('API Response:', response.data);
       }
 
 
-      const response = await axios.get(`${backendUrl}/college/appliedCandidatesDetails?leadId=${leadId}`, {
-        headers: { 'x-auth': token }
-      });
+      const visibleIsJobLead = Boolean(visibleProfile?.isHrJobLead || (showAppliedJobsRef.current && leadId));
+      const response = visibleIsJobLead
+        ? await axios.get(`${backendUrl}/college/hr/leads/${leadId}`, {
+          headers: { 'x-auth': token }
+        })
+        : await axios.get(`${backendUrl}/college/appliedCandidatesDetails?leadId=${leadId}`, {
+          headers: { 'x-auth': token }
+        });
 
       if (response.data.success && response.data.data) {
         const data = response.data;
+        const detail = visibleIsJobLead ? mapHrLeadToB2cProfile(data.data) : data.data;
 
         if (updateTarget === 'whatsapp' && selectedProfile) {
-          // WhatsApp panel ke liye selectedProfile ko update karo with full candidate details
-          setSelectedProfile(data.data)
+          setSelectedProfile(detail)
         } else if (updateTarget === 'leadDetails' && leadId) {
           setAllProfiles((prev) => prev.map((p) => (
-            String(p._id) === String(leadId) ? { ...p, ...data.data } : p
+            String(p._id) === String(leadId) ? { ...p, ...detail } : p
           )));
         }
 
@@ -15255,6 +15318,7 @@ useEffect(() => {
   }, [crossSaleSourceProfile, crossSaleCache, crossSaleAllCourses]);
 
   useEffect(() => {
+    if (showAppliedJobs) return;
     if (!displayedProfiles.length) return;
     if (isPhoneSearchQuery(filterData?.name)) return;
     const rootIds = [...new Set(displayedProfiles.map((p) => getProfileGroupRootId(p)).filter(Boolean))];
@@ -15264,7 +15328,7 @@ useEffect(() => {
       if (sample) fetchCrossSaleGroup(sample);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displayedProfiles, fetchCrossSaleGroup, filterData?.name]);
+  }, [displayedProfiles, fetchCrossSaleGroup, filterData?.name, showAppliedJobs]);
 
   useEffect(() => {
     if (!showCrossSaleModal || !crossSaleForm.leadStatus) {
@@ -17492,6 +17556,31 @@ useEffect(() => {
                         )}
                       </div>
                       <div className="adm-cycle-toolbar__inner d-flex align-items-center gap-2">
+                            <div
+                              className="form-check form-switch mb-0 d-flex align-items-center gap-2"
+                              title="Off: leads and filters use applied courses. On: they use applied jobs."
+                              style={{ whiteSpace: 'nowrap' }}
+                            >
+                              <input
+                                className="form-check-input"
+                                type="checkbox"
+                                role="switch"
+                                id="appliedJobSourceToggle"
+                                checked={showAppliedJobs}
+                                onChange={(e) => {
+                                  const next = e.target.checked;
+                                  showAppliedJobsRef.current = next;
+                                  setShowAppliedJobs(next);
+                                  setCrossSaleCache({});
+                                  setCurrentPage(1);
+                                  fetchProfileData(filterData, 1);
+                                }}
+                                style={{ cursor: 'pointer' }}
+                              />
+                              <label className="form-check-label small fw-semibold mb-0" htmlFor="appliedJobSourceToggle" style={{ cursor: 'pointer' }}>
+                                {showAppliedJobs ? 'Applied Jobs' : 'Applied Courses'}
+                              </label>
+                            </div>
                             <div className="position-relative adm-cycle-search">
                               <input
                                 type="text"
@@ -20669,7 +20758,11 @@ useEffect(() => {
                                                 <div className="text-muted">
                                                   <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
                                                   <h5 className="text-success">No Documents Required</h5>
-                                                  <p>This course does not require any document verification.</p>
+                                                  <p>
+                                                    {profile?.isHrJobLead
+                                                      ? 'This job does not require any document verification.'
+                                                      : 'This course does not require any document verification.'}
+                                                  </p>
                                                 </div>
                                               </div>
 
