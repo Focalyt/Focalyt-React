@@ -3716,6 +3716,26 @@ async function syncAppliedCourseFollowupDates() {
 }
 
 const UNTOUCH_LEAD_STATUS_ID = '64ab1234abcd5678ef901234';
+const MOVED_IN_KYC_STATUS_ID = '6894825c9fc1425f4d5e2fc5';
+const WON_LEAD_STATUS_ID = '6a4b97bfd668a7671551cdef';
+
+function buildB2cListStageMatch(leadStatus) {
+	const status = String(leadStatus || '');
+	if (status === MOVED_IN_KYC_STATUS_ID) {
+		return { kycStage: { $in: [true] } };
+	}
+	if (status === WON_LEAD_STATUS_ID) {
+		return {
+			kyc: { $ne: true },
+			admissionDone: { $ne: true },
+		};
+	}
+	return {
+		kycStage: { $ne: true },
+		kyc: { $ne: true },
+		admissionDone: { $ne: true },
+	};
+}
 
 function applyAiLeadStatusMatch(baseMatch, aiLeadStatus) {
 	if (!aiLeadStatus || aiLeadStatus === 'undefined') return baseMatch;
@@ -3809,22 +3829,8 @@ async function resolveB2cCandidateSearchIds(name) {
 
 function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, forCount = false }) {
 	const pipeline = [];
-	let baseMatch = {};
 	filters.leadStatus = String(filters.leadStatus);
-	if (filters.leadStatus === '6894825c9fc1425f4d5e2fc5') {
-		baseMatch = {
-			kycStage: { $in: [true] },
-		};
-	}
-
-	else {
-		// Base match with essential filters
-		baseMatch = {
-			kycStage: { $ne: true },
-			kyc: { $ne: true },
-			admissionDone: { $ne: true },
-		};
-	}
+	let baseMatch = buildB2cListStageMatch(filters.leadStatus);
 
 	applyB2cLeadOwnershipMatch(baseMatch, {
 		teamMemberIds,
@@ -4108,22 +4114,8 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, 
 // New pipeline function with WhatsApp message lookups
 function buildSimplifiedPipelineWithWhatsApp({ teamMemberIds, college, filters, pagination }) {
 	const pipeline = [];
-	let baseMatch = {};
 	filters.leadStatus = String(filters.leadStatus);
-	if (filters.leadStatus === '6894825c9fc1425f4d5e2fc5') {
-		baseMatch = {
-			kycStage: { $in: [true] },
-		};
-	}
-
-	else {
-		// Base match with essential filters
-		baseMatch = {
-			kycStage: { $ne: true },
-			kyc: { $ne: true },
-			admissionDone: { $ne: true },
-		};
-	}
+	let baseMatch = buildB2cListStageMatch(filters.leadStatus);
 
 
 
@@ -4609,22 +4601,8 @@ router.route("/downloadleads").get(isCollege, async (req, res) => {
 
 function downloadPipeline({ teamMemberIds, college, filters }) {
 	const pipeline = [];
-	let baseMatch = {};
 	filters.leadStatus = String(filters.leadStatus);
-	if (filters.leadStatus === '6894825c9fc1425f4d5e2fc5') {
-		baseMatch = {
-			kycStage: { $in: [true] },
-		};
-	}
-
-	else {
-		// Base match with essential filters
-		baseMatch = {
-			kycStage: { $ne: true },
-			kyc: { $ne: true },
-			admissionDone: { $ne: true },
-		};
-	}
+	let baseMatch = buildB2cListStageMatch(filters.leadStatus);
 
 
 
@@ -5042,13 +5020,22 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			kycStage: { $in: [true] },
 			_course: { $in: collegeCourseIds },
 		};
+		const wonKeptInKycMatch = {
+			_leadStatus: new mongoose.Types.ObjectId(WON_LEAD_STATUS_ID),
+			kycStage: true,
+			kyc: { $ne: true },
+			admissionDone: { $ne: true },
+			_course: { $in: collegeCourseIds },
+		};
 		if (Array.isArray(candidateIds)) {
 			baseMatch._candidate = { $in: candidateIds };
 			kycMatch._candidate = { $in: candidateIds };
+			wonKeptInKycMatch._candidate = { $in: candidateIds };
 		}
 
 		let basePipeline = [{ $match: baseMatch }];
 		let movedInKYCPipeline = [{ $match: kycMatch }];
+		let wonKeptInKycPipeline = [{ $match: wonKeptInKycMatch }];
 
 		// if (appliedFilters.leadStatus === '6894825c9fc1425f4d5e2fc5') {
 		// 	basePipeline[0].$match.kycStage = { $in: [true] };
@@ -5066,6 +5053,12 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			counselorIds: ownerArray.length > 0 ? [] : counselorArray,
 		});
 		applyB2cLeadSourceMatch(movedInKYCPipeline[0].$match, leadSourceFilter);
+		applyB2cLeadOwnershipToMatch(wonKeptInKycPipeline[0].$match, {
+			teamMemberIds,
+			ownerIds: ownerArray,
+			counselorIds: ownerArray.length > 0 ? [] : counselorArray,
+		});
+		applyB2cLeadSourceMatch(wonKeptInKycPipeline[0].$match, leadSourceFilter);
 
 		// Add date filters to base pipeline
 		const dateFilters = {};
@@ -5112,17 +5105,20 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 		if (appliedFilters.subStatuses && appliedFilters.subStatuses !== 'undefined') {
 			basePipeline[0].$match._leadSubStatus = new mongoose.Types.ObjectId(appliedFilters.subStatuses);
 			movedInKYCPipeline[0].$match._leadSubStatus = new mongoose.Types.ObjectId(appliedFilters.subStatuses);
+			wonKeptInKycPipeline[0].$match._leadSubStatus = new mongoose.Types.ObjectId(appliedFilters.subStatuses);
 		}
 
 		if (Object.keys(dateFilters).length > 0) {
 			basePipeline[0].$match = { ...basePipeline[0].$match, ...dateFilters };
 			movedInKYCPipeline[0].$match = { ...movedInKYCPipeline[0].$match, ...dateFilters };
+			wonKeptInKycPipeline[0].$match = { ...wonKeptInKycPipeline[0].$match, ...dateFilters };
 		}
 
 		if (appliedFilters.centerArray?.length > 0) {
 			const centerIds = appliedFilters.centerArray.map(id => new mongoose.Types.ObjectId(id));
 			basePipeline[0].$match._center = { $in: centerIds };
 			movedInKYCPipeline[0].$match._center = { $in: centerIds };
+			wonKeptInKycPipeline[0].$match._center = { $in: centerIds };
 		}
 
 
@@ -5131,7 +5127,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 
 
 
-		const [facetResult, movedInKYCCount] = await Promise.all([
+		const [facetResult, movedInKYCCount, wonKeptInKycCount] = await Promise.all([
 			AppliedCourses.aggregate([
 				...basePipeline,
 				{
@@ -5174,6 +5170,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 				}
 			]),
 			AppliedCourses.aggregate([...movedInKYCPipeline, { $count: 'total' }]),
+			AppliedCourses.aggregate([...wonKeptInKycPipeline, { $count: 'total' }]),
 		]);
 		const faceted = facetResult[0] || {};
 		const allCount = faceted.allCount || [];
@@ -5218,6 +5215,10 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 				};
 			}
 		});
+
+		if (counts[WON_LEAD_STATUS_ID]) {
+			counts[WON_LEAD_STATUS_ID].count += wonKeptInKycCount[0]?.total || 0;
+		}
 
 		const aiCounts = { all: allCount[0]?.total || 0 };
 		allStatuses.forEach((status) => {
