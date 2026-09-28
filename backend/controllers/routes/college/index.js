@@ -2662,7 +2662,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			name ? resolveB2cCandidateSearchIds(name) : Promise.resolve(null),
 		]);
 
-		if (!collegeCourseIds.length || (Array.isArray(candidateIds) && candidateIds.length === 0)) {
+		if ((!collegeCourseIds.length && !verticalsArray.length) || (Array.isArray(candidateIds) && candidateIds.length === 0)) {
 			return res.status(200).json({
 				success: true,
 				count: 0,
@@ -3719,6 +3719,55 @@ const UNTOUCH_LEAD_STATUS_ID = '64ab1234abcd5678ef901234';
 const MOVED_IN_KYC_STATUS_ID = '6894825c9fc1425f4d5e2fc5';
 const WON_LEAD_STATUS_ID = '6a4b97bfd668a7671551cdef';
 
+function applyStudentDepartmentStages() {
+	return [
+		{
+			$lookup: {
+				from: 'verticals',
+				localField: 'department',
+				foreignField: '_id',
+				as: '_studentDepartment',
+			},
+		},
+		{
+			$addFields: {
+				'_course.vertical': {
+					$cond: [
+						{ $gt: [{ $size: { $ifNull: ['$_studentDepartment', []] } }, 0] },
+						'$_studentDepartment',
+						'$_course.vertical',
+					],
+				},
+			},
+		},
+		{ $unset: '_studentDepartment' },
+	];
+}
+
+function stripShiftedStudentGates(match) {
+	if (!match || typeof match !== 'object') return match;
+	if (Array.isArray(match.$and)) {
+		return {
+			...match,
+			$and: match.$and.map((part) => stripShiftedStudentGates(part)),
+		};
+	}
+	const next = { ...match };
+	delete next.admissionDone;
+	delete next.kyc;
+	delete next.kycStage;
+	delete next._course;
+	return next;
+}
+
+function attachShiftedDepartmentMatch(match, verticalsArray) {
+	const departmentIds = toB2cObjectIdList(verticalsArray);
+	if (!departmentIds.length || !match) return match;
+	const shifted = stripShiftedStudentGates(match);
+	shifted.department = { $in: departmentIds };
+	return { $or: [match, shifted] };
+}
+
 function buildB2cListStageMatch(leadStatus) {
 	const status = String(leadStatus || '');
 	if (status === MOVED_IN_KYC_STATUS_ID) {
@@ -3938,6 +3987,8 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, 
 	if (Array.isArray(filters.candidateIds)) {
 		baseMatch._candidate = { $in: filters.candidateIds };
 	}
+
+	baseMatch = attachShiftedDepartmentMatch(baseMatch, filters.verticalsArray);
 
 	pipeline.push({ $match: baseMatch });
 
@@ -4999,7 +5050,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			appliedFilters.name ? resolveB2cCandidateSearchIds(appliedFilters.name) : Promise.resolve(null),
 		]);
 
-		if (!collegeCourseIds.length || (Array.isArray(candidateIds) && candidateIds.length === 0)) {
+		if ((!collegeCourseIds.length && !(appliedFilters.verticalsArray || []).length) || (Array.isArray(candidateIds) && candidateIds.length === 0)) {
 			return res.status(200).json({
 				success: true,
 				crmFilterCount: { all: 0 },
@@ -5120,6 +5171,11 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			movedInKYCPipeline[0].$match._center = { $in: centerIds };
 			wonKeptInKycPipeline[0].$match._center = { $in: centerIds };
 		}
+
+		basePipeline[0].$match = attachShiftedDepartmentMatch(
+			basePipeline[0].$match,
+			appliedFilters.verticalsArray
+		);
 
 
 
@@ -10343,6 +10399,9 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 				}
 			},
 			{ $unwind: '$_course' },
+		);
+		aggregationPipeline.push(...applyStudentDepartmentStages());
+		aggregationPipeline.push(
 			{
 				$lookup: {
 					from: 'users',
@@ -12649,6 +12708,7 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 				}
 			}
 		);
+		aggregationPipeline.push(...applyStudentDepartmentStages());
 		aggregationPipeline.push({ $match: { '_course.college': college._id } });
 		let additionalMatches = {};
 		if (courseType) {

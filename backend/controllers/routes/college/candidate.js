@@ -57,6 +57,8 @@ const {
 	ReEnquire,
 	PreVerification,
 	B2cFollowup,
+	Vertical,
+	Project,
 } = require("../../models");
 const Candidate = require("../../models/candidateProfile");
 const { statusLogHelper } = require("../../../helpers/college");
@@ -1743,6 +1745,222 @@ router.post('/move-candidate-status/:appliedCourseId', [isCollege], async (req, 
 		});
 	}
 
+});
+
+const collectCourseCenterIds = (course) => {
+	const ids = [];
+	if (Array.isArray(course?.center)) {
+		course.center.forEach((id) => ids.push(String(id?._id || id)));
+	}
+	if (course?.centerId) ids.push(String(course.centerId?._id || course.centerId));
+	return [...new Set(ids.filter((id) => mongoose.Types.ObjectId.isValid(id)))];
+};
+
+const sameCollegeId = (left, right) => {
+	const leftId = String(left?._id || left || '');
+	const rightId = String(right?._id || right || '');
+	return Boolean(leftId) && leftId === rightId;
+};
+
+const loadPlacementCourses = async (collegeId, projectId, verticalId) => {
+	if (!mongoose.Types.ObjectId.isValid(verticalId)) {
+		const error = new Error('Select a department');
+		error.statusCode = 400;
+		throw error;
+	}
+
+	const department = await Vertical.findOne({ _id: verticalId, college: collegeId }).select('name college').lean();
+	if (!department) {
+		const error = new Error('Department not found');
+		error.statusCode = 404;
+		throw error;
+	}
+
+	if (!mongoose.Types.ObjectId.isValid(projectId)) {
+		const error = new Error('Select a valid project');
+		error.statusCode = 400;
+		throw error;
+	}
+
+	const project = await Project.findById(projectId).select('name vertical college').lean();
+	if (!project) {
+		const error = new Error('Project not found');
+		error.statusCode = 404;
+		throw error;
+	}
+	if (!sameCollegeId(project.college, collegeId)) {
+		const error = new Error('This project does not belong to your college');
+		error.statusCode = 403;
+		throw error;
+	}
+	if (!sameCollegeId(project.vertical, department._id)) {
+		const error = new Error('This project is not under the selected department');
+		error.statusCode = 400;
+		throw error;
+	}
+
+	const courses = await Courses.find({
+		project: project._id,
+		vertical: department._id,
+		isDeleted: { $ne: true },
+		status: { $ne: false },
+		$or: [
+			{ college: collegeId },
+			{ college: null },
+			{ college: { $exists: false } },
+		],
+	}).select('name center centerId vertical project college').lean();
+
+	const centerIds = [...new Set(courses.flatMap(collectCourseCenterIds))];
+	const centerDocs = centerIds.length
+		? await Center.find({ _id: { $in: centerIds } }).select('name status').lean()
+		: [];
+	const centerById = new Map(centerDocs.map((center) => [String(center._id), center]));
+
+	return {
+		department,
+		project,
+		courses: courses.map((course) => ({
+			_id: course._id,
+			name: course.name,
+			centers: collectCourseCenterIds(course)
+				.map((id) => centerById.get(id))
+				.filter((center) => center && center.status !== false)
+				.map((center) => ({ _id: center._id, name: center.name })),
+		})),
+	};
+};
+
+router.get('/placement-b2c-options', [isCollege], async (req, res) => {
+	try {
+		const collegeId = req.user?.college?._id;
+		if (!collegeId) {
+			return res.status(400).json({ status: false, message: 'College not found' });
+		}
+		const result = await loadPlacementCourses(collegeId, req.query.projectId, req.query.verticalId);
+		return res.status(200).json({
+			status: true,
+			department: result.department.name,
+			project: { _id: result.project._id, name: result.project.name },
+			courses: result.courses,
+		});
+	} catch (error) {
+		return res.status(error.statusCode || 500).json({
+			status: false,
+			message: error.message || 'Failed to load placement courses',
+		});
+	}
+});
+
+router.post('/move-to-placement-b2c', [isCollege], async (req, res) => {
+	try {
+		const collegeId = req.user?.college?._id;
+		const userId = req.user?._id;
+		if (!collegeId || !userId) {
+			return res.status(400).json({ status: false, message: 'College not found' });
+		}
+
+		const appliedCourseIds = Array.isArray(req.body?.appliedCourseIds) ? req.body.appliedCourseIds : [];
+		const { verticalId } = req.body || {};
+		const uniqueIds = [...new Set(appliedCourseIds.map((id) => String(id || '').trim()).filter(Boolean))];
+
+		if (!uniqueIds.length) {
+			return res.status(400).json({ status: false, message: 'Select at least one student' });
+		}
+		if (uniqueIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
+			return res.status(400).json({ status: false, message: 'One or more selected students are invalid' });
+		}
+		if (!mongoose.Types.ObjectId.isValid(verticalId)) {
+			return res.status(400).json({ status: false, message: 'Select a department' });
+		}
+
+		const department = await Vertical.findOne({ _id: verticalId, college: collegeId }).select('name').lean();
+		if (!department) {
+			return res.status(404).json({ status: false, message: 'Department not found' });
+		}
+
+		const moved = [];
+		const skipped = [];
+
+		for (const appliedCourseId of uniqueIds) {
+			try {
+				const source = await AppliedCourses.findById(appliedCourseId)
+					.populate('_course', 'name college vertical project')
+					.populate('department', 'name');
+				if (!source) {
+					skipped.push({ id: appliedCourseId, reason: 'Student record not found' });
+					continue;
+				}
+				if (source._course?.college && !sameCollegeId(source._course.college, collegeId)) {
+					skipped.push({ id: appliedCourseId, reason: 'Student belongs to another college' });
+					continue;
+				}
+				if (!source.isBatchFreeze) {
+					skipped.push({ id: appliedCourseId, reason: 'Student is not in Batch Freezed' });
+					continue;
+				}
+				if (!source._candidate) {
+					skipped.push({ id: appliedCourseId, reason: 'Candidate not found' });
+					continue;
+				}
+
+				const currentDepartmentId = source.department?._id || source.department || source._course?.vertical;
+				if (currentDepartmentId && sameCollegeId(currentDepartmentId, department._id)) {
+					skipped.push({ id: appliedCourseId, reason: `Already in ${department.name}` });
+					continue;
+				}
+
+				if (!Array.isArray(source.departmentHistory)) source.departmentHistory = [];
+				if (currentDepartmentId) {
+					source.departmentHistory.push({
+						department: currentDepartmentId,
+						shiftedAt: new Date(),
+						shiftedBy: userId,
+					});
+				}
+
+				source.department = department._id;
+				if (/placement/i.test(department.name || '')) {
+					source.movetoplacementstatus = true;
+				}
+				source.logs = source.logs || [];
+				source.logs.push({
+					user: userId,
+					timestamp: new Date(),
+					action: `Department moved to ${department.name}`,
+					remarks: 'Course, project, and center kept as they were',
+				});
+				await source.save();
+				moved.push(source._id);
+			} catch (studentError) {
+				console.error('Move department failed for', appliedCourseId, studentError);
+				skipped.push({
+					id: appliedCourseId,
+					reason: studentError.message || 'Could not move this student',
+				});
+			}
+		}
+
+		const skipText = skipped.length
+			? ` Skipped ${skipped.length}: ${skipped.map((item) => item.reason).filter((reason, index, list) => list.indexOf(reason) === index).join(', ')}.`
+			: '';
+		const message = moved.length
+			? `Moved ${moved.length} student${moved.length === 1 ? '' : 's'} to ${department.name}. Course, project, and center are unchanged.${skipText}`
+			: `No students were moved.${skipText}`;
+
+		return res.status(moved.length ? 200 : 400).json({
+			status: moved.length > 0,
+			message,
+			moved: moved.length,
+			skipped,
+		});
+	} catch (error) {
+		console.error('Error moving students to placement B2C:', error);
+		return res.status(error.statusCode || 500).json({
+			status: false,
+			message: error.message || 'Error moving students to placement',
+		});
+	}
 });
 
 // API to remove student from zero period
