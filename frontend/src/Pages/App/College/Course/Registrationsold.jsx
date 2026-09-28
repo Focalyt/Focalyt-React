@@ -5199,6 +5199,47 @@ console.log('API Response:', response.data);
         });
       }
 
+      if (shouldIncludeHrLeads({
+        cycle,
+        filters,
+        verticalOptions,
+        projectOptions,
+        listEndpoint: 'appliedCandidates',
+      })) {
+        try {
+          const hrCountRes = await axios.get(`${backendUrl}/college/hr/leads/counts`, {
+            headers: { 'x-auth': token },
+            params: {
+              ...buildHrRequestParams({
+                filters: { ...filters, leadStatus: undefined },
+                cycle,
+                verticalOptions,
+                crmFilters,
+                listParts,
+              }),
+              statusTitle: undefined,
+            },
+          });
+          const hrFollowups = hrCountRes.data?.data?.followups;
+          if (hrCountRes.data?.success && hrFollowups) {
+            setFollowupDashCounts((prev) => ({
+              call: {
+                done: (prev.call?.done || 0) + (hrFollowups.call?.done || 0),
+                planned: (prev.call?.planned || 0) + (hrFollowups.call?.planned || 0),
+                missed: (prev.call?.missed || 0) + (hrFollowups.call?.missed || 0),
+              },
+              visit: {
+                done: (prev.visit?.done || 0) + (hrFollowups.visit?.done || 0),
+                planned: (prev.visit?.planned || 0) + (hrFollowups.visit?.planned || 0),
+                missed: (prev.visit?.missed || 0) + (hrFollowups.visit?.missed || 0),
+              },
+            }));
+          }
+        } catch (hrCountErr) {
+          console.error('Error fetching HR followup counts for B2C dashboard:', hrCountErr);
+        }
+      }
+
       if (referRes?.data?.success) {
         setMyReferLeadsCount(referRes.data.totalCount || 0);
       }
@@ -5343,15 +5384,59 @@ console.log('API Response:', response.data);
     }
 
     const cycle = cycleOverride || cycleFilters;
+    const shouldMergeHrLeads = shouldIncludeHrLeads({
+      cycle,
+      filters,
+      verticalOptions,
+      projectOptions,
+      listEndpoint,
+      page,
+    });
 
     try {
-      const response = await axios.get(`${backendUrl}/college/${listEndpoint}?${queryParams}`, {
-        headers: { 'x-auth': token }
-      });
+      const hrParams = shouldMergeHrLeads
+        ? buildHrRequestParams({
+          filters,
+          cycle,
+          extra: { leadViewTab: activeLeadViewTab },
+          verticalOptions,
+          crmFilters,
+          listParts: buildListFilterQueryParts(formDataRef.current || formData, cycle),
+        })
+        : null;
+      if (hrParams && activeLeadViewTab === 'noFollowup') {
+        hrParams.hasFollowUpCall = 'false';
+        hrParams.hasFollowUpVisit = 'false';
+      }
+
+      const [response, hrRes] = await Promise.all([
+        axios.get(`${backendUrl}/college/${listEndpoint}?${queryParams}`, {
+          headers: { 'x-auth': token }
+        }),
+        hrParams
+          ? axios.get(`${backendUrl}/college/hr/leads`, {
+            headers: { 'x-auth': token },
+            params: hrParams,
+          }).catch((hrErr) => {
+            console.error('Error fetching HR leads for B2C list:', hrErr);
+            return null;
+          })
+          : Promise.resolve(null),
+      ]);
 
       if (response.data.success && response.data.data) {
         const data = response.data;
-        const profiles = Array.isArray(data.data) ? [...data.data] : [];
+        let profiles = Array.isArray(data.data) ? [...data.data] : [];
+
+        if (hrRes?.data?.success) {
+          const hrLeads = hrRes.data?.data?.leads || [];
+          const searchQuery = String(filters.name || '').trim();
+          const hrProfiles = hrLeads
+            .map(mapHrLeadToB2cProfile)
+            .filter((item) => !searchQuery || profileMatchesQuickSearch(item, searchQuery));
+          const hrIds = new Set(hrProfiles.map((item) => String(item._id)));
+          profiles = [...hrProfiles, ...profiles.filter((item) => !hrIds.has(String(item._id)))];
+        }
 
         setAllProfiles(profiles);
         setTotalPages(data.totalPages);
@@ -5913,9 +5998,54 @@ console.log('API Response:', response.data);
 
       if (response.data.success && response.data) {
         const data = response.data;
-        const crmFilterCount = data.crmFilterCount || { all: 0 };
-        const approvalCounts = data.approvalCounts;
-        const aiCrmFilterCount = data.aiCrmFilterCount;
+        let crmFilterCount = data.crmFilterCount || { all: 0 };
+        let approvalCounts = data.approvalCounts;
+        let aiCrmFilterCount = data.aiCrmFilterCount;
+
+        if (shouldIncludeHrLeads({
+          cycle,
+          filters,
+          verticalOptions,
+          projectOptions,
+          listEndpoint: 'appliedCandidates',
+        })) {
+          try {
+            const hrCountRes = await axios.get(`${backendUrl}/college/hr/leads/counts`, {
+              headers: { 'x-auth': token },
+              params: {
+                ...buildHrRequestParams({
+                  filters: { ...filters, leadStatus: undefined },
+                  cycle,
+                  verticalOptions,
+                  crmFilters,
+                  listParts: buildListFilterQueryParts(fd, cycle),
+                }),
+                statusTitle: undefined,
+              },
+            });
+            if (hrCountRes.data?.success) {
+              const hrAll = Number(hrCountRes.data?.data?.counts?.all || 0);
+              const merged = mergeHrCountsIntoB2cCrm(crmFilterCount, hrCountRes.data.data, crmFilters);
+              crmFilterCount = merged.crmFilterCount;
+              if (hrAll) {
+                approvalCounts = {
+                  total: (Number(approvalCounts?.total) || 0) + hrAll,
+                  approved: Number(approvalCounts?.approved) || 0,
+                  pending: (Number(approvalCounts?.pending) || 0) + hrAll,
+                  rejected: Number(approvalCounts?.rejected) || 0,
+                };
+                const untouchFilter = (crmFilters || []).find((item) => normalizeStatusTitle(item.name).includes('untouch'));
+                aiCrmFilterCount = { ...(aiCrmFilterCount || {}) };
+                aiCrmFilterCount.all = (Number(aiCrmFilterCount.all) || 0) + hrAll;
+                if (untouchFilter?._id) {
+                  aiCrmFilterCount[untouchFilter._id] = addCountValue(aiCrmFilterCount[untouchFilter._id], hrAll);
+                }
+              }
+            }
+          } catch (hrCountErr) {
+            console.error('Error fetching HR CRM counts for B2C:', hrCountErr);
+          }
+        }
 
         updateCrmFiltersFromBackend(crmFilterCount, filteredTotalCount, approvalCounts, aiCrmFilterCount)
 
