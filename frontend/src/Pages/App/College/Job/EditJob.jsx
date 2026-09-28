@@ -72,6 +72,7 @@ function EditJob({ readOnly = false }) {
 
   // ---------- reference / dropdown data ----------
   const [company, setCompany] = useState({ name: '', creditLeft: 0 });
+  const [companyList, setCompanyList] = useState([]);
   const [industryList, setIndustryList] = useState([]);
   const [qualificationList, setQualificationList] = useState([]);
   const [subQualificationList, setSubQualificationList] = useState([]);
@@ -90,6 +91,7 @@ function EditJob({ readOnly = false }) {
     vertical: '',
     project: '',
     center: '',
+    _company: '',
     displayCompanyName: '',
     title: '',
     _industry: '',
@@ -223,6 +225,7 @@ function EditJob({ readOnly = false }) {
         const data = res.data?.data || {};
 
         setCompany({ name: data.college?.name || '', creditLeft: 0, _id: data.college?._id });
+        setCompanyList(asArray(data.companies));
         setIndustryList(asArray(data.industry));
         setQualificationList(asArray(data.qualification));
         setSubQualificationList(asArray(data.subQualification));
@@ -323,6 +326,7 @@ function EditJob({ readOnly = false }) {
           vertical: toId(jd.vertical),
           project: toId(jd.project),
           center: toId(jd.center),
+          _company: toId(jd._company),
           displayCompanyName: jd.displayCompanyName || prev.displayCompanyName || '',
           title: jd.title || '',
           _industry: toId(jd._industry),
@@ -700,6 +704,7 @@ function EditJob({ readOnly = false }) {
     if (!form.pay) newErrors.pay = 'Please select pay type';
     if (!form.work) newErrors.work = 'Please select work type';
     if (!form.isFixed) newErrors.salaryRange = 'Please choose fixed or a defined range';
+    if (!form._company) newErrors.company = 'Please select a company';
     if (!form.displayCompanyName.trim()) newErrors.organizationName = 'Enter company name';
     if (!form.genderPreference) newErrors.genderPreference = 'Please select gender preference';
 
@@ -755,6 +760,17 @@ function EditJob({ readOnly = false }) {
         'questionsAnswers',
         JSON.stringify(
           questionAnswers.filter((qa) => qa.question.trim() && qa.answer.trim())
+        )
+      );
+      formData.append(
+        'docsRequired',
+        JSON.stringify(
+          docsRequired
+            .filter((doc) => doc.name.trim())
+            .map((doc) => ({
+              Name: doc.name.trim(),
+              mandatory: !!doc.mandatory,
+            }))
         )
       );
       if (jobVideo) formData.append('jobVideo', jobVideo);
@@ -961,6 +977,23 @@ function EditJob({ readOnly = false }) {
                           <option value="">Select Center</option>
                           {asArray(centers).map((item) => (
                             <option key={item._id || item.id} value={item._id || item.id}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className={`col-xl-3 mb-1 ${errors.company ? 'error' : ''}`}>
+                        <label>Company</label><span className="mandatory"> *</span>
+                        <select
+                          className="form-control"
+                          value={form._company}
+                          onChange={(e) => updateField('_company', e.target.value)}
+                          disabled={readOnly}
+                        >
+                          <option value="">Select company</option>
+                          {asArray(companyList).map((item) => (
+                            <option key={item._id} value={item._id} className="text-capitalize">
                               {item.name}
                             </option>
                           ))}

@@ -77,6 +77,7 @@ function AddJob() {
 
   // ---------- dropdown / reference data ----------
   const [company, setCompany] = useState({ name: '', creditLeft: 0 });
+  const [companyList, setCompanyList] = useState([]);
   const [industryList, setIndustryList] = useState([]);
   const [qualificationList, setQualificationList] = useState([]);
   const [subQualificationList, setSubQualificationList] = useState([]);
@@ -93,6 +94,7 @@ function AddJob() {
     vertical: prefillVerticalId,
     project: prefillProjectId,
     center: prefillCenterId,
+    _company: '',
     displayCompanyName: '',
     title: '',
     _industry: '',
@@ -218,6 +220,7 @@ function AddJob() {
         const data = res.data?.data || {};
 
         setCompany({ name: data.college?.name || '', creditLeft: 0, _id: data.college?._id });
+        setCompanyList(asArray(data.companies));
         setIndustryList(asArray(data.industry));
         setQualificationList(asArray(data.qualification));
         setSubQualificationList(asArray(data.subQualification));
@@ -642,6 +645,7 @@ function AddJob() {
     if (form.isFixed === 'true' && !form.amount) newErrors.fixedAmount = 'Enter a fixed amount';
     if (form.isFixed === 'false' && (!form.min || !form.max))
       newErrors.salaryMinMax = 'Enter both minimum and maximum salary';
+    if (!form._company) newErrors.company = 'Please select a company';
     if (!form.displayCompanyName.trim()) newErrors.organizationName = 'Enter company name';
     if (!form.genderPreference) newErrors.genderPreference = 'Please select gender preference';
 
@@ -689,6 +693,17 @@ function AddJob() {
         'questionsAnswers',
         JSON.stringify(
           questionAnswers.filter((qa) => qa.question.trim() && qa.answer.trim())
+        )
+      );
+      formData.append(
+        'docsRequired',
+        JSON.stringify(
+          docsRequired
+            .filter((doc) => doc.name.trim())
+            .map((doc) => ({
+              Name: doc.name.trim(),
+              mandatory: !!doc.mandatory,
+            }))
         )
       );
       if (jobVideo) formData.append('jobVideo', jobVideo);
@@ -896,6 +911,22 @@ function AddJob() {
                           <option value="">Select Center</option>
                           {asArray(centers).map((item) => (
                             <option key={item._id || item.id} value={item._id || item.id}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className={`col-xl-3 mb-1 ${errors.company ? 'error' : ''}`}>
+                        <label>Company</label><span className="mandatory"> *</span>
+                        <select
+                          className="form-control"
+                          value={form._company}
+                          onChange={(e) => updateField('_company', e.target.value)}
+                        >
+                          <option value="">Select company</option>
+                          {asArray(companyList).map((item) => (
+                            <option key={item._id} value={item._id} className="text-capitalize">
                               {item.name}
                             </option>
                           ))}

@@ -262,6 +262,18 @@ const Student = ({
   });
   const [placementFormErrors, setPlacementFormErrors] = useState({});
   const [studentForPlacement, setStudentForPlacement] = useState(null);
+  const [showMoveToPlacement, setShowMoveToPlacement] = useState(false);
+  const [placementSelectedIds, setPlacementSelectedIds] = useState(new Set());
+  const [placementDepartments, setPlacementDepartments] = useState([]);
+  const [placementDepartmentId, setPlacementDepartmentId] = useState("");
+  const [placementProjects, setPlacementProjects] = useState([]);
+  const [placementProjectId, setPlacementProjectId] = useState("");
+  const [placementProjectsLoading, setPlacementProjectsLoading] = useState(false);
+  const [placementCourses, setPlacementCourses] = useState([]);
+  const [placementCourseId, setPlacementCourseId] = useState("");
+  const [placementCenterId, setPlacementCenterId] = useState("");
+  const [placementOptionsLoading, setPlacementOptionsLoading] = useState(false);
+  const [placementMoveLoading, setPlacementMoveLoading] = useState(false);
   const [attendanceView, setAttendanceView] = useState("daily");
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -4213,6 +4225,143 @@ const Student = ({
     setSelectedStudents(newSelected);
   };
 
+  const clearPlacementMoveForm = () => {
+    setPlacementSelectedIds(new Set());
+    setPlacementDepartmentId("");
+    setPlacementProjectId("");
+    setPlacementProjects([]);
+    setPlacementCourses([]);
+    setPlacementCourseId("");
+    setPlacementCenterId("");
+  };
+
+  const handleMoveToPlacementToggle = () => {
+    if (showMoveToPlacement) {
+      setShowMoveToPlacement(false);
+      clearPlacementMoveForm();
+      return;
+    }
+    setShowAttendanceMode(false);
+    setShowBulkControls(false);
+    setShowMoveToPlacement(true);
+  };
+
+  const togglePlacementSelection = (studentId) => {
+    setPlacementSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(studentId)) {
+        next.delete(studentId);
+      } else {
+        next.add(studentId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAllPlacement = () => {
+    const ids = allProfiles.map((profile) => profile._id).filter(Boolean);
+    const allSelected = ids.length > 0 && ids.every((id) => placementSelectedIds.has(id));
+    setPlacementSelectedIds(allSelected ? new Set() : new Set(ids));
+  };
+
+  const loadPlacementDepartments = async () => {
+    if (!token) return;
+    setPlacementProjectsLoading(true);
+    try {
+      const verticalRes = await axios.get(`${backendUrl}/college/getVerticals`, {
+        headers: { "x-auth": token },
+      });
+      const verticals = Array.isArray(verticalRes.data?.data) ? verticalRes.data.data : [];
+      setPlacementDepartments(verticals);
+    } catch (error) {
+      console.error("Failed to load departments", error);
+      setPlacementDepartments([]);
+    } finally {
+      setPlacementProjectsLoading(false);
+    }
+  };
+
+  const handlePlacementDepartmentChange = (departmentId) => {
+    setPlacementDepartmentId(departmentId);
+  };
+
+  useEffect(() => {
+    if (showMoveToPlacement) {
+      loadPlacementDepartments();
+    }
+  }, [showMoveToPlacement]);
+
+  const loadPlacementCourseOptions = async (projectId, departmentId) => {
+    setPlacementCourseId("");
+    setPlacementCenterId("");
+    if (!projectId || !departmentId || !token) {
+      setPlacementCourses([]);
+      return;
+    }
+    setPlacementOptionsLoading(true);
+    try {
+      const response = await axios.get(`${backendUrl}/college/candidate/placement-b2c-options`, {
+        headers: { "x-auth": token },
+        params: { projectId, verticalId: departmentId },
+      });
+      const courses = Array.isArray(response.data?.courses) ? response.data.courses : [];
+      setPlacementCourses(courses);
+      if (courses.length === 1) {
+        setPlacementCourseId(courses[0]._id);
+        const centers = courses[0].centers || [];
+        if (centers.length === 1) setPlacementCenterId(centers[0]._id);
+      }
+    } catch (error) {
+      console.error("Failed to load department courses", error);
+      setPlacementCourses([]);
+      alert(error.response?.data?.message || "Could not load courses for this project");
+    } finally {
+      setPlacementOptionsLoading(false);
+    }
+  };
+
+  const handlePlacementProjectChange = (projectId) => {
+    setPlacementProjectId(projectId);
+    loadPlacementCourseOptions(projectId, placementDepartmentId);
+  };
+
+  const handlePlacementCourseChange = (courseId) => {
+    setPlacementCourseId(courseId);
+    const course = placementCourses.find((item) => String(item._id) === String(courseId));
+    const centers = course?.centers || [];
+    setPlacementCenterId(centers.length === 1 ? centers[0]._id : "");
+  };
+
+  const handleConfirmMoveToPlacement = async () => {
+    if (placementSelectedIds.size === 0) {
+      alert("Select at least one student");
+      return;
+    }
+    if (!placementDepartmentId) {
+      alert("Select a department");
+      return;
+    }
+
+    setPlacementMoveLoading(true);
+    try {
+      const response = await axios.post(
+        `${backendUrl}/college/candidate/move-to-placement-b2c`,
+        {
+          appliedCourseIds: Array.from(placementSelectedIds),
+          verticalId: placementDepartmentId,
+        },
+        { headers: { "x-auth": token } }
+      );
+      alert(response.data?.message || "Students moved to the selected department");
+      setPlacementSelectedIds(new Set());
+      fetchProfileData();
+    } catch (error) {
+      alert(error.response?.data?.message || "Could not move the selected students");
+    } finally {
+      setPlacementMoveLoading(false);
+    }
+  };
+
   const selectAllStudents = () => {
     // Get eligible students based on current tab and attendance status
     const eligibleStudents = allProfiles.filter((s) => {
@@ -4580,6 +4729,10 @@ const Student = ({
                               setFilterData({ ...filterData, status: tab.key });
                               setActiveSubTab("student");
                               setCurrentPage(1);
+                              if (tab.key !== "batchFreeze") {
+                                setShowMoveToPlacement(false);
+                                clearPlacementMoveForm();
+                              }
                             }}
                           >
                             <i className={`${tab.icon} me-1`}></i>
@@ -4602,6 +4755,16 @@ const Student = ({
                         >
                           <i className="fas fa-upload"></i> Bulk Upload
                         </button> */}
+                        {activeTab === "batchFreeze" && (
+                          <button
+                            type="button"
+                            onClick={handleMoveToPlacementToggle}
+                            className={`btn btn-sm me-2 ${showMoveToPlacement ? "btn-success" : "btn-outline-primary"}`}
+                          >
+                            <i className="fas fa-briefcase me-1"></i>
+                            Move to Placement
+                          </button>
+                        )}
                         <button
                           onClick={handleAttendanceManagement}
                           className="btn btn-sm btn-primary me-2"
@@ -4620,6 +4783,16 @@ const Student = ({
                         >
                           <i className="fas fa-upload"></i> Bulk Upload
                         </button> */}
+                        {activeTab === "batchFreeze" && (
+                          <button
+                            type="button"
+                            onClick={handleMoveToPlacementToggle}
+                            className={`btn btn-sm me-2 mb-2 ${showMoveToPlacement ? "btn-success" : "btn-outline-primary"}`}
+                          >
+                            <i className="fas fa-briefcase me-1"></i>
+                            Move to Placement
+                          </button>
+                        )}
                         <button
                           onClick={handleAttendanceManagement}
                           className="btn btn-sm btn-primary me-2 mb-2"
@@ -4631,6 +4804,62 @@ const Student = ({
                         <Link className="btn btn-sm btn-primary me-2" to={`/institute/misreport/${selectedBatch._id}`} >MIS Report</Link>
                       </div>
                   </div>
+
+                  {activeTab === "batchFreeze" && showMoveToPlacement && (
+                    <div className="col-12 mt-3 p-3 bg-light rounded border">
+                      <div className="d-flex align-items-end gap-3 flex-wrap">
+                        <div className="form-check mb-2">
+                          <input
+                            type="checkbox"
+                            className="form-check-input"
+                            id="selectAllPlacementStudents"
+                            checked={
+                              allProfiles.length > 0 &&
+                              allProfiles.every((profile) => placementSelectedIds.has(profile._id))
+                            }
+                            onChange={toggleSelectAllPlacement}
+                          />
+                          <label className="form-check-label fw-bold" htmlFor="selectAllPlacementStudents">
+                            Select all ({placementSelectedIds.size}/{allProfiles.length})
+                          </label>
+                        </div>
+
+                        <div>
+                          <label className="form-label mb-1 small fw-bold">Department</label>
+                          <select
+                            className="form-select form-select-sm"
+                            value={placementDepartmentId}
+                            onChange={(e) => handlePlacementDepartmentChange(e.target.value)}
+                            style={{ minWidth: "180px" }}
+                            disabled={placementProjectsLoading || placementMoveLoading}
+                          >
+                            <option value="">
+                              {placementProjectsLoading && !placementDepartmentId
+                                ? "Loading departments..."
+                                : placementDepartments.length === 0
+                                  ? "No departments"
+                                  : "Select department"}
+                            </option>
+                            {placementDepartments.map((department) => (
+                              <option key={department._id} value={department._id}>
+                                {department.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-primary mb-0"
+                          onClick={handleConfirmMoveToPlacement}
+                          disabled={placementMoveLoading || placementOptionsLoading}
+                        >
+                          <i className="fas fa-paper-plane me-1"></i>
+                          {placementMoveLoading ? "Moving..." : `Move ${placementSelectedIds.size} selected`}
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* ===== BULK ATTENDANCE CONTROLS ===== */}
                   {showAttendanceMode && showBulkControls && (
@@ -5079,6 +5308,17 @@ const Student = ({
                                           }
                                         >
                                           <div className="d-flex align-items-center">
+                                            {showMoveToPlacement && activeTab === "batchFreeze" && (
+                                              <div className="form-check me-3">
+                                                <input
+                                                  className="form-check-input"
+                                                  type="checkbox"
+                                                  checked={placementSelectedIds.has(profile._id)}
+                                                  onChange={() => togglePlacementSelection(profile._id)}
+                                                  aria-label={`Select ${profile._candidate?.name || "student"}`}
+                                                />
+                                              </div>
+                                            )}
                                             {/* Bulk Selection Checkbox */}
                                             {showAttendanceMode &&
                                               showBulkControls &&

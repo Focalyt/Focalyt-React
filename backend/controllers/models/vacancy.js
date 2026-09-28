@@ -40,6 +40,13 @@ const vacancySchema = new Schema(
     shiftTimingTo: { type: String },
     work: { type: String },
     questionsAnswers: [{ Question: String, Answer: String }],
+    docsRequired: [
+      {
+        Name: { type: String },
+        mandatory: { type: Boolean, default: false },
+        status: { type: Boolean, default: true },
+      },
+    ],
     benifits: [String],
     remarks: String,
     place: String,
@@ -143,6 +150,9 @@ vacancySchema.methods.assignHr = async function () {
         "jobCategory.values": jobCategoryId,
       });
     }
+
+    const vacancyId = this._id;
+    const jobTitle = this.title;
 
     const jobNameIds = new Set();
     if (vacancyId) {

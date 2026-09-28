@@ -125,6 +125,12 @@ const appliedCoursesSchema = new Schema(
     dropoutReason: { type: String },
     dropoutBy: { type: ObjectId, ref: "User" },
     movetoplacementstatus: { type: Boolean, default: false },
+    department: { type: ObjectId, ref: "Vertical" },
+    departmentHistory: [{
+      department: { type: ObjectId, ref: "Vertical" },
+      shiftedAt: { type: Date },
+      shiftedBy: { type: ObjectId, ref: "User" },
+    }],
     
     // Attendance Tracking
     attendance: {
