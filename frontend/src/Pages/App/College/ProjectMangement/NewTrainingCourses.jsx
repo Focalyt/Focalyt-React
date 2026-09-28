@@ -46,6 +46,14 @@ const NewTrainingCourses = () => {
   const [savingCenters, setSavingCenters] = useState(false);
   const [assignMessage, setAssignMessage] = useState('');
 
+  const [projectCourse, setProjectCourse] = useState(null);
+  const [projectOptions, setProjectOptions] = useState([]);
+  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [savingProject, setSavingProject] = useState(false);
+  const [projectMessage, setProjectMessage] = useState('');
+  const [copyingId, setCopyingId] = useState('');
+
   // Assign Course = refer selected sessions of the course to a senior trainer
   const [referCourse, setReferCourse] = useState(null);
   const [referSessions, setReferSessions] = useState([]);
@@ -164,6 +172,110 @@ const NewTrainingCourses = () => {
       setAssignMessage(error?.response?.data?.message || 'Could not assign the center.');
     } finally {
       setSavingCenters(false);
+    }
+  };
+
+  const openAssignProject = async (course) => {
+    setProjectMessage('');
+    setProjectCourse(course);
+    setSelectedProjectId(idOf(course.project));
+    setProjectsLoading(true);
+    try {
+      const verticalId = idOf(course.vertical);
+      const response = await axios.get(
+        `${backendUrl}/college/${verticalId ? 'list-projects' : 'list_all_projects'}`,
+        {
+          params: verticalId ? { vertical: verticalId } : {},
+          headers: { 'x-auth': token },
+        }
+      );
+      setProjectOptions(response.data?.data || []);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      setProjectOptions([]);
+      setProjectMessage('Could not load projects.');
+    } finally {
+      setProjectsLoading(false);
+    }
+  };
+
+  const saveAssignedProject = async () => {
+    if (!projectCourse || !selectedProjectId) {
+      setProjectMessage('Select a project.');
+      return;
+    }
+    const courseFeeType = projectCourse.courseFeeType;
+    if (!courseFeeType) {
+      setProjectMessage('Could not assign: course fee type is missing on this course.');
+      return;
+    }
+    setSavingProject(true);
+    setProjectMessage('');
+    try {
+      const payload = {
+        project: selectedProjectId,
+        courseFeeType,
+      };
+      if (projectCourse.courseType) payload.courseType = projectCourse.courseType;
+      if (projectCourse.ojt) payload.ojt = projectCourse.ojt;
+      if (courseFeeType === 'Paid') {
+        if (!projectCourse.emiOptionAvailable) {
+          setProjectMessage('Could not assign: set EMI option on the course first.');
+          setSavingProject(false);
+          return;
+        }
+        payload.emiOptionAvailable = projectCourse.emiOptionAvailable;
+      }
+
+      const response = await axios.put(
+        `${backendUrl}/college/courses/editcoursecopy/${projectCourse._id}`,
+        payload,
+        { headers: { 'x-auth': token } }
+      );
+      if (!response.data?.status) {
+        setProjectMessage(response.data?.message || 'Could not assign the project.');
+        return;
+      }
+      const assigned = projectOptions.find((project) => String(project._id) === selectedProjectId);
+      setCourses((prev) => prev.map((course) => (
+        course._id === projectCourse._id
+          ? { ...course, project: assigned || { _id: selectedProjectId } }
+          : course
+      )));
+      setProjectCourse(null);
+    } catch (error) {
+      setProjectMessage(error?.response?.data?.message || 'Could not assign the project.');
+    } finally {
+      setSavingProject(false);
+    }
+  };
+
+  const copyCourse = async (course) => {
+    setCopyingId(course._id);
+    try {
+      const response = await axios.post(
+        `${backendUrl}/college/courses/${course._id}/duplicatecoursecopy`,
+        {},
+        { headers: { 'x-auth': token } }
+      );
+      if (!response.data?.success) {
+        window.alert(response.data?.message || 'Could not copy this course.');
+        return;
+      }
+      const created = response.data.data || {};
+      setCourses((prev) => [{
+        ...course,
+        ...created,
+        _id: created._id || created.id,
+        name: created.name || `${course.name || 'Course'} (Copy)`,
+        vertical: course.vertical,
+        project: course.project,
+        status: created.status === false || created.status === 'inactive' ? 'inactive' : 'active',
+      }, ...prev]);
+    } catch (error) {
+      window.alert(error?.response?.data?.message || 'Could not copy this course.');
+    } finally {
+      setCopyingId('');
     }
   };
 
@@ -410,12 +522,23 @@ const NewTrainingCourses = () => {
                       </span>
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
-                      <div className="vt-actions">
+                      <div className="vt-actions" style={{ flexWrap: 'wrap' }}>
+                        <button type="button" className="vt-action-text" onClick={() => openAssignProject(course)}>
+                          Assign Project
+                        </button>
                         <button type="button" className="vt-action-text" onClick={() => openAssignCenter(course)}>
                           Assign Center
                         </button>
                         <button type="button" className="vt-action-text" onClick={() => openAssignCourse(course)}>
                           Assign Course
+                        </button>
+                        <button
+                          type="button"
+                          className="vt-action-text"
+                          disabled={copyingId === course._id}
+                          onClick={() => copyCourse(course)}
+                        >
+                          {copyingId === course._id ? 'Copying...' : 'Copy'}
                         </button>
                       </div>
                     </td>
@@ -432,6 +555,51 @@ const NewTrainingCourses = () => {
           </div>
         )}
       </div>
+
+      {projectCourse && (
+        <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header text-white" style={{ backgroundColor: '#fc2b5a' }}>
+                <h5 className="modal-title">Assign Project — {projectCourse.name}</h5>
+                <button type="button" className="btn-close btn-close-white" onClick={() => setProjectCourse(null)}></button>
+              </div>
+              <div className="modal-body">
+                <p className="text-muted mb-3">Select a project for this course.</p>
+                {projectsLoading ? (
+                  <p>Loading projects...</p>
+                ) : projectOptions.length === 0 ? (
+                  <p>No projects found for this department.</p>
+                ) : (
+                  <div className="d-flex flex-column gap-2" style={{ maxHeight: 280, overflow: 'auto' }}>
+                    {projectOptions.map((project) => {
+                      const projectId = String(project._id);
+                      return (
+                        <label key={projectId} className="d-flex align-items-center gap-2 mb-0">
+                          <input
+                            type="radio"
+                            name="assignProject"
+                            checked={selectedProjectId === projectId}
+                            onChange={() => setSelectedProjectId(projectId)}
+                          />
+                          <span>{project.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+                {projectMessage && <p className="text-danger mt-3 mb-0">{projectMessage}</p>}
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setProjectCourse(null)}>Cancel</button>
+                <button type="button" className="btn btn-danger" disabled={savingProject || projectsLoading || !selectedProjectId} onClick={saveAssignedProject}>
+                  {savingProject ? 'Saving...' : 'Assign Project'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {centerCourse && (
         <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>

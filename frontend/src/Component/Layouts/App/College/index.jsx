@@ -9,7 +9,7 @@ import { toast } from 'react-toastify';
 import { useWhatsAppContext } from '../../../../contexts/WhatsAppContext';
 import { useTranslation } from 'react-i18next';
 import {
-  faUser, faBookOpen, faPlusCircle, faEye, faShoppingCart, faChartLine, faUserFriends, faUserCheck, faBell,
+  faUser, faUsers, faBookOpen, faPlusCircle, faEye, faShoppingCart, faChartLine, faUserFriends, faUserCheck, faBell,
   faHandshake, faTasks, faClipboardList, faFileUpload, faGraduationCap, faBuilding, faCalendarAlt, faCheckCircle,
   faCogs, faUserShield, faSitemap, faProjectDiagram, faFileAlt, faWallet, faCaretDown, faIndustry, faTags, faGlobe, faBullhorn, faUserTie, faVideo
 } from "@fortawesome/free-solid-svg-icons";
@@ -808,19 +808,30 @@ function CollegeLayout({ children }) {
                   <span className="menu-title">{t('your_profile')}</span>
                 </Link>
               </li>
-              {/* <li className={`nav-item ${location.pathname === '/institute/new-training/centers' ? 'active' : ''}`}>
+              <li className={`nav-item ${location.pathname === '/institute/new-training/centers' ? 'active' : ''}`}>
                     <Link to="/institute/new-training/centers" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faBuilding} />
-                      <span className="menu-title">Centers Management</span>
+                      <span className="menu-title">Centers </span>
                     </Link>
                   </li>
                   <li className={`nav-item ${location.pathname === '/institute/new-training/courses' ? 'active' : ''}`}>
                     <Link to="/institute/new-training/courses" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faGraduationCap} />
-                      <span className="menu-title">Courses Management</span>
+                      <span className="menu-title">Courses </span>
                     </Link>
-                  </li> */}
-
+                  </li>
+                  <li className={`nav-item ${location.pathname === '/institute/new-training/batches' ? 'active' : ''}`}>
+                    <Link to="/institute/new-training/batches" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faGraduationCap} />
+                      <span className="menu-title">Batch </span>
+                    </Link>
+                  </li>
+                  <li className={`nav-item ${location.pathname === '/institute/assign-team' ? 'active' : ''}`}>
+                    <Link to="/institute/assign-team" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faUsers} />
+                      <span className="menu-title">Assign Team </span>
+                    </Link>
+                  </li>
               {/* Courses */}
               <li className={`nav-item has-sub dropdown-courses ${openSubmenu.courses ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('courses')}>

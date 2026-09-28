@@ -96,6 +96,8 @@ import AppliedEvents from './Pages/App/Candidate/Events/AppliedEvents';
 import CandidateManagementPortal from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal';
 import NewTrainingCenters from './Pages/App/College/ProjectMangement/NewTrainingCenters';
 import NewTrainingCourses from './Pages/App/College/ProjectMangement/NewTrainingCourses';
+import NewTrainingBatches from './Pages/App/College/ProjectMangement/NewTrainingBatches';
+import AssignTeam from './Pages/App/College/Course/AssignTeam';
 import CandidateManagementPortal_old from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal_copy';
 import AddCoursecopy from './Pages/App/College/Course/AddCoursecopy';
 import Registrations from './Pages/App/College/Course/Registrations';
@@ -328,6 +330,8 @@ const Layout = () => {
           <Route path="candidatemanagment" element={<CandidateManagementPortal/>}/>
           <Route path="new-training/centers" element={<NewTrainingCenters/>}/>
           <Route path="new-training/courses" element={<NewTrainingCourses/>}/>
+          <Route path="new-training/batches" element={<NewTrainingBatches/>}/>
+          <Route path="new-training/assign-team" element={<AssignTeam/>}/>
           <Route path='addcourse' element={<AddCoursecopy/>}/>
           <Route path='addcoursecopy' element={<Navigate to="/institute/addcourse" replace />}/>
           <Route path='editcoursecopy/:id' element={<RedirectEditCourseCopy />}/>
