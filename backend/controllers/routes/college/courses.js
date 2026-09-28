@@ -681,6 +681,10 @@ router
 			applyCourseFeeTypeRules(body);
 			normalizeCourseMedia(body);
 
+			// Project stays on the course schema for existing records, but this add API does not accept it.
+			delete body.project;
+			delete body.projectName;
+
 			const newCourse = await Courses.create(body);
 			res.json({ status: true, message: "Record added!", data: newCourse });
 

@@ -40,7 +40,6 @@ const AddCourse = () => {
   const navigate = useNavigate();
   const sectorRef = useRef(null);
   const verticalRef = useRef(null);
-  const projectRef = useRef(null);
   const searchableChoicesInstances = useRef({});
   const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -70,10 +69,8 @@ const AddCourse = () => {
   const [selectedTestimonialPreviews, setSelectedTestimonialPreviews] = useState([]);
   const [selectedBrochurePreview, setSelectedBrochurePreview] = useState(null);
 
-  //vertical and project handle
   const [selectedVertical, setSelectedVertical] = useState([]);
   const [verticals, setVerticals] = useState([]);
-  const [projects, setProjects] = useState([]);
 
   // Basic form state
   const [formData, setFormData] = useState(
@@ -82,9 +79,7 @@ const AddCourse = () => {
       sector: [],
       courseLevel: '',
       courseFeeType: '',
-      projectName: '',
       vertical: '',
-      project: '',
       typeOfProject: '',
       courseType: '',
       name: '',
@@ -219,13 +214,6 @@ const AddCourse = () => {
         value: formData.vertical,
         optionsLength: verticals.length,
         placeholder: 'Search vertical'
-      },
-      {
-        key: 'project',
-        element: projectRef.current,
-        value: formData.project,
-        optionsLength: projects.length,
-        placeholder: 'Search project'
       }
     ];
 
@@ -278,42 +266,12 @@ const AddCourse = () => {
         searchableChoicesInstances.current[key] = null;
       });
     };
-  }, [sectors, verticals, projects, formData.sectors, formData.vertical, formData.project]);
+  }, [sectors, verticals, formData.sectors, formData.vertical]);
 
   // Fetch verticals on mount
   useEffect(() => {
     fetchVerticals();
   }, []);
-
-  useEffect(() => {
-    console.log('projects', projects);
-  }, [projects]);
-
-  // Fetch projects when vertical changes
-  useEffect(() => {
-    const fetchProjects = async () => {
-      if (formData.vertical) {
-        try {
-          const response = await axios.get(`${backendUrl}/college/list-projects?vertical=${formData.vertical}`, {
-            headers: { 'x-auth': token }
-          });
-          if (response.data.success) {
-            setProjects(sortOptionsByName(response.data.data));
-          } else {
-            setProjects([]);
-            console.error('Failed to fetch projects');
-          }
-        } catch (error) {
-          setProjects([]);
-          console.error('Error fetching projects:', error);
-        }
-      } else {
-        setProjects([]);
-      }
-    };
-
-    fetchProjects();
-  }, [formData.vertical, backendUrl, token]);
 
   const fetchVerticals = async () => {
     try {
@@ -332,23 +290,7 @@ const AddCourse = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    // If vertical is changed, reset project selection
-    if (name === 'vertical') {
-      setFormData({
-        ...formData,
-        [name]: value,
-        project: '' // Reset project when vertical changes
-      });
-      setProjects([]); // Clear projects immediately
-    }
-    // If project is selected to the default value, reset it to empty string
-    else if (name === 'project' && value === '') {
-      setFormData({
-        ...formData,
-        [name]: ''  // Reset to empty string when the default option is selected
-      });
-    }
-    else if (name === 'courseFeeType') {
+    if (name === 'courseFeeType') {
       setFormData({
         ...formData,
         courseFeeType: value,
@@ -557,7 +499,6 @@ const AddCourse = () => {
       'courseLevel',
       'courseFeeType',
       'vertical',
-      'project',
       'name',
       'duration',
       'qualification',
@@ -599,9 +540,7 @@ const AddCourse = () => {
       sector: [],
       courseLevel: '',
       courseFeeType: '',
-      projectName: '',
       vertical: '',
-      project: '',
       typeOfProject: '',
       courseType: '',
       name: '',
@@ -1080,7 +1019,6 @@ const AddCourse = () => {
         courseLevel: 'courseLevel',
         courseFeeType: 'courseFeeType',
         vertical: 'vertical',
-        project: 'project',
         name: 'name',
         duration: 'duration',
         qualification: 'qualification',
@@ -1339,25 +1277,6 @@ const AddCourse = () => {
                           ))}
                         </select>
                         {formErrors.vertical && <div className="invalid-feedback">{formErrors.vertical}</div>}
-                      </div>
-
-                      {/* Project */}
-                      <div className="col-xl-3 col-xl-lg-3 col-md-4 col-sm-12 col-12 mb-1" id="courseProjectblock">
-                        <label htmlFor="project" style={{ color: formErrors.project ? '#ef4444' : '' }}>Project <span style={{ color: '#ef4444' }}>*</span></label>
-                        <select
-                          className={`form-control ${formErrors.project ? 'is-invalid' : ''}`}
-                          name="project"
-                          id="project"
-                          ref={projectRef}
-                          value={formData.project}
-                          onChange={handleChange}
-                        >
-                          <option value="">Select Project</option>
-                          {projects.map((project, index) => (
-                            <option key={project._id || index} value={project._id}>{project.name}</option>
-                          ))}
-                        </select>
-                        {formErrors.project && <div className="invalid-feedback">{formErrors.project}</div>}
                       </div>
 
                       {/* Course Type */}

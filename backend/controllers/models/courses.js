@@ -49,7 +49,6 @@ const courseSchema = new Schema({
   project: {
       type: Schema.Types.ObjectId,
       ref: 'Project',
-      required: true,
     },
   courseType: String,
   youtubeURL: String,
