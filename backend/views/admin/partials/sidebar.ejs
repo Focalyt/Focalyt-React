@@ -55,6 +55,11 @@
                                                                   class="fas fa-user-friends"></i><span
                                                                   class="menu-item"
                                                                   data-i18n="Analytics">Registrations</span></a></li>
+                                                <li class="<% if(menu==='landing') {%>active<%}%>"><a
+                                                            href="<%= process.env.MIPIE_BACKEND_URL %>/admin/landing"><i
+                                                                  class="feather icon-layout"></i><span
+                                                                  class="menu-item"
+                                                                  data-i18n="Analytics">Landing Page</span></a></li>
                                                 <!-- <li class="<% if(menu==='listview') {%>active<%}%>">
                         <a href="/admin/courses/listview">
                             <i class="fas fa-user-friends"></i>
@@ -639,6 +644,10 @@
                                                       href="<%= process.env.MIPIE_BACKEND_URL %>/admin/courses/registrations"><i
                                                             class="fas fa-user-friends"></i><span class="menu-item"
                                                             data-i18n="Analytics">Registrations</span></a></li>
+                                          <li class="<% if(menu==='landing') {%>active<%}%>"><a
+                                                      href="<%= process.env.MIPIE_BACKEND_URL %>/admin/landing"><i
+                                                            class="feather icon-layout"></i><span class="menu-item"
+                                                            data-i18n="Analytics">Landing Page</span></a></li>
                                           <!-- <li class="<% if(menu==='listview') {%>active<%}%>">
                               <a href="/admin/courses/listview">
                                   <i class="fas fa-user-friends"></i>

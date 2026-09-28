@@ -808,6 +808,18 @@ function CollegeLayout({ children }) {
                   <span className="menu-title">{t('your_profile')}</span>
                 </Link>
               </li>
+              {/* <li className={`nav-item ${location.pathname === '/institute/new-training/centers' ? 'active' : ''}`}>
+                    <Link to="/institute/new-training/centers" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faBuilding} />
+                      <span className="menu-title">Centers Management</span>
+                    </Link>
+                  </li>
+                  <li className={`nav-item ${location.pathname === '/institute/new-training/courses' ? 'active' : ''}`}>
+                    <Link to="/institute/new-training/courses" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faGraduationCap} />
+                      <span className="menu-title">Courses Management</span>
+                    </Link>
+                  </li> */}
 
               {/* Courses */}
               <li className={`nav-item has-sub dropdown-courses ${openSubmenu.courses ? 'open' : ''}`}>
@@ -845,7 +857,7 @@ function CollegeLayout({ children }) {
                   <li className={`nav-item ${location.pathname === '/institute/viewcourse' ? 'active' : ''}`}>
                     <Link to="/institute/viewcourse" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faEye} />
-                      <span className="menu-title">{t('view_courses')}</span>
+                      <span className="menu-title">{t('Academic Planner')}</span>
                     </Link>
                   </li>
                 </ul>
@@ -1164,18 +1176,7 @@ function CollegeLayout({ children }) {
                   <span className="menu-title">{t('training_management')}</span>
                 </a>
               </li>
-                  <li className={`nav-item ${location.pathname === '/institute/new-training/centers' ? 'active' : ''}`}>
-                    <Link to="/institute/new-training/centers" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={faBuilding} />
-                      <span className="menu-title">Centers</span>
-                    </Link>
-                  </li>
-                  <li className={`nav-item ${location.pathname === '/institute/new-training/courses' ? 'active' : ''}`}>
-                    <Link to="/institute/new-training/courses" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={faGraduationCap} />
-                      <span className="menu-title">Courses</span>
-                    </Link>
-                  </li>
+                 
               <li className={`nav-item ${location.pathname === '/institute/trainerManagement' ? 'active' : ''}`}>
                     <Link to="/institute/trainerManagement" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faUserTie} />
