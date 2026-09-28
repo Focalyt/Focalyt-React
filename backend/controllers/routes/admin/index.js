@@ -66,6 +66,7 @@ const contactRoutes=require('./contacts')
 const loanRoutes = require('./loanEnquiry');
 const courseSectorsRoutes = require('./courseSectors');
 const teamRoutes=require('./team')
+const landingRoutes = require('./landing')
 const eventRoutes = require('./events');
 const addCenterRoutes = require('./center');
 const addPortalAccessRoutes = require('./portalAccess');
@@ -124,6 +125,7 @@ router.use("/contact",contactRoutes)
 router.use("/loanEnquiry",loanRoutes);
 router.use('/courseSectors', courseSectorsRoutes);
 router.use('/team', teamRoutes);
+router.use('/landing', landingRoutes);
 router.use('/event', eventRoutes);
 router.use('/center', addCenterRoutes);
 router.use('/portalaccess', addPortalAccessRoutes);

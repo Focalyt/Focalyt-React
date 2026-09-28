@@ -24,6 +24,18 @@ const getProfileGroupRootId = (profile) => {
   return String(profile.crossSaleRootId || profile.parentAppliedCourseId || profile._id || '');
 };
 
+const leadSubStatusTitle = (profile) => {
+  const subStatusId = profile?.selectedSubstatus?._id || profile?._leadSubStatus;
+  const fromStatus = (profile?._leadStatus?.substatuses || []).find(
+    (sub) => subStatusId && String(sub?._id) === String(subStatusId)
+  );
+  const fromList = String(fromStatus?.title || fromStatus?.name || '').trim();
+  if (fromList) return fromList;
+  const direct = String(profile?.selectedSubstatus?.title || '').trim();
+  if (direct && direct !== 'No Sub Status') return direct;
+  return '';
+};
+
 const getSearchDigits = (value) => String(value ?? '').replace(/\D/g, '');
 
 const isPhoneSearchQuery = (query) => {
@@ -18128,7 +18140,7 @@ useEffect(() => {
                                                   className="lead-strip-v3__kv-pill"
                                                   onClick={() => openEditPanel(profile, 'StatusChange')}
                                                 >
-                                                  {profile.selectedSubstatus?.title || 'Untouch Lead'}
+                                                  {leadSubStatusTitle(profile) || 'Not Set'}
                                                 </button>
                                               </div>
                                               <button

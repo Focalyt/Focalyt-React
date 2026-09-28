@@ -31761,7 +31761,7 @@ max-width: 600px;
 
         .lead-card-kyc-dash__stat{
           flex: 1 1 0;
-          min-width: 52px;
+          min-width: 40px;
           border-radius: 8px;
           padding: 5px 4px;
           display: flex;
