@@ -1629,17 +1629,6 @@ router.post('/addleadsb2c', isCollege, async (req, res) => {
 	
 		// console.log("existingUser", existingUser)
 		// console.log("centerId from req.body", req.body)
-		const existingCandidate = await Candidate.findOne({ mobile: candidateData.mobile });
-		if (existingCandidate) {
-			return res.status(400).json({
-				status: false,
-				message: "Candidate already exists"
-			});
-		}
-
-		const candidate = await Candidate.create(candidateData);
-		// console.log("candidate", candidate)
-
 		const counselor = await User.findById(counselorId);
 		if (!counselor) {
 			return res.status(404).json({
@@ -1647,6 +1636,36 @@ router.post('/addleadsb2c', isCollege, async (req, res) => {
 				message: "Counselor not found"
 			});
 		}
+
+		const selectedCourse = await Courses.findById(courseId).select('project').lean();
+		if (!selectedCourse) {
+			return res.status(400).json({
+				status: false,
+				message: "Course not found"
+			});
+		}
+
+		const existingCandidate = await Candidate.findOne({ mobile: candidateData.mobile });
+		if (existingCandidate) {
+			const projectCourseIds = selectedCourse.project
+				? await Courses.find({ project: selectedCourse.project }).distinct('_id')
+				: [courseId];
+
+			const alreadyInProject = await AppliedCourses.findOne({
+				_candidate: existingCandidate._id,
+				_course: { $in: projectCourseIds },
+			}).select('_id').lean();
+
+			if (alreadyInProject) {
+				return res.status(400).json({
+					status: false,
+					message: "Candidate already exists"
+				});
+			}
+		}
+
+		const candidate = existingCandidate || await Candidate.create(candidateData);
+		// console.log("candidate", candidate)
 
 		const resolveOptionalCoOwner = async (rawValue, label) => {
 			const coOwnerRaw = rawValue != null ? String(rawValue).trim() : '';
@@ -1699,14 +1718,26 @@ router.post('/addleadsb2c', isCollege, async (req, res) => {
 
 		const appliedCourse = await AppliedCourses.create(appliedCoursePayload);
 
-		// console.log("appliedCourse", appliedCourse)
-
-		candidate.appliedCourses.push(appliedCourse._id);
-		await candidate.save();
+		// Existing lead: attach this course without replacing their profile.
+		// New lead: keep the previous link used by this endpoint.
+		if (existingCandidate) {
+			await Candidate.updateOne(
+				{ _id: candidate._id },
+				{
+					$addToSet: { _appliedCourses: appliedCourse._id },
+					$push: { appliedCourses: { courseId, centerId } },
+				}
+			);
+		} else {
+			candidate.appliedCourses.push(appliedCourse._id);
+			await candidate.save();
+		}
 
 		res.status(200).json({
 			status: true,
-			message: "Lead added successfully",
+			message: existingCandidate
+				? "Lead added to this project successfully"
+				: "Lead added successfully",
 			data: appliedCourse
 		});
 

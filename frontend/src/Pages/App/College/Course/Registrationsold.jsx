@@ -3358,7 +3358,7 @@ const CRMDashboard = () => {
       });
 
       if (response.data.status) {
-        alert("Lead added successfully");
+        alert(response.data.message || "Lead added successfully");
 
         // Switch to "All" tab so the newly added lead is visible regardless of leadStatus tab filter
         setActiveCrmFilter(0);

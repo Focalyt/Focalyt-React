@@ -471,7 +471,7 @@ const ViewCourses = () => {
               <thead>
                 <tr style={{ background: '#f8fafc' }}>
                   {['#', 'Sector', 'Course Level', 'Course Name', 'Duration',
-                    ...(status === 'true' || status === true ? ['Add Leads'] : []),
+                    // ...(status === 'true' || status === true ? ['Add Leads'] : []),
                     'Status', 'Action'].map((h, i) => (
                     <th key={i} style={{
                       padding: '12px 16px',
@@ -534,7 +534,7 @@ const ViewCourses = () => {
                       <i className="fa fa-clock-o" style={{ marginRight: '5px', color: '#94a3b8', fontSize: '13px' }}></i>
                       {course.duration || 'N/A'}
                     </td>
-                    {/* Add Leads */}
+                    {/* Add Leads
                     {(course.status === 'true' || course.status === true) && (
                       <td style={tdStyle}>
                         <Link
@@ -552,6 +552,7 @@ const ViewCourses = () => {
                         </Link>
                       </td>
                     )}
+                    */}
                     {/* Status Toggle */}
                     <td style={tdStyle}>
                       <div className="custom-control custom-switch custom-control-inline p-0">
