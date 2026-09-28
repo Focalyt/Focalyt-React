@@ -314,6 +314,9 @@ const mapHrLeadToB2cProfile = (lead) => {
     aiVoice: lead?.aiVoice || null,
     _leadStatus: lead?.leadStatus || null,
     _leadSubStatus: lead?.leadSubstatus || null,
+    selectedSubstatus: lead?.subStatusTitle
+      ? { _id: lead?.leadSubstatus || null, title: lead.subStatusTitle }
+      : null,
     followups: lead?.followups || [],
     logs: lead?.logs || [],
     createdAt: lead?.createdAt,
@@ -19206,7 +19209,7 @@ useEffect(() => {
                                                   className="lead-strip-v3__kv-pill"
                                                   onClick={() => openEditPanel(profile, 'StatusChange')}
                                                 >
-                                                  {profile.selectedSubstatus?.title || 'Untouch Lead'}
+                                                  {profile.selectedSubstatus?.title || 'N/A'}
                                                 </button>
                                               </div>
                                               <button

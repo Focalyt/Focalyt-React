@@ -111,7 +111,7 @@ const serializeLead = (doc) => {
     };
     lead.statusTitle = statusRef.title;
     lead.statusMilestone = statusRef.milestone || '';
-    lead.subStatusTitle = sub?.title || '';
+    lead.subStatusTitle = sub?.title || lead.subStatusTitle || '';
   } else {
     lead.leadStatus = null;
     lead.statusTitle = '';
@@ -712,6 +712,7 @@ const mapApplyToLead = (apply, statusIndex) => {
     (item) => String(item.title || '').trim().toLowerCase() === String(subStatusTitle || '').trim().toLowerCase()
   ) || null;
   const sub = subFromApply || subFromHiring || null;
+  const resolvedSubTitle = sub?.title || subStatusTitle || '';
   const resumeUrl = apply.resume
     || (candidate.personalInfo?.resume || []).find((item) => isActualMediaFile(item?.url))?.url
     || '';
@@ -747,6 +748,7 @@ const mapApplyToLead = (apply, statusIndex) => {
       })),
     leadStatus: statusDoc || null,
     leadSubstatus: sub?._id || apply.leadSubstatus || null,
+    subStatusTitle: resolvedSubTitle,
     leadOwner,
     hasStoredLeadOwner: Boolean(apply.leadOwner || apply.assignedTo || apply.leadCoOwner),
     leadCoOwner: apply.leadCoOwner || null,
