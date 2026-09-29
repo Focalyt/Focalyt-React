@@ -20,6 +20,18 @@ const centerIdsOf = (course) => {
   return list.map(idOf).filter(Boolean);
 };
 
+const centersLabel = (course) => {
+  const list = Array.isArray(course?.center)
+    ? course.center
+    : course?.center
+      ? [course.center]
+      : course?.centerId
+        ? [course.centerId]
+        : [];
+  const names = list.map(labelOf).filter((name) => name && name !== '—');
+  return names.length ? names.join(', ') : '—';
+};
+
 const sessionLabel = (session) => {
   const parts = [
     session.unitNumber ? `Unit ${session.unitNumber}${session.unitName ? ` - ${session.unitName}` : ''}` : session.unitName,
@@ -96,6 +108,7 @@ const NewTrainingCourses = () => {
       course.name,
       labelOf(course.vertical),
       labelOf(course.project),
+      centersLabel(course),
     ].join(' ').toLowerCase();
     return haystack.includes(searchQuery.trim().toLowerCase());
   });
@@ -162,9 +175,13 @@ const NewTrainingCourses = () => {
         setAssignMessage(response.data?.message || 'Could not assign the center.');
         return;
       }
+      const assignedCenters = selectedCenterIds.map((id) => {
+        const match = centerOptions.find((center) => String(center._id) === id);
+        return match ? { _id: match._id, name: match.name } : { _id: id };
+      });
       setCourses((prev) => prev.map((course) => (
         course._id === centerCourse._id
-          ? { ...course, center: selectedCenterIds }
+          ? { ...course, center: assignedCenters }
           : course
       )));
       setCenterCourse(null);
@@ -270,6 +287,7 @@ const NewTrainingCourses = () => {
         name: created.name || `${course.name || 'Course'} (Copy)`,
         vertical: course.vertical,
         project: course.project,
+        center: course.center,
         status: created.status === false || created.status === 'inactive' ? 'inactive' : 'active',
       }, ...prev]);
     } catch (error) {
@@ -494,6 +512,7 @@ const NewTrainingCourses = () => {
                 <tr>
                   <th>Department</th>
                   <th>Project</th>
+                  <th>Centre</th>
                   <th>Course</th>
                   <th>Status</th>
                   <th>Actions</th>
@@ -509,6 +528,7 @@ const NewTrainingCourses = () => {
                   >
                     <td>{labelOf(course.vertical)}</td>
                     <td>{labelOf(course.project)}</td>
+                    <td>{centersLabel(course)}</td>
                     <td>
                       <span className="vt-name">
                         <span className="vt-avatar">{(course.name || '?').charAt(0).toUpperCase()}</span>

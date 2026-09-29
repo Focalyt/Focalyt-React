@@ -8725,6 +8725,8 @@ router.get('/all_courses', async (req, res) => {
 			.populate('trainers', 'name email mobile')
 			.populate('vertical', 'name')
 			.populate('project', 'name')
+			.populate('center', 'name')
+			.populate('centerId', 'name')
 			.sort({ createdAt: -1 });
 
 		res.json({ success: true, data: courses });
