@@ -4984,7 +4984,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 		const user = req.user;
 		const collegeId = user.college._id;
 		const {
-			name, courseType, status, leadStatus,
+			name, courseType, status, leadStatus, aiLeadStatus,
 			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
 			nextActionFromDate, nextActionToDate,
 			projects, verticals, course, center, counselor, owner,
@@ -5176,6 +5176,10 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			basePipeline[0].$match,
 			appliedFilters.verticalsArray
 		);
+
+		basePipeline[0].$match = applyAiLeadStatusMatch(basePipeline[0].$match, aiLeadStatus);
+		movedInKYCPipeline[0].$match = applyAiLeadStatusMatch(movedInKYCPipeline[0].$match, aiLeadStatus);
+		wonKeptInKycPipeline[0].$match = applyAiLeadStatusMatch(wonKeptInKycPipeline[0].$match, aiLeadStatus);
 
 
 

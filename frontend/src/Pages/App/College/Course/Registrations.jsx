@@ -5350,6 +5350,7 @@ console.log('API Response:', response.data);
       ...(filters.courseType && { courseType: filters.courseType }),
       ...(filters.status && filters.status !== 'true' && { status: filters.status }),
       // leadStatus is intentionally excluded - we want counts for all statuses
+      ...(filters.aiLeadStatus && { aiLeadStatus: filters.aiLeadStatus }),
       ...(filters.sector && { sector: filters.sector }),
       ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
       ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),

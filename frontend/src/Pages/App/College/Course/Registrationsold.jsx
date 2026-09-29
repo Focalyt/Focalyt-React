@@ -5976,6 +5976,7 @@ console.log('API Response:', response.data);
       ...(filters.courseType && { courseType: filters.courseType }),
       ...(filters.status && filters.status !== 'true' && { status: filters.status }),
       // leadStatus is intentionally excluded - we want counts for all statuses
+      ...(filters.aiLeadStatus && { aiLeadStatus: filters.aiLeadStatus }),
       ...(filters.sector && { sector: filters.sector }),
       ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
       ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
@@ -18334,7 +18335,7 @@ useEffect(() => {
                       </div>
 
                       {/* Status Select */}
-                      <div className="col-12 col-md-6 mb-3 mb-md-0">
+                      <div className="col-12 col-md-4 mb-3 mb-md-0">
                         <select
                           className="form-select border-0  bgcolor"
                           id="status"
@@ -18356,8 +18357,31 @@ useEffect(() => {
                         </select>
                       </div>
 
+                      {/* AI Status Select */}
+                      <div className="col-12 col-md-4 mb-3 mb-md-0">
+                        <select
+                          className="form-select border-0 bgcolor"
+                          id="aiStatus"
+                          name="aiLeadStatus"
+                          value={filterData.aiLeadStatus || ''}
+                          style={{
+                            height: '42px',
+                            paddingTop: '8px',
+                            paddingInline: '10px',
+                            width: '100%',
+                            backgroundColor: '#f1f2f6'
+                          }}
+                          onChange={(e) => handleFilterChange(e)}
+                        >
+                          <option value="">Select AI Status</option>
+                          {statuses.filter((filter) => filter._id).map((filter) => (
+                            <option key={filter._id} value={filter._id}>{filter.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
                       {/* Sub-Status Select */}
-                      <div className="col-12 col-md-6">
+                      <div className="col-12 col-md-4">
                         <select
                           className="form-select border-0  bgcolor"
                           name="subStatuses"
@@ -18699,6 +18723,7 @@ useEffect(() => {
                         <button
                           className="btn btn-primary"
                           onClick={() => {
+                            setActiveAiPerformanceId(filterData.aiLeadStatus || null);
                             fetchProfileData(filterData, 1);
                             setIsFilterCollapsed(true);
                           }}
