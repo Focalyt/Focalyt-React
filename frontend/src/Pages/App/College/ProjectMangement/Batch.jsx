@@ -283,6 +283,81 @@ const MultiSelectCheckbox = ({
     </div>
   );
 };
+
+const uniquePeople = (people) => {
+  const seen = new Set();
+  return people.filter((person) => {
+    const id = String(person.value ?? person._id ?? '');
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+};
+
+const RoleTrainerPicker = ({ title, emptyText, options, selectedValues, onChange, tone }) => {
+  const [query, setQuery] = useState('');
+  const needle = query.trim().toLowerCase();
+  const selectedIds = selectedValues.map(String);
+  const visibleOptions = options.filter((option) => {
+    const haystack = `${option.label || ''} ${option.hint || ''}`.toLowerCase();
+    return haystack.includes(needle);
+  });
+
+  const toggle = (value) => {
+    const id = String(value);
+    onChange(
+      selectedIds.includes(id)
+        ? selectedValues.filter((item) => String(item) !== id)
+        : [...selectedValues, value]
+    );
+  };
+
+  return (
+    <section className={`assign-card ${tone === 'trainer' ? 'is-trainer' : ''}`}>
+      <div className="assign-card__top">
+        <h3 className="assign-card__title">
+          <span className="assign-card__mark">
+            <i className={`fas ${tone === 'senior' ? 'fa-user-tie' : 'fa-chalkboard-teacher'}`}></i>
+          </span>
+          {title}
+        </h3>
+        <span className="assign-card__count">{selectedValues.length} selected</span>
+      </div>
+      <label className="assign-card__search">
+        <i className="fas fa-search"></i>
+        <input
+          type="text"
+          placeholder={`Search ${title.toLowerCase()}...`}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </label>
+      <div className="assign-card__list">
+        {visibleOptions.length === 0 ? (
+          <div className="assign-card__empty">{emptyText}</div>
+        ) : visibleOptions.map((option) => {
+          const active = selectedIds.includes(String(option.value));
+          return (
+            <button
+              key={String(option.value)}
+              type="button"
+              className={`assign-person ${active ? 'is-on' : ''}`}
+              onClick={() => toggle(option.value)}
+            >
+              <span className="assign-person__avatar">{(option.label || '?').charAt(0).toUpperCase()}</span>
+              <span>
+                <span className="assign-person__name">{option.label}</span>
+                {option.hint ? <span className="assign-person__hint">{option.hint}</span> : null}
+              </span>
+              <span className="assign-person__check"><i className="fas fa-check"></i></span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+};
+
 const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter = null, onBackToCenters = null, selectedProject = null, onBackToProjects = null, selectedVertical = null, onBackToVerticals = null }) => {
 
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
@@ -314,9 +389,11 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
 
 
   const [trainers, setTrainers] = useState([]);
+  const [seniorTrainers, setSeniorTrainers] = useState([]);
   const [showTrainerModal, setShowTrainerModal] = useState(false)
   const [alert, setAlert] = useState({ show: false, message: '', type: '' });
-  const [selectedTrainers, setSelectedTrainers] = useState([]);
+  const [selectedSeniorTrainers, setSelectedSeniorTrainers] = useState([]);
+  const [selectedFieldTrainers, setSelectedFieldTrainers] = useState([]);
   const [isTrainerDropdownOpen, setIsTrainerDropdownOpen] = useState(false);
   const [selectedBatchForTrainer, setSelectedBatchForTrainer] = useState(null);
   // Show alert
@@ -329,6 +406,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
 
   useEffect(() => {
     fetchTrainers()
+    fetchSeniorTrainers()
   }, [])
 
   const fetchTrainers = async () => {
@@ -363,6 +441,35 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     }
   };
 
+  const fetchSeniorTrainers = async () => {
+    try {
+      const response = await axios.get(`${backendUrl}/college/users/training-role-users`, {
+        headers: { 'x-auth': token },
+        params: { roleType: 'senior' },
+      });
+      setSeniorTrainers(response.data?.data || []);
+    } catch (error) {
+      console.error('Error fetching senior trainers:', error);
+      setSeniorTrainers([]);
+    }
+  };
+
+  const closeTrainerModal = () => {
+    setIsTrainerDropdownOpen(false);
+    setSelectedSeniorTrainers([]);
+    setSelectedFieldTrainers([]);
+    setSelectedBatchForTrainer(null);
+  };
+
+  const openTrainerModal = (batch) => {
+    const assigned = batch.trainers || [];
+    const seniorIds = new Set(seniorTrainers.map((trainer) => String(trainer._id)));
+    setSelectedBatchForTrainer(batch);
+    setSelectedSeniorTrainers(assigned.filter((trainer) => seniorIds.has(String(trainer._id))).map((trainer) => trainer._id));
+    setSelectedFieldTrainers(assigned.filter((trainer) => !seniorIds.has(String(trainer._id))).map((trainer) => trainer._id));
+    setIsTrainerDropdownOpen(true);
+  };
+
 
   // This was causing the modal to not open properly
   // useEffect(()=>{
@@ -375,18 +482,18 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
       return;
     }
 
-    if (selectedTrainers.length === 0) {
-      showAlert('Please select at least one trainer', 'warning');
+    const trainersToAssign = [...selectedSeniorTrainers, ...selectedFieldTrainers];
+    if (trainersToAssign.length === 0) {
+      showAlert('Please select a senior trainer or a trainer', 'warning');
       return;
     }
 
     try {
       setLoading(true);
       
-      // console.log('Assigning trainers:', selectedTrainers);
       const response = await axios.post(`${backendUrl}/college/assigntrainerstobatch`, {
         batchId: selectedBatchForTrainer._id,
-        trainers: selectedTrainers
+        trainers: trainersToAssign
       }, {
         headers: {
           'x-auth': token,
@@ -396,9 +503,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
 
       if (response.data.status) {
         showAlert('Trainers assigned successfully!', 'success');
-        setIsTrainerDropdownOpen(false);
-        setSelectedTrainers([]);
-        setSelectedBatchForTrainer(null);
+        closeTrainerModal();
         
         // Refresh batches list
         const batchesResponse = await axios.get(`${backendUrl}/college/get_batches`, {
@@ -2186,7 +2291,8 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                   <tr>
                     <th>Name</th>
                     <th>Instructor</th>
-                    <th>Trainers</th>
+                    <th className="vt-role-col">Senior Trainer</th>
+                    <th className="vt-role-col">Trainer</th>
                     <th>Status</th>
                     <th>Start</th>
                     <th>End</th>
@@ -2198,6 +2304,9 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                 <tbody>
                   {filteredBatches.map(batch => {
                     const enrollmentPercentage = getEnrollmentPercentage(batch.enrolledStudents, batch.maxStudents);
+                    const seniorIds = new Set(seniorTrainers.map((trainer) => String(trainer._id)));
+                    const seniorNames = (batch.trainers || []).filter((trainer) => seniorIds.has(String(trainer._id))).map((trainer) => trainer.name).join(', ');
+                    const trainerNames = (batch.trainers || []).filter((trainer) => !seniorIds.has(String(trainer._id))).map((trainer) => trainer.name).join(', ');
                     const showDate = (value) => {
                       if (!value) return '—';
                       const date = new Date(value);
@@ -2213,7 +2322,8 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                           </span>
                         </td>
                         <td>{batch.instructor || '—'}</td>
-                        <td className="vt-desc">{batch.trainers?.length ? batch.trainers.map(t => t.name).join(', ') : '—'}</td>
+                        <td className="vt-role-col">{seniorNames || '—'}</td>
+                        <td className="vt-role-col">{trainerNames || '—'}</td>
                         <td>
                           <span className={`vt-pill ${batch.status === 'active' ? 'is-active' : ''}`}>{batch.status || '—'}</span>
                         </td>
@@ -2225,12 +2335,8 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                           <div className="vt-actions">
                             <button
                               type="button"
-                              title="Select Trainers"
-                              onClick={() => {
-                                setSelectedBatchForTrainer(batch);
-                                setSelectedTrainers(batch.trainers?.map(t => t._id) || []);
-                                setIsTrainerDropdownOpen(true);
-                              }}
+                              title="Assign Senior Trainer and Trainer"
+                              onClick={() => openTrainerModal(batch)}
                             >
                               <i className="bi bi-people"></i>
                             </button>
@@ -4354,120 +4460,84 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
             );
           })()}
 
-          {isTrainerDropdownOpen && (
-            <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-              <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered modal-lg  justify-content-center" style={{ margin: 'auto' }}>
-                <div className="modal-content p-0">
-                  <div className="modal-header">
+          {isTrainerDropdownOpen && (() => {
+            const seniorIds = new Set(seniorTrainers.map((trainer) => String(trainer._id)));
+            const toOption = (trainer) => ({
+              value: trainer._id,
+              label: trainer.name || trainer.email || 'Trainer',
+              hint: trainer.designation || trainer.email || '',
+            });
+            const seniorOptions = uniquePeople(seniorTrainers.map(toOption));
+            const fieldOptions = uniquePeople([
+              ...trainers.filter((trainer) => !seniorIds.has(String(trainer._id))).map(toOption),
+              ...(selectedBatchForTrainer?.trainers || [])
+                .filter((trainer) => !seniorIds.has(String(trainer._id)))
+                .map(toOption),
+            ]);
+
+            const assigned = selectedBatchForTrainer?.trainers || [];
+            const assignedSeniors = assigned.filter((trainer) => seniorIds.has(String(trainer._id)));
+            const assignedTrainers = assigned.filter((trainer) => !seniorIds.has(String(trainer._id)));
+            const assignCount = selectedSeniorTrainers.length + selectedFieldTrainers.length;
+
+            return (
+            <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}>
+              <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered" style={{ margin: 'auto', maxWidth: 560 }}>
+                <div className="modal-content assign-modal">
+                  <div className="assign-modal__head">
                     <div>
-                      <h1 className="modal-title fs-5">
-                        <i className="fas fa-users me-2"></i>
-                        Select Trainers
-                      </h1>
+                      <p className="assign-modal__kicker">Batch team</p>
+                      <h2>Assign Senior Trainer & Trainer</h2>
                       {selectedBatchForTrainer && (
-                        <small className="text-muted">
-                          Batch: <strong>{selectedBatchForTrainer.name}</strong> ({selectedBatchForTrainer.code})
-                        </small>
+                        <p>Batch <strong>{selectedBatchForTrainer.name}</strong>{selectedBatchForTrainer.code ? ` · ${selectedBatchForTrainer.code}` : ''}</p>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      className="btn-close"
-                      onClick={() => {
-                        setIsTrainerDropdownOpen(false);
-                        setSelectedTrainers([]);
-                        setSelectedBatchForTrainer(null);
-                      }}
-                    ></button>
-                  </div>
-                  <div className="modal-body" style={{minHeight: '200px'}}>
-                    {/* Currently assigned trainers info */}
-                    {selectedBatchForTrainer?.trainers && selectedBatchForTrainer.trainers.length > 0 && (
-                      <div className="alert alert-info mb-3">
-                        <h6 className="mb-2">
-                          <i className="fas fa-info-circle me-2"></i>
-                          Currently Assigned Trainers:
-                        </h6>
-                        <div className="d-flex flex-wrap gap-2">
-                          {selectedBatchForTrainer.trainers.map(trainer => (
-                            <span key={trainer._id} className="badge bg-primary fs-6 px-2 py-1">
-                              {trainer.name}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <MultiSelectCheckbox
-                      title="Available Trainers"
-                      options={trainers.map(trainer => ({
-                        value: trainer._id,
-                        label: trainer.name
-                      }))}
-                      selectedValues={selectedTrainers}
-                      onChange={setSelectedTrainers}
-                      icon="fas fa-users"
-                      isOpen={true}
-                      onToggle={() => { }}
-                    />
-
-                    {/* Selected trainers display */}
-                    {selectedTrainers.length > 0 && (
-                      <div className="mt-4">
-                        <h6 className="text-success">
-                          <i className="fas fa-check-circle me-2"></i>
-                          Selected Trainers ({selectedTrainers.length}):
-                        </h6>
-                        <div className="d-flex flex-wrap gap-2">
-                          {selectedTrainers.map(trainerId => {
-                            const trainer = trainers.find(t => t._id === trainerId);
-                            return (
-                              <span key={trainerId} className="badge bg-success fs-6 px-3 py-2">
-                                <i className="fas fa-user me-1"></i>
-                                {trainer?.name}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="modal-footer">
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => {
-                        setIsTrainerDropdownOpen(false);
-                        setSelectedTrainers([]);
-                        setSelectedBatchForTrainer(null);
-                      }}
-                    >
-                      <i className="fas fa-times me-2"></i>
-                      Cancel
+                    <button type="button" className="assign-modal__close" onClick={closeTrainerModal} aria-label="Close">
+                      <i className="fas fa-times"></i>
                     </button>
+                  </div>
+                  <div className="assign-modal__body">
+                    {assigned.length > 0 && (
+                      <div className="assign-modal__assigned">
+                        <span className="assign-modal__chip">Senior <span>{assignedSeniors.map((trainer) => trainer.name).join(', ') || '—'}</span></span>
+                        <span className="assign-modal__chip">Trainer <span>{assignedTrainers.map((trainer) => trainer.name).join(', ') || '—'}</span></span>
+                      </div>
+                    )}
+                    <div className="d-flex flex-column gap-3">
+                      <RoleTrainerPicker
+                        title="Senior Trainer"
+                        tone="senior"
+                        options={seniorOptions}
+                        selectedValues={selectedSeniorTrainers}
+                        onChange={setSelectedSeniorTrainers}
+                        emptyText="No senior trainer found. Tick Senior Trainer on a user in User Management."
+                      />
+                      <RoleTrainerPicker
+                        title="Trainer"
+                        tone="trainer"
+                        options={fieldOptions}
+                        selectedValues={selectedFieldTrainers}
+                        onChange={setSelectedFieldTrainers}
+                        emptyText="No trainer found."
+                      />
+                    </div>
+                  </div>
+                  <div className="assign-modal__foot">
+                    <button type="button" className="vt-back" onClick={closeTrainerModal}>Cancel</button>
                     <button
                       type="button"
-                      className="btn btn-primary"
-                      disabled={selectedTrainers.length === 0 || loading}
+                      className="assign-modal__assign"
+                      disabled={assignCount === 0 || loading}
                       onClick={handleAssignTrainers}
                     >
-                      {loading ? (
-                        <>
-                          <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                          Assigning...
-                        </>
-                      ) : (
-                        <>
-                          <i className="fas fa-check me-2"></i>
-                          Assign Trainer ({selectedTrainers.length})
-                        </>
-                      )}
+                      {loading ? 'Assigning...' : `Assign (${assignCount})`}
                     </button>
                   </div>
                 </div>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           <style>
             {
