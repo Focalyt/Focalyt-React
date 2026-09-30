@@ -3,12 +3,13 @@ const { Schema, Types, ObjectId } = mongoose;
 
 const BatchSchema = new Schema({
   name: { type: String, required: true },
-  instructor :{ type: String, required: true },
+  instructor: { type: String, default: '' },
   description : { type: String},
   startDate: { type: Date, required: true },
   endDate: { type: Date, required: true },
   zeroPeriodStartDate: { type: Date, required: true },
   zeroPeriodEndDate: { type: Date, required: true },
+  assessmentDate: { type: Date, default: null },
   maxStudents: { type: Number, default: 0 },
   trainers: [ { type: ObjectId, ref: 'User' } ],
   status: { type: String, enum: ['active', 'completed', 'inactive'], default: 'active' },

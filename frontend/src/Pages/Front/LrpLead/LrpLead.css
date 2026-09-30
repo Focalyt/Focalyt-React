@@ -1,0 +1,154 @@
+.lrp-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #f4f6f8;
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  color: #1f2933;
+}
+
+.lrp-header {
+  background: #fc2b5a;
+  color: #fff;
+  padding: 16px 16px 28px;
+}
+
+.lrp-header-inner {
+  max-width: 560px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lrp-header img {
+  height: 36px;
+  width: auto;
+  background: #fff;
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+.lrp-header h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.lrp-header p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  opacity: 0.92;
+}
+
+.lrp-card {
+  max-width: 560px;
+  margin: -16px auto 24px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.08);
+  padding: 18px 16px 20px;
+}
+
+.lrp-field {
+  margin-bottom: 14px;
+}
+
+.lrp-field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.lrp-field label span {
+  color: #fc2b5a;
+}
+
+.lrp-field input,
+.lrp-field select,
+.lrp-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 48px;
+  border: 1px solid #e5e7eb;
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 16px;
+  color: #1f2933;
+  outline: none;
+}
+
+.lrp-field textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.lrp-field input:focus,
+.lrp-field select:focus,
+.lrp-field textarea:focus {
+  border-color: #fc2b5a;
+  background: #fff;
+}
+
+.lrp-field input:disabled,
+.lrp-locked {
+  background: #eef1f4;
+  color: #4b5563;
+  cursor: not-allowed;
+}
+
+.lrp-error {
+  background: #fff1f3;
+  color: #b42318;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  margin-bottom: 14px;
+}
+
+.lrp-submit {
+  width: 100%;
+  min-height: 50px;
+  border: none;
+  border-radius: 12px;
+  background: #fc2b5a;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+}
+
+.lrp-submit:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.lrp-success {
+  text-align: center;
+  padding: 28px 8px 12px;
+}
+
+.lrp-success h2 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+
+.lrp-success p {
+  margin: 0 0 18px;
+  color: #4b5563;
+  font-size: 15px;
+}
+
+@media (min-width: 640px) {
+  .lrp-header {
+    padding: 24px 24px 36px;
+  }
+
+  .lrp-card {
+    margin-top: -20px;
+    padding: 24px;
+  }
+}

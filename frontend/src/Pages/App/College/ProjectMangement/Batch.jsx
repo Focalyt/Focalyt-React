@@ -439,6 +439,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     endDate: '', // End Date
     zeroPeriodStartDate: '', // Zero Period Start Date
     zeroPeriodEndDate: '', // Zero Period End Date
+    assessmentDate: null,
     maxStudents: 0, // Changed from 'students' to 'maxStudents'
     status: '', // Default to 'active'
     courseId: selectedCourse?._id || '', // Course ID (using selectedCourseData)
@@ -463,6 +464,62 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
+  const assessmentAnchorRef = useRef(null);
+  const [assessmentCalendarOpen, setAssessmentCalendarOpen] = useState(false);
+
+  useEffect(() => {
+    if (!assessmentCalendarOpen) return undefined;
+
+    const placeCalendar = () => {
+      const anchor = assessmentAnchorRef.current?.querySelector('.react-date-picker__wrapper');
+      const calendar = document.querySelector('body > .react-date-picker__calendar--open');
+      if (!anchor || !calendar) return;
+      const rect = anchor.getBoundingClientRect();
+      const calendarRect = calendar.getBoundingClientRect();
+      const height = calendarRect.height || 320;
+      const width = Math.max(calendarRect.width || 0, 280);
+      const gap = 8;
+      const fitsBelow = rect.bottom + height + gap <= window.innerHeight;
+      const top = fitsBelow ? rect.bottom + gap : Math.max(8, rect.top - height - gap);
+      const left = Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - width - 8));
+      calendar.style.setProperty('top', `${top}px`, 'important');
+      calendar.style.setProperty('left', `${left}px`, 'important');
+    };
+
+    const frame = requestAnimationFrame(placeCalendar);
+    const timer = window.setTimeout(placeCalendar, 40);
+    const modal = assessmentAnchorRef.current?.closest('.modal-content');
+    let blockOutsideClose = false;
+    let blockTimer = 0;
+    const onScroll = () => {
+      blockOutsideClose = true;
+      window.clearTimeout(blockTimer);
+      blockTimer = window.setTimeout(() => {
+        blockOutsideClose = false;
+      }, 400);
+    };
+    const keepOpenWhileScrolling = (event) => {
+      if (!blockOutsideClose) return;
+      const calendar = document.querySelector('body > .react-date-picker__calendar--open');
+      if (calendar?.contains(event.target)) return;
+      event.stopPropagation();
+    };
+
+    modal?.addEventListener('scroll', onScroll, { passive: true });
+    document.addEventListener('mousedown', keepOpenWhileScrolling, true);
+    document.addEventListener('focusin', keepOpenWhileScrolling, true);
+    document.addEventListener('touchstart', keepOpenWhileScrolling, true);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+      window.clearTimeout(blockTimer);
+      modal?.removeEventListener('scroll', onScroll);
+      document.removeEventListener('mousedown', keepOpenWhileScrolling, true);
+      document.removeEventListener('focusin', keepOpenWhileScrolling, true);
+      document.removeEventListener('touchstart', keepOpenWhileScrolling, true);
+    };
+  }, [assessmentCalendarOpen]);
   const [editingBatch, setEditingBatch] = useState(null);
   const [showShareModal, setShowShareModal] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState(null);
@@ -1283,7 +1340,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     return batch.name.toLowerCase() ||
       batch.code.toLowerCase() ||
       batch.course.toLowerCase() ||
-      batch.instructor.toLowerCase() ||
+      (batch.instructor || '').toLowerCase() ||
       batch.centerName.toLowerCase();
   });
 
@@ -1347,6 +1404,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
         endDate: null, // End Date
         zeroPeriodStartDate: null, // Zero Period Start Date
         zeroPeriodEndDate: null, // Zero Period End Date
+        assessmentDate: null,
         maxStudents: 0, // Changed from 'students' to 'maxStudents'
         status: 'active', // Default to 'active'
         courseId: selectedCourse?._id || '', // Course ID (using selectedCourseData)
@@ -1372,6 +1430,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
       maxStudents: batch.maxStudents.toString(),
       startDate: batch.startDate,
       endDate: batch.endDate,
+      assessmentDate: batch.assessmentDate || null,
       mode: batch.mode,
       status: batch.status
     });
@@ -1423,7 +1482,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   }, []);
 
   const handleSubmit = async () => {
-    if (!formData.name.trim() || !formData.instructor.trim()) {
+    if (!formData.name.trim()) {
       alert('Please fill in all required fields');
       return;
     }
@@ -2131,6 +2190,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                     <th>Status</th>
                     <th>Start</th>
                     <th>End</th>
+                    <th>Assessment</th>
                     <th>Enrollment</th>
                     <th>Actions</th>
                   </tr>
@@ -2159,6 +2219,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                         </td>
                         <td className="vt-date">{showDate(batch.startDate)}</td>
                         <td className="vt-date">{showDate(batch.endDate)}</td>
+                        <td className="vt-date">{showDate(batch.assessmentDate)}</td>
                         <td>{batch.enrolledStudents || 0}/{batch.maxStudents || 0} ({enrollmentPercentage}%)</td>
                         <td onClick={(e) => e.stopPropagation()}>
                           <div className="vt-actions">
@@ -3933,7 +3994,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
 
                     <div className="row">
                       <div className="col-md-6 mb-3">
-                        <label className="form-label">Instructor *</label>
+                        <label className="form-label">Instructor</label>
                         <input
                           type="text"
                           className="form-control"
@@ -4105,6 +4166,26 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                       </div>
 
 
+                    </div>
+                    <div className="row">
+                      <div className="col-md-6 mb-3" style={{ marginTop: 16 }} ref={assessmentAnchorRef}>
+                        <label className="form-label">Assessment Date</label>
+                        <DatePicker
+                          onChange={(date) => setFormData(prev => ({ ...prev, assessmentDate: date }))}
+                          onCalendarOpen={() => setAssessmentCalendarOpen(true)}
+                          onCalendarClose={() => setAssessmentCalendarOpen(false)}
+                          portalContainer={typeof document !== 'undefined' ? document.body : null}
+                          value={formatDateForState(formData.assessmentDate)}
+                          minDate={today}
+                          format="dd/MM/yyyy"
+                          clearIcon={null}
+                          className="form-control"
+                          dayPlaceholder="dd"
+                          monthPlaceholder="mm"
+                          yearPlaceholder="yyyy"
+                          calendarIcon={<i className="fas fa-calendar-alt"></i>}
+                        />
+                      </div>
                     </div>
 
                     <div className="mb-3">
@@ -7118,6 +7199,12 @@ width:100%;
          .react-date-picker__calendar.react-date-picker__calendar--open{
     inset: 0 !important;
     width: 300px !important;
+}
+body > .react-date-picker__calendar.react-date-picker__calendar--open {
+    position: fixed !important;
+    inset: auto !important;
+    width: auto !important;
+    z-index: 4000 !important;
 }
 /* Responsive Design */
 @media (max-width: 1920px) {

@@ -146,3 +146,4 @@ module.exports.BotTraining = require("./botTraining");
 module.exports.BotTrainingRule = require("./botTrainingRule");
 module.exports.Partner = require("./partners");
 module.exports.LRP = require("./lrp");
+module.exports.TempLrpLead = require("./tempLrpLead");

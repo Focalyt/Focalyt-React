@@ -73,6 +73,7 @@ import Certificate from './Pages/Front/Certificate/certificate';
 import Certificates from './Pages/Front/Certificate/certificates';
 import Application from './Pages/Front/StudentRegistration/Application';
 import Registration from './Pages/Front/StudentRegistration/Registration';
+import LrpLead from './Pages/Front/LrpLead/LrpLead';
 import Regitrationsold from './Pages/App/College/Course/Registrationsold'
 import CollegeLayout from './Component/Layouts/App/College';
 import CollegeLogin from './Pages/App/College/Login/CollegeLogin';
@@ -254,6 +255,7 @@ const Layout = () => {
         <Route path="/stulabs" element={<StuLabs />} />
         <Route path="/events" element={<Event />} />
         <Route path="/studentRegistration" element={<Registration />} />
+        <Route path="/lrp-lead" element={<LrpLead />} />
         <Route path="/application" element={<Application />} />
         <Route path="/Resumetest" element={<ResumeTest/>}/>
         <Route path="/employersTermsofService" element={<EmployersTermsofService/>}/>
@@ -332,6 +334,7 @@ const Layout = () => {
           <Route path="new-training/courses" element={<NewTrainingCourses/>}/>
           <Route path="new-training/batches" element={<NewTrainingBatches/>}/>
           <Route path="new-training/assign-team" element={<AssignTeam/>}/>
+          <Route path="assign-team" element={<Navigate to="/institute/new-training/assign-team" replace />}/>
           <Route path='addcourse' element={<AddCoursecopy/>}/>
           <Route path='addcoursecopy' element={<Navigate to="/institute/addcourse" replace />}/>
           <Route path='editcoursecopy/:id' element={<RedirectEditCourseCopy />}/>

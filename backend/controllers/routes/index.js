@@ -30,6 +30,7 @@ const {uploadSinglefile} = require('./functions/images')
 const { resolvePublicUrl } = require('../../helpers/s3Storage');
 const AppliedCourses = require('../models/appliedCourses');
 const commonFunc = require('./functions/common');
+const publicLrpLeadRoutes = require('./publicLrpLead');
 
 // Production nginx often strips `/api` before Node — mirror OTP routes at root.
 router.post('/sendOtp', commonFunc.sendOtp);
@@ -39,6 +40,7 @@ router.post('/otpCandidateLogin', commonFunc.otpCandidateLogin);
 router.post('/otpCompanyLogin', commonFunc.otpCompanyLogin);
 router.post('/otpTrainerLogin', commonFunc.loginAsTrainer);
 router.post('/publicApply', commonFunc.publicApply);
+router.use('/public', publicLrpLeadRoutes);
 
 router.use('/', frontRoutes);
 router.use('/', conversionTrakingRoutes);
