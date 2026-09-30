@@ -11170,14 +11170,13 @@ useEffect(() => {
 
               <div className="mb-3">
                 <label htmlFor="candidateEmail" className="form-label fw-semibold text-dark mb-2">
-                  Email <span className="text-danger">*</span>
+                  Email
                 </label>
                 <input
                   type="email"
                   id="candidateEmail"
                   className="form-control border-0 shadow-sm"
                   placeholder="Enter email address"
-                  required
                   value={candidateFormData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
                   style={{
@@ -22774,13 +22773,12 @@ useEffect(() => {
 
                     <div className="col-md-6">
                       <label className="form-label fw-bold">
-                        Email <span className="text-danger">*</span>
+                        Email
                       </label>
                       <input
                         type="email"
                         className="form-control"
                         placeholder="Enter email address"
-                        required
                         value={candidateFormData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
                       />
