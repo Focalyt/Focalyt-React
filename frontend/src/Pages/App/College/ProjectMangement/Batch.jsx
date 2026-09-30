@@ -411,33 +411,14 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
 
   const fetchTrainers = async () => {
     try {
-      setLoading(true);
-
-      const response = await axios.get(
-        `${backendUrl}/college/trainer/trainers`,
-        {
-          headers: {
-            'x-auth': token,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      // console.log("fetch trainers", response.data)
-
-
-      if (response.data.status && response.data.data) {
-        setTrainers(response.data.data);
-      } else {
-        setTrainers([]);
-        showAlert(response.data.message || 'No trainers found', 'warning');
-      }
-
+      const response = await axios.get(`${backendUrl}/college/users/training-role-users`, {
+        headers: { 'x-auth': token },
+        params: { roleType: 'trainer' },
+      });
+      setTrainers(response.data?.data || []);
     } catch (error) {
       console.error('Error fetching trainers:', error);
-      showAlert(
-        error?.response?.data?.message || 'Failed to fetch trainers',
-        'error'
-      );
+      setTrainers([]);
     }
   };
 
@@ -538,7 +519,6 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   // Form states
   const [formData, setFormData] = useState({
     name: '', // Batch Name
-    instructor: '', // Instructor Name
     description: '', // Description Name
     startDate: '', // Start Date
     endDate: '', // End Date
@@ -1445,7 +1425,6 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     return batch.name.toLowerCase() ||
       batch.code.toLowerCase() ||
       batch.course.toLowerCase() ||
-      (batch.instructor || '').toLowerCase() ||
       batch.centerName.toLowerCase();
   });
 
@@ -1531,7 +1510,6 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
       name: batch.name,
       course: batch.course,
       center: batch.center,
-      instructor: batch.instructor,
       maxStudents: batch.maxStudents.toString(),
       startDate: batch.startDate,
       endDate: batch.endDate,
@@ -2290,7 +2268,6 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                 <thead>
                   <tr>
                     <th>Name</th>
-                    <th>Instructor</th>
                     <th className="vt-role-col">Senior Trainer</th>
                     <th className="vt-role-col">Trainer</th>
                     <th>Status</th>
@@ -2321,7 +2298,6 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                             <i className="bi bi-chevron-right vt-go"></i>
                           </span>
                         </td>
-                        <td>{batch.instructor || '—'}</td>
                         <td className="vt-role-col">{seniorNames || '—'}</td>
                         <td className="vt-role-col">{trainerNames || '—'}</td>
                         <td>
@@ -4100,16 +4076,6 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
 
                     <div className="row">
                       <div className="col-md-6 mb-3">
-                        <label className="form-label">Instructor</label>
-                        <input
-                          type="text"
-                          className="form-control"
-                          value={formData.instructor}
-                          onChange={(e) => setFormData(prev => ({ ...prev, instructor: e.target.value }))}
-                          placeholder="Enter instructor name"
-                        />
-                      </div>
-                      <div className="col-md-6 mb-3">
                         <label className="form-label">Max Students</label>
                         <input
                           type="number"
@@ -4518,7 +4484,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                         options={fieldOptions}
                         selectedValues={selectedFieldTrainers}
                         onChange={setSelectedFieldTrainers}
-                        emptyText="No trainer found."
+                        emptyText="No trainer found. Tick Trainer on a user in User Management."
                       />
                     </div>
                   </div>

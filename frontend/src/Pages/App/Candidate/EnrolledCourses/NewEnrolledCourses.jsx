@@ -870,7 +870,6 @@ const EnrolledCourseList = ({ courses, loading }) => {
 
         const metaItems = [
           { icon: 'fa-calendar-alt', label: 'Batch Name', value: batch?.name || 'N/A' },
-          { icon: 'fa-user', label: 'Instructor', value: batch?.instructor || 'N/A' },
           { icon: 'fa-chalkboard-teacher', label: 'Training Sessions', value: String(sessionCount) },
         ];
 
@@ -947,7 +946,7 @@ const EnrolledCourseSessions = ({ courseId, courses, loading, onRefresh, refresh
   const basicDetails = useMemo(() => ({
     courseTrade: enrollment?._course?.name || '-',
     batchCode: enrollment?.batch?.name || enrollment?.batch?.code || '-',
-    trainerName: enrollment?.batch?.instructor || '-',
+    trainerName: '-',
     centerName: enrollment?._center?.name || '-',
     departmentName: 'B2G',
     projectName: 'OSDA',
