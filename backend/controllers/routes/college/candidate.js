@@ -1861,7 +1861,7 @@ router.post('/move-to-placement-b2c', [isCollege], async (req, res) => {
 		}
 
 		const appliedCourseIds = Array.isArray(req.body?.appliedCourseIds) ? req.body.appliedCourseIds : [];
-		const { verticalId } = req.body || {};
+		const { verticalId, leadOwnerId } = req.body || {};
 		const uniqueIds = [...new Set(appliedCourseIds.map((id) => String(id || '').trim()).filter(Boolean))];
 
 		if (!uniqueIds.length) {
@@ -1878,6 +1878,24 @@ router.post('/move-to-placement-b2c', [isCollege], async (req, res) => {
 		if (!department) {
 			return res.status(404).json({ status: false, message: 'Department not found' });
 		}
+		if (!mongoose.Types.ObjectId.isValid(leadOwnerId)) {
+			return res.status(400).json({ status: false, message: 'Select a lead owner' });
+		}
+		const leadOwner = await User.findOne({
+			_id: leadOwnerId,
+			status: true,
+			isDeleted: { $ne: true },
+		}).select('_id name').lean();
+		if (!leadOwner) {
+			return res.status(404).json({ status: false, message: 'Lead owner not found' });
+		}
+		const college = await College.findById(collegeId).select('_concernPerson').lean();
+		const isConcernPerson = (college?._concernPerson || []).some((person) =>
+			sameCollegeId(person?._id, leadOwner._id)
+		);
+		if (!isConcernPerson) {
+			return res.status(400).json({ status: false, message: 'Selected lead owner is not part of this college' });
+		}
 
 		const moved = [];
 		const skipped = [];
@@ -1886,7 +1904,8 @@ router.post('/move-to-placement-b2c', [isCollege], async (req, res) => {
 			try {
 				const source = await AppliedCourses.findById(appliedCourseId)
 					.populate('_course', 'name college vertical project')
-					.populate('department', 'name');
+					.populate('department', 'name')
+					.populate('counsellor', 'name');
 				if (!source) {
 					skipped.push({ id: appliedCourseId, reason: 'Student record not found' });
 					continue;
@@ -1905,31 +1924,64 @@ router.post('/move-to-placement-b2c', [isCollege], async (req, res) => {
 				}
 
 				const currentDepartmentId = source.department?._id || source.department || source._course?.vertical;
-				if (currentDepartmentId && sameCollegeId(currentDepartmentId, department._id)) {
-					skipped.push({ id: appliedCourseId, reason: `Already in ${department.name}` });
+				const alreadyInDepartment = currentDepartmentId && sameCollegeId(currentDepartmentId, department._id);
+				const previousOwnerId = source.counsellor?._id || source.counsellor || null;
+				const previousOwnerName = source.counsellor?.name || '';
+				const ownerUnchanged = previousOwnerId && sameCollegeId(previousOwnerId, leadOwner._id);
+
+				if (alreadyInDepartment && ownerUnchanged) {
+					skipped.push({ id: appliedCourseId, reason: `Already in ${department.name} with this lead owner` });
 					continue;
 				}
 
-				if (!Array.isArray(source.departmentHistory)) source.departmentHistory = [];
-				if (currentDepartmentId) {
-					source.departmentHistory.push({
-						department: currentDepartmentId,
-						shiftedAt: new Date(),
-						shiftedBy: userId,
+				source.logs = source.logs || [];
+				if (!alreadyInDepartment) {
+					if (!Array.isArray(source.departmentHistory)) source.departmentHistory = [];
+					if (currentDepartmentId) {
+						source.departmentHistory.push({
+							department: currentDepartmentId,
+							shiftedAt: new Date(),
+							shiftedBy: userId,
+						});
+					}
+					source.department = department._id;
+					if (/placement/i.test(department.name || '')) {
+						source.movetoplacementstatus = true;
+					}
+					source.logs.push({
+						user: userId,
+						timestamp: new Date(),
+						action: `Department moved to ${department.name}`,
+						remarks: 'Course, project, and center kept as they were',
 					});
 				}
 
-				source.department = department._id;
-				if (/placement/i.test(department.name || '')) {
-					source.movetoplacementstatus = true;
+				if (!ownerUnchanged) {
+					if (!Array.isArray(source.leadOwnerHistory)) source.leadOwnerHistory = [];
+					if (previousOwnerId) {
+						source.leadOwnerHistory.push({
+							counsellor: previousOwnerId,
+							shiftedAt: new Date(),
+							shiftedBy: userId,
+						});
+					}
+					source.counsellor = leadOwner._id;
+					if (!Array.isArray(source.leadAssignment)) source.leadAssignment = [];
+					source.leadAssignment.push({
+						_counsellor: leadOwner._id,
+						counsellorName: leadOwner.name || 'Counselor',
+						assignDate: new Date(),
+						assignedBy: userId,
+					});
+					source.logs.push({
+						user: userId,
+						timestamp: new Date(),
+						action: `Lead owner changed to ${leadOwner.name || 'Counselor'}`,
+						remarks: previousOwnerName
+							? `Previous lead owner ${previousOwnerName} saved`
+							: 'No previous lead owner',
+					});
 				}
-				source.logs = source.logs || [];
-				source.logs.push({
-					user: userId,
-					timestamp: new Date(),
-					action: `Department moved to ${department.name}`,
-					remarks: 'Course, project, and center kept as they were',
-				});
 				await source.save();
 				moved.push(source._id);
 			} catch (studentError) {
@@ -1945,7 +1997,7 @@ router.post('/move-to-placement-b2c', [isCollege], async (req, res) => {
 			? ` Skipped ${skipped.length}: ${skipped.map((item) => item.reason).filter((reason, index, list) => list.indexOf(reason) === index).join(', ')}.`
 			: '';
 		const message = moved.length
-			? `Moved ${moved.length} student${moved.length === 1 ? '' : 's'} to ${department.name}. Course, project, and center are unchanged.${skipText}`
+			? `Updated ${moved.length} student${moved.length === 1 ? '' : 's'} to ${department.name}. Lead owner set to ${leadOwner.name}. Previous department and lead owner were saved. Course, project, and center are unchanged.${skipText}`
 			: `No students were moved.${skipText}`;
 
 		return res.status(moved.length ? 200 : 400).json({
