@@ -4775,7 +4775,166 @@ router.route('/reqDocs/:courseId')
       return res.status(500).send({ status: false, message: err.message });
     }
   })
-  
+
+const activeJobDocs = (docsRequired = []) =>
+  (Array.isArray(docsRequired) ? docsRequired : [])
+    .filter((doc) => doc && doc.status !== false && (doc.Name || doc.name))
+    .map((doc) => {
+      const obj = doc.toObject ? doc.toObject() : doc;
+      return {
+        _id: obj._id,
+        Name: obj.Name || obj.name,
+        mandatory: !!obj.mandatory,
+      };
+    });
+
+const mergeJobDocs = (requiredDocs, savedDocs = []) =>
+  requiredDocs.map((doc) => {
+    const nameKey = String(doc.Name || '').trim().toLowerCase();
+    const saved = savedDocs.find((item) => (
+      String(item?.key || '') === String(doc._id)
+      || String(item?.name || '').trim().toLowerCase() === nameKey
+    ));
+    return {
+      ...doc,
+      fileUrl: saved?.fileUrl || '',
+      uploadedAt: saved?.uploadedAt || null,
+    };
+  });
+
+router.route('/jobDocs/:jobId')
+  .get(isCandidate, async (req, res) => {
+    try {
+      const validation = { mobile: req.user.mobile };
+      const { value, error } = await CandidateValidators.userMobile(validation);
+      if (error) {
+        return res.status(400).json({ status: false, msg: "Invalid mobile number.", error });
+      }
+
+      const candidate = await Candidate.findOne({ mobile: value.mobile, isDeleted: false, status: true });
+      if (!candidate) {
+        return res.status(404).json({ status: false, message: "Candidate not found." });
+      }
+
+      const { jobId } = req.params;
+      if (!mongoose.Types.ObjectId.isValid(jobId)) {
+        return res.status(400).json({ status: false, message: "Invalid job id." });
+      }
+
+      const appliedJob = await AppliedJobs.findOne({ _candidate: candidate._id, _job: jobId });
+      if (!appliedJob) {
+        return res.status(400).json({ status: false, message: "You have not applied for this job." });
+      }
+
+      const vacancy = await Vacancy.findById(jobId).select('title docsRequired');
+      const requiredDocs = activeJobDocs(vacancy?.docsRequired);
+      const mergedDocs = mergeJobDocs(requiredDocs, appliedJob.documents || []);
+
+      return res.json({
+        status: true,
+        jobId,
+        jobTitle: vacancy?.title || '',
+        mergedDocs,
+      });
+    } catch (err) {
+      console.log("jobDocs get error", err);
+      return res.status(500).json({ status: false, message: "Something went wrong", error: err.message });
+    }
+  })
+  .post(isCandidate, async (req, res) => {
+    try {
+      let { docsName, jobId, docsId } = req.body;
+      jobId = jobId || req.params.jobId;
+
+      const validation = { mobile: req.user.mobile };
+      const { value, error } = await CandidateValidators.userMobile(validation);
+      if (error) {
+        return res.status(400).json({ status: false, msg: "Invalid mobile number.", error });
+      }
+
+      if (!mongoose.Types.ObjectId.isValid(jobId) || !mongoose.Types.ObjectId.isValid(docsId)) {
+        return res.status(400).json({ status: false, message: "Invalid job or document id." });
+      }
+
+      const candidate = await Candidate.findOne({ mobile: value.mobile, isDeleted: false, status: true });
+      if (!candidate) {
+        return res.status(400).json({ status: false, message: "Candidate not found." });
+      }
+
+      const appliedJob = await AppliedJobs.findOne({ _candidate: candidate._id, _job: jobId });
+      if (!appliedJob) {
+        return res.status(400).json({ status: false, message: "You have not applied for this job." });
+      }
+
+      const vacancy = await Vacancy.findById(jobId).select('docsRequired');
+      const requiredDocs = activeJobDocs(vacancy?.docsRequired);
+      const matchedDoc = requiredDocs.find((doc) => String(doc._id) === String(docsId));
+      if (!matchedDoc) {
+        return res.status(400).json({ status: false, message: "This document is not required for the job." });
+      }
+
+      const files = req.files?.file;
+      if (!files) {
+        return res.status(400).json({ status: false, message: "No files uploaded" });
+      }
+
+      const filesArray = Array.isArray(files) ? files : [files];
+      const uploadedFiles = [];
+      const uploadPromises = [];
+
+      filesArray.forEach((item) => {
+        const { name, mimetype } = item;
+        const ext = name?.split('.').pop().toLowerCase();
+        if (!allowedExtensions.includes(ext)) {
+          throw new Error(`File type not supported: ${ext}`);
+        }
+
+        const key = `job-docs/${jobId}/${candidate._id}/${docsId}/${uuid()}.${ext}`;
+        uploadPromises.push(
+          s3.upload({
+            Bucket: bucketName,
+            Key: key,
+            Body: item.data,
+            ContentType: mimetype,
+          }).promise().then(() => {
+            uploadedFiles.push({ fileURL: key });
+          })
+        );
+      });
+
+      await Promise.all(uploadPromises);
+
+      const nextDoc = {
+        key: String(matchedDoc._id),
+        name: matchedDoc.Name || docsName || 'Document',
+        fileUrl: uploadedFiles[0].fileURL,
+        uploadedAt: new Date(),
+      };
+
+      const docs = (appliedJob.documents || []).map((item) => (item.toObject ? item.toObject() : item));
+      const existingIndex = docs.findIndex((item) => String(item.key) === nextDoc.key);
+      if (existingIndex >= 0) docs[existingIndex] = { ...docs[existingIndex], ...nextDoc };
+      else docs.push(nextDoc);
+      appliedJob.documents = docs;
+      if (!appliedJob.logs) appliedJob.logs = [];
+      appliedJob.logs.push({
+        action: `${nextDoc.name} uploaded by candidate`,
+        remarks: '',
+        timestamp: new Date(),
+      });
+      await appliedJob.save();
+
+      return res.status(200).json({
+        status: true,
+        message: "Document uploaded successfully",
+        mergedDocs: mergeJobDocs(requiredDocs, appliedJob.documents),
+      });
+    } catch (err) {
+      console.log("jobDocs upload error", err);
+      return res.status(500).json({ status: false, message: err.message });
+    }
+  });
+
 // Backend (Node.js with Express)
 router.post('/saveProfile', [isCandidate, authenti], async (req, res) => {
   try {
