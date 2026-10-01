@@ -128,13 +128,6 @@ const EnrolledCourses = () => {
                                   </h3>
                                   <span className="jobDetails-wrap">Batch Name</span>
                                 </li>
-                                <li style={{ display: "inline" }}>
-                                  <i className="la la-user"></i>
-                                  <h3 className="jobDetails-wrap">
-                                    {batch?.instructor || "N/A"}
-                                  </h3>
-                                  <span className="jobDetails-wrap">Instructor</span>
-                                </li>
                                 <li style={{ display: "inline", float: "right", width: '35.334%' }}>
                                   <i className="la la-check-circle"></i>
                                   <h3 className="jobDetails-wrap">

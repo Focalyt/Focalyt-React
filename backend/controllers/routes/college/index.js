@@ -8818,7 +8818,6 @@ router.post('/add_batch', isCollege, async (req, res) => {
 			assessmentDate,
 			maxStudents,
 			status,
-			instructor,
 			courseId,
 			centerId,
 
@@ -8839,7 +8838,6 @@ router.post('/add_batch', isCollege, async (req, res) => {
 			name,
 			startDate,
 			description,
-			instructor: instructor || '',
 			endDate,
 			zeroPeriodStartDate,
 			zeroPeriodEndDate,

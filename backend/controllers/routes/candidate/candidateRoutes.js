@@ -5465,7 +5465,7 @@ router.get('/enrolledCourses', [isCandidate, authenti], async (req, res) => {
       })
       .populate({
         path: 'batch',
-        select: 'name code startDate endDate mode status instructor maxStudents enrolledStudents'
+        select: 'name code startDate endDate mode status maxStudents enrolledStudents'
       })
       .sort({ createdAt: -1 })
       .skip((page - 1) * perPage)
