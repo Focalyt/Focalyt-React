@@ -1077,7 +1077,7 @@ function CollegeLayout({ children }) {
                   </ul>
                 </li>
               )}
-              <li className={`nav-item has-sub dropdown-hr ${openSubmenu.hr ? 'open' : ''}`}>
+              {/* <li className={`nav-item has-sub dropdown-hr ${openSubmenu.hr ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('hr')}>
                   <FontAwesomeIcon icon={faUserTie} />
                   <span className="menu-title">HR</span>
@@ -1111,7 +1111,7 @@ function CollegeLayout({ children }) {
                     </Link>
                   </li>
                 </ul>
-              </li>
+              </li> */}
               <li className={`nav-item has-sub dropdown-placements ${openSubmenu.placements ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('placements')}>
                   <FontAwesomeIcon icon={faHandshake} />
