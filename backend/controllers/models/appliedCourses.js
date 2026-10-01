@@ -131,6 +131,11 @@ const appliedCoursesSchema = new Schema(
       shiftedAt: { type: Date },
       shiftedBy: { type: ObjectId, ref: "User" },
     }],
+    leadOwnerHistory: [{
+      counsellor: { type: ObjectId, ref: "User" },
+      shiftedAt: { type: Date },
+      shiftedBy: { type: ObjectId, ref: "User" },
+    }],
     
     // Attendance Tracking
     attendance: {

@@ -266,6 +266,8 @@ const Student = ({
   const [placementSelectedIds, setPlacementSelectedIds] = useState(new Set());
   const [placementDepartments, setPlacementDepartments] = useState([]);
   const [placementDepartmentId, setPlacementDepartmentId] = useState("");
+  const [placementLeadOwners, setPlacementLeadOwners] = useState([]);
+  const [placementLeadOwnerId, setPlacementLeadOwnerId] = useState("");
   const [placementProjects, setPlacementProjects] = useState([]);
   const [placementProjectId, setPlacementProjectId] = useState("");
   const [placementProjectsLoading, setPlacementProjectsLoading] = useState(false);
@@ -4228,6 +4230,7 @@ const Student = ({
   const clearPlacementMoveForm = () => {
     setPlacementSelectedIds(new Set());
     setPlacementDepartmentId("");
+    setPlacementLeadOwnerId("");
     setPlacementProjectId("");
     setPlacementProjects([]);
     setPlacementCourses([]);
@@ -4273,9 +4276,20 @@ const Student = ({
       });
       const verticals = Array.isArray(verticalRes.data?.data) ? verticalRes.data.data : [];
       setPlacementDepartments(verticals);
+      try {
+        const filterRes = await axios.get(`${backendUrl}/college/filters-data`, {
+          headers: { "x-auth": token },
+        });
+        const counselors = Array.isArray(filterRes.data?.counselors) ? filterRes.data.counselors : [];
+        setPlacementLeadOwners(counselors.filter((owner) => owner?._id && owner?.name));
+      } catch (ownerError) {
+        console.error("Failed to load lead owners", ownerError);
+        setPlacementLeadOwners([]);
+      }
     } catch (error) {
       console.error("Failed to load departments", error);
       setPlacementDepartments([]);
+      setPlacementLeadOwners([]);
     } finally {
       setPlacementProjectsLoading(false);
     }
@@ -4341,6 +4355,10 @@ const Student = ({
       alert("Select a department");
       return;
     }
+    if (!placementLeadOwnerId) {
+      alert("Select a lead owner");
+      return;
+    }
 
     setPlacementMoveLoading(true);
     try {
@@ -4349,6 +4367,7 @@ const Student = ({
         {
           appliedCourseIds: Array.from(placementSelectedIds),
           verticalId: placementDepartmentId,
+          leadOwnerId: placementLeadOwnerId,
         },
         { headers: { "x-auth": token } }
       );
@@ -4843,6 +4862,30 @@ const Student = ({
                             {placementDepartments.map((department) => (
                               <option key={department._id} value={department._id}>
                                 {department.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="form-label mb-1 small fw-bold">Lead Owner</label>
+                          <select
+                            className="form-select form-select-sm"
+                            value={placementLeadOwnerId}
+                            onChange={(e) => setPlacementLeadOwnerId(e.target.value)}
+                            style={{ minWidth: "180px" }}
+                            disabled={placementProjectsLoading || placementMoveLoading}
+                          >
+                            <option value="">
+                              {placementProjectsLoading && placementLeadOwners.length === 0
+                                ? "Loading lead owners..."
+                                : placementLeadOwners.length === 0
+                                  ? "No lead owners"
+                                  : "Select lead owner"}
+                            </option>
+                            {placementLeadOwners.map((owner) => (
+                              <option key={owner._id} value={owner._id}>
+                                {owner.name}
                               </option>
                             ))}
                           </select>
