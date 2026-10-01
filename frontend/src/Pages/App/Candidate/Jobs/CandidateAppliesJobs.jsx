@@ -173,6 +173,67 @@ const AppliedJobs = () => {
     }
   };
 
+  const getRequiredJobDocs = (job) => {
+    const required = Array.isArray(job?.vacancy?.docsRequired) ? job.vacancy.docsRequired : [];
+    const saved = Array.isArray(job?.documents) ? job.documents : [];
+    return required
+      .filter((doc) => doc && doc.status !== false && (doc.Name || doc.name))
+      .map((doc) => {
+        const name = doc.Name || doc.name;
+        const nameKey = String(name).trim().toLowerCase();
+        const match = saved.find((item) => (
+          String(item?.key || '') === String(doc._id)
+          || String(item?.name || '').trim().toLowerCase() === nameKey
+        ));
+        return {
+          _id: doc._id,
+          name,
+          mandatory: !!doc.mandatory,
+          uploaded: Boolean(match?.fileUrl),
+        };
+      });
+  };
+
+  const renderJobDocuments = (job, vacancy) => {
+    const requiredDocs = getRequiredJobDocs(job);
+    if (!requiredDocs.length || !vacancy?._id) return null;
+
+    const uploadedCount = requiredDocs.filter((doc) => doc.uploaded).length;
+
+    return (
+      <div className="job-required-docs">
+        <div className="job-required-docs-card">
+          <i className="la la-file-text-o" aria-hidden="true"></i>
+          <div className="job-required-docs-body">
+            <strong>Documents Required</strong>
+            <span className="job-required-docs-count">
+              {uploadedCount}/{requiredDocs.length} uploaded
+            </span>
+            <ul>
+              {requiredDocs.map((doc) => (
+                <li key={doc._id}>
+                  <span>
+                    {doc.name}
+                    {doc.mandatory ? <em> *</em> : null}
+                  </span>
+                  <span className={doc.uploaded ? 'doc-pill doc-pill-done' : 'doc-pill doc-pill-pending'}>
+                    {doc.uploaded ? 'Uploaded' : 'Pending'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <Link
+          to={`/candidate/jobDocs/${vacancy._id}`}
+          className="job-required-docs-btn"
+        >
+          Upload Documents
+        </Link>
+      </div>
+    );
+  };
+
   // Handle pagination
   const handlePageChange = (pageNumber) => {
     setPage(pageNumber);
@@ -236,6 +297,95 @@ const AppliedJobs = () => {
 
   return (
     <>
+      <style>{`
+        .job-required-docs {
+          float: left;
+          width: 100%;
+          margin-top: 10px;
+        }
+        .job-required-docs-card {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          border: 2px solid #e8ecec;
+          border-radius: 8px;
+          padding: 12px 16px;
+          background: #fff;
+        }
+        .job-required-docs-card > i {
+          color: #FC2B5A;
+          font-size: 28px;
+          line-height: 1;
+          margin-top: 2px;
+        }
+        .job-required-docs-body {
+          flex: 1;
+          min-width: 0;
+        }
+        .job-required-docs-body strong {
+          display: block;
+          color: #202020;
+          font-size: 13px;
+          font-weight: 700;
+        }
+        .job-required-docs-count {
+          display: block;
+          color: #888;
+          font-size: 12px;
+          margin-top: 2px;
+        }
+        .job-required-docs-body ul {
+          list-style: none;
+          margin: 8px 0 0;
+          padding: 0;
+        }
+        .job-required-docs-body li {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          padding: 6px 0;
+          border-top: 1px solid #f1f1f1;
+          color: #333;
+          font-size: 13px;
+          text-transform: capitalize;
+        }
+        .job-required-docs-body li em {
+          color: #FC2B5A;
+          font-style: normal;
+        }
+        .doc-pill {
+          flex-shrink: 0;
+          border-radius: 999px;
+          padding: 2px 8px;
+          font-size: 11px;
+          font-weight: 700;
+        }
+        .doc-pill-pending {
+          background: #fff4e8;
+          color: #c56a12;
+        }
+        .doc-pill-done {
+          background: #e8f8ef;
+          color: #1b8a45;
+        }
+        .job-required-docs-btn {
+          display: block;
+          margin-top: 10px;
+          background: #28a745;
+          color: #fff !important;
+          text-align: center;
+          border-radius: 8px;
+          padding: 8px 12px;
+          font-size: 13px;
+          font-weight: 700;
+        }
+        .job-required-docs-btn:hover {
+          background: #218838;
+          color: #fff !important;
+          text-decoration: none;
+        }
+      `}</style>
 
       <div className="content-header row d-xl-block d-lg-block d-md-none d-sm-none d-none">
         <div className="content-header-left col-md-9 col-12 mb-2">
@@ -367,6 +517,7 @@ const AppliedJobs = () => {
                                 {city.name}, {state.name}
                               </span>
                             </div>
+                            {renderJobDocuments(job, vacancy)}
                           </div>
                         </div>
                         <hr />
@@ -505,6 +656,7 @@ const AppliedJobs = () => {
                               {city.name}, {state.name}
                             </span>
                           </div>
+                          {renderJobDocuments(job, vacancy)}
                         </div>
                         <hr />
                       </React.Fragment>

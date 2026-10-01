@@ -60,6 +60,7 @@ import AdminLayout from './Component/Layouts/Admin';
 import CandidateLogin from './Pages/App/Candidate/Login/CandidateLogin';
 import CandidateViewJobs from './Pages/App/Candidate/Jobs/CandidateViewJobs';
 import RequiredDocuments from './Pages/App/Candidate/RequiredDocuments/RequiredDocuments';
+import JobRequiredDocuments from './Pages/App/Candidate/Jobs/JobRequiredDocuments';
 import PaymentDetails from './Pages/App/Candidate/PaymentsDetails/PaymentDetails';
 import CandidatesEvents from './Pages/App/Candidate/Events/CandidatesEvents';
 import EnrolledCourses from './Pages/App/Candidate/EnrolledCourses/EnrolledCourses';
@@ -290,6 +291,7 @@ const Layout = () => {
           <Route path="course/:courseId" element={<SearchCourseDetail />} />
           <Route path="job/:JobId" element={<CandidateViewJobs />} />
           <Route path="reqDocs/:courseId" element={<RequiredDocuments />} />
+          <Route path="jobDocs/:jobId" element={<JobRequiredDocuments />} />
           <Route path="pendingFee" element={<PaymentDetails />} />
           <Route path='candidateevent' element={<CandidatesEvents />} />
           <Route path='appliedevents' element={<AppliedEvents/>}/>
