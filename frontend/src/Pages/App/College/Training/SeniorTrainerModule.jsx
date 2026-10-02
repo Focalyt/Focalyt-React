@@ -2286,6 +2286,10 @@ const SeniorTrainerModule = () => {
   const canBeSeniorTrainerPermission =
     (permissions?.custom_permissions?.can_be_senior_trainer && permissions?.permission_type === 'Custom') ||
     permissions?.permission_type === 'Admin';
+  const canBeTrainerPermission =
+    (permissions?.custom_permissions?.can_be_trainer && permissions?.permission_type === 'Custom') ||
+    permissions?.permission_type === 'Admin';
+  const canOpenTimetable = canBeSeniorTrainerPermission || canBeTrainerPermission;
 
   const [reportDate, setReportDate] = useState(new Date());
   const [filters, setFilters] = useState({

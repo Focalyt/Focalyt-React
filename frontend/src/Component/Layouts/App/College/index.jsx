@@ -808,30 +808,43 @@ function CollegeLayout({ children }) {
                   <span className="menu-title">{t('your_profile')}</span>
                 </Link>
               </li>
+                
               <li className={`nav-item ${location.pathname === '/institute/new-training/centers' ? 'active' : ''}`}>
-                    <Link to="/institute/new-training/centers" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={faBuilding} />
-                      <span className="menu-title">Centers </span>
-                    </Link>
-                  </li>
-                  <li className={`nav-item ${location.pathname === '/institute/new-training/courses' ? 'active' : ''}`}>
-                    <Link to="/institute/new-training/courses" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={faGraduationCap} />
-                      <span className="menu-title">Courses </span>
-                    </Link>
-                  </li>
-                  <li className={`nav-item ${location.pathname === '/institute/new-training/batches' ? 'active' : ''}`}>
-                    <Link to="/institute/new-training/batches" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={faGraduationCap} />
-                      <span className="menu-title">Batch </span>
-                    </Link>
-                  </li>
-                  <li className={`nav-item ${location.pathname === '/institute/new-training/assign-team' ? 'active' : ''}`}>
-                    <Link to="/institute/new-training/assign-team" onClick={() => handleSidebarClose()}>
-                      <FontAwesomeIcon icon={faUsers} />
-                      <span className="menu-title">Assign Team </span>
-                    </Link>
-                  </li>
+                <Link to="/institute/new-training/centers" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faBuilding} />
+                  <span className="menu-title">Centers </span>
+                </Link>
+              </li>
+              <li className={`nav-item ${location.pathname === '/institute/new-training/courses' ? 'active' : ''}`}>
+                <Link to="/institute/new-training/courses" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faGraduationCap} />
+                  <span className="menu-title">Courses </span>
+                </Link>
+              </li>
+              <li className={`nav-item ${location.pathname === '/institute/new-training/batches' ? 'active' : ''}`}>
+                <Link to="/institute/new-training/batches" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faGraduationCap} />
+                  <span className="menu-title">Batch </span>
+                </Link>
+              </li>
+              <li className={`nav-item ${location.pathname === '/institute/new-training/assign-team' ? 'active' : ''}`}>
+                <Link to="/institute/new-training/assign-team" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faUsers} />
+                  <span className="menu-title">Assign Team </span>
+                </Link>
+              </li>
+              <li className={`nav-item ${location.pathname === '/institute/training/senior-trainer' || location.pathname === '/institute/seniorTrainer' ? 'active' : ''}`}>
+                <Link to="/institute/training/senior-trainer" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faCalendarAlt} />
+                  <span className="menu-title">Batch Time Table</span>
+                </Link>
+              </li>
+              <li className={`nav-item ${location.pathname === '/institute/training' ? 'active' : ''}`}>
+                <Link to="/institute/training" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faUserTie} />
+                  <span className="menu-title">Trainer</span>
+                </Link>
+              </li>
               {/* Courses */}
               <li className={`nav-item has-sub dropdown-courses ${openSubmenu.courses ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('courses')}>

@@ -303,6 +303,12 @@
   background: transparent;
   font-size: 13px;
 }
+.assign-card__hint {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #64748b;
+}
 .assign-card__list { max-height: 190px; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
 .assign-person {
   display: flex;
