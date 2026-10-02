@@ -12,6 +12,14 @@ const JobRequiredDocuments = () => {
   const [uploadingDocId, setUploadingDocId] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const previewBaseUrl = () => {
+    const backend = String(backendUrl || 'http://localhost:8080').replace(/\/$/, '');
+    const localUpload = `${backend}/api/upload`;
+    const onLocalhost = typeof window !== 'undefined'
+      && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
+    return onLocalhost ? localUpload : bucketUrl;
+  };
+
   const fetchDocuments = async () => {
     try {
       setLoading(true);
@@ -131,7 +139,7 @@ const JobRequiredDocuments = () => {
         ) : (
           <div className="documents-grid-enhanced">
             {docs.map((doc) => {
-              const fileUrl = doc.fileUrl ? resolveMediaUrl(bucketUrl, doc.fileUrl) : '';
+              const fileUrl = doc.fileUrl ? resolveMediaUrl(previewBaseUrl(), doc.fileUrl) : '';
               const fileType = getFileType(fileUrl);
               const uploadedDate = formatUploadedDate(doc.uploadedAt);
               const uploadedTime = formatUploadedTime(doc.uploadedAt);

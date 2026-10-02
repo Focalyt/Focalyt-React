@@ -1501,9 +1501,22 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
         body: JSON.stringify(formData),
       });
 
-      if (!response.ok) throw new Error('Failed to add project');
-      window.alert('Batch added successfully')
-      resetForm()
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.success === false) {
+        throw new Error(result.message || 'Failed to add batch');
+      }
+      const refreshed = await axios.get(`${backendUrl}/college/get_batches`, {
+        params: {
+          courseId: selectedCourse?._id,
+          centerId: selectedCenter?._id,
+        },
+        headers: { 'x-auth': token },
+      });
+      if (refreshed.data.success) {
+        setBatches(refreshed.data.data);
+      }
+      window.alert(result.message || 'Batch added successfully');
+      resetForm();
       setShowAddForm(false);
     }
 

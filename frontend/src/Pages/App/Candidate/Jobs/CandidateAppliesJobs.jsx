@@ -173,6 +173,13 @@ const AppliedJobs = () => {
     }
   };
 
+  const previewBaseUrl = () => {
+    const backend = String(backendUrl || 'http://localhost:8080').replace(/\/$/, '');
+    const onLocalhost = typeof window !== 'undefined'
+      && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
+    return onLocalhost ? `${backend}/api/upload` : bucketUrl;
+  };
+
   const getRequiredJobDocs = (job) => {
     const required = Array.isArray(job?.vacancy?.docsRequired) ? job.vacancy.docsRequired : [];
     const saved = Array.isArray(job?.documents) ? job.documents : [];
@@ -190,6 +197,7 @@ const AppliedJobs = () => {
           name,
           mandatory: !!doc.mandatory,
           uploaded: Boolean(match?.fileUrl),
+          fileUrl: match?.fileUrl || '',
         };
       });
   };
@@ -216,8 +224,20 @@ const AppliedJobs = () => {
                     {doc.name}
                     {doc.mandatory ? <em> *</em> : null}
                   </span>
-                  <span className={doc.uploaded ? 'doc-pill doc-pill-done' : 'doc-pill doc-pill-pending'}>
-                    {doc.uploaded ? 'Uploaded' : 'Pending'}
+                  <span className="doc-row-actions">
+                    {doc.uploaded && doc.fileUrl ? (
+                      <a
+                        className="doc-preview-link"
+                        href={resolveMediaUrl(previewBaseUrl(), doc.fileUrl)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Preview
+                      </a>
+                    ) : null}
+                    <span className={doc.uploaded ? 'doc-pill doc-pill-done' : 'doc-pill doc-pill-pending'}>
+                      {doc.uploaded ? 'Uploaded' : 'Pending'}
+                    </span>
                   </span>
                 </li>
               ))}
@@ -368,6 +388,23 @@ const AppliedJobs = () => {
         .doc-pill-done {
           background: #e8f8ef;
           color: #1b8a45;
+        }
+        .doc-row-actions {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          flex-shrink: 0;
+        }
+        .doc-preview-link {
+          color: #FC2B5A;
+          font-size: 12px;
+          font-weight: 700;
+          text-transform: uppercase;
+          text-decoration: none;
+        }
+        .doc-preview-link:hover {
+          color: #d41442;
+          text-decoration: underline;
         }
         .job-required-docs-btn {
           display: block;
