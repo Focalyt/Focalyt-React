@@ -284,6 +284,8 @@ const MultiSelectCheckbox = ({
   );
 };
 
+const personIsSenior = (trainer) => Boolean(trainer?.permissions?.custom_permissions?.can_be_senior_trainer);
+
 const uniquePeople = (people) => {
   const seen = new Set();
   return people.filter((person) => {
@@ -388,8 +390,8 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   const [mainTab, setMainTab] = useState('Batches'); // 'Batches' or 'All Admissions'
 
 
-  const [trainers, setTrainers] = useState([]);
-  const [seniorTrainers, setSeniorTrainers] = useState([]);
+  const [courseTeam, setCourseTeam] = useState({ seniorTrainers: [], trainers: [], courseName: '' });
+  const [courseTeamLoading, setCourseTeamLoading] = useState(false);
   const [showTrainerModal, setShowTrainerModal] = useState(false)
   const [alert, setAlert] = useState({ show: false, message: '', type: '' });
   const [selectedSeniorTrainers, setSelectedSeniorTrainers] = useState([]);
@@ -404,51 +406,43 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     }, 5000);
   };
 
-  useEffect(() => {
-    fetchTrainers()
-    fetchSeniorTrainers()
-  }, [])
-
-  const fetchTrainers = async () => {
-    try {
-      const response = await axios.get(`${backendUrl}/college/users/training-role-users`, {
-        headers: { 'x-auth': token },
-        params: { roleType: 'trainer' },
-      });
-      setTrainers(response.data?.data || []);
-    } catch (error) {
-      console.error('Error fetching trainers:', error);
-      setTrainers([]);
-    }
-  };
-
-  const fetchSeniorTrainers = async () => {
-    try {
-      const response = await axios.get(`${backendUrl}/college/users/training-role-users`, {
-        headers: { 'x-auth': token },
-        params: { roleType: 'senior' },
-      });
-      setSeniorTrainers(response.data?.data || []);
-    } catch (error) {
-      console.error('Error fetching senior trainers:', error);
-      setSeniorTrainers([]);
-    }
-  };
-
   const closeTrainerModal = () => {
     setIsTrainerDropdownOpen(false);
     setSelectedSeniorTrainers([]);
     setSelectedFieldTrainers([]);
     setSelectedBatchForTrainer(null);
+    setCourseTeam({ seniorTrainers: [], trainers: [], courseName: '' });
+    setCourseTeamLoading(false);
   };
 
-  const openTrainerModal = (batch) => {
-    const assigned = batch.trainers || [];
-    const seniorIds = new Set(seniorTrainers.map((trainer) => String(trainer._id)));
+  const openTrainerModal = async (batch) => {
     setSelectedBatchForTrainer(batch);
-    setSelectedSeniorTrainers(assigned.filter((trainer) => seniorIds.has(String(trainer._id))).map((trainer) => trainer._id));
-    setSelectedFieldTrainers(assigned.filter((trainer) => !seniorIds.has(String(trainer._id))).map((trainer) => trainer._id));
+    setSelectedSeniorTrainers([]);
+    setSelectedFieldTrainers([]);
+    setCourseTeam({ seniorTrainers: [], trainers: [], courseName: selectedCourse?.name || '' });
     setIsTrainerDropdownOpen(true);
+    setCourseTeamLoading(true);
+    try {
+      const response = await axios.get(
+        `${backendUrl}/college/batches/${batch._id}/available-training-team`,
+        { headers: { 'x-auth': token } }
+      );
+      const seniorTrainers = response.data?.seniorTrainers || [];
+      const trainers = response.data?.trainers || [];
+      setCourseTeam({
+        seniorTrainers,
+        trainers,
+        courseName: response.data?.course?.name || selectedCourse?.name || '',
+      });
+      setSelectedSeniorTrainers(seniorTrainers.filter((trainer) => trainer.selected).map((trainer) => trainer._id));
+      setSelectedFieldTrainers(trainers.filter((trainer) => trainer.selected).map((trainer) => trainer._id));
+    } catch (error) {
+      console.error('Error fetching course training team:', error);
+      showAlert(error?.response?.data?.message || 'Could not load this course training team', 'error');
+      setCourseTeam({ seniorTrainers: [], trainers: [], courseName: selectedCourse?.name || '' });
+    } finally {
+      setCourseTeamLoading(false);
+    }
   };
 
 
@@ -472,9 +466,9 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     try {
       setLoading(true);
       
-      const response = await axios.post(`${backendUrl}/college/assigntrainerstobatch`, {
-        batchId: selectedBatchForTrainer._id,
-        trainers: trainersToAssign
+      const response = await axios.put(`${backendUrl}/college/batches/${selectedBatchForTrainer._id}/training-team`, {
+        seniorTrainerIds: selectedSeniorTrainers,
+        trainerIds: selectedFieldTrainers,
       }, {
         headers: {
           'x-auth': token,
@@ -482,7 +476,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
         }
       });
 
-      if (response.data.status) {
+      if (response.data.status || response.data.success) {
         showAlert('Trainers assigned successfully!', 'success');
         closeTrainerModal();
         
@@ -2238,9 +2232,8 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                 <tbody>
                   {filteredBatches.map(batch => {
                     const enrollmentPercentage = getEnrollmentPercentage(batch.enrolledStudents, batch.maxStudents);
-                    const seniorIds = new Set(seniorTrainers.map((trainer) => String(trainer._id)));
-                    const seniorNames = (batch.trainers || []).filter((trainer) => seniorIds.has(String(trainer._id))).map((trainer) => trainer.name).join(', ');
-                    const trainerNames = (batch.trainers || []).filter((trainer) => !seniorIds.has(String(trainer._id))).map((trainer) => trainer.name).join(', ');
+                    const seniorNames = (batch.trainers || []).filter((trainer) => personIsSenior(trainer)).map((trainer) => trainer.name).join(', ');
+                    const trainerNames = (batch.trainers || []).filter((trainer) => trainer?.name && !personIsSenior(trainer)).map((trainer) => trainer.name).join(', ');
                     const showDate = (value) => {
                       if (!value) return '—';
                       const date = new Date(value);
@@ -4381,23 +4374,17 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
           })()}
 
           {isTrainerDropdownOpen && (() => {
-            const seniorIds = new Set(seniorTrainers.map((trainer) => String(trainer._id)));
             const toOption = (trainer) => ({
               value: trainer._id,
-              label: trainer.name || trainer.email || 'Trainer',
-              hint: trainer.designation || trainer.email || '',
+              label: trainer.name || 'Trainer',
+              hint: '',
             });
-            const seniorOptions = uniquePeople(seniorTrainers.map(toOption));
-            const fieldOptions = uniquePeople([
-              ...trainers.filter((trainer) => !seniorIds.has(String(trainer._id))).map(toOption),
-              ...(selectedBatchForTrainer?.trainers || [])
-                .filter((trainer) => !seniorIds.has(String(trainer._id)))
-                .map(toOption),
-            ]);
+            const seniorOptions = uniquePeople((courseTeam.seniorTrainers || []).map(toOption));
+            const fieldOptions = uniquePeople((courseTeam.trainers || []).map(toOption));
 
-            const assigned = selectedBatchForTrainer?.trainers || [];
-            const assignedSeniors = assigned.filter((trainer) => seniorIds.has(String(trainer._id)));
-            const assignedTrainers = assigned.filter((trainer) => !seniorIds.has(String(trainer._id)));
+            const assignedSeniors = (courseTeam.seniorTrainers || []).filter((trainer) => trainer.selected);
+            const assignedTrainers = (courseTeam.trainers || []).filter((trainer) => trainer.selected);
+            const assigned = [...assignedSeniors, ...assignedTrainers];
             const assignCount = selectedSeniorTrainers.length + selectedFieldTrainers.length;
 
             return (
@@ -4409,7 +4396,10 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                       <p className="assign-modal__kicker">Batch team</p>
                       <h2>Assign Senior Trainer & Trainer</h2>
                       {selectedBatchForTrainer && (
-                        <p>Batch <strong>{selectedBatchForTrainer.name}</strong>{selectedBatchForTrainer.code ? ` · ${selectedBatchForTrainer.code}` : ''}</p>
+                        <p>
+                          Batch <strong>{selectedBatchForTrainer.name}</strong>
+                          {courseTeam.courseName ? <> · Course <strong>{courseTeam.courseName}</strong></> : null}
+                        </p>
                       )}
                     </div>
                     <button type="button" className="assign-modal__close" onClick={closeTrainerModal} aria-label="Close">
@@ -4417,37 +4407,43 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                     </button>
                   </div>
                   <div className="assign-modal__body">
-                    {assigned.length > 0 && (
-                      <div className="assign-modal__assigned">
-                        <span className="assign-modal__chip">Senior <span>{assignedSeniors.map((trainer) => trainer.name).join(', ') || '—'}</span></span>
-                        <span className="assign-modal__chip">Trainer <span>{assignedTrainers.map((trainer) => trainer.name).join(', ') || '—'}</span></span>
-                      </div>
+                    {courseTeamLoading ? (
+                      <p className="mb-0">Loading this course's training team...</p>
+                    ) : (
+                      <>
+                        {assigned.length > 0 && (
+                          <div className="assign-modal__assigned">
+                            <span className="assign-modal__chip">Senior <span>{assignedSeniors.map((trainer) => trainer.name).join(', ') || '—'}</span></span>
+                            <span className="assign-modal__chip">Trainer <span>{assignedTrainers.map((trainer) => trainer.name).join(', ') || '—'}</span></span>
+                          </div>
+                        )}
+                        <div className="d-flex flex-column gap-3">
+                          <RoleTrainerPicker
+                            title="Senior Trainer"
+                            tone="senior"
+                            options={seniorOptions}
+                            selectedValues={selectedSeniorTrainers}
+                            onChange={setSelectedSeniorTrainers}
+                            emptyText="No senior trainer is assigned to this course."
+                          />
+                          <RoleTrainerPicker
+                            title="Trainer"
+                            tone="trainer"
+                            options={fieldOptions}
+                            selectedValues={selectedFieldTrainers}
+                            onChange={setSelectedFieldTrainers}
+                            emptyText="No trainer is assigned to this course."
+                          />
+                        </div>
+                      </>
                     )}
-                    <div className="d-flex flex-column gap-3">
-                      <RoleTrainerPicker
-                        title="Senior Trainer"
-                        tone="senior"
-                        options={seniorOptions}
-                        selectedValues={selectedSeniorTrainers}
-                        onChange={setSelectedSeniorTrainers}
-                        emptyText="No senior trainer found. Tick Senior Trainer on a user in User Management."
-                      />
-                      <RoleTrainerPicker
-                        title="Trainer"
-                        tone="trainer"
-                        options={fieldOptions}
-                        selectedValues={selectedFieldTrainers}
-                        onChange={setSelectedFieldTrainers}
-                        emptyText="No trainer found. Tick Trainer on a user in User Management."
-                      />
-                    </div>
                   </div>
                   <div className="assign-modal__foot">
                     <button type="button" className="vt-back" onClick={closeTrainerModal}>Cancel</button>
                     <button
                       type="button"
                       className="assign-modal__assign"
-                      disabled={assignCount === 0 || loading}
+                      disabled={assignCount === 0 || loading || courseTeamLoading}
                       onClick={handleAssignTrainers}
                     >
                       {loading ? 'Assigning...' : `Assign (${assignCount})`}

@@ -57,10 +57,8 @@ const NewTrainingCourses = () => {
   const [projectMessage, setProjectMessage] = useState('');
   const [copyingId, setCopyingId] = useState('');
 
-  // Assign Course = refer selected sessions of the course to a senior trainer
+  // Course training team: eligible senior trainers and trainers stored on course.trainers
   const [referCourse, setReferCourse] = useState(null);
-  const [referSessions, setReferSessions] = useState([]);
-  const [referSessionsLoading, setReferSessionsLoading] = useState(false);
   const [seniorTrainers, setSeniorTrainers] = useState([]);
   const [fieldTrainers, setFieldTrainers] = useState([]);
   const [trainersLoading, setTrainersLoading] = useState(false);
@@ -293,18 +291,12 @@ const NewTrainingCourses = () => {
     setReferCourse(course);
     setSelectedTrainerIds([]);
     setSelectedFieldTrainerIds([]);
-    setReferSessions([]);
     setSeniorTrainers([]);
     setFieldTrainers([]);
-    setReferSessionsLoading(true);
     setTrainersLoading(true);
 
     try {
-      const [sessionsRes, seniorRes, trainerRes] = await Promise.all([
-        axios.get(`${backendUrl}/college/session-plans`, {
-          headers: { 'x-auth': token },
-          params: { course: course._id },
-        }),
+      const [seniorRes, trainerRes, teamRes] = await Promise.all([
         axios.get(`${backendUrl}/college/users/training-role-users`, {
           headers: { 'x-auth': token },
           params: { roleType: 'senior', status: 'active' },
@@ -313,13 +305,10 @@ const NewTrainingCourses = () => {
           headers: { 'x-auth': token },
           params: { roleType: 'trainer', status: 'active' },
         }),
+        axios.get(`${backendUrl}/college/courses/${course._id}/training-team`, {
+          headers: { 'x-auth': token },
+        }),
       ]);
-
-      // Only Scheduled sessions are still waiting to be referred
-      const sessions = (sessionsRes.data?.data || [])
-        .filter((session) => (session.workflowStatus || 'Scheduled') === 'Scheduled')
-        .map((session) => ({ id: String(session._id || session.id) }));
-      setReferSessions(sessions);
 
       const toPerson = (user, fallback) => ({
         id: String(user._id),
@@ -334,11 +323,12 @@ const NewTrainingCourses = () => {
           .filter((user) => user._id && !seniorIds.has(String(user._id)))
           .map((user) => toPerson(user, 'Trainer'))
       );
+      setSelectedTrainerIds((teamRes.data?.seniorTrainers || []).map((trainer) => String(trainer._id)));
+      setSelectedFieldTrainerIds((teamRes.data?.trainers || []).map((trainer) => String(trainer._id)));
     } catch (error) {
       console.error('Error opening assign course:', error);
       setReferMessage('Could not load trainers.');
     } finally {
-      setReferSessionsLoading(false);
       setTrainersLoading(false);
     }
   };
@@ -355,10 +345,7 @@ const NewTrainingCourses = () => {
   };
 
   const saveAssignCourse = async () => {
-    const sessionsToRefer = referSessions;
-    const chosenSeniors = seniorTrainers.filter((trainer) => selectedTrainerIds.includes(trainer.id));
-    const chosenTrainers = fieldTrainers.filter((trainer) => selectedFieldTrainerIds.includes(trainer.id));
-    if (chosenSeniors.length === 0 && chosenTrainers.length === 0) {
+    if (selectedTrainerIds.length === 0 && selectedFieldTrainerIds.length === 0) {
       setReferMessage('Select a senior trainer or a trainer.');
       return;
     }
@@ -366,42 +353,21 @@ const NewTrainingCourses = () => {
     setReferSaving(true);
     setReferMessage('');
     try {
-      const payload = {
-        workflowStatus: chosenTrainers.length ? 'Assigned' : 'Sent to Senior Trainer',
-        seniorTrainerId: chosenSeniors[0]?.id || '',
-        seniorTrainerName: chosenSeniors.map((trainer) => trainer.name).join(', '),
-        fieldTrainerId: chosenTrainers[0]?.id || '',
-        fieldTrainerName: chosenTrainers.map((trainer) => trainer.name).join(', '),
-      };
-      const results = await Promise.allSettled(
-        sessionsToRefer.map((session) =>
-          axios.patch(`${backendUrl}/college/session-plans/${session.id}`, payload, {
-            headers: { 'x-auth': token },
-          })
-        )
+      const response = await axios.put(
+        `${backendUrl}/college/courses/${referCourse._id}/training-team`,
+        {
+          seniorTrainerIds: selectedTrainerIds,
+          trainerIds: selectedFieldTrainerIds,
+        },
+        { headers: { 'x-auth': token } }
       );
-
-      const failedIndexes = results
-        .map((result, index) => (
-          result.status === 'rejected' || result.value?.data?.status === false ? index : -1
-        ))
-        .filter((index) => index >= 0);
-      const failed = failedIndexes.length;
-      const succeeded = sessionsToRefer.length - failed;
-
-      if (sessionsToRefer.length > 0 && succeeded === 0) {
-        setReferMessage('Could not assign.');
-        return;
-      }
-      if (failed > 0) {
-        const failedIds = new Set(failedIndexes.map((index) => sessionsToRefer[index].id));
-        setReferSessions((prev) => prev.filter((session) => failedIds.has(session.id)));
-        setReferMessage('Some assignments failed. Try again.');
+      if (response.data?.success === false || response.data?.status === false) {
+        setReferMessage(response.data?.message || 'Could not assign the training team.');
         return;
       }
       closeAssignCourse();
     } catch (error) {
-      setReferMessage(error?.response?.data?.message || 'Could not refer the course.');
+      setReferMessage(error?.response?.data?.message || 'Could not assign the training team.');
     } finally {
       setReferSaving(false);
     }
@@ -694,7 +660,7 @@ const NewTrainingCourses = () => {
                 <button
                   type="button"
                   className="btn btn-danger"
-                  disabled={referSaving || referSessionsLoading || trainersLoading || (selectedTrainerIds.length === 0 && selectedFieldTrainerIds.length === 0)}
+                  disabled={referSaving || trainersLoading || (selectedTrainerIds.length === 0 && selectedFieldTrainerIds.length === 0)}
                   onClick={saveAssignCourse}
                 >
                   {referSaving ? 'Sending...' : 'Assign Trainer'}

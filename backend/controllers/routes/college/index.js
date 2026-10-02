@@ -13,6 +13,7 @@ const puppeteer = require("puppeteer");
 const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
 const { applyHumanRemarksToDoc, humanRemarksSetPayload } = require("../../../helpers/aiRemark");
+const { assertCourseMembers, toIdString, TrainingTeamError } = require("../../../helpers/trainingTeam");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
 	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage, UploadCandidates, Placement, PlacementStatus, BatchMonitor, Source } = require("../../models");
 const { ReEnquire } = require("../../models");
@@ -8892,7 +8893,7 @@ router.get('/get_batches', async (req, res) => {
 		}
 
 		const batches = await Batch.find(filter)
-			.populate('trainers', 'name email mobile')
+			.populate('trainers', 'name email mobile permissions.custom_permissions.can_be_senior_trainer permissions.custom_permissions.can_be_trainer')
 			.populate('createdBy', 'name email')
 			.sort({ createdAt: -1 });  // Sorting by createdAt
 
@@ -17113,12 +17114,27 @@ router.post('/assigntrainerstobatch', isCollege, async (req, res) => {
 			})
 
 		}
+		const course = await Courses.findById(batch.courseId).select('trainers').lean();
+		const submittedIds = [...new Set((Array.isArray(trainers) ? trainers : []).map((id) => toIdString(id)).filter(Boolean))];
+		try {
+			assertCourseMembers(course?.trainers || [], submittedIds);
+		} catch (validationError) {
+			if (validationError instanceof TrainingTeamError) {
+				return res.status(validationError.statusCode || 400).json({
+					success: false,
+					status: false,
+					message: validationError.message,
+				});
+			}
+			throw validationError;
+		}
+
 		const trainee = await User.find({
-			_id: { $in: trainers },
+			_id: { $in: submittedIds },
 			role: 4
 		})
 
-		batch.trainers = trainers;
+		batch.trainers = submittedIds;
 		await batch.save()
 
 		return res.status(200).json({

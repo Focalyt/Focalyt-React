@@ -28,6 +28,13 @@ const s3 = require("../../../helpers/objectStorage");
 const { normalizeStorageKey } = require('../../../helpers/s3Storage');
 const { buildCourseDocumentKey } = require('../../../helpers/storagePaths');
 const { normalizeCourseStructure } = require('../../../helpers/courseStructure');
+const {
+	TrainingTeamError,
+	parseIdList,
+	splitUsers,
+	assertRoleMembers,
+	uniqueIds,
+} = require('../../../helpers/trainingTeam');
 const allowedVideoExtensions = ['mp4', 'mkv', 'mov', 'avi', 'wmv'];
 const allowedImageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
 const allowedDocumentExtensions = ['pdf', 'doc', 'docx']; // ✅ PDF aur DOC types allow karein
@@ -2192,5 +2199,90 @@ router.post('/candidate-visit-calendar', async (req, res) => {
 // 	  res.status(500).json({ error: 'Internal server error' });
 // 	}
 //   });
+
+const TRAINING_USER_SELECT = 'name email isDeleted permissions.custom_permissions.can_be_senior_trainer permissions.custom_permissions.can_be_trainer';
+
+const findCollegeCourse = async (req, courseId) => {
+	if (!req.college?._id) {
+		throw new TrainingTeamError('College not found', 403);
+	}
+	if (!mongoose.Types.ObjectId.isValid(courseId)) {
+		throw new TrainingTeamError('Invalid course id');
+	}
+	const course = await Courses.findOne({
+		_id: courseId,
+		college: req.college._id,
+		isDeleted: { $ne: true },
+	});
+	if (!course) {
+		throw new TrainingTeamError('Course not found', 404);
+	}
+	return course;
+};
+
+router.get('/:courseId/training-team', async (req, res) => {
+	try {
+		const course = await findCollegeCourse(req, req.params.courseId);
+		await course.populate({ path: 'trainers', select: TRAINING_USER_SELECT });
+		const { seniorTrainers, trainers } = splitUsers(course.trainers || []);
+
+		return res.json({
+			success: true,
+			status: true,
+			courseId: course._id,
+			seniorTrainers,
+			trainers,
+		});
+	} catch (err) {
+		const statusCode = err.statusCode || 500;
+		if (statusCode === 500) console.error('GET /college/courses/:courseId/training-team', err);
+		return res.status(statusCode).json({
+			success: false,
+			status: false,
+			message: err.message || 'Could not load the course training team',
+		});
+	}
+});
+
+router.put('/:courseId/training-team', async (req, res) => {
+	try {
+		const course = await findCollegeCourse(req, req.params.courseId);
+		const seniorTrainerIds = parseIdList(req.body?.seniorTrainerIds, 'seniorTrainerIds');
+		const trainerIds = parseIdList(req.body?.trainerIds, 'trainerIds');
+		const combinedIds = uniqueIds(seniorTrainerIds, trainerIds);
+
+		const users = combinedIds.length
+			? await User.find({ _id: { $in: combinedIds } }).select(TRAINING_USER_SELECT).lean()
+			: [];
+		const usersById = new Map(users.map((user) => [String(user._id), user]));
+		assertRoleMembers(usersById, seniorTrainerIds, trainerIds);
+
+		course.trainers = combinedIds;
+		await course.save();
+
+		const savedUsers = combinedIds
+			.map((id) => usersById.get(id))
+			.filter(Boolean);
+		const { seniorTrainers, trainers } = splitUsers(savedUsers);
+
+		return res.json({
+			success: true,
+			status: true,
+			message: 'Course training team updated',
+			courseId: course._id,
+			trainerIds: combinedIds,
+			seniorTrainers,
+			trainers,
+		});
+	} catch (err) {
+		const statusCode = err.statusCode || 500;
+		if (statusCode === 500) console.error('PUT /college/courses/:courseId/training-team', err);
+		return res.status(statusCode).json({
+			success: false,
+			status: false,
+			message: err.message || 'Could not update the course training team',
+		});
+	}
+});
 
 module.exports = router;

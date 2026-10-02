@@ -325,13 +325,9 @@ const loadAssignedCoordinatorSessions = (batchId, trainerId) => {
   }
 };
 
-const fetchAssignedCoordinatorSessionsApi = async (backendUrl, token, trainerId, batchId = '') => {
-  if (!trainerId || !token) return [];
-  const params = new URLSearchParams({
-    fieldTrainerId: trainerId,
-  });
-  if (batchId) params.set('batch', batchId);
-  const res = await axios.get(`${backendUrl}/college/session-plans?${params.toString()}`, {
+const fetchAssignedCoordinatorSessionsApi = async (backendUrl, token) => {
+  if (!token) return [];
+  const res = await axios.get(`${backendUrl}/college/batches/my-sessions`, {
     headers: { 'x-auth': token },
   });
   return Array.isArray(res.data?.data) ? res.data.data : [];
@@ -4264,7 +4260,7 @@ const TrainerModule = () => {
 
     let coordinatorSessions = [];
     try {
-      coordinatorSessions = await fetchAssignedCoordinatorSessionsApi(backendUrl, token, trainerId);
+      coordinatorSessions = await fetchAssignedCoordinatorSessionsApi(backendUrl, token);
     } catch (err) {
       if (err?.code !== 'ERR_CANCELED' && err?.name !== 'CanceledError') {
         console.error('Failed to load assigned session plans', err);
@@ -5186,7 +5182,7 @@ const TrainerModule = () => {
                       )}
                       {filteredSessions.map((session) => (
                         <SessionCard
-                          key={session.id}
+                          key={session.assignmentId || session.id}
                           basicDetails={activeBasicDetails}
                           session={session}
                           students={students}
