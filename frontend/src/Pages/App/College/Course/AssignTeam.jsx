@@ -15,6 +15,15 @@ const statusLabel = (member, key) => {
   return `Inactive ${member}`;
 };
 
+const sessionLabel = (session) => {
+  const parts = [
+    session.unitNumber ? `Unit ${session.unitNumber}${session.unitName ? ` - ${session.unitName}` : ''}` : session.unitName,
+    session.chapterNumber ? `Ch. ${session.chapterNumber}${session.chapterName ? ` - ${session.chapterName}` : ''}` : session.chapterName,
+    session.title || 'Untitled session',
+  ].filter(Boolean);
+  return parts.join(' › ');
+};
+
 const AssignTeam = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
@@ -30,6 +39,16 @@ const AssignTeam = () => {
   const [editForm, setEditForm] = useState({ name: '', email: '', mobile: '', designation: '', status: 'active' });
   const [savingEdit, setSavingEdit] = useState(false);
   const [deletingId, setDeletingId] = useState('');
+  const [assignPerson, setAssignPerson] = useState(null);
+  const [courses, setCourses] = useState([]);
+  const [coursesLoading, setCoursesLoading] = useState(false);
+  const [courseQuery, setCourseQuery] = useState('');
+  const [selectedCourseId, setSelectedCourseId] = useState('');
+  const [sessions, setSessions] = useState([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [selectedSessionIds, setSelectedSessionIds] = useState([]);
+  const [assignSaving, setAssignSaving] = useState(false);
+  const [assignMessage, setAssignMessage] = useState('');
 
   const role = ROLES.find((item) => item.key === roleKey) || ROLES[0];
 
@@ -128,6 +147,144 @@ const AssignTeam = () => {
     }
   };
 
+  const closeAssign = () => {
+    setAssignPerson(null);
+    setCourseQuery('');
+    setSelectedCourseId('');
+    setSessions([]);
+    setSelectedSessionIds([]);
+    setAssignMessage('');
+    setSessionsLoading(false);
+  };
+
+  const openAssign = async (person) => {
+    setAssignPerson(person);
+    setCourseQuery('');
+    setSelectedCourseId('');
+    setSessions([]);
+    setSelectedSessionIds([]);
+    setAssignMessage('');
+    if (courses.length > 0) return;
+    setCoursesLoading(true);
+    try {
+      const response = await axios.get(`${backendUrl}/college/all_courses`, {
+        params: { scope: 'all' },
+        headers: { 'x-auth': token },
+      });
+      const list = (response.data?.data || [])
+        .filter((course) => course && course._id)
+        .map((course) => ({
+          _id: String(course._id),
+          name: course.name || 'Untitled course',
+          status: course.status === true || course.status === 'active' ? 'active' : 'inactive',
+        }))
+        .filter((course) => course.status === 'active');
+      setCourses(list);
+    } catch (error) {
+      console.error('Error loading courses:', error);
+      setAssignMessage(error?.response?.data?.message || 'Could not load courses.');
+    } finally {
+      setCoursesLoading(false);
+    }
+  };
+
+  const chooseCourse = async (courseId) => {
+    setSelectedCourseId(courseId);
+    setSessions([]);
+    setSelectedSessionIds([]);
+    setAssignMessage('');
+    if (!courseId) return;
+    setSessionsLoading(true);
+    try {
+      const response = await axios.get(`${backendUrl}/college/session-plans`, {
+        headers: { 'x-auth': token },
+        params: { course: courseId },
+      });
+      const list = (response.data?.data || []).map((session) => ({
+        id: String(session.id || session._id),
+        title: session.title || 'Untitled session',
+        unitNumber: session.unitNumber || '',
+        unitName: session.unitName || '',
+        chapterNumber: session.chapterNumber || '',
+        chapterName: session.chapterName || '',
+        workflowStatus: session.workflowStatus || 'Scheduled',
+      }));
+      setSessions(list);
+      setSelectedSessionIds(
+        list.filter((session) => session.workflowStatus === 'Scheduled').map((session) => session.id)
+      );
+    } catch (error) {
+      console.error('Error loading sessions:', error);
+      setAssignMessage(error?.response?.data?.message || 'Could not load sessions.');
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  const toggleSession = (sessionId) => {
+    setSelectedSessionIds((prev) => (
+      prev.includes(sessionId) ? prev.filter((id) => id !== sessionId) : [...prev, sessionId]
+    ));
+  };
+
+  const saveAssign = async () => {
+    if (!assignPerson) return;
+    if (!selectedCourseId) {
+      setAssignMessage('Select a course.');
+      return;
+    }
+    const chosen = sessions.filter((session) => selectedSessionIds.includes(session.id));
+    if (chosen.length === 0) {
+      setAssignMessage('Select at least one session.');
+      return;
+    }
+    const isSenior = role.key === 'senior';
+    const payload = isSenior
+      ? {
+        workflowStatus: 'Sent to Senior Trainer',
+        seniorTrainerId: assignPerson._id,
+        seniorTrainerName: assignPerson.name || '',
+      }
+      : {
+        workflowStatus: 'Assigned',
+        fieldTrainerId: assignPerson._id,
+        fieldTrainerName: assignPerson.name || '',
+      };
+
+    setAssignSaving(true);
+    setAssignMessage('');
+    try {
+      const results = await Promise.allSettled(
+        chosen.map((session) =>
+          axios.patch(`${backendUrl}/college/session-plans/${session.id}`, payload, {
+            headers: { 'x-auth': token },
+          })
+        )
+      );
+      const failed = results.filter((result) => (
+        result.status === 'rejected' || result.value?.data?.status === false
+      )).length;
+      if (failed === chosen.length) {
+        setAssignMessage('Could not assign the selected sessions.');
+        return;
+      }
+      if (failed > 0) {
+        setAssignMessage(`Assigned ${chosen.length - failed} session(s). ${failed} failed.`);
+        return;
+      }
+      toast.success(`Assigned ${chosen.length} session${chosen.length === 1 ? '' : 's'} to ${assignPerson.name || role.member}.`);
+      closeAssign();
+    } catch (error) {
+      setAssignMessage(error?.response?.data?.message || 'Could not assign the course.');
+    } finally {
+      setAssignSaving(false);
+    }
+  };
+
+  const filteredCourses = courses.filter((course) => (
+    course.name.toLowerCase().includes(courseQuery.trim().toLowerCase())
+  ));
+
   const deletePerson = async (person) => {
     const confirmed = window.confirm(`Delete ${person.name || 'this team member'}?`);
     if (!confirmed) return;
@@ -171,6 +328,19 @@ const AssignTeam = () => {
         }
         .at-action:hover { background: #ffe4e8; }
         .at-action:disabled { opacity: 0.55; cursor: default; }
+        .at-assign-split {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
+          align-items: start;
+        }
+        .at-assign-split .assign-card { min-width: 0; }
+        .at-assign-split .assign-card__list { max-height: 320px; }
+        .at-assign-split .assign-person > span:nth-child(2) { flex: 1; min-width: 0; }
+        .at-assign-split .assign-person__name { white-space: normal; }
+        @media (max-width: 760px) {
+          .at-assign-split { grid-template-columns: 1fr; }
+        }
         .at-action svg {
           width: 16px;
           height: 16px;
@@ -275,6 +445,15 @@ const AssignTeam = () => {
                     </td>
                     <td>
                       <div className="at-actions">
+                        {role.key !== 'academic' && (
+                          <button type="button" className="at-action" title="Assign course" onClick={() => openAssign(person)}>
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                              <path d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v15.2" />
+                              <path d="M7.5 6H19v13.5a1.5 1.5 0 0 1-1.5 1.5H7.5A2.5 2.5 0 0 1 5 18.5v-13z" />
+                              <path d="M8.5 10h6M8.5 13.5h4" />
+                            </svg>
+                          </button>
+                        )}
                         <button type="button" className="at-action" title="Edit" onClick={() => openEdit(person)}>
                           <svg viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M4 20h4.2L19.4 8.8a1.6 1.6 0 0 0 0-2.3l-1.9-1.9a1.6 1.6 0 0 0-2.3 0L4 15.8V20z" />
@@ -310,6 +489,132 @@ const AssignTeam = () => {
           </div>
         )}
       </div>
+
+      {assignPerson && (
+        <div className="modal show fade d-block" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}>
+          <div className="modal-dialog modal-dialog-scrollable modal-dialog-centered" style={{ margin: 'auto', maxWidth: 920 }}>
+            <div className="modal-content assign-modal">
+              <div className="assign-modal__head">
+                <div>
+                  <p className="assign-modal__kicker">Assign course</p>
+                  <h2>{assignPerson.name || role.member}</h2>
+                  <p>Choose a course, then the sessions to assign.</p>
+                </div>
+                <button type="button" className="assign-modal__close" onClick={closeAssign} aria-label="Close">
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+              <div className="assign-modal__body">
+                <div className="at-assign-split">
+                  <section className="assign-card">
+                    <div className="assign-card__top">
+                      <h3 className="assign-card__title">
+                        <span className="assign-card__mark"><i className="fas fa-book"></i></span>
+                        Course
+                      </h3>
+                    </div>
+                    <label className="assign-card__search">
+                      <i className="fas fa-search"></i>
+                      <input
+                        type="text"
+                        placeholder="Search courses..."
+                        value={courseQuery}
+                        onChange={(e) => setCourseQuery(e.target.value)}
+                      />
+                    </label>
+                    <div className="assign-card__list">
+                      {coursesLoading ? (
+                        <div className="assign-card__empty">Loading courses...</div>
+                      ) : filteredCourses.length === 0 ? (
+                        <div className="assign-card__empty">No courses found.</div>
+                      ) : filteredCourses.map((course) => (
+                        <button
+                          key={course._id}
+                          type="button"
+                          className={`assign-person ${selectedCourseId === course._id ? 'is-on' : ''}`}
+                          onClick={() => chooseCourse(course._id)}
+                        >
+                          <span className="assign-person__avatar">{course.name.charAt(0).toUpperCase()}</span>
+                          <span>
+                            <span className="assign-person__name">{course.name}</span>
+                          </span>
+                          <span className="assign-person__check"><i className="fas fa-check"></i></span>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="assign-card">
+                      <div className="assign-card__top">
+                        <h3 className="assign-card__title">
+                          <span className="assign-card__mark"><i className="fas fa-clipboard-list"></i></span>
+                          Sessions
+                        </h3>
+                        <span className="assign-card__count">{selectedSessionIds.length} selected</span>
+                      </div>
+                      <div className="assign-card__list">
+                        {!selectedCourseId ? (
+                          <div className="assign-card__empty">Select a course to see its sessions.</div>
+                        ) : sessionsLoading ? (
+                          <div className="assign-card__empty">Loading sessions...</div>
+                        ) : sessions.length === 0 ? (
+                          <div className="assign-card__empty">No sessions found for this course.</div>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              className={`assign-person ${selectedSessionIds.length === sessions.length ? 'is-on' : ''}`}
+                              onClick={() => setSelectedSessionIds(
+                                selectedSessionIds.length === sessions.length ? [] : sessions.map((session) => session.id)
+                              )}
+                            >
+                              <span className="assign-person__avatar">All</span>
+                              <span>
+                                <span className="assign-person__name">Select all</span>
+                                <span className="assign-person__hint">{selectedSessionIds.length}/{sessions.length}</span>
+                              </span>
+                              <span className="assign-person__check"><i className="fas fa-check"></i></span>
+                            </button>
+                            {sessions.map((session) => {
+                              const active = selectedSessionIds.includes(session.id);
+                              return (
+                                <button
+                                  key={session.id}
+                                  type="button"
+                                  className={`assign-person ${active ? 'is-on' : ''}`}
+                                  onClick={() => toggleSession(session.id)}
+                                >
+                                  <span className="assign-person__avatar">{(session.title || '?').charAt(0).toUpperCase()}</span>
+                                  <span>
+                                    <span className="assign-person__name">{sessionLabel(session)}</span>
+                                    <span className="assign-person__hint">{session.workflowStatus}</span>
+                                  </span>
+                                  <span className="assign-person__check"><i className="fas fa-check"></i></span>
+                                </button>
+                              );
+                            })}
+                          </>
+                        )}
+                      </div>
+                    </section>
+                </div>
+                {assignMessage && <p className="text-danger mt-3 mb-0">{assignMessage}</p>}
+              </div>
+              <div className="assign-modal__foot">
+                <button type="button" className="vt-back" onClick={closeAssign}>Cancel</button>
+                <button
+                  type="button"
+                  className="assign-modal__assign"
+                  disabled={assignSaving || coursesLoading || sessionsLoading || !selectedCourseId || selectedSessionIds.length === 0}
+                  onClick={saveAssign}
+                >
+                  {assignSaving ? 'Assigning...' : `Assign (${selectedSessionIds.length})`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editingPerson && (
         <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>

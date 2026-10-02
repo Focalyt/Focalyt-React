@@ -294,15 +294,6 @@ const uniquePeople = (people) => {
   });
 };
 
-const courseSessionLabel = (session) => {
-  const parts = [
-    session.unitNumber ? `Unit ${session.unitNumber}${session.unitName ? ` - ${session.unitName}` : ''}` : session.unitName,
-    session.chapterNumber ? `Ch. ${session.chapterNumber}${session.chapterName ? ` - ${session.chapterName}` : ''}` : session.chapterName,
-    session.title || 'Untitled session',
-  ].filter(Boolean);
-  return parts.join(' › ');
-};
-
 const RoleTrainerPicker = ({ title, emptyText, options, selectedValues, onChange, tone }) => {
   const [query, setQuery] = useState('');
   const needle = query.trim().toLowerCase();
@@ -405,9 +396,6 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   const [selectedFieldTrainers, setSelectedFieldTrainers] = useState([]);
   const [isTrainerDropdownOpen, setIsTrainerDropdownOpen] = useState(false);
   const [selectedBatchForTrainer, setSelectedBatchForTrainer] = useState(null);
-  const [courseSessions, setCourseSessions] = useState([]);
-  const [selectedCourseSessionIds, setSelectedCourseSessionIds] = useState([]);
-  const [courseSessionsLoading, setCourseSessionsLoading] = useState(false);
   // Show alert
   const showAlert = (message, type) => {
     setAlert({ show: true, message, type });
@@ -452,43 +440,6 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     setSelectedSeniorTrainers([]);
     setSelectedFieldTrainers([]);
     setSelectedBatchForTrainer(null);
-    setCourseSessions([]);
-    setSelectedCourseSessionIds([]);
-    setCourseSessionsLoading(false);
-  };
-
-  const loadCourseSessions = async (batch) => {
-    const courseId = selectedCourse?._id || batch?.courseId?._id || batch?.courseId;
-    if (!courseId) {
-      setCourseSessions([]);
-      setSelectedCourseSessionIds([]);
-      return;
-    }
-    setCourseSessionsLoading(true);
-    try {
-      const response = await axios.get(`${backendUrl}/college/session-plans`, {
-        headers: { 'x-auth': token },
-        params: { course: courseId },
-      });
-      const sessions = (response.data?.data || [])
-        .filter((session) => (session.workflowStatus || 'Scheduled') === 'Scheduled')
-        .map((session) => ({
-          id: String(session.id || session._id),
-          title: session.title || 'Untitled session',
-          unitNumber: session.unitNumber || '',
-          unitName: session.unitName || '',
-          chapterNumber: session.chapterNumber || '',
-          chapterName: session.chapterName || '',
-        }));
-      setCourseSessions(sessions);
-      setSelectedCourseSessionIds(sessions.map((session) => session.id));
-    } catch (error) {
-      console.error('Error loading course sessions:', error);
-      setCourseSessions([]);
-      setSelectedCourseSessionIds([]);
-    } finally {
-      setCourseSessionsLoading(false);
-    }
   };
 
   const openTrainerModal = (batch) => {
@@ -498,13 +449,6 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     setSelectedSeniorTrainers(assigned.filter((trainer) => seniorIds.has(String(trainer._id))).map((trainer) => trainer._id));
     setSelectedFieldTrainers(assigned.filter((trainer) => !seniorIds.has(String(trainer._id))).map((trainer) => trainer._id));
     setIsTrainerDropdownOpen(true);
-    loadCourseSessions(batch);
-  };
-
-  const toggleCourseSession = (sessionId) => {
-    setSelectedCourseSessionIds((prev) => (
-      prev.includes(sessionId) ? prev.filter((id) => id !== sessionId) : [...prev, sessionId]
-    ));
   };
 
 
@@ -524,10 +468,6 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
       showAlert('Please select a senior trainer or a trainer', 'warning');
       return;
     }
-    if (selectedCourseSessionIds.length > 0 && selectedSeniorTrainers.length === 0) {
-      showAlert('Select a senior trainer to assign the course with this batch', 'warning');
-      return;
-    }
 
     try {
       setLoading(true);
@@ -543,44 +483,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
       });
 
       if (response.data.status) {
-        const sessionsToRefer = courseSessions.filter((session) => selectedCourseSessionIds.includes(session.id));
-        let courseNote = '';
-        if (sessionsToRefer.length > 0) {
-          const seniorId = String(selectedSeniorTrainers[0]);
-          const seniorTrainer = seniorTrainers.find((trainer) => String(trainer._id) === seniorId);
-          const fieldTrainer = selectedFieldTrainers.length === 1
-            ? trainers.find((trainer) => String(trainer._id) === String(selectedFieldTrainers[0]))
-            : null;
-          const courseId = selectedCourse?._id || selectedBatchForTrainer.courseId?._id || selectedBatchForTrainer.courseId;
-          const payload = {
-            workflowStatus: 'Sent to Senior Trainer',
-            seniorTrainerId: seniorTrainer?._id,
-            seniorTrainerName: seniorTrainer?.name || '',
-            batch: selectedBatchForTrainer._id,
-            batchCode: selectedBatchForTrainer.name || selectedBatchForTrainer.code || '',
-            course: courseId,
-            courseName: selectedCourse?.name || '',
-          };
-          if (fieldTrainer) {
-            payload.fieldTrainerId = fieldTrainer._id;
-            payload.fieldTrainerName = fieldTrainer.name || '';
-          }
-          const results = await Promise.allSettled(
-            sessionsToRefer.map((session) =>
-              axios.patch(`${backendUrl}/college/session-plans/${session.id}`, payload, {
-                headers: { 'x-auth': token },
-              })
-            )
-          );
-          const failed = results.filter((result) => (
-            result.status === 'rejected' || result.value?.data?.status === false
-          )).length;
-          const succeeded = sessionsToRefer.length - failed;
-          courseNote = failed > 0
-            ? ` Course: ${succeeded} session(s) assigned, ${failed} failed.`
-            : ` Course assigned (${succeeded} session${succeeded === 1 ? '' : 's'}).`;
-        }
-        showAlert(`Trainers assigned successfully!${courseNote}`, courseNote.includes('failed') ? 'warning' : 'success');
+        showAlert('Trainers assigned successfully!', 'success');
         closeTrainerModal();
         
         // Refresh batches list
@@ -4506,11 +4409,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                       <p className="assign-modal__kicker">Batch team</p>
                       <h2>Assign Senior Trainer & Trainer</h2>
                       {selectedBatchForTrainer && (
-                        <p>
-                          Batch <strong>{selectedBatchForTrainer.name}</strong>
-                          {selectedBatchForTrainer.code ? ` · ${selectedBatchForTrainer.code}` : ''}
-                          {selectedCourse?.name ? ` · ${selectedCourse.name}` : ''}
-                        </p>
+                        <p>Batch <strong>{selectedBatchForTrainer.name}</strong>{selectedBatchForTrainer.code ? ` · ${selectedBatchForTrainer.code}` : ''}</p>
                       )}
                     </div>
                     <button type="button" className="assign-modal__close" onClick={closeTrainerModal} aria-label="Close">
@@ -4541,61 +4440,6 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                         onChange={setSelectedFieldTrainers}
                         emptyText="No trainer found. Tick Trainer on a user in User Management."
                       />
-                      <section className="assign-card">
-                        <div className="assign-card__top">
-                          <h3 className="assign-card__title">
-                            <span className="assign-card__mark">
-                              <i className="fas fa-book"></i>
-                            </span>
-                            Course
-                          </h3>
-                          <span className="assign-card__count">{selectedCourseSessionIds.length} selected</span>
-                        </div>
-                        <p className="assign-card__hint">
-                          Scheduled sessions of {selectedCourse?.name || 'this course'} go to the selected senior trainer with this batch.
-                        </p>
-                        {courseSessionsLoading ? (
-                          <div className="assign-card__empty">Loading sessions...</div>
-                        ) : courseSessions.length === 0 ? (
-                          <div className="assign-card__empty">No scheduled sessions found for this course.</div>
-                        ) : (
-                          <div className="assign-card__list">
-                            <button
-                              type="button"
-                              className={`assign-person ${selectedCourseSessionIds.length === courseSessions.length ? 'is-on' : ''}`}
-                              onClick={() => setSelectedCourseSessionIds(
-                                selectedCourseSessionIds.length === courseSessions.length
-                                  ? []
-                                  : courseSessions.map((session) => session.id)
-                              )}
-                            >
-                              <span className="assign-person__avatar">All</span>
-                              <span>
-                                <span className="assign-person__name">Select all</span>
-                                <span className="assign-person__hint">{selectedCourseSessionIds.length}/{courseSessions.length}</span>
-                              </span>
-                              <span className="assign-person__check"><i className="fas fa-check"></i></span>
-                            </button>
-                            {courseSessions.map((session) => {
-                              const active = selectedCourseSessionIds.includes(session.id);
-                              return (
-                                <button
-                                  key={session.id}
-                                  type="button"
-                                  className={`assign-person ${active ? 'is-on' : ''}`}
-                                  onClick={() => toggleCourseSession(session.id)}
-                                >
-                                  <span className="assign-person__avatar">{(session.title || '?').charAt(0).toUpperCase()}</span>
-                                  <span>
-                                    <span className="assign-person__name">{courseSessionLabel(session)}</span>
-                                  </span>
-                                  <span className="assign-person__check"><i className="fas fa-check"></i></span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </section>
                     </div>
                   </div>
                   <div className="assign-modal__foot">
@@ -4603,7 +4447,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                     <button
                       type="button"
                       className="assign-modal__assign"
-                      disabled={assignCount === 0 || loading || courseSessionsLoading}
+                      disabled={assignCount === 0 || loading}
                       onClick={handleAssignTrainers}
                     >
                       {loading ? 'Assigning...' : `Assign (${assignCount})`}

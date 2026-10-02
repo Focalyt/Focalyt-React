@@ -1271,14 +1271,21 @@ router.get('/training-role-users', isCollege, async (req, res) => {
       ? { [`permissions.custom_permissions.${permissionKeys[0]}`]: true }
       : { $or: permissionKeys.map((key) => ({ [`permissions.custom_permissions.${key}`]: true })) };
 
+    const statusQuery = String(req.query.status || 'all').toLowerCase();
+    const statusFilter = statusQuery === 'active'
+      ? { status: true }
+      : statusQuery === 'inactive'
+        ? { status: false }
+        : {};
+
     const concernPersons = await User.find({
       _id: { $in: concernPersonIds },
       role: 2,
-      status: true,
       isDeleted: false,
+      ...statusFilter,
       ...roleFilter,
     })
-      .select('_id name email mobile designation')
+      .select('_id name email mobile designation status')
       .sort({ name: 1 })
       .lean();
 
@@ -1288,6 +1295,7 @@ router.get('/training-role-users', isCollege, async (req, res) => {
       email: u.email,
       mobile: u.mobile,
       designation: u.designation || '',
+      status: u.status ? 'active' : 'inactive',
     }));
 
     return res.status(200).json({
