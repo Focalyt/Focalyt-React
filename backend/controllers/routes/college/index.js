@@ -8833,8 +8833,17 @@ router.post('/add_batch', isCollege, async (req, res) => {
 			return res.status(400).json({ success: false, message: 'All required fields must be provided' });
 		}
 
-		// Create a new batch
-		const newBatch = new Batch({
+		const course = await Courses.findById(courseId).select('center').lean();
+		const assignedCenterIds = [
+			...new Set(
+				(Array.isArray(course?.center) ? course.center : [])
+					.map((id) => (id && id._id ? String(id._id) : String(id || '')))
+					.filter((id) => mongoose.Types.ObjectId.isValid(id))
+			),
+		];
+		const centerIds = assignedCenterIds.length ? assignedCenterIds : [String(centerId)];
+
+		const batchFields = {
 			name,
 			startDate,
 			description,
@@ -8842,22 +8851,24 @@ router.post('/add_batch', isCollege, async (req, res) => {
 			zeroPeriodStartDate,
 			zeroPeriodEndDate,
 			assessmentDate: assessmentDate || null,
-			maxStudents: maxStudents || 0,  // Default to 0 if not provided
-			status,  // Default to active if not provided
+			maxStudents: maxStudents || 0,
+			status: status || 'active',
 			courseId,
-			centerId,
 			createdBy: user._id,
-			college: college._id
-		});
+			college: college._id,
+		};
 
-		// Save the batch to the database
-		const savedBatch = await newBatch.save();
+		const savedBatches = await Batch.insertMany(
+			centerIds.map((id) => ({ ...batchFields, centerId: id }))
+		);
 
-		// Send success response
 		res.status(201).json({
 			success: true,
-			message: 'Batch created successfully',
-			data: savedBatch
+			message: savedBatches.length > 1
+				? `Batch created for ${savedBatches.length} centers`
+				: 'Batch created successfully',
+			data: savedBatches.length === 1 ? savedBatches[0] : savedBatches,
+			count: savedBatches.length,
 		});
 	} catch (error) {
 		console.error('Error creating batch:', error);

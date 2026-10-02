@@ -11,6 +11,13 @@ const RequiredDocuments = () => {
   const [selectedFiles, setSelectedFiles] = useState({});
    const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
    const bucketUrl = process.env.REACT_APP_MIPIE_BUCKET_URL;
+
+   const documentBaseUrl = () => {
+     const backend = String(backendUrl || 'http://localhost:8080').replace(/\/$/, '');
+     const onLocalhost = typeof window !== 'undefined'
+       && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
+     return onLocalhost ? `${backend}/api/upload` : bucketUrl;
+   };
   
    const { courseId } = useParams(); // ✅ Get courseId from URL path
  
@@ -240,6 +247,24 @@ const RequiredDocuments = () => {
                         </>
                       )}
                       
+                      {doc.uploads?.length > 0 && doc.uploads[doc.uploads.length - 1].status === 'Verified' && (
+                        <>
+                          <span className="text-success">
+                            Your {doc.Name} has been verified. Please check the status by click on the check status button
+                          </span>
+                          <div className="d-flex flex-wrap align-items-center justify-content-end">
+                            <button
+                              className="btn btn-link collapsed py-0 mx-0 filter-docs"
+                              onClick={() => toggleStatusView(doc._id)}
+                              data-doc-id={doc._id}
+                              alt="Filter"
+                            >
+                              Check Status
+                            </button>
+                          </div>
+                        </>
+                      )}
+
                       {doc.uploads?.length > 0 && doc.uploads[doc.uploads.length - 1].status === 'Rejected' && (
                         <>
                           <span className="text-success">
@@ -292,7 +317,7 @@ const RequiredDocuments = () => {
                                 <td>{moment(upload.uploadedAt).format('DD/MM/YYYY HH:mm:ss')}</td>
                                 <td>
                                   <a
-                                    href={resolveMediaUrl(bucketUrl, upload.fileUrl)}
+                                    href={resolveMediaUrl(documentBaseUrl(), upload.fileUrl)}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="btn btn-primary"

@@ -18,7 +18,13 @@ import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
 
 const DOC_BUCKET_URL = (process.env.REACT_APP_MIPIE_BUCKET_URL || '').replace(/\/$/, '');
 
-const getDocFileUrl = (fileUrl) => resolveMediaUrl(DOC_BUCKET_URL, fileUrl);
+const getDocFileUrl = (fileUrl) => {
+  const backend = String(process.env.REACT_APP_MIPIE_BACKEND_URL || 'http://localhost:8080').replace(/\/$/, '');
+  const onLocalhost = typeof window !== 'undefined'
+    && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
+  const base = onLocalhost ? `${backend}/api/upload` : DOC_BUCKET_URL;
+  return resolveMediaUrl(base, fileUrl);
+};
 
 const getProfileGroupRootId = (profile) => {
   if (!profile) return '';

@@ -646,62 +646,6 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
-  const assessmentAnchorRef = useRef(null);
-  const [assessmentCalendarOpen, setAssessmentCalendarOpen] = useState(false);
-
-  useEffect(() => {
-    if (!assessmentCalendarOpen) return undefined;
-
-    const placeCalendar = () => {
-      const anchor = assessmentAnchorRef.current?.querySelector('.react-date-picker__wrapper');
-      const calendar = document.querySelector('body > .react-date-picker__calendar--open');
-      if (!anchor || !calendar) return;
-      const rect = anchor.getBoundingClientRect();
-      const calendarRect = calendar.getBoundingClientRect();
-      const height = calendarRect.height || 320;
-      const width = Math.max(calendarRect.width || 0, 280);
-      const gap = 8;
-      const fitsBelow = rect.bottom + height + gap <= window.innerHeight;
-      const top = fitsBelow ? rect.bottom + gap : Math.max(8, rect.top - height - gap);
-      const left = Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - width - 8));
-      calendar.style.setProperty('top', `${top}px`, 'important');
-      calendar.style.setProperty('left', `${left}px`, 'important');
-    };
-
-    const frame = requestAnimationFrame(placeCalendar);
-    const timer = window.setTimeout(placeCalendar, 40);
-    const modal = assessmentAnchorRef.current?.closest('.modal-content');
-    let blockOutsideClose = false;
-    let blockTimer = 0;
-    const onScroll = () => {
-      blockOutsideClose = true;
-      window.clearTimeout(blockTimer);
-      blockTimer = window.setTimeout(() => {
-        blockOutsideClose = false;
-      }, 400);
-    };
-    const keepOpenWhileScrolling = (event) => {
-      if (!blockOutsideClose) return;
-      const calendar = document.querySelector('body > .react-date-picker__calendar--open');
-      if (calendar?.contains(event.target)) return;
-      event.stopPropagation();
-    };
-
-    modal?.addEventListener('scroll', onScroll, { passive: true });
-    document.addEventListener('mousedown', keepOpenWhileScrolling, true);
-    document.addEventListener('focusin', keepOpenWhileScrolling, true);
-    document.addEventListener('touchstart', keepOpenWhileScrolling, true);
-
-    return () => {
-      cancelAnimationFrame(frame);
-      window.clearTimeout(timer);
-      window.clearTimeout(blockTimer);
-      modal?.removeEventListener('scroll', onScroll);
-      document.removeEventListener('mousedown', keepOpenWhileScrolling, true);
-      document.removeEventListener('focusin', keepOpenWhileScrolling, true);
-      document.removeEventListener('touchstart', keepOpenWhileScrolling, true);
-    };
-  }, [assessmentCalendarOpen]);
   const [editingBatch, setEditingBatch] = useState(null);
   const [showShareModal, setShowShareModal] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState(null);
@@ -1740,9 +1684,22 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
         body: JSON.stringify(formData),
       });
 
-      if (!response.ok) throw new Error('Failed to add project');
-      window.alert('Batch added successfully')
-      resetForm()
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.success === false) {
+        throw new Error(result.message || 'Failed to add batch');
+      }
+      const refreshed = await axios.get(`${backendUrl}/college/get_batches`, {
+        params: {
+          courseId: selectedCourse?._id,
+          centerId: selectedCenter?._id,
+        },
+        headers: { 'x-auth': token },
+      });
+      if (refreshed.data.success) {
+        setBatches(refreshed.data.data);
+      }
+      window.alert(result.message || 'Batch added successfully');
+      resetForm();
       setShowAddForm(false);
     }
 
@@ -4337,13 +4294,10 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
 
                     </div>
                     <div className="row">
-                      <div className="col-md-6 mb-3" style={{ marginTop: 16 }} ref={assessmentAnchorRef}>
+                      <div className="col-md-6 mb-3 assessment-date-field" style={{ marginTop: 16 }}>
                         <label className="form-label">Assessment Date</label>
                         <DatePicker
                           onChange={(date) => setFormData(prev => ({ ...prev, assessmentDate: date }))}
-                          onCalendarOpen={() => setAssessmentCalendarOpen(true)}
-                          onCalendarClose={() => setAssessmentCalendarOpen(false)}
-                          portalContainer={typeof document !== 'undefined' ? document.body : null}
                           value={formatDateForState(formData.assessmentDate)}
                           minDate={today}
                           format="dd/MM/yyyy"
@@ -7397,6 +7351,12 @@ body > .react-date-picker__calendar.react-date-picker__calendar--open {
     inset: auto !important;
     width: auto !important;
     z-index: 4000 !important;
+}
+.assessment-date-field .react-date-picker__calendar.react-date-picker__calendar--open {
+    position: absolute !important;
+    inset: auto auto calc(100% + 4px) 0 !important;
+    width: 300px !important;
+    z-index: 30 !important;
 }
 /* Responsive Design */
 @media (max-width: 1920px) {

@@ -429,24 +429,6 @@ const NewTrainingCourses = () => {
     }
   };
 
-  const openCourse = (course) => {
-    const rawCenter = Array.isArray(course.center) ? course.center[0] : course.center;
-    const center = !rawCenter
-      ? null
-      : typeof rawCenter === 'object'
-        ? rawCenter
-        : { _id: rawCenter };
-    const vertical = course.vertical && typeof course.vertical === 'object' ? course.vertical : null;
-    const project = course.project && typeof course.project === 'object' ? course.project : null;
-
-    setSelectedCourse({
-      course,
-      center,
-      project,
-      vertical: vertical ? { ...vertical, id: vertical._id || vertical.id } : null,
-    });
-  };
-
   const filteredTrainers = seniorTrainers.filter((trainer) => {
     const q = trainerQuery.trim().toLowerCase();
     if (!q) return true;
@@ -522,9 +504,7 @@ const NewTrainingCourses = () => {
                 {filteredCourses.map((course) => (
                   <tr
                     key={course._id}
-                    className="vt-row"
-                    title="Open batches"
-                    onClick={() => openCourse(course)}
+                    className="vt-row is-static"
                   >
                     <td>{labelOf(course.vertical)}</td>
                     <td>{labelOf(course.project)}</td>
@@ -533,7 +513,6 @@ const NewTrainingCourses = () => {
                       <span className="vt-name">
                         <span className="vt-avatar">{(course.name || '?').charAt(0).toUpperCase()}</span>
                         {course.name || 'Untitled course'}
-                        <i className="bi bi-chevron-right vt-go"></i>
                       </span>
                     </td>
                     <td>
