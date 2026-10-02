@@ -100,6 +100,7 @@ import NewTrainingCenters from './Pages/App/College/ProjectMangement/NewTraining
 import NewTrainingCourses from './Pages/App/College/ProjectMangement/NewTrainingCourses';
 import NewTrainingBatches from './Pages/App/College/ProjectMangement/NewTrainingBatches';
 import AssignTeam from './Pages/App/College/Course/AssignTeam';
+import BatchMonitoring from './Pages/App/College/ProjectMangement/BatchMonitoring';
 import CandidateManagementPortal_old from './Pages/App/College/CandidateManagementPortal/CandidateManagementPortal_copy';
 import AddCoursecopy from './Pages/App/College/Course/AddCoursecopy';
 import Registrations from './Pages/App/College/Course/Registrations';
@@ -336,6 +337,7 @@ const Layout = () => {
           <Route path="new-training/courses" element={<NewTrainingCourses/>}/>
           <Route path="new-training/batches" element={<NewTrainingBatches/>}/>
           <Route path="new-training/assign-team" element={<AssignTeam/>}/>
+          <Route path="new-training/batch-monitoring" element={<BatchMonitoring/>}/>
           <Route path="assign-team" element={<Navigate to="/institute/new-training/assign-team" replace />}/>
           <Route path='addcourse' element={<AddCoursecopy/>}/>
           <Route path='addcoursecopy' element={<Navigate to="/institute/addcourse" replace />}/>

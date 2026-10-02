@@ -833,6 +833,12 @@ function CollegeLayout({ children }) {
                   <span className="menu-title">Assign Team </span>
                 </Link>
               </li>
+              <li className={`nav-item ${location.pathname === '/institute/new-training/batch-monitoring' ? 'active' : ''}`}>
+                <Link to="/institute/new-training/batch-monitoring" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faClipboardList} />
+                  <span className="menu-title">Batch Monitoring</span>
+                </Link>
+              </li>
               <li className={`nav-item ${location.pathname === '/institute/training/senior-trainer' || location.pathname === '/institute/seniorTrainer' ? 'active' : ''}`}>
                 <Link to="/institute/training/senior-trainer" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faCalendarAlt} />

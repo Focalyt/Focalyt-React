@@ -32,15 +32,6 @@ const centersLabel = (course) => {
   return names.length ? names.join(', ') : '—';
 };
 
-const sessionLabel = (session) => {
-  const parts = [
-    session.unitNumber ? `Unit ${session.unitNumber}${session.unitName ? ` - ${session.unitName}` : ''}` : session.unitName,
-    session.chapterNumber ? `Ch. ${session.chapterNumber}${session.chapterName ? ` - ${session.chapterName}` : ''}` : session.chapterName,
-    session.title || 'Untitled session',
-  ].filter(Boolean);
-  return parts.join(' › ');
-};
-
 const NewTrainingCourses = () => {
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
   const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
@@ -69,12 +60,12 @@ const NewTrainingCourses = () => {
   // Assign Course = refer selected sessions of the course to a senior trainer
   const [referCourse, setReferCourse] = useState(null);
   const [referSessions, setReferSessions] = useState([]);
-  const [selectedSessionIds, setSelectedSessionIds] = useState([]);
   const [referSessionsLoading, setReferSessionsLoading] = useState(false);
   const [seniorTrainers, setSeniorTrainers] = useState([]);
+  const [fieldTrainers, setFieldTrainers] = useState([]);
   const [trainersLoading, setTrainersLoading] = useState(false);
-  const [selectedTrainerId, setSelectedTrainerId] = useState('');
-  const [trainerQuery, setTrainerQuery] = useState('');
+  const [selectedTrainerIds, setSelectedTrainerIds] = useState([]);
+  const [selectedFieldTrainerIds, setSelectedFieldTrainerIds] = useState([]);
   const [referSaving, setReferSaving] = useState(false);
   const [referMessage, setReferMessage] = useState('');
 
@@ -300,51 +291,52 @@ const NewTrainingCourses = () => {
   const openAssignCourse = async (course) => {
     setReferMessage('');
     setReferCourse(course);
-    setSelectedTrainerId('');
-    setTrainerQuery('');
+    setSelectedTrainerIds([]);
+    setSelectedFieldTrainerIds([]);
     setReferSessions([]);
-    setSelectedSessionIds([]);
     setSeniorTrainers([]);
+    setFieldTrainers([]);
     setReferSessionsLoading(true);
     setTrainersLoading(true);
 
     try {
-      const [sessionsRes, trainersRes] = await Promise.all([
+      const [sessionsRes, seniorRes, trainerRes] = await Promise.all([
         axios.get(`${backendUrl}/college/session-plans`, {
           headers: { 'x-auth': token },
           params: { course: course._id },
         }),
         axios.get(`${backendUrl}/college/users/training-role-users`, {
           headers: { 'x-auth': token },
-          params: { roleType: 'senior' },
+          params: { roleType: 'senior', status: 'active' },
+        }),
+        axios.get(`${backendUrl}/college/users/training-role-users`, {
+          headers: { 'x-auth': token },
+          params: { roleType: 'trainer', status: 'active' },
         }),
       ]);
 
       // Only Scheduled sessions are still waiting to be referred
       const sessions = (sessionsRes.data?.data || [])
         .filter((session) => (session.workflowStatus || 'Scheduled') === 'Scheduled')
-        .map((session) => ({
-          id: String(session._id || session.id),
-          title: session.title || 'Untitled session',
-          unitNumber: session.unitNumber || '',
-          unitName: session.unitName || '',
-          chapterNumber: session.chapterNumber || '',
-          chapterName: session.chapterName || '',
-        }));
+        .map((session) => ({ id: String(session._id || session.id) }));
       setReferSessions(sessions);
-      setSelectedSessionIds(sessions.map((session) => session.id)); // default: all selected
 
-      const trainers = (trainersRes.data?.data || [])
-        .filter((user) => user._id)
-        .map((user) => ({
-          id: String(user._id),
-          name: user.name || user.email || 'Senior Trainer',
-          email: user.email || '',
-        }));
-      setSeniorTrainers(trainers);
+      const toPerson = (user, fallback) => ({
+        id: String(user._id),
+        name: user.name || user.email || fallback,
+        email: user.email || '',
+      });
+      const seniors = (seniorRes.data?.data || []).filter((user) => user._id).map((user) => toPerson(user, 'Senior Trainer'));
+      const seniorIds = new Set(seniors.map((person) => person.id));
+      setSeniorTrainers(seniors);
+      setFieldTrainers(
+        (trainerRes.data?.data || [])
+          .filter((user) => user._id && !seniorIds.has(String(user._id)))
+          .map((user) => toPerson(user, 'Trainer'))
+      );
     } catch (error) {
       console.error('Error opening assign course:', error);
-      setReferMessage(error?.response?.data?.message || 'Could not load sessions or trainers.');
+      setReferMessage('Could not load trainers.');
     } finally {
       setReferSessionsLoading(false);
       setTrainersLoading(false);
@@ -356,31 +348,18 @@ const NewTrainingCourses = () => {
     setReferMessage('');
   };
 
-  const toggleSession = (sessionId) => {
-    setSelectedSessionIds((prev) => (
-      prev.includes(sessionId) ? prev.filter((id) => id !== sessionId) : [...prev, sessionId]
-    ));
-  };
-
-  const toggleAllSessions = () => {
-    setSelectedSessionIds((prev) => (
-      prev.length === referSessions.length ? [] : referSessions.map((session) => session.id)
+  const togglePerson = (setter, personId) => {
+    setter((prev) => (
+      prev.includes(personId) ? prev.filter((id) => id !== personId) : [...prev, personId]
     ));
   };
 
   const saveAssignCourse = async () => {
-    if (referSessions.length === 0) {
-      setReferMessage('No scheduled sessions found for this course.');
-      return;
-    }
-    const sessionsToRefer = referSessions.filter((session) => selectedSessionIds.includes(session.id));
-    if (sessionsToRefer.length === 0) {
-      setReferMessage('Select at least one session.');
-      return;
-    }
-    const trainer = seniorTrainers.find((t) => t.id === selectedTrainerId);
-    if (!trainer) {
-      setReferMessage('Select a senior trainer.');
+    const sessionsToRefer = referSessions;
+    const chosenSeniors = seniorTrainers.filter((trainer) => selectedTrainerIds.includes(trainer.id));
+    const chosenTrainers = fieldTrainers.filter((trainer) => selectedFieldTrainerIds.includes(trainer.id));
+    if (chosenSeniors.length === 0 && chosenTrainers.length === 0) {
+      setReferMessage('Select a senior trainer or a trainer.');
       return;
     }
 
@@ -388,9 +367,11 @@ const NewTrainingCourses = () => {
     setReferMessage('');
     try {
       const payload = {
-        workflowStatus: 'Sent to Senior Trainer',
-        seniorTrainerId: trainer.id,
-        seniorTrainerName: trainer.name,
+        workflowStatus: chosenTrainers.length ? 'Assigned' : 'Sent to Senior Trainer',
+        seniorTrainerId: chosenSeniors[0]?.id || '',
+        seniorTrainerName: chosenSeniors.map((trainer) => trainer.name).join(', '),
+        fieldTrainerId: chosenTrainers[0]?.id || '',
+        fieldTrainerName: chosenTrainers.map((trainer) => trainer.name).join(', '),
       };
       const results = await Promise.allSettled(
         sessionsToRefer.map((session) =>
@@ -408,17 +389,14 @@ const NewTrainingCourses = () => {
       const failed = failedIndexes.length;
       const succeeded = sessionsToRefer.length - failed;
 
-      if (succeeded === 0) {
-        setReferMessage('Could not refer any selected sessions.');
+      if (sessionsToRefer.length > 0 && succeeded === 0) {
+        setReferMessage('Could not assign.');
         return;
       }
       if (failed > 0) {
         const failedIds = new Set(failedIndexes.map((index) => sessionsToRefer[index].id));
-        setReferSessions((prev) => prev.filter((session) => (
-          !selectedSessionIds.includes(session.id) || failedIds.has(session.id)
-        )));
-        setSelectedSessionIds([...failedIds]);
-        setReferMessage(`Referred ${succeeded} session(s); ${failed} failed. Try again for the rest.`);
+        setReferSessions((prev) => prev.filter((session) => failedIds.has(session.id)));
+        setReferMessage('Some assignments failed. Try again.');
         return;
       }
       closeAssignCourse();
@@ -428,15 +406,6 @@ const NewTrainingCourses = () => {
       setReferSaving(false);
     }
   };
-
-  const filteredTrainers = seniorTrainers.filter((trainer) => {
-    const q = trainerQuery.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      (trainer.name || '').toLowerCase().includes(q)
-      || (trainer.email || '').toLowerCase().includes(q)
-    );
-  });
 
   if (selectedCourse) {
     return (
@@ -521,23 +490,23 @@ const NewTrainingCourses = () => {
                       </span>
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
-                      <div className="vt-actions" style={{ flexWrap: 'wrap' }}>
-                        <button type="button" className="vt-action-text" onClick={() => openAssignProject(course)}>
-                          Assign Project
+                      <div className="vt-actions">
+                        <button type="button" title="Assign Project" onClick={() => openAssignProject(course)}>
+                          <i className="bi bi-folder2"></i>
                         </button>
-                        <button type="button" className="vt-action-text" onClick={() => openAssignCenter(course)}>
-                          Assign Center
+                        <button type="button" title="Assign Center" onClick={() => openAssignCenter(course)}>
+                          <i className="bi bi-building"></i>
                         </button>
-                        <button type="button" className="vt-action-text" onClick={() => openAssignCourse(course)}>
-                          Assign Course
+                        <button type="button" title="Assign Trainer" onClick={() => openAssignCourse(course)}>
+                          <i className="bi bi-people"></i>
                         </button>
                         <button
                           type="button"
-                          className="vt-action-text"
+                          title="Copy"
                           disabled={copyingId === course._id}
                           onClick={() => copyCourse(course)}
                         >
-                          {copyingId === course._id ? 'Copying...' : 'Copy'}
+                          <i className={`bi ${copyingId === course._id ? 'bi-hourglass-split' : 'bi-files'}`}></i>
                         </button>
                       </div>
                     </td>
@@ -646,86 +615,77 @@ const NewTrainingCourses = () => {
 
       {referCourse && (
         <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-dialog-centered">
+          <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable" style={{ maxWidth: 860 }}>
             <div className="modal-content">
               <div className="modal-header text-white" style={{ backgroundColor: '#fc2b5a' }}>
-                <h5 className="modal-title">Assign Course — {referCourse.name}</h5>
+                <h5 className="modal-title">Assign Trainer — {referCourse.name}</h5>
                 <button type="button" className="btn-close btn-close-white" onClick={closeAssignCourse}></button>
               </div>
               <div className="modal-body">
-                <p className="text-muted mb-3">
-                  Select one or more scheduled sessions, then choose a senior trainer.
-                </p>
-
-                <label className="form-label fw-semibold">Sessions</label>
-                {referSessionsLoading ? (
-                  <p>Loading sessions...</p>
-                ) : referSessions.length === 0 ? (
-                  <p className="text-muted mb-3">No scheduled sessions found for this course.</p>
-                ) : (
-                  <div className="mb-3">
-                    <label className="d-flex align-items-center gap-2 mb-2 fw-semibold">
-                      <input
-                        type="checkbox"
-                        checked={selectedSessionIds.length === referSessions.length}
-                        onChange={toggleAllSessions}
-                      />
-                      <span>Select all ({selectedSessionIds.length}/{referSessions.length})</span>
-                    </label>
-                    <div className="d-flex flex-column gap-2 border rounded p-2" style={{ maxHeight: 180, overflow: 'auto' }}>
-                      {referSessions.map((session) => (
-                        <label key={session.id} className="d-flex align-items-start gap-2 mb-0">
-                          <input
-                            type="checkbox"
-                            className="mt-1"
-                            checked={selectedSessionIds.includes(session.id)}
-                            onChange={() => toggleSession(session.id)}
-                          />
-                          <span>{sessionLabel(session)}</span>
-                        </label>
-                      ))}
-                    </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div>
+                    <label className="form-label fw-semibold">Senior trainer</label>
+                    {trainersLoading ? (
+                      <p>Loading...</p>
+                    ) : seniorTrainers.length === 0 ? (
+                      <p className="text-muted mb-0">No senior trainers found.</p>
+                    ) : (
+                      <div className="d-flex flex-column gap-2" style={{ maxHeight: 280, overflow: 'auto' }}>
+                        {seniorTrainers.map((trainer) => (
+                          <label
+                            key={trainer.id}
+                            className="d-flex align-items-center gap-2 mb-0 p-2 rounded"
+                            style={{
+                              background: selectedTrainerIds.includes(trainer.id) ? '#fff1f4' : 'transparent',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedTrainerIds.includes(trainer.id)}
+                              onChange={() => togglePerson(setSelectedTrainerIds, trainer.id)}
+                            />
+                            <span>
+                              <span className="d-block fw-semibold">{trainer.name}</span>
+                              <span className="text-muted" style={{ fontSize: 12 }}>{trainer.email}</span>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-
-                <label className="form-label fw-semibold">Senior trainer</label>
-                <input
-                  className="form-control mb-2"
-                  placeholder="Search senior trainers..."
-                  value={trainerQuery}
-                  onChange={(e) => setTrainerQuery(e.target.value)}
-                />
-                {trainersLoading ? (
-                  <p>Loading senior trainers...</p>
-                ) : filteredTrainers.length === 0 ? (
-                  <p className="text-muted mb-0">
-                    No senior trainers found. Tick <strong>Senior Trainer</strong> on a user in User Management.
-                  </p>
-                ) : (
-                  <div className="d-flex flex-column gap-2" style={{ maxHeight: 220, overflow: 'auto' }}>
-                    {filteredTrainers.map((trainer) => (
-                      <label
-                        key={trainer.id}
-                        className="d-flex align-items-center gap-2 mb-0 p-2 rounded"
-                        style={{
-                          background: selectedTrainerId === trainer.id ? '#fff1f4' : 'transparent',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <input
-                          type="radio"
-                          name="seniorTrainer"
-                          checked={selectedTrainerId === trainer.id}
-                          onChange={() => setSelectedTrainerId(trainer.id)}
-                        />
-                        <span>
-                          <span className="d-block fw-semibold">{trainer.name}</span>
-                          <span className="text-muted" style={{ fontSize: 12 }}>{trainer.email}</span>
-                        </span>
-                      </label>
-                    ))}
+                  <div>
+                    <label className="form-label fw-semibold">Trainer</label>
+                    {trainersLoading ? (
+                      <p>Loading...</p>
+                    ) : fieldTrainers.length === 0 ? (
+                      <p className="text-muted mb-0">No trainers found.</p>
+                    ) : (
+                      <div className="d-flex flex-column gap-2" style={{ maxHeight: 280, overflow: 'auto' }}>
+                        {fieldTrainers.map((trainer) => (
+                          <label
+                            key={trainer.id}
+                            className="d-flex align-items-center gap-2 mb-0 p-2 rounded"
+                            style={{
+                              background: selectedFieldTrainerIds.includes(trainer.id) ? '#fff1f4' : 'transparent',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedFieldTrainerIds.includes(trainer.id)}
+                              onChange={() => togglePerson(setSelectedFieldTrainerIds, trainer.id)}
+                            />
+                            <span>
+                              <span className="d-block fw-semibold">{trainer.name}</span>
+                              <span className="text-muted" style={{ fontSize: 12 }}>{trainer.email}</span>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
 
                 {referMessage && <p className="text-danger mt-3 mb-0">{referMessage}</p>}
               </div>
@@ -734,10 +694,10 @@ const NewTrainingCourses = () => {
                 <button
                   type="button"
                   className="btn btn-danger"
-                  disabled={referSaving || referSessionsLoading || trainersLoading || selectedSessionIds.length === 0 || !selectedTrainerId}
+                  disabled={referSaving || referSessionsLoading || trainersLoading || (selectedTrainerIds.length === 0 && selectedFieldTrainerIds.length === 0)}
                   onClick={saveAssignCourse}
                 >
-                  {referSaving ? 'Sending...' : 'Assign Course'}
+                  {referSaving ? 'Sending...' : 'Assign Trainer'}
                 </button>
               </div>
             </div>
