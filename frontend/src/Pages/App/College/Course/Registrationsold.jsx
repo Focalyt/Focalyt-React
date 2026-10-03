@@ -69,6 +69,22 @@ const profileMatchesQuickSearch = (profile, query) => {
 
 const pickFirstNonEmpty = (...vals) => vals.find((v) => v != null && String(v).trim() !== '') || '';
 
+// Chip clicks (HOT, approval, follow-up, etc.) filter the lead list only.
+// Count cards stay on the current date/search/course set.
+const omitDashboardChipFilters = (filters = {}) => {
+  const next = { ...(filters || {}) };
+  delete next.leadStatus;
+  delete next.aiLeadStatus;
+  delete next.approvalStatus;
+  delete next.followupStatus;
+  delete next.hasFollowUpCall;
+  delete next.hasFollowUpVisit;
+  delete next.kyc;
+  delete next.kycBucket;
+  delete next.subStatuses;
+  return next;
+};
+
 const toHrFilterYmd = (value) => {
   if (!value) return undefined;
   const parsed = moment(value);
@@ -5115,6 +5131,7 @@ console.log('API Response:', response.data);
   const fetchDashboardCounts = async (filters = filterData, cycleOverride = null) => {
     if (!token) return;
     try {
+      filters = omitDashboardChipFilters(filters);
       const cycle = cycleOverride || cycleFilters;
       if (showAppliedJobsRef.current) {
         const hrCountRes = await axios.get(`${backendUrl}/college/hr/leads/counts`, {
@@ -5937,6 +5954,7 @@ console.log('API Response:', response.data);
       return;
     }
 
+    filters = omitDashboardChipFilters(filters);
     const cycle = cycleOverride || cycleFilters;
     const fd = formDataRef.current || formData;
 
@@ -17451,7 +17469,7 @@ useEffect(() => {
                             borderRadius: "4px",
                             backgroundColor: "#fff",
                             overflow: "hidden",
-                            width: "200px",
+                            width: "228px",
                             height: "32px",
                             boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
                           }}>
@@ -17535,6 +17553,35 @@ useEffect(() => {
                                 cursor: "default"
                               }}
                             />
+                            <button
+                              type="button"
+                              aria-label="Close input"
+                              title="Close"
+                              onClick={() => {
+                                if (bulkMode === 'AiCall') {
+                                  closeAiCallBulk();
+                                  return;
+                                }
+                                setShowBulkInputs(false);
+                                setBulkMode(null);
+                                setInput1Value('');
+                                setSelectedProfiles([]);
+                                if (showPanel === 'bulkstatuschange' || showPanel === 'RefferAllLeads') {
+                                  closePanel();
+                                }
+                              }}
+                              style={{
+                                border: "none",
+                                borderLeft: "1px solid #dee2e6",
+                                background: "transparent",
+                                width: "28px",
+                                color: "#6c757d",
+                                cursor: "pointer",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <i className="fas fa-times" aria-hidden="true"></i>
+                            </button>
                           </div>
                           {bulkMode === 'AiCall' && (
                             <>
@@ -17551,15 +17598,6 @@ useEffect(() => {
                                 }}
                               >
                                 {aiFabBusy ? 'Queuing...' : 'Call AI'}
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-outline-secondary"
-                                onClick={closeAiCallBulk}
-                                title="Cancel AI call"
-                                style={{ padding: '6px 8px', fontSize: '11px' }}
-                              >
-                                <i className="fas fa-times"></i>
                               </button>
                             </>
                           )}

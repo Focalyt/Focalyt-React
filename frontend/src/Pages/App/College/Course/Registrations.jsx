@@ -74,6 +74,22 @@ const profileMatchesQuickSearch = (profile, query) => {
 
 const pickFirstNonEmpty = (...vals) => vals.find((v) => v != null && String(v).trim() !== '') || '';
 
+// Chip clicks (HOT, approval, follow-up, etc.) filter the lead list only.
+// Count cards stay on the current date/search/course set.
+const omitDashboardChipFilters = (filters = {}) => {
+  const next = { ...(filters || {}) };
+  delete next.leadStatus;
+  delete next.aiLeadStatus;
+  delete next.approvalStatus;
+  delete next.followupStatus;
+  delete next.hasFollowUpCall;
+  delete next.hasFollowUpVisit;
+  delete next.kyc;
+  delete next.kycBucket;
+  delete next.subStatuses;
+  return next;
+};
+
 const MultiSelectCheckbox = ({
   title,
   options,
@@ -3194,6 +3210,7 @@ const CRMDashboard = () => {
   const fetchMilestoneCounts = useCallback(async (filters = filterDataRef.current || {}) => {
     if (!token) return;
     try {
+      filters = omitDashboardChipFilters(filters);
       const fd = formDataRef.current || formData;
       const queryParams = new URLSearchParams({
         page: '1',
@@ -4684,6 +4701,7 @@ console.log('API Response:', response.data);
   const fetchDashboardCounts = async (filters = filterData, cycleOverride = null) => {
     if (!token) return;
     try {
+      filters = omitDashboardChipFilters(filters);
       const cycle = cycleOverride || cycleFilters;
       const listParts = buildListFilterQueryParts(formDataRef.current || formData, cycle);
       const sharedFilterParts = {
@@ -5340,6 +5358,7 @@ console.log('API Response:', response.data);
       return;
     }
 
+    filters = omitDashboardChipFilters(filters);
     const cycle = cycleOverride || cycleFilters;
     const fd = formDataRef.current || formData;
 
