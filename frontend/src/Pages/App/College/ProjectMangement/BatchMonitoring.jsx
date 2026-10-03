@@ -1734,6 +1734,7 @@ const BatchMonitoring = () => {
             </div>
           </div>
 
+          {card.sideTitle !== 'Training' && (
           <div className="lead-strip-v3__panel lead-strip-v3__panel--kyc">
             <div className="lead-card-kyc-dash">
               <div className="lead-strip-v3__panel-head lead-strip-v3__panel-head--actions">
@@ -1811,6 +1812,7 @@ const BatchMonitoring = () => {
               )}
             </div>
           </div>
+          )}
         </div>
         {isOpen && (
           <div className="bm-card-open">
@@ -2509,81 +2511,77 @@ const BatchMonitoring = () => {
             </div>
           )}
 
-          <div className="row g-2 mt-1 mb-2 align-items-stretch b2b-followup-scroll-row">
-            <div className="col-12 col-lg-3 b2b-followup-scroll-col">
-              <div className="b2b-dash-section h-100">
-                <span className="b2b-dash-section__label">Followup Calling</span>
-                <div className="d-flex flex-wrap gap-1 pt-1">
-                  {[
-                    { key: 'done', label: 'Done', value: followupCounts.call.done, bg: '#12b3ff' },
-                    { key: 'planned', label: 'Planned', value: followupCounts.call.planned, bg: '#f59e0b' },
-                    { key: 'missed', label: 'Missed', value: followupCounts.call.missed, bg: '#7c3d14' },
-                  ].map((row) => (
-                    <button
-                      key={row.key}
-                      type="button"
-                      className={`b2b-dash-stat-card text-center text-white flex-grow-1 border-0${followupCallFilter === row.key ? ' b2b-dash-stat-card--active' : ''}`}
-                      style={{ background: row.bg }}
-                      onClick={() => setFollowupCallFilter(followupCallFilter === row.key ? '' : row.key)}
-                    >
-                      <div className="b2b-dash-stat-card__label">{row.label}</div>
-                      <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
-                      <div className="b2b-dash-stat-card__value text-white">{padCount(row.value)}</div>
-                    </button>
-                  ))}
-                </div>
+          <div className="d-flex flex-column align-items-start gap-3 mt-3 mb-2">
+            <div className="d-flex flex-wrap align-items-start gap-3">
+            <div className="b2b-dash-section">
+              <span className="b2b-dash-section__label">Followup Calling</span>
+              <div className="d-flex flex-wrap gap-2 pt-1">
+                {[
+                  { key: 'done', label: 'Done', value: followupCounts.call.done, bg: '#12b3ff' },
+                  { key: 'planned', label: 'Planned', value: followupCounts.call.planned, bg: '#f59e0b' },
+                  { key: 'missed', label: 'Missed', value: followupCounts.call.missed, bg: '#7c3d14' },
+                ].map((row) => (
+                  <button
+                    key={row.key}
+                    type="button"
+                    className={`b2b-dash-stat-card text-center text-white border-0${followupCallFilter === row.key ? ' b2b-dash-stat-card--active' : ''}`}
+                    style={{ background: row.bg, width: 108, flex: '0 0 108px' }}
+                    onClick={() => setFollowupCallFilter(followupCallFilter === row.key ? '' : row.key)}
+                  >
+                    <div className="b2b-dash-stat-card__label">{row.label}</div>
+                    <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                    <div className="b2b-dash-stat-card__value text-white">{padCount(row.value)}</div>
+                  </button>
+                ))}
               </div>
             </div>
 
-            <div className="col-12 col-lg-3 b2b-followup-scroll-col">
-              <div className="b2b-dash-section h-100">
-                <span className="b2b-dash-section__label">Followup Visit</span>
-                <div className="d-flex flex-wrap gap-1 pt-1">
-                  {[
-                    { key: 'done', label: 'Done', value: followupCounts.visit.done, bg: '#4b5563' },
-                    { key: 'planned', label: 'Planned', value: followupCounts.visit.planned, bg: '#4b5563' },
-                    { key: 'missed', label: 'Missed', value: followupCounts.visit.missed, bg: '#7c3d14' },
-                  ].map((row) => (
-                    <button
-                      key={row.key}
-                      type="button"
-                      className={`b2b-dash-stat-card text-center text-white flex-grow-1 border-0${followupVisitFilter === row.key ? ' b2b-dash-stat-card--active' : ''}`}
-                      style={{ background: row.bg }}
-                      onClick={() => setFollowupVisitFilter(followupVisitFilter === row.key ? '' : row.key)}
-                    >
-                      <div className="b2b-dash-stat-card__label">{row.label}</div>
-                      <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
-                      <div className="b2b-dash-stat-card__value text-white">{padCount(row.value)}</div>
-                    </button>
-                  ))}
-                </div>
+            <div className="b2b-dash-section">
+              <span className="b2b-dash-section__label">Followup Visit</span>
+              <div className="d-flex flex-wrap gap-2 pt-1">
+                {[
+                  { key: 'done', label: 'Done', value: followupCounts.visit.done, bg: '#4b5563' },
+                  { key: 'planned', label: 'Planned', value: followupCounts.visit.planned, bg: '#4b5563' },
+                  { key: 'missed', label: 'Missed', value: followupCounts.visit.missed, bg: '#7c3d14' },
+                ].map((row) => (
+                  <button
+                    key={row.key}
+                    type="button"
+                    className={`b2b-dash-stat-card text-center text-white border-0${followupVisitFilter === row.key ? ' b2b-dash-stat-card--active' : ''}`}
+                    style={{ background: row.bg, width: 108, flex: '0 0 108px' }}
+                    onClick={() => setFollowupVisitFilter(followupVisitFilter === row.key ? '' : row.key)}
+                  >
+                    <div className="b2b-dash-stat-card__label">{row.label}</div>
+                    <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                    <div className="b2b-dash-stat-card__value text-white">{padCount(row.value)}</div>
+                  </button>
+                ))}
               </div>
             </div>
+            </div>
 
-            <div className="col-12 col-lg-6 b2b-followup-scroll-col">
-              <div className="b2b-dash-section h-100">
-                <span className="b2b-dash-section__label">Training Milestones</span>
-                <div className="d-flex flex-wrap gap-1 pt-1">
-                  {[
-                    { key: 'started', label: 'Batch Started', value: milestoneCounts.batchStarted, bg: '#059669' },
-                    { key: 'half', label: '50% Training', value: milestoneCounts.training50, bg: '#0ea5e9' },
-                    { key: 'assessment', label: 'Assessment', value: milestoneCounts.assessment, bg: '#6366f1' },
-                    { key: 'certified', label: 'Certified', value: milestoneCounts.certified, bg: '#10b981' },
-                    { key: 'completed', label: 'Completed', value: milestoneCounts.completed, bg: '#5b4fc9' },
-                  ].map((row) => (
-                    <button
-                      key={row.key}
-                      type="button"
-                      className={`b2b-dash-stat-card text-center text-white flex-grow-1 border-0${milestoneFilter === row.key ? ' b2b-dash-stat-card--active' : ''}`}
-                      style={{ background: row.bg }}
-                      onClick={() => setMilestoneFilter(milestoneFilter === row.key ? '' : row.key)}
-                    >
-                      <div className="b2b-dash-stat-card__label">{row.label}</div>
-                      <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
-                      <div className="b2b-dash-stat-card__value text-white">{padCount(row.value)}</div>
-                    </button>
-                  ))}
-                </div>
+            <div className="b2b-dash-section">
+              <span className="b2b-dash-section__label">Milestone</span>
+              <div className="d-flex flex-wrap gap-2 pt-1">
+              {[
+                { key: 'started', label: 'Batch Started', value: milestoneCounts.batchStarted, bg: '#059669' },
+                { key: 'half', label: '50% Training', value: milestoneCounts.training50, bg: '#0ea5e9' },
+                { key: 'assessment', label: 'Assessment', value: milestoneCounts.assessment, bg: '#6366f1' },
+                { key: 'certified', label: 'Certified', value: milestoneCounts.certified, bg: '#10b981' },
+                { key: 'completed', label: 'Completed', value: milestoneCounts.completed, bg: '#5b4fc9' },
+              ].map((row) => (
+                <button
+                  key={row.key}
+                  type="button"
+                  className={`b2b-dash-stat-card text-center text-white border-0${milestoneFilter === row.key ? ' b2b-dash-stat-card--active' : ''}`}
+                  style={{ background: row.bg, width: 108, flex: '0 0 108px' }}
+                  onClick={() => setMilestoneFilter(milestoneFilter === row.key ? '' : row.key)}
+                >
+                  <div className="b2b-dash-stat-card__label">{row.label}</div>
+                  <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
+                  <div className="b2b-dash-stat-card__value text-white">{padCount(row.value)}</div>
+                </button>
+              ))}
               </div>
             </div>
           </div>
