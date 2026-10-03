@@ -135,6 +135,28 @@ const updateSessionApi = async (token, sessionId, payload) => {
   return res.data.data;
 };
 
+const patchSessionApi = async (token, sessionId, payload) => {
+  const res = await axios.patch(`${BACKEND_URL}/college/session-plans/${sessionId}`, payload, {
+    headers: authHeaders(token),
+  });
+  if (!res.data?.status) throw new Error(res.data?.message || "Failed to refer session");
+  return res.data.data;
+};
+
+const fetchRoleTrainersApi = async (token, roleType) => {
+  const res = await axios.get(`${BACKEND_URL}/college/users/training-role-users`, {
+    headers: authHeaders(token),
+    params: { roleType, status: "active" },
+  });
+  const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+  return rows
+    .filter((row) => row._id)
+    .map((row) => ({
+      id: String(row._id),
+      name: row.name || row.email || "Trainer",
+    }));
+};
+
 const deleteSessionApi = async (token, sessionId) => {
   const res = await axios.delete(`${BACKEND_URL}/college/session-plans/${sessionId}`, {
     headers: authHeaders(token),
@@ -198,7 +220,11 @@ const mapApiSessionToUi = (api = {}) => {
     },
     notes: api.notes || "",
     fieldTrainer: api.fieldTrainerName || null,
+    fieldTrainerId: api.fieldTrainerId || "",
     totTrainer: api.totTrainerName || null,
+    totTrainerId: api.totTrainerId || "",
+    seniorTrainer: api.seniorTrainerName || null,
+    seniorTrainerId: api.seniorTrainerId || "",
     totTopic: api.totTopicCovered || "",
     totMethod: api.totTrainingMethod || "",
     totUseSameTopic: api.totUseSameTopics !== false,
@@ -285,6 +311,8 @@ export default function AcademicCoordinatorMockup() {
   const [createStep, setCreateStep] = useState(0);
   const [editingSession, setEditingSession] = useState(null);
   const [savingSession, setSavingSession] = useState(false);
+  const [referOpen, setReferOpen] = useState(false);
+  const [referSaving, setReferSaving] = useState(false);
   const [activityTypes, setActivityTypes] = useState([]);
   const [typesLoading, setTypesLoading] = useState(true);
   const [courses, setCourses] = useState([]);
@@ -501,6 +529,35 @@ export default function AcademicCoordinatorMockup() {
     }
   }
 
+  async function referSession(trainer) {
+    const token = getAuthToken();
+    if (!token || !selected?.id) {
+      setToast({ type: "error", message: "Select a session first" });
+      return;
+    }
+    if (!trainer?.id) {
+      setToast({ type: "error", message: "Select a trainer" });
+      return;
+    }
+    setReferSaving(true);
+    try {
+      const saved = await patchSessionApi(token, selected.id, {
+        seniorTrainerId: trainer.id,
+        seniorTrainerName: trainer.name,
+        workflowStatus: "Sent to Senior Trainer",
+      });
+      const mapped = mapApiSessionToUi(saved);
+      setSessions((prev) => prev.map((item) => (item.id === mapped.id ? mapped : item)));
+      setReferOpen(false);
+      setToast({ type: "success", message: `Session referred to ${trainer.name}` });
+    } catch (err) {
+      console.error("Failed to refer session", err);
+      setToast({ type: "error", message: err.response?.data?.message || err.message || "Failed to refer session" });
+    } finally {
+      setReferSaving(false);
+    }
+  }
+
   async function deleteSession(id) {
     const token = getAuthToken();
     if (!token) {
@@ -580,6 +637,7 @@ export default function AcademicCoordinatorMockup() {
           onNewPlan={() => openCreate(null)}
           onEdit={() => openCreate(selected)}
           onDelete={() => deleteSession(selected.id)}
+          onRefer={() => setReferOpen(true)}
           onManageActivities={() => {
             if (!selectedCourseId) {
               setToast({ type: "error", message: "No course available" });
@@ -614,6 +672,15 @@ export default function AcademicCoordinatorMockup() {
         />
       )}
 
+      {referOpen && selected && (
+        <ReferSessionModal
+          session={selected}
+          saving={referSaving}
+          onClose={() => { if (!referSaving) setReferOpen(false); }}
+          onConfirm={referSession}
+        />
+      )}
+
       <Toast toast={toast} />
     </div>
   );
@@ -626,7 +693,7 @@ function Workspace(props) {
   const {
     display, distribution, search, setSearch, grouped,
     selectedId, setSelectedId, selected, activityTypes, onNewPlan, onEdit,
-    onDelete, onManageActivities,
+    onDelete, onRefer, onManageActivities,
   } = props;
 
   return (
@@ -697,6 +764,7 @@ function Workspace(props) {
           session={selected}
           onEdit={onEdit}
           onDelete={onDelete}
+          onRefer={onRefer}
           activityTypes={activityTypes}
         />
       </div>
@@ -785,7 +853,88 @@ function TocPanel({ display, grouped, selectedId, setSelectedId, onCreateFirst, 
   );
 }
 
-function DetailPanel({ display, session, onEdit, onDelete, activityTypes }) {
+function ReferSessionModal({ session, saving, onClose, onConfirm }) {
+  const [trainerId, setTrainerId] = useState(session.seniorTrainerId || "");
+  const [trainers, setTrainers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const chosen = trainers.find((item) => item.id === trainerId);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const token = getAuthToken();
+      if (!token) return;
+      setLoading(true);
+      try {
+        const rows = await fetchRoleTrainersApi(token, "trainer");
+        if (cancelled) return;
+        setTrainers(rows);
+        setTrainerId((current) => (
+          rows.some((item) => item.id === current) ? current : (session.seniorTrainerId || "")
+        ));
+      } catch (err) {
+        console.error("Failed to load trainers", err);
+        if (!cancelled) setTrainers([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [session.seniorTrainerId]);
+
+  return (
+    <ModalShell onClose={onClose} width={480}>
+      <div style={{ padding: "18px 20px", borderBottom: `1px solid ${T.line}` }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: T.coral, textTransform: "uppercase" }}>Refer session</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: T.ink, marginTop: 4 }}>
+          {session.number ? `Session ${session.number}` : "Session"} · {session.name || "Untitled session"}
+        </div>
+        {(session.unit || session.chapter) && (
+          <div style={{ fontSize: 12, color: T.mute, marginTop: 4 }}>
+            {[session.unit, session.chapter].filter(Boolean).join("  ›  ")}
+          </div>
+        )}
+      </div>
+      <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+        <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, fontWeight: 700, color: T.mute }}>
+          Trainer
+          <select
+            className="ac-input"
+            value={trainerId}
+            disabled={loading}
+            onChange={(e) => setTrainerId(e.target.value)}
+          >
+            <option value="">{loading ? "Loading trainers..." : "Select trainer"}</option>
+            {trainers.map((item) => (
+              <option key={item.id} value={item.id}>{item.name}</option>
+            ))}
+          </select>
+        </label>
+        <div style={{ background: T.page, borderRadius: 12, padding: "10px 12px", fontSize: 13, color: T.ink }}>
+          {chosen
+            ? <>Referring <strong>{session.name || "this session"}</strong> to <strong>{chosen.name}</strong>.</>
+            : "Choose a trainer to refer this session."}
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 8, padding: 16, borderTop: `1px solid ${T.line}` }}>
+        <button type="button" onClick={onClose} disabled={saving} style={{ flex: 1, height: 40, borderRadius: 12, border: `1px solid ${T.line}`, background: "#fff", fontWeight: 600, cursor: "pointer" }}>
+          Cancel
+        </button>
+        <button
+          type="button"
+          disabled={saving || !chosen}
+          onClick={() => onConfirm(chosen)}
+          style={{ flex: 1, height: 40, borderRadius: 12, border: "none", background: chosen ? T.coral : T.page, color: chosen ? "#fff" : T.mute, fontWeight: 700, cursor: chosen ? "pointer" : "not-allowed" }}
+        >
+          {saving ? "Referring..." : "Refer session"}
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+function DetailPanel({ display, session, onEdit, onDelete, onRefer, activityTypes }) {
   if (!session) {
     return (
       <div style={{ background: "#fff", border: `1px solid ${T.line}`, borderRadius: 16, padding: 30, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 260, textAlign: "center" }}>
@@ -866,31 +1015,20 @@ function DetailPanel({ display, session, onEdit, onDelete, activityTypes }) {
           </div>
         )}
 
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: T.mute, marginBottom: 8, textTransform: "uppercase" }}>Trainers</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-              <span style={{ width: 26, height: 26, borderRadius: 999, background: T.skyTint, color: T.sky, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700 }}>
-                {session.fieldTrainer ? session.fieldTrainer[0] : "?"}
-              </span>
-              {session.fieldTrainer ? (
-                <span>{session.fieldTrainer} <span style={{ color: T.mute }}>· Field trainer</span></span>
-              ) : (
-                <span style={{ color: T.mute, fontStyle: "italic" }}>Waiting for Senior Trainer</span>
-              )}
-            </div>
-            {session.tot && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                <span style={{ width: 26, height: 26, borderRadius: 999, background: T.mintTint, color: T.mint, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700 }}>
-                  {session.totTrainer ? session.totTrainer[0] : "?"}
-                </span>
-                {session.totTrainer ? (
-                  <span>{session.totTrainer} <span style={{ color: T.mute }}>· TOT trainer</span></span>
-                ) : (
-                  <span style={{ color: T.mute, fontStyle: "italic" }}>Waiting for Senior Trainer</span>
-                )}
+        <div style={{ marginBottom: 16, border: `1px solid ${T.line}`, borderRadius: 12, overflow: "hidden" }}>
+                   <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+            {[
+              { role: "Field trainer", name: session.fieldTrainer },
+              { role: "Senior trainer", name: session.seniorTrainer },
+              ...(session.tot ? [{ role: "TOT trainer", name: session.totTrainer }] : []),
+            ].map((row) => (
+              <div key={row.role} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13 }}>
+                <span style={{ color: T.mute }}>{row.role}</span>
+                <strong style={{ color: row.name ? T.ink : T.amber, textAlign: "right" }}>
+                  {row.name || "Not referred yet"}
+                </strong>
               </div>
-            )}
+            ))}
           </div>
         </div>
 
@@ -909,6 +1047,13 @@ function DetailPanel({ display, session, onEdit, onDelete, activityTypes }) {
         >
           Edit
         </button>
+        <button
+              type="button"
+              onClick={onRefer}
+              style={{ flexShrink: 0, height: 34, padding: "0 12px", borderRadius: 10, border: "none", background: T.coral, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+            >
+              Refer
+            </button>
         <button
           disabled={isAssigned}
           onClick={onDelete}
