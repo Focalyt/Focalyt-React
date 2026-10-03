@@ -97,6 +97,30 @@ const fetchSessionsApi = async (token, courseId) => {
   return Array.isArray(res.data?.data) ? res.data.data : [];
 };
 
+const fetchCourseBatchesApi = async (token, courseId) => {
+  const res = await axios.get(`${BACKEND_URL}/college/get_batches`, {
+    headers: authHeaders(token),
+    params: courseId ? { courseId } : {},
+  });
+  const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+  const seen = new Set();
+  return rows
+    .filter((row) => {
+      const id = row._id ? String(row._id) : "";
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    })
+    .map((row) => ({
+      id: String(row._id),
+      name: row.name || "Batch",
+      status: row.status || "",
+      startDate: row.startDate || "",
+      endDate: row.endDate || "",
+    }));
+};
+
+
 const COURSE_STRUCTURE_PATHS = {
   "unit-chapter-session": { unit: true, chapter: true, session: true, path: "unit-chapter-session", pathLabel: "Unit → Chapter → Session" },
   "unit-session": { unit: true, chapter: false, session: true, path: "unit-session", pathLabel: "Unit → Session" },
@@ -225,6 +249,9 @@ const mapApiSessionToUi = (api = {}) => {
     totTrainerId: api.totTrainerId || "",
     seniorTrainer: api.seniorTrainerName || null,
     seniorTrainerId: api.seniorTrainerId || "",
+    batch: api.batch ? String(api.batch) : "",
+    batchCode: api.batchCode || "",
+    courseName: api.courseName || api.courseTrade || "",
     totTopic: api.totTopicCovered || "",
     totMethod: api.totTrainingMethod || "",
     totUseSameTopic: api.totUseSameTopics !== false,
@@ -529,10 +556,14 @@ export default function AcademicCoordinatorMockup() {
     }
   }
 
-  async function referSession(trainer) {
+  async function referSession(trainer, batch) {
     const token = getAuthToken();
     if (!token || !selected?.id) {
       setToast({ type: "error", message: "Select a session first" });
+      return;
+    }
+    if (!batch?.id) {
+      setToast({ type: "error", message: "Select a batch" });
       return;
     }
     if (!trainer?.id) {
@@ -545,11 +576,13 @@ export default function AcademicCoordinatorMockup() {
         seniorTrainerId: trainer.id,
         seniorTrainerName: trainer.name,
         workflowStatus: "Sent to Senior Trainer",
+        batch: batch.id,
+        batchCode: batch.name,
       });
       const mapped = mapApiSessionToUi(saved);
       setSessions((prev) => prev.map((item) => (item.id === mapped.id ? mapped : item)));
       setReferOpen(false);
-      setToast({ type: "success", message: `Session referred to ${trainer.name}` });
+      setToast({ type: "success", message: `Session referred to ${trainer.name} for ${batch.name}` });
     } catch (err) {
       console.error("Failed to refer session", err);
       setToast({ type: "error", message: err.response?.data?.message || err.message || "Failed to refer session" });
@@ -675,6 +708,7 @@ export default function AcademicCoordinatorMockup() {
       {referOpen && selected && (
         <ReferSessionModal
           session={selected}
+          courseId={selectedCourseId}
           saving={referSaving}
           onClose={() => { if (!referSaving) setReferOpen(false); }}
           onConfirm={referSession}
@@ -853,11 +887,15 @@ function TocPanel({ display, grouped, selectedId, setSelectedId, onCreateFirst, 
   );
 }
 
-function ReferSessionModal({ session, saving, onClose, onConfirm }) {
+function ReferSessionModal({ session, courseId, saving, onClose, onConfirm }) {
   const [trainerId, setTrainerId] = useState(session.seniorTrainerId || "");
+  const [batchId, setBatchId] = useState(session.batch || "");
   const [trainers, setTrainers] = useState([]);
+  const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [batchesLoading, setBatchesLoading] = useState(false);
   const chosen = trainers.find((item) => item.id === trainerId);
+  const batch = batches.find((item) => item.id === batchId);
 
   useEffect(() => {
     let cancelled = false;
@@ -883,9 +921,33 @@ function ReferSessionModal({ session, saving, onClose, onConfirm }) {
     return () => { cancelled = true; };
   }, [session.seniorTrainerId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const token = getAuthToken();
+      if (!token || !courseId) return;
+      setBatchesLoading(true);
+      try {
+        const rows = await fetchCourseBatchesApi(token, courseId);
+        if (cancelled) return;
+        setBatches(rows);
+        setBatchId((current) => (
+          rows.some((item) => item.id === current) ? current : (session.batch || "")
+        ));
+      } catch (err) {
+        console.error("Failed to load batches", err);
+        if (!cancelled) setBatches([]);
+      } finally {
+        if (!cancelled) setBatchesLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [courseId, session.batch]);
+
   return (
     <ModalShell onClose={onClose} width={480}>
-      <div style={{ padding: "18px 20px", borderBottom: `1px solid ${T.line}` }}>
+      <div style={{ padding: "18px 20px", borderBottom: `1px solid ${T.line}`, flexShrink: 0 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: T.coral, textTransform: "uppercase" }}>Refer session</div>
         <div style={{ fontSize: 18, fontWeight: 700, color: T.ink, marginTop: 4 }}>
           {session.number ? `Session ${session.number}` : "Session"} · {session.name || "Untitled session"}
@@ -896,7 +958,21 @@ function ReferSessionModal({ session, saving, onClose, onConfirm }) {
           </div>
         )}
       </div>
-      <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+      <div className="ac-scroll" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14, overflow: "auto", flex: 1, minHeight: 0 }}>
+        <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, fontWeight: 700, color: T.mute }}>
+          Batch
+          <select
+            className="ac-input"
+            value={batchId}
+            disabled={batchesLoading}
+            onChange={(e) => setBatchId(e.target.value)}
+          >
+            <option value="">{batchesLoading ? "Loading batches..." : "Select batch"}</option>
+            {batches.map((item) => (
+              <option key={item.id} value={item.id}>{item.name}</option>
+            ))}
+          </select>
+        </label>
         <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, fontWeight: 700, color: T.mute }}>
           Trainer
           <select
@@ -912,20 +988,20 @@ function ReferSessionModal({ session, saving, onClose, onConfirm }) {
           </select>
         </label>
         <div style={{ background: T.page, borderRadius: 12, padding: "10px 12px", fontSize: 13, color: T.ink }}>
-          {chosen
-            ? <>Referring <strong>{session.name || "this session"}</strong> to <strong>{chosen.name}</strong>.</>
-            : "Choose a trainer to refer this session."}
+          {chosen && batch
+            ? <>Referring <strong>{session.name || "this session"}</strong> of batch <strong>{batch.name}</strong> to <strong>{chosen.name}</strong>.</>
+            : "Choose the batch and trainer for this session."}
         </div>
       </div>
-      <div style={{ display: "flex", gap: 8, padding: 16, borderTop: `1px solid ${T.line}` }}>
+      <div style={{ display: "flex", gap: 8, padding: 16, borderTop: `1px solid ${T.line}`, flexShrink: 0 }}>
         <button type="button" onClick={onClose} disabled={saving} style={{ flex: 1, height: 40, borderRadius: 12, border: `1px solid ${T.line}`, background: "#fff", fontWeight: 600, cursor: "pointer" }}>
           Cancel
         </button>
         <button
           type="button"
-          disabled={saving || !chosen}
-          onClick={() => onConfirm(chosen)}
-          style={{ flex: 1, height: 40, borderRadius: 12, border: "none", background: chosen ? T.coral : T.page, color: chosen ? "#fff" : T.mute, fontWeight: 700, cursor: chosen ? "pointer" : "not-allowed" }}
+          disabled={saving || !chosen || !batch}
+          onClick={() => onConfirm(chosen, batch)}
+          style={{ flex: 1, height: 40, borderRadius: 12, border: "none", background: chosen && batch ? T.coral : T.page, color: chosen && batch ? "#fff" : T.mute, fontWeight: 700, cursor: chosen && batch ? "pointer" : "not-allowed" }}
         >
           {saving ? "Referring..." : "Refer session"}
         </button>
@@ -1018,14 +1094,15 @@ function DetailPanel({ display, session, onEdit, onDelete, onRefer, activityType
         <div style={{ marginBottom: 16, border: `1px solid ${T.line}`, borderRadius: 12, overflow: "hidden" }}>
                    <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
             {[
-              { role: "Field trainer", name: session.fieldTrainer },
-              { role: "Senior trainer", name: session.seniorTrainer },
-              ...(session.tot ? [{ role: "TOT trainer", name: session.totTrainer }] : []),
+              { role: "Batch", name: session.batchCode, empty: "Not selected" },
+              { role: "Field trainer", name: session.fieldTrainer, empty: "Not referred yet" },
+              { role: "Senior trainer", name: session.seniorTrainer, empty: "Not referred yet" },
+              ...(session.tot ? [{ role: "TOT trainer", name: session.totTrainer, empty: "Not referred yet" }] : []),
             ].map((row) => (
               <div key={row.role} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13 }}>
                 <span style={{ color: T.mute }}>{row.role}</span>
                 <strong style={{ color: row.name ? T.ink : T.amber, textAlign: "right" }}>
-                  {row.name || "Not referred yet"}
+                  {row.name || row.empty}
                 </strong>
               </div>
             ))}
