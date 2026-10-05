@@ -193,6 +193,51 @@ const loadCourseTeam = async (courseId) => {
 	return course;
 };
 
+const assignCourseToSeniorTrainer = async (batch, seniorTrainerIds, usersById) => {
+	if (!seniorTrainerIds.length || !batch?.courseId) {
+		return { count: 0, seniorTrainerName: '' };
+	}
+
+	const seniorId = seniorTrainerIds[0];
+	const senior = usersById.get(seniorId);
+	const seniorName = senior?.name || senior?.email || '';
+	const sessions = await SessionPlan.find({
+		course: batch.courseId,
+		college: batch.college,
+		isDeleted: false,
+	});
+
+	const now = new Date();
+	for (const session of sessions) {
+		const status = session.workflowStatus || 'Scheduled';
+		const alreadyWithTrainer = status === 'Assigned' || status === 'In Progress' || status === 'Completed';
+		session.seniorTrainer = seniorId;
+		session.seniorTrainerName = seniorName;
+		if (!session.referredAt) session.referredAt = now;
+		if (!alreadyWithTrainer) {
+			session.workflowStatus = 'Sent to Senior Trainer';
+			session.batch = batch._id;
+			session.batchCode = batch.name || '';
+		}
+		await session.save();
+
+		await BatchSessionAssignment.findOneAndUpdate(
+			{ batch: batch._id, session: session._id },
+			{
+				$set: { seniorTrainer: seniorId },
+				$setOnInsert: {
+					course: batch.courseId,
+					batch: batch._id,
+					session: session._id,
+				},
+			},
+			{ upsert: true, setDefaultsOnInsert: true }
+		);
+	}
+
+	return { count: sessions.length, seniorTrainerName: seniorName };
+};
+
 const sendTeamError = (res, err, label) => {
 	const statusCode = err.statusCode || 500;
 	if (statusCode === 500) console.error(label, err);
@@ -272,6 +317,8 @@ router.put('/:batchId/training-team', async (req, res) => {
 		batch.trainers = combinedIds;
 		await batch.save();
 
+		const courseAssignment = await assignCourseToSeniorTrainer(batch, seniorTrainerIds, usersById);
+
 		const savedUsers = combinedIds.map((id) => usersById.get(id)).filter(Boolean);
 		const { seniorTrainers, trainers } = splitUsers(savedUsers);
 
@@ -287,6 +334,8 @@ router.put('/:batchId/training-team', async (req, res) => {
 			trainerIds: combinedIds,
 			seniorTrainers,
 			trainers,
+			assignedSessionCount: courseAssignment.count,
+			seniorTrainerName: courseAssignment.seniorTrainerName,
 		});
 	} catch (err) {
 		return sendTeamError(res, err, 'PUT /college/batches/:batchId/training-team');

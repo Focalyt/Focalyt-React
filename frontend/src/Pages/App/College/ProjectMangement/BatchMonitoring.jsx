@@ -4,11 +4,14 @@ import React, {
   useState,
 } from 'react';
 
+import { useNavigate } from 'react-router-dom';
+
 import axios from 'axios';
 
 import './batchMonitoring.css';
 
 const BatchMonitoring = () => {
+  const navigate = useNavigate();
   const backendUrl = process.env.REACT_APP_MIPIE_BACKEND_URL;
 
   const userData =
@@ -149,62 +152,6 @@ const BatchMonitoring = () => {
     trainer: '',
   });
 
-  // =========================================================
-  // REFER SESSION
-  // =========================================================
-
-  const [
-    referSession,
-    setReferSession,
-  ] = useState(null);
-
-  const [
-    selectedSessionIds,
-    setSelectedSessionIds,
-  ] = useState([]);
-
-  const [
-    referBatches,
-    setReferBatches,
-  ] = useState([]);
-
-  const [
-    selectedBatchId,
-    setSelectedBatchId,
-  ] = useState('');
-
-  const [
-    batchesLoading,
-    setBatchesLoading,
-  ] = useState(false);
-
-  const [
-    team,
-    setTeam,
-  ] = useState({
-    seniorTrainers: [],
-    trainers: [],
-  });
-
-  const [
-    teamLoading,
-    setTeamLoading,
-  ] = useState(false);
-
-  const [
-    selectedPersonId,
-    setSelectedPersonId,
-  ] = useState('');
-
-  const [
-    saving,
-    setSaving,
-  ] = useState(false);
-
-  const [
-    referMessage,
-    setReferMessage,
-  ] = useState('');
 
   // =========================================================
   // LOAD SESSIONS
@@ -335,394 +282,35 @@ const BatchMonitoring = () => {
     token,
   ]);
 
-  // =========================================================
-  // REFER SESSION COURSE SESSIONS
-  // =========================================================
-
-  const courseSessions =
-    useMemo(() => {
-      if (!referSession) {
-        return [];
-      }
-
-      return sessions.filter(
-        (session) => {
-          if (!referSession.course) {
-            return true;
-          }
-
-          return (
-            String(
-              session.course
-            ) ===
-            String(
-              referSession.course
-            )
-          );
-        }
-      );
-    }, [
-      referSession,
-      sessions,
-    ]);
 
   // =========================================================
-  // LOAD BATCH TRAINING TEAM
+  // OPEN SESSION SCREEN
   // =========================================================
 
-  const loadBatchTeam =
-    async (batchId) => {
-      if (!batchId) {
-        setTeam({
-          seniorTrainers: [],
-          trainers: [],
-        });
-
-        setSelectedPersonId('');
-
-        return;
-      }
-
-      setTeamLoading(true);
-
-      try {
-        const response =
-          await axios.get(
-            `${backendUrl}/college/batches/${batchId}/training-team`,
-            {
-              headers,
-            }
-          );
-
-        setTeam({
-          seniorTrainers:
-            response.data
-              ?.seniorTrainers ||
-            [],
-
-          trainers:
-            response.data
-              ?.trainers ||
-            [],
-        });
-
-        setSelectedPersonId('');
-      } catch (error) {
-        console.error(
-          'Error fetching batch team:',
-          error
-        );
-
-        setTeam({
-          seniorTrainers: [],
-          trainers: [],
-        });
-
-        setReferMessage(
-          error?.response?.data
-            ?.message ||
-            'Could not load this batch team.'
-        );
-      } finally {
-        setTeamLoading(false);
-      }
-    };
-
-  // =========================================================
-  // OPEN REFER
-  // =========================================================
-
-  const openRefer =
-    async (session) => {
-      setReferMessage('');
-
-      setReferSession(session);
-
-      setSelectedSessionIds([
-        String(
-          session.id ||
-          session._id
-        ),
-      ]);
-
-      const initialBatchId =
-        session.batch
-          ? String(
-              session.batch
-            )
-          : '';
-
-      setSelectedBatchId(
-        initialBatchId
-      );
-
-      setSelectedPersonId('');
-
-      setTeam({
-        seniorTrainers: [],
-        trainers: [],
-      });
-
-      setReferBatches([]);
-
-      if (!session.course) {
-        setReferMessage(
-          'This session has no course.'
-        );
-
-        return;
-      }
-
-      setBatchesLoading(true);
-
-      try {
-        const response =
-          await axios.get(
-            `${backendUrl}/college/get_batches`,
-            {
-              headers,
-
-              params: {
-                courseId:
-                  session.course,
-              },
-            }
-          );
-
-        const list =
-          response.data?.data ||
-          [];
-
-        setReferBatches(list);
-
-        const batchId =
-          initialBatchId ||
-          (
-            list.length === 1
-              ? String(
-                  list[0]._id
-                )
-              : ''
-          );
-
-        if (
-          !initialBatchId &&
-          batchId
-        ) {
-          setSelectedBatchId(
-            batchId
-          );
-        }
-
-        if (batchId) {
-          await loadBatchTeam(
-            batchId
-          );
-        }
-      } catch (error) {
-        console.error(
-          'Error fetching batches:',
-          error
-        );
-
-        setReferMessage(
-          'Could not load batches for this course.'
-        );
-      } finally {
-        setBatchesLoading(false);
-      }
-    };
-
-  // =========================================================
-  // TOGGLE SESSION
-  // =========================================================
-
-  const toggleSession =
-    (sessionId) => {
-      setReferMessage('');
-
-      setSelectedSessionIds(
-        (current) => {
-          if (
-            current.includes(
-              sessionId
-            )
-          ) {
-            return current.filter(
-              (id) =>
-                id !== sessionId
-            );
-          }
-
-          return [
-            ...current,
-            sessionId,
-          ];
-        }
-      );
-    };
-
-  // =========================================================
-  // TOGGLE FULL COURSE
-  // =========================================================
-
-  const toggleCourse = () => {
-    setReferMessage('');
-
-    const allIds =
-      courseSessions.map(
-        (session) =>
-          String(
-            session.id ||
-            session._id
-          )
-      );
-
-    const allSelected =
-      allIds.length > 0 &&
-      allIds.every(
-        (id) =>
-          selectedSessionIds.includes(
-            id
-          )
-      );
-
-    setSelectedSessionIds(
-      allSelected
-        ? []
-        : allIds
-    );
+  const resolveId = (value) => {
+    if (!value) return '';
+    if (typeof value === 'object') {
+      return String(value._id || value.id || '');
+    }
+    return String(value);
   };
 
-  // =========================================================
-  // SAVE REFER SESSION
-  // =========================================================
+  const openBatchRefer = (batch) => {
+    const courseId = resolveId(batch?.courseId || batch?.course);
+    const batchId = resolveId(batch?._id);
 
-  const saveRefer =
-    async () => {
-      const chosen =
-        courseSessions.filter(
-          (session) =>
-            selectedSessionIds.includes(
-              String(
-                session.id ||
-                session._id
-              )
-            )
-        );
+    if (courseId) {
+      sessionStorage.setItem('ac.selectedCourseId', courseId);
+    }
 
-      if (!selectedBatchId) {
-        setReferMessage(
-          'Select a batch.'
-        );
+    const params = new URLSearchParams();
+    if (courseId) params.set('courseId', courseId);
+    if (batchId) params.set('batchId', batchId);
 
-        return;
-      }
-
-      if (
-        chosen.length === 0
-      ) {
-        setReferMessage(
-          'Select a session.'
-        );
-
-        return;
-      }
-
-      if (!selectedPersonId) {
-        setReferMessage(
-          'Select a trainer.'
-        );
-
-        return;
-      }
-
-      const personIsSenior =
-        (
-          team.seniorTrainers ||
-          []
-        ).some(
-          (person) =>
-            String(
-              person._id
-            ) ===
-            String(
-              selectedPersonId
-            )
-        );
-
-      setSaving(true);
-
-      setReferMessage('');
-
-      try {
-        const response =
-          await axios.post(
-            `${backendUrl}/college/batches/${selectedBatchId}/session-assignments`,
-
-            {
-              sessionIds:
-                chosen.map(
-                  (session) =>
-                    session.id ||
-                    session._id
-                ),
-
-              ...(personIsSenior
-                ? {
-                    seniorTrainerId:
-                      selectedPersonId,
-                  }
-                : {
-                    trainerId:
-                      selectedPersonId,
-                  }),
-            },
-
-            {
-              headers,
-            }
-          );
-
-        if (
-          response.data
-            ?.success ===
-            false ||
-          response.data
-            ?.status ===
-            false
-        ) {
-          setReferMessage(
-            response.data
-              ?.message ||
-              'Could not save session assignment.'
-          );
-
-          return;
-        }
-
-        setReferSession(null);
-
-        setSelectedSessionIds(
-          []
-        );
-
-        await loadSessions();
-      } catch (error) {
-        console.error(
-          'Error referring session:',
-          error
-        );
-
-        setReferMessage(
-          error?.response?.data
-            ?.message ||
-            'Could not save session assignment.'
-        );
-      } finally {
-        setSaving(false);
-      }
-    };
+    navigate(
+      `/institute/academicCoordinator?${params.toString()}`
+    );
+  };
 
   // =========================================================
   // HELPERS
@@ -1583,10 +1171,12 @@ const BatchMonitoring = () => {
                 {renderProgressRing(card.progress)}
               </div>
               <div className="lead-strip-v3__profile-body">
+                {card.line1 ? (
                 <div className="lead-strip-v3__phone-line" title={card.line1}>
                   <i className={card.line1Icon} aria-hidden="true" />
-                  <span>{card.line1 || 'N/A'}</span>
+                  <span>{card.line1}</span>
                 </div>
+                ) : null}
                 <div className="lead-strip-v3__email-line" title={card.line2}>
                   <i className={card.line2Icon} aria-hidden="true" />
                   <span>{card.line2 || 'N/A'}</span>
@@ -1880,7 +1470,7 @@ const BatchMonitoring = () => {
       tab: batch.courseName || batch.course?.name || 'Course',
       name: batch.name || batch.batchCode || 'Untitled Batch',
       progress,
-      line1: batch.batchCode || batch.code || 'N/A',
+      line1: batch.batchCode || batch.code || '',
       line1Icon: 'fas fa-hashtag',
       line2: batch.courseName || batch.course?.name || 'Course not available',
       line2Icon: 'fas fa-graduation-cap',
@@ -1899,7 +1489,7 @@ const BatchMonitoring = () => {
       approval: batch.status || 'Active',
       call,
       visit,
-      sideTitle: 'Training',
+      sideTitle: 'Batch',
       sideIcon: 'fas fa-id-card',
       sideStats: [
         { key: 'students', label: 'Students', value: studentCount, bg: '#10b981' },
@@ -1907,12 +1497,11 @@ const BatchMonitoring = () => {
         { key: 'left', label: 'Left', value: Math.max(batchSessions.length - completed, 0), bg: '#f59e0b' },
       ],
       sideButton: {
-        label: 'Open Sessions',
-        onClick: () => setActiveView('session'),
+        label: 'Refer Session',
+        onClick: () => openBatchRefer(batch),
       },
       actions: [
-        { label: 'Sessions', icon: 'fas fa-calendar-alt', onClick: () => setActiveView('session') },
-        { label: 'Students', icon: 'fas fa-users', onClick: () => setActiveView('student') },
+        { label: 'Refer', icon: 'fas fa-share-alt', onClick: () => openBatchRefer(batch) },
       ],
     });
   };
@@ -1958,13 +1547,7 @@ const BatchMonitoring = () => {
         { key: 'chapter', label: 'Chapter', value: session.chapterNumber || 0, bg: '#0ea5e9' },
         { key: 'done', label: 'Done', value: call.done, bg: '#10b981' },
       ],
-      sideButton: {
-        label: 'Refer Session',
-        onClick: () => openRefer(session),
-      },
-      actions: [
-        { label: 'Refer', icon: 'fas fa-share-alt', onClick: () => openRefer(session) },
-      ],
+      actions: [],
     });
   };
 
@@ -2645,387 +2228,6 @@ const BatchMonitoring = () => {
         </div>
       )}
 
-      {/* ==================================================
-          REFER SESSION MODAL
-      ================================================== */}
-
-      {referSession && (
-        <div className="bm-modal-overlay">
-
-          <div className="bm-modal">
-
-            <div className="bm-modal-head">
-
-              <div>
-
-                <span>
-                  Batch Monitoring
-                </span>
-
-                <h3>
-                  Refer Session
-                </h3>
-
-                <p>
-                  {referSession.courseName ||
-                    referSession.title ||
-                    'Session'}
-                </p>
-
-              </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setReferSession(
-                    null
-                  )
-                }
-              >
-                ×
-              </button>
-
-            </div>
-
-            <div className="bm-modal-body">
-
-              {/* BATCH */}
-
-              <div className="bm-modal-field">
-
-                <label>
-                  Batch
-                </label>
-
-                {batchesLoading ? (
-                  <p>
-                    Loading batches...
-                  </p>
-                ) : referBatches.length ===
-                  0 ? (
-                  <p className="text-muted">
-                    No batch found
-                    for this course.
-                  </p>
-                ) : (
-                  <select
-                    value={
-                      selectedBatchId
-                    }
-                    onChange={(e) => {
-                      const batchId =
-                        e.target.value;
-
-                      setReferMessage(
-                        ''
-                      );
-
-                      setSelectedBatchId(
-                        batchId
-                      );
-
-                      loadBatchTeam(
-                        batchId
-                      );
-                    }}
-                  >
-                    <option value="">
-                      Select a batch
-                    </option>
-
-                    {referBatches.map(
-                      (batch) => (
-                        <option
-                          key={
-                            batch._id
-                          }
-                          value={
-                            batch._id
-                          }
-                        >
-                          {batch.name ||
-                            batch.batchCode}
-                        </option>
-                      )
-                    )}
-
-                  </select>
-                )}
-
-              </div>
-
-              {/* TRAINER */}
-
-              <div className="bm-modal-field">
-
-                <label>
-                  Trainer
-                </label>
-
-                {teamLoading ? (
-                  <p>
-                    Loading trainers...
-                  </p>
-                ) : !selectedBatchId ? (
-                  <p className="text-muted">
-                    Select a batch
-                    first.
-                  </p>
-                ) : (
-                  <select
-                    value={
-                      selectedPersonId
-                    }
-                    onChange={(e) => {
-                      setReferMessage(
-                        ''
-                      );
-
-                      setSelectedPersonId(
-                        e.target.value
-                      );
-                    }}
-                  >
-                    <option value="">
-                      Select a trainer
-                    </option>
-
-                    {team.seniorTrainers.map(
-                      (person) => (
-                        <option
-                          key={
-                            person._id
-                          }
-                          value={
-                            person._id
-                          }
-                        >
-                          {person.name}{' '}
-                          — Senior Trainer
-                        </option>
-                      )
-                    )}
-
-                    {team.trainers.map(
-                      (person) => (
-                        <option
-                          key={
-                            person._id
-                          }
-                          value={
-                            person._id
-                          }
-                        >
-                          {person.name}{' '}
-                          — Trainer
-                        </option>
-                      )
-                    )}
-
-                  </select>
-                )}
-
-              </div>
-
-              {/* SESSION SELECTION */}
-
-              <div className="bm-session-selector">
-
-                <div>
-
-                  <h6>
-                    Sessions
-                  </h6>
-
-                  <div className="bm-session-check-list">
-
-                    {courseSessions.map(
-                      (session) => {
-                        const id =
-                          String(
-                            session.id ||
-                            session._id
-                          );
-
-                        const checked =
-                          selectedSessionIds.includes(
-                            id
-                          );
-
-                        const place =
-                          [
-                            session.unitName ||
-                              (
-                                session.unitNumber
-                                  ? `Unit ${session.unitNumber}`
-                                  : ''
-                              ),
-
-                            session.chapterName ||
-                              (
-                                session.chapterNumber
-                                  ? `Chapter ${session.chapterNumber}`
-                                  : ''
-                              ),
-                          ]
-                            .filter(
-                              Boolean
-                            )
-                            .join(
-                              ' • '
-                            );
-
-                        return (
-                          <label
-                            key={
-                              id
-                            }
-                            className={
-                              checked
-                                ? 'checked'
-                                : ''
-                            }
-                          >
-
-                            <input
-                              type="checkbox"
-                              checked={
-                                checked
-                              }
-                              onChange={() =>
-                                toggleSession(
-                                  id
-                                )
-                              }
-                            />
-
-                            <div>
-
-                              <strong>
-                                {session.title ||
-                                  'Untitled Session'}
-                              </strong>
-
-                              {place && (
-                                <span>
-                                  {place}
-                                </span>
-                              )}
-
-                            </div>
-
-                          </label>
-                        );
-                      }
-                    )}
-
-                  </div>
-
-                </div>
-
-                {/* FULL COURSE */}
-
-                <div>
-
-                  <h6>
-                    Full Course
-                  </h6>
-
-                  <label className="bm-full-course-option">
-
-                    <input
-                      type="checkbox"
-                      checked={
-                        courseSessions.length >
-                          0 &&
-                        courseSessions.every(
-                          (session) =>
-                            selectedSessionIds.includes(
-                              String(
-                                session.id ||
-                                session._id
-                              )
-                            )
-                        )
-                      }
-                      onChange={
-                        toggleCourse
-                      }
-                    />
-
-                    <div>
-
-                      <strong>
-                        {referSession.courseName ||
-                          'This Course'}
-                      </strong>
-
-                      <span>
-                        {
-                          courseSessions.length
-                        }{' '}
-                        session(s)
-                      </span>
-
-                    </div>
-
-                  </label>
-
-                </div>
-
-              </div>
-
-              {referMessage && (
-                <div className="bm-modal-error">
-                  {referMessage}
-                </div>
-              )}
-
-            </div>
-
-            {/* FOOTER */}
-
-            <div className="bm-modal-footer">
-
-              <button
-                type="button"
-                className="cancel"
-                onClick={() =>
-                  setReferSession(
-                    null
-                  )
-                }
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                className="save"
-                disabled={
-                  saving ||
-                  batchesLoading ||
-                  teamLoading ||
-                  !selectedBatchId ||
-                  !selectedPersonId ||
-                  selectedSessionIds.length ===
-                    0
-                }
-                onClick={
-                  saveRefer
-                }
-              >
-                {saving
-                  ? 'Referring...'
-                  : `Refer (${selectedSessionIds.length})`}
-              </button>
-
-            </div>
-
-          </div>
-
-        </div>
-      )}
 
     </div>
   );
