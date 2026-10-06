@@ -477,7 +477,14 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
       });
 
       if (response.data.status || response.data.success) {
-        showAlert('Trainers assigned successfully!', 'success');
+        const assignedCount = Number(response.data.assignedSessionCount) || 0;
+        const seniorName = response.data.seniorTrainerName || 'the senior trainer';
+        showAlert(
+          assignedCount
+            ? `Trainers assigned. Full course (${assignedCount} session${assignedCount === 1 ? '' : 's'}) sent to ${seniorName}.`
+            : 'Trainers assigned successfully!',
+          'success'
+        );
         closeTrainerModal();
         
         // Refresh batches list

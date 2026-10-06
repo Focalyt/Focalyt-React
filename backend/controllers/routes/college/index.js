@@ -2917,6 +2917,9 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					uploadPercentage: docCounts.uploadPercentage,
 				},
 				uploadedDocs: doc.uploadedDocs || [],
+				kyc: doc.kyc === true,
+				kycDoneAt: doc.kycDoneAt || null,
+				kycDoneBy: doc.kycDoneBy || null,
 				followup,
 				followUpCall,
 				followUpVisit,
@@ -4153,6 +4156,9 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, 
 			_aiLeadStatus: 1,
 			_aiLeadSubStatus: 1,
 			uploadedDocs: 1,
+			kyc: 1,
+			kycDoneAt: 1,
+			kycDoneBy: 1,
 			createdAt: 1,
 			updatedAt: 1,
 			approval: 1,
@@ -8913,11 +8919,26 @@ router.get('/get_batches', async (req, res) => {
 		const batches = await Batch.find(filter)
 			.populate('trainers', 'name email mobile permissions.custom_permissions.can_be_senior_trainer permissions.custom_permissions.can_be_trainer')
 			.populate('createdBy', 'name email')
-			.sort({ createdAt: -1 });  // Sorting by createdAt
+			.sort({ createdAt: -1 })
+			.lean();
+
+		const courseIds = [...new Set(batches.map((batch) => String(batch.courseId || '')).filter((id) => mongoose.Types.ObjectId.isValid(id)))];
+		const centerIds = [...new Set(batches.map((batch) => String(batch.centerId || '')).filter((id) => mongoose.Types.ObjectId.isValid(id)))];
+		const [courses, centers] = await Promise.all([
+			courseIds.length ? Courses.find({ _id: { $in: courseIds } }).select('name').lean() : [],
+			centerIds.length ? Center.find({ _id: { $in: centerIds } }).select('name').lean() : [],
+		]);
+		const courseNameById = new Map(courses.map((course) => [String(course._id), course.name || '']));
+		const centerNameById = new Map(centers.map((center) => [String(center._id), center.name || '']));
+		const data = batches.map((batch) => ({
+			...batch,
+			courseName: courseNameById.get(String(batch.courseId || '')) || '',
+			centerName: centerNameById.get(String(batch.centerId || '')) || '',
+		}));
 
 		res.json({
 			success: true,
-			data: batches
+			data
 		});
 
 	} catch (error) {
@@ -12497,14 +12518,23 @@ router.post("/kycDone/:profileId", isCollege, async (req, res) => {
 		const mandatoryDocs = course.docsRequired.filter(
 			(d) => d.mandatory === true && d.status !== false
 		);
-		const uploadedDocs = appliedCourse.uploadedDocs || [];
-		const failures = getMandatoryKycFailures(course, uploadedDocs);
-	
-		if (failures.length) {
-			
+		if (!mandatoryDocs.length) {
 			return res.status(400).json({
 				success: false,
-				message: "All mandatory documents must be verified before marking KYC done",
+				message: "KYC cannot be marked done. This course has no mandatory documents to verify.",
+				missingOrUnverifiedMandatory: true,
+			});
+		}
+		const uploadedDocs = appliedCourse.uploadedDocs || [];
+		const failures = getMandatoryKycFailures(course, uploadedDocs);
+
+		if (failures.length) {
+			const detail = failures
+				.map((f) => `${f.name} (${f.reason === "missing" ? "not uploaded" : (f.status || "not verified")})`)
+				.join(", ");
+			return res.status(400).json({
+				success: false,
+				message: `All mandatory documents must be verified before marking KYC done: ${detail}`,
 				missingOrUnverifiedMandatory: true,
 				failingMandatoryDocs: failures,
 			});

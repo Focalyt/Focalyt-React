@@ -167,12 +167,12 @@ const patchSessionApi = async (token, sessionId, payload) => {
   return res.data.data;
 };
 
-const fetchRoleTrainersApi = async (token, roleType) => {
-  const res = await axios.get(`${BACKEND_URL}/college/users/training-role-users`, {
+const fetchBatchFieldTrainersApi = async (token, batchId) => {
+  if (!batchId) return [];
+  const res = await axios.get(`${BACKEND_URL}/college/batches/${batchId}/training-team`, {
     headers: authHeaders(token),
-    params: { roleType, status: "active" },
   });
-  const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+  const rows = Array.isArray(res.data?.trainers) ? res.data.trainers : [];
   return rows
     .filter((row) => row._id)
     .map((row) => ({
@@ -344,6 +344,7 @@ export default function AcademicCoordinatorMockup() {
   const [typesLoading, setTypesLoading] = useState(true);
   const [courses, setCourses] = useState([]);
   const [selectedCourseId, setSelectedCourseId] = useState(() => sessionStorage.getItem(COURSE_STORAGE_KEY) || "");
+  const [incomingBatchId] = useState(() => new URLSearchParams(window.location.search).get("batchId") || "");
   const [toast, setToast] = useState(null);
   const persistTimer = useRef(null);
   const [permissions, setPermissions] = useState();
@@ -392,10 +393,14 @@ export default function AcademicCoordinatorMockup() {
         const courseRows = await fetchCoursesApi(token);
         if (cancelled) return;
         setCourses(courseRows);
+        const params = new URLSearchParams(window.location.search);
+        const queryCourseId = params.get("courseId") || "";
+        const querySessionId = params.get("sessionId") || "";
         const storedCourseId = sessionStorage.getItem(COURSE_STORAGE_KEY) || "";
-        const validStored = courseRows.some((course) => String(course._id) === storedCourseId);
+        const preferredCourseId = queryCourseId || storedCourseId;
+        const validStored = courseRows.some((course) => String(course._id) === preferredCourseId);
         const nextCourseId = validStored
-          ? storedCourseId
+          ? preferredCourseId
           : (courseRows[0] ? String(courseRows[0]._id) : "");
         if (nextCourseId !== selectedCourseId) {
           setSelectedCourseId(nextCourseId);
@@ -412,8 +417,12 @@ export default function AcademicCoordinatorMockup() {
           fetchSessionsApi(token, nextCourseId),
         ]);
         if (!cancelled) {
+          const mapped = sessionRows.map(mapApiSessionToUi);
           setActivityTypes(types);
-          setSessions(sessionRows.map(mapApiSessionToUi));
+          setSessions(mapped);
+          if (querySessionId && mapped.some((session) => session.id === String(querySessionId))) {
+            setSelectedId(String(querySessionId));
+          }
         }
       } catch (err) {
         console.error("Failed to load academic coordinator data", err);
@@ -465,6 +474,13 @@ export default function AcademicCoordinatorMockup() {
 
   const display = { fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" };
   const body = { fontFamily: "'Inter', system-ui, sans-serif" };
+
+  useEffect(() => {
+    if (!selectedId) return undefined;
+    const row = document.querySelector(`[data-ac-session="${CSS.escape(String(selectedId))}"]`);
+    row?.scrollIntoView({ block: "center" });
+    return undefined;
+  }, [selectedId, sessions]);
 
   const selected = sessions.find((s) => s.id === selectedId) || null;
   const selectedCourse = useMemo(
@@ -572,17 +588,18 @@ export default function AcademicCoordinatorMockup() {
     }
     setReferSaving(true);
     try {
+      const keepProgress = selected.status === "In Progress" || selected.status === "Completed";
       const saved = await patchSessionApi(token, selected.id, {
-        seniorTrainerId: trainer.id,
-        seniorTrainerName: trainer.name,
-        workflowStatus: "Sent to Senior Trainer",
+        fieldTrainerId: trainer.id,
+        fieldTrainerName: trainer.name,
+        workflowStatus: keepProgress ? selected.status : "Assigned",
         batch: batch.id,
         batchCode: batch.name,
       });
       const mapped = mapApiSessionToUi(saved);
       setSessions((prev) => prev.map((item) => (item.id === mapped.id ? mapped : item)));
       setReferOpen(false);
-      setToast({ type: "success", message: `Session referred to ${trainer.name} for ${batch.name}` });
+      setToast({ type: "success", message: `Session assigned to ${trainer.name} for ${batch.name}` });
     } catch (err) {
       console.error("Failed to refer session", err);
       setToast({ type: "error", message: err.response?.data?.message || err.message || "Failed to refer session" });
@@ -608,17 +625,21 @@ export default function AcademicCoordinatorMockup() {
     }
   }
 
-  const canBeAcademicCoordinator =
-    (permissions?.custom_permissions?.can_be_academic_coordinator && permissions?.permission_type === "Custom") ||
-    permissions?.permission_type === "Admin";
+  const isCustom = permissions?.permission_type === "Custom";
+  const canOpenSessionScreen =
+    permissions?.permission_type === "Admin" ||
+    (isCustom && (
+      permissions?.custom_permissions?.can_be_academic_coordinator ||
+      permissions?.custom_permissions?.can_be_senior_trainer
+    ));
 
-  if (permissions && !canBeAcademicCoordinator) {
+  if (permissions && !canOpenSessionScreen) {
     return (
       <div style={{ ...body, background: T.page, minHeight: 600, borderRadius: 16, padding: 48, textAlign: "center", color: T.ink }}>
         <div style={{ fontSize: 32, marginBottom: 12 }}>🔒</div>
         <div style={{ ...display, fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Access denied</div>
         <div style={{ color: T.mute }}>
-          You need <strong>Academic Coordinator</strong> permission (or Admin) to use this module.
+          You need <strong>Academic Coordinator</strong> or <strong>Senior Trainer</strong> permission (or Admin) to use this module.
         </div>
       </div>
     );
@@ -709,6 +730,7 @@ export default function AcademicCoordinatorMockup() {
         <ReferSessionModal
           session={selected}
           courseId={selectedCourseId}
+          preferredBatchId={incomingBatchId}
           saving={referSaving}
           onClose={() => { if (!referSaving) setReferOpen(false); }}
           onConfirm={referSession}
@@ -812,6 +834,7 @@ function SessionRow({ s, selectedId, setSelectedId, activityTypes = [] }) {
   return (
     <div
       className="ac-toc-row"
+      data-ac-session={s.id}
       onClick={() => setSelectedId(s.id)}
       style={{
         display: "flex", alignItems: "center", gap: 10, padding: "9px 10px 9px 8px",
@@ -887,39 +910,49 @@ function TocPanel({ display, grouped, selectedId, setSelectedId, onCreateFirst, 
   );
 }
 
-function ReferSessionModal({ session, courseId, saving, onClose, onConfirm }) {
-  const [trainerId, setTrainerId] = useState(session.seniorTrainerId || "");
-  const [batchId, setBatchId] = useState(session.batch || "");
+function ReferSessionModal({ session, courseId, preferredBatchId = "", saving, onClose, onConfirm }) {
+  const [trainerId, setTrainerId] = useState(session.fieldTrainerId || "");
+  const [batchId, setBatchId] = useState(preferredBatchId || session.batch || "");
   const [trainers, setTrainers] = useState([]);
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [batchesLoading, setBatchesLoading] = useState(false);
   const chosen = trainers.find((item) => item.id === trainerId);
   const batch = batches.find((item) => item.id === batchId);
+  const batchLocked = Boolean(preferredBatchId);
 
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       const token = getAuthToken();
-      if (!token) return;
+      if (!token || !batchId) {
+        setTrainers([]);
+        setTrainerId("");
+        return;
+      }
       setLoading(true);
       try {
-        const rows = await fetchRoleTrainersApi(token, "trainer");
+        const rows = await fetchBatchFieldTrainersApi(token, batchId);
         if (cancelled) return;
         setTrainers(rows);
-        setTrainerId((current) => (
-          rows.some((item) => item.id === current) ? current : (session.seniorTrainerId || "")
-        ));
+        setTrainerId((current) => {
+          if (rows.some((item) => item.id === current)) return current;
+          if (rows.some((item) => item.id === session.fieldTrainerId)) return session.fieldTrainerId;
+          return "";
+        });
       } catch (err) {
-        console.error("Failed to load trainers", err);
-        if (!cancelled) setTrainers([]);
+        console.error("Failed to load batch trainers", err);
+        if (!cancelled) {
+          setTrainers([]);
+          setTrainerId("");
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
     load();
     return () => { cancelled = true; };
-  }, [session.seniorTrainerId]);
+  }, [batchId, session.fieldTrainerId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -931,9 +964,14 @@ function ReferSessionModal({ session, courseId, saving, onClose, onConfirm }) {
         const rows = await fetchCourseBatchesApi(token, courseId);
         if (cancelled) return;
         setBatches(rows);
-        setBatchId((current) => (
-          rows.some((item) => item.id === current) ? current : (session.batch || "")
-        ));
+        setBatchId((current) => {
+          const preferred = preferredBatchId && rows.some((item) => item.id === String(preferredBatchId))
+            ? String(preferredBatchId)
+            : "";
+          if (preferred) return preferred;
+          if (rows.some((item) => item.id === current)) return current;
+          return session.batch && rows.some((item) => item.id === session.batch) ? session.batch : "";
+        });
       } catch (err) {
         console.error("Failed to load batches", err);
         if (!cancelled) setBatches([]);
@@ -943,12 +981,12 @@ function ReferSessionModal({ session, courseId, saving, onClose, onConfirm }) {
     };
     load();
     return () => { cancelled = true; };
-  }, [courseId, session.batch]);
+  }, [courseId, session.batch, preferredBatchId]);
 
   return (
     <ModalShell onClose={onClose} width={480}>
       <div style={{ padding: "18px 20px", borderBottom: `1px solid ${T.line}`, flexShrink: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: T.coral, textTransform: "uppercase" }}>Refer session</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: T.coral, textTransform: "uppercase" }}>Assign session</div>
         <div style={{ fontSize: 18, fontWeight: 700, color: T.ink, marginTop: 4 }}>
           {session.number ? `Session ${session.number}` : "Session"} · {session.name || "Untitled session"}
         </div>
@@ -964,14 +1002,20 @@ function ReferSessionModal({ session, courseId, saving, onClose, onConfirm }) {
           <select
             className="ac-input"
             value={batchId}
-            disabled={batchesLoading}
-            onChange={(e) => setBatchId(e.target.value)}
+            disabled={batchesLoading || batchLocked}
+            onChange={(e) => { if (!batchLocked) setBatchId(e.target.value); }}
+            style={batchLocked ? { background: T.page, color: T.ink, cursor: "not-allowed", opacity: 1 } : undefined}
           >
             <option value="">{batchesLoading ? "Loading batches..." : "Select batch"}</option>
             {batches.map((item) => (
               <option key={item.id} value={item.id}>{item.name}</option>
             ))}
           </select>
+          {batchLocked && (
+            <span style={{ fontSize: 12, fontWeight: 600, color: T.mute }}>
+              Locked to the batch you referred from.
+            </span>
+          )}
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, fontWeight: 700, color: T.mute }}>
           Trainer
@@ -987,10 +1031,17 @@ function ReferSessionModal({ session, courseId, saving, onClose, onConfirm }) {
             ))}
           </select>
         </label>
+        {batch && !loading && trainers.length === 0 && (
+          <div style={{ background: T.amberTint, borderRadius: 12, padding: "10px 12px", fontSize: 13, color: T.amber }}>
+            No trainer is assigned on this batch yet. Assign a trainer on the batch first.
+          </div>
+        )}
         <div style={{ background: T.page, borderRadius: 12, padding: "10px 12px", fontSize: 13, color: T.ink }}>
           {chosen && batch
-            ? <>Referring <strong>{session.name || "this session"}</strong> of batch <strong>{batch.name}</strong> to <strong>{chosen.name}</strong>.</>
-            : "Choose the batch and trainer for this session."}
+            ? <>Assigning <strong>{session.name || "this session"}</strong> of batch <strong>{batch.name}</strong> to trainer <strong>{chosen.name}</strong>.</>
+            : batchLocked
+              ? "This batch is fixed. Choose the trainer already assigned on it."
+              : "Choose the batch, then the trainer already assigned on that batch."}
         </div>
       </div>
       <div style={{ display: "flex", gap: 8, padding: 16, borderTop: `1px solid ${T.line}`, flexShrink: 0 }}>
@@ -1003,7 +1054,7 @@ function ReferSessionModal({ session, courseId, saving, onClose, onConfirm }) {
           onClick={() => onConfirm(chosen, batch)}
           style={{ flex: 1, height: 40, borderRadius: 12, border: "none", background: chosen && batch ? T.coral : T.page, color: chosen && batch ? "#fff" : T.mute, fontWeight: 700, cursor: chosen && batch ? "pointer" : "not-allowed" }}
         >
-          {saving ? "Referring..." : "Refer session"}
+          {saving ? "Assigning..." : "Assign session"}
         </button>
       </div>
     </ModalShell>
@@ -1129,7 +1180,7 @@ function DetailPanel({ display, session, onEdit, onDelete, onRefer, activityType
               onClick={onRefer}
               style={{ flexShrink: 0, height: 34, padding: "0 12px", borderRadius: 10, border: "none", background: T.coral, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
             >
-              Refer
+              Assign
             </button>
         <button
           disabled={isAssigned}

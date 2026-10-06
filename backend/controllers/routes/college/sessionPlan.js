@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const path = require('path');
 const uuid = require('uuid/v1');
 const { isCollege } = require('../../../helpers');
-const { SessionPlan, SessionActivityType, College, Courses, CoursesCopy, CourseActivity, Batch } = require('../../models');
+const { SessionPlan, SessionActivityType, College, Courses, CoursesCopy, CourseActivity, Batch, BatchSessionAssignment } = require('../../models');
 const { normalizeCourseStructure } = require('../../../helpers/courseStructure');
 const { bucketName } = require('../../../config');
 const s3 = require('../../../helpers/objectStorage');
@@ -766,10 +766,40 @@ router.patch('/:id', async (req, res) => {
     }
     if (body.totStatus !== undefined) existing.totStatus = body.totStatus;
 
-    if (existing.batch && existing.fieldTrainer) {
-      await Batch.updateOne(
-        { _id: existing.batch },
-        { $addToSet: { trainers: existing.fieldTrainer } }
+    if (body.fieldTrainerId && existing.fieldTrainer) {
+      if (!existing.batch) {
+        return res.status(400).json({
+          status: false,
+          message: 'Select a batch before assigning a trainer',
+        });
+      }
+      const batchDoc = await Batch.findOne({
+        _id: existing.batch,
+        college: college._id,
+      }).select('trainers courseId');
+      if (!batchDoc) {
+        return res.status(400).json({ status: false, message: 'Batch not found' });
+      }
+      const onBatch = (batchDoc.trainers || []).some(
+        (id) => String(id) === String(existing.fieldTrainer)
+      );
+      if (!onBatch) {
+        return res.status(400).json({
+          status: false,
+          message: 'This trainer is not assigned to the selected batch',
+        });
+      }
+      await BatchSessionAssignment.findOneAndUpdate(
+        { batch: existing.batch, session: existing._id },
+        {
+          $set: { trainer: existing.fieldTrainer },
+          $setOnInsert: {
+            course: existing.course || batchDoc.courseId,
+            batch: existing.batch,
+            session: existing._id,
+          },
+        },
+        { upsert: true, setDefaultsOnInsert: true }
       );
     }
 

@@ -5,6 +5,7 @@ import Calendar from 'react-calendar';
 import 'react-date-picker/dist/DatePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import { resolveMediaUrl } from '../../../../utils/resolveMediaUrl';
+import '../ProjectMangement/listView.css';
 
 const PINK = '#fa5579';
 const BLUE = '#2563eb';
@@ -1052,6 +1053,7 @@ const SessionTable = ({
   loadingBatches,
   onFilterChange,
   onFilterReset,
+  hideFilters = false,
   assignmentDrafts = {},
   trainerOptions = [],
   loadingTrainers = false,
@@ -1063,6 +1065,7 @@ const SessionTable = ({
       <span>{sessions.length} session(s)</span>
     </div>
 
+    {!hideFilters && (
     <div className="st-sessions-table__filters">
       <div className="st-filters__grid">
         <label className="st-filter-field">
@@ -1126,6 +1129,7 @@ const SessionTable = ({
         </button>
       )}
     </div>
+    )}
 
     {sessions.length === 0 ? (
       <p className="st-sessions-table__empty">
@@ -2305,6 +2309,13 @@ const SeniorTrainerModule = () => {
   const [loadingCenters, setLoadingCenters] = useState(true);
   const [loadingCourses, setLoadingCourses] = useState(false);
   const [loadingBatches, setLoadingBatches] = useState(false);
+  const [timetableOpen, setTimetableOpen] = useState(false);
+  const [draftCourseId, setDraftCourseId] = useState('');
+  const [draftBatchId, setDraftBatchId] = useState('');
+  const [draftBatches, setDraftBatches] = useState([]);
+  const [loadingDraftBatches, setLoadingDraftBatches] = useState(false);
+  const [searchMessage, setSearchMessage] = useState('');
+  const [openedSelection, setOpenedSelection] = useState(null);
 
   const [sessions, setSessions] = useState([]);
   const [selectedSessionId, setSelectedSessionId] = useState('');
@@ -2556,7 +2567,38 @@ const SeniorTrainerModule = () => {
   }, [filters.center]);
 
   useEffect(() => {
-    if (!token || !filters.center || !filters.course) {
+    if (!token || !draftCourseId) {
+      setDraftBatches([]);
+      return undefined;
+    }
+    let cancelled = false;
+    const loadDraftBatches = async () => {
+      setLoadingDraftBatches(true);
+      try {
+        const res = await axios.get(`${backendUrl}/college/get_batches`, {
+          headers: { 'x-auth': token },
+          params: { courseId: draftCourseId },
+        });
+        if (cancelled) return;
+        const rows = (res.data?.data || []).map((batch) => ({
+          value: String(batch._id),
+          label: batch.name || 'Batch',
+        }));
+        setDraftBatches(rows);
+        setDraftBatchId((current) => (rows.some((row) => row.value === current) ? current : ''));
+      } catch (err) {
+        console.error('Failed to load course batches', err);
+        if (!cancelled) setDraftBatches([]);
+      } finally {
+        if (!cancelled) setLoadingDraftBatches(false);
+      }
+    };
+    loadDraftBatches();
+    return () => { cancelled = true; };
+  }, [draftCourseId, token, backendUrl]);
+
+  useEffect(() => {
+    if (!token || !filters.course) {
       setBatchOptions([]);
       return undefined;
     }
@@ -2564,8 +2606,8 @@ const SeniorTrainerModule = () => {
       setLoadingBatches(true);
       try {
         const params = new URLSearchParams();
-        params.set('centerId', filters.center);
         params.set('courseId', filters.course);
+        if (filters.center) params.set('centerId', filters.center);
         const res = await axios.get(`${backendUrl}/college/get_batches?${params.toString()}`, {
           headers: { 'x-auth': token },
         });
@@ -2607,6 +2649,36 @@ const SeniorTrainerModule = () => {
     setSelectedSessionId('');
   };
 
+  const handleDraftCourseChange = (value) => {
+    setDraftCourseId(value);
+    setDraftBatchId('');
+    setSearchMessage('');
+  };
+
+  const handleTimetableSearch = (event) => {
+    event.preventDefault();
+    if (!draftCourseId || !draftBatchId) {
+      setSearchMessage('Select course and batch.');
+      return;
+    }
+    const course = courseOptions.find((item) => item.value === draftCourseId);
+    const batch = draftBatches.find((item) => item.value === draftBatchId);
+    setSearchMessage('');
+    setOpenedSelection({
+      courseName: course?.label || 'Course',
+      batchName: batch?.label || 'Batch',
+    });
+    setFilters({ center: '', course: draftCourseId, batch: draftBatchId });
+    setSelectedSessionId('');
+    setTimetableOpen(true);
+  };
+
+  const handleTimetableBack = () => {
+    setTimetableOpen(false);
+    setFilters({ center: '', course: '', batch: '' });
+    setSelectedSessionId('');
+  };
+
   const totSessions = useMemo(
     () => sessions.filter((session) => isTotSession(session)).map(mapSessionForTotCalendar),
     [sessions]
@@ -2644,6 +2716,75 @@ const SeniorTrainerModule = () => {
     );
   }
 
+  if (!timetableOpen) {
+    return (
+      <div className="container py-4 vt-page vt-screen-enter">
+        <div className="vt-shell">
+          <div className="vt-head">
+            <div>
+              <p className="vt-kicker">Training</p>
+              <h4 style={{ margin: '2px 0 0', fontWeight: 800, color: '#1e293b' }}>Batch Time Table</h4>
+            </div>
+          </div>
+
+          <form onSubmit={handleTimetableSearch} style={{ marginTop: 18 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, maxWidth: 720 }}>
+              <label>
+                <span style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9f1239', marginBottom: 6 }}>Course</span>
+                <select
+                  className="form-select"
+                  value={draftCourseId}
+                  onChange={(e) => handleDraftCourseChange(e.target.value)}
+                  disabled={loadingCenters}
+                >
+                  <option value="">{loadingCenters ? 'Loading...' : 'Select course'}</option>
+                  {courseOptions.map((item) => (
+                    <option key={item.value} value={item.value}>{item.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9f1239', marginBottom: 6 }}>Batch</span>
+                <select
+                  className="form-select"
+                  value={draftBatchId}
+                  onChange={(e) => {
+                    setDraftBatchId(e.target.value);
+                    setSearchMessage('');
+                  }}
+                  disabled={!draftCourseId || loadingDraftBatches}
+                >
+                  <option value="">
+                    {!draftCourseId
+                      ? 'Select course first'
+                      : loadingDraftBatches
+                        ? 'Loading...'
+                        : draftBatches.length
+                          ? 'Select batch'
+                          : 'No batches for this course'}
+                  </option>
+                  {draftBatches.map((item) => (
+                    <option key={item.value} value={item.value}>{item.label}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div style={{ marginTop: 16 }}>
+              <button type="submit" className="vt-add">Search</button>
+            </div>
+            {searchMessage && <p className="text-danger mt-3 mb-0">{searchMessage}</p>}
+          </form>
+
+          <div className="vt-empty">
+            <i className="bi bi-funnel"></i>
+            <h5>Search to see the time table</h5>
+            <p>Choose a course, then the batch connected to that course.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="st-portal">
       <style>{ST_CSS}</style>
@@ -2654,9 +2795,15 @@ const SeniorTrainerModule = () => {
             <i className="fas fa-user-shield" /> Senior Trainer
           </div>
           <h1 className="st-title">Training Calendar</h1>
-                   
+          {openedSelection && (
+            <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 14 }}>
+              {openedSelection.courseName} · {openedSelection.batchName}
+            </p>
+          )}
         </div>
-        
+        <button type="button" className="vt-back" onClick={handleTimetableBack}>
+          Change course / batch
+        </button>
       </header>
 
 
@@ -2716,6 +2863,7 @@ const SeniorTrainerModule = () => {
           loadingBatches={loadingBatches}
           onFilterChange={handleFilterChange}
           onFilterReset={handleFilterReset}
+          hideFilters
           assignmentDrafts={assignmentDrafts}
           trainerOptions={trainerOptions}
           loadingTrainers={loadingTrainers}

@@ -15000,9 +15000,52 @@ useEffect(() => {
     setKycRejectionReason('');
   };
 
+  const getProfileMandatoryKycFailures = (profile) => {
+    const requiredDocs = profile?._course?.docsRequired;
+    if (!Array.isArray(requiredDocs)) return null;
+    const mandatoryDocs = requiredDocs.filter((d) => d && d.mandatory === true && d.status !== false);
+    if (!mandatoryDocs.length) {
+      return [{ name: 'This course has no mandatory documents configured', reason: 'none_configured' }];
+    }
+    const uploads = Array.isArray(profile.uploadedDocs) ? profile.uploadedDocs : [];
+    return mandatoryDocs.flatMap((req) => {
+      const id = String(req._id);
+      const name = req.Name || req.name || 'Document';
+      const combined = uploads.find((u) => String(u._id) === id && Array.isArray(u.uploads));
+      let latest = null;
+      if (combined) {
+        latest = combined.uploads.length ? combined.uploads[combined.uploads.length - 1] : null;
+      } else {
+        const matching = uploads.filter((u) => {
+          const docsId = u?.docsId?._id || u?.docsId;
+          return docsId && String(docsId) === id;
+        });
+        latest = matching.length ? matching[matching.length - 1] : null;
+      }
+      if (!latest) return [{ name, reason: 'missing' }];
+      if (latest.status !== 'Verified') return [{ name, reason: 'not_verified', status: latest.status || 'Pending' }];
+      return [];
+    });
+  };
+
+  const formatMandatoryKycFailures = (failures) => {
+    if (failures?.some((f) => f.reason === 'none_configured')) {
+      return 'KYC cannot be marked done. This course has no mandatory documents to verify.';
+    }
+    const lines = (failures || []).map((f) => (
+      `${f.name} (${f.reason === 'missing' ? 'not uploaded' : (f.status || 'not verified')})`
+    ));
+    return `All mandatory documents must be verified before marking KYC done:\n${lines.join('\n')}`;
+  };
+
   const handleKycMarkDone = async (profile) => {
     if (!profile?._id || profile.kyc === true) {
       if (profile?.kyc === true) alert('KYC is already marked as done for this candidate.');
+      return;
+    }
+    const localFailures = getProfileMandatoryKycFailures(profile);
+    if (localFailures?.length) {
+      alert(formatMandatoryKycFailures(localFailures));
       return;
     }
     if (!window.confirm('Mark KYC as done for this candidate? All mandatory documents must be verified.')) return;
