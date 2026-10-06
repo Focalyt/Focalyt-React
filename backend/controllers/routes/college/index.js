@@ -3774,12 +3774,21 @@ function buildB2cListStageMatch(leadStatus) {
 	if (status === MOVED_IN_KYC_STATUS_ID) {
 		return { kycStage: { $in: [true] } };
 	}
-	if (status === WON_LEAD_STATUS_ID) {
-		return {
-			kyc: { $ne: true },
-			admissionDone: { $ne: true },
-		};
-	}
+	// if (status === WON_LEAD_STATUS_ID) {
+	// 	return {
+	// 		// kyc: { $ne: true },
+	// 		// admissionDone: { $ne: true },
+	// 		kycStage: { $in: [true] },
+	// 	};
+	// }
+
+	if (status === MOVED_IN_KYC_STATUS_ID) {
+        return { kycStage: { $in: [true] } };
+    }
+
+    if (status === WON_LEAD_STATUS_ID) {
+        return {};
+    }
 	return {
 		kycStage: { $ne: true },
 		kyc: { $ne: true },
@@ -5075,8 +5084,8 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 		const wonKeptInKycMatch = {
 			_leadStatus: new mongoose.Types.ObjectId(WON_LEAD_STATUS_ID),
 			kycStage: true,
-			kyc: { $ne: true },
-			admissionDone: { $ne: true },
+			// kyc: { $ne: true },
+			// admissionDone: { $ne: true },
 			_course: { $in: collegeCourseIds },
 		};
 		if (Array.isArray(candidateIds)) {
@@ -5310,6 +5319,15 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			else if (_id === 'rejected') approvalCounts.rejected += count;
 			else approvalCounts.pending += count;
 		});
+
+		console.log('[registrationCrmFilterCounts]', JSON.stringify({
+			url: req.originalUrl,
+			query: req.query,
+			all: counts.all,
+			won: counts[WON_LEAD_STATUS_ID] || null,
+			movedInKyc: counts[MOVED_IN_KYC_STATUS_ID] || null,
+			wonKeptInKyc: wonKeptInKycCount[0]?.total || 0,
+		}, null, 2));
 
 		res.status(200).json({ success: true, crmFilterCount: counts, aiCrmFilterCount: aiCounts, approvalCounts });
 
@@ -10739,6 +10757,12 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 		}
 
 		if (req.query.countOnly === 'true' || req.query.countsOnly === 'true') {
+			console.log('[kycCandidates]', JSON.stringify({
+				url: req.originalUrl,
+				query: req.query,
+				totalCount: listTotalCount,
+				crmFilterCounts,
+			}, null, 2));
 			return res.status(200).json({
 				success: true,
 				count: 0,
@@ -10891,7 +10915,13 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			result.followup = followup
 		}
 
-		// console.log("paginatedResult", JSON.stringify(paginatedResult[0], null, 2))
+		console.log('[kycCandidates]', JSON.stringify({
+			url: req.originalUrl,
+			query: req.query,
+			totalCount,
+			pageCount: paginatedResult.length,
+			crmFilterCounts,
+		}, null, 2));
 
 		res.status(200).json({
 			success: true,
