@@ -68,8 +68,8 @@ const ViewCourses = () => {
   // State variables
   const [courses, setCourses] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [sectors, setSectors] = useState([]);
   const [status, setStatus] = useState(false);
-  const [isArchived, setIsArchived] = useState(false);
   const [permissions, setPermissions] = useState();
   const canBeAcademicCoordinator =
     permissions?.permission_type === 'Admin' ||
@@ -77,6 +77,7 @@ const ViewCourses = () => {
       permissions?.custom_permissions?.can_be_academic_coordinator === true);
   const [filterData, setFilterData] = useState({
     name: '',
+    sector: '',
     vertical: '',
     Profile: '',
     status: 'true'
@@ -103,12 +104,11 @@ const ViewCourses = () => {
   // Get query params from URL
   useEffect(() => {
     const queryParams = qs.parse(location.search);
-    const initialArchived = queryParams.status === 'false';
-    setIsArchived(initialArchived);
 
     // Set filter data from query params
     setFilterData({
       name: queryParams.name || '',
+      sector: queryParams.sector || '',
       vertical: queryParams.vertical || '',
       Profile: queryParams.Profile || '',
       status: queryParams.status || 'true'
@@ -136,6 +136,29 @@ const ViewCourses = () => {
       }
     };
     loadDepartments();
+  }, [backendUrl]);
+
+  useEffect(() => {
+    const loadSectors = async () => {
+      try {
+        const response = await axios.get(`${backendUrl}/api/sectorList`);
+        const list = Array.isArray(response.data) ? response.data : [];
+        setSectors(
+          [...list]
+            .filter((item) => item && item.status !== false)
+            .sort((a, b) =>
+              String(a?.name || '').localeCompare(String(b?.name || ''), undefined, {
+                sensitivity: 'base',
+                numeric: true,
+              })
+            )
+        );
+      } catch (error) {
+        console.error('Error fetching sectors:', error);
+        setSectors([]);
+      }
+    };
+    loadSectors();
   }, [backendUrl]);
 
   const departmentNameOf = (course) => {
@@ -169,11 +192,22 @@ const ViewCourses = () => {
     }
   };
 
-  // Handle archived checkbox change
-  const handleArchivedChange = () => {
-    const newArchived = !isArchived;
-    setIsArchived(newArchived);
-    navigate(`/institute/viewcourse?status=${!newArchived}`);
+  const statusTab =
+    filterData.status === 'false' || filterData.status === 'inactive'
+      ? 'inactive'
+      : filterData.status === 'all'
+        ? 'all'
+        : 'active';
+
+  const handleStatusTab = (tab) => {
+    const queryParams = {};
+    ['name', 'sector', 'vertical', 'Profile'].forEach((key) => {
+      if (filterData[key]) queryParams[key] = filterData[key];
+    });
+    if (tab === 'inactive') queryParams.status = 'false';
+    else if (tab === 'all') queryParams.status = 'all';
+    else queryParams.status = 'true';
+    navigate(`/institute/viewcourse?${qs.stringify(queryParams)}`);
   };
 
   // Handle toggle status - FIXED VERSION
@@ -316,11 +350,22 @@ const ViewCourses = () => {
     navigate('/institute/viewcourse');
   };
 
+  const courseMatchesSector = (course, sectorId) => {
+    if (!sectorId) return true;
+    const list = Array.isArray(course?.sectors) ? course.sectors : [];
+    return list.some((sector) => {
+      const id = sector && typeof sector === 'object' ? sector._id : sector;
+      return String(id || '') === String(sectorId);
+    });
+  };
+
   const visibleCourses = courses.filter((course) => {
-    if (!filterData.vertical) return true;
-    const vertical = course.vertical;
-    const id = vertical && typeof vertical === 'object' ? vertical._id : vertical;
-    return String(id || '') === String(filterData.vertical);
+    if (filterData.vertical) {
+      const vertical = course.vertical;
+      const id = vertical && typeof vertical === 'object' ? vertical._id : vertical;
+      if (String(id || '') !== String(filterData.vertical)) return false;
+    }
+    return courseMatchesSector(course, filterData.sector);
   });
 
   return (
@@ -376,37 +421,41 @@ const ViewCourses = () => {
             <h5 style={{ margin: 0, fontWeight: 700, color: '#1e293b', fontSize: '15px', paddingLeft: '12px', borderLeft: '4px solid #FC2B5A', borderRadius: '2px' }}>
               Filter Courses
             </h5>
-            {/* Archive Toggle */}
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
-              <div style={{ position: 'relative', width: '40px', height: '22px' }}>
-                <input
-                  type="checkbox"
-                  id="checkbox1"
-                  checked={isArchived}
-                  onChange={handleArchivedChange}
-                  style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
-                />
-                <div style={{
-                  position: 'absolute', inset: 0,
-                  background: isArchived ? '#FC2B5A' : '#cbd5e1',
-                  borderRadius: '20px',
-                  transition: '0.2s',
-                  cursor: 'pointer',
-                }}>
-                  <div style={{
-                    position: 'absolute',
-                    top: '3px',
-                    left: isArchived ? '21px' : '3px',
-                    width: '16px', height: '16px',
-                    background: 'white',
-                    borderRadius: '50%',
-                    transition: '0.2s',
-                    boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
-                  }}></div>
-                </div>
-              </div>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>Show Archived</span>
-            </label>
+            <div style={{
+              display: 'flex',
+              gap: '6px',
+              background: '#fff1f4',
+              padding: '5px',
+              borderRadius: '999px',
+              flexWrap: 'wrap',
+            }}>
+              {[
+                { id: 'active', label: 'Active' },
+                { id: 'inactive', label: 'Inactive' },
+                { id: 'all', label: 'All' },
+              ].map((tab) => {
+                const selected = statusTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => handleStatusTab(tab.id)}
+                    style={{
+                      border: 0,
+                      background: selected ? '#FC2B5A' : 'transparent',
+                      color: selected ? '#fff' : '#9f1239',
+                      borderRadius: '999px',
+                      padding: '7px 14px',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <Form onSubmit={handleFilterSubmit}>
@@ -423,6 +472,20 @@ const ViewCourses = () => {
                   placeholder="Search by name..."
                   style={inputStyle}
                 />
+              </div>
+              <div style={{ flex: '1 1 180px', minWidth: '160px' }}>
+                <label style={labelStyle}>Sector</label>
+                <select
+                  name="sector"
+                  value={filterData.sector}
+                  onChange={handleInputChange}
+                  style={inputStyle}
+                >
+                  <option value="">All</option>
+                  {sectors.map((sector) => (
+                    <option key={sector._id} value={sector._id}>{sector.name}</option>
+                  ))}
+                </select>
               </div>
               <div style={{ flex: '1 1 180px', minWidth: '160px' }}>
                 <label style={labelStyle}>Department</label>

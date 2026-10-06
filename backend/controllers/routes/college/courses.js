@@ -746,13 +746,21 @@ router
 				fields.vertical = data.vertical;
 			}
 
+			if (data.sector && mongoose.Types.ObjectId.isValid(data.sector)) {
+				fields.sectors = new mongoose.Types.ObjectId(data.sector);
+			}
+
 			let status = true;
 			let isChecked = "false";
-			if (req.query.status !== undefined && req.query.status.toString() === "false") {
-				status = false;
-				isChecked = "true";
+			const statusQuery = req.query.status !== undefined ? String(req.query.status).toLowerCase() : "";
+			const showAllStatuses = statusQuery === "all";
+			if (!showAllStatuses) {
+				if (statusQuery === "false" || statusQuery === "inactive") {
+					status = false;
+					isChecked = "true";
+				}
+				fields["status"] = status;
 			}
-			fields["status"] = status;
 
 			const courses = await Courses.find({
 				...fields,

@@ -2268,7 +2268,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                           <div className="vt-actions">
                             <button
                               type="button"
-                              title="Pool of Trainer and Senior Trainer"
+                              title="Assign Trainer"
                               onClick={() => openTrainerModal(batch)}
                             >
                               <i className="bi bi-people"></i>
@@ -4401,7 +4401,7 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                   <div className="assign-modal__head">
                     <div>
                       <p className="assign-modal__kicker">Batch team</p>
-                      <h2>Pool of Trainer and Senior Trainer</h2>
+                      <h2>Assign Trainer</h2>
                       {selectedBatchForTrainer && (
                         <p>
                           Batch <strong>{selectedBatchForTrainer.name}</strong>
