@@ -536,7 +536,7 @@ const Project = ({ selectedVertical = null, onBackToVerticals = null, stopAtCent
             </button>
           )}
           {canEditProject && (
-            <button type="button" className="vt-add" onClick={handleAdd}>Add Project</button>
+            <button type="button" className="vt-add" onClick={handleAdd}>+ Project</button>
           )}
         </div>
       </div>

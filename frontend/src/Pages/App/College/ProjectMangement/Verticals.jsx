@@ -359,7 +359,7 @@ const CandidateManagementPortal = ({ stopAtCenter = false }) => {
             <h4>Verticals</h4>
           </div>
           {((permissions?.custom_permissions?.can_add_vertical && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin') && (
-            <button type="button" className="vt-add" onClick={handleAdd}>Add Vertical</button>
+            <button type="button" className="vt-add" onClick={handleAdd}>+ Department</button>
           )}
         </div>
 

@@ -71,8 +71,6 @@ const ViewCourses = () => {
   const [isArchived, setIsArchived] = useState(false);
   const [filterData, setFilterData] = useState({
     name: '',
-    FromDate: '',
-    ToDate: '',
     Profile: '',
     status: 'true'
   });
@@ -86,14 +84,14 @@ const ViewCourses = () => {
     // Set filter data from query params
     setFilterData({
       name: queryParams.name || '',
-      FromDate: queryParams.FromDate || '',
-      ToDate: queryParams.ToDate || '',
       Profile: queryParams.Profile || '',
       status: queryParams.status || 'true'
     });
 
-    // Fetch courses based on query params
-    fetchCourses(queryParams);
+    const courseParams = { ...queryParams };
+    delete courseParams.FromDate;
+    delete courseParams.ToDate;
+    fetchCourses(courseParams);
   }, [location.search]);
 
   // Fetch courses data
@@ -163,21 +161,9 @@ const ViewCourses = () => {
     setFilterData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Validate date filters
-  const validateFilters = () => {
-    if ((filterData.FromDate && !filterData.ToDate) || (!filterData.FromDate && filterData.ToDate)) {
-      return false;
-    }
-    return true;
-  };
-
   // Handle filter form submit
   const handleFilterSubmit = (e) => {
     e.preventDefault();
-
-    if (!validateFilters()) {
-      return;
-    }
 
     // Build query string for navigation
     const queryParams = {};
@@ -296,34 +282,6 @@ const ViewCourses = () => {
                   placeholder="Search by name..."
                   style={inputStyle}
                 />
-              </div>
-              {/* From Date */}
-              <div style={{ flex: '1 1 150px', minWidth: '140px' }}>
-                <label style={labelStyle}>From Date</label>
-                <input
-                  type="date"
-                  name="FromDate"
-                  value={filterData.FromDate}
-                  onChange={handleInputChange}
-                  style={{ ...inputStyle, borderColor: (!filterData.FromDate && filterData.ToDate) ? '#ef4444' : '#e2e8f0' }}
-                />
-                {(!filterData.FromDate && filterData.ToDate) && (
-                  <span style={{ fontSize: '11px', color: '#ef4444', marginTop: '3px', display: 'block' }}>Required</span>
-                )}
-              </div>
-              {/* To Date */}
-              <div style={{ flex: '1 1 150px', minWidth: '140px' }}>
-                <label style={labelStyle}>To Date</label>
-                <input
-                  type="date"
-                  name="ToDate"
-                  value={filterData.ToDate}
-                  onChange={handleInputChange}
-                  style={{ ...inputStyle, borderColor: (filterData.FromDate && !filterData.ToDate) ? '#ef4444' : '#e2e8f0' }}
-                />
-                {(filterData.FromDate && !filterData.ToDate) && (
-                  <span style={{ fontSize: '11px', color: '#ef4444', marginTop: '3px', display: 'block' }}>Required</span>
-                )}
               </div>
               {/* Profile */}
               <div style={{ flex: '1 1 150px', minWidth: '140px' }}>

@@ -742,6 +742,10 @@ router
 				};
 			}
 
+			if (data.vertical && mongoose.Types.ObjectId.isValid(data.vertical)) {
+				fields.vertical = data.vertical;
+			}
+
 			let status = true;
 			let isChecked = "false";
 			if (req.query.status !== undefined && req.query.status.toString() === "false") {

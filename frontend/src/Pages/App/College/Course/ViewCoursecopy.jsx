@@ -67,6 +67,7 @@ const ViewCourses = () => {
 
   // State variables
   const [courses, setCourses] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [status, setStatus] = useState(false);
   const [isArchived, setIsArchived] = useState(false);
   const [permissions, setPermissions] = useState();
@@ -76,8 +77,7 @@ const ViewCourses = () => {
       permissions?.custom_permissions?.can_be_academic_coordinator === true);
   const [filterData, setFilterData] = useState({
     name: '',
-    FromDate: '',
-    ToDate: '',
+    vertical: '',
     Profile: '',
     status: 'true'
   });
@@ -109,15 +109,42 @@ const ViewCourses = () => {
     // Set filter data from query params
     setFilterData({
       name: queryParams.name || '',
-      FromDate: queryParams.FromDate || '',
-      ToDate: queryParams.ToDate || '',
+      vertical: queryParams.vertical || '',
       Profile: queryParams.Profile || '',
       status: queryParams.status || 'true'
     });
 
-    // Fetch courses based on query params
-    fetchCourses(queryParams);
+    const courseParams = { ...queryParams };
+    delete courseParams.FromDate;
+    delete courseParams.ToDate;
+    fetchCourses(courseParams);
   }, [location.search]);
+
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        const user = JSON.parse(sessionStorage.getItem('user') || '{}');
+        if (!user.token) return;
+        const response = await axios.get(`${backendUrl}/college/getVerticals`, {
+          headers: { 'x-auth': user.token },
+        });
+        const list = Array.isArray(response.data?.data) ? response.data.data : [];
+        setDepartments(list.filter((item) => item.status !== false));
+      } catch (error) {
+        console.error('Error fetching departments:', error);
+        setDepartments([]);
+      }
+    };
+    loadDepartments();
+  }, [backendUrl]);
+
+  const departmentNameOf = (course) => {
+    const vertical = course?.vertical;
+    if (vertical && typeof vertical === 'object' && vertical.name) return vertical.name;
+    const id = vertical && typeof vertical === 'object' ? vertical._id : vertical;
+    const match = departments.find((item) => String(item._id) === String(id));
+    return match?.name || '—';
+  };
 
   // Fetch courses data
   const fetchCourses = async (params) => {
@@ -268,21 +295,9 @@ const ViewCourses = () => {
     setFilterData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Validate date filters
-  const validateFilters = () => {
-    if ((filterData.FromDate && !filterData.ToDate) || (!filterData.FromDate && filterData.ToDate)) {
-      return false;
-    }
-    return true;
-  };
-
   // Handle filter form submit
   const handleFilterSubmit = (e) => {
     e.preventDefault();
-
-    if (!validateFilters()) {
-      return;
-    }
 
     // Build query string for navigation
     const queryParams = {};
@@ -300,6 +315,13 @@ const ViewCourses = () => {
   const handleResetFilters = () => {
     navigate('/institute/viewcourse');
   };
+
+  const visibleCourses = courses.filter((course) => {
+    if (!filterData.vertical) return true;
+    const vertical = course.vertical;
+    const id = vertical && typeof vertical === 'object' ? vertical._id : vertical;
+    return String(id || '') === String(filterData.vertical);
+  });
 
   return (
     <div style={{ background: '#f1f5f9', minHeight: '100vh', padding: '20px' }}>
@@ -336,7 +358,7 @@ const ViewCourses = () => {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '13px', opacity: 0.9 }}>Total: {courses.length} courses</span>
+          <span style={{ fontSize: '13px', opacity: 0.9 }}>Total: {visibleCourses.length} courses</span>
         </div>
       </div>
 
@@ -402,33 +424,19 @@ const ViewCourses = () => {
                   style={inputStyle}
                 />
               </div>
-              {/* From Date */}
-              <div style={{ flex: '1 1 150px', minWidth: '140px' }}>
-                <label style={labelStyle}>From Date</label>
-                <input
-                  type="date"
-                  name="FromDate"
-                  value={filterData.FromDate}
+              <div style={{ flex: '1 1 180px', minWidth: '160px' }}>
+                <label style={labelStyle}>Department</label>
+                <select
+                  name="vertical"
+                  value={filterData.vertical}
                   onChange={handleInputChange}
-                  style={{ ...inputStyle, borderColor: (!filterData.FromDate && filterData.ToDate) ? '#ef4444' : '#e2e8f0' }}
-                />
-                {(!filterData.FromDate && filterData.ToDate) && (
-                  <span style={{ fontSize: '11px', color: '#ef4444', marginTop: '3px', display: 'block' }}>Required</span>
-                )}
-              </div>
-              {/* To Date */}
-              <div style={{ flex: '1 1 150px', minWidth: '140px' }}>
-                <label style={labelStyle}>To Date</label>
-                <input
-                  type="date"
-                  name="ToDate"
-                  value={filterData.ToDate}
-                  onChange={handleInputChange}
-                  style={{ ...inputStyle, borderColor: (filterData.FromDate && !filterData.ToDate) ? '#ef4444' : '#e2e8f0' }}
-                />
-                {(filterData.FromDate && !filterData.ToDate) && (
-                  <span style={{ fontSize: '11px', color: '#ef4444', marginTop: '3px', display: 'block' }}>Required</span>
-                )}
+                  style={inputStyle}
+                >
+                  <option value="">All</option>
+                  {departments.map((department) => (
+                    <option key={department._id} value={department._id}>{department.name}</option>
+                  ))}
+                </select>
               </div>
               {/* Profile */}
               <div style={{ flex: '1 1 150px', minWidth: '140px' }}>
@@ -460,7 +468,7 @@ const ViewCourses = () => {
 
         {/* Table */}
         <div style={{ overflowX: 'auto' }}>
-          {courses.length === 0 ? (
+          {visibleCourses.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 20px' }}>
               <div style={{ fontSize: '48px', marginBottom: '12px', opacity: 0.3 }}>📚</div>
               <p style={{ color: '#94a3b8', fontWeight: 600, fontSize: '15px', margin: 0 }}>No courses found</p>
@@ -470,7 +478,7 @@ const ViewCourses = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#f8fafc' }}>
-                  {['#', 'Sector', 'Course Level', 'Course Name', 'Duration',
+                  {['#', 'Sector', 'Course Level', 'Course Name', 'Department', 'Duration',
                     // ...(status === 'true' || status === true ? ['Add Leads'] : []),
                     'Status', 'Action'].map((h, i) => (
                     <th key={i} style={{
@@ -488,7 +496,7 @@ const ViewCourses = () => {
                 </tr>
               </thead>
               <tbody>
-                {courses.map((course, i) => (
+                {visibleCourses.map((course, i) => (
                   <tr key={course._id} style={{
                     borderBottom: '1px solid #f8fafc',
                     transition: 'background 0.15s',
@@ -528,6 +536,9 @@ const ViewCourses = () => {
                     {/* Course Name */}
                     <td style={{ ...tdStyle, fontWeight: 600, color: '#1e293b', maxWidth: '200px' }}>
                       {course.name}
+                    </td>
+                    <td style={{ ...tdStyle, color: '#475569' }}>
+                      {departmentNameOf(course)}
                     </td>
                     {/* Duration */}
                     <td style={{ ...tdStyle, color: '#475569' }}>

@@ -588,9 +588,9 @@ const updatedPermission = async () => {
                             <i className="bi bi-arrow-left"></i> Back
                         </button>
                     )}
-                    <button type="button" className="vt-back" title="Align Existing Center" onClick={handleAlign}>Align Center</button>
+                    <button type="button" className="vt-back" title="Assign New Center" onClick={handleAlign}>Assign New Center</button>
                     {canEditCenter && (
-                        <button type="button" className="vt-add" onClick={handleAdd}>Add Center</button>
+                        <button type="button" className="vt-add" onClick={handleAdd}>+ Center</button>
                     )}
                 </div>
             </div>

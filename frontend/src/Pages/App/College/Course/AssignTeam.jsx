@@ -355,7 +355,7 @@ const AssignTeam = () => {
         <div className="vt-head">
           <div>
             <p className="vt-kicker">Training</p>
-            <h4 style={{ margin: '2px 0 0', fontWeight: 800, color: '#1e293b' }}>Assign Team</h4>
+            <h4 style={{ margin: '2px 0 0', fontWeight: 800, color: '#1e293b' }}>Team Details</h4>
           </div>
         </div>
 

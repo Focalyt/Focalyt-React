@@ -424,7 +424,9 @@ function CollegeLayout({ children }) {
     events: false,
     placements: false,
     trainerManagement: false,
-    hr: false
+    hr: false,
+    department: window.location.pathname === '/institute/new-training/centers',
+    departmentProject: window.location.pathname === '/institute/new-training/centers'
   });
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1199);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1199);
@@ -583,7 +585,9 @@ function CollegeLayout({ children }) {
     events: useRef(null),
     placements: useRef(null),
     trainerManagement: useRef(null),
-    hr: useRef(null)
+    hr: useRef(null),
+    department: useRef(null),
+    departmentProject: useRef(null)
   };
 
   const handleItemClick = (item) => {
@@ -603,7 +607,9 @@ function CollegeLayout({ children }) {
     events: '0px',
     placements: '0px',
     trainerManagement: '0px',
-    hr: '0px'
+    hr: '0px',
+    department: '0px',
+    departmentProject: '0px'
   });
 
   const B2B_SETTINGS_SUBMENU_MAX = 280;
@@ -654,12 +660,59 @@ function CollegeLayout({ children }) {
       ...newHeights,
     }));
 
-    if (openSubmenu.settings && openSubmenu.dropdown) {
+    if ((openSubmenu.settings && openSubmenu.dropdown) || (openSubmenu.department && openSubmenu.departmentProject)) {
       requestAnimationFrame(() => {
         requestAnimationFrame(recalcOpenSubmenuHeights);
       });
     }
   }, [openSubmenu]);
+
+  const [historyTick, setHistoryTick] = useState(0);
+
+  useEffect(() => {
+    const notify = () => setHistoryTick((n) => n + 1);
+    const originalReplace = window.history.replaceState.bind(window.history);
+    const originalPush = window.history.pushState.bind(window.history);
+    window.history.replaceState = (...args) => {
+      originalReplace(...args);
+      notify();
+    };
+    window.history.pushState = (...args) => {
+      originalPush(...args);
+      notify();
+    };
+    window.addEventListener('popstate', notify);
+    return () => {
+      window.history.replaceState = originalReplace;
+      window.history.pushState = originalPush;
+      window.removeEventListener('popstate', notify);
+    };
+  }, []);
+
+  const trainingParams = new URLSearchParams(historyTick >= 0 ? window.location.search : '');
+  const trainingStage = trainingParams.get('stage') || '';
+  const trainingVerticalId = trainingParams.get('verticalId') || '';
+  const trainingProjectId = trainingParams.get('projectId') || '';
+  const onDepartmentNav = window.location.pathname === '/institute/new-training/centers';
+  const departmentActive = onDepartmentNav && (!trainingStage || trainingStage === 'vertical');
+  const projectActive = onDepartmentNav && trainingStage === 'project';
+  const centerActive = onDepartmentNav && (trainingStage === 'center' || trainingStage === 'course' || trainingStage === 'batch');
+  const departmentHref = '/institute/new-training/centers';
+  const projectHref = trainingVerticalId
+    ? `${departmentHref}?stage=project&verticalId=${trainingVerticalId}`
+    : departmentHref;
+  const centerHref = trainingVerticalId && trainingProjectId
+    ? `${departmentHref}?stage=center&verticalId=${trainingVerticalId}&projectId=${trainingProjectId}`
+    : projectHref;
+
+  useEffect(() => {
+    if (location.pathname !== '/institute/new-training/centers') return;
+    setOpenSubmenu((prev) => ({
+      ...prev,
+      department: true,
+      departmentProject: true,
+    }));
+  }, [location.pathname]);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -809,11 +862,83 @@ function CollegeLayout({ children }) {
                 </Link>
               </li>
                 
-              <li className={`nav-item ${location.pathname === '/institute/new-training/centers' ? 'active' : ''}`}>
-                <Link to="/institute/new-training/centers" onClick={() => handleSidebarClose()}>
-                  <FontAwesomeIcon icon={faBuilding} />
-                  <span className="menu-title">Centers </span>
+              <li className={`nav-item has-sub dropdown-department ${openSubmenu.department ? 'open' : ''} ${departmentActive ? 'active' : ''}`}>
+                <Link
+                  to={departmentHref}
+                  onClick={() => {
+                    handleSidebarClose();
+                    setOpenSubmenu((prev) => ({ ...prev, department: true }));
+                  }}
+                >
+                  <FontAwesomeIcon icon={faSitemap} />
+                  <span className="menu-title">Department</span>
+                  <span
+                    className="dropdown-arrow"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleSubmenu('department');
+                    }}
+                  >
+                    <FontAwesomeIcon
+                      icon={faCaretDown}
+                      className={`chevron-icon ${openSubmenu.department ? 'rotate-90' : ''}`}
+                    />
+                  </span>
                 </Link>
+                <ul
+                  ref={menuRefs.department}
+                  className="menu-content"
+                  style={{
+                    maxHeight: submenuMaxHeight.department,
+                    overflow: 'hidden',
+                    transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out',
+                    opacity: submenuMaxHeight.department === '0px' ? 0 : 1
+                  }}
+                >
+                  <li className={`nav-item has-sub ${openSubmenu.departmentProject ? 'open' : ''} ${projectActive ? 'active' : ''}`}>
+                    <Link
+                      to={projectHref}
+                      onClick={() => {
+                        handleSidebarClose();
+                        setOpenSubmenu((prev) => ({ ...prev, department: true, departmentProject: true }));
+                      }}
+                    >
+                      <FontAwesomeIcon icon={faProjectDiagram} />
+                      <span className="menu-title">Project</span>
+                      <span
+                        className="dropdown-arrow"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          toggleSubmenu('departmentProject');
+                        }}
+                      >
+                        <FontAwesomeIcon
+                          icon={faCaretDown}
+                          className={`chevron-icon ${openSubmenu.departmentProject ? 'rotate-90' : ''}`}
+                        />
+                      </span>
+                    </Link>
+                    <ul
+                      ref={menuRefs.departmentProject}
+                      className="menu-content"
+                      style={{
+                        maxHeight: submenuMaxHeight.departmentProject,
+                        overflow: 'hidden',
+                        transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out',
+                        opacity: submenuMaxHeight.departmentProject === '0px' ? 0 : 1
+                      }}
+                    >
+                      <li className={`nav-item ${centerActive ? 'active' : ''}`}>
+                        <Link to={centerHref} onClick={() => handleSidebarClose()}>
+                          <FontAwesomeIcon icon={faBuilding} />
+                          <span className="menu-title">Center</span>
+                        </Link>
+                      </li>
+                    </ul>
+                  </li>
+                </ul>
               </li>
               <li className={`nav-item ${location.pathname === '/institute/new-training/courses' ? 'active' : ''}`}>
                 <Link to="/institute/new-training/courses" onClick={() => handleSidebarClose()}>
@@ -830,7 +955,7 @@ function CollegeLayout({ children }) {
               <li className={`nav-item ${location.pathname === '/institute/new-training/assign-team' ? 'active' : ''}`}>
                 <Link to="/institute/new-training/assign-team" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faUsers} />
-                  <span className="menu-title">Assign Team </span>
+                  <span className="menu-title">Team Details</span>
                 </Link>
               </li>
               <li className={`nav-item ${location.pathname === '/institute/new-training/batch-monitoring' ? 'active' : ''}`}>
@@ -2184,6 +2309,80 @@ function CollegeLayout({ children }) {
 }
 
 .nav-item.has-sub.dropdown-settings .menu-content .menu-content .nav-item.active > a {
+  background-color: #ff3366 !important;
+  color: #fff !important;
+}
+
+/* Department → Project → Center, same nest as Settings → B2B Setting → B2B Department */
+.nav-item.has-sub.dropdown-department > a {
+  background-color: #f3f4f6 !important;
+  border-left: 2px solid #6b7280;
+  color: #374151 !important;
+}
+.nav-item.has-sub.dropdown-department > a:hover,
+.nav-item.has-sub.dropdown-department.open > a {
+  background-color: #e5e7eb !important;
+  border-left-color: #4b5563;
+  color: #374151 !important;
+}
+.nav-item.has-sub.dropdown-department.active > a,
+.nav-item.has-sub.dropdown-department.active > a span,
+.nav-item.has-sub.dropdown-department.active > a svg {
+  background-color: #ff3366 !important;
+  border-left-color: #ff3366 !important;
+  color: #fff !important;
+}
+.nav-item.has-sub.dropdown-department > .menu-content {
+  background-color: #f9fafb !important;
+  border-left: 2px solid #9ca3af;
+  margin-left: 14px !important;
+  width: calc(100% - 14px) !important;
+  padding: 4px 0 6px;
+  position: relative;
+}
+.nav-item.has-sub.dropdown-department > .menu-content > .nav-item > a {
+  background-color: transparent !important;
+  color: #555 !important;
+  padding-left: 28px !important;
+  font-size: 0.92em;
+  border-left: 2px solid transparent;
+}
+.nav-item.has-sub.dropdown-department > .menu-content > .nav-item.has-sub > a {
+  background-color: #f3f4f6 !important;
+  border-left: 2px solid #6b7280;
+  color: #374151 !important;
+}
+.nav-item.has-sub.dropdown-department > .menu-content > .nav-item.has-sub.open > a,
+.nav-item.has-sub.dropdown-department > .menu-content > .nav-item.has-sub > a:hover {
+  background-color: #e5e7eb !important;
+  border-left-color: #4b5563;
+  color: #374151 !important;
+}
+.nav-item.has-sub.dropdown-department > .menu-content > .nav-item.active > a,
+.nav-item.has-sub.dropdown-department > .menu-content > .nav-item.has-sub.active > a,
+.nav-item.has-sub.dropdown-department > .menu-content > .nav-item.active > a span,
+.nav-item.has-sub.dropdown-department > .menu-content > .nav-item.active > a svg,
+.nav-item.has-sub.dropdown-department > .menu-content > .nav-item.has-sub.active > a span,
+.nav-item.has-sub.dropdown-department > .menu-content > .nav-item.has-sub.active > a svg {
+  background-color: #ff3366 !important;
+  border-left-color: #ff3366 !important;
+  color: #fff !important;
+}
+.nav-item.has-sub.dropdown-department .menu-content .menu-content {
+  background-color: #f3f4f6 !important;
+  border-left: 2px solid #9ca3af;
+  margin-left: 18px !important;
+  width: calc(100% - 18px) !important;
+}
+.nav-item.has-sub.dropdown-department .menu-content .menu-content .nav-item > a {
+  background-color: transparent !important;
+  padding-left: 22px !important;
+  font-size: 0.9em;
+  color: #555 !important;
+}
+.nav-item.has-sub.dropdown-department .menu-content .menu-content .nav-item.active > a,
+.nav-item.has-sub.dropdown-department .menu-content .menu-content .nav-item.active > a span,
+.nav-item.has-sub.dropdown-department .menu-content .menu-content .nav-item.active > a svg {
   background-color: #ff3366 !important;
   color: #fff !important;
 }

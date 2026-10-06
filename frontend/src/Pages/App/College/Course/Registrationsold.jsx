@@ -160,6 +160,7 @@ const buildHrRequestParams = ({
       ? selectedDepartmentId
       : undefined,
     project: cycle?.project || undefined,
+    applyingFor: cycle?.job || undefined,
     statusTitle: selectedStatus?.name && selectedStatus._id !== 'all' ? selectedStatus.name : undefined,
   };
   if (filters?.hasFollowUpCall === true || filters?.hasFollowUpCall === 'yes') params.hasFollowUpCall = 'true';
@@ -1136,7 +1137,9 @@ const CRMDashboard = () => {
     batch: '',
     counsellor: '',
     owner: '',
+    job: '',
   });
+  const [jobFilterOptions, setJobFilterOptions] = useState([]);
   const [headerDatePreset, setHeaderDatePreset] = useState('');
   const [headerDateFrom, setHeaderDateFrom] = useState(() => {
     const d = new Date();
@@ -14602,6 +14605,8 @@ useEffect(() => {
       next = { ...cycleFilters, counsellor: value };
     } else if (key === 'owner') {
       next = { ...cycleFilters, owner: value };
+    } else if (key === 'job') {
+      next = { ...cycleFilters, job: value };
     }
 
     setCycleFilters(next);
@@ -14757,6 +14762,81 @@ useEffect(() => {
     setShowHeaderDateRangePicker(false);
   };
 
+  useEffect(() => {
+    if (!showAppliedJobs || !token) return undefined;
+    let cancelled = false;
+    const loadJobOptions = async () => {
+      try {
+        const cycle = { ...cycleFilters, job: '' };
+        const res = await axios.get(`${backendUrl}/college/hr/leads/counts`, {
+          headers: { 'x-auth': token },
+          params: {
+            ...buildHrRequestParams({
+              filters: { ...filterData, leadStatus: undefined },
+              cycle,
+              verticalOptions,
+              crmFilters,
+              listParts: buildListFilterQueryParts(formDataRef.current || formData, cycle),
+            }),
+            statusTitle: undefined,
+            applyingFor: undefined,
+          },
+        });
+        if (cancelled) return;
+        setJobFilterOptions((res.data?.data?.roles || []).filter(Boolean));
+      } catch (error) {
+        if (!cancelled) console.error('Error fetching job filter options:', error);
+      }
+    };
+    loadJobOptions();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    showAppliedJobs,
+    token,
+    backendUrl,
+    cycleFilters.department,
+    cycleFilters.project,
+    filterData.createdFromDate,
+    filterData.createdToDate,
+    verticalOptions,
+    crmFilters,
+    formData,
+    buildListFilterQueryParts,
+  ]);
+
+  const renderAppliedSourceToggle = (compact = false) => (
+    <div
+      className="form-check form-switch adm-header-date-range__source-toggle"
+      title="Off: leads and filters use applied courses. On: they use applied jobs."
+    >
+      <input
+        className="form-check-input"
+        type="checkbox"
+        role="switch"
+        id={compact ? 'appliedJobSourceToggleMobile' : 'appliedJobSourceToggle'}
+        checked={showAppliedJobs}
+        onChange={(e) => {
+          const next = e.target.checked;
+          showAppliedJobsRef.current = next;
+          setShowAppliedJobs(next);
+          setCrossSaleCache({});
+          setCurrentPage(1);
+          const nextCycle = next ? cycleFilters : { ...cycleFilters, job: '' };
+          if (!next && cycleFilters.job) setCycleFilters(nextCycle);
+          fetchProfileData(filterData, 1, nextCycle);
+        }}
+      />
+      <label
+        className="form-check-label"
+        htmlFor={compact ? 'appliedJobSourceToggleMobile' : 'appliedJobSourceToggle'}
+      >
+        {showAppliedJobs ? 'Applied Jobs' : 'Applied Courses'}
+      </label>
+    </div>
+  );
+
   const renderHeaderDateRangeFilter = (compact = false) => (
     <div
       className={`adm-header-date-range${compact ? ' adm-header-date-range--compact' : ''}`}
@@ -14869,6 +14949,7 @@ useEffect(() => {
             Clear
           </button>
         )}
+        {renderAppliedSourceToggle(compact)}
       </div>
     </div>
   );
@@ -14907,6 +14988,26 @@ useEffect(() => {
           ))}
         </select>
       </div>
+      {showAppliedJobs && (
+        <div className="b2b-cycle-filters__item b2b-cycle-filters__item--job">
+          <label className="b2b-cycle-filters__label" htmlFor={mobile ? 'adm-filter-job-mobile' : 'adm-filter-job'}>
+            <i className="fas fa-briefcase" aria-hidden="true" /> Job
+          </label>
+          <select
+            id={mobile ? 'adm-filter-job-mobile' : 'adm-filter-job'}
+            className="b2b-cycle-filters__select"
+            value={cycleFilters.job || ''}
+            onChange={(e) => handleCycleFilterChange('job', e.target.value)}
+          >
+            <option value="">All</option>
+            {jobFilterOptions.map((job) => (
+              <option key={job} value={job}>{job}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      {!showAppliedJobs && (
+      <>
       <div className="b2b-cycle-filters__item">
         <label className="b2b-cycle-filters__label" htmlFor="adm-filter-center">
           <i className="fas fa-building" aria-hidden="true" /> Center
@@ -14955,6 +15056,8 @@ useEffect(() => {
           ))}
         </select>
       </div>
+      </>
+      )}
       <div className="b2b-cycle-filters__item">
         <label className="b2b-cycle-filters__label" htmlFor="adm-filter-counsellor">
           <i className="fas fa-user-tie" aria-hidden="true" /> Counsellor
@@ -16722,6 +16825,10 @@ useEffect(() => {
             flex: 1 1 0;
             max-width: 70px;
           }
+          .b2b-cycle-filters__item--job{
+            max-width: 150px;
+            flex: 1.4 1 110px;
+          }
           .b2b-cycle-filters__label{
             font-size: 8px;
             font-weight: 700;
@@ -16785,6 +16892,9 @@ useEffect(() => {
             flex: 0 0 auto;
             width: 82px;
           }
+          .b2b-cycle-filters--mobile .b2b-cycle-filters__item--job{
+            width: 140px;
+          }
           .b2b-cycle-filters--mobile .b2b-cycle-filters__select{
             width: 100%;
             min-width: 0;
@@ -16805,6 +16915,33 @@ useEffect(() => {
             align-items: center;
             gap: 6px 8px;
             overflow: visible;
+          }
+          .adm-header-date-range .form-check.form-switch.adm-header-date-range__source-toggle{
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            height: 28px;
+            min-height: 0;
+            margin: 0 0 0 2px;
+            padding: 0 0 0 10px;
+            border-left: 1px solid #e5e7eb;
+            white-space: nowrap;
+          }
+          .adm-header-date-range__source-toggle.form-switch .form-check-input{
+            width: 2rem;
+            height: 1rem;
+            margin: 0;
+            cursor: pointer;
+            flex-shrink: 0;
+            float: none;
+          }
+          .adm-header-date-range__source-toggle .form-check-label{
+            margin: 0;
+            font-size: 11px;
+            font-weight: 600;
+            color: #1f2937;
+            cursor: pointer;
+            line-height: 1;
           }
           .adm-header-date-range--compact .adm-header-date-range__pills{
             flex-wrap: nowrap;
@@ -17776,31 +17913,6 @@ useEffect(() => {
                         )}
                       </div>
                       <div className="adm-cycle-toolbar__inner d-flex align-items-center gap-2">
-                            <div
-                              className="form-check form-switch mb-0 d-flex align-items-center gap-2"
-                              title="Off: leads and filters use applied courses. On: they use applied jobs."
-                              style={{ whiteSpace: 'nowrap' }}
-                            >
-                              <input
-                                className="form-check-input"
-                                type="checkbox"
-                                role="switch"
-                                id="appliedJobSourceToggle"
-                                checked={showAppliedJobs}
-                                onChange={(e) => {
-                                  const next = e.target.checked;
-                                  showAppliedJobsRef.current = next;
-                                  setShowAppliedJobs(next);
-                                  setCrossSaleCache({});
-                                  setCurrentPage(1);
-                                  fetchProfileData(filterData, 1);
-                                }}
-                                style={{ cursor: 'pointer' }}
-                              />
-                              <label className="form-check-label small fw-semibold mb-0" htmlFor="appliedJobSourceToggle" style={{ cursor: 'pointer' }}>
-                                {showAppliedJobs ? 'Applied Jobs' : 'Applied Courses'}
-                              </label>
-                            </div>
                             <div className="position-relative adm-cycle-search">
                               <input
                                 type="text"
