@@ -940,42 +940,6 @@ function CollegeLayout({ children }) {
                   </li>
                 </ul>
               </li>
-              <li className={`nav-item ${location.pathname === '/institute/new-training/courses' ? 'active' : ''}`}>
-                <Link to="/institute/new-training/courses" onClick={() => handleSidebarClose()}>
-                  <FontAwesomeIcon icon={faGraduationCap} />
-                  <span className="menu-title">Courses </span>
-                </Link>
-              </li>
-              <li className={`nav-item ${location.pathname === '/institute/new-training/batches' ? 'active' : ''}`}>
-                <Link to="/institute/new-training/batches" onClick={() => handleSidebarClose()}>
-                  <FontAwesomeIcon icon={faGraduationCap} />
-                  <span className="menu-title">Batch </span>
-                </Link>
-              </li>
-              <li className={`nav-item ${location.pathname === '/institute/new-training/assign-team' ? 'active' : ''}`}>
-                <Link to="/institute/new-training/assign-team" onClick={() => handleSidebarClose()}>
-                  <FontAwesomeIcon icon={faUsers} />
-                  <span className="menu-title">Team Details</span>
-                </Link>
-              </li>
-              <li className={`nav-item ${location.pathname === '/institute/new-training/batch-monitoring' ? 'active' : ''}`}>
-                <Link to="/institute/new-training/batch-monitoring" onClick={() => handleSidebarClose()}>
-                  <FontAwesomeIcon icon={faClipboardList} />
-                  <span className="menu-title">Batch Monitoring</span>
-                </Link>
-              </li>
-              <li className={`nav-item ${location.pathname === '/institute/training/senior-trainer' || location.pathname === '/institute/seniorTrainer' ? 'active' : ''}`}>
-                <Link to="/institute/training/senior-trainer" onClick={() => handleSidebarClose()}>
-                  <FontAwesomeIcon icon={faCalendarAlt} />
-                  <span className="menu-title">Batch Time Table</span>
-                </Link>
-              </li>
-              <li className={`nav-item ${location.pathname === '/institute/training' ? 'active' : ''}`}>
-                <Link to="/institute/training" onClick={() => handleSidebarClose()}>
-                  <FontAwesomeIcon icon={faUserTie} />
-                  <span className="menu-title">Trainer</span>
-                </Link>
-              </li>
               {/* Courses */}
               <li className={`nav-item has-sub dropdown-courses ${openSubmenu.courses ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('courses')}>
@@ -1015,8 +979,46 @@ function CollegeLayout({ children }) {
                       <span className="menu-title">{t('Academic Planner')}</span>
                     </Link>
                   </li>
+                  <li className={`nav-item ${location.pathname === '/institute/new-training/courses' ? 'active' : ''}`}>
+                <Link to="/institute/new-training/courses" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faGraduationCap} />
+                  <span className="menu-title">Assign course </span>
+                </Link>
+              </li>
                 </ul>
               </li>
+             
+              <li className={`nav-item ${location.pathname === '/institute/new-training/batches' ? 'active' : ''}`}>
+                <Link to="/institute/new-training/batches" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faGraduationCap} />
+                  <span className="menu-title">Batch </span>
+                </Link>
+              </li>
+              <li className={`nav-item ${location.pathname === '/institute/new-training/assign-team' ? 'active' : ''}`}>
+                <Link to="/institute/new-training/assign-team" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faUsers} />
+                  <span className="menu-title">Team Details</span>
+                </Link>
+              </li>
+              <li className={`nav-item ${location.pathname === '/institute/new-training/batch-monitoring' ? 'active' : ''}`}>
+                <Link to="/institute/new-training/batch-monitoring" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faClipboardList} />
+                  <span className="menu-title">Batch Monitoring</span>
+                </Link>
+              </li>
+              <li className={`nav-item ${location.pathname === '/institute/training/senior-trainer' || location.pathname === '/institute/seniorTrainer' ? 'active' : ''}`}>
+                <Link to="/institute/training/senior-trainer" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faCalendarAlt} />
+                  <span className="menu-title">Batch Time Table</span>
+                </Link>
+              </li>
+              <li className={`nav-item ${location.pathname === '/institute/training' ? 'active' : ''}`}>
+                <Link to="/institute/training" onClick={() => handleSidebarClose()}>
+                  <FontAwesomeIcon icon={faUserTie} />
+                  <span className="menu-title">Trainer</span>
+                </Link>
+              </li>
+              
 
               {/* Sales (B2C) */}
               {((permissions?.custom_permissions?.can_view_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin' || permissions?.permission_type === 'view_only') && (

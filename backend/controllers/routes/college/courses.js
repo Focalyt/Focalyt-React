@@ -1076,6 +1076,116 @@ router
 		}
 	})
 
+const RESOURCE_UPLOAD_TYPES = ['Image', 'PDF', 'Video', 'Document', 'Presentation'];
+
+const extensionsForResourceType = (uploadType) => {
+	if (uploadType === 'Image') return allowedImageExtensions;
+	if (uploadType === 'Video') return allowedVideoExtensions;
+	if (uploadType === 'PDF') return ['pdf'];
+	if (uploadType === 'Presentation') return ['ppt', 'pptx', 'pdf'];
+	return ['pdf', 'doc', 'docx', 'ppt', 'pptx'];
+};
+
+const parseResourceList = (value) => {
+	if (!value) return [];
+	if (Array.isArray(value)) return value;
+	if (typeof value === 'string') {
+		try {
+			const parsed = JSON.parse(value);
+			return Array.isArray(parsed) ? parsed : [];
+		} catch (err) {
+			return [];
+		}
+	}
+	return [];
+};
+
+const attachResourceFiles = async (items, files, prefix, courseName) => {
+	const bucketName = process.env.AWS_BUCKET_NAME;
+	const next = items.map((item) => ({ ...item }));
+	for (let index = 0; index < next.length; index += 1) {
+		const uploaded = files?.[`${prefix}_${index}`];
+		if (!uploaded) continue;
+		const file = Array.isArray(uploaded) ? uploaded[0] : uploaded;
+		const uploadType = RESOURCE_UPLOAD_TYPES.includes(next[index].uploadType) ? next[index].uploadType : 'PDF';
+		const [key] = await uploadFilesToS3({
+			files: file,
+			folder: 'Courses',
+			courseName: courseName || 'unnamed',
+			s3,
+			bucketName,
+			allowedExtensions: extensionsForResourceType(uploadType),
+		});
+		next[index].fileUrl = key;
+	}
+	return next;
+};
+
+const normalizeRequiredResources = (items) => {
+	if (!Array.isArray(items)) return [];
+	return items
+		.filter((item) => item && String(item.Name || item.name || '').trim())
+		.map((item) => {
+			const uploadType = RESOURCE_UPLOAD_TYPES.includes(item.uploadType) ? item.uploadType : 'PDF';
+			const row = {
+				Name: String(item.Name || item.name).trim(),
+				description: String(item.description || '').trim(),
+				uploadType,
+				fileUrl: normalizeStorageKey(String(item.fileUrl || '').trim()),
+				mandatory: item.mandatory === true || item.mandatory === 'true',
+				status: item.status !== false,
+			};
+			if (item._id && mongoose.Types.ObjectId.isValid(item._id)) {
+				row._id = item._id;
+			}
+			return row;
+		});
+};
+
+router.patch('/:courseId/required-resources', async (req, res) => {
+	try {
+		const { courseId } = req.params;
+		if (!mongoose.Types.ObjectId.isValid(courseId)) {
+			return res.status(400).json({ status: false, message: 'Invalid course' });
+		}
+
+		const course = await Courses.findById(courseId);
+		if (!course) {
+			return res.status(404).json({ status: false, message: 'Course not found' });
+		}
+
+		const courseName = (course.name || 'unnamed').replace(/[^\w\- ]+/g, '').trim() || 'unnamed';
+		const classItems = await attachResourceFiles(
+			parseResourceList(req.body.classResourcesRequired),
+			req.files,
+			'classFile',
+			courseName
+		);
+		const labItems = await attachResourceFiles(
+			parseResourceList(req.body.labResourcesRequired),
+			req.files,
+			'labFile',
+			courseName
+		);
+
+		course.classResourcesRequired = normalizeRequiredResources(classItems);
+		course.labResourcesRequired = normalizeRequiredResources(labItems);
+		await course.save();
+
+		return res.json({
+			status: true,
+			message: 'Resources updated',
+			data: {
+				classResourcesRequired: (course.classResourcesRequired || []).filter((doc) => doc.status !== false),
+				labResourcesRequired: (course.labResourcesRequired || []).filter((doc) => doc.status !== false),
+			},
+		});
+	} catch (err) {
+		console.error('Failed to update course resources:', err);
+		return res.status(400).json({ status: false, message: err.message || 'Failed to update resources' });
+	}
+});
+
 router.patch('/:courseId/disable-doc/:docId', async (req, res) => {
 	const { courseId, docId } = req.params;
 

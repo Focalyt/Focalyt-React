@@ -10,6 +10,7 @@ const resourceRequiredSchema = {
     enum: ['Image', 'PDF', 'Video', 'Document', 'Presentation'],
     default: 'PDF'
   },
+  fileUrl: { type: String, default: '' },
   mandatory: { type: Boolean, default: false },
   status: { type: Boolean, default: true }
 };

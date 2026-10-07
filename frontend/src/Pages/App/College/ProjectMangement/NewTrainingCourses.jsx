@@ -463,7 +463,7 @@ const NewTrainingCourses = () => {
                         <button type="button" title="Assign Center" onClick={() => openAssignCenter(course)}>
                           <i className="bi bi-building"></i>
                         </button>
-                        <button type="button" title="Assign Trainer" onClick={() => openAssignCourse(course)}>
+                        <button type="button" title="Trainer Pool" onClick={() => openAssignCourse(course)}>
                           <i className="bi bi-people"></i>
                         </button>
                         <button
