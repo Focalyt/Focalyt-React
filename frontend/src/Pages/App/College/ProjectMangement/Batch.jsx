@@ -393,16 +393,16 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   const [courseTeam, setCourseTeam] = useState({ seniorTrainers: [], trainers: [], courseName: '' });
   const [courseTeamLoading, setCourseTeamLoading] = useState(false);
   const [showTrainerModal, setShowTrainerModal] = useState(false)
-  const [alert, setAlert] = useState({ show: false, message: '', type: '' });
+  const [, setNotice] = useState({ show: false, message: '', type: '' });
   const [selectedSeniorTrainers, setSelectedSeniorTrainers] = useState([]);
   const [selectedFieldTrainers, setSelectedFieldTrainers] = useState([]);
   const [isTrainerDropdownOpen, setIsTrainerDropdownOpen] = useState(false);
   const [selectedBatchForTrainer, setSelectedBatchForTrainer] = useState(null);
   // Show alert
   const showAlert = (message, type) => {
-    setAlert({ show: true, message, type });
+    setNotice({ show: true, message, type });
     setTimeout(() => {
-      setAlert({ show: false, message: '', type: '' });
+      setNotice({ show: false, message: '', type: '' });
     }, 5000);
   };
 
@@ -583,7 +583,8 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   const [allProfiles, setAllProfiles] = useState([]);
   const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize] = useState(20);
+  const [admissionTotal, setAdmissionTotal] = useState(0);
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [isBatchAssigning, setIsBatchAssigning] = useState(false);
 
@@ -1392,21 +1393,26 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
   }, [allAdmissions, admissionSubTab, searchQuery]);
 
   // Fetch admissions data
-  const fetchAdmissionsData = async (customSearchQuery = null) => {
+  const fetchAdmissionsData = async (page = currentPage, customSearchQuery = null) => {
     const searchParam = customSearchQuery !== null ? customSearchQuery : searchQuery;
     if (mainTab !== 'All Admissions') return;
     setIsLoadingProfiles(true);
     try {
-      const response = await axios.get(`${backendUrl}/college/admission-list/${selectedCourse?._id}/${selectedCenter?._id}?name=${searchParam}`, {
-
+      const response = await axios.get(`${backendUrl}/college/admission-list/${selectedCourse?._id}/${selectedCenter?._id}`, {
         headers: {
           'x-auth': token
+        },
+        params: {
+          name: searchParam,
+          page,
+          limit: pageSize,
         }
       });
 
       if (response.data.success) {
-        setAllAdmissions(response.data.data);
-        console.log(response.data.data, 'response.data.data')
+        setAllAdmissions(response.data.data || []);
+        setTotalPages(response.data.totalPages || 1);
+        setAdmissionTotal(response.data.totalCount || 0);
       } else {
         setError('Failed to fetch admissions data');
       }
@@ -1418,12 +1424,12 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
     }
   };
 
-  // Fetch data when tab changes
+  // Fetch data when tab or page changes
   useEffect(() => {
     if (mainTab === 'All Admissions') {
-      fetchAdmissionsData();
+      fetchAdmissionsData(currentPage);
     }
-  }, [mainTab]);
+  }, [mainTab, currentPage]);
 
   const resetForm = () => {
     setFormData(
@@ -2150,7 +2156,10 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                   type="button"
                   key={tab}
                   className={mainTab === tab ? 'is-active' : ''}
-                  onClick={() => setMainTab(tab)}
+                  onClick={() => {
+                    setMainTab(tab);
+                    setCurrentPage(1);
+                  }}
                 >
                   {tab}
                 </button>
@@ -2176,7 +2185,10 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                     type="button"
                     key={tab}
                     className={admissionSubTab === tab ? 'is-active' : ''}
-                    onClick={() => setAdmissionSubTab(tab)}
+                    onClick={() => {
+                      setAdmissionSubTab(tab);
+                      setCurrentPage(1);
+                    }}
                   >
                     {tab}
                   </button>
@@ -2204,8 +2216,11 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
                 type="button"
                 className="vt-back"
                 onClick={() => {
-                  if (mainTab === 'All Admissions') {
-                    fetchAdmissionsData();
+                  if (mainTab !== 'All Admissions') return;
+                  if (currentPage !== 1) {
+                    setCurrentPage(1);
+                  } else {
+                    fetchAdmissionsData(1);
                   }
                 }}
               >
@@ -3658,6 +3673,33 @@ const Batch = ({ selectedCourse = null, onBackToCourses = null, selectedCenter =
 
                 </div>
               </section>
+              {filteredAdmissions.length > 0 && (
+                <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 py-3">
+                  <span className="text-muted small">
+                    Showing {allAdmissions.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}
+                    –{(currentPage - 1) * pageSize + allAdmissions.length} of {admissionTotal}
+                  </span>
+                  <div className="d-flex align-items-center gap-2">
+                    <button
+                      type="button"
+                      className="vt-back"
+                      disabled={currentPage <= 1 || isLoadingProfiles}
+                      onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                    >
+                      Previous
+                    </button>
+                    <span className="small">Page {currentPage} of {totalPages}</span>
+                    <button
+                      type="button"
+                      className="vt-back"
+                      disabled={currentPage >= totalPages || isLoadingProfiles}
+                      onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

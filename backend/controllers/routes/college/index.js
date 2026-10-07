@@ -197,7 +197,7 @@ async function resolveB2cLeadSourceFilter(leadSourceIds) {
 	return { registeredByIds, candidateIds };
 }
 
-function applyB2cLeadSourceMatch(baseMatch, leadSourceFilter) {
+function applyB2cLeadSourceMatch(baseMatch, leadSourceFilter, fieldPrefix = '') {
 	if (!baseMatch) return;
 	const registeredByIds = toB2cObjectIdList(
 		Array.isArray(leadSourceFilter) ? leadSourceFilter : leadSourceFilter?.registeredByIds
@@ -208,9 +208,14 @@ function applyB2cLeadSourceMatch(baseMatch, leadSourceFilter) {
 	if (!registeredByIds.length && !candidateIds.length) return;
 
 	const or = [];
-	if (registeredByIds.length) or.push({ registeredBy: { $in: registeredByIds } });
-	if (candidateIds.length) or.push({ _candidate: { $in: candidateIds } });
+	if (registeredByIds.length) or.push({ [`${fieldPrefix}registeredBy`]: { $in: registeredByIds } });
+	if (candidateIds.length) or.push({ [`${fieldPrefix}_candidate`]: { $in: candidateIds } });
 	const sourceClause = or.length === 1 ? or[0] : { $or: or };
+
+	if (fieldPrefix) {
+		baseMatch.$and = [...(baseMatch.$and || []), sourceClause];
+		return;
+	}
 
 	const pushAnd = (clause) => {
 		baseMatch.$and = [...(baseMatch.$and || []), clause];
@@ -9242,7 +9247,7 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 
 		const user = req.user;
 
-		let { fromDate, toDate, projects, verticals, course, center, counselor, owner, allTime, filterBy, createdFromDate, createdToDate, batch } = req.query;
+		let { fromDate, toDate, projects, verticals, course, center, counselor, owner, allTime, filterBy, createdFromDate, createdToDate, batch, leadSource } = req.query;
 		const useAllTime = allTime === 'true' || allTime === true;
 		const useActivityFilter = filterBy === 'activity';
 
@@ -9269,6 +9274,9 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 		const ownerArray = parseB2cFilterIdArray(owner);
+		const leadSourceFilter = await resolveB2cLeadSourceFilter(parseB2cFilterIdArray(leadSource));
+		const hasLeadSourceFilter = (leadSourceFilter.registeredByIds?.length || 0) > 0
+			|| (leadSourceFilter.candidateIds?.length || 0) > 0;
 
 		({ verticalsArray, projectsArray } = applyB2cAccessKeepingUserWidening(user, {
 			projectsArray, verticalsArray, courseArray, centerArray, batchArray
@@ -9288,7 +9296,8 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 			|| courseArray.length > 0
 			|| centerArray.length > 0
 			|| batchArray.length > 0
-			|| Boolean(createdFromDate || createdToDate);
+			|| Boolean(createdFromDate || createdToDate)
+			|| hasLeadSourceFilter;
 
 		if (needsFollowupJoins) {
 			aggregate.push(
@@ -9298,7 +9307,7 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 						localField: 'appliedCourseId',
 						foreignField: '_id',
 						as: 'appliedCourseId',
-						pipeline: [{ $project: { _course: 1, _center: 1, batch: 1, createdAt: 1 } }]
+						pipeline: [{ $project: { _course: 1, _center: 1, batch: 1, createdAt: 1, registeredBy: 1, _candidate: 1 } }]
 					}
 				},
 				{
@@ -9350,6 +9359,9 @@ router.get('/followupcounts', isCollege, async (req, res) => {
 					toDate.setHours(23, 59, 59, 999);
 					additionalMatches['appliedCourseId.createdAt'].$lte = toDate;
 				}
+			}
+			if (hasLeadSourceFilter) {
+				applyB2cLeadSourceMatch(additionalMatches, leadSourceFilter, 'appliedCourseId.');
 			}
 			if (Object.keys(additionalMatches).length > 0) {
 				aggregate.push({ $match: additionalMatches });
@@ -10310,7 +10322,8 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			center,
 			counselor,
 			owner,
-			batch
+			batch,
+			leadSource
 		} = req.query;
 
 		// Parse multi-select filter values
@@ -10332,6 +10345,7 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 		const ownerArray = parseB2cFilterIdArray(owner);
+		const leadSourceFilter = await resolveB2cLeadSourceFilter(parseB2cFilterIdArray(leadSource));
 		const hasPersonFilter = ownerArray.length > 0 || counselorArray.length > 0;
 
 		let userSelectedWideningFilter;
@@ -10409,6 +10423,8 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 		if (leadStatus) {
 			baseMatchStage._leadStatus = new mongoose.Types.ObjectId(leadStatus);
 		}
+
+		applyB2cLeadSourceMatch(baseMatchStage, leadSourceFilter);
 
 		// Filter by KYC status when tab is "Pending for Documents" (kyc=false) or "Verified" (kyc=true)
 		if (kyc !== undefined && kyc !== '' && String(kyc).toLowerCase() !== 'all') {
@@ -10745,7 +10761,8 @@ router.route("/kycCandidates").get(isCollege, async (req, res) => {
 			centerArray,
 			counselorArray,
 			ownerArray,
-			batchArray
+			batchArray,
+			leadSourceFilter
 		};
 
 		// Tab counts must ignore the active kyc tab filter so every tab shows its true total
@@ -11043,6 +11060,8 @@ async function calculateKycFilterCounts(teamMembers, collegeId, appliedFilters =
 		if (appliedFilters.leadStatus) {
 			baseMatchStage._leadStatus = new mongoose.Types.ObjectId(appliedFilters.leadStatus);
 		}
+
+		applyB2cLeadSourceMatch(baseMatchStage, appliedFilters.leadSourceFilter);
 
 		if (
 			applyKycFilter &&
@@ -12598,7 +12617,8 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			center,
 			counselor,
 			owner,
-			batch
+			batch,
+			leadSource
 		} = req.query;
 		// Parse multi-select filter values
 
@@ -12620,6 +12640,7 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			console.error('Error parsing filter arrays:', parseError);
 		}
 		const ownerArray = parseB2cFilterIdArray(owner);
+		const leadSourceFilter = await resolveB2cLeadSourceFilter(parseB2cFilterIdArray(leadSource));
 		const hasPersonFilter = ownerArray.length > 0 || counselorArray.length > 0;
 
 		let userSelectedWideningFilter;
@@ -12709,6 +12730,7 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		if (batchArray.length > 0) {
 			baseMatchStage.batch = { $in: batchArray.map(id => new mongoose.Types.ObjectId(id)) };
 		}
+		applyB2cLeadSourceMatch(baseMatchStage, leadSourceFilter);
 		aggregationPipeline.push({ $match: baseMatchStage });
 		aggregationPipeline.push(
 			{
@@ -12835,7 +12857,8 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			centerArray,
 			counselorArray,
 			ownerArray,
-			batchArray
+			batchArray,
+			leadSourceFilter
 		});
 
 		if (req.query.countOnly === 'true' || req.query.countsOnly === 'true') {
@@ -13340,6 +13363,7 @@ async function calculateAdmissionFilterCounts(teamMembers, collegeId, appliedFil
 		if (appliedFilters.centerArray && appliedFilters.centerArray.length > 0) {
 			baseMatchStage._center = { $in: appliedFilters.centerArray.map(id => new mongoose.Types.ObjectId(id)) };
 		}
+		applyB2cLeadSourceMatch(baseMatchStage, appliedFilters.leadSourceFilter);
 		basePipeline.push({ $match: baseMatchStage });
 		basePipeline.push(
 			{ $lookup: { from: 'courses', localField: '_course', foreignField: '_id', as: '_course', pipeline: [{ $lookup: { from: 'sectors', localField: 'sectors', foreignField: '_id', as: 'sectors' } }, { $lookup: { from: 'verticals', localField: 'vertical', foreignField: '_id', as: 'vertical' } }, { $lookup: { from: 'projects', localField: 'project', foreignField: '_id', as: 'project' } }] } },
@@ -14500,7 +14524,7 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 		});
 
 		const page = parseInt(req.query.page) || 1;
-		const limit = parseInt(req.query.limit) || 50;
+		const limit = parseInt(req.query.limit) || 20;
 		const skip = (page - 1) * limit;
 
 		// Extract filter parameters from query
@@ -14712,10 +14736,6 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 			}
 		);
 
-		// Test intermediate results before college filter
-		const intermediateResults = await AppliedCourses.aggregate(aggregationPipeline);
-
-
 		// Filter by college
 		aggregationPipeline.push({
 			$match: {
@@ -14771,52 +14791,88 @@ router.route("/admission-list/:courseId/:centerId").get(isCollege, async (req, r
 			aggregationPipeline.push({ $match: additionalMatches });
 		}
 
-		// Sort by creation date
-		aggregationPipeline.push({
-			$sort: { createdAt: -1 }
-		});
+		// Count without sorting. Sorting the full joined set exceeds MongoDB's 32MB in-memory limit.
+		const totalCountResult = await AppliedCourses.aggregate([
+			...aggregationPipeline,
+			{ $count: 'total' }
+		]);
+		const totalCount = totalCountResult[0]?.total || 0;
 
-		// Execute aggregation for total count (without pagination)
-		const totalResults = await AppliedCourses.aggregate(aggregationPipeline);
-
-
-		const totalCount = totalResults.length;
-
-		// Add pagination to pipeline
-		aggregationPipeline.push(
+		// Sort only this page query, and let MongoDB spill that sort to disk.
+		const appliedCourses = await AppliedCourses.aggregate([
+			...aggregationPipeline,
+			{ $sort: { createdAt: -1 } },
 			{ $skip: skip },
 			{ $limit: limit }
-		);
+		]).allowDiskUse(true);
 
-		// Execute aggregation with pagination
-		const appliedCourses = await AppliedCourses.aggregate(aggregationPipeline);
-
-		// Calculate filter counts (simplified version)
+		// Calculate filter counts without loading or sorting every document.
 		const calculateFilterCounts = async () => {
-			// Use base aggregation pipeline for counts (without status filter)
-			let countPipeline = aggregationPipeline.slice(0, -2); // Remove skip and limit
+			const countPipeline = aggregationPipeline.map((stage, index) => {
+				if (index !== 0) return stage;
 
-			// Remove status filter from base match for counting
-			let baseMatch = { ...baseMatchStage };
-			delete baseMatch.admissionDone;
-			delete baseMatch.isZeroPeriodAssigned;
-			delete baseMatch.isBatchFreeze;
-			delete baseMatch.dropout;
-			baseMatch.admissionDone = { $in: [true] }; // Keep base admission filter
+				const baseMatch = { ...baseMatchStage };
+				delete baseMatch.admissionDone;
+				delete baseMatch.isZeroPeriodAssigned;
+				delete baseMatch.isBatchFreeze;
+				delete baseMatch.dropout;
+				baseMatch.admissionDone = { $in: [true] };
 
-			countPipeline[0] = { $match: baseMatch };
+				return { $match: baseMatch };
+			});
 
-			const allResults = await AppliedCourses.aggregate(countPipeline);
+			countPipeline.push({
+				$group: {
+					_id: null,
+					all: { $sum: 1 },
+					dropout: {
+						$sum: { $cond: [{ $eq: ['$dropout', true] }, 1, 0] }
+					},
+					zeroPeriod: {
+						$sum: {
+							$cond: [{
+								$and: [
+									{ $eq: ['$isZeroPeriodAssigned', true] },
+									{ $eq: ['$isBatchFreeze', false] },
+									{ $eq: ['$dropout', false] }
+								]
+							}, 1, 0]
+						}
+					},
+					batchFreeze: {
+						$sum: {
+							$cond: [{
+								$and: [
+									{ $eq: ['$isBatchFreeze', true] },
+									{ $eq: ['$dropout', false] }
+								]
+							}, 1, 0]
+						}
+					},
+					admission: {
+						$sum: {
+							$cond: [{
+								$and: [
+									{ $eq: ['$admissionDone', true] },
+									{ $eq: ['$isZeroPeriodAssigned', false] },
+									{ $eq: ['$isBatchFreeze', false] },
+									{ $eq: ['$dropout', false] }
+								]
+							}, 1, 0]
+						}
+					}
+				}
+			});
 
-			const counts = {
-				all: allResults.length,
-				dropout: allResults.filter(doc => doc.dropout === true).length,
-				zeroPeriod: allResults.filter(doc => (doc.isZeroPeriodAssigned === true && doc.isBatchFreeze === false && doc.dropout === false)).length,
-				batchFreeze: allResults.filter(doc => (doc.isBatchFreeze === true && doc.dropout === false)).length,
-				admission: allResults.filter(doc => (doc.admissionDone === true && doc.isZeroPeriodAssigned === false && doc.isBatchFreeze === false && doc.dropout === false)).length,
+			const [counts] = await AppliedCourses.aggregate(countPipeline);
+
+			return {
+				all: counts?.all || 0,
+				dropout: counts?.dropout || 0,
+				zeroPeriod: counts?.zeroPeriod || 0,
+				batchFreeze: counts?.batchFreeze || 0,
+				admission: counts?.admission || 0
 			};
-
-			return counts;
 		};
 
 		const filterCounts = await calculateFilterCounts();

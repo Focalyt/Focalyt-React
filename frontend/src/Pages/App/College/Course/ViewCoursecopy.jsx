@@ -59,6 +59,8 @@ const tdStyle = {
   verticalAlign: 'middle',
 };
 
+const COURSE_LEVELS = ['Certificate', 'Diploma', 'Advance Diploma', 'Degree'];
+
 const ViewCourses = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -77,9 +79,9 @@ const ViewCourses = () => {
       permissions?.custom_permissions?.can_be_academic_coordinator === true);
   const [filterData, setFilterData] = useState({
     name: '',
+    courseLevel: '',
     sector: '',
     vertical: '',
-    Profile: '',
     status: 'true'
   });
 
@@ -108,15 +110,16 @@ const ViewCourses = () => {
     // Set filter data from query params
     setFilterData({
       name: queryParams.name || '',
+      courseLevel: queryParams.courseLevel || '',
       sector: queryParams.sector || '',
       vertical: queryParams.vertical || '',
-      Profile: queryParams.Profile || '',
       status: queryParams.status || 'true'
     });
 
     const courseParams = { ...queryParams };
     delete courseParams.FromDate;
     delete courseParams.ToDate;
+    delete courseParams.Profile;
     fetchCourses(courseParams);
   }, [location.search]);
 
@@ -201,7 +204,7 @@ const ViewCourses = () => {
 
   const handleStatusTab = (tab) => {
     const queryParams = {};
-    ['name', 'sector', 'vertical', 'Profile'].forEach((key) => {
+    ['name', 'courseLevel', 'sector', 'vertical'].forEach((key) => {
       if (filterData[key]) queryParams[key] = filterData[key];
     });
     if (tab === 'inactive') queryParams.status = 'false';
@@ -360,6 +363,9 @@ const ViewCourses = () => {
   };
 
   const visibleCourses = courses.filter((course) => {
+    if (filterData.courseLevel && String(course.courseLevel || '') !== String(filterData.courseLevel)) {
+      return false;
+    }
     if (filterData.vertical) {
       const vertical = course.vertical;
       const id = vertical && typeof vertical === 'object' ? vertical._id : vertical;
@@ -460,18 +466,19 @@ const ViewCourses = () => {
 
           <Form onSubmit={handleFilterSubmit}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'flex-end' }}>
-              {/* Name */}
-              <div style={{ flex: '1 1 160px', minWidth: '140px' }}>
-                <label style={labelStyle}>Course Name</label>
-                <input
-                  type="text"
-                  name="name"
-                  value={filterData.name}
+              <div style={{ flex: '1 1 180px', minWidth: '160px' }}>
+                <label style={labelStyle}>Department</label>
+                <select
+                  name="vertical"
+                  value={filterData.vertical}
                   onChange={handleInputChange}
-                  maxLength={25}
-                  placeholder="Search by name..."
                   style={inputStyle}
-                />
+                >
+                  <option value="">All</option>
+                  {departments.map((department) => (
+                    <option key={department._id} value={department._id}>{department.name}</option>
+                  ))}
+                </select>
               </div>
               <div style={{ flex: '1 1 180px', minWidth: '160px' }}>
                 <label style={labelStyle}>Sector</label>
@@ -488,33 +495,30 @@ const ViewCourses = () => {
                 </select>
               </div>
               <div style={{ flex: '1 1 180px', minWidth: '160px' }}>
-                <label style={labelStyle}>Department</label>
+                <label style={labelStyle}>Course Level</label>
                 <select
-                  name="vertical"
-                  value={filterData.vertical}
+                  name="courseLevel"
+                  value={filterData.courseLevel}
                   onChange={handleInputChange}
                   style={inputStyle}
                 >
                   <option value="">All</option>
-                  {departments.map((department) => (
-                    <option key={department._id} value={department._id}>{department.name}</option>
+                  {COURSE_LEVELS.map((level) => (
+                    <option key={level} value={level}>{level}</option>
                   ))}
                 </select>
               </div>
-              {/* Profile */}
-              <div style={{ flex: '1 1 150px', minWidth: '140px' }}>
-                <label style={labelStyle}>Profile</label>
-                <select
-                  name="Profile"
-                  value={filterData.Profile}
+              <div style={{ flex: '1 1 160px', minWidth: '140px' }}>
+                <label style={labelStyle}>Course Name</label>
+                <input
+                  type="text"
+                  name="name"
+                  value={filterData.name}
                   onChange={handleInputChange}
+                  maxLength={25}
+                  placeholder="Search by name..."
                   style={inputStyle}
-                >
-                  <option value="">Select</option>
-                  <option value="All">All</option>
-                  <option value="true">Completed</option>
-                  <option value="false">Due</option>
-                </select>
+                />
               </div>
               {/* Buttons */}
               <div style={{ display: 'flex', gap: '8px', paddingBottom: '1px' }}>
@@ -541,7 +545,7 @@ const ViewCourses = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#f8fafc' }}>
-                  {['#', 'Sector', 'Course Level', 'Course Name', 'Department', 'Duration',
+                  {['#','Department', 'Sector', 'Course Level', 'Course Name', 'Duration',
                     // ...(status === 'true' || status === true ? ['Add Leads'] : []),
                     'Status', 'Action'].map((h, i) => (
                     <th key={i} style={{
@@ -575,6 +579,10 @@ const ViewCourses = () => {
                         fontSize: '12px', fontWeight: 700,
                       }}>{i + 1}</span>
                     </td>
+                    {/* Department */}
+                    <td style={tdStyle}>
+                      {course.vertical?.name}
+                    </td>
                     {/* Sector */}
                     <td style={tdStyle}>
                       {course.sectors?.map((sector) => (
@@ -587,6 +595,7 @@ const ViewCourses = () => {
                         }}>{sector.name}</span>
                       ))}
                     </td>
+                  
                     {/* Course Level */}
                     <td style={tdStyle}>
                       <span style={{
@@ -600,9 +609,7 @@ const ViewCourses = () => {
                     <td style={{ ...tdStyle, fontWeight: 600, color: '#1e293b', maxWidth: '200px' }}>
                       {course.name}
                     </td>
-                    <td style={{ ...tdStyle, color: '#475569' }}>
-                      {departmentNameOf(course)}
-                    </td>
+                  
                     {/* Duration */}
                     <td style={{ ...tdStyle, color: '#475569' }}>
                       <i className="fa fa-clock-o" style={{ marginRight: '5px', color: '#94a3b8', fontSize: '13px' }}></i>

@@ -5225,7 +5225,7 @@ console.log('API Response:', response.data);
         });
       }
 
-      if (shouldIncludeHrLeads({
+      if (!listParts.leadSource && shouldIncludeHrLeads({
         cycle,
         filters,
         verticalOptions,

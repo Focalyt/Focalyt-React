@@ -750,6 +750,10 @@ router
 				fields.sectors = new mongoose.Types.ObjectId(data.sector);
 			}
 
+			if (data.courseLevel) {
+				fields.courseLevel = data.courseLevel;
+			}
+
 			let status = true;
 			let isChecked = "false";
 			const statusQuery = req.query.status !== undefined ? String(req.query.status).toLowerCase() : "";
