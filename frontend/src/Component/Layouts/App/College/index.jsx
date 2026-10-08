@@ -1487,6 +1487,14 @@ function CollegeLayout({ children }) {
                     </Link>
                   </li>
               )}
+              {(permissions?.permission_type === 'Admin' || permissions?.custom_permissions?.can_change_lead_status) && (
+                  <li className={`nav-item ${location.pathname === '/institute/milestonedesignb2c' ? 'active' : ''}`}>
+                    <Link to="/institute/milestonedesignb2c" onClick={() => handleSidebarClose()}>
+                      <FontAwesomeIcon icon={faProjectDiagram} />
+                      <span className="menu-title">{t('milestone_design_b2c')}</span>
+                    </Link>
+                  </li>
+              )}
                   <li className={`nav-item ${location.pathname === '/institute/statusplacements' ? 'active' : ''}`}>
                     <Link to="/institute/statusplacements" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faProjectDiagram} />

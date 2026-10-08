@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   getSessionAssignDateKey,
+  getSessionOutline,
   toLocalDateKey,
   resolveSessionSelectionId,
 } from './seniorTrainerShared';
@@ -88,6 +89,40 @@ const buildPlanSlots = (plan) => {
   return slots.sort((a, b) => toMin(a.start) - toMin(b.start));
 };
 
+const outlineRank = (value) => {
+  const number = parseInt(String(value || ''), 10);
+  return Number.isFinite(number) ? number : 9999;
+};
+
+const groupPool = (list) => {
+  const sorted = [...list].sort((a, b) => (
+    outlineRank(a.unitNumber) - outlineRank(b.unitNumber)
+    || outlineRank(a.chapterNumber) - outlineRank(b.chapterNumber)
+    || outlineRank(a.sessionNumber) - outlineRank(b.sessionNumber)
+    || String(a.title || '').localeCompare(String(b.title || ''))
+  ));
+  const units = [];
+  const byUnit = new Map();
+  sorted.forEach((session) => {
+    const outline = getSessionOutline(session);
+    const unitKey = outline.unit || '';
+    const chapterKey = outline.chapter || '';
+    if (!byUnit.has(unitKey)) {
+      const group = { key: unitKey || 'sessions', label: outline.unit, chapters: [], byChapter: new Map() };
+      byUnit.set(unitKey, group);
+      units.push(group);
+    }
+    const unit = byUnit.get(unitKey);
+    if (!unit.byChapter.has(chapterKey)) {
+      const chapter = { key: `${unitKey}::${chapterKey || 'sessions'}`, label: outline.chapter, sessions: [] };
+      unit.byChapter.set(chapterKey, chapter);
+      unit.chapters.push(chapter);
+    }
+    unit.byChapter.get(chapterKey).sessions.push(session);
+  });
+  return units;
+};
+
 const durationLabel = (start, end) => {
   const mins = toMin(end) - toMin(start);
   if (!Number.isFinite(mins) || mins <= 0) return 'Set time';
@@ -97,48 +132,47 @@ const durationLabel = (start, end) => {
   return m ? `${h} hr ${m} min` : `${h} hr`;
 };
 
-const buildDummySessions = () => ([
-    {
-      id: 'dummy-course-1',
-      title: 'Communication Skills',
-      sessionNumber: '12',
-      timetableType: 'course',
-      startTime: '',
-      endTime: '',
-      sessionDate: '',
-      sample: true,
-    },
-    {
-      id: 'dummy-course-2',
-      title: 'Digital Marketing',
-      sessionNumber: '13',
-      timetableType: 'course',
-      startTime: '',
-      endTime: '',
-      sessionDate: '',
-      sample: true,
-    },
-    {
-      id: 'dummy-place-1',
-      title: 'Mock Interview',
-      sessionNumber: '2',
-      timetableType: 'placement',
-      startTime: '',
-      endTime: '',
-      sessionDate: '',
-      sample: true,
-    },
-    {
-      id: 'dummy-club-1',
-      title: 'Coding Club',
-      sessionNumber: '1',
-      timetableType: 'club',
-      startTime: '',
-      endTime: '',
-      sessionDate: '',
-      sample: true,
-    },
-  ]);
+const buildDemoSessions = () => ([
+  {
+    id: 'demo-1',
+    title: 'lksdkl',
+    sessionNumber: '1',
+    unitNumber: '1',
+    unitName: 'unit',
+    chapterNumber: '1',
+    chapterName: 'ch1',
+    timetableType: 'course',
+    startTime: '',
+    endTime: '',
+    sessionDate: '',
+  },
+  {
+    id: 'demo-2',
+    title: 'iosjk',
+    sessionNumber: '2',
+    unitNumber: '1',
+    unitName: 'unit',
+    chapterNumber: '1',
+    chapterName: 'ch1',
+    timetableType: 'course',
+    startTime: '',
+    endTime: '',
+    sessionDate: '',
+  },
+  {
+    id: 'demo-3',
+    title: 'lkslk',
+    sessionNumber: '3',
+    unitNumber: '1',
+    unitName: 'unit',
+    chapterNumber: '1',
+    chapterName: 'ch1',
+    timetableType: 'course',
+    startTime: '',
+    endTime: '',
+    sessionDate: '',
+  },
+]);
 
 const startOfWeek = (key) => {
   const d = new Date(`${key}T12:00:00`);
@@ -159,7 +193,7 @@ const SessionDayTimetable = ({
   const [busy, setBusy] = useState(false);
   const [plan, setPlan] = useState(defaultPlan);
   const [classPeriods, setClassPeriods] = useState(readStoredPeriods);
-  const [dummySessions, setDummySessions] = useState(buildDummySessions);
+  const [demoSessions, setDemoSessions] = useState(buildDemoSessions);
 
   useEffect(() => {
     localStorage.setItem(PERIODS_STORAGE_KEY, JSON.stringify(classPeriods));
@@ -175,8 +209,8 @@ const SessionDayTimetable = ({
   }), [classPeriods]);
 
   const visibleSessions = useMemo(
-    () => [...sessions, ...dummySessions],
-    [sessions, dummySessions]
+    () => [...demoSessions, ...sessions],
+    [demoSessions, sessions]
   );
 
   const tabSessions = useMemo(
@@ -192,6 +226,7 @@ const SessionDayTimetable = ({
   );
 
   const pool = tabSessions.filter((session) => !session._date || session._start == null);
+  const groupedPool = useMemo(() => groupPool(pool), [pool]);
   const daySessions = tabSessions.filter((session) => session._date === day && session._start != null);
 
   const countByDate = useMemo(() => {
@@ -256,8 +291,8 @@ const SessionDayTimetable = ({
   const bookedPeriods = teachingPeriods.filter((period) => sessionsIn(period).length > 0).length;
 
   const savePlacement = async (sessionId, payload) => {
-    if (String(sessionId).startsWith('dummy-')) {
-      setDummySessions((prev) => prev.map((session) => (
+    if (String(sessionId).startsWith('demo-')) {
+      setDemoSessions((prev) => prev.map((session) => (
         session.id === sessionId
           ? {
             ...session,
@@ -396,22 +431,32 @@ const SessionDayTimetable = ({
             <p className="tt__pool-hint">
               Click a session, then click Free on a class.
             </p>
-            <ul>
-              {pool.map((session) => (
-                <li key={session.id}>
-                  <button
-                    type="button"
-                    className={`tt__pool-item${pickedId === session.id ? ' tt__pool-item--on' : ''}`}
-                    onClick={() => setPickedId((current) => (current === session.id ? '' : session.id))}
-                  >
-                    <strong>{session.title || 'Untitled session'}</strong>
-                    <small>
-                      {session.sessionNumber ? `Session ${session.sessionNumber}` : 'No number'}
-                    </small>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            {groupedPool.map((unit) => (
+              <div key={unit.key} className="tt__outline">
+                {unit.label ? <div className="tt__outline-unit">{unit.label}</div> : null}
+                {unit.chapters.map((chapter) => (
+                  <div key={chapter.key} className={chapter.label ? 'tt__outline-chapter-wrap' : ''}>
+                    {chapter.label ? <div className="tt__outline-chapter">{chapter.label}</div> : null}
+                    <ul>
+                      {chapter.sessions.map((session) => (
+                        <li key={session.id}>
+                          <button
+                            type="button"
+                            className={`tt__pool-item${pickedId === session.id ? ' tt__pool-item--on' : ''}`}
+                            onClick={() => setPickedId((current) => (current === session.id ? '' : session.id))}
+                          >
+                            <strong>
+                              {session.sessionNumber ? `${String(session.sessionNumber).padStart(2, '0')} ` : ''}
+                              {session.title || 'Untitled session'}
+                            </strong>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            ))}
           </div>
         </aside>
 
@@ -586,6 +631,7 @@ const SessionDayTimetable = ({
                   <div className="tt__slot">
                     {items.map((session) => {
                       const selected = resolveSessionSelectionId(selectedSessionId) === resolveSessionSelectionId(session.id);
+                      const outline = getSessionOutline(session);
                       return (
                         <button
                           key={session.id}
@@ -594,13 +640,8 @@ const SessionDayTimetable = ({
                           onClick={() => onSelectSession(session.id)}
                         >
                           <span className="tt__chip-title">{session.title || 'Untitled session'}</span>
-                          {!session.sample && session.startTime && session.endTime ? (
-                            <span className="tt__chip-sub">
-                              {session.startTime}–{session.endTime}
-                              {session.fieldTrainerName ? ` · ${session.fieldTrainerName}` : ''}
-                            </span>
-                          ) : session.fieldTrainerName ? (
-                            <span className="tt__chip-sub">{session.fieldTrainerName}</span>
+                          {outline.path ? (
+                            <span className="tt__chip-sub">{outline.path}</span>
                           ) : null}
                           <span
                             className="tt__chip-x"

@@ -6,6 +6,7 @@ import {
   getSessionTypeLabel,
   getSessionTypeBadgeKind,
   getSessionActivityLabel,
+  getSessionOutline,
   getDayNameFromDate,
 } from './seniorTrainerShared';
 
@@ -136,6 +137,7 @@ const SessionTable = ({
                   <td>{index + 1}</td>
                   <td>
                     <strong>{session.title || 'Untitled session'}</strong>
+                    {getSessionOutline(session).path ? <small>{getSessionOutline(session).path}</small> : null}
                   </td>
                   <td>
                     <span className={`st-table-type st-table-type--${typeBadge}`}>

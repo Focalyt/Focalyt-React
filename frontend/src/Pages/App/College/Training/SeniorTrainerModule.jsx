@@ -134,14 +134,22 @@ const SeniorTrainerModule = () => {
   const [batchOptions, setBatchOptions] = useState([]);
   const [allCoursesMeta, setAllCoursesMeta] = useState([]);
   const [allCentersMeta, setAllCentersMeta] = useState([]);
-  const [loadingCenters, setLoadingCenters] = useState(true);
+  const [loadingCenters, setLoadingCenters] = useState(false);
   const [loadingCourses, setLoadingCourses] = useState(false);
   const [loadingBatches, setLoadingBatches] = useState(false);
   const [timetableOpen, setTimetableOpen] = useState(false);
-  const [draftCourseId, setDraftCourseId] = useState('');
-  const [draftBatchId, setDraftBatchId] = useState('');
-  const [draftBatches, setDraftBatches] = useState([]);
-  const [loadingDraftBatches, setLoadingDraftBatches] = useState(false);
+  const [departmentId, setDepartmentId] = useState('');
+  const [projectId, setProjectId] = useState('');
+  const [centerId, setCenterId] = useState('');
+  const [courseId, setCourseId] = useState('');
+  const [batchId, setBatchId] = useState('');
+  const [department, setDepartment] = useState([]);
+  const [project, setProject] = useState([]);
+  const [center, setCenter] = useState([]);
+  const [course, setCourse] = useState([]);
+  const [batch, setBatch] = useState([]);
+  const [loadingDepartments, setLoadingDepartments] = useState(true);
+  const [loadingProjects, setLoadingProjects] = useState(false);
   const [searchMessage, setSearchMessage] = useState('');
   const [openedSelection, setOpenedSelection] = useState(null);
 
@@ -179,13 +187,24 @@ const SeniorTrainerModule = () => {
       return;
     }
 
-    // Always load referred sessions for this senior trainer (batch filter is optional)
-    fetchCoordinatorSessionsApi(backendUrl, token, {
-      seniorTrainerId: '',
-      excludeScheduled: true,
-    })
+    const courseId = filters.course || '';
+    const batchId = filters.batch && !String(filters.batch).startsWith('course:')
+      ? filters.batch
+      : '';
+
+    fetchCoordinatorSessionsApi(backendUrl, token, courseId
+      ? {
+        batchId,
+        courseId,
+        includeCoursePlans: Boolean(batchId),
+        excludeScheduled: false,
+      }
+      : {
+        seniorTrainerId: '',
+        excludeScheduled: true,
+      })
       .then((data) => {
-        const mine = filterSessionsForSeniorTrainer(data, seniorTrainerId);
+        const mine = courseId ? data : filterSessionsForSeniorTrainer(data, seniorTrainerId);
         setSessions(applyPathFilters(mine, filters));
       })
       .catch((err) => {
@@ -465,35 +484,150 @@ const SeniorTrainerModule = () => {
   }, [filters.center]);
 
   useEffect(() => {
-    if (!token || !draftCourseId) {
-      setDraftBatches([]);
+    if (!token) {
+      setLoadingDepartments(false);
+      return undefined;
+    }
+    let cancelled = false;
+    const loadDepartments = async () => {
+      setLoadingDepartments(true);
+      try {
+        const response = await axios.get(`${backendUrl}/college/getVerticals`, {
+          headers: { 'x-auth': token },
+        });
+        if (cancelled) return;
+        setDepartment((response.data?.data || []).map((item) => ({
+          value: String(item._id),
+          label: item.name || 'Untitled department',
+        })));
+      } catch (err) {
+        console.error('Failed to load departments', err);
+        if (!cancelled) setDepartment([]);
+      } finally {
+        if (!cancelled) setLoadingDepartments(false);
+      }
+    };
+    loadDepartments();
+    return () => { cancelled = true; };
+  }, [backendUrl, token]);
+
+  useEffect(() => {
+    if (!token || !departmentId) {
+      setProject([]);
+      return undefined;
+    }
+    let cancelled = false;
+    const loadProjects = async () => {
+      setLoadingProjects(true);
+      try {
+        const response = await axios.get(`${backendUrl}/college/list-projects`, {
+          headers: { 'x-auth': token },
+          params: { vertical: departmentId },
+        });
+        if (cancelled) return;
+        setProject((response.data?.data || []).map((item) => ({
+          value: String(item._id),
+          label: item.name || 'Project',
+        })));
+      } catch (err) {
+        console.error('Failed to load projects', err);
+        if (!cancelled) setProject([]);
+      } finally {
+        if (!cancelled) setLoadingProjects(false);
+      }
+    };
+    loadProjects();
+    return () => { cancelled = true; };
+  }, [departmentId, backendUrl, token]);
+
+  useEffect(() => {
+    if (!token || !projectId) {
+      setCenter([]);
+      return undefined;
+    }
+    let cancelled = false;
+    const loadCenters = async () => {
+      setLoadingCenters(true);
+      try {
+        const response = await axios.get(`${backendUrl}/college/list-centers`, {
+          headers: { 'x-auth': token },
+          params: { projectId: projectId },
+        });
+        if (cancelled) return;
+        setCenter((response.data?.data || []).map((item) => ({
+          value: String(item._id),
+          label: item.name || 'Center',
+        })));
+      } catch (err) {
+        console.error('Failed to load centers', err);
+        if (!cancelled) setCenter([]);
+      } finally {
+        if (!cancelled) setLoadingCenters(false);
+      }
+    };
+    loadCenters();
+    return () => { cancelled = true; };
+  }, [projectId, backendUrl, token]);
+
+  useEffect(() => {
+    if (!token || !projectId || !centerId) {
+      setCourse([]);
+      return undefined;
+    }
+    let cancelled = false;
+    const loadCourses = async () => {
+      setLoadingCourses(true);
+      try {
+        const response = await axios.get(`${backendUrl}/college/all_coursescopy_centerwise`, {
+          headers: { 'x-auth': token },
+          params: { projectId: projectId, centerId: centerId },
+        });
+        if (cancelled) return;
+        setCourse((response.data?.data || []).map((item) => ({
+          value: String(item._id),
+          label: item.name || 'Course',
+        })));
+      } catch (err) {
+        console.error('Failed to load courses', err);
+        if (!cancelled) setCourse([]);
+      } finally {
+        if (!cancelled) setLoadingCourses(false);
+      }
+    };
+    loadCourses();
+    return () => { cancelled = true; };
+  }, [projectId, centerId, backendUrl, token]);
+
+  useEffect(() => {
+    if (!token || !courseId || !centerId) {
+      setBatch([]);
       return undefined;
     }
     let cancelled = false;
     const loadDraftBatches = async () => {
-      setLoadingDraftBatches(true);
+      setLoadingBatches(true);
       try {
         const res = await axios.get(`${backendUrl}/college/get_batches`, {
           headers: { 'x-auth': token },
-          params: { courseId: draftCourseId },
+          params: { courseId: courseId, centerId: centerId },
         });
         if (cancelled) return;
         const rows = (res.data?.data || []).map((batch) => ({
           value: String(batch._id),
           label: batch.name || 'Batch',
         }));
-        setDraftBatches(rows);
-        setDraftBatchId((current) => (rows.some((row) => row.value === current) ? current : ''));
+        setBatch(rows);
+        setBatchId((current) => (rows.some((row) => row.value === current) ? current : ''));
       } catch (err) {
         console.error('Failed to load course batches', err);
-        if (!cancelled) setDraftBatches([]);
+        if (!cancelled) setBatch([]);
       } finally {
-        if (!cancelled) setLoadingDraftBatches(false);
+        if (!cancelled) setLoadingBatches(false);
       }
     };
     loadDraftBatches();
     return () => { cancelled = true; };
-  }, [draftCourseId, token, backendUrl]);
+  }, [courseId, centerId, token, backendUrl]);
 
   useEffect(() => {
     if (!token || !filters.course) {
@@ -547,26 +681,56 @@ const SeniorTrainerModule = () => {
     setSelectedSessionId('');
   };
 
+  const handleDraftDepartmentChange = (value) => {
+    setDepartmentId(value);
+    setProjectId('');
+    setCenterId('');
+    setCourseId('');
+    setBatchId('');
+    setSearchMessage('');
+  };
+
+  const handleDraftProjectChange = (value) => {
+    setProjectId(value);
+    setCenterId('');
+    setCourseId('');
+    setBatchId('');
+    setSearchMessage('');
+  };
+
+  const handleDraftCenterChange = (value) => {
+    setCenterId(value);
+    setCourseId('');
+    setBatchId('');
+    setSearchMessage('');
+  };
+
   const handleDraftCourseChange = (value) => {
-    setDraftCourseId(value);
-    setDraftBatchId('');
+    setCourseId(value);
+    setBatchId('');
     setSearchMessage('');
   };
 
   const handleTimetableSearch = (event) => {
     event.preventDefault();
-    if (!draftCourseId || !draftBatchId) {
-      setSearchMessage('Select course and batch.');
+    if (!departmentId || !projectId || !centerId || !courseId || !batchId) {
+      setSearchMessage('Select department, project, center, course, and batch.');
       return;
     }
-    const course = courseOptions.find((item) => item.value === draftCourseId);
-    const batch = draftBatches.find((item) => item.value === draftBatchId);
+    const selectedDepartment = department.find((item) => item.value === departmentId);
+    const selectedProject = project.find((item) => item.value === projectId);
+    const selectedCenter = center.find((item) => item.value === centerId);
+    const selectedCourse = course.find((item) => item.value === courseId);
+    const selectedBatch = batch.find((item) => item.value === batchId);
     setSearchMessage('');
     setOpenedSelection({
-      courseName: course?.label || 'Course',
-      batchName: batch?.label || 'Batch',
+      departmentName: selectedDepartment?.label || 'Department',
+      projectName: selectedProject?.label || 'Project',
+      centerName: selectedCenter?.label || 'Center',
+      courseName: selectedCourse?.label || 'Course',
+      batchName: selectedBatch?.label || 'Batch',
     });
-    setFilters({ center: '', course: draftCourseId, batch: draftBatchId });
+    setFilters({ center: centerId, course: courseId, batch: batchId });
     setSelectedSessionId('');
     setTimetableOpen(true);
   };
@@ -630,58 +794,85 @@ const SeniorTrainerModule = () => {
             </div>
           </div>
 
-          <form onSubmit={handleTimetableSearch} style={{ marginTop: 18 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, maxWidth: 720 }}>
+          <form onSubmit={handleTimetableSearch} style={{ marginTop: 14 }}>
+            <style>{`
+              .tt-search { display: flex; align-items: flex-end; gap: 8px; }
+              .tt-search label { flex: 1 1 0; min-width: 0; }
+              .tt-search label span { display: block; font-size: 11px; font-weight: 700; color: #9f1239; margin-bottom: 4px; }
+              .tt-search .form-select { font-size: 12px; line-height: 1.2; height: 32px; padding: 2px 24px 2px 8px; }
+              .tt-search .vt-add { padding: 6px 14px; font-size: 12px; white-space: nowrap; }
+            `}</style>
+            <div className="tt-search">
               <label>
-                <span style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9f1239', marginBottom: 6 }}>Course</span>
-                <select
-                  className="form-select"
-                  value={draftCourseId}
-                  onChange={(e) => handleDraftCourseChange(e.target.value)}
-                  disabled={loadingCenters}
-                >
-                  <option value="">{loadingCenters ? 'Loading...' : 'Select course'}</option>
-                  {courseOptions.map((item) => (
+                <span>Department</span>
+                <select className="form-select" value={departmentId} onChange={(e) => handleDraftDepartmentChange(e.target.value)} disabled={loadingDepartments}>
+                  <option value="">{loadingDepartments ? 'Loading...' : 'Select department'}</option>
+                  {department.map((item) => (
                     <option key={item.value} value={item.value}>{item.label}</option>
                   ))}
                 </select>
               </label>
               <label>
-                <span style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9f1239', marginBottom: 6 }}>Batch</span>
+                <span>Project</span>
+                <select className="form-select" value={projectId} onChange={(e) => handleDraftProjectChange(e.target.value)} disabled={!departmentId || loadingProjects}>
+                  <option value="">{!departmentId ? 'Select department first' : loadingProjects ? 'Loading...' : 'Select project'}</option>
+                  {project.map((item) => (
+                    <option key={item.value} value={item.value}>{item.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Center</span>
+                <select className="form-select" value={centerId} onChange={(e) => handleDraftCenterChange(e.target.value)} disabled={!projectId || loadingCenters}>
+                  <option value="">{!projectId ? 'Select project first' : loadingCenters ? 'Loading...' : 'Select center'}</option>
+                  {center.map((item) => (
+                    <option key={item.value} value={item.value}>{item.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Course</span>
+                <select className="form-select" value={courseId} onChange={(e) => handleDraftCourseChange(e.target.value)} disabled={!centerId || loadingCourses}>
+                  <option value="">{!centerId ? 'Select center first' : loadingCourses ? 'Loading...' : 'Select course'}</option>
+                  {course.map((item) => (
+                    <option key={item.value} value={item.value}>{item.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Batch</span>
                 <select
                   className="form-select"
-                  value={draftBatchId}
+                  value={batchId}
                   onChange={(e) => {
-                    setDraftBatchId(e.target.value);
+                    setBatchId(e.target.value);
                     setSearchMessage('');
                   }}
-                  disabled={!draftCourseId || loadingDraftBatches}
+                  disabled={!courseId || loadingBatches}
                 >
                   <option value="">
-                    {!draftCourseId
+                    {!courseId
                       ? 'Select course first'
-                      : loadingDraftBatches
+                      : loadingBatches
                         ? 'Loading...'
-                        : draftBatches.length
+                        : batch.length
                           ? 'Select batch'
-                          : 'No batches for this course'}
+                          : 'No batches'}
                   </option>
-                  {draftBatches.map((item) => (
+                  {batch.map((item) => (
                     <option key={item.value} value={item.value}>{item.label}</option>
                   ))}
                 </select>
               </label>
-            </div>
-            <div style={{ marginTop: 16 }}>
               <button type="submit" className="vt-add">Search</button>
             </div>
-            {searchMessage && <p className="text-danger mt-3 mb-0">{searchMessage}</p>}
+            {searchMessage && <p className="text-danger mt-2 mb-0" style={{ fontSize: 12 }}>{searchMessage}</p>}
           </form>
 
           <div className="vt-empty">
             <i className="bi bi-funnel"></i>
             <h5>Search to see the time table</h5>
-            <p>Choose a course, then the batch connected to that course.</p>
+            <p>Choose department, project, center, course, then batch.</p>
           </div>
         </div>
       </div>
@@ -700,12 +891,12 @@ const SeniorTrainerModule = () => {
           <h1 className="st-title">Training Calendar</h1>
           {openedSelection && (
             <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 14 }}>
-              {openedSelection.courseName} · {openedSelection.batchName}
+              {[openedSelection.departmentName, openedSelection.projectName, openedSelection.centerName, openedSelection.courseName, openedSelection.batchName].filter(Boolean).join(' · ')}
             </p>
           )}
         </div>
         <button type="button" className="vt-back" onClick={handleTimetableBack}>
-          Change course / batch
+          Change path
         </button>
       </header>
 
@@ -822,6 +1013,14 @@ const SeniorTrainerModule = () => {
           loadingTrainers={loadingTrainers}
           backendUrl={backendUrl}
           token={token}
+          lockedPath={filters.course && filters.batch ? {
+            center: filters.center || editingSession.center || '',
+            centerName: openedSelection?.centerName || editingSession.centerName || '',
+            course: filters.course,
+            courseName: openedSelection?.courseName || editingSession.courseName || '',
+            batch: filters.batch,
+            batchName: openedSelection?.batchName || editingSession.batchCode || '',
+          } : null}
           onClose={handleCloseEditModal}
           onSave={handleModalSave}
         />

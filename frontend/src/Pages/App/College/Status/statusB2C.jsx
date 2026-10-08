@@ -1,7 +1,199 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios'
 
+const CopyTargetModal = ({
+  isOpen,
+  selection,
+  departments,
+  loadingDepartments,
+  backendUrl,
+  token,
+  onClose,
+  onCopy,
+}) => {
+  const [targetDepartmentId, setTargetDepartmentId] = useState('');
+  const [targetProjectId, setTargetProjectId] = useState('');
+  const [targetProjects, setTargetProjects] = useState([]);
+  const [loadingTargetProjects, setLoadingTargetProjects] = useState(false);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    setTargetDepartmentId('');
+    setTargetProjectId('');
+    setTargetProjects([]);
+  }, [isOpen, selection]);
+
+  useEffect(() => {
+    if (!isOpen || !token || !targetDepartmentId) {
+      setTargetProjects([]);
+      setLoadingTargetProjects(false);
+      return undefined;
+    }
+    let cancelled = false;
+    const loadProjects = async () => {
+      setLoadingTargetProjects(true);
+      try {
+        const response = await axios.get(`${backendUrl}/college/list-projects`, {
+          headers: { 'x-auth': token },
+          params: { vertical: targetDepartmentId },
+        });
+        if (cancelled) return;
+        setTargetProjects((response.data?.data || []).map((item) => ({
+          _id: String(item._id),
+          name: item.name || 'Untitled project',
+        })));
+      } catch (error) {
+        console.error('Error fetching projects for copy:', error);
+        if (!cancelled) setTargetProjects([]);
+      } finally {
+        if (!cancelled) setLoadingTargetProjects(false);
+      }
+    };
+    loadProjects();
+    return () => { cancelled = true; };
+  }, [isOpen, targetDepartmentId, backendUrl, token]);
+
+  if (!isOpen || !selection) return null;
+
+  const statusList = selection.statuses || [];
+  const fieldStyle = {
+    width: '100%',
+    padding: '8px 12px',
+    border: '1px solid #ddd',
+    borderRadius: 4,
+    fontSize: 14,
+    boxSizing: 'border-box',
+    background: 'white',
+  };
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'flex-start',
+      zIndex: 120,
+      overflowY: 'auto',
+      padding: '40px 16px',
+    }}>
+      <div style={{
+        background: 'white',
+        padding: 24,
+        borderRadius: 8,
+        width: 440,
+        maxWidth: '100%',
+        margin: 'auto 0',
+      }}>
+        <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 600 }}>
+          Shift all statuses
+        </h3>
+        <p style={{ margin: '0 0 16px', fontSize: 13, color: '#4a5568', lineHeight: 1.5 }}>
+          {`Shift all ${statusList.length} statuses, with their substatuses, to another department and project.`}
+        </p>
+
+        <div style={{
+          marginBottom: 16,
+          padding: '10px 12px',
+          background: '#f8fafc',
+          border: '1px solid #e2e8f0',
+          borderRadius: 6,
+          maxHeight: 120,
+          overflowY: 'auto',
+        }}>
+          {statusList.length > 0 ? (
+            statusList.map((item, index) => (
+              <div key={item._id || index} style={{ fontSize: 13, color: '#1a202c', marginBottom: 4 }}>
+                {index + 1}. {item.title}
+                <span style={{ color: '#718096' }}> ({(item.substatuses || []).length} substatuses)</span>
+              </div>
+            ))
+          ) : (
+            <div style={{ fontSize: 13, color: '#a0aec0' }}>No statuses to shift</div>
+          )}
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>Department</label>
+          <select
+            value={targetDepartmentId}
+            disabled={loadingDepartments}
+            onChange={(e) => {
+              setTargetDepartmentId(e.target.value);
+              setTargetProjectId('');
+            }}
+            style={fieldStyle}
+          >
+            <option value="">{loadingDepartments ? 'Loading departments...' : 'Select department'}</option>
+            {departments.map((item) => (
+              <option key={item._id} value={item._id}>{item.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>Project</label>
+          <select
+            value={targetProjectId}
+            disabled={!targetDepartmentId || loadingTargetProjects}
+            onChange={(e) => setTargetProjectId(e.target.value)}
+            style={{ ...fieldStyle, background: !targetDepartmentId ? '#f8fafc' : 'white' }}
+          >
+            <option value="">
+              {!targetDepartmentId ? 'Select department first' : loadingTargetProjects ? 'Loading projects...' : 'Select project'}
+            </option>
+            {targetProjects.map((item) => (
+              <option key={item._id} value={item._id}>{item.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: '8px 16px',
+              background: '#f1f5f9',
+              border: 'none',
+              borderRadius: 4,
+              cursor: 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const departmentName = departments.find((item) => item._id === targetDepartmentId)?.name || 'Department';
+              const projectName = targetProjects.find((item) => item._id === targetProjectId)?.name || 'Project';
+              onCopy({
+                targetDepartmentId,
+                targetProjectId,
+                departmentName,
+                projectName,
+              });
+            }}
+            style={{
+              padding: '8px 16px',
+              background: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: 4,
+              cursor: 'pointer',
+            }}
+          >
+            Shift all
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // Main Component
 const StatusB2C = () => {
@@ -28,6 +220,18 @@ const StatusB2C = () => {
   // Drag and drop state
   const [draggedItem, setDraggedItem] = useState(null);
 
+  // Department and project are UI scope only. Nothing is saved.
+  const [departments, setDepartments] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [departmentId, setDepartmentId] = useState('');
+  const [projectId, setProjectId] = useState('');
+  const [loadingDepartments, setLoadingDepartments] = useState(false);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [statusRegistryByScope, setStatusRegistryByScope] = useState({});
+  const [substatusRegistryByScope, setSubstatusRegistryByScope] = useState({});
+  const [transferSelection, setTransferSelection] = useState(null);
+  const [scopeNotice, setScopeNotice] = useState('');
+
   useEffect(() => {
 
     fetchStatus();
@@ -38,6 +242,153 @@ const StatusB2C = () => {
   const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
 
   const token = userData.token;
+
+  useEffect(() => {
+    if (!token) return undefined;
+    let cancelled = false;
+    const loadDepartments = async () => {
+      setLoadingDepartments(true);
+      try {
+        const response = await axios.get(`${backendUrl}/college/getVerticals`, {
+          headers: { 'x-auth': token },
+        });
+        if (cancelled) return;
+        const list = (response.data?.data || [])
+          .filter((item) => item.status !== false)
+          .map((item) => ({
+            _id: String(item._id),
+            name: item.name || 'Untitled department',
+          }));
+        setDepartments(list);
+      } catch (error) {
+        console.error('Error fetching departments:', error);
+        if (!cancelled) setDepartments([]);
+      } finally {
+        if (!cancelled) setLoadingDepartments(false);
+      }
+    };
+    loadDepartments();
+    return () => { cancelled = true; };
+  }, [backendUrl, token]);
+
+  useEffect(() => {
+    if (!token || !departmentId) {
+      setProjects([]);
+      setLoadingProjects(false);
+      return undefined;
+    }
+    let cancelled = false;
+    const loadProjects = async () => {
+      setLoadingProjects(true);
+      try {
+        const response = await axios.get(`${backendUrl}/college/list-projects`, {
+          headers: { 'x-auth': token },
+          params: { vertical: departmentId },
+        });
+        if (cancelled) return;
+        const list = (response.data?.data || []).map((item) => ({
+          _id: String(item._id),
+          name: item.name || 'Untitled project',
+        }));
+        setProjects(list);
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+        if (!cancelled) setProjects([]);
+      } finally {
+        if (!cancelled) setLoadingProjects(false);
+      }
+    };
+    loadProjects();
+    return () => { cancelled = true; };
+  }, [departmentId, backendUrl, token]);
+
+  const selectedDepartment = departments.find((item) => item._id === departmentId);
+  const selectedProject = projects.find((item) => item._id === projectId);
+  const scopeReady = Boolean(departmentId && projectId);
+
+  const handleDepartmentChange = (value) => {
+    setDepartmentId(value);
+    setProjectId('');
+  };
+
+  const scopeKeyFor = (dept, proj) => `${dept}::${proj}`;
+  const currentScopeKey = scopeKeyFor(departmentId, projectId);
+  const localStatuses = statusRegistryByScope[currentScopeKey] || [];
+  const localSubstatuses = substatusRegistryByScope[currentScopeKey] || {};
+
+  const visibleStatuses = statuses.map((status) => ({
+    ...status,
+    substatuses: [
+      ...(status.substatuses || []),
+      ...(localSubstatuses[status._id] || []),
+    ],
+  }));
+
+  const makeLocalId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+  const cloneSubstatus = (substatus) => ({
+    title: substatus.title,
+    description: substatus.description,
+    hasRemarks: substatus.hasRemarks,
+    hasFollowup: substatus.hasFollowup,
+    hasAttachment: substatus.hasAttachment,
+    _id: makeLocalId('local-sub'),
+    isLocalCopy: true,
+  });
+
+  const cloneStatus = (status) => ({
+    title: status.title,
+    description: status.description,
+    milestone: status.milestone,
+    _id: makeLocalId('local-status'),
+    id: makeLocalId('local'),
+    isLocalCopy: true,
+    substatuses: (status.substatuses || []).map(cloneSubstatus),
+  });
+
+  const openShiftAll = () => {
+    if (!visibleStatuses.length) {
+      alert('No statuses to shift');
+      return;
+    }
+    setTransferSelection({ statuses: visibleStatuses });
+  };
+
+  const handleCopyToScope = ({ targetDepartmentId, targetProjectId, departmentName, projectName }) => {
+    const sourceStatuses = transferSelection?.statuses || [];
+    if (!sourceStatuses.length || !targetDepartmentId || !targetProjectId) {
+      alert('Select department and project');
+      return;
+    }
+    if (targetDepartmentId === departmentId && targetProjectId === projectId) {
+      alert('Choose a different department or project');
+      return;
+    }
+    const key = scopeKeyFor(targetDepartmentId, targetProjectId);
+    setStatusRegistryByScope((prev) => ({
+      ...prev,
+      [key]: sourceStatuses.map(cloneStatus),
+    }));
+    setDepartmentId(targetDepartmentId);
+    setProjectId(targetProjectId);
+    setScopeNotice(`Shifted ${sourceStatuses.length} statuses to ${departmentName} / ${projectName}. This stays on this screen only.`);
+    setTransferSelection(null);
+  };
+
+  const handleRemoveLocalStatus = (localId) => {
+    setStatusRegistryByScope((prev) => ({
+      ...prev,
+      [currentScopeKey]: (prev[currentScopeKey] || []).filter((item) => item._id !== localId),
+    }));
+  };
+
+  const handleRemoveLocalSubstatus = (statusId, substatusId) => {
+    setSubstatusRegistryByScope((prev) => {
+      const scope = { ...(prev[currentScopeKey] || {}) };
+      scope[statusId] = (scope[statusId] || []).filter((item) => item._id !== substatusId);
+      return { ...prev, [currentScopeKey]: scope };
+    });
+  };
 
   // Toggle Switch Component
   const ToggleSwitch = ({ id, label, checked, onChange }) => {
@@ -244,7 +595,8 @@ const handleMoveRight = async (statusId, currentIndex) => {
     onAddSubstatus,
     onEditSubstatus,
     onDeleteSubstatus, onMoveLeft,
-    onMoveRight
+    onMoveRight,
+    isLocalCopy
   }) => {
     const [showSubstatuses, setShowSubstatuses] = useState(true);
 
@@ -252,7 +604,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
 
       <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-top', minWidth: 220, margin: '0 4px' }}>
         <div style={{ marginTop:'15%' }}>
-          
+          {!isLocalCopy && (
             <button
               onClick={() => onMoveLeft(_id, index)}
               disabled={index === 0}
@@ -272,7 +624,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
             >
               ← Move Left
             </button>
-        
+          )}
 
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -289,7 +641,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
               userSelect: 'none',
               position: 'relative'
             }}
-            draggable
+            draggable={!isLocalCopy}
             onDragStart={onDragStart}
             onDragOver={onDragOver}
             onDrop={onDrop}
@@ -306,7 +658,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
               }}>
               <span>Position: {index + 1}</span>
               <div>
-
+                {!isLocalCopy && (
                 <button
                   onClick={() => onEdit(index)}
                   disabled={index === 0}
@@ -322,9 +674,10 @@ const handleMoveRight = async (statusId, currentIndex) => {
                 >
                   ✏️
                 </button>
+                )}
                 <button
                   onClick={() => onDelete(_id)}
-                  disabled={index === 0}
+                  disabled={!isLocalCopy && index === 0}
                   style={{
                     background: 'none',
                     border: 'none',
@@ -341,6 +694,11 @@ const handleMoveRight = async (statusId, currentIndex) => {
             <div style={{ textAlign: 'center', fontWeight: 500, marginTop: 12, fontSize: '16px', color: '#333' }}>
               {title}
             </div>
+            {isLocalCopy && (
+              <div style={{ textAlign: 'center', marginTop: 6 }}>
+                <FeatureBadge label="Shifted" color="#3182ce" />
+              </div>
+            )}
             <div style={{ textAlign: 'center', fontSize: '14px', color: '#666', marginTop: 6 }}>
               {description}
             </div>
@@ -408,6 +766,9 @@ const handleMoveRight = async (statusId, currentIndex) => {
                           <div style={{ fontWeight: 500, fontSize: '14px' }}>{substatus.title}</div>
                           <div style={{ fontSize: '12px', color: '#718096' }}>{substatus.description}</div>
                           <div style={{ marginTop: '4px' }}>
+                            {substatus.isLocalCopy && (
+                              <FeatureBadge label="Shifted" color="#3182ce" />
+                            )}
                             {substatus.hasRemarks && (
                               <FeatureBadge label="Remarks" color="#38b2ac" />
                             )}
@@ -420,6 +781,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
                           </div>
                         </div>
                         <div>
+                          {!substatus.isLocalCopy && (
                           <button
                             onClick={() => onEditSubstatus(index, subIndex)}
                             style={{
@@ -434,8 +796,9 @@ const handleMoveRight = async (statusId, currentIndex) => {
                           >
                             ✏️
                           </button>
+                          )}
                           <button
-                            onClick={() => onDeleteSubstatus(_id, substatus._id)}
+                            onClick={() => onDeleteSubstatus(_id, substatus._id, substatus)}
                             style={{
                               background: 'none',
                               border: 'none',
@@ -458,6 +821,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
                 </div>
               )}
 
+              {!isLocalCopy && (
               <button
                 onClick={() => onAddSubstatus(index)}
                 style={{
@@ -476,11 +840,12 @@ const handleMoveRight = async (statusId, currentIndex) => {
               >
                 <span style={{ marginRight: '4px' }}>+</span> Add New Substatus
               </button>
+              )}
             </div>
           )}
         </div>
         <div  style={{ marginTop:'15%' }}>
-
+          {!isLocalCopy && (
           <button
             onClick={() => onMoveRight(_id, index)}
             disabled={index === statuses.length - 1}
@@ -497,7 +862,9 @@ const handleMoveRight = async (statusId, currentIndex) => {
             title="Move Right"
           >
             → Move Right
-          </button></div>
+          </button>
+          )}
+          </div>
       </div>
     );
   };
@@ -544,6 +911,10 @@ const handleMoveRight = async (statusId, currentIndex) => {
     const [hasRemarks, setHasRemarks] = useState(false);
     const [hasFollowup, setHasFollowup] = useState(false);
     const [hasAttachment, setHasAttachment] = useState(false);
+    const [formDepartmentId, setFormDepartmentId] = useState('');
+    const [formProjectId, setFormProjectId] = useState('');
+    const [formProjects, setFormProjects] = useState([]);
+    const [loadingFormProjects, setLoadingFormProjects] = useState(false);
 
     // Initialize form if in edit mode
     useEffect(() => {
@@ -564,7 +935,40 @@ const handleMoveRight = async (statusId, currentIndex) => {
         setHasFollowup(false);
         setHasAttachment(false);
       }
-    }, [editMode, initialData, isOpen, isSubstatus]);
+      if (isOpen && !isSubstatus) {
+        setFormDepartmentId(departmentId || '');
+        setFormProjectId(projectId || '');
+      }
+    }, [editMode, initialData, isOpen, isSubstatus, departmentId, projectId]);
+
+    useEffect(() => {
+      if (!isOpen || isSubstatus || !formDepartmentId) {
+        if (!formDepartmentId) setFormProjects([]);
+        return undefined;
+      }
+      let cancelled = false;
+      const loadFormProjects = async () => {
+        setLoadingFormProjects(true);
+        try {
+          const response = await axios.get(`${backendUrl}/college/list-projects`, {
+            headers: { 'x-auth': token },
+            params: { vertical: formDepartmentId },
+          });
+          if (cancelled) return;
+          setFormProjects((response.data?.data || []).map((item) => ({
+            _id: String(item._id),
+            name: item.name || 'Untitled project',
+          })));
+        } catch (error) {
+          console.error('Error fetching projects for status form:', error);
+          if (!cancelled) setFormProjects([]);
+        } finally {
+          if (!cancelled) setLoadingFormProjects(false);
+        }
+      };
+      loadFormProjects();
+      return () => { cancelled = true; };
+    }, [isOpen, isSubstatus, formDepartmentId, backendUrl, token]);
 
     const handleSave = async (statusId, substatusId) => {
       if (title.trim()) {
@@ -592,6 +996,12 @@ const handleMoveRight = async (statusId, currentIndex) => {
           }
         }
         else {
+          if (!formDepartmentId || !formProjectId) {
+            alert('Select department and project');
+            return;
+          }
+          setDepartmentId(formDepartmentId);
+          setProjectId(formProjectId);
           // 🔁 Edit role (API call)
           if (editMode && statusId) {
             // Edit status
@@ -639,21 +1049,83 @@ const handleMoveRight = async (statusId, currentIndex) => {
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         display: 'flex',
         justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 100
+        alignItems: 'flex-start',
+        zIndex: 100,
+        overflowY: 'auto',
+        padding: '40px 16px'
       }}>
         <div style={{
           background: 'white',
           padding: 24,
           borderRadius: 8,
           width: 400,
-          maxWidth: '90%'
+          maxWidth: '100%',
+          margin: 'auto 0'
         }}>
           <h3 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 600 }}>
             {editMode
               ? (isSubstatus ? 'Edit Substatus' : 'Edit Status')
               : (isSubstatus ? 'Add New Substatus' : 'Add New Status')}
           </h3>
+
+          {!isSubstatus && (
+            <>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>
+                  Department:
+                </label>
+                <select
+                  value={formDepartmentId}
+                  onChange={(e) => {
+                    setFormDepartmentId(e.target.value);
+                    setFormProjectId('');
+                  }}
+                  disabled={loadingDepartments}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #ddd',
+                    borderRadius: 4,
+                    fontSize: 14,
+                    boxSizing: 'border-box',
+                    background: 'white'
+                  }}
+                >
+                  <option value="">{loadingDepartments ? 'Loading departments...' : 'Select department'}</option>
+                  {departments.map((item) => (
+                    <option key={item._id} value={item._id}>{item.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>
+                  Project:
+                </label>
+                <select
+                  value={formProjectId}
+                  onChange={(e) => setFormProjectId(e.target.value)}
+                  disabled={!formDepartmentId || loadingFormProjects}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #ddd',
+                    borderRadius: 4,
+                    fontSize: 14,
+                    boxSizing: 'border-box',
+                    background: !formDepartmentId ? '#f8fafc' : 'white'
+                  }}
+                >
+                  <option value="">
+                    {!formDepartmentId ? 'Select department first' : loadingFormProjects ? 'Loading projects...' : 'Select project'}
+                  </option>
+                  {formProjects.map((item) => (
+                    <option key={item._id} value={item._id}>{item.name}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
 
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>
@@ -1040,7 +1512,11 @@ const handleMoveRight = async (statusId, currentIndex) => {
   };
 
   // Delete substatus
-  const handleDeleteSubstatus = (statusId, substatusId) => {
+  const handleDeleteSubstatus = (statusId, substatusId, substatus) => {
+    if (substatus?.isLocalCopy) {
+      handleRemoveLocalSubstatus(statusId, substatusId);
+      return;
+    }
     setDeletingStatusId(statusId);
     setDeletingSubstatusId(substatusId);
     setIsDeletingSubstatus(true);
@@ -1141,23 +1617,137 @@ const handleMoveRight = async (statusId, currentIndex) => {
         </button>
       </div>
 
+      {scopeNotice && (
+        <div style={{
+          marginBottom: '12px',
+          padding: '8px 12px',
+          background: '#f0fdf4',
+          border: '1px solid #bbf7d0',
+          borderRadius: '6px',
+          color: '#166534',
+          fontSize: '13px'
+        }}>
+          {scopeNotice}
+        </div>
+      )}
+
       <div style={{
         background: 'white',
         border: '1px solid #e5e7eb',
         borderRadius: '8px',
-        padding: '32px 16px',
-        marginTop: '24px',
+        marginTop: '16px',
         overflowX: 'auto',
-        whiteSpace: 'nowrap'
+        whiteSpace: scopeReady ? 'nowrap' : 'normal'
       }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          padding: '10px 14px',
+          borderBottom: '1px solid #eef2f6',
+          background: '#fafbfc',
+          borderRadius: '8px 8px 0 0',
+          whiteSpace: 'normal'
+        }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Department</span>
+            <select
+              value={departmentId}
+              onChange={(e) => handleDepartmentChange(e.target.value)}
+              disabled={loadingDepartments}
+              style={{
+                height: '32px',
+                width: '160px',
+                padding: '0 8px',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+                fontSize: '13px',
+                color: '#1e293b',
+                background: 'white'
+              }}
+            >
+              <option value="">{loadingDepartments ? 'Loading...' : 'Select'}</option>
+              {departments.map((item) => (
+                <option key={item._id} value={item._id}>{item.name}</option>
+              ))}
+            </select>
+          </label>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Project</span>
+            <select
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+              disabled={!departmentId || loadingProjects}
+              style={{
+                height: '32px',
+                width: '160px',
+                padding: '0 8px',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+                fontSize: '13px',
+                color: '#1e293b',
+                background: !departmentId ? '#f8fafc' : 'white'
+              }}
+            >
+              <option value="">
+                {!departmentId ? 'Select department' : loadingProjects ? 'Loading...' : 'Select'}
+              </option>
+              {projects.map((item) => (
+                <option key={item._id} value={item._id}>{item.name}</option>
+              ))}
+            </select>
+          </label>
+
+          <button
+            type="button"
+            onClick={openShiftAll}
+            disabled={!scopeReady || visibleStatuses.length === 0}
+            style={{
+              marginLeft: 'auto',
+              height: '32px',
+              padding: '0 14px',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px',
+              background: 'white',
+              color: '#334155',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: !scopeReady || visibleStatuses.length === 0 ? 'not-allowed' : 'pointer',
+              opacity: !scopeReady || visibleStatuses.length === 0 ? 0.55 : 1
+            }}
+          >
+            Shift all
+          </button>
+        </div>
+        <div style={{ padding: scopeReady ? '8px 0 24px' : '24px 16px' }}>
+        {!scopeReady ? (
+          <div style={{
+            minHeight: '180px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+            color: '#718096',
+            gap: '8px'
+          }}>
+            <div style={{ fontSize: '16px', fontWeight: 600, color: '#4a5568' }}>
+              Select a department and project
+            </div>
+            <div style={{ fontSize: '14px', maxWidth: '420px' }}>
+              The lead status flow opens for the department and project you choose. This selection stays on this screen only.
+            </div>
+          </div>
+        ) : (
         <div style={{
           display: 'flex',
           alignItems: 'flex-start',
           padding: '20px 16px',
           minWidth: 'max-content'
         }}>
-          {statuses.map((status, index) => (
-            <React.Fragment key={status.id}>
+          {visibleStatuses.map((status, index) => (
+            <React.Fragment key={status.id || status._id}>
               <StatusCard
                 index={index}
                 title={status.title}
@@ -1175,12 +1765,43 @@ const handleMoveRight = async (statusId, currentIndex) => {
                 onDeleteSubstatus={handleDeleteSubstatus}
                 onMoveLeft={handleMoveLeft}
                 onMoveRight={handleMoveRight}
-
-
               />
-              {index < statuses.length - 1 && <Arrow />}
+              {index < visibleStatuses.length - 1 && <Arrow />}
             </React.Fragment>
           ))}
+        </div>
+        )}
+        {scopeReady && localStatuses.length > 0 && (
+          <div style={{ marginTop: '28px', padding: '8px 16px 0', whiteSpace: 'normal' }}>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: '#1e40af', marginBottom: '12px' }}>
+              Shifted into {selectedDepartment?.name} / {selectedProject?.name}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', minWidth: 'max-content', whiteSpace: 'nowrap' }}>
+              {localStatuses.map((status, index) => (
+                <StatusCard
+                  key={status._id}
+                  index={index}
+                  title={status.title}
+                  _id={status._id}
+                  description={status.description}
+                  milestone={status.milestone}
+                  substatuses={status.substatuses}
+                  isLocalCopy
+                  onDelete={handleRemoveLocalStatus}
+                  onDeleteSubstatus={handleDeleteSubstatus}
+                  onEdit={() => {}}
+                  onAddSubstatus={() => {}}
+                  onEditSubstatus={() => {}}
+                  onDragStart={() => {}}
+                  onDragOver={() => {}}
+                  onDrop={() => {}}
+                  onMoveLeft={() => {}}
+                  onMoveRight={() => {}}
+                />
+              ))}
+            </div>
+          </div>
+        )}
         </div>
       </div>
 
@@ -1193,6 +1814,8 @@ const handleMoveRight = async (statusId, currentIndex) => {
       }}>
         <h3 style={{ margin: '0 0 12px', fontSize: '16px', fontWeight: 500, color: '#4a5568' }}>Instructions:</h3>
         <ul style={{ margin: 0, padding: '0 0 0 20px', color: '#4a5568', fontSize: '14px' }}>
+          <li style={{ marginBottom: '8px' }}>Choose a department, then a project, to open that status flow</li>
+          <li style={{ marginBottom: '8px' }}>Use Shift all to move every status and its substatuses together to another department and project</li>
           <li style={{ marginBottom: '8px' }}>Drag and drop status cards to change their order</li>
           <li style={{ marginBottom: '8px' }}>Click on "Show Substatus ▼" to view substatus options</li>
           <li style={{ marginBottom: '8px' }}>Use the "Add New Substatus" button to add substatus to a status</li>
@@ -1219,6 +1842,17 @@ const handleMoveRight = async (statusId, currentIndex) => {
         initialData={editingSubstatus}
         isSubstatus={true}
         editingStatus={statuses[editingStatusIndex]}
+      />
+
+      <CopyTargetModal
+        isOpen={Boolean(transferSelection)}
+        selection={transferSelection}
+        departments={departments}
+        loadingDepartments={loadingDepartments}
+        backendUrl={backendUrl}
+        token={token}
+        onClose={() => setTransferSelection(null)}
+        onCopy={handleCopyToScope}
       />
 
       {/* Delete Confirmation Modal */}

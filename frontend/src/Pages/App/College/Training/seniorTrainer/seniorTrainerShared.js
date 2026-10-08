@@ -61,13 +61,14 @@ export const fetchCoordinatorSessionsApi = async (backendUrl, token, options = {
     courseId = '',
     seniorTrainerId = '',
     includeCoursePlans = false,
+    excludeScheduled = true,
   } = options;
   const params = new URLSearchParams();
   if (batchId) params.set('batch', batchId);
   if (courseId) params.set('course', courseId);
   if (seniorTrainerId) params.set('seniorTrainerId', seniorTrainerId);
   if (includeCoursePlans) params.set('includeCoursePlans', 'true');
-  params.set('excludeScheduled', 'true');
+  if (excludeScheduled) params.set('excludeScheduled', 'true');
   const res = await axios.get(`${backendUrl}/college/session-plans?${params.toString()}`, {
     headers: authHeaders(token),
   });
@@ -290,7 +291,14 @@ export const filterSessionsForSeniorTrainer = (sessions = [], userId = '') => {
 export const applyPathFilters = (sessions = [], filters = {}) => {
   let list = sessions;
   if (filters.center) {
-    list = list.filter((session) => String(session.center || '') === String(filters.center));
+    list = list.filter((session) => (
+      String(session.center || '') === String(filters.center)
+      || (
+        (!session.center || session.center === 'null')
+        && filters.course
+        && String(session.course || '') === String(filters.course)
+      )
+    ));
   }
   if (filters.course) {
     list = list.filter((session) => String(session.course || '') === String(filters.course));
@@ -374,6 +382,12 @@ export const getSessionDateValue = (session) => {
   if (!key) return null;
   const date = new Date(`${key}T12:00:00`);
   return Number.isNaN(date.getTime()) ? null : date;
+};
+
+export const getSessionOutline = (session = {}) => {
+  const unit = [session.unitNumber ? `Unit ${session.unitNumber}` : '', session.unitName].filter(Boolean).join(' · ');
+  const chapter = [session.chapterNumber ? `Ch. ${session.chapterNumber}` : '', session.chapterName].filter(Boolean).join(' · ');
+  return { unit, chapter, path: [unit, chapter].filter(Boolean).join(' › ') };
 };
 
 export const getSessionTypeLabel = (session) => {
@@ -1941,7 +1955,12 @@ export const ST_CSS = `
   .tt__pool { border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; padding: 8px; overflow-y: auto; }
   .tt__pool h4 { margin: 0 0 4px; font-size: 13px; font-weight: 800; }
   .tt__pool-hint { margin: 0 0 8px; font-size: 11px; font-weight: 600; color: #64748b; line-height: 1.4; }
-  .tt__pool ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .tt__outline { display: flex; flex-direction: column; gap: 4px; }
+  .tt__outline + .tt__outline { margin-top: 8px; }
+  .tt__outline-unit { font-size: 11px; font-weight: 800; color: #0f172a; }
+  .tt__outline-chapter { margin: 2px 0 2px 8px; font-size: 10px; font-weight: 700; color: #64748b; }
+  .tt__outline-chapter-wrap ul { margin-left: 8px; }
+  .tt__pool ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
   .tt__pool-item { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 1px; padding: 7px 9px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; font: inherit; cursor: pointer; }
   .tt__pool-item strong { font-size: 12px; font-weight: 800; }
   .tt__pool-item small { font-size: 10px; font-weight: 600; color: #94a3b8; }

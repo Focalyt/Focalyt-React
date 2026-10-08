@@ -15,13 +15,15 @@ const SessionAssignModal = ({
   loadingTrainers = false,
   backendUrl,
   token,
+  lockedPath = null,
   onClose,
   onSave,
 }) => {
-  const [center, setCenter] = useState(session?.center ? String(session.center) : '');
-  const [course, setCourse] = useState(session?.course ? String(session.course) : '');
+  const [center, setCenter] = useState(lockedPath?.center || (session?.center ? String(session.center) : ''));
+  const [course, setCourse] = useState(lockedPath?.course || (session?.course ? String(session.course) : ''));
   const [batch, setBatch] = useState(
-    session?.batch && session.batch !== 'null' ? String(session.batch) : ''
+    lockedPath?.batch
+      || (session?.batch && session.batch !== 'null' ? String(session.batch) : '')
   );
   const [assignDate, setAssignDate] = useState(parseSessionDateKey(session) || '');
   const [trainerId, setTrainerId] = useState(session?.fieldTrainerId ? String(session.fieldTrainerId) : '');
@@ -84,9 +86,18 @@ const SessionAssignModal = ({
   const handleSave = async () => {
     setSaving(true);
     try {
-      const centerName = centerOptions.find((option) => String(option.value) === String(center))?.label || '';
-      const courseName = linkedCourseOptions.find((option) => String(option.value) === String(course))?.label || '';
-      const batchCode = batchOptions.find((option) => String(option.value) === String(batch))?.label || '';
+      const centerName = lockedPath?.centerName
+        || centerOptions.find((option) => String(option.value) === String(center))?.label
+        || session.centerName
+        || '';
+      const courseName = lockedPath?.courseName
+        || linkedCourseOptions.find((option) => String(option.value) === String(course))?.label
+        || session.courseName
+        || '';
+      const batchCode = lockedPath?.batchName
+        || batchOptions.find((option) => String(option.value) === String(batch))?.label
+        || session.batchCode
+        || '';
       await onSave(session.id, {
         center,
         course,
@@ -116,6 +127,12 @@ const SessionAssignModal = ({
         <div className="st-modal__body">
           <p className="st-modal__session-title">{session.title || 'Untitled session'}</p>
 
+          {lockedPath ? (
+            <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 700, color: '#64748b' }}>
+              {lockedPath.courseName} · {lockedPath.batchName}
+            </p>
+          ) : (
+            <>
           <label className="st-modal-field">
             <span>Center</span>
             <select
@@ -165,6 +182,8 @@ const SessionAssignModal = ({
               ))}
             </select>
           </label>
+            </>
+          )}
 
           <label className="st-modal-field">
             <span>Assign Date</span>

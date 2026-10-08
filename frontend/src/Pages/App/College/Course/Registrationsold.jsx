@@ -82,6 +82,7 @@ const omitDashboardChipFilters = (filters = {}) => {
   delete next.kyc;
   delete next.kycBucket;
   delete next.subStatuses;
+  delete next.milestoneTitle;
   return next;
 };
 
@@ -3892,6 +3893,8 @@ const CRMDashboard = () => {
   );
   const [aiStatusCounts, setAiStatusCounts] = useState({});
   const [activeAiPerformanceId, setActiveAiPerformanceId] = useState(null);
+  const [leadMilestones, setLeadMilestones] = useState([]);
+  const [activeMilestoneId, setActiveMilestoneId] = useState(null);
   const aiPerformanceFilters = useMemo(
     () => performanceFilters.map((filter) => ({
       ...filter,
@@ -3945,8 +3948,8 @@ const CRMDashboard = () => {
     return () => window.removeEventListener('resize', checkIfMobile);
   }, []);
   useEffect(() => {
-    fetchStatus()
-
+    fetchStatus();
+    fetchLeadMilestones();
   }, []);
 
   useEffect(() => {
@@ -4064,6 +4067,7 @@ const CRMDashboard = () => {
     setLeadViewTab('all');
     setSelectedApprovalFilter(null);
     setSelectedFollowupBucket('');
+    setActiveMilestoneId(null);
 
     setCurrentPage(1);
     // Explicitly call fetchProfileData with cleared filters to ensure data is fetched
@@ -4149,6 +4153,19 @@ const CRMDashboard = () => {
     } catch (error) {
       console.error('Error fetching roles:', error);
       alert('Failed to fetch Status');
+    }
+  };
+
+  const fetchLeadMilestones = async () => {
+    try {
+      const response = await axios.get(`${backendUrl}/college/milestone`, {
+        headers: { 'x-auth': token },
+      });
+      if (response.data.success) {
+        setLeadMilestones(response.data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching milestones:', error);
     }
   };
 
@@ -5357,6 +5374,7 @@ console.log('API Response:', response.data);
       ...(filters.courseType && { courseType: filters.courseType }),
       ...(filters.status && filters.status !== 'true' && { status: filters.status }),
       ...(filters.leadStatus && { leadStatus: filters.leadStatus }),
+      ...(filters.milestoneTitle && { milestoneTitle: filters.milestoneTitle }),
       ...(filters.aiLeadStatus && { aiLeadStatus: filters.aiLeadStatus }),
       ...(filters.sector && { sector: filters.sector }),
       ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
@@ -6284,10 +6302,12 @@ console.log('API Response:', response.data);
     setSelectedMilestoneFilter(null);
     setActiveCrmFilter(0);
     setActiveAiPerformanceId(null);
+    setActiveMilestoneId(null);
 
     const newFilterData = { ...filterData };
     delete newFilterData.approvalStatus;
     delete newFilterData.leadStatus;
+    delete newFilterData.milestoneTitle;
     delete newFilterData.aiLeadStatus;
     delete newFilterData.followupStatus;
     if (tab === 'ekyc') {
@@ -6347,10 +6367,36 @@ console.log('API Response:', response.data);
 
     newFilterData.followupStatus = '';
     delete newFilterData.kyc;
+    delete newFilterData.milestoneTitle;
     setSelectedFollowupBucket('');
     setSelectedApprovalFilter(null);
     setSelectedKycFilter(null);
     setSelectedMilestoneFilter(null);
+    setActiveMilestoneId(null);
+    setFilterData(newFilterData);
+    fetchProfileData(newFilterData, 1);
+  };
+
+  const handleMilestoneChipClick = (milestone) => {
+    if (pageMainTab === 'ekyc') return;
+    setActiveMilestoneId(milestone?._id || null);
+    setActiveCrmFilter(0);
+    setCurrentPage(1);
+    setInput1Value('');
+    setSelectedProfiles([]);
+    setSelectedFollowupBucket('');
+    setSelectedApprovalFilter(null);
+    setSelectedKycFilter(null);
+    setSelectedMilestoneFilter(null);
+
+    const newFilterData = { ...filterData, followupStatus: '' };
+    delete newFilterData.leadStatus;
+    delete newFilterData.kyc;
+    if (milestone?._id) {
+      newFilterData.milestoneTitle = milestone.title;
+    } else {
+      delete newFilterData.milestoneTitle;
+    }
     setFilterData(newFilterData);
     fetchProfileData(newFilterData, 1);
   };
@@ -7276,6 +7322,17 @@ console.log('API Response:', response.data);
     if (!id || id === 'all') return null;
     return id;
   })();
+  const normalizeMilestoneTitle = (value) => String(value || '').trim().toLowerCase();
+  const milestonePerformanceChips = leadMilestones.map((milestone) => ({
+    ...milestone,
+    count: performanceFilters
+      .filter((filter) => normalizeMilestoneTitle(filter.milestone) === normalizeMilestoneTitle(milestone.title))
+      .reduce((sum, filter) => sum + (Number(filter.count) || 0), 0),
+  }));
+  const milestonePerformanceTotal = milestonePerformanceChips.reduce(
+    (sum, milestone) => sum + (Number(milestone.count) || 0),
+    0
+  );
 
   // Auto-select profiles based on Input 1 value (bulk WhatsApp, bulk Refer, bulk Action, AI Call)
   useEffect(() => {
@@ -15924,6 +15981,51 @@ useEffect(() => {
           })}
         </div>
       </div>
+      <div className="b2b-dash-section mt-3">
+        <span className="b2b-dash-section__label">Milestone</span>
+        <div className="b2b-mobile-hscroll b2b-mobile-hscroll--chips d-flex gap-2 align-items-center pt-1">
+          <button
+            type="button"
+            className="b2b-perf-chip"
+            style={{
+              padding: '6px 14px',
+              fontSize: '12px',
+              fontWeight: 600,
+              borderRadius: '999px',
+              cursor: 'pointer',
+              color: !activeMilestoneId ? '#fff' : 'rgb(250, 85, 121)',
+              backgroundColor: !activeMilestoneId ? 'rgb(250, 85, 121)' : '#fff',
+              border: !activeMilestoneId ? 'none' : '1.5px solid rgb(250, 85, 121)',
+            }}
+            onClick={() => handleMilestoneChipClick(null)}
+          >
+            All ({milestonePerformanceTotal})
+          </button>
+          {milestonePerformanceChips.map((milestone, index) => {
+            const isSelected = activeMilestoneId === milestone._id;
+            return (
+              <button
+                key={milestone._id || index}
+                type="button"
+                className="b2b-perf-chip"
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  borderRadius: '999px',
+                  cursor: 'pointer',
+                  color: isSelected ? '#fff' : 'rgb(250, 85, 121)',
+                  backgroundColor: isSelected ? 'rgb(250, 85, 121)' : '#fff',
+                  border: isSelected ? 'none' : '1.5px solid rgb(250, 85, 121)',
+                }}
+                onClick={() => handleMilestoneChipClick(milestone)}
+              >
+                {(milestone.title || 'Milestone').toUpperCase()} ({milestone.count ?? 0})
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {(selectedFollowupBucket || selectedApprovalFilter || selectedKycFilter || selectedMilestoneFilter) && (
         <div className="d-flex flex-wrap align-items-center gap-2 mt-2 mb-1">
@@ -15962,6 +16064,7 @@ useEffect(() => {
               setSelectedMilestoneFilter(null);
               const cleared = { ...filterData, followupStatus: '' };
               delete cleared.leadStatus;
+              delete cleared.milestoneTitle;
               delete cleared.aiLeadStatus;
               delete cleared.kyc;
               delete cleared.kycBucket;
@@ -15969,6 +16072,7 @@ useEffect(() => {
               setFilterData(cleared);
               setActiveCrmFilter(0);
               setActiveAiPerformanceId(null);
+              setActiveMilestoneId(null);
               fetchProfileData(cleared, 1, null, null, null);
             }}
             style={{ fontSize: '12px', fontWeight: 600, borderRadius: '999px' }}
