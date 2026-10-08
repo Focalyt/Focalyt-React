@@ -1171,21 +1171,46 @@ const BatchMonitoring = () => {
                 {renderProgressRing(card.progress)}
               </div>
               <div className="lead-strip-v3__profile-body">
-                {card.line1 ? (
+                {card.line1Label ? (
+                  <div className="lead-strip-v3__owner-line lead-strip-v3__owner-line--owner" title={card.line1 || ''}>
+                    <span className="lead-strip-v3__owner-label">{card.line1Label}</span>
+                    <span className="lead-strip-v3__owner-val">{card.line1 || '—'}</span>
+                  </div>
+                ) : card.line1 ? (
                 <div className="lead-strip-v3__phone-line" title={card.line1}>
                   <i className={card.line1Icon} aria-hidden="true" />
                   <span>{card.line1}</span>
                 </div>
                 ) : null}
+                {card.line2Label ? null : (
                 <div className="lead-strip-v3__email-line" title={card.line2}>
                   <i className={card.line2Icon} aria-hidden="true" />
                   <span>{card.line2 || 'N/A'}</span>
                 </div>
+                )}
                 <div className="lead-strip-v3__owners">
+                  {card.line2Label ? (
+                    <div className="lead-strip-v3__owner-line lead-strip-v3__owner-line--owner" title={card.line2 || ''}>
+                      <span className="lead-strip-v3__owner-label">{card.line2Label}</span>
+                      <span className="lead-strip-v3__owner-val">{card.line2 || '—'}</span>
+                    </div>
+                  ) : null}
                   <div className="lead-strip-v3__owner-line lead-strip-v3__owner-line--owner">
                     <span className="lead-strip-v3__owner-label">{card.ownerLabel}</span>
                     <span className="lead-strip-v3__owner-val">{card.owner || '—'}</span>
                   </div>
+                  {(card.co1Label || card.co2Label) && card.stackMeta ? (
+                    <>
+                      <div className="lead-strip-v3__owner-line lead-strip-v3__owner-line--owner" title={card.co1 || ''}>
+                        <span className="lead-strip-v3__owner-label">{card.co1Label}</span>
+                        <span className="lead-strip-v3__owner-val">{card.co1 || '—'}</span>
+                      </div>
+                      <div className="lead-strip-v3__owner-line lead-strip-v3__owner-line--owner" title={card.co2 || ''}>
+                        <span className="lead-strip-v3__owner-label">{card.co2Label}</span>
+                        <span className="lead-strip-v3__owner-val">{card.co2 || '—'}</span>
+                      </div>
+                    </>
+                  ) : (card.co1Label || card.co2Label) ? (
                   <div className="lead-strip-v3__owners-row">
                     <div className="lead-strip-v3__owner-line">
                       <span className="lead-strip-v3__owner-label">{card.co1Label}</span>
@@ -1196,6 +1221,7 @@ const BatchMonitoring = () => {
                       <span className="lead-strip-v3__owner-val">{card.co2 || '—'}</span>
                     </div>
                   </div>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -1208,19 +1234,6 @@ const BatchMonitoring = () => {
                   <span className="lead-strip-v3__panel-title">
                     <i className="fas fa-chart-line" aria-hidden="true" /> Performance
                   </span>
-                  <button
-                    type="button"
-                    className="lead-strip-v3__panel-edit"
-                    title="Edit Performance"
-                    aria-label="Edit Performance"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      openActionPanel(card, 'status');
-                    }}
-                  >
-                    <i className="fas fa-edit" aria-hidden="true" />
-                  </button>
                 </div>
                 {performanceRows.map((row) => (
                   <div className="lead-strip-v3__kv" key={row.label}>
@@ -1238,6 +1251,19 @@ const BatchMonitoring = () => {
                     )}
                   </div>
                 ))}
+                <button
+                  type="button"
+                  className="lead-strip-v3__panel-edit"
+                  title="Edit Performance"
+                  aria-label="Edit Performance"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openActionPanel(card, 'status');
+                  }}
+                >
+                  <i className="fas fa-edit" aria-hidden="true" />
+                </button>
               </div>
             </div>
             <div className="lead-strip-v3__panel lead-strip-v3__panel--approval">
@@ -1260,7 +1286,7 @@ const BatchMonitoring = () => {
             </div>
           </div>
 
-          <div className="lead-strip-v3__panel">
+          <div className={`lead-strip-v3__panel lead-strip-v3__panel--followup-call${(Number(call.done) || 0) + (Number(call.planned) || 0) + (Number(call.missed) || 0) > 0 ? '' : ' lead-strip-v3__panel--no-followup'}`}>
             <div className="lead-strip-v3__panel-head">
               <span className="lead-strip-v3__panel-title">
                 <i className="fas fa-phone-alt" aria-hidden="true" /> Followup Calling
@@ -1292,7 +1318,7 @@ const BatchMonitoring = () => {
             </div>
           </div>
 
-          <div className="lead-strip-v3__panel">
+          <div className={`lead-strip-v3__panel lead-strip-v3__panel--followup-visit${(Number(visit.done) || 0) + (Number(visit.planned) || 0) + (Number(visit.missed) || 0) > 0 ? '' : ' lead-strip-v3__panel--no-followup'}`}>
             <div className="lead-strip-v3__panel-head">
               <span className="lead-strip-v3__panel-title">
                 <i className="fas fa-user-check" aria-hidden="true" /> Followup Visit
@@ -1324,8 +1350,8 @@ const BatchMonitoring = () => {
             </div>
           </div>
 
-          {card.sideTitle !== 'Training' && (
-          <div className="lead-strip-v3__panel lead-strip-v3__panel--kyc">
+          {card.sideTitle && (
+          <div className="lead-strip-v3__panel lead-strip-v3__panel--side p-0">
             <div className="lead-card-kyc-dash">
               <div className="lead-strip-v3__panel-head lead-strip-v3__panel-head--actions">
                 <span className="lead-strip-v3__panel-title">
@@ -1333,7 +1359,7 @@ const BatchMonitoring = () => {
                 </span>
                 <div className="lead-strip-v3__head-actions">
                   {card.actions.length > 0 && (
-                  <div className="lead-strip-v3__actions-wrap">
+                  <div className="lead-strip-v3__actions-wrap z-index-0">
                     <button
                       type="button"
                       className="lead-strip-v3__icon-btn"
@@ -1381,7 +1407,7 @@ const BatchMonitoring = () => {
                 </div>
               </div>
               <div className="lead-card-kyc-dash__stats">
-                {card.sideStats.map((row) => (
+                {(card.sideStats || []).map((row) => (
                   <div
                     key={row.key}
                     className="lead-card-kyc-dash__stat text-center text-white"
@@ -1419,24 +1445,24 @@ const BatchMonitoring = () => {
                 ['Visit follow-up', visit.nextDate],
                 ['Status', approval || 'Pending'],
                 ['Remarks', edit.remarks || '—'],
-              ].map(([label, value]) => (
+              ].filter(([label]) => label).map(([label, value]) => (
                 <div className="bm-card-open__item" key={label}>
-                  <span>{label}</span>
-                  <strong>{value || '—'}</strong>
+                  <div className="bm-card-open__label">{label}</div>
+                  <div className="bm-card-open__value">{value || '—'}</div>
                 </div>
               ))}
             </div>
-            <div className="bm-card-open__actions">
-              <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => openActionPanel(card, 'status')}>
-                <i className="fas fa-edit me-1" /> Edit Performance
+            {/* <div className="bm-card-open__actions">
+              <button type="button" className="bm-card-open__btn" onClick={() => openActionPanel(card, 'status')}>
+                <i className="fas fa-edit" aria-hidden="true" /> Edit Performance
               </button>
-              <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => openActionPanel(card, 'followup', 'Call')}>
-                <i className="fas fa-phone-alt me-1" /> Set Call Followup
+              <button type="button" className="bm-card-open__btn" onClick={() => openActionPanel(card, 'followup', 'Call')}>
+                <i className="fas fa-phone-alt" aria-hidden="true" /> Set Call Followup
               </button>
-              <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => openActionPanel(card, 'followup', 'Visit')}>
-                <i className="fas fa-user-check me-1" /> Set Visit Followup
+              <button type="button" className="bm-card-open__btn" onClick={() => openActionPanel(card, 'followup', 'Visit')}>
+                <i className="fas fa-user-check" aria-hidden="true" /> Set Visit Followup
               </button>
-            </div>
+            </div> */}
           </div>
         )}
       </div>
@@ -1472,14 +1498,16 @@ const BatchMonitoring = () => {
       progress,
       line1: batch.batchCode || batch.code || '',
       line1Icon: 'fas fa-hashtag',
-      line2: batch.courseName || batch.course?.name || 'Course not available',
+      line2Label: 'Course',
+      line2: batch.courseName || batch.course?.name || '—',
       line2Icon: 'fas fa-graduation-cap',
       ownerLabel: 'Center',
       owner: batch.centerName || batch.center?.name || '—',
-      co1Label: 'Start',
+      co1Label: 'Start Date',
       co1: formatDate(batch.startDate),
-      co2Label: 'End',
+      co2Label: 'End Date',
       co2: formatDate(batch.endDate),
+      stackMeta: true,
       performance: [
         { label: 'Status', value: batch.status || 'Active' },
         { label: 'Students', value: String(studentCount) },
@@ -1521,16 +1549,11 @@ const BatchMonitoring = () => {
       tab: session.courseName || 'Course',
       name: session.title || 'Untitled Session',
       progress: call.done ? 100 : 0,
-      line1: formatDate(session.sessionDate || session.date),
-      line1Icon: 'fas fa-calendar-alt',
-      line2: session.courseName || 'Course not available',
+      line2Label: 'Course',
+      line2: session.courseName || '—',
       line2Icon: 'fas fa-graduation-cap',
       ownerLabel: 'Batch',
       owner: session.batchCode || '—',
-      co1Label: 'Unit',
-      co1: session.unitName || (session.unitNumber ? `Unit ${session.unitNumber}` : '—'),
-      co2Label: 'Chap',
-      co2: session.chapterName || (session.chapterNumber ? `Ch ${session.chapterNumber}` : '—'),
       performance: [
         { label: 'Status', value: status },
         { label: 'Trainer', value: session.fieldTrainerName || '—' },
@@ -1543,8 +1566,8 @@ const BatchMonitoring = () => {
       sideTitle: 'Session',
       sideIcon: 'fas fa-chalkboard-teacher',
       sideStats: [
-        { key: 'unit', label: 'Unit', value: session.unitNumber || 0, bg: '#6366f1' },
-        { key: 'chapter', label: 'Chapter', value: session.chapterNumber || 0, bg: '#0ea5e9' },
+        { key: 'students', label: 'Students', value: session.studentCount || 0, bg: '#6366f1' },
+        { key: 'present', label: 'Present', value: session.presentCandidates || 0, bg: '#0ea5e9' },
         { key: 'done', label: 'Done', value: call.done, bg: '#10b981' },
       ],
       actions: [],

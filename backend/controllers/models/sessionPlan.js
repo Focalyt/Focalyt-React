@@ -133,6 +133,11 @@ const sessionPlanSchema = new Schema(
     dateLabel: { type: String, default: '' },
     startTime: { type: String, default: '' },
     endTime: { type: String, default: '' },
+    timetableType: {
+      type: String,
+      enum: ['course', 'placement', 'club'],
+      default: 'course',
+    },
 
     activityIds: [{ type: ObjectId, ref: 'CourseActivity' }],
     sessionActivities: { type: [activityItemSchema], default: [] },

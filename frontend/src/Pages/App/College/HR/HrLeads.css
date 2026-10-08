@@ -1161,7 +1161,7 @@
         }
 
         .lead-strip-v3__owner-line--owner{
-          grid-template-columns: 40px minmax(0, 1fr);
+          grid-template-columns: 56px minmax(0, 1fr);
         }
 
         .lead-strip-v3__owner-label{

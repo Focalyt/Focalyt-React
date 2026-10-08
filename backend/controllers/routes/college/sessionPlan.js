@@ -289,6 +289,7 @@ const mapSessionToClient = (doc) => {
     dateLabel: session.dateLabel || '',
     startTime: session.startTime || '',
     endTime: session.endTime || '',
+    timetableType: session.timetableType || 'course',
     sessionActivities: normalizeActivities(session.sessionActivities),
     activityIds: (session.activityIds || []).map((id) => String(id)).filter(Boolean),
     evidenceDocs: session.evidenceDocs || [],
@@ -756,6 +757,13 @@ router.patch('/:id', async (req, res) => {
     if (body.batchCode !== undefined && body.batch === undefined) existing.batchCode = body.batchCode || '';
     if (body.sessionDate !== undefined) {
       existing.sessionDate = toDate(body.sessionDate);
+    }
+    if (body.startTime !== undefined) existing.startTime = body.startTime || '';
+    if (body.endTime !== undefined) existing.endTime = body.endTime || '';
+    if (body.timetableType !== undefined) {
+      existing.timetableType = ['course', 'placement', 'club'].includes(body.timetableType)
+        ? body.timetableType
+        : 'course';
     }
     if (body.date !== undefined || body.dateLabel !== undefined) {
       existing.dateLabel = body.date || body.dateLabel || '';
