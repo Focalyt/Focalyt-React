@@ -1,5 +1,6 @@
 const express = require("express");
-const { StatusB2b, College } = require("../../models");
+const mongoose = require("mongoose");
+const { StatusB2b, College, B2bStatusAssignment } = require("../../models");
 const { isAdmin } = require("../../../helpers");
 const router = express.Router();
 router.use(isAdmin);
@@ -160,6 +161,7 @@ router.delete('/delete/:id', async (req, res) => {
 		const collegeId = status.college;
 		
 		await status.deleteOne();
+		await B2bStatusAssignment.deleteMany({ status: status._id });
 		
 		let reindexQuery = {};
 		if (collegeId) {
@@ -256,6 +258,10 @@ router.post('/:statusId/substatus', async (req, res) => {
 		status.substatuses.push(newSubstatus);
 		
 		const data = await status.save();
+		await B2bStatusAssignment.updateMany(
+			{ status: status._id },
+			{ $addToSet: { substatuses: data.substatuses[data.substatuses.length - 1]._id } }
+		);
 		return res.status(201).json({ success: true, message: 'Sub status created successfully', data: data });
 	} catch (err) {
 		console.error(err.message);
@@ -316,6 +322,10 @@ router.delete('/deleteSubStatus/:statusId/substatus/:substatusId', async (req, r
 		status.substatuses.splice(substatusIndex, 1);
 		
 		await status.save();
+		await B2bStatusAssignment.updateMany(
+			{ status: status._id },
+			{ $pull: { substatuses: new mongoose.Types.ObjectId(req.params.substatusId) } }
+		);
 		return res.status(200).json({
 			success: true,
 			message: 'Substatus deleted successfully'

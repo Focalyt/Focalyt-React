@@ -14,6 +14,7 @@ const { CollegeValidators } = require('../../../helpers/validators')
 const { statusLogHelper } = require("../../../helpers/college");
 const { applyHumanRemarksToDoc, humanRemarksSetPayload } = require("../../../helpers/aiRemark");
 const { assertCourseMembers, toIdString, TrainingTeamError } = require("../../../helpers/trainingTeam");
+const { findLeadsBlockedForStatus } = require("../../../helpers/b2cStatusAssignment");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
 	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage, UploadCandidates, Placement, PlacementStatus, BatchMonitor, Source } = require("../../models");
 const { ReEnquire } = require("../../models");
@@ -8288,6 +8289,21 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 			return res.status(404).json({ success: false, message: 'AppliedCourse not found' });
 		}
 
+		if (_leadStatus) {
+			const blocked = await findLeadsBlockedForStatus({
+				user: req.user,
+				leadIds: [id],
+				statusId: _leadStatus,
+				substatusId: _leadSubStatus,
+			});
+			if (blocked.length) {
+				return res.status(403).json({
+					success: false,
+					message: "This status or sub-status is not assigned to the lead's project",
+				});
+			}
+		}
+
 		let actionParts = [];
 
 		// Fetch the current status document (including sub-statuses)
@@ -8470,6 +8486,23 @@ router.put('/lead/bulk_status_change', [isCollege], async (req, res) => {
 		}
 		const userId = req.user._id;
 		console.log('[Lead Bulk Status Change] Step 3: User', { userId: userId?.toString(), userName: req.user?.name });
+
+		const blocked = await findLeadsBlockedForStatus({
+			user: req.user,
+			leadIds: selectedProfiles,
+			statusId: _leadStatus,
+			substatusId: _leadSubStatus,
+		});
+		if (blocked.length) {
+			const names = blocked.map((lead) => lead.name || String(lead._id));
+			const shown = names.slice(0, 10).join(', ');
+			const more = names.length > 10 ? ` and ${names.length - 10} more` : '';
+			return res.status(403).json({
+				success: false,
+				message: `No leads were updated. This status or sub-status is not assigned to the project of: ${shown}${more}`,
+				blockedLeads: blocked,
+			});
+		}
 
 		// Fetch the new status document (including sub-statuses) only once
 		const newStatusDoc = await Status.findById(_leadStatus).lean();

@@ -58,6 +58,7 @@ const StatusB2b = require("../../../models/statusB2b");
 const Candidate = require("../../../models/candidateProfile");
 
 const { generatePassword, sendMail } = require("../../../../helpers");
+const { findLeadsBlockedForStatus } = require("../../../../helpers/b2bStatusAssignment");
 
 function createB2BRouter(LeadModel = defaultLeadModel) {
 	const Lead = LeadModel;
@@ -4557,6 +4558,20 @@ router.put('/leads/:id/status', isCollege, async (req, res) => {
 			}
 		} else {
 			console.log('[B2B Update Status] Step 7: Skipped ownership check (admin)');
+		}
+
+		const blocked = await findLeadsBlockedForStatus({
+			user: req.user,
+			leadIds: [lead._id],
+			statusId: status,
+			substatusId: subStatus,
+			LeadModel: Lead,
+		});
+		if (blocked.length) {
+			return res.status(403).json({
+				status: false,
+				message: "This status or sub-status is not assigned to the lead's project",
+			});
 		}
 
 		// Get old status for logging

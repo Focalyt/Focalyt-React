@@ -3,6 +3,145 @@ import axios from 'axios'
 
 const subSelectionKey = (status, sub, index) => `${status?._id || 'status'}::${sub?._id || index}`;
 
+const MultiSelectDropdown = ({
+  options,
+  selected,
+  onChange,
+  placeholder,
+  disabled,
+  loading,
+  loadingText,
+  emptyText,
+}) => {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
+
+  const selectedLabels = options.filter((item) => selected.includes(item.value)).map((item) => item.label);
+  const allSelected = options.length > 0 && options.every((item) => selected.includes(item.value));
+
+  let summary = placeholder;
+  if (loading) summary = loadingText;
+  else if (selectedLabels.length === 1 || selectedLabels.length === 2) summary = selectedLabels.join(', ');
+  else if (selectedLabels.length > 2) summary = `${selectedLabels.length} selected`;
+
+  const toggleValue = (value) => {
+    onChange(selected.includes(value)
+      ? selected.filter((item) => item !== value)
+      : [...selected, value]);
+  };
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => !disabled && setOpen((prev) => !prev)}
+        disabled={disabled}
+        title={selectedLabels.join(', ')}
+        style={{
+          width: '100%',
+          padding: '8px 12px',
+          border: '1px solid #ddd',
+          borderRadius: 4,
+          fontSize: 14,
+          boxSizing: 'border-box',
+          background: disabled ? '#f8fafc' : 'white',
+          color: selectedLabels.length && !loading ? '#1a202c' : '#4a5568',
+          textAlign: 'left',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{summary}</span>
+        <span style={{ marginLeft: 8, fontSize: 10 }}>{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute',
+          top: 'calc(100% + 2px)',
+          left: 0,
+          right: 0,
+          zIndex: 10,
+          background: 'white',
+          border: '1px solid #ddd',
+          borderRadius: 4,
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.12)',
+          maxHeight: 240,
+          overflowY: 'auto',
+          padding: '4px 0',
+        }}>
+          {options.length === 0 ? (
+            <div style={{ padding: '8px 12px', fontSize: 13, color: '#a0aec0' }}>{emptyText}</div>
+          ) : (
+            <>
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '6px 12px',
+                fontSize: 13,
+                fontWeight: 600,
+                color: '#2563eb',
+                cursor: 'pointer',
+                borderBottom: '1px solid #edf2f7',
+              }}>
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={() => onChange(allSelected ? [] : options.map((item) => item.value))}
+                />
+                <span>Select all</span>
+              </label>
+              {options.map((item, index) => {
+                const showGroup = item.group && item.group !== options[index - 1]?.group;
+                return (
+                  <React.Fragment key={item.value}>
+                    {showGroup && (
+                      <div style={{ padding: '6px 12px 2px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                        {item.group}
+                      </div>
+                    )}
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '6px 12px',
+                      fontSize: 14,
+                      cursor: 'pointer',
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(item.value)}
+                        onChange={() => toggleValue(item.value)}
+                      />
+                      <span>{item.label}</span>
+                    </label>
+                  </React.Fragment>
+                );
+              })}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const CopyTargetModal = ({
   isOpen,
   selection,
@@ -128,8 +267,8 @@ const CopyTargetModal = ({
         </h3>
         <p style={{ margin: '0 0 16px', fontSize: 13, color: '#4a5568', lineHeight: 1.5 }}>
           {isSingle
-            ? `Add "${statusList[0]?.title || 'this status'}" to one or more departments and projects. Select the substatuses to take with it.`
-            : 'Add these statuses to one or more departments and projects. Select the substatuses to take with them.'}
+            ? `Add "${statusList[0]?.title || 'this status'}" to one or more departments and projects. In the selected projects it will show only the ticked substatuses.`
+            : 'Add these statuses to one or more departments and projects. In the selected projects they will show only the ticked substatuses.'}
         </p>
 
         <div style={{
@@ -353,7 +492,7 @@ const StatusB2C = () => {
   // Drag and drop state
   const [draggedItem, setDraggedItem] = useState(null);
 
-  // Department and project are UI scope only. Nothing is saved.
+  // Assignments made with Edit and Switch are saved in B2cStatusAssignment.
   const [departments, setDepartments] = useState([]);
   const [projects, setProjects] = useState([]);
   const [departmentId, setDepartmentId] = useState('');
@@ -362,8 +501,6 @@ const StatusB2C = () => {
   const [appliedProjectId, setAppliedProjectId] = useState('');
   const [loadingDepartments, setLoadingDepartments] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
-  const [statusRegistryByScope, setStatusRegistryByScope] = useState({});
-  const [scopeMeta, setScopeMeta] = useState({});
   const [transferSelection, setTransferSelection] = useState(null);
   const [scopeNotice, setScopeNotice] = useState('');
 
@@ -460,121 +597,77 @@ const StatusB2C = () => {
     setAppliedProjectId('');
   };
 
-  const scopeKeyFor = (dept, proj) => `${dept}::${proj}`;
-
-  const scopeSections = Object.keys(statusRegistryByScope)
-    .filter((key) => (statusRegistryByScope[key] || []).length > 0)
-    .filter((key) => {
-      if (!filterActive) return true;
-      const meta = scopeMeta[key] || {};
-      if (meta.departmentId !== appliedDepartmentId) return false;
-      return !appliedProjectId || meta.projectId === appliedProjectId;
-    })
-    .map((key) => ({ key, meta: scopeMeta[key] || {}, statuses: statusRegistryByScope[key] }));
+  const savedScopedStatuses = filterActive
+    ? statuses
+      .map((status, index) => ({ status, index }))
+      .filter(({ status }) => (
+        (status.assignedDepartments || []).includes(appliedDepartmentId)
+        && (!appliedProjectId || (status.assignedProjects || []).includes(appliedProjectId))
+      ))
+      .map(({ status, index }) => ({
+        index,
+        status: appliedProjectId
+          ? {
+            ...status,
+            substatuses: (status.substatuses || []).filter((sub) => (
+              (sub.assignedProjects || []).includes(appliedProjectId)
+            )),
+          }
+          : status,
+      }))
+    : [];
 
   const appliedDepartmentName = departments.find((item) => item._id === appliedDepartmentId)?.name || '';
   const appliedProjectName = appliedProjectId
-    ? (projects.find((item) => item._id === appliedProjectId)?.name
-      || Object.values(scopeMeta).find((meta) => meta.projectId === appliedProjectId)?.projectName
-      || '')
+    ? (projects.find((item) => item._id === appliedProjectId)?.name || '')
     : '';
-
-  const makeLocalId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-
-  const cloneSubstatus = (substatus) => ({
-    title: substatus.title,
-    description: substatus.description,
-    hasRemarks: substatus.hasRemarks,
-    hasFollowup: substatus.hasFollowup,
-    hasAttachment: substatus.hasAttachment,
-    _id: makeLocalId('local-sub'),
-    isLocalCopy: true,
-  });
-
-  const cloneStatus = (status) => ({
-    title: status.title,
-    description: status.description,
-    milestone: status.milestone,
-    sourceId: status.sourceId || status._id,
-    _id: makeLocalId('local-status'),
-    id: makeLocalId('local'),
-    isLocalCopy: true,
-    substatuses: (status.substatuses || []).map(cloneSubstatus),
-  });
 
   const openSwitchStatus = (status) => {
     if (!status) return;
     setTransferSelection({ statuses: [status], single: true });
   };
 
-  const handleCopyToScope = ({ targets, selectedSubKeys }) => {
+  const handleCopyToScope = async ({ targets, selectedSubKeys }) => {
     const sourceStatuses = transferSelection?.statuses || [];
     if (!sourceStatuses.length || !targets?.length) {
       alert('Select at least one department and project');
       return;
     }
     const chosenKeys = new Set(selectedSubKeys || []);
-    const preparedStatuses = sourceStatuses.map((status) => ({
-      ...status,
-      substatuses: (status.substatuses || []).filter((sub, index) => (
-        chosenKeys.has(subSelectionKey(status, sub, index))
-      )),
+    const items = sourceStatuses.map((status) => ({
+      statusId: status._id,
+      substatusIds: (status.substatuses || [])
+        .filter((sub, index) => chosenKeys.has(subSelectionKey(status, sub, index)))
+        .map((sub) => sub._id),
     }));
-    const movedSubCount = preparedStatuses.reduce((total, item) => total + (item.substatuses || []).length, 0);
+    const movedSubCount = items.reduce((total, item) => total + item.substatusIds.length, 0);
 
-    setStatusRegistryByScope((prev) => {
-      const next = { ...prev };
-      targets.forEach((target) => {
-        const key = scopeKeyFor(target.departmentId, target.projectId);
-        const incoming = preparedStatuses.map(cloneStatus);
-        const incomingSources = new Set(incoming.map((item) => item.sourceId));
-        const kept = (next[key] || []).filter((item) => !incomingSources.has(item.sourceId));
-        next[key] = [...kept, ...incoming];
-      });
-      return next;
-    });
-    setScopeMeta((prev) => {
-      const next = { ...prev };
-      targets.forEach((target) => {
-        next[scopeKeyFor(target.departmentId, target.projectId)] = target;
-      });
-      return next;
-    });
+    try {
+      const response = await axios.post(`${backendUrl}/college/status/assign`, {
+        projects: [...new Set(targets.map((target) => target.projectId))],
+        items,
+      }, { headers: { 'x-auth': token } });
+      if (!response.data.success) {
+        alert(response.data.message || 'Failed to assign statuses');
+        return;
+      }
+    } catch (error) {
+      console.error('Error assigning statuses:', error);
+      alert(error.response?.data?.message || 'Failed to assign statuses');
+      return;
+    }
 
     const subLabel = `${movedSubCount} substatus${movedSubCount === 1 ? '' : 'es'}`;
     const targetLabel = targets.length === 1
       ? `${targets[0].departmentName} / ${targets[0].projectName}`
-      : `${targets.length} department/project combinations`;
+      : `${targets.length} projects`;
     setScopeNotice(
       transferSelection?.single
-        ? `Added "${preparedStatuses[0].title}" with ${subLabel} to ${targetLabel}. This stays on this screen only.`
-        : `Added ${preparedStatuses.length} statuses with ${subLabel} to ${targetLabel}. This stays on this screen only.`
+        ? `Assigned "${sourceStatuses[0].title}" with ${subLabel} to ${targetLabel}.`
+        : `Assigned ${sourceStatuses.length} statuses with ${subLabel} to ${targetLabel}.`
     );
     setTransferSelection(null);
-  };
-
-  const handleRemoveLocalStatus = (localId) => {
-    setStatusRegistryByScope((prev) => {
-      const next = {};
-      Object.keys(prev).forEach((key) => {
-        next[key] = (prev[key] || []).filter((item) => item._id !== localId);
-      });
-      return next;
-    });
-  };
-
-  const handleRemoveLocalSubstatus = (statusId, substatusId) => {
-    setStatusRegistryByScope((prev) => {
-      const next = {};
-      Object.keys(prev).forEach((key) => {
-        next[key] = (prev[key] || []).map((item) => (
-          item._id === statusId
-            ? { ...item, substatuses: (item.substatuses || []).filter((sub) => sub._id !== substatusId) }
-            : item
-        ));
-      });
-      return next;
-    });
+    fetchStatus();
   };
 
   // Toggle Switch Component
@@ -784,36 +877,38 @@ const handleMoveRight = async (statusId, currentIndex) => {
     onDeleteSubstatus, onMoveLeft,
     onMoveRight,
     onSwitch,
-    isLocalCopy
+    assignedDepartments = [],
+    assignedProjects = []
   }) => {
     const [showSubstatuses, setShowSubstatuses] = useState(true);
+    const departmentNames = assignedDepartments
+      .map((id) => departments.find((item) => item._id === String(id))?.name)
+      .filter(Boolean)
+      .join(', ');
 
     return (
 
       <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-top', minWidth: 220, margin: '0 4px' }}>
         <div style={{ marginTop:'15%' }}>
-          {!isLocalCopy && (
-            <button
-              onClick={() => onMoveLeft(_id, index)}
-              disabled={index === 0}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: index === 0 ? 'not-allowed' : 'pointer',
-                color: index === 0 ? '#cbd5e0' : '#4299e1',
-                marginRight: '4px',
-                padding: '0',
-                fontSize: '14px',
-                opacity: index === 0 ? 0.5 : 1,
-                position: 'relative',
-                top: '2px'
-              }}
-              title="Move Left"
-            >
-              ← Move Left
-            </button>
-          )}
-
+          <button
+            onClick={() => onMoveLeft(_id, index)}
+            disabled={index === 0}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: index === 0 ? 'not-allowed' : 'pointer',
+              color: index === 0 ? '#cbd5e0' : '#4299e1',
+              marginRight: '4px',
+              padding: '0',
+              fontSize: '14px',
+              opacity: index === 0 ? 0.5 : 1,
+              position: 'relative',
+              top: '2px'
+            }}
+            title="Move Left"
+          >
+            ← Move Left
+          </button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div
@@ -829,7 +924,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
               userSelect: 'none',
               position: 'relative'
             }}
-            draggable={!isLocalCopy}
+            draggable
             onDragStart={onDragStart}
             onDragOver={onDragOver}
             onDrop={onDrop}
@@ -869,7 +964,6 @@ const handleMoveRight = async (statusId, currentIndex) => {
                 </button>
               </div>
               <div>
-                {!isLocalCopy && (
                 <button
                   onClick={() => onEdit(index)}
                   disabled={index === 0}
@@ -885,10 +979,9 @@ const handleMoveRight = async (statusId, currentIndex) => {
                 >
                   ✏️
                 </button>
-                )}
                 <button
                   onClick={() => onDelete(_id)}
-                  disabled={!isLocalCopy && index === 0}
+                  disabled={index === 0}
                   style={{
                     background: 'none',
                     border: 'none',
@@ -905,17 +998,21 @@ const handleMoveRight = async (statusId, currentIndex) => {
             <div style={{ textAlign: 'center', fontWeight: 500, marginTop: 12, fontSize: '16px', color: '#333' }}>
               {title}
             </div>
-            {isLocalCopy && (
-              <div style={{ textAlign: 'center', marginTop: 6 }}>
-                <FeatureBadge label="Shifted" color="#3182ce" />
-              </div>
-            )}
             <div style={{ textAlign: 'center', fontSize: '14px', color: '#666', marginTop: 6 }}>
               {description}
             </div>
             {milestone &&(<div style={{ textAlign: 'center', fontSize: '14px', color: '#666', marginTop: 6 }}>
               {milestone}
             </div>)}
+            <div style={{ textAlign: 'center', fontSize: '12px', marginTop: 6, padding: '0 8px', whiteSpace: 'normal' }}>
+              {assignedProjects.length ? (
+                <span style={{ color: '#1e40af' }}>
+                  {departmentNames || 'Department'} · {assignedProjects.length} project{assignedProjects.length === 1 ? '' : 's'}
+                </span>
+              ) : (
+                <span style={{ color: '#d97706' }}>Global · not aligned to any project yet</span>
+              )}
+            </div>
             <div
               style={{
                 textAlign: 'center',
@@ -977,8 +1074,8 @@ const handleMoveRight = async (statusId, currentIndex) => {
                           <div style={{ fontWeight: 500, fontSize: '14px' }}>{substatus.title}</div>
                           <div style={{ fontSize: '12px', color: '#718096' }}>{substatus.description}</div>
                           <div style={{ marginTop: '4px' }}>
-                            {substatus.isLocalCopy && (
-                              <FeatureBadge label="Shifted" color="#3182ce" />
+                            {(substatus.assignedProjects || []).length < assignedProjects.length && (
+                              <FeatureBadge label="Some projects" color="#d97706" />
                             )}
                             {substatus.hasRemarks && (
                               <FeatureBadge label="Remarks" color="#38b2ac" />
@@ -992,9 +1089,8 @@ const handleMoveRight = async (statusId, currentIndex) => {
                           </div>
                         </div>
                         <div>
-                          {!substatus.isLocalCopy && (
                           <button
-                            onClick={() => onEditSubstatus(index, subIndex)}
+                            onClick={() => onEditSubstatus(index, subIndex, substatus)}
                             style={{
                               background: 'none',
                               border: 'none',
@@ -1007,9 +1103,8 @@ const handleMoveRight = async (statusId, currentIndex) => {
                           >
                             ✏️
                           </button>
-                          )}
                           <button
-                            onClick={() => onDeleteSubstatus(_id, substatus._id, substatus)}
+                            onClick={() => onDeleteSubstatus(_id, substatus._id)}
                             style={{
                               background: 'none',
                               border: 'none',
@@ -1032,7 +1127,6 @@ const handleMoveRight = async (statusId, currentIndex) => {
                 </div>
               )}
 
-              {!isLocalCopy && (
               <button
                 onClick={() => onAddSubstatus(index)}
                 style={{
@@ -1051,12 +1145,10 @@ const handleMoveRight = async (statusId, currentIndex) => {
               >
                 <span style={{ marginRight: '4px' }}>+</span> Add New Substatus
               </button>
-              )}
             </div>
           )}
         </div>
         <div  style={{ marginTop:'15%' }}>
-          {!isLocalCopy && (
           <button
             onClick={() => onMoveRight(_id, index)}
             disabled={index === statuses.length - 1}
@@ -1074,7 +1166,6 @@ const handleMoveRight = async (statusId, currentIndex) => {
           >
             → Move Right
           </button>
-          )}
           </div>
       </div>
     );
@@ -1118,13 +1209,12 @@ const handleMoveRight = async (statusId, currentIndex) => {
   const StatusModal = ({ isOpen, onClose, onSave, editMode, initialData, isSubstatus, editingStatus }) => {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
-    const [milestone, setMilestone] = useState('');
     const [hasRemarks, setHasRemarks] = useState(false);
     const [hasFollowup, setHasFollowup] = useState(false);
     const [hasAttachment, setHasAttachment] = useState(false);
-    const [formDepartmentId, setFormDepartmentId] = useState('');
-    const [formProjectId, setFormProjectId] = useState('');
-    const [formProjects, setFormProjects] = useState([]);
+    const [formDepartmentIds, setFormDepartmentIds] = useState([]);
+    const [formProjectIds, setFormProjectIds] = useState([]);
+    const [formProjectsByDepartment, setFormProjectsByDepartment] = useState({});
     const [loadingFormProjects, setLoadingFormProjects] = useState(false);
 
     // Initialize form if in edit mode
@@ -1132,7 +1222,6 @@ const handleMoveRight = async (statusId, currentIndex) => {
       if (editMode && initialData) {
         setTitle(initialData.title || '');
         setDescription(initialData.description || '');
-        setMilestone(initialData.milestone || '');
         if (isSubstatus) {
           setHasRemarks(initialData.hasRemarks || false);
           setHasFollowup(initialData.hasFollowup || false);
@@ -1141,101 +1230,137 @@ const handleMoveRight = async (statusId, currentIndex) => {
       } else {
         setTitle('');
         setDescription('');
-        setMilestone('');
         setHasRemarks(false);
         setHasFollowup(false);
         setHasAttachment(false);
       }
-      if (isOpen && !isSubstatus) {
-        setFormDepartmentId(departmentId || '');
-        setFormProjectId(projectId || '');
+      if (isOpen && isSubstatus) {
+        setFormDepartmentIds(editingStatus?.assignedDepartments || []);
+        setFormProjectIds(editMode && initialData
+          ? (initialData.assignedProjects || [])
+          : (editingStatus?.assignedProjects || []));
+      } else if (isOpen) {
+        if (editMode && initialData) {
+          setFormDepartmentIds(initialData.assignedDepartments || []);
+          setFormProjectIds(initialData.assignedProjects || []);
+        } else {
+          setFormDepartmentIds([]);
+          setFormProjectIds([]);
+        }
       }
-    }, [editMode, initialData, isOpen, isSubstatus, departmentId, projectId]);
+    }, [editMode, initialData, isOpen, isSubstatus, editingStatus]);
 
     useEffect(() => {
-      if (!isOpen || isSubstatus || !formDepartmentId) {
-        if (!formDepartmentId) setFormProjects([]);
+      const missingDepartmentIds = formDepartmentIds.filter((deptId) => !formProjectsByDepartment[deptId]);
+      if (!isOpen || !missingDepartmentIds.length) {
+        setLoadingFormProjects(false);
         return undefined;
       }
       let cancelled = false;
-      const loadFormProjects = async () => {
-        setLoadingFormProjects(true);
-        try {
-          const response = await axios.get(`${backendUrl}/college/list-projects`, {
-            headers: { 'x-auth': token },
-            params: { vertical: formDepartmentId },
-          });
-          if (cancelled) return;
-          setFormProjects((response.data?.data || []).map((item) => ({
-            _id: String(item._id),
-            name: item.name || 'Untitled project',
-          })));
-        } catch (error) {
+      setLoadingFormProjects(true);
+      Promise.all(missingDepartmentIds.map((deptId) => (
+        axios.get(`${backendUrl}/college/list-projects`, {
+          headers: { 'x-auth': token },
+          params: { vertical: deptId },
+        }).then((response) => [deptId, (response.data?.data || []).map((item) => ({
+          _id: String(item._id),
+          name: item.name || 'Untitled project',
+        }))]).catch((error) => {
           console.error('Error fetching projects for status form:', error);
-          if (!cancelled) setFormProjects([]);
-        } finally {
-          if (!cancelled) setLoadingFormProjects(false);
-        }
-      };
-      loadFormProjects();
+          return [deptId, []];
+        })
+      ))).then((entries) => {
+        if (cancelled) return;
+        setFormProjectsByDepartment((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+      });
       return () => { cancelled = true; };
-    }, [isOpen, isSubstatus, formDepartmentId, backendUrl, token]);
+    }, [isOpen, formDepartmentIds, formProjectsByDepartment, backendUrl, token]);
+
+    const handleFormDepartmentsChange = (nextDepartmentIds) => {
+      setFormDepartmentIds(nextDepartmentIds);
+      setFormProjectIds((prev) => prev.filter((projId) => nextDepartmentIds.some((deptId) => (
+        (formProjectsByDepartment[deptId] || []).some((item) => item._id === projId)
+      ))));
+    };
+
+    const parentProjectIds = editingStatus?.assignedProjects || [];
+    const formProjectOptions = formDepartmentIds.flatMap((deptId) => {
+      const departmentName = departments.find((item) => item._id === deptId)?.name || 'Department';
+      return (formProjectsByDepartment[deptId] || [])
+        .filter((item) => !isSubstatus || parentProjectIds.includes(item._id))
+        .map((item) => ({
+          value: item._id,
+          label: item.name,
+          group: formDepartmentIds.length > 1 ? departmentName : undefined,
+        }));
+    });
 
     const handleSave = async (statusId, substatusId) => {
       if (title.trim()) {
         if (isSubstatus) {
-          if (editMode) {
-            // Edit substatus
-            const response = await axios.put(`${backendUrl}/college/status/${statusId}/substatus/${substatusId}`, {
-              title, description, hasRemarks, hasFollowup, hasAttachment
-            }, { headers: { 'x-auth': token } });
+          if (parentProjectIds.length && !formProjectIds.length) {
+            alert('Select at least one project for this substatus');
+            return;
+          }
+          const projects = formProjectIds;
+          try {
+            if (editMode) {
+              const response = await axios.put(`${backendUrl}/college/status/${statusId}/substatus/${substatusId}`, {
+                title, description, hasRemarks, hasFollowup, hasAttachment, projects
+              }, { headers: { 'x-auth': token } });
 
-            if (response.data.success) {
-              alert("Substatus updated successfully");
-              fetchStatus();
-            }
-          } else {
-            // Add substatus
-            const response = await axios.post(`${backendUrl}/college/status/${statusId}/substatus`, {
-              title, description, hasRemarks, hasFollowup, hasAttachment
-            }, { headers: { 'x-auth': token } });
+              if (response.data.success) {
+                alert("Substatus updated successfully");
+                fetchStatus();
+              }
+            } else {
+              const response = await axios.post(`${backendUrl}/college/status/${statusId}/substatus`, {
+                title, description, hasRemarks, hasFollowup, hasAttachment, projects
+              }, { headers: { 'x-auth': token } });
 
-            if (response.data.success) {
-              alert("Substatus added successfully");
-              fetchStatus();
+              if (response.data.success) {
+                alert("Substatus added successfully");
+                fetchStatus();
+              }
             }
+          } catch (error) {
+            console.error('Error saving substatus:', error);
+            alert(error.response?.data?.message || 'Failed to save substatus');
+            return;
           }
         }
         else {
-          if (!formDepartmentId || !formProjectId) {
-            alert('Select department and project');
+          try {
+            if (editMode && statusId) {
+              // Empty departments and projects make the status global again.
+              // A department with no picked project gets all of its current projects.
+              const response = await axios.put(`${backendUrl}/college/status/edit/${statusId}`, {
+                title, description, departments: formDepartmentIds, projects: formProjectIds
+              }, {
+                headers: { 'x-auth': token }
+              });
+
+              if (response.data.success) {
+                alert("Status updated successfully");
+                fetchStatus();
+              }
+            } else {
+              const response = await axios.post(`${backendUrl}/college/status/add`, {
+                title, description
+              }, {
+                headers: { 'x-auth': token }
+              });
+
+              if (response.data.success) {
+                alert("Status added successfully");
+                fetchStatus();
+              }
+            }
+          } catch (error) {
+            console.error('Error saving status:', error);
+            alert(error.response?.data?.message || 'Failed to save status');
             return;
           }
-          setDepartmentId(formDepartmentId);
-          setProjectId(formProjectId);
-          // 🔁 Edit role (API call)
-          if (editMode && statusId) {
-            // Edit status
-            const response = await axios.put(`${backendUrl}/college/status/edit/${statusId}`, {
-              title, description, milestone
-            }, { headers: { 'x-auth': token } });
-
-            if (response.data.success) {
-              alert("Status updated successfully");
-              fetchStatus();
-            }
-          } else {
-            // Add status
-            const response = await axios.post(`${backendUrl}/college/status/add`, {
-              title, description,milestone
-            }, { headers: { 'x-auth': token } });
-
-            if (response.data.success) {
-              alert("Status added successfully");
-              fetchStatus();
-            }
-          }
-
         }
         setTitle('');
         setDescription('');
@@ -1279,63 +1404,64 @@ const handleMoveRight = async (statusId, currentIndex) => {
               : (isSubstatus ? 'Add New Substatus' : 'Add New Status')}
           </h3>
 
-          {!isSubstatus && (
+          {!isSubstatus && editMode && (
             <>
               <div style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>
                   Department:
                 </label>
-                <select
-                  value={formDepartmentId}
-                  onChange={(e) => {
-                    setFormDepartmentId(e.target.value);
-                    setFormProjectId('');
-                  }}
+                <MultiSelectDropdown
+                  options={departments.map((item) => ({ value: item._id, label: item.name }))}
+                  selected={formDepartmentIds}
+                  onChange={handleFormDepartmentsChange}
+                  placeholder="Select departments"
                   disabled={loadingDepartments}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    border: '1px solid #ddd',
-                    borderRadius: 4,
-                    fontSize: 14,
-                    boxSizing: 'border-box',
-                    background: 'white'
-                  }}
-                >
-                  <option value="">{loadingDepartments ? 'Loading departments...' : 'Select department'}</option>
-                  {departments.map((item) => (
-                    <option key={item._id} value={item._id}>{item.name}</option>
-                  ))}
-                </select>
+                  loading={loadingDepartments}
+                  loadingText="Loading departments..."
+                  emptyText="No departments"
+                />
               </div>
 
               <div style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>
                   Project:
                 </label>
-                <select
-                  value={formProjectId}
-                  onChange={(e) => setFormProjectId(e.target.value)}
-                  disabled={!formDepartmentId || loadingFormProjects}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    border: '1px solid #ddd',
-                    borderRadius: 4,
-                    fontSize: 14,
-                    boxSizing: 'border-box',
-                    background: !formDepartmentId ? '#f8fafc' : 'white'
-                  }}
-                >
-                  <option value="">
-                    {!formDepartmentId ? 'Select department first' : loadingFormProjects ? 'Loading projects...' : 'Select project'}
-                  </option>
-                  {formProjects.map((item) => (
-                    <option key={item._id} value={item._id}>{item.name}</option>
-                  ))}
-                </select>
+                <MultiSelectDropdown
+                  options={formProjectOptions}
+                  selected={formProjectIds}
+                  onChange={setFormProjectIds}
+                  placeholder={formDepartmentIds.length ? 'Select projects' : 'Select department first'}
+                  disabled={!formDepartmentIds.length || loadingFormProjects}
+                  loading={loadingFormProjects}
+                  loadingText="Loading projects..."
+                  emptyText="No projects"
+                />
               </div>
             </>
+          )}
+
+          {isSubstatus && (
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>
+                Show in projects:
+              </label>
+              {parentProjectIds.length ? (
+                <MultiSelectDropdown
+                  options={formProjectOptions}
+                  selected={formProjectIds}
+                  onChange={setFormProjectIds}
+                  placeholder="Select projects"
+                  disabled={loadingFormProjects}
+                  loading={loadingFormProjects}
+                  loadingText="Loading projects..."
+                  emptyText="No projects"
+                />
+              ) : (
+                <div style={{ fontSize: 13, color: '#a0aec0' }}>
+                  This status is global for now. The substatus will follow it once you align the status to projects.
+                </div>
+              )}
+            </div>
           )}
 
           <div style={{ marginBottom: 16 }}>
@@ -1357,7 +1483,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
             />
           </div>
 
-          <div style={{ marginBottom: isSubstatus ? 24 : 0 }}>
+          <div style={{ marginBottom: 24 }}>
             <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>
               {isSubstatus ? 'Substatus Description:' : 'Status Description:'}
             </label>
@@ -1376,27 +1502,6 @@ const handleMoveRight = async (statusId, currentIndex) => {
             />
           </div>
 
-          {!isSubstatus && (
-
-          <div style={{ marginBottom:  0 }}>
-            <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>
-              Milestone:
-            </label>
-            <input
-              type="text"
-              value={milestone}
-              onChange={(e) => setMilestone(e.target.value)}
-              placeholder="Example: 1st Milestone"
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #ddd',
-                borderRadius: 4,
-                fontSize: 14
-              }}
-            />
-          </div>
-          )}
           {isSubstatus && (
             <div style={{
               marginTop: 20,
@@ -1568,7 +1673,9 @@ const handleMoveRight = async (statusId, currentIndex) => {
           title: r.title,
           milestone: r.milestone,
           description: r.description,
-          substatuses: r.substatuses
+          substatuses: r.substatuses,
+          assignedDepartments: r.assignedDepartments || [],
+          assignedProjects: r.assignedProjects || []
         })));
 
         ;
@@ -1682,10 +1789,10 @@ const handleMoveRight = async (statusId, currentIndex) => {
   };
 
   // Edit substatus
-  const handleEditSubstatus = (statusIndex, substatusIndex) => {
+  const handleEditSubstatus = (statusIndex, substatusIndex, substatus) => {
     setEditingStatusIndex(statusIndex);
     setEditingSubstatusIndex(substatusIndex);
-    setEditingSubstatus(statuses[statusIndex].substatuses[substatusIndex]);
+    setEditingSubstatus(substatus || statuses[statusIndex].substatuses[substatusIndex]);
     setIsEditMode(true);
     setIsSubstatusModalOpen(true);
   };
@@ -1723,11 +1830,7 @@ const handleMoveRight = async (statusId, currentIndex) => {
   };
 
   // Delete substatus
-  const handleDeleteSubstatus = (statusId, substatusId, substatus) => {
-    if (substatus?.isLocalCopy) {
-      handleRemoveLocalSubstatus(statusId, substatusId);
-      return;
-    }
+  const handleDeleteSubstatus = (statusId, substatusId) => {
     setDeletingStatusId(statusId);
     setDeletingSubstatusId(substatusId);
     setIsDeletingSubstatus(true);
@@ -1975,6 +2078,8 @@ const handleMoveRight = async (statusId, currentIndex) => {
                 description={status.description}
                 milestone={status.milestone}
                 substatuses={status.substatuses}
+                assignedDepartments={status.assignedDepartments}
+                assignedProjects={status.assignedProjects}
                 onDragStart={(e) => handleDragStart(e, index)}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, status.index)}
@@ -1992,7 +2097,42 @@ const handleMoveRight = async (statusId, currentIndex) => {
           ))}
         </div>
         )}
-        {filterActive && scopeSections.length === 0 && (
+        {filterActive && savedScopedStatuses.length > 0 && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          padding: '20px 16px',
+          minWidth: 'max-content'
+        }}>
+          {savedScopedStatuses.map(({ status, index }, position) => (
+            <React.Fragment key={status.id || status._id}>
+              <StatusCard
+                index={index}
+                title={status.title}
+                _id={status._id}
+                description={status.description}
+                milestone={status.milestone}
+                substatuses={status.substatuses}
+                assignedDepartments={status.assignedDepartments}
+                assignedProjects={status.assignedProjects}
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, index)}
+                onEdit={handleEditStatus}
+                onDelete={handleDeleteStatus}
+                onAddSubstatus={handleAddSubstatus}
+                onEditSubstatus={handleEditSubstatus}
+                onDeleteSubstatus={handleDeleteSubstatus}
+                onMoveLeft={handleMoveLeft}
+                onMoveRight={handleMoveRight}
+                onSwitch={() => openSwitchStatus(status)}
+              />
+              {position < savedScopedStatuses.length - 1 && <Arrow />}
+            </React.Fragment>
+          ))}
+        </div>
+        )}
+        {filterActive && savedScopedStatuses.length === 0 && (
           <div style={{
             minHeight: '160px',
             display: 'flex',
@@ -2009,44 +2149,10 @@ const handleMoveRight = async (statusId, currentIndex) => {
               No statuses added here yet
             </div>
             <div style={{ fontSize: '14px', maxWidth: '420px' }}>
-              Clear the search to see all statuses, then use Switch to add them to this department and project.
+              Clear the search, then use Switch or ✏️ on a status to assign it to this department and project.
             </div>
           </div>
         )}
-        {scopeSections.map((section) => (
-          <div key={section.key} style={{ marginTop: '28px', padding: '8px 16px 0', whiteSpace: 'normal' }}>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: '#1e40af', marginBottom: '12px' }}>
-              {section.meta.departmentName || 'Department'} / {section.meta.projectName || 'Project'}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'flex-start', minWidth: 'max-content', whiteSpace: 'nowrap' }}>
-              {section.statuses.map((status, index) => (
-                <React.Fragment key={status._id}>
-                  <StatusCard
-                    index={index}
-                    title={status.title}
-                    _id={status._id}
-                    description={status.description}
-                    milestone={status.milestone}
-                    substatuses={status.substatuses}
-                    isLocalCopy
-                    onDelete={handleRemoveLocalStatus}
-                    onDeleteSubstatus={handleDeleteSubstatus}
-                    onEdit={() => {}}
-                    onAddSubstatus={() => {}}
-                    onEditSubstatus={() => {}}
-                    onDragStart={() => {}}
-                    onDragOver={() => {}}
-                    onDrop={() => {}}
-                    onMoveLeft={() => {}}
-                    onMoveRight={() => {}}
-                    onSwitch={() => openSwitchStatus(status)}
-                  />
-                  {index < section.statuses.length - 1 && <Arrow />}
-                </React.Fragment>
-              ))}
-            </div>
-          </div>
-        ))}
         </div>
       </div>
 
@@ -2059,6 +2165,8 @@ const handleMoveRight = async (statusId, currentIndex) => {
       }}>
         <h3 style={{ margin: '0 0 12px', fontSize: '16px', fontWeight: 500, color: '#4a5568' }}>Instructions:</h3>
         <ul style={{ margin: 0, padding: '0 0 0 20px', color: '#4a5568', fontSize: '14px' }}>
+          <li style={{ marginBottom: '8px' }}>A new status is global. Use ✏️ to align it to one or more departments and projects. A department with no project selected gets all of its current projects</li>
+          <li style={{ marginBottom: '8px' }}>When adding or editing a substatus, pick which of the status's projects it shows in</li>
           <li style={{ marginBottom: '8px' }}>All statuses show by default. Pick a department (and optionally a project) and click Search to see only the statuses added there</li>
           <li style={{ marginBottom: '8px' }}>Use Switch on a status, tick one or more departments and projects, and select the substatuses to add with it</li>
           <li style={{ marginBottom: '8px' }}>Drag and drop status cards to change their order</li>
