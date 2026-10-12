@@ -93,6 +93,27 @@ async function getDataLeadSourceIds() {
     return ids;
 }
 
+function parseLeadSourceFilter(raw) {
+    const value = String(raw || '').trim().toLowerCase();
+    if (['data', 'data-lead', 'data-leads'].includes(value)) return 'data-lead';
+    if (['digital', 'digital-lead', 'other', 'except-data'].includes(value)) return 'digital-lead';
+    return '';
+}
+
+async function applyLeadSourceMatch(match, leadSourceFilter) {
+    if (!leadSourceFilter) return;
+    const ids = (await getDataLeadSourceIds())
+        .filter((id) => mongoose.Types.ObjectId.isValid(id))
+        .map((id) => new mongoose.Types.ObjectId(id));
+    if (leadSourceFilter === 'data-lead') {
+        match.registeredBy = { $in: ids };
+        return;
+    }
+    if (leadSourceFilter === 'digital-lead' && ids.length) {
+        match.registeredBy = { $nin: ids };
+    }
+}
+
 async function resolveVoiceCampaignId(applied) {
     const registeredBy = String(applied?.registeredBy?._id || applied?.registeredBy || '');
     const isDataLead = Boolean(registeredBy) && (await getDataLeadSourceIds()).includes(registeredBy);
@@ -355,7 +376,7 @@ function parseIstDateRange(fromRaw, toRaw) {
     };
 }
 
-async function fetchUntouchNewLeadLeads(collegeId, range) {
+async function fetchUntouchNewLeadLeads(collegeId, range, leadSourceFilter) {
     const { statusIds, subStatusIds } = await resolveUntouchNewLeadIds();
     const match = {
         ...B2C_REGISTRATION_MATCH,
@@ -363,6 +384,7 @@ async function fetchUntouchNewLeadLeads(collegeId, range) {
         _leadSubStatus: { $in: subStatusIds },
         ...aiCallNotAttemptedMatch(),
     };
+    await applyLeadSourceMatch(match, leadSourceFilter);
     if (range?.start && range?.end) {
         match.createdAt = { $gte: range.start, $lte: range.end };
     }
@@ -1337,7 +1359,8 @@ router.get("/untouch-new-lead", isCollege, async (req, res) => {
     try {
         const collegeId = await resolveCollegeIdFromUser(req.user);
         const range = parseIstDateRange(req.query.from, req.query.to);
-        const leads = await fetchUntouchNewLeadLeads(collegeId, range);
+        const leadSourceFilter = parseLeadSourceFilter(req.query.leadSource);
+        const leads = await fetchUntouchNewLeadLeads(collegeId, range, leadSourceFilter);
 
         return res.json({
             status: true,
@@ -1709,10 +1732,11 @@ router.post("/voicex-dispatch", isCollege, async (req, res) => {
         const collegeId = await resolveCollegeIdFromUser(req.user);
         let pool = [];
         const range = parseIstDateRange(req.body.from, req.body.to);
+        const leadSourceFilter = parseLeadSourceFilter(req.body.leadSource);
         if (source === 'b2c-today') {
             pool = await fetchB2cTodayLeads(collegeId);
         } else if (source === 'untouch-new-lead') {
-            pool = await fetchUntouchNewLeadLeads(collegeId, range);
+            pool = await fetchUntouchNewLeadLeads(collegeId, range, leadSourceFilter);
         } else if (source === 'untouch-not-connected') {
             pool = await fetchUntouchNotConnectedLeads(collegeId);
         } else if (!selectedLeadIds.length) {

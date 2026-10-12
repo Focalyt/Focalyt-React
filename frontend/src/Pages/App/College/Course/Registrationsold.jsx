@@ -1590,6 +1590,7 @@ const CRMDashboard = () => {
   const [aiCallSentIds, setAiCallSentIds] = useState([]);
   const [aiCallDateFrom, setAiCallDateFrom] = useState('');
   const [aiCallDateTo, setAiCallDateTo] = useState('');
+  const [aiCallLeadSource, setAiCallLeadSource] = useState('');
   const [showAiCallDateModal, setShowAiCallDateModal] = useState(false);
   const [aiCallDateDraftFrom, setAiCallDateDraftFrom] = useState('');
   const [aiCallDateDraftTo, setAiCallDateDraftTo] = useState('');
@@ -1780,16 +1781,18 @@ const CRMDashboard = () => {
     setAiCallLeads([]);
     setAiCallDateFrom('');
     setAiCallDateTo('');
+    setAiCallLeadSource('');
     setShowAiCallDateModal(false);
     setAiCallDateDraftFrom('');
     setAiCallDateDraftTo('');
   }, []);
 
-  const loadAiCallQueue = useCallback(async (source, label, from, to) => {
+  const loadAiCallQueue = useCallback(async (source, label, from, to, leadSource) => {
     const params = {};
     if (source === 'untouch-new-lead') {
       if (from) params.from = from;
       if (to) params.to = to;
+      if (leadSource) params.leadSource = leadSource;
     }
     const listPath = source === 'untouch-new-lead'
       ? 'untouch-new-lead'
@@ -1863,9 +1866,10 @@ const CRMDashboard = () => {
         return;
       }
 
-      const total = await loadAiCallQueue(source, label, '', '');
+      const total = await loadAiCallQueue(source, label, '', '', '');
       setAiCallDateFrom('');
       setAiCallDateTo('');
+      setAiCallLeadSource('');
       setInput1Value('');
       if (!total) {
         toast.info(`No remaining ${label} leads to send to AI`);
@@ -1879,15 +1883,36 @@ const CRMDashboard = () => {
     }
   }, [aiCallSentIds, aiFabBusy, backendUrl, loadAiCallQueue, token]);
 
-  const applyAiCallDates = useCallback((from, to) => {
+  const applyAiCallDates = useCallback((from, to, leadSource = aiCallLeadSource) => {
     setAiCallDateFrom(from || '');
     setAiCallDateTo(to || '');
     if (aiCallSource !== 'untouch-new-lead') return;
-    loadAiCallQueue(aiCallSource, aiCallLabel || 'Untouch / New Lead', from || '', to || '')
-      .catch((err) => {
-        toast.error(err.response?.data?.msg || err.message || 'Failed to load AI call leads');
-      });
-  }, [aiCallLabel, aiCallSource, loadAiCallQueue]);
+    loadAiCallQueue(
+      aiCallSource,
+      aiCallLabel || 'Untouch / New Lead',
+      from || '',
+      to || '',
+      leadSource || ''
+    ).catch((err) => {
+      toast.error(err.response?.data?.msg || err.message || 'Failed to load AI call leads');
+    });
+  }, [aiCallLabel, aiCallLeadSource, aiCallSource, loadAiCallQueue]);
+
+  const applyAiCallLeadSource = useCallback((leadSource) => {
+    const next = aiCallLeadSource === leadSource ? '' : leadSource;
+    setAiCallLeadSource(next);
+    setInput1Value('');
+    if (aiCallSource !== 'untouch-new-lead') return;
+    loadAiCallQueue(
+      aiCallSource,
+      aiCallLabel || 'Untouch / New Lead',
+      aiCallDateFrom || '',
+      aiCallDateTo || '',
+      next
+    ).catch((err) => {
+      toast.error(err.response?.data?.msg || err.message || 'Failed to load AI call leads');
+    });
+  }, [aiCallDateFrom, aiCallDateTo, aiCallLabel, aiCallLeadSource, aiCallSource, loadAiCallQueue]);
 
   const handleAiCallDispatch = useCallback(async () => {
     const selectedIds = [...new Set(
@@ -1907,6 +1932,10 @@ const CRMDashboard = () => {
       toast.info('Pick New Lead or Not Connected first');
       return;
     }
+    if (aiCallSource === 'untouch-new-lead' && !aiCallLeadSource) {
+      toast.info('Pick Data Lead or Digital Lead first');
+      return;
+    }
     if (!numValue || numValue < 1) {
       toast.info('Type how many leads to call in the left box');
       return;
@@ -1921,8 +1950,13 @@ const CRMDashboard = () => {
       return;
     }
 
+    const sourceLabel = aiCallLeadSource === 'data-lead'
+      ? 'Data Lead'
+      : aiCallLeadSource === 'digital-lead'
+        ? 'Digital Lead'
+        : aiCallLabel;
     const confirmed = window.confirm(
-      `Send ${idsToSend.length || numValue} lead(s) to AI call?`
+      `Send ${idsToSend.length || numValue} ${sourceLabel} lead(s) to AI call?`
     );
     if (!confirmed) return;
 
@@ -1934,6 +1968,7 @@ const CRMDashboard = () => {
         ...(idsToSend.length ? { leadIds: idsToSend } : {}),
         ...(aiCallSource === 'untouch-new-lead' && aiCallDateFrom ? { from: aiCallDateFrom } : {}),
         ...(aiCallSource === 'untouch-new-lead' && aiCallDateTo ? { to: aiCallDateTo } : {}),
+        ...(aiCallSource === 'untouch-new-lead' && aiCallLeadSource ? { leadSource: aiCallLeadSource } : {}),
       };
       const dispatchRes = await axios.post(
         `${backendUrl}/college/digitalLead/voicex-dispatch`,
@@ -1961,7 +1996,7 @@ const CRMDashboard = () => {
     } finally {
       setAiFabBusy(false);
     }
-  }, [aiCallDateFrom, aiCallDateTo, aiCallLabel, aiCallLeads, aiCallSentIds, aiCallSource, aiFabBusy, allProfiles, backendUrl, closeAiCallBulk, hasAiAlreadyGoneThroughLead, input1Value, selectedProfiles, token]);
+  }, [aiCallDateFrom, aiCallDateTo, aiCallLabel, aiCallLeadSource, aiCallLeads, aiCallSentIds, aiCallSource, aiFabBusy, allProfiles, backendUrl, closeAiCallBulk, hasAiAlreadyGoneThroughLead, input1Value, selectedProfiles, token]);
 
   useEffect(() => {
     if (!isAiFabOpen) return undefined;
@@ -17634,6 +17669,24 @@ useEffect(() => {
                                         <strong>{aiCallTotalCount || 0}</strong>
                                       </div>
                                     </div>
+                                    <div className="ai-call-date-modal__source">
+                                      <span>Send to VoiceX</span>
+                                      <div className="ai-call-date-modal__presets ai-call-date-modal__presets--source">
+                                        {[
+                                          { id: 'data-lead', label: 'Data Lead' },
+                                          { id: 'digital-lead', label: 'Digital Lead' },
+                                        ].map((option) => (
+                                          <button
+                                            key={option.id}
+                                            type="button"
+                                            className={`ai-call-date-modal__preset${aiCallLeadSource === option.id ? ' is-active' : ''}`}
+                                            onClick={() => applyAiCallLeadSource(option.id)}
+                                          >
+                                            {option.label}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
                                     <div className="ai-call-date-modal__presets">
                                       {[
                                         { id: 'today', label: 'Today' },
@@ -17735,7 +17788,7 @@ useEffect(() => {
                                     <button
                                       type="button"
                                       className="ai-call-date-modal__apply"
-                                      disabled={aiFabBusy || !input1Value}
+                                      disabled={aiFabBusy || !input1Value || !aiCallLeadSource}
                                       onClick={handleAiCallDispatch}
                                     >
                                       {aiFabBusy ? 'Queuing...' : 'Call AI'}
@@ -34296,11 +34349,26 @@ max-width: 600px;
           color: #1d4ed8;
           line-height: 1.2;
         }
+        .ai-call-date-modal__source {
+          margin-bottom: 14px;
+        }
+        .ai-call-date-modal__source > span {
+          display: block;
+          margin-bottom: 8px;
+          font-size: 11px;
+          font-weight: 700;
+          color: #64748b;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
         .ai-call-date-modal__presets {
           display: flex;
           flex-wrap: wrap;
           gap: 8px;
           margin-bottom: 16px;
+        }
+        .ai-call-date-modal__presets--source {
+          margin-bottom: 0;
         }
         .ai-call-date-modal__preset {
           border: 1px solid #dbeafe;
@@ -34312,6 +34380,11 @@ max-width: 600px;
           font-weight: 600;
         }
         .ai-call-date-modal__preset:hover { background: #dbeafe; }
+        .ai-call-date-modal__preset.is-active {
+          background: #2563eb;
+          border-color: #2563eb;
+          color: #fff;
+        }
         .ai-call-date-modal__fields {
           display: flex;
           align-items: flex-end;
@@ -34370,6 +34443,10 @@ max-width: 600px;
           border: none;
           background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
           color: #fff;
+        }
+        .ai-call-date-modal__apply:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
       `}</style>
       </div>
