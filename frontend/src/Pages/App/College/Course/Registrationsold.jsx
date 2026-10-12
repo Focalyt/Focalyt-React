@@ -3639,6 +3639,8 @@ const CRMDashboard = () => {
     ...(filters.sector && { sector: filters.sector }),
     ...(filters.createdFromDate && { createdFromDate: toFilterIsoDate(filters.createdFromDate) }),
     ...(filters.createdToDate && { createdToDate: toFilterIsoDate(filters.createdToDate) }),
+    ...(filters.admissionFromDate && { admissionFromDate: toFilterIsoDate(filters.admissionFromDate) }),
+    ...(filters.admissionToDate && { admissionToDate: toFilterIsoDate(filters.admissionToDate) }),
     ...(filters.modifiedFromDate && { modifiedFromDate: toFilterIsoDate(filters.modifiedFromDate) }),
     ...(filters.modifiedToDate && { modifiedToDate: toFilterIsoDate(filters.modifiedToDate) }),
     ...(filters.nextActionFromDate && { nextActionFromDate: toFilterIsoDate(filters.nextActionFromDate) }),
@@ -3879,6 +3881,8 @@ const CRMDashboard = () => {
     // Date filter states
     createdFromDate: null,
     createdToDate: null,
+    admissionFromDate: null,
+    admissionToDate: null,
     modifiedFromDate: null,
     modifiedToDate: null,
     nextActionFromDate: null,
@@ -4047,6 +4051,9 @@ const CRMDashboard = () => {
       newFilterData.createdFromDate = null;
       newFilterData.createdToDate = null;
       resetHeaderDateFilterState();
+    } else if (filterType === 'admission') {
+      newFilterData.admissionFromDate = null;
+      newFilterData.admissionToDate = null;
     } else if (filterType === 'modified') {
       newFilterData.modifiedFromDate = null;
       newFilterData.modifiedToDate = null;
@@ -4072,6 +4079,8 @@ const CRMDashboard = () => {
       sector: '',
       createdFromDate: null,
       createdToDate: null,
+      admissionFromDate: null,
+      admissionToDate: null,
       modifiedFromDate: null,
       modifiedToDate: null,
       nextActionFromDate: null,
@@ -5423,6 +5432,8 @@ console.log('API Response:', response.data);
       ...(filters.sector && { sector: filters.sector }),
       ...(filters.createdFromDate && { createdFromDate: filters.createdFromDate.toISOString() }),
       ...(filters.createdToDate && { createdToDate: filters.createdToDate.toISOString() }),
+      ...(filters.admissionFromDate && { admissionFromDate: filters.admissionFromDate.toISOString() }),
+      ...(filters.admissionToDate && { admissionToDate: filters.admissionToDate.toISOString() }),
       ...(filters.modifiedFromDate && { modifiedFromDate: filters.modifiedFromDate.toISOString() }),
       ...(filters.modifiedToDate && { modifiedToDate: filters.modifiedToDate.toISOString() }),
       ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
@@ -19224,6 +19235,66 @@ useEffect(() => {
                           </div>
                         </div>
                       </div>
+
+                      {/* Admission Creation Date Range */}
+                      <div className="col-12 col-md-4 mb-3 mb-md-0">
+                        <label className="form-label small fw-bold text-dark">
+                          <i className="fas fa-user-graduate me-1" style={{ color: '#059669' }}></i>
+                          Admission Creation Date Range
+                        </label>
+                        <div className="card border-0 bg-light p-1">
+                          <div className="row g-2">
+                            <div className="col-12 col-sm-6 fixDate">
+                              <label className="form-label small">From Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'admissionFromDate')}
+                                value={filterData.admissionFromDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar" style={{ color: '#059669' }}></i>}
+                                maxDate={filterData.admissionToDate || new Date()}
+                              />
+                            </div>
+                            <div className="col-12 col-sm-6 fixDate">
+                              <label className="form-label small">To Date</label>
+                              <DatePicker
+                                onChange={(date) => handleDateFilterChange(date, 'admissionToDate')}
+                                value={filterData.admissionToDate}
+                                format="dd/MM/yyyy"
+                                className="form-control p-0"
+                                clearIcon={null}
+                                calendarIcon={<i className="fas fa-calendar" style={{ color: '#059669' }}></i>}
+                                minDate={filterData.admissionFromDate}
+                                maxDate={new Date()}
+                              />
+                            </div>
+                          </div>
+
+                          {(filterData.admissionFromDate || filterData.admissionToDate) && (
+                            <div className="mt-2 p-2 rounded" style={{ background: 'rgba(5, 150, 105, 0.1)' }}>
+                              <small style={{ color: '#059669' }}>
+                                <i className="fas fa-info-circle me-1"></i>
+                                <strong>Selected:</strong>
+                                {filterData.admissionFromDate && ` From ${formatDate(filterData.admissionFromDate)}`}
+                                {filterData.admissionFromDate && filterData.admissionToDate && ' |'}
+                                {filterData.admissionToDate && ` To ${formatDate(filterData.admissionToDate)}`}
+                              </small>
+                            </div>
+                          )}
+
+                          <div className="mt-2">
+                            <button
+                              className="btn btn-sm btn-outline-danger w-100 CButton"
+                              onClick={() => clearDateFilter('admission')}
+                              disabled={!filterData.admissionFromDate && !filterData.admissionToDate}
+                            >
+                              <i className="fas fa-times me-1"></i>
+                              Clear
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="row g-4 mt-3">
@@ -19271,6 +19342,13 @@ useEffect(() => {
                                   </span>
                                 )}
 
+                                {(filterData.admissionFromDate || filterData.admissionToDate) && (
+                                  <span className="badge me-2" style={{ background: '#059669' }}>
+                                    <i className="fas fa-user-graduate me-1"></i>
+                                    Admission Creation Date Filter Active
+                                  </span>
+                                )}
+
                                 {filterData.includeKyc && (
                                   <span className="badge bg-primary me-2">
                                     <i className="fas fa-id-card me-1"></i>
@@ -19311,7 +19389,18 @@ useEffect(() => {
                           className="btn btn-primary"
                           onClick={() => {
                             setActiveAiPerformanceId(filterData.aiLeadStatus || null);
-                            fetchProfileData(filterData, 1);
+                            const hasAdmissionDate = Boolean(filterData.admissionFromDate || filterData.admissionToDate);
+                            if (hasAdmissionDate) {
+                              setSelectedMilestoneFilter('admission');
+                              setSelectedKycFilter(null);
+                              selectedKycFilterRef.current = null;
+                              setSelectedApprovalFilter(null);
+                              setSelectedFollowupBucket('');
+                              setCurrentPage(1);
+                              fetchProfileData(filterData, 1, null, null, 'admission');
+                            } else {
+                              fetchProfileData(filterData, 1);
+                            }
                             setIsFilterCollapsed(true);
                           }}
                         >

@@ -299,6 +299,25 @@ function applyAdmissionDateFilterToMatch(match, createdFromDate, createdToDate) 
 	});
 }
 
+/** Admission Creation filter: only the date the profile was moved to admission. */
+function applyAdmissionCreationDateFilterToMatch(match, fromDate, toDate) {
+	if (!match || (!fromDate && !toDate)) return;
+	const range = buildB2cCreatedDateRange(fromDate, toDate);
+	andB2cMatchClause(match, {
+		$or: [
+			{ admissionDate: range },
+			{
+				logs: {
+					$elemMatch: {
+						action: 'Moved to Admission List',
+						timestamp: range,
+					},
+				},
+			},
+		],
+	});
+}
+
 function isB2cQuickSearch(name) {
 	return Boolean(name && String(name).trim());
 }
@@ -12742,6 +12761,8 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			sector,
 			createdFromDate,
 			createdToDate,
+			admissionFromDate,
+			admissionToDate,
 			modifiedFromDate,
 			modifiedToDate,
 			nextActionFromDate,
@@ -12813,6 +12834,7 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 		});
 		// Date filter: lead created in range OR admitted in range
 		applyAdmissionDateFilterToMatch(baseMatchStage, createdFromDate, createdToDate);
+		applyAdmissionCreationDateFilterToMatch(baseMatchStage, admissionFromDate, admissionToDate);
 		if (modifiedFromDate || modifiedToDate) {
 			baseMatchStage.updatedAt = {};
 			if (modifiedFromDate) {
@@ -12982,6 +13004,8 @@ router.route("/admission-list").get(isCollege, async (req, res) => {
 			sector,
 			createdFromDate,
 			createdToDate,
+			admissionFromDate,
+			admissionToDate,
 			modifiedFromDate,
 			modifiedToDate,
 			nextActionFromDate,
@@ -13471,6 +13495,11 @@ async function calculateAdmissionFilterCounts(teamMembers, collegeId, appliedFil
 			baseMatchStage,
 			appliedFilters.createdFromDate,
 			appliedFilters.createdToDate
+		);
+		applyAdmissionCreationDateFilterToMatch(
+			baseMatchStage,
+			appliedFilters.admissionFromDate,
+			appliedFilters.admissionToDate
 		);
 		if (appliedFilters.modifiedFromDate || appliedFilters.modifiedToDate) {
 			baseMatchStage.updatedAt = {};
