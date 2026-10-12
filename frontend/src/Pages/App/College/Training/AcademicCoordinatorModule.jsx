@@ -1946,12 +1946,12 @@ const DetailPanel = ({ display, session, onEdit, onDelete, onRefer, onSetActivit
           Edit
         </button>
         <button
-              type="button"
-              onClick={onRefer}
-              style={{ flexShrink: 0, height: 34, padding: "0 12px", borderRadius: 10, border: "none", background: T.coral, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
-            >
-              Assign
-            </button>
+          type="button"
+          onClick={onRefer}
+          style={{ flex: 1, height: 40, borderRadius: 12, border: `1px solid ${T.line}`, background: "#fff", color: T.ink, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+        >
+          Assign
+        </button>
         <button
           disabled={isAssigned}
           onClick={onDelete}
@@ -2607,17 +2607,62 @@ const TlmModal = ({ display, session, onClose, onSave, saving }) => {
                           value={item.name}
                           onChange={(e) => updateListItem(setter, index, "name", e.target.value)}
                           placeholder="Enter item name"
-                          style={{ flex: 1 }}
+                          style={{ flex: 1, minWidth: 0 }}
                         />
                         <select
                           value={item.type}
-                          onChange={(e) => updateListItem(setter, index, "type", e.target.value)}
-                          style={{ minWidth: 120, border: `1px solid ${T.line}`, borderRadius: 10, padding: "9px 10px", fontSize: 13, fontWeight: 600, background: "#fff", color: T.ink }}
+                          onChange={(e) => {
+                            const nextType = e.target.value;
+                            setter((prev) => prev.map((row, i) => {
+                              if (i !== index) return row;
+                              const keepFile = row.file && resourceFileAllowed(nextType, row.file);
+                              return { ...row, type: nextType, file: keepFile ? row.file : null };
+                            }));
+                          }}
+                          style={{ width: 110, flexShrink: 0, border: `1px solid ${T.line}`, borderRadius: 10, padding: "9px 10px", fontSize: 13, fontWeight: 600, background: "#fff", color: T.ink }}
                         >
                           {MATERIAL_TYPE_OPTIONS.map((option) => (
                             <option key={option} value={option}>{option}</option>
                           ))}
                         </select>
+                        <label
+                          title={item.file?.name || (item.fileUrl ? "Change file" : "Upload file")}
+                          style={{ height: 38, maxWidth: 140, flexShrink: 0, padding: "0 12px", borderRadius: 10, border: `1px solid ${T.line}`, background: item.file ? "#eef6ff" : T.page, color: item.file ? T.sky : T.ink, fontSize: 12, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", overflow: "hidden" }}
+                        >
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {item.file ? item.file.name : item.fileUrl ? "Change file" : "Upload file"}
+                          </span>
+                          <input
+                            type="file"
+                            accept={(RESOURCE_FILE_RULES[item.type] || RESOURCE_FILE_RULES.PDF).accept}
+                            style={{ display: "none" }}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null;
+                              if (file && !resourceFileAllowed(item.type, file)) {
+                                const rule = RESOURCE_FILE_RULES[item.type] || RESOURCE_FILE_RULES.PDF;
+                                window.alert(`This type accepts ${rule.extensions.join(", ")} files.`);
+                                e.target.value = "";
+                                return;
+                              }
+                              setter((prev) => prev.map((row, i) => {
+                                if (i !== index) return row;
+                                const nextName = row.name?.trim() || (file ? file.name.replace(/\.[^.]+$/, "") : "");
+                                return { ...row, file, name: nextName || row.name };
+                              }));
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                        {!item.file && item.fileUrl ? (
+                          <a
+                            href={resolveMediaUrl(undefined, item.fileUrl)}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ fontSize: 12, fontWeight: 700, color: T.sky, textDecoration: "none", whiteSpace: "nowrap" }}
+                          >
+                            View
+                          </a>
+                        ) : null}
                         <button
                           type="button"
                           onClick={() => removeListItem(setter, index)}

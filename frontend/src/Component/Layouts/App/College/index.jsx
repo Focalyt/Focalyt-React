@@ -861,8 +861,8 @@ function CollegeLayout({ children }) {
                   <span className="menu-title">{t('your_profile')}</span>
                 </Link>
               </li>
-                
-              <li className={`nav-item has-sub dropdown-department ${openSubmenu.department ? 'open' : ''} ${departmentActive ? 'active' : ''}`}>
+              {((permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_be_academic_coordinator) || permissions?.permission_type === 'Admin') && (
+                <li className={`nav-item has-sub dropdown-department ${openSubmenu.department ? 'open' : ''} ${departmentActive ? 'active' : ''}`}>
                 <Link
                   to={departmentHref}
                   onClick={() => {
@@ -940,7 +940,10 @@ function CollegeLayout({ children }) {
                   </li>
                 </ul>
               </li>
+              )}
+              
               {/* Courses */}
+              {((permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_be_academic_coordinator) || permissions?.permission_type === 'Admin') && (
               <li className={`nav-item has-sub dropdown-courses ${openSubmenu.courses ? 'open' : ''}`}>
                 <a href="#" onClick={() => toggleSubmenu('courses')}>
                   <FontAwesomeIcon icon={faBookOpen} />
@@ -987,42 +990,50 @@ function CollegeLayout({ children }) {
               </li>
                 </ul>
               </li>
-             
+              )}
+              {((permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_be_academic_coordinator) || permissions?.permission_type === 'Admin') && (
               <li className={`nav-item ${location.pathname === '/institute/new-training/batches' ? 'active' : ''}`}>
                 <Link to="/institute/new-training/batches" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faGraduationCap} />
                   <span className="menu-title">Batch </span>
                 </Link>
               </li>
+              )}
+              {((permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_be_academic_coordinator) || permissions?.permission_type === 'Admin') && (
               <li className={`nav-item ${location.pathname === '/institute/new-training/assign-team' ? 'active' : ''}`}>
                 <Link to="/institute/new-training/assign-team" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faUsers} />
                   <span className="menu-title">Team</span>
                 </Link>
               </li>
+              )}
+              {((permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_be_academic_coordinator)|| permissions?.permission_type === 'can_be_senior_trainer' || permissions?.permission_type === 'Admin') && (
               <li className={`nav-item ${location.pathname === '/institute/new-training/batch-monitoring' ? 'active' : ''}`}>
                 <Link to="/institute/new-training/batch-monitoring" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faClipboardList} />
                   <span className="menu-title">Batch Monitoring</span>
                 </Link>
               </li>
+              )}
+              {((permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_be_academic_coordinator) || permissions?.permission_type === 'can_be_senior_trainer' || permissions?.permission_type === 'Admin') && (
               <li className={`nav-item ${location.pathname === '/institute/training/senior-trainer' || location.pathname === '/institute/seniorTrainer' ? 'active' : ''}`}>
                 <Link to="/institute/training/senior-trainer" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faCalendarAlt} />
                   <span className="menu-title">Batch Time Table</span>
                 </Link>
               </li>
+              )}
+              {((permissions?.permission_type === 'Custom' && permissions?.custom_permissions?.can_be_academic_coordinator) || permissions?.permission_type === 'can_be_trainer' || permissions?.permission_type === 'can_be_senior_trainer' || permissions?.permission_type === 'Admin') && (
               <li className={`nav-item ${location.pathname === '/institute/training' ? 'active' : ''}`}>
                 <Link to="/institute/training" onClick={() => handleSidebarClose()}>
                   <FontAwesomeIcon icon={faUserTie} />
                   <span className="menu-title">Trainer</span>
                 </Link>
               </li>
-              
+              )}
 
               {/* Sales (B2C) */}
               {((permissions?.custom_permissions?.can_view_leads && permissions?.permission_type === 'Custom') || permissions?.permission_type === 'Admin' || permissions?.permission_type === 'view_only') && (
-
                 <li className={`nav-item has-sub dropdown-sales ${openSubmenu.sales ? 'open' : ''}`}>
                   <a href="#" onClick={() => toggleSubmenu('sales')}>
                     <FontAwesomeIcon icon={faShoppingCart} />
@@ -1334,12 +1345,12 @@ function CollegeLayout({ children }) {
                 </a>
               </li>
                  
-              <li className={`nav-item ${location.pathname === '/institute/trainerManagement' ? 'active' : ''}`}>
+              {/* <li className={`nav-item ${location.pathname === '/institute/trainerManagement' ? 'active' : ''}`}>
                     <Link to="/institute/trainerManagement" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faUserTie} />
                       <span className="menu-title">{t('add_trainer')}</span>
                     </Link>
-                  </li>
+                  </li> */}
                   {/* <li className={`nav-item ${location.pathname === '/institute/b2bfollowup' ? 'active' : ''}`}>
                     <Link to="/institute/b2bfollowup" onClick={() => handleSidebarClose()}>
                       <FontAwesomeIcon icon={faCalendarAlt} />
