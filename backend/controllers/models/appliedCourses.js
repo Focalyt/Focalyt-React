@@ -63,6 +63,10 @@ const appliedCoursesSchema = new Schema(
       type: ObjectId,
       default: new mongoose.Types.ObjectId('64ab1234abcd5678ef901235')
     },
+    _milestone: {
+      type: ObjectId,
+      ref: "B2cMilestone",
+    },
     // Testing-only AI copy of lead status. VoiceX writes here while AI_LEAD_STATUS_TESTING is on.
     // Flip that env to false (or stop using these fields) when AI should own the real status.
     _aiLeadStatus: {

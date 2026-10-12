@@ -16,7 +16,7 @@ const { applyHumanRemarksToDoc, humanRemarksSetPayload } = require("../../../hel
 const { assertCourseMembers, toIdString, TrainingTeamError } = require("../../../helpers/trainingTeam");
 const { findLeadsBlockedForStatus } = require("../../../helpers/b2cStatusAssignment");
 const { AppliedCourses, StatusLogs, User, College, State, University, City, Qualification, Industry, Vacancy, CandidateImport,
-	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage, UploadCandidates, Placement, PlacementStatus, BatchMonitor, Source } = require("../../models");
+	Skill, CollegeDocuments, CandidateProfile, SubQualification, Import, CoinsAlgo, AppliedJobs, HiringStatus, Company, Vertical, Project, Batch, Status, StatusB2b, Center, Courses, B2cFollowup, B2cMilestone, B2cMilestoneAssignment, TrainerTimeTable, Curriculum, DailyDiary, AssignmentQuestions, AssignmentSubmission, WhatsAppMessage, UploadCandidates, Placement, PlacementStatus, BatchMonitor, Source } = require("../../models");
 const { ReEnquire } = require("../../models");
 const bcrypt = require("bcryptjs");
 let fs = require("fs");
@@ -8483,6 +8483,87 @@ router.put('/lead/status_change/:id', [isCollege], async (req, res) => {
 		return res.json({ success: true, data: doc });
 	} catch (error) {
 		console.error('[Lead Status Change] Error:', error);
+		return res.status(500).json({ success: false, message: error.message || 'Internal Server Error' });
+	}
+});
+
+// Save the B2C milestone chosen on an admitted lead, the same way status is stored on the lead.
+router.put('/lead/milestone_change/:id', [isCollege], async (req, res) => {
+	try {
+		const { id } = req.params;
+		const milestoneId = req.body._milestone;
+		const userId = req.user._id;
+		const collegeId = req.user?.college?._id;
+		if (!collegeId) {
+			return res.status(400).json({ success: false, message: 'College not found for this user' });
+		}
+		if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(String(milestoneId || ''))) {
+			return res.status(400).json({ success: false, message: 'Invalid lead or milestone' });
+		}
+
+		const doc = await AppliedCourses.findById(id).populate('_course', 'project college name');
+		if (!doc) {
+			return res.status(404).json({ success: false, message: 'AppliedCourse not found' });
+		}
+		if (String(doc._course?.college) !== String(collegeId)) {
+			return res.status(403).json({ success: false, message: 'Lead does not belong to this college' });
+		}
+		if (doc.admissionDone !== true) {
+			return res.status(400).json({ success: false, message: 'Milestone can be set after admission' });
+		}
+
+		const milestone = await B2cMilestone.findOne({ _id: milestoneId, college: collegeId }).lean();
+		if (!milestone) {
+			return res.status(404).json({ success: false, message: 'Milestone not found' });
+		}
+
+		const projectId = doc._course?.project;
+		if (projectId) {
+			const assigned = await B2cMilestoneAssignment.findOne({
+				college: collegeId,
+				milestone: milestone._id,
+				project: projectId,
+			}).select('_id').lean();
+			if (!assigned) {
+				return res.status(400).json({ success: false, message: "This milestone is not aligned to the lead's project" });
+			}
+		}
+
+		const savedMilestone = {
+			_id: milestone._id,
+			title: milestone.title,
+			description: milestone.description || '',
+		};
+		if (String(doc._milestone || '') === String(milestone._id)) {
+			return res.json({ success: true, message: 'Milestone already set', data: { _id: doc._id, _milestone: savedMilestone } });
+		}
+
+		let previousTitle = '';
+		if (doc._milestone) {
+			const previous = await B2cMilestone.findById(doc._milestone).select('title').lean();
+			previousTitle = previous?.title || '';
+		}
+
+		doc._milestone = milestone._id;
+		doc.logs.push({
+			user: userId,
+			timestamp: new Date(),
+			action: previousTitle
+				? `Milestone changed from "${previousTitle}" to "${milestone.title}"`
+				: `Milestone set to "${milestone.title}"`,
+			remarks: '',
+		});
+		await doc.save();
+
+		await statusLogHelper(id, { milestone: milestone._id });
+
+		return res.json({
+			success: true,
+			message: 'Milestone updated',
+			data: { _id: doc._id, _milestone: savedMilestone },
+		});
+	} catch (error) {
+		console.error('[Lead Milestone Change] Error:', error);
 		return res.status(500).json({ success: false, message: error.message || 'Internal Server Error' });
 	}
 });

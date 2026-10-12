@@ -37,6 +37,10 @@ const StatusLogsSchema = new mongoose.Schema({
   _subStatusId: {
     type: mongoose.Schema.Types.ObjectId,
   },
+  milestone: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'B2cMilestone',
+  },
   _collegeId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'College',

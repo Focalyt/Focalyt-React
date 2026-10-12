@@ -1222,6 +1222,12 @@ const CRMDashboard = () => {
   const [showReapplyModal, setShowReapplyModal] = useState(false);
   const [reapplyProfile, setReapplyProfile] = useState(null);
   const [reapplyHistoryLoading, setReapplyHistoryLoading] = useState(false);
+  const [showLeadMilestoneModal, setShowLeadMilestoneModal] = useState(false);
+  const [leadMilestoneProfile, setLeadMilestoneProfile] = useState(null);
+  const [leadMilestoneRows, setLeadMilestoneRows] = useState([]);
+  const [leadMilestoneLoading, setLeadMilestoneLoading] = useState(false);
+  const [leadMilestoneSavingId, setLeadMilestoneSavingId] = useState(null);
+  const [leadMilestoneError, setLeadMilestoneError] = useState('');
 
   // Google Maps initialization
 
@@ -7656,6 +7662,112 @@ console.log('API Response:', response.data);
     setOpenModalId(profile._id);
   }
 
+  const idOf = (value) => {
+    if (!value) return '';
+    if (typeof value === 'string' || typeof value === 'number') return String(value);
+    return String(value._id || '');
+  };
+
+  const getProfileProject = (profile) => {
+    const project = profile?._course?.project || profile?._course?.projectInfo;
+    const first = Array.isArray(project) ? project[0] : project;
+    return {
+      id: idOf(first),
+      name: first?.name || profile?._course?.projectName || '',
+    };
+  };
+
+  const closeLeadMilestones = () => {
+    if (leadMilestoneSavingId) return;
+    setShowLeadMilestoneModal(false);
+    setLeadMilestoneProfile(null);
+    setLeadMilestoneRows([]);
+    setLeadMilestoneError('');
+  };
+
+  const getProfileMilestoneId = (profile) => idOf(profile?._milestone);
+
+  const saveLeadMilestone = async (profile, milestone) => {
+    if (!profile?._id || !milestone?._id || leadMilestoneSavingId) return;
+    if (getProfileMilestoneId(profile) === String(milestone._id)) return;
+    setLeadMilestoneSavingId(milestone._id);
+    setLeadMilestoneError('');
+    try {
+      const response = await axios.put(
+        `${backendUrl}/college/lead/milestone_change/${profile._id}`,
+        { _milestone: milestone._id },
+        { headers: { 'x-auth': token, 'Content-Type': 'application/json' } }
+      );
+      if (!response.data?.success) {
+        setLeadMilestoneError(response.data?.message || 'Failed to save milestone');
+        return;
+      }
+      const saved = response.data.data?._milestone || {
+        _id: milestone._id,
+        title: milestone.title,
+        description: milestone.description || '',
+      };
+      setAllProfiles((prev) => prev.map((item) => (
+        String(item._id) === String(profile._id) ? { ...item, _milestone: saved } : item
+      )));
+      setLeadMilestoneProfile((prev) => (
+        prev && String(prev._id) === String(profile._id) ? { ...prev, _milestone: saved } : prev
+      ));
+    } catch (error) {
+      console.error('Error saving lead milestone:', error);
+      setLeadMilestoneError(error.response?.data?.message || 'Failed to save milestone');
+    } finally {
+      setLeadMilestoneSavingId(null);
+    }
+  };
+
+  const openLeadMilestones = async (profile) => {
+    if (!profile?._id) return;
+    setLeadMilestoneProfile(profile);
+    setShowLeadMilestoneModal(true);
+    setLeadMilestoneLoading(true);
+    setLeadMilestoneError('');
+    setLeadMilestoneRows([]);
+    try {
+      const response = await axios.get(`${backendUrl}/college/milestone`, {
+        headers: { 'x-auth': token },
+      });
+      if (!response.data?.success) {
+        setLeadMilestoneError(response.data?.message || 'Failed to fetch milestones');
+        return;
+      }
+      const rows = Array.isArray(response.data.data) ? response.data.data : [];
+      setLeadMilestones(rows);
+      const projectId = getProfileProject(profile).id;
+      const matched = projectId
+        ? rows.filter((item) => (item.assignedProjects || []).map(String).includes(projectId))
+        : rows;
+      setLeadMilestoneRows(matched);
+    } catch (error) {
+      console.error('Error fetching B2C milestones:', error);
+      setLeadMilestoneError(error.response?.data?.message || 'Failed to fetch milestones');
+    } finally {
+      setLeadMilestoneLoading(false);
+    }
+  };
+
+  const renderLeadMilestoneButton = (profile, extraClassName = '') => {
+    if (!profile?.admissionDone) return null;
+    return (
+      <button
+        type="button"
+        className={`lead-card-kyc-dash__btn lead-card-kyc-dash__btn--milestone${extraClassName ? ` ${extraClassName}` : ''}`}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openLeadMilestones(profile);
+        }}
+      >
+        Milestone
+      </button>
+    );
+  };
+
   const renderLeadReApplyButton = (profile) => {
     if (!profile?._id) return null;
     return (
@@ -7671,6 +7783,7 @@ console.log('API Response:', response.data);
         >
           ReApply
         </button>
+        {renderLeadMilestoneButton(profile)}
       </div>
     );
   };
@@ -18287,6 +18400,89 @@ useEffect(() => {
             </div>
           )}
 
+          {showLeadMilestoneModal && leadMilestoneProfile && (
+            <div
+              className="modal fade show d-block"
+              tabIndex="-1"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="leadMilestoneModalLabel"
+              style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1065 }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) closeLeadMilestones();
+              }}
+            >
+              <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                <div className="modal-content">
+                  <div className="modal-header">
+                    <h1 className="modal-title fs-5 text-capitalize" id="leadMilestoneModalLabel">
+                      Milestones — {leadMilestoneProfile._candidate?.name || 'Candidate'}
+                    </h1>
+                    <button
+                      type="button"
+                      className="btn-close"
+                      aria-label="Close"
+                      onClick={closeLeadMilestones}
+                    />
+                  </div>
+                  <div className="modal-body">
+                    <p className="text-muted small mb-3">
+                      Select a B2C milestone
+                      {getProfileProject(leadMilestoneProfile).name
+                        ? ` for ${getProfileProject(leadMilestoneProfile).name}`
+                        : ' for this course'}
+                      . The choice is saved on this lead.
+                    </p>
+                    {leadMilestoneLoading && (
+                      <div className="text-center py-4">
+                        <div className="spinner-border spinner-border-sm text-primary me-2" role="status" />
+                        Loading milestones...
+                      </div>
+                    )}
+                    {!leadMilestoneLoading && leadMilestoneError && (
+                      <div className="alert alert-danger mb-0">{leadMilestoneError}</div>
+                    )}
+                    {!leadMilestoneLoading && !leadMilestoneError && leadMilestoneRows.length === 0 && (
+                      <div className="text-center text-muted py-4">
+                        No B2C milestones are aligned to this project.
+                      </div>
+                    )}
+                    {!leadMilestoneLoading && leadMilestoneRows.length > 0 && (
+                      <div className="list-group">
+                        {leadMilestoneRows.map((milestone) => {
+                          const selected = getProfileMilestoneId(leadMilestoneProfile) === String(milestone._id);
+                          const saving = String(leadMilestoneSavingId) === String(milestone._id);
+                          return (
+                            <button
+                              key={milestone._id}
+                              type="button"
+                              className={`list-group-item list-group-item-action text-start${selected ? ' active' : ''}`}
+                              disabled={Boolean(leadMilestoneSavingId)}
+                              onClick={() => saveLeadMilestone(leadMilestoneProfile, milestone)}
+                            >
+                              <div className="d-flex justify-content-between align-items-center gap-2">
+                                <div className="fw-semibold">{milestone.title}</div>
+                                <span className="small">{saving ? 'Saving...' : selected ? 'Saved' : 'Select'}</span>
+                              </div>
+                              {milestone.description ? (
+                                <div className={`small${selected ? '' : ' text-muted'}`}>{milestone.description}</div>
+                              ) : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  <div className="modal-footer">
+                    <button type="button" className="btn btn-secondary" onClick={closeLeadMilestones}>
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Cross Sale Modal */}
           {showCrossSaleModal && crossSaleSourceProfile && (
             <div
@@ -19338,6 +19534,7 @@ useEffect(() => {
                                         </div>
                                         <i className="fas fa-user-circle lhm__name-icon" aria-hidden="true"></i>
                                         <span className="text-capitalize lhm__name-text">{profile._candidate?.name || 'N/A'}</span>
+                                        {renderLeadMilestoneButton(profile, 'lhm__milestone-btn')}
                                         <span className="lhm__mobile-number" title={profile._candidate?.mobile || ''}>
                                           <i className="fas fa-phone" aria-hidden="true"></i>
                                           <span>{profile._candidate?.mobile || 'N/A'}</span>
@@ -31889,6 +32086,9 @@ max-width: 600px;
           z-index: 9;
           top: -4px;
           left: 8px;
+          display: flex;
+          align-items: center;
+          gap: 6px;
         }
 
         .lead-strip-v3__reapply-wrap .lead-card-kyc-dash__btn{
@@ -32470,6 +32670,20 @@ max-width: 600px;
           display: block;
           cursor: default;
           background: linear-gradient(135deg, #047857, #10b981);
+        }
+
+        .lead-card-kyc-dash__btn--milestone{
+          width: auto;
+          min-width: 72px;
+          background: linear-gradient(135deg, #4f46e5, #6366f1);
+          box-shadow: 0 2px 6px rgba(79, 70, 229, 0.35);
+        }
+
+        .lhm__milestone-btn{
+          margin-left: 6px;
+          padding: 3px 8px;
+          font-size: 10px;
+          flex-shrink: 0;
         }
 
         .lead-card-kyc-dash--mobile{
