@@ -3869,6 +3869,7 @@ const CRMDashboard = () => {
     followupStatus: '',
     hasFollowUpCall: '', // '' | true | false
     hasFollowUpVisit: '', // '' | true | false
+    includeKyc: false,
     // Date filter states
     createdFromDate: null,
     createdToDate: null,
@@ -4074,6 +4075,7 @@ const CRMDashboard = () => {
       followupStatus: '',
       hasFollowUpCall: '',
       hasFollowUpVisit: '',
+      includeKyc: false,
       approvalStatus: '',
     };
 
@@ -5226,6 +5228,7 @@ console.log('API Response:', response.data);
       const sharedFilterParts = {
         ...buildLeadDateQueryParts(filters),
         ...(filters?.aiLeadStatus && { aiLeadStatus: filters.aiLeadStatus }),
+        ...(filters?.includeKyc ? { includeKyc: 'true' } : {}),
       };
       const followupParams = new URLSearchParams({ allTime: 'true', ...listParts, ...sharedFilterParts });
       const followupPromise = axios.get(`${backendUrl}/college/followupcounts?${followupParams}`, {
@@ -5460,6 +5463,7 @@ console.log('API Response:', response.data);
         queryParams.set('hasFollowUpCall', 'false');
         queryParams.set('hasFollowUpVisit', 'false');
       }
+      if (filters.includeKyc) queryParams.set('includeKyc', 'true');
     }
 
     const cycle = cycleOverride || cycleFilters;
@@ -5974,6 +5978,7 @@ console.log('API Response:', response.data);
       ...(filters.nextActionFromDate && { nextActionFromDate: filters.nextActionFromDate.toISOString() }),
       ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
+      ...(filters.includeKyc ? { includeKyc: 'true' } : {}),
       ...buildListFilterQueryParts(formData, cycleFilters),
     });
 
@@ -6066,6 +6071,7 @@ console.log('API Response:', response.data);
       ...(filters.nextActionToDate && { nextActionToDate: filters.nextActionToDate.toISOString() }),
       ...(filters.subStatuses && { subStatuses: filters.subStatuses }),
       ...(filters.approvalStatus && { approvalStatus: filters.approvalStatus }),
+      ...(filters.includeKyc ? { includeKyc: 'true' } : {}),
       // Multi-select filters
       ...buildListFilterQueryParts(fd, cycle),
     });
@@ -7426,6 +7432,7 @@ console.log('API Response:', response.data);
             ...(filterData.nextActionFromDate && { nextActionFromDate: filterData.nextActionFromDate.toISOString() }),
             ...(filterData.nextActionToDate && { nextActionToDate: filterData.nextActionToDate.toISOString() }),
             ...(filterData.subStatuses && { subStatuses: filterData.subStatuses }),
+            ...(filterData.includeKyc ? { includeKyc: 'true' } : {}),
             ...buildListFilterQueryParts(formData, cycleFilters),
           });
 
@@ -10032,6 +10039,7 @@ console.log('API Response:', response.data);
         ...(filterData.nextActionFromDate && { nextActionFromDate: filterData.nextActionFromDate.toISOString() }),
         ...(filterData.nextActionToDate && { nextActionToDate: filterData.nextActionToDate.toISOString() }),
         ...(filterData.subStatuses && { subStatuses: filterData.subStatuses }),
+        ...(filterData.includeKyc ? { includeKyc: 'true' } : {}),
         ...buildListFilterQueryParts(formData, cycleFilters),
       });
 
@@ -18802,6 +18810,27 @@ useEffect(() => {
                         </select>
                       </div>
 
+                      <div className="col-md-3">
+                        <label className="form-label fw-medium text-dark mb-2">
+                          <i className="fas fa-id-card text-primary me-2"></i>
+                          KYC
+                        </label>
+                        <select
+                          className="form-select"
+                          value={filterData.includeKyc ? 'yes' : ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setFilterData((prev) => ({
+                              ...prev,
+                              includeKyc: v === 'yes',
+                            }));
+                          }}
+                        >
+                          <option value="">Select</option>
+                          <option value="yes">Moved to KYC</option>
+                        </select>
+                      </div>
+
                     </div>
 
 
@@ -19043,6 +19072,13 @@ useEffect(() => {
                                   <span className="badge bg-info me-2">
                                     <i className="fas fa-calendar-check me-1"></i>
                                     Next Action Date Filter Active
+                                  </span>
+                                )}
+
+                                {filterData.includeKyc && (
+                                  <span className="badge bg-primary me-2">
+                                    <i className="fas fa-id-card me-1"></i>
+                                    Moved to KYC only
                                   </span>
                                 )}
 

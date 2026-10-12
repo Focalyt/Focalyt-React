@@ -2584,7 +2584,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			nextActionFromDate, nextActionToDate,
 			projects, verticals, course, center, counselor, owner, subStatuses, batch, registeredByMe,
 			followupStatus, approvalStatus,
-			hasFollowUpCall, hasFollowUpVisit, leadSource,
+			hasFollowUpCall, hasFollowUpVisit, leadSource, includeKyc,
 		} = req.query;
 
 		// console.log("substautes", subStatuses)
@@ -2699,6 +2699,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 			hasFollowUpCall,
 			hasFollowUpVisit,
 			leadSourceFilter,
+			includeKyc,
 			collegeCourseIds,
 			candidateIds: candidateIds || undefined,
 		};
@@ -3782,7 +3783,11 @@ function attachShiftedDepartmentMatch(match, verticalsArray) {
 	return { $or: [match, shifted] };
 }
 
-function buildB2cListStageMatch(leadStatus) {
+function isIncludeMovedToKyc(value) {
+	return value === true || value === 'true';
+}
+
+function buildB2cListStageMatch(leadStatus, options = {}) {
 	const status = String(leadStatus || '');
 	if (status === MOVED_IN_KYC_STATUS_ID) {
 		return { kycStage: { $in: [true] } };
@@ -3798,6 +3803,11 @@ function buildB2cListStageMatch(leadStatus) {
 	if (status === MOVED_IN_KYC_STATUS_ID) {
         return { kycStage: { $in: [true] } };
     }
+
+	// KYC filter shows only leads already moved to KYC. Other filters still apply.
+	if (isIncludeMovedToKyc(options.includeKyc)) {
+		return { kycStage: { $in: [true] } };
+	}
 
     if (status === WON_LEAD_STATUS_ID) {
         return {};
@@ -3902,7 +3912,7 @@ async function resolveB2cCandidateSearchIds(name) {
 function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, forCount = false }) {
 	const pipeline = [];
 	filters.leadStatus = String(filters.leadStatus);
-	let baseMatch = buildB2cListStageMatch(filters.leadStatus);
+	let baseMatch = buildB2cListStageMatch(filters.leadStatus, { includeKyc: filters.includeKyc });
 
 	applyB2cLeadOwnershipMatch(baseMatch, {
 		teamMemberIds,
@@ -4192,7 +4202,7 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, 
 function buildSimplifiedPipelineWithWhatsApp({ teamMemberIds, college, filters, pagination }) {
 	const pipeline = [];
 	filters.leadStatus = String(filters.leadStatus);
-	let baseMatch = buildB2cListStageMatch(filters.leadStatus);
+	let baseMatch = buildB2cListStageMatch(filters.leadStatus, { includeKyc: filters.includeKyc });
 
 
 
@@ -4569,7 +4579,7 @@ router.route("/downloadleads").get(isCollege, async (req, res) => {
 			name, courseType, status, leadStatus, aiLeadStatus,
 			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
 			nextActionFromDate, nextActionToDate,
-			projects, verticals, course, center, counselor, owner, subStatuses, leadSource
+			projects, verticals, course, center, counselor, owner, subStatuses, leadSource, includeKyc
 		} = req.query;
 
 		// Parse multi-select filters
@@ -4626,6 +4636,7 @@ router.route("/downloadleads").get(isCollege, async (req, res) => {
 				ownerIds: ownerArray,
 				counselorIds: ownerArray.length > 0 ? [] : counselorArray,
 				leadSourceFilter,
+				includeKyc,
 			}
 		});
 
@@ -4679,7 +4690,7 @@ router.route("/downloadleads").get(isCollege, async (req, res) => {
 function downloadPipeline({ teamMemberIds, college, filters }) {
 	const pipeline = [];
 	filters.leadStatus = String(filters.leadStatus);
-	let baseMatch = buildB2cListStageMatch(filters.leadStatus);
+	let baseMatch = buildB2cListStageMatch(filters.leadStatus, { includeKyc: filters.includeKyc });
 
 
 
@@ -5014,7 +5025,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			createdFromDate, createdToDate, modifiedFromDate, modifiedToDate,
 			nextActionFromDate, nextActionToDate,
 			projects, verticals, course, center, counselor, owner,
-			subStatuses, leadSource
+			subStatuses, leadSource, includeKyc
 		} = req.query;
 
 
@@ -5086,13 +5097,19 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 		}
 
 		const allStatuses = await Status.find({}).select('_id title milestone').lean();
+		const includeMovedToKyc = isIncludeMovedToKyc(includeKyc);
 
-		const baseMatch = {
-			kycStage: { $ne: true },
-			kyc: { $ne: true },
-			admissionDone: { $ne: true },
-			_course: { $in: collegeCourseIds },
-		};
+		const baseMatch = includeMovedToKyc
+			? {
+				kycStage: { $in: [true] },
+				_course: { $in: collegeCourseIds },
+			}
+			: {
+				kycStage: { $ne: true },
+				kyc: { $ne: true },
+				admissionDone: { $ne: true },
+				_course: { $in: collegeCourseIds },
+			};
 		const kycMatch = {
 			kycStage: { $in: [true] },
 			_course: { $in: collegeCourseIds },
@@ -5302,7 +5319,7 @@ router.route('/registrationCrmFilterCounts').get(isCollege, async (req, res) => 
 			}
 		});
 
-		if (counts[WON_LEAD_STATUS_ID]) {
+		if (counts[WON_LEAD_STATUS_ID] && !includeMovedToKyc) {
 			counts[WON_LEAD_STATUS_ID].count += wonKeptInKycCount[0]?.total || 0;
 		}
 
