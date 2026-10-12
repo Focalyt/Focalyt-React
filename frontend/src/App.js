@@ -155,6 +155,7 @@ import B2BSales from './Pages/App/College/B2B/B2BSales';
 import B2BSalesCopy from './Pages/App/College/B2B/B2BSales_copy';
 import StatusB2C from './Pages/App/College/Status/statusB2C'
 import MilestoneB2C from './Pages/App/College/Status/milestoneB2C'
+import MilestoneB2B from './Pages/App/College/Status/milestoneB2B'
 import PrivacyPolicy from './Pages/App/College/Register/privacyPolicy';
 import TermsOfService from './Pages/App/College/Register/termsOfService';
 import Attendance from './Pages/App/College/Attendance/Attendance';
@@ -372,6 +373,7 @@ const Layout = () => {
           <Route path='sales_copy' element={<B2BSalesCopy/>}/>
           <Route path='statusdesignb2c' element={<StatusB2C/>}/>
           <Route path='milestonedesignb2c' element={<MilestoneB2C/>}/>
+          <Route path='milestonedesignb2b' element={<MilestoneB2B/>}/>
           <Route path='typeOfB2b' element={<TypeB2b/>}/>
           <Route path='b2bProject' element={<B2BProject/>}/>
           <Route path='b2bDepartment' element={<B2BDepartment/>}/>

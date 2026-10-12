@@ -1,8 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 
-const scopeKeyFor = (department, project) => `${department}::${project}`;
-
 const ShiftTargetModal = ({
   isOpen,
   selection,
@@ -272,8 +270,6 @@ const MilestoneB2C = () => {
   const [appliedProjectId, setAppliedProjectId] = useState('');
   const [loadingDepartments, setLoadingDepartments] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
-  const [milestoneRegistryByScope, setMilestoneRegistryByScope] = useState({});
-  const [scopeMeta, setScopeMeta] = useState({});
   const [transferSelection, setTransferSelection] = useState(null);
   const [scopeNotice, setScopeNotice] = useState('');
 
@@ -292,6 +288,8 @@ const MilestoneB2C = () => {
           id: item.index + 1,
           title: item.title,
           description: item.description,
+          assignedDepartments: (item.assignedDepartments || []).map(String),
+          assignedProjects: (item.assignedProjects || []).map(String),
         })));
       }
     } catch (error) {
@@ -384,73 +382,57 @@ const MilestoneB2C = () => {
     setAppliedProjectId('');
   };
 
-  const scopeSections = Object.keys(milestoneRegistryByScope)
-    .filter((key) => (milestoneRegistryByScope[key] || []).length > 0)
-    .filter((key) => {
-      if (!filterActive) return true;
-      const meta = scopeMeta[key] || {};
-      if (meta.departmentId !== appliedDepartmentId) return false;
-      return !appliedProjectId || meta.projectId === appliedProjectId;
-    })
-    .map((key) => ({ key, meta: scopeMeta[key] || {}, milestones: milestoneRegistryByScope[key] }));
+  const filteredMilestones = filterActive
+    ? milestones.filter((item) => item.assignedDepartments.includes(appliedDepartmentId)
+      && (!appliedProjectId || item.assignedProjects.includes(appliedProjectId)))
+    : milestones;
 
   const appliedDepartmentName = departments.find((item) => item._id === appliedDepartmentId)?.name || '';
   const appliedProjectName = appliedProjectId
-    ? (projects.find((item) => item._id === appliedProjectId)?.name
-      || Object.values(scopeMeta).find((meta) => meta.projectId === appliedProjectId)?.projectName
-      || '')
+    ? (projects.find((item) => item._id === appliedProjectId)?.name || '')
     : '';
+
+  const assignmentLabelFor = (milestone) => {
+    const projectCount = milestone.assignedProjects.length;
+    if (!projectCount) return null;
+    const departmentNames = milestone.assignedDepartments
+      .map((id) => departments.find((item) => item._id === id)?.name)
+      .filter(Boolean)
+      .join(', ');
+    return `${departmentNames || 'Department'} · ${projectCount} project${projectCount === 1 ? '' : 's'}`;
+  };
 
   const openSwitchMilestone = (milestone) => {
     if (!milestone) return;
     setTransferSelection({ milestones: [milestone], single: true });
   };
 
-  const handleShiftToScope = ({ targets, milestones: chosen, single }) => {
+  const handleShiftToScope = async ({ targets, milestones: chosen, single }) => {
     if (!targets?.length || !chosen?.length) return;
-    setMilestoneRegistryByScope((prev) => {
-      const next = { ...prev };
-      targets.forEach((target) => {
-        const key = scopeKeyFor(target.departmentId, target.projectId);
-        const incoming = chosen.map((item) => ({
-          title: item.title,
-          description: item.description,
-          sourceId: item.sourceId || item._id,
-          _id: `local-milestone-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          isLocalCopy: true,
-        }));
-        const incomingSources = new Set(incoming.map((item) => item.sourceId));
-        const kept = (next[key] || []).filter((item) => !incomingSources.has(item.sourceId));
-        next[key] = [...kept, ...incoming];
-      });
-      return next;
-    });
-    setScopeMeta((prev) => {
-      const next = { ...prev };
-      targets.forEach((target) => {
-        next[scopeKeyFor(target.departmentId, target.projectId)] = target;
-      });
-      return next;
-    });
+    try {
+      const response = await axios.post(`${backendUrl}/college/milestone/assign`, {
+        milestoneIds: chosen.map((item) => item._id),
+        projects: targets.map((target) => target.projectId),
+      }, { headers: { 'x-auth': token } });
+      if (!response.data.success) {
+        alert(response.data.message || 'Failed to assign milestone');
+        return;
+      }
+    } catch (error) {
+      console.error('Error assigning milestone:', error);
+      alert(error.response?.data?.message || 'Failed to assign milestone');
+      return;
+    }
     const targetLabel = targets.length === 1
       ? `${targets[0].departmentName} / ${targets[0].projectName}`
-      : `${targets.length} department/project combinations`;
+      : `${targets.length} projects`;
     setScopeNotice(
       single
-        ? `Added "${chosen[0].title}" to ${targetLabel}. This stays on this screen only.`
-        : `Added ${chosen.length} milestones to ${targetLabel}. This stays on this screen only.`
+        ? `Assigned "${chosen[0].title}" to ${targetLabel}.`
+        : `Assigned ${chosen.length} milestones to ${targetLabel}.`
     );
     setTransferSelection(null);
-  };
-
-  const handleRemoveLocalMilestone = (localId) => {
-    setMilestoneRegistryByScope((prev) => {
-      const next = {};
-      Object.keys(prev).forEach((key) => {
-        next[key] = (prev[key] || []).filter((item) => item._id !== localId);
-      });
-      return next;
-    });
+    fetchMilestones();
   };
 
   const persistOrder = async (nextMilestones) => {
@@ -500,8 +482,8 @@ const MilestoneB2C = () => {
     persistOrder(next);
   };
 
-  const handleEditMilestone = (index) => {
-    setEditingMilestone(milestones[index]);
+  const handleEditMilestone = (milestone) => {
+    setEditingMilestone(milestone);
     setIsEditMode(true);
     setIsMilestoneModalOpen(true);
   };
@@ -511,13 +493,15 @@ const MilestoneB2C = () => {
     setIsDeleteModalOpen(true);
   };
 
-  const handleSave = async ({ title, description }) => {
+  const handleSave = async ({ title, description, departments: formDepartments, projects: formProjects }) => {
     const headers = { 'x-auth': token };
     try {
       if (isEditMode && editingMilestone?._id) {
+        // Empty departments and projects make the milestone global again.
+        // A department with no picked project gets all of its current projects.
         const response = await axios.put(
           `${backendUrl}/college/milestone/edit/${editingMilestone._id}`,
-          { title, description },
+          { title, description, departments: formDepartments, projects: formProjects },
           { headers }
         );
         if (response.data.success) alert('Milestone updated successfully');
@@ -738,36 +722,38 @@ const MilestoneB2C = () => {
               <strong>{appliedProjectId ? (appliedProjectName || 'Project') : 'All projects'}</strong>
             </div>
           )}
-          {!filterActive && (
+          {filteredMilestones.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'flex-start', padding: '20px 16px', minWidth: 'max-content' }}>
-              {milestones.map((milestone, index) => (
+              {filteredMilestones.map((milestone, index) => (
                 <React.Fragment key={milestone._id}>
                   <MilestoneCard
                     index={index}
-                    total={milestones.length}
+                    total={filteredMilestones.length}
                     title={milestone.title}
                     _id={milestone._id}
                     description={milestone.description}
+                    assignmentLabel={assignmentLabelFor(milestone)}
+                    reorderDisabled={filterActive}
                     onDragStart={() => setDraggedItem(index)}
                     onDragOver={(event) => event.preventDefault()}
                     onDrop={(event) => handleDrop(event, index)}
-                    onEdit={handleEditMilestone}
+                    onEdit={() => handleEditMilestone(milestone)}
                     onDelete={handleDeleteMilestone}
                     onMoveLeft={handleMoveLeft}
                     onMoveRight={handleMoveRight}
                     onSwitch={() => openSwitchMilestone(milestone)}
                   />
-                  {index < milestones.length - 1 && <Arrow />}
+                  {index < filteredMilestones.length - 1 && <Arrow />}
                 </React.Fragment>
               ))}
-              {milestones.length === 0 && (
-                <div style={{ color: '#718096', padding: '12px 8px', whiteSpace: 'normal' }}>
-                  No milestones yet. Add one to show it in the Performance tab.
-                </div>
-              )}
             </div>
           )}
-          {filterActive && scopeSections.length === 0 && (
+          {!filterActive && milestones.length === 0 && (
+            <div style={{ color: '#718096', padding: '20px 24px', whiteSpace: 'normal' }}>
+              No milestones yet. Add one to show it in the Performance tab.
+            </div>
+          )}
+          {filterActive && filteredMilestones.length === 0 && (
             <div style={{
               minHeight: '140px',
               display: 'flex',
@@ -785,40 +771,10 @@ const MilestoneB2C = () => {
                 No milestones added here yet
               </div>
               <div style={{ fontSize: '14px', maxWidth: '420px' }}>
-                Clear the search to see all milestones, then use Switch to add them to this department and project.
+                Clear the search to see all milestones, then use Switch or Edit to align them to this department and project.
               </div>
             </div>
           )}
-          {scopeSections.map((section) => (
-            <div key={section.key} style={{ marginTop: '8px', padding: '8px 16px 0', whiteSpace: 'normal' }}>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#1e40af', marginBottom: '12px' }}>
-                {section.meta.departmentName || 'Department'} / {section.meta.projectName || 'Project'}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'flex-start', minWidth: 'max-content', whiteSpace: 'nowrap' }}>
-                {section.milestones.map((milestone, index) => (
-                  <React.Fragment key={milestone._id}>
-                    <MilestoneCard
-                      index={index}
-                      total={section.milestones.length}
-                      title={milestone.title}
-                      _id={milestone._id}
-                      description={milestone.description}
-                      isLocalCopy
-                      onDelete={handleRemoveLocalMilestone}
-                      onEdit={() => {}}
-                      onDragStart={() => {}}
-                      onDragOver={() => {}}
-                      onDrop={() => {}}
-                      onMoveLeft={() => {}}
-                      onMoveRight={() => {}}
-                      onSwitch={() => openSwitchMilestone(milestone)}
-                    />
-                    {index < section.milestones.length - 1 && <Arrow />}
-                  </React.Fragment>
-                ))}
-              </div>
-            </div>
-          ))}
         </div>
       </div>
 
@@ -832,9 +788,10 @@ const MilestoneB2C = () => {
       >
         <h3 style={{ margin: '0 0 12px', fontSize: '16px', fontWeight: 500, color: '#4a5568' }}>Instructions:</h3>
         <ul style={{ margin: 0, padding: '0 0 0 20px', color: '#4a5568', fontSize: '14px' }}>
-          <li style={{ marginBottom: '8px' }}>All milestones show by default. Pick a department (and optionally a project) and click Search to see only the milestones added there</li>
-          <li style={{ marginBottom: '8px' }}>Use Switch on a milestone to add it to one or more departments and projects</li>
-          <li style={{ marginBottom: '8px' }}>Drag and drop milestone cards to change their order</li>
+          <li style={{ marginBottom: '8px' }}>New milestones are global. Align them to departments and projects with Edit or Switch</li>
+          <li style={{ marginBottom: '8px' }}>All milestones show by default. Pick a department (and optionally a project) and click Search to see only the milestones aligned there</li>
+          <li style={{ marginBottom: '8px' }}>Use Switch on a milestone to add it to more departments and projects. Its current projects are kept</li>
+          <li style={{ marginBottom: '8px' }}>Drag and drop milestone cards to change their order (clear the search first)</li>
           <li style={{ marginBottom: '8px' }}>Use ✏️ and 🗑️ buttons to edit or delete milestones</li>
         </ul>
       </div>
@@ -849,12 +806,6 @@ const MilestoneB2C = () => {
         loadingDepartments={loadingDepartments}
         backendUrl={backendUrl}
         token={token}
-        departmentId={departmentId}
-        projectId={projectId}
-        onScopeChange={(nextDepartmentId, nextProjectId) => {
-          setDepartmentId(nextDepartmentId);
-          setProjectId(nextProjectId);
-        }}
       />
       <ShiftTargetModal
         isOpen={Boolean(transferSelection)}
@@ -893,11 +844,12 @@ const MilestoneCard = ({
   onMoveLeft,
   onMoveRight,
   onSwitch,
-  isLocalCopy,
+  assignmentLabel,
+  reorderDisabled,
 }) => (
   <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', minWidth: 220, margin: '0 4px' }}>
     <div style={{ marginTop: '15%' }}>
-      {!isLocalCopy && (
+      {!reorderDisabled && (
       <button
         type="button"
         onClick={() => onMoveLeft(index)}
@@ -926,11 +878,11 @@ const MilestoneCard = ({
         backgroundColor: 'white',
         display: 'flex',
         flexDirection: 'column',
-        cursor: 'grab',
+        cursor: reorderDisabled ? 'default' : 'grab',
         userSelect: 'none',
         position: 'relative',
       }}
-      draggable={!isLocalCopy}
+      draggable={!reorderDisabled}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDrop={onDrop}
@@ -970,7 +922,6 @@ const MilestoneCard = ({
           </button>
         </div>
         <div>
-          {!isLocalCopy && (
           <button
             type="button"
             onClick={() => onEdit(index)}
@@ -978,7 +929,6 @@ const MilestoneCard = ({
           >
             ✏️
           </button>
-          )}
           <button
             type="button"
             onClick={() => onDelete(_id)}
@@ -991,19 +941,19 @@ const MilestoneCard = ({
       <div style={{ textAlign: 'center', fontWeight: 500, marginTop: 12, fontSize: '16px', color: '#333', whiteSpace: 'normal' }}>
         {title}
       </div>
-      {isLocalCopy && (
-        <div style={{ textAlign: 'center', marginTop: 6 }}>
-          <span style={{ background: '#3182ce', color: 'white', fontSize: '10px', padding: '2px 6px', borderRadius: '10px', fontWeight: 500 }}>
-            Shifted
-          </span>
-        </div>
-      )}
-      <div style={{ textAlign: 'center', fontSize: '14px', color: '#666', marginTop: 6, whiteSpace: 'normal', padding: '0 8px 16px' }}>
+      <div style={{ textAlign: 'center', fontSize: '14px', color: '#666', marginTop: 6, whiteSpace: 'normal', padding: '0 8px' }}>
         {description}
+      </div>
+      <div style={{ textAlign: 'center', fontSize: '12px', marginTop: 6, whiteSpace: 'normal', padding: '0 8px 16px' }}>
+        {assignmentLabel ? (
+          <span style={{ color: '#1e40af' }}>{assignmentLabel}</span>
+        ) : (
+          <span style={{ color: '#d97706' }}>Global · not aligned to any project yet</span>
+        )}
       </div>
     </div>
     <div style={{ marginTop: '15%' }}>
-      {!isLocalCopy && (
+      {!reorderDisabled && (
       <button
         type="button"
         onClick={() => onMoveRight(index)}
@@ -1063,55 +1013,81 @@ const MilestoneModal = ({
   loadingDepartments,
   backendUrl,
   token,
-  departmentId,
-  projectId,
-  onScopeChange,
 }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [formDepartmentId, setFormDepartmentId] = useState('');
-  const [formProjectId, setFormProjectId] = useState('');
-  const [formProjects, setFormProjects] = useState([]);
-  const [loadingFormProjects, setLoadingFormProjects] = useState(false);
+  const [formDepartmentIds, setFormDepartmentIds] = useState([]);
+  const [formProjectIds, setFormProjectIds] = useState([]);
+  const [projectsByDepartment, setProjectsByDepartment] = useState({});
+  const [loadingProjectsByDepartment, setLoadingProjectsByDepartment] = useState({});
+  const loadedDepartmentsRef = useRef({});
 
   useEffect(() => {
     if (!isOpen) return;
     setTitle(editMode ? (initialData?.title || '') : '');
     setDescription(editMode ? (initialData?.description || '') : '');
-    setFormDepartmentId(departmentId || '');
-    setFormProjectId(projectId || '');
-  }, [editMode, initialData, isOpen, departmentId, projectId]);
+    setFormDepartmentIds(editMode ? (initialData?.assignedDepartments || []) : []);
+    setFormProjectIds(editMode ? (initialData?.assignedProjects || []) : []);
+  }, [editMode, initialData, isOpen]);
 
   useEffect(() => {
-    if (!isOpen || !token || !formDepartmentId) {
-      if (!formDepartmentId) setFormProjects([]);
-      return undefined;
-    }
+    if (!isOpen || !editMode || !token) return undefined;
     let cancelled = false;
-    const loadFormProjects = async () => {
-      setLoadingFormProjects(true);
-      try {
-        const response = await axios.get(`${backendUrl}/college/list-projects`, {
-          headers: { 'x-auth': token },
-          params: { vertical: formDepartmentId },
-        });
+    const loadedDepartments = loadedDepartmentsRef.current;
+    formDepartmentIds.forEach((deptId) => {
+      if (loadedDepartments[deptId]) return;
+      loadedDepartments[deptId] = 'loading';
+      setLoadingProjectsByDepartment((prev) => ({ ...prev, [deptId]: true }));
+      axios.get(`${backendUrl}/college/list-projects`, {
+        headers: { 'x-auth': token },
+        params: { vertical: deptId },
+      }).then((response) => {
         if (cancelled) return;
-        setFormProjects((response.data?.data || []).map((item) => ({
-          _id: String(item._id),
-          name: item.name || 'Untitled project',
-        })));
-      } catch (error) {
+        loadedDepartmentsRef.current[deptId] = 'done';
+        setProjectsByDepartment((prev) => ({
+          ...prev,
+          [deptId]: (response.data?.data || []).map((item) => ({
+            _id: String(item._id),
+            name: item.name || 'Untitled project',
+          })),
+        }));
+      }).catch((error) => {
         console.error('Error fetching projects for milestone form:', error);
-        if (!cancelled) setFormProjects([]);
-      } finally {
-        if (!cancelled) setLoadingFormProjects(false);
-      }
+        if (!cancelled) {
+          loadedDepartmentsRef.current[deptId] = '';
+          setProjectsByDepartment((prev) => ({ ...prev, [deptId]: [] }));
+        }
+      }).finally(() => {
+        if (!cancelled) {
+          setLoadingProjectsByDepartment((prev) => ({ ...prev, [deptId]: false }));
+        }
+      });
+    });
+    return () => {
+      cancelled = true;
+      Object.keys(loadedDepartments).forEach((deptId) => {
+        if (loadedDepartments[deptId] === 'loading') loadedDepartments[deptId] = '';
+      });
     };
-    loadFormProjects();
-    return () => { cancelled = true; };
-  }, [isOpen, formDepartmentId, backendUrl, token]);
+  }, [isOpen, editMode, formDepartmentIds, backendUrl, token]);
 
   if (!isOpen) return null;
+
+  const toggleDepartment = (deptId) => {
+    if (formDepartmentIds.includes(deptId)) {
+      const departmentProjectIds = (projectsByDepartment[deptId] || []).map((item) => item._id);
+      setFormDepartmentIds((prev) => prev.filter((id) => id !== deptId));
+      setFormProjectIds((prev) => prev.filter((id) => !departmentProjectIds.includes(id)));
+      return;
+    }
+    setFormDepartmentIds((prev) => [...prev, deptId]);
+  };
+
+  const toggleProject = (projId) => {
+    setFormProjectIds((prev) => (
+      prev.includes(projId) ? prev.filter((id) => id !== projId) : [...prev, projId]
+    ));
+  };
 
   return (
     <div style={{
@@ -1131,39 +1107,57 @@ const MilestoneModal = ({
         <h3 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 600 }}>
           {editMode ? 'Edit Milestone' : 'Add New Milestone'}
         </h3>
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>Department:</label>
-          <select
-            value={formDepartmentId}
-            disabled={loadingDepartments}
-            onChange={(event) => {
-              setFormDepartmentId(event.target.value);
-              setFormProjectId('');
-            }}
-            style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: 4, fontSize: 14, boxSizing: 'border-box', background: 'white' }}
-          >
-            <option value="">{loadingDepartments ? 'Loading departments...' : 'Select department'}</option>
-            {departments.map((item) => (
-              <option key={item._id} value={item._id}>{item.name}</option>
-            ))}
-          </select>
-        </div>
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>Project:</label>
-          <select
-            value={formProjectId}
-            disabled={!formDepartmentId || loadingFormProjects}
-            onChange={(event) => setFormProjectId(event.target.value)}
-            style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: 4, fontSize: 14, boxSizing: 'border-box', background: !formDepartmentId ? '#f8fafc' : 'white' }}
-          >
-            <option value="">
-              {!formDepartmentId ? 'Select department first' : loadingFormProjects ? 'Loading projects...' : 'Select project'}
-            </option>
-            {formProjects.map((item) => (
-              <option key={item._id} value={item._id}>{item.name}</option>
-            ))}
-          </select>
-        </div>
+        {editMode && (
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Departments and projects:</label>
+            <div style={{ fontSize: 12, color: '#718096', marginBottom: 8 }}>
+              A department with no project ticked gets all of its projects. Nothing ticked keeps the milestone global.
+            </div>
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, maxHeight: 220, overflowY: 'auto', padding: '8px 12px' }}>
+              {loadingDepartments ? (
+                <div style={{ fontSize: 13, color: '#718096' }}>Loading departments...</div>
+              ) : departments.length === 0 ? (
+                <div style={{ fontSize: 13, color: '#a0aec0' }}>No departments</div>
+              ) : departments.map((department) => {
+                const departmentChecked = formDepartmentIds.includes(department._id);
+                const departmentProjects = projectsByDepartment[department._id] || [];
+                return (
+                  <div key={department._id} style={{ marginBottom: 8 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={departmentChecked}
+                        onChange={() => toggleDepartment(department._id)}
+                      />
+                      <span>{department.name}</span>
+                    </label>
+                    {departmentChecked && (
+                      <div style={{ marginLeft: 24, marginTop: 4 }}>
+                        {loadingProjectsByDepartment[department._id] ? (
+                          <div style={{ fontSize: 12, color: '#718096' }}>Loading projects...</div>
+                        ) : departmentProjects.length === 0 ? (
+                          <div style={{ fontSize: 12, color: '#a0aec0' }}>No projects</div>
+                        ) : departmentProjects.map((project) => (
+                          <label
+                            key={project._id}
+                            style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 4, cursor: 'pointer' }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={formProjectIds.includes(project._id)}
+                              onChange={() => toggleProject(project._id)}
+                            />
+                            <span>{project.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         <div style={{ marginBottom: 16 }}>
           <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>Milestone Name:</label>
           <input
@@ -1192,12 +1186,17 @@ const MilestoneModal = ({
             type="button"
             onClick={() => {
               if (!title.trim()) return;
-              if (!formDepartmentId || !formProjectId) {
-                alert('Select department and project');
-                return;
-              }
-              onScopeChange(formDepartmentId, formProjectId);
-              onSave({ title: title.trim(), description: description.trim() });
+              const departmentIds = formDepartmentIds.filter((id) => departments.some((item) => item._id === id));
+              onSave({
+                title: title.trim(),
+                description: description.trim(),
+                ...(editMode ? {
+                  departments: departmentIds,
+                  projects: formProjectIds.filter((projId) => departmentIds.some((deptId) => (
+                    (projectsByDepartment[deptId] || []).some((item) => item._id === projId)
+                  ))),
+                } : {}),
+              });
             }}
             style={{ padding: '8px 16px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
           >

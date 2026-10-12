@@ -42,6 +42,7 @@ module.exports = {
   xtremeAuthToken: process.env.XTRME_GEN_AUTH_TOKEN,
   xtremeBusinessId: process.env.XTRME_GEN_BUSINESS_ID,
   xtremeCampaignId: process.env.XTRME_GEN_CAMPAIGN_ID,
+  xtremeDataCampaignId: process.env.XTRME_GEN_DATA_CAMPAIGN_ID,
   xtremeAgentId: process.env.XTRME_GEN_AGENT_ID,
   xtremeCallFrom: process.env.XTRME_GEN_CALL_FROM,
   xtremeAutoCall: process.env.XTRME_GEN_AUTO_CALL,

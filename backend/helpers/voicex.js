@@ -18,6 +18,7 @@ function getConfig() {
         agentId: trim(process.env.XTRME_GEN_AGENT_ID),
         businessId: trim(process.env.XTRME_GEN_BUSINESS_ID),
         campaignId: trim(process.env.XTRME_GEN_CAMPAIGN_ID),
+        dataCampaignId: trim(process.env.XTRME_GEN_DATA_CAMPAIGN_ID),
         callFrom: trim(process.env.XTRME_GEN_CALL_FROM),
         authToken: trim(process.env.XTRME_GEN_AUTH_TOKEN),
         autoCall: envFlag(process.env.XTRME_GEN_AUTO_CALL, true),
@@ -31,6 +32,16 @@ function isAutoCallEnabled() {
 
 function isLeadStatusTesting() {
     return getConfig().leadStatusTesting;
+}
+
+function campaignIdFor({ isDataLead } = {}) {
+    const cfg = getConfig();
+    return (isDataLead && cfg.dataCampaignId) || cfg.campaignId;
+}
+
+function allCampaignIds() {
+    const cfg = getConfig();
+    return [...new Set([cfg.campaignId, cfg.dataCampaignId].filter(Boolean))];
 }
 
 function buildAuthHeader(token) {
@@ -113,7 +124,7 @@ function axiosErrorMessage(err) {
     return err?.message || 'VoiceX request failed';
 }
 
-async function makeCall({ callTo, customField, callInitTime, agentId, callFrom } = {}) {
+async function makeCall({ callTo, customField, callInitTime, agentId, callFrom, campaignId } = {}) {
     const missing = configError();
     if (missing) throw missing;
 
@@ -128,7 +139,7 @@ async function makeCall({ callTo, customField, callInitTime, agentId, callFrom }
     const payload = {
         callTo: e164,
         businessId: cfg.businessId,
-        campaignId: cfg.campaignId,
+        campaignId: trim(campaignId) || cfg.campaignId,
         custom_field: customField && typeof customField === 'object' ? customField : {},
     };
     const agent = trim(agentId) || cfg.agentId;
@@ -150,7 +161,9 @@ async function makeCall({ callTo, customField, callInitTime, agentId, callFrom }
     return { payload, data: res.data, status: res.status };
 }
 
-async function cancelCall({ phoneNumber } = {}) {
+// Without a campaignId the cancel is sent to every configured campaign,
+// since the number may be scheduled in either one.
+async function cancelCall({ phoneNumber, campaignId } = {}) {
     const missing = configError();
     if (missing) throw missing;
 
@@ -168,22 +181,28 @@ async function cancelCall({ phoneNumber } = {}) {
         throw err;
     }
 
-    const payload = {
-        phoneNumber: phone,
-        businessId: cfg.businessId,
-        campaignId: cfg.campaignId,
-        source: CANCEL_SOURCE,
-    };
+    const targets = trim(campaignId) ? [trim(campaignId)] : allCampaignIds();
+    const results = await Promise.allSettled(targets.map(async (target) => {
+        const payload = {
+            phoneNumber: phone,
+            businessId: cfg.businessId,
+            campaignId: target,
+            source: CANCEL_SOURCE,
+        };
+        const res = await axios.post(cfg.cancelUrl, payload, {
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: buildAuthHeader(cfg.authToken),
+            },
+            timeout: 20000,
+        });
+        return { payload, data: res.data, status: res.status };
+    }));
 
-    const res = await axios.post(cfg.cancelUrl, payload, {
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: buildAuthHeader(cfg.authToken),
-        },
-        timeout: 20000,
-    });
-
-    return { payload, data: res.data, status: res.status };
+    const ok = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
+    if (!ok.length) throw results[0].reason;
+    if (ok.length === 1) return ok[0];
+    return { payload: ok.map((r) => r.payload), data: ok.map((r) => r.data), status: ok[0].status };
 }
 
 module.exports = {
@@ -192,6 +211,8 @@ module.exports = {
     isConfigured,
     isAutoCallEnabled,
     isLeadStatusTesting,
+    campaignIdFor,
+    allCampaignIds,
     toE164,
     buildCustomField,
     axiosErrorMessage,

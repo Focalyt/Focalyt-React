@@ -34,6 +34,7 @@ const whatsappRoutes = require("./whatsapp");
 
 const batchRoutes = require("./batches");
 const statusRoutes = require("./status");
+const milestoneRoutes = require("./milestone");
 const skillTestRoutes = require("./skillTest");
 const careerObjectiveRoutes = require("../college/careerObjective");
 const todoRoutes = require("./todo");
@@ -59,6 +60,7 @@ const leadRankingRoutes = require("./b2b/leadRankingRoutes");
 const b2bCopyRoutes = require("./b2b/b2b_copy");
 const androidAppRoutes = require("./androidApp");
 const statusB2bRoutes = require("./b2b/statusB2b");
+const milestoneB2bRoutes = require("./b2b/milestoneB2b");
 const placementRoutes = require("./placement");
 const router = express.Router();
 const moment = require('moment')
@@ -539,6 +541,7 @@ router.use("/b2b", isCollege, leadRankingRoutes);
 router.use("/b2b", isCollege, b2bRoutes);
 router.use("/b2b_copy", isCollege, b2bCopyRoutes);
 router.use("/statusB2b", statusB2bRoutes);
+router.use("/milestoneB2b", milestoneB2bRoutes);
 router.use("/placementStatus", placementRoutes);
 router.use("/androidApp", androidAppRoutes);
 
@@ -564,6 +567,7 @@ router.use("/coverLetter", isCollege, coverLetterRoutes);
 router.use("/mockInterview", isCollege, mockInterviewRoutes);
 router.use("/courses", isCollege, coursesRoutes);
 router.use("/status", statusRoutes);
+router.use("/milestone", milestoneRoutes);
 router.use("/dripmarketing", isCollege, dripmarketingRoutes);
 router.use("/lrp", isCollege, lrpRoutes);
 router.use("/video-timestamp", videoTimestampRoutes);

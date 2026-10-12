@@ -83,6 +83,22 @@ async function markLeadsQueuedForAiCall(leadIds) {
     );
 }
 
+let dataLeadSourceIdsCache = null;
+
+async function getDataLeadSourceIds() {
+    if (dataLeadSourceIdsCache) return dataLeadSourceIdsCache;
+    const docs = await Source.find({ name: { $regex: /^data\s*leads?$/i } }).select('_id').lean();
+    const ids = docs.map((doc) => String(doc._id));
+    if (ids.length) dataLeadSourceIdsCache = ids;
+    return ids;
+}
+
+async function resolveVoiceCampaignId(applied) {
+    const registeredBy = String(applied?.registeredBy?._id || applied?.registeredBy || '');
+    const isDataLead = Boolean(registeredBy) && (await getDataLeadSourceIds()).includes(registeredBy);
+    return voicex.campaignIdFor({ isDataLead });
+}
+
 async function initiateVoiceCallForLead({ applied, candidate, course, center, source, callInitTime } = {}) {
     if (!applied?._id) {
         return { skipped: true, reason: 'no_lead' };
@@ -94,11 +110,13 @@ async function initiateVoiceCallForLead({ applied, candidate, course, center, so
     }
 
     const customField = voicex.buildCustomField({ applied, candidate, course, center, source });
+    const campaignId = await resolveVoiceCampaignId(applied);
     try {
         const result = await voicex.makeCall({
             callTo: candidate?.mobile,
             customField,
             callInitTime,
+            campaignId,
         });
         const remoteLifetime = extractVoicexLifetimeCall(result?.data);
         const queuedPatch = {
@@ -106,6 +124,7 @@ async function initiateVoiceCallForLead({ applied, candidate, course, center, so
             'aiVoice.lastMakeCallAt': new Date(),
             'aiVoice.lastMakeCallStatus': 'queued',
             'aiVoice.lastMakeCallError': '',
+            'aiVoice.campaignId': campaignId,
         };
         if (remoteLifetime) {
             queuedPatch['aiVoice.lifetimeCallCount'] = remoteLifetime.count;
@@ -125,6 +144,7 @@ async function initiateVoiceCallForLead({ applied, candidate, course, center, so
             'aiVoice.lastMakeCallAt': new Date(),
             'aiVoice.lastMakeCallStatus': 'failed',
             'aiVoice.lastMakeCallError': message,
+            'aiVoice.campaignId': campaignId,
         }, {
             action: 'AI counselor call failed',
             remarks: message,
@@ -149,7 +169,10 @@ function queueVoiceCallForLead(opts) {
 
 async function cancelVoiceCallForLead({ applied, phoneNumber } = {}) {
     const phone = phoneNumber || applied?.candidate?.mobile || applied?._candidate?.mobile || '';
-    const result = await voicex.cancelCall({ phoneNumber: voicex.toE164(phone) || phone });
+    const result = await voicex.cancelCall({
+        phoneNumber: voicex.toE164(phone) || phone,
+        campaignId: applied?.aiVoice?.campaignId,
+    });
     if (applied?._id) {
         await recordVoiceCallAttempt(applied._id, {
             'aiVoice.lastEvent': 'MAKE_CALL_CANCELLED',
@@ -1650,7 +1673,10 @@ router.post("/voicex-webhook", async (req, res) => {
                 if (['JUNK', 'WON'].includes(mappedTitle) && voicex.isConfigured()) {
                     const phone = extractVoicexPhone(payload);
                     if (phone) {
-                        voicex.cancelCall({ phoneNumber: phone }).catch((err) => {
+                        voicex.cancelCall({
+                            phoneNumber: phone,
+                            campaignId: doc.aiVoice?.campaignId || payload.campaignId,
+                        }).catch((err) => {
                             console.error('[VoiceX] cancel after webhook failed', voicex.axiosErrorMessage(err));
                         });
                     }

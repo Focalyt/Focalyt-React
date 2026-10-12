@@ -276,6 +276,7 @@ const appliedCoursesSchema = new Schema(
       lastMakeCallStatus: { type: String, default: "" },
       lastMakeCallError: { type: String, default: "" },
       lastCancelAt: { type: Date },
+      campaignId: { type: String, default: "" },
       lifetimeCallCount: { type: Number, default: 0 },
       lifetimeCallField: { type: String, default: "" },
       lastCountedCallId: { type: String, default: "" },
