@@ -297,6 +297,24 @@
   line-height: 1.2;
 }
 
+.bm-page .b2b-crm-dashboard .b2b-dash-section {
+  border-color: #dbe1e8;
+  background: #eef1f5;
+}
+
+.bm-page .b2b-crm-dashboard .b2b-dash-section__label {
+  background: linear-gradient(to bottom, #f8fafc 50%, #eef1f5 50%);
+}
+
+.bm-page .b2b-crm-dashboard .b2b-dash-stat-card:hover {
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.bm-page .b2b-crm-dashboard .b2b-dash-stat-card__divider {
+  background: currentColor;
+  opacity: 0.3;
+}
+
 .b2b-crm-dashboard .b2b-perf-chip {
   display: inline-flex;
   align-items: center;

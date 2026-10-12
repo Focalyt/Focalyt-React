@@ -5,6 +5,31 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 import CollegeRegister from '../Register/CollegeRegister';
 
+const hasCollegePermission = (permissions, permission) => {
+    const permissionType = permissions?.permission_type;
+    if (permissionType === 'Admin') return true;
+
+    if (permissionType === 'View Only' || permissionType === 'view_only') {
+        return ['can_view_leads', 'can_view_kyc', 'can_view_training', 'can_view_users', 'can_bulk_export'].includes(permission);
+    }
+
+    if (permissionType === 'Custom') {
+        return !!permissions?.custom_permissions?.[permission];
+    }
+
+    return false;
+};
+
+const getInstituteHomePath = (permissions) => {
+    if (hasCollegePermission(permissions, 'can_view_leads')) {
+        return '/institute/registration';
+    }
+    if (hasCollegePermission(permissions, 'can_view_leads_b2b')) {
+        return '/institute/sales';
+    }
+    return '/institute/registration';
+};
+
 const CollegeLogin = () => {
     const userData = JSON.parse(sessionStorage.getItem("user") || "{}");
     const token = userData.token;
@@ -22,6 +47,8 @@ const CollegeLogin = () => {
     const [otp, setOtp] = useState('');
     const [showOtpField, setShowOtpField] = useState(false);
     const [showOtpBtn, setShowOtpBtn] = useState(false);
+
+    const [permissions, setPermissions] = useState();
 
     const [isUserInputDisabled, setIsUserInputDisabled] = useState(false);
 
@@ -73,10 +100,28 @@ const CollegeLogin = () => {
             if (returnUrl) {
                 navigate(returnUrl);
             } else {
-                navigate('/institute/registration');
+                navigate(getInstituteHomePath(userData?.permissions));
             }
         }
     }, [userData]);
+
+    const updatedPermission = async () => {
+        try {
+          const respose = await axios.get(`${backendUrl}/college/permission`, {
+            headers: { 'x-auth': token }
+          });
+          if (respose.data.status) {
+            setPermissions(respose.data.permissions);
+          }
+        } catch (error) {
+          console.error('Error fetching permissions:', error);
+        }
+      }
+    
+      useEffect(() => {
+        console.log('userData', userData)
+        console.log("permissions", permissions)
+      }, [permissions])
 
     const handleMobileNumberKeyPress = (e) => {
         const charCode = e.which ? e.which : e.keyCode;
@@ -113,7 +158,7 @@ const CollegeLogin = () => {
                         // window.location.href = decodeURIComponent(returnUrl);
                         navigate(decodeURIComponent(returnUrl));
                     } else {
-                        window.location.href = '/institute/registration';
+                        window.location.href = getInstituteHomePath(verifyRes.data.userData?.permissions);
                     }
                 } else {
                     setSuccessMessage('');
@@ -143,8 +188,7 @@ const CollegeLogin = () => {
                         // window.location.href = decodeURIComponent(returnUrl);
                         navigate(decodeURIComponent(returnUrl));
                     } else {
-                        // window.location.href = '/institute/dashboard';
-                        navigate('/institute/registration');
+                        navigate(getInstituteHomePath(verifyRes.data.userData?.permissions));
                     }
                 } else {
                     setSuccessMessage('');

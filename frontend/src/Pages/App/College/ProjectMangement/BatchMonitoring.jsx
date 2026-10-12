@@ -2123,20 +2123,20 @@ const BatchMonitoring = () => {
               <span className="b2b-dash-section__label">Followup Calling</span>
               <div className="d-flex flex-wrap gap-2 pt-1">
                 {[
-                  { key: 'done', label: 'Done', value: followupCounts.call.done, bg: '#12b3ff' },
-                  { key: 'planned', label: 'Planned', value: followupCounts.call.planned, bg: '#f59e0b' },
-                  { key: 'missed', label: 'Missed', value: followupCounts.call.missed, bg: '#7c3d14' },
+                  { key: 'done', label: 'Done', value: followupCounts.call.done, bg: '#e0f2fe', color: '#0369a1' },
+                  { key: 'planned', label: 'Planned', value: followupCounts.call.planned, bg: '#fef3c7', color: '#b45309' },
+                  { key: 'missed', label: 'Missed', value: followupCounts.call.missed, bg: '#fde8dc', color: '#9a3412' },
                 ].map((row) => (
                   <button
                     key={row.key}
                     type="button"
-                    className={`b2b-dash-stat-card text-center text-white border-0${followupCallFilter === row.key ? ' b2b-dash-stat-card--active' : ''}`}
-                    style={{ background: row.bg, width: 108, flex: '0 0 108px' }}
+                    className={`b2b-dash-stat-card text-center${followupCallFilter === row.key ? ' b2b-dash-stat-card--active' : ''}`}
+                    style={{ background: row.bg, color: row.color, border: `1px solid ${row.color}40`, width: 108, flex: '0 0 108px' }}
                     onClick={() => setFollowupCallFilter(followupCallFilter === row.key ? '' : row.key)}
                   >
                     <div className="b2b-dash-stat-card__label">{row.label}</div>
                     <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
-                    <div className="b2b-dash-stat-card__value text-white">{padCount(row.value)}</div>
+                    <div className="b2b-dash-stat-card__value">{padCount(row.value)}</div>
                   </button>
                 ))}
               </div>
@@ -2146,20 +2146,20 @@ const BatchMonitoring = () => {
               <span className="b2b-dash-section__label">Followup Visit</span>
               <div className="d-flex flex-wrap gap-2 pt-1">
                 {[
-                  { key: 'done', label: 'Done', value: followupCounts.visit.done, bg: '#4b5563' },
-                  { key: 'planned', label: 'Planned', value: followupCounts.visit.planned, bg: '#4b5563' },
-                  { key: 'missed', label: 'Missed', value: followupCounts.visit.missed, bg: '#7c3d14' },
+                  { key: 'done', label: 'Done', value: followupCounts.visit.done, bg: '#ffffff', color: '#374151' },
+                  { key: 'planned', label: 'Planned', value: followupCounts.visit.planned, bg: '#ffffff', color: '#374151' },
+                  { key: 'missed', label: 'Missed', value: followupCounts.visit.missed, bg: '#fde8dc', color: '#9a3412' },
                 ].map((row) => (
                   <button
                     key={row.key}
                     type="button"
-                    className={`b2b-dash-stat-card text-center text-white border-0${followupVisitFilter === row.key ? ' b2b-dash-stat-card--active' : ''}`}
-                    style={{ background: row.bg, width: 108, flex: '0 0 108px' }}
+                    className={`b2b-dash-stat-card text-center${followupVisitFilter === row.key ? ' b2b-dash-stat-card--active' : ''}`}
+                    style={{ background: row.bg, color: row.color, border: `1px solid ${row.color}40`, width: 108, flex: '0 0 108px' }}
                     onClick={() => setFollowupVisitFilter(followupVisitFilter === row.key ? '' : row.key)}
                   >
                     <div className="b2b-dash-stat-card__label">{row.label}</div>
                     <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
-                    <div className="b2b-dash-stat-card__value text-white">{padCount(row.value)}</div>
+                    <div className="b2b-dash-stat-card__value">{padCount(row.value)}</div>
                   </button>
                 ))}
               </div>
@@ -2170,22 +2170,22 @@ const BatchMonitoring = () => {
               <span className="b2b-dash-section__label">Milestone</span>
               <div className="d-flex flex-wrap gap-2 pt-1">
               {[
-                { key: 'started', label: 'Batch Started', value: milestoneCounts.batchStarted, bg: '#059669' },
-                { key: 'half', label: '50% Training', value: milestoneCounts.training50, bg: '#0ea5e9' },
-                { key: 'assessment', label: 'Assessment', value: milestoneCounts.assessment, bg: '#6366f1' },
-                { key: 'certified', label: 'Certified', value: milestoneCounts.certified, bg: '#10b981' },
-                { key: 'completed', label: 'Completed', value: milestoneCounts.completed, bg: '#5b4fc9' },
+                { key: 'started', label: 'Batch Started', value: milestoneCounts.batchStarted, bg: '#d1fae5', color: '#047857' },
+                { key: 'half', label: '50% Training', value: milestoneCounts.training50, bg: '#e0f2fe', color: '#0369a1' },
+                { key: 'assessment', label: 'Assessment', value: milestoneCounts.assessment, bg: '#e0e7ff', color: '#4338ca' },
+                { key: 'certified', label: 'Certified', value: milestoneCounts.certified, bg: '#ccfbf1', color: '#0f766e' },
+                { key: 'completed', label: 'Completed', value: milestoneCounts.completed, bg: '#ede9fe', color: '#5b21b6' },
               ].map((row) => (
                 <button
                   key={row.key}
                   type="button"
-                  className={`b2b-dash-stat-card text-center text-white border-0${milestoneFilter === row.key ? ' b2b-dash-stat-card--active' : ''}`}
-                  style={{ background: row.bg, width: 108, flex: '0 0 108px' }}
+                  className={`b2b-dash-stat-card text-center${milestoneFilter === row.key ? ' b2b-dash-stat-card--active' : ''}`}
+                  style={{ background: row.bg, color: row.color, border: `1px solid ${row.color}40`, width: 108, flex: '0 0 108px' }}
                   onClick={() => setMilestoneFilter(milestoneFilter === row.key ? '' : row.key)}
                 >
                   <div className="b2b-dash-stat-card__label">{row.label}</div>
                   <div className="b2b-dash-stat-card__divider" aria-hidden="true" />
-                  <div className="b2b-dash-stat-card__value text-white">{padCount(row.value)}</div>
+                  <div className="b2b-dash-stat-card__value">{padCount(row.value)}</div>
                 </button>
               ))}
               </div>
