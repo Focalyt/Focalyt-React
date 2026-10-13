@@ -531,14 +531,15 @@ const Profile = () => {
     padding: '9px 13px',
     border: '1.5px solid #e2e8f0',
     borderRadius: '10px',
-    fontSize: '13px',
+    fontSize: 'var(--foc-text-sm)',
+    fontFamily: 'var(--foc-font-sans)',
     outline: 'none',
     background: '#fff',
     color: '#333',
     transition: 'border-color 0.2s',
   };
   const fldErrStyle = { ...fldStyle, border: '1.5px solid #ef4444' };
-  const lblStyle = { fontSize: '12px', fontWeight: '600', color: '#64748b', marginBottom: '5px', display: 'block' };
+  const lblStyle = { fontSize: 'var(--foc-text-xs)', fontWeight: '600', fontFamily: 'var(--foc-font-sans)', color: '#64748b', marginBottom: '5px', display: 'block' };
   const lblErrStyle = { ...lblStyle, color: '#ef4444' };
   const reqStar = <span style={{ color: '#ef4444' }}>*</span>;
   const sectionCardStyle = {
@@ -560,7 +561,7 @@ const Profile = () => {
   const fieldWrapWide = { flex: '1 1 300px', minWidth: '220px', maxWidth: '420px' };
 
   return (
-    <>
+    <div className="foc-crm-profile">
       {/* Page Header Banner */}
       <div style={{
         background: 'linear-gradient(90deg, #E11D48 , #ff5770 )',
@@ -573,11 +574,11 @@ const Profile = () => {
         boxShadow: '0 4px 20px rgba(252,43,90,0.25)',
       }}>
         <div>
-          <h2 style={{ margin: 0, color: '#fff', fontWeight: 700, fontSize: '22px', letterSpacing: '-0.3px' }}>
+          <h2 style={{ margin: 0, color: '#fff', fontWeight: 700, fontSize: 'var(--foc-text-xl)', fontFamily: 'var(--foc-font-sans)', letterSpacing: '-0.3px' }}>
             <i className="fas fa-university" style={{ marginRight: '10px', opacity: 0.9 }}></i>
             Your Profile
           </h2>
-          <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
+          <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.8)', fontSize: 'var(--foc-text-sm)', fontFamily: 'var(--foc-font-sans)' }}>
             Manage college information and representatives
           </p>
         </div>
@@ -589,7 +590,8 @@ const Profile = () => {
             color: '#fff',
             borderRadius: '10px',
             padding: '8px 18px',
-            fontSize: '13px',
+            fontSize: 'var(--foc-text-sm)',
+            fontFamily: 'var(--foc-font-sans)',
             fontWeight: '600',
             cursor: 'pointer',
             display: 'flex',
@@ -608,7 +610,7 @@ const Profile = () => {
       <div style={sectionCardStyle} id="college-info">
         <div style={sectionHeaderStyle}>
           <i className="fas fa-building" style={{ color: '#fff', fontSize: '16px' }}></i>
-          <h5 style={{ margin: 0, color: '#fff', fontWeight: 700, fontSize: '15px' }}>College Information</h5>
+          <h5 style={{ margin: 0, color: '#fff', fontWeight: 700, fontSize: 'var(--foc-text-base)', fontFamily: 'var(--foc-font-sans)' }}>College Information</h5>
         </div>
         <div style={{ padding: '24px' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px' }}>
@@ -670,7 +672,7 @@ const Profile = () => {
                   type="text"
                   id="work-loc"
                   name="place"
-                  style={{ flex: 1, padding: '9px 12px', border: 'none', outline: 'none', fontSize: '13px', background: '#fff', color: '#333' }}
+                  style={{ flex: 1, padding: '9px 12px', border: 'none', outline: 'none', fontSize: 'var(--foc-text-sm)', fontFamily: 'var(--foc-font-sans)', background: '#fff', color: '#333' }}
                   placeholder="Enter a location"
                   value={college.place || ''}
                   onChange={(e) => handleInputChange(e, 'college')}
@@ -970,7 +972,7 @@ const Profile = () => {
                 maxWidth: '800px',
                 margin: '0 auto',
                 boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)',
-                fontFamily: 'Roboto, Arial, sans-serif'
+                fontFamily: 'var(--foc-font-sans)'
               }}>
                 {/* College Logo and Name */}
                 <div style={{
@@ -1189,7 +1191,7 @@ const Profile = () => {
       <div style={sectionCardStyle} id="Concerned-Person">
         <div style={sectionHeaderStyle}>
           <i className="fas fa-user-tie" style={{ color: '#fff', fontSize: '16px' }}></i>
-          <h5 style={{ margin: 0, color: '#fff', fontWeight: 700, fontSize: '15px' }}>Concerned Person</h5>
+          <h5 style={{ margin: 0, color: '#fff', fontWeight: 700, fontSize: 'var(--foc-text-base)', fontFamily: 'var(--foc-font-sans)' }}>Concerned Person</h5>
         </div>
         <div style={{ padding: '24px' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px' }}>
@@ -1248,7 +1250,7 @@ const Profile = () => {
       <div style={sectionCardStyle} id="representativeinfo">
         <div style={sectionHeaderStyle}>
           <i className="fas fa-users" style={{ color: '#fff', fontSize: '16px' }}></i>
-          <h5 style={{ margin: 0, color: '#fff', fontWeight: 700, fontSize: '15px' }}>College Representatives</h5>
+          <h5 style={{ margin: 0, color: '#fff', fontWeight: 700, fontSize: 'var(--foc-text-base)', fontFamily: 'var(--foc-font-sans)' }}>College Representatives</h5>
         </div>
         <div style={{ padding: '24px' }}>
           {college.collegeRepresentatives.map((rep, index) => (
@@ -1349,7 +1351,7 @@ const Profile = () => {
               style={{
                 background: loading ? '#ccc' : 'linear-gradient(135deg, #FC2B5A 0%, #a5003a 100%)',
                 color: '#fff', border: 'none', borderRadius: '10px',
-                padding: '9px 28px', fontSize: '13px', fontWeight: '600',
+                padding: '9px 28px', fontSize: 'var(--foc-text-sm)', fontFamily: 'var(--foc-font-sans)', fontWeight: '600',
                 cursor: loading ? 'not-allowed' : 'pointer',
                 boxShadow: loading ? 'none' : '0 4px 14px rgba(252,43,90,0.35)',
                 transition: 'all 0.2s',
@@ -1426,10 +1428,10 @@ select {
     border-radius: 0.5rem;
 }
 .bg-intext {
-    background-color: #FC2B5A;
+    background-color: #fc2b5a;
 }
 .new-bg-text {
-    background-color: #FC2B5A !important;
+    background-color: #fc2b5a !important;
     border-top-right-radius: 0px !important;
     border-bottom-right-radius: 0px !important;
 }
@@ -1458,7 +1460,7 @@ select {
 }
 .breadcrumb {
     font-size: 1rem;
-    font-family: "Montserrat", Helvetica, Arial, serif;
+    font-family: var(--foc-font-sans);
     background-color: transparent;
     padding: 0.5rem 0 0.5rem 1rem !important;
     border-left: 1px solid #d6dce1;
@@ -1474,7 +1476,7 @@ select {
     padding-left: .6rem;
 }
 a {
-    color: #FC2B5A;
+    color: #fc2b5a;
     text-decoration: none;
     background-color: transparent;
 }
@@ -2609,7 +2611,7 @@ max-width: 600px;
     max-width: 800px;
     margin: 0 auto;
     box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-    font-family: 'Roboto', Arial, sans-serif;
+    font-family: var(--foc-font-sans);
   }
   
   .resume-document-header {
@@ -3019,11 +3021,28 @@ max-width: 600px;
     color: #999 !important;
   }
 
-  
+  .foc-crm-profile {
+    font-family: var(--foc-font-sans);
+  }
+  .foc-crm-profile button,
+  .foc-crm-profile input,
+  .foc-crm-profile select,
+  .foc-crm-profile textarea,
+  .foc-crm-profile label,
+  .foc-crm-profile a,
+  .foc-crm-profile h1,
+  .foc-crm-profile h2,
+  .foc-crm-profile h3,
+  .foc-crm-profile h4,
+  .foc-crm-profile h5,
+  .foc-crm-profile h6,
+  .foc-crm-profile p {
+    font-family: var(--foc-font-sans);
+  }
     `
   }
 </style>
-    </>
+    </div>
   );
 };
 

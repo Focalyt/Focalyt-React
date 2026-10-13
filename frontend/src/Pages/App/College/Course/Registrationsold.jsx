@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import { createPortal } from 'react-dom';
 import DatePicker from 'react-date-picker';
 import Calendar from 'react-calendar';
 import { io } from 'socket.io-client';
@@ -5362,9 +5363,12 @@ console.log('API Response:', response.data);
     const { silent = false, leadViewTabOverride } = options;
     const activeLeadViewTab = leadViewTabOverride ?? leadViewTab;
 
+    const keepReferPanelOpen = showPanel === 'RefferAllLeads' || showPanel === 'Reffer';
     if (!silent) {
       setIsLoadingProfiles(true);
-      closePanel();
+      if (!keepReferPanelOpen) {
+        closePanel();
+      }
       setLeadDetailsVisible(null);
     }
 
@@ -6422,9 +6426,10 @@ console.log('API Response:', response.data);
     if (index !== 0) {
       newFilterData.leadStatus = crmFilters[index]._id;
     } else {
-      // Remove leadStatus filter for "All"
       delete newFilterData.leadStatus;
     }
+    delete newFilterData.aiLeadStatus;
+    setActiveAiPerformanceId(null);
 
     newFilterData.followupStatus = '';
     delete newFilterData.kyc;
@@ -6442,6 +6447,7 @@ console.log('API Response:', response.data);
     if (pageMainTab === 'ekyc') return;
     setActiveMilestoneId(milestone?._id || null);
     setActiveCrmFilter(0);
+    setActiveAiPerformanceId(null);
     setCurrentPage(1);
     setInput1Value('');
     setSelectedProfiles([]);
@@ -6452,6 +6458,7 @@ console.log('API Response:', response.data);
 
     const newFilterData = { ...filterData, followupStatus: '' };
     delete newFilterData.leadStatus;
+    delete newFilterData.aiLeadStatus;
     delete newFilterData.kyc;
     if (milestone?._id) {
       newFilterData.milestoneTitle = milestone.title;
@@ -6509,11 +6516,22 @@ console.log('API Response:', response.data);
 
   const handleAiPerformanceChipClick = (filterId) => {
     if (pageMainTab === 'ekyc') return;
+    const allIndex = crmFilters.findIndex((f) => f._id === 'all' || !f._id);
+    setActiveCrmFilter(allIndex >= 0 ? allIndex : 0);
     setActiveAiPerformanceId(filterId || null);
+    setActiveMilestoneId(null);
     setCurrentPage(1);
     setInput1Value('');
     setSelectedProfiles([]);
-    const newFilterData = { ...filterData };
+    setSelectedFollowupBucket('');
+    setSelectedApprovalFilter(null);
+    setSelectedKycFilter(null);
+    setSelectedMilestoneFilter(null);
+    const newFilterData = { ...filterData, followupStatus: '' };
+    delete newFilterData.leadStatus;
+    delete newFilterData.kyc;
+    delete newFilterData.milestoneTitle;
+    delete newFilterData.approvalStatus;
     if (filterId) {
       newFilterData.aiLeadStatus = filterId;
     } else {
@@ -7383,6 +7401,16 @@ console.log('API Response:', response.data);
     if (!id || id === 'all') return null;
     return id;
   })();
+  const noStatusChipSelected = !activeAiPerformanceId && !activePerformanceId;
+  const activeStatusLeadCount = (() => {
+    if (activeAiPerformanceId) {
+      return Number(aiPerformanceFilters.find((filter) => filter._id === activeAiPerformanceId)?.count) || 0;
+    }
+    if (activePerformanceId) {
+      return Number(performanceFilters.find((filter) => filter._id === activePerformanceId)?.count) || 0;
+    }
+    return Number(crmFilters.find((filter) => filter._id === 'all' || !filter._id)?.count) || performanceTotalCount || 0;
+  })();
   const normalizeMilestoneTitle = (value) => String(value || '').trim().toLowerCase();
   const milestonePerformanceChips = leadMilestones.map((milestone) => ({
     ...milestone,
@@ -7426,8 +7454,11 @@ console.log('API Response:', response.data);
     // Get total available leads from CRM filter (AI Call uses remaining New Lead / Not Connected)
     const totalAvailableLeads = bulkMode === 'AiCall'
       ? (aiCallTotalCount || profilesForSelect.length)
-      : (crmFilters[activeCrmFilter]?.count || allProfiles.length);
+      : activeStatusLeadCount;
     const validNumValue = Math.min(numValue, totalAvailableLeads);
+    if (bulkMode !== 'AiCall' && numValue > totalAvailableLeads) {
+      setInput1Value(totalAvailableLeads > 0 ? String(totalAvailableLeads) : '');
+    }
 
     // If user wants more profiles than currently loaded, fetch them
     if (validNumValue > profilesForSelect.length && validNumValue > 0) {
@@ -7439,7 +7470,7 @@ console.log('API Response:', response.data);
           const queryParams = new URLSearchParams({
             page: '1',
             limit: (bulkMode === 'AiCall' ? Math.max(validNumValue * 3, 50) : validNumValue).toString(),
-            leadStatus: crmFilters[activeCrmFilter]?._id || '',
+            ...(filterData.leadStatus && { leadStatus: filterData.leadStatus }),
             ...(filterData.aiLeadStatus && { aiLeadStatus: filterData.aiLeadStatus }),
             ...(filterData.name && { name: filterData.name }),
             ...(filterData.courseType && { courseType: filterData.courseType }),
@@ -7515,7 +7546,7 @@ console.log('API Response:', response.data);
       });
     }
 
-  }, [input1Value, allProfiles, bulkMode, crmFilters, activeCrmFilter, filterData, formData, aiCallTotalCount, hasAiAlreadyGoneThroughLead]);
+  }, [input1Value, allProfiles, bulkMode, crmFilters, activeCrmFilter, filterData, formData, aiCallTotalCount, hasAiAlreadyGoneThroughLead, activeStatusLeadCount]);
 
 
 
@@ -16112,9 +16143,9 @@ useEffect(() => {
               fontWeight: 600,
               borderRadius: '999px',
               cursor: 'pointer',
-              color: !activeAiPerformanceId ? '#fff' : 'rgb(250, 85, 121)',
-              backgroundColor: !activeAiPerformanceId ? 'rgb(250, 85, 121)' : '#fff',
-              border: !activeAiPerformanceId ? 'none' : '1.5px solid rgb(250, 85, 121)',
+              color: noStatusChipSelected ? '#fff' : 'rgb(250, 85, 121)',
+              backgroundColor: noStatusChipSelected ? 'rgb(250, 85, 121)' : '#fff',
+              border: noStatusChipSelected ? 'none' : '1.5px solid rgb(250, 85, 121)',
             }}
             onClick={() => handleAiPerformanceChipClick(null)}
           >
@@ -16157,9 +16188,9 @@ useEffect(() => {
               fontWeight: 600,
               borderRadius: '999px',
               cursor: 'pointer',
-              color: !activePerformanceId ? '#fff' : 'rgb(250, 85, 121)',
-              backgroundColor: !activePerformanceId ? 'rgb(250, 85, 121)' : '#fff',
-              border: !activePerformanceId ? 'none' : '1.5px solid rgb(250, 85, 121)',
+              color: noStatusChipSelected ? '#fff' : 'rgb(250, 85, 121)',
+              backgroundColor: noStatusChipSelected ? 'rgb(250, 85, 121)' : '#fff',
+              border: noStatusChipSelected ? 'none' : '1.5px solid rgb(250, 85, 121)',
             }}
             onClick={() => handlePerformanceChipClick(null)}
           >
@@ -16775,6 +16806,12 @@ useEffect(() => {
             text-align: center;
             line-height: 1.15;
             min-height: 34px;
+            white-space: nowrap;
+            flex: 0 0 auto;
+          }
+          .b2b-crm-dashboard .b2b-mobile-hscroll--chips{
+            flex-wrap: nowrap;
+            overflow-x: auto;
           }
           .b2b-crm-dashboard .b2b-followup-scroll-row{
             min-width: 0;
@@ -16899,12 +16936,12 @@ useEffect(() => {
               max-width: none;
             }
             .b2b-crm-dashboard .b2b-mobile-hscroll--chips .b2b-perf-chip{
-              min-width: 62px;
-              max-width: 136px;
-              min-height: 42px;
-              white-space: normal;
-              word-break: keep-all;
-              padding: 7px 12px !important;
+              min-width: auto;
+              max-width: none;
+              min-height: 34px;
+              white-space: nowrap;
+              word-break: normal;
+              padding: 6px 14px !important;
             }
             .b2b-crm-dashboard .b2b-followup-scroll-row{
               display: flex;
@@ -17003,8 +17040,11 @@ useEffect(() => {
             flex-direction: column;
             align-items: center;
             gap: 14px;
-            z-index: 1250;
+            z-index: 1600;
             pointer-events: none;
+          }
+          .ai-call-date-modal{
+            z-index: 3000 !important;
           }
           .crm-ai-fab-main{
             position: relative;
@@ -17786,7 +17826,8 @@ useEffect(() => {
                       <div className="adm-cycle-toolbar__actions d-flex flex-nowrap gap-2 align-items-center">
                         {showBulkInputs ? (
                           bulkMode === 'AiCall' && aiCallSource === 'untouch-new-lead' ? (
-                            <div className="modal show fade d-block ai-call-date-modal" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)' }}>
+                            createPortal(
+                            <div className="modal show fade d-block ai-call-date-modal" tabIndex="-1" role="dialog" style={{ backgroundColor: 'rgba(15, 23, 42, 0.45)', zIndex: 3000 }}>
                               <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '440px' }}>
                                 <div className="modal-content ai-call-date-modal__card">
                                   <div className="ai-call-date-modal__head">
@@ -17970,7 +18011,9 @@ useEffect(() => {
                                   </div>
                                 </div>
                               </div>
-                            </div>
+                            </div>,
+                            document.body
+                            )
                           ) : (
                           <div className="d-flex align-items-center gap-2">
                           <div style={{
@@ -18004,7 +18047,7 @@ useEffect(() => {
                                 }
                                 const maxValue = bulkMode === 'AiCall'
                                   ? Math.min(100, aiCallTotalCount || 0)
-                                  : (crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0);
+                                  : activeStatusLeadCount;
                                 if (e.key === 'Enter' && bulkMode === 'whatsapp' && input1Value) {
                                   e.preventDefault();
                                   const numValue = parseInt(input1Value, 10);
@@ -18020,7 +18063,7 @@ useEffect(() => {
                               onChange={(e) => {
                                 const maxValue = bulkMode === 'AiCall'
                                   ? Math.min(100, aiCallTotalCount || 0)
-                                  : (crmFilters[activeCrmFilter]?.count || allProfiles?.length || 0);
+                                  : activeStatusLeadCount;
                                 let inputValue = e.target.value.replace(/[^0-9]/g, '');
                                 if (inputValue === '') {
                                   setInput1Value('');
@@ -18049,7 +18092,7 @@ useEffect(() => {
                             <input
                               type="text"
                               placeholder="Input 2"
-                              value={bulkMode === 'AiCall' ? (aiCallTotalCount || 0) : (crmFilters[activeCrmFilter]?.count || 0)}
+                              value={bulkMode === 'AiCall' ? (aiCallTotalCount || 0) : activeStatusLeadCount}
                               readOnly
                               title={bulkMode === 'AiCall' ? `Total ${aiCallLabel} leads` : 'Total filtered leads'}
                               style={{

@@ -86,6 +86,13 @@ function createB2BRouter(LeadModel = defaultLeadModel) {
 
 	const isAdminUser = (req) => req.user?.permissions?.permission_type === 'Admin';
 
+	const canApproveB2bLeads = (req) => {
+		if (isAdminUser(req)) return true;
+		const permissions = req.user?.permissions;
+		return permissions?.permission_type === 'Custom'
+			&& permissions?.custom_permissions?.can_approve_leads_b2b === true;
+	};
+
 	const isReferredByMeQuery = (value) =>
 		value === true || value === 'true' || value === '1';
 
@@ -4236,8 +4243,8 @@ router.post('/add-lead', isCollege, async (req, res) => {
 // Atomic $set on approval fields only — never touches lead.status / lead.subStatus (Performance).
 router.put('/leads/:id/approval', isCollege, async (req, res) => {
 	try {
-		if (!isAdminUser(req)) {
-			return res.status(403).json({ status: false, message: 'Only Admin can approve/reject leads' });
+		if (!canApproveB2bLeads(req)) {
+			return res.status(403).json({ status: false, message: 'You do not have permission to approve or reject leads' });
 		}
 
 		const { status, rejectionReason } = req.body || {};

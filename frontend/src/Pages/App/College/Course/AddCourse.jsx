@@ -127,7 +127,7 @@ const AddCourse = () => {
 
   // Document requirements
   const [docsRequired, setDocsRequired] = useState([]);
-
+  const [placementDocsRequired, setPlacementDocsRequired] = useState([]);
   // FAQ questions and answers
   const [questionAnswers, setQuestionAnswers] = useState([
     { question: '<p>Do you offer a safe working environment?</p>', answer: '<p>Do you offer a safe working environment?</p>' }
@@ -513,12 +513,17 @@ const AddCourse = () => {
   const addDocumentField = () => {
     setDocsRequired([...docsRequired, { name: '', mandatory: false }]);
   };
+  const addPlacementDocumentField = () => {
+    setPlacementDocsRequired([...placementDocsRequired, { name: '', mandatory: false }]);
+  };
 
   // Remove a document field
   const removeDocumentField = (index) => {
     setDocsRequired(docsRequired.filter((_, i) => i !== index));
   };
-
+  const removePlacementDocumentField = (index) => {
+    setPlacementDocsRequired(placementDocsRequired.filter((_, i) => i !== index));
+  };
   // Update document field value
   const updateDocumentField = (index, value, field) => {
     const updatedDocs = [...docsRequired];
@@ -528,6 +533,16 @@ const AddCourse = () => {
       updatedDocs[index].mandatory = value === 'true' ? true : false;
     }
     setDocsRequired(updatedDocs);
+  };
+  // Update placement document field value
+  const updatePlacementDocumentField = (index, value, field) => {
+    const updatedPlacementDocs = [...placementDocsRequired];
+    if(field === 'name'){
+      updatedPlacementDocs[index].name = value;
+    }else if(field === 'mandatory'){
+      updatedPlacementDocs[index].mandatory = value === 'true' ? true : false;
+    }
+    setPlacementDocsRequired(updatedPlacementDocs);
   };
 
   // Add a new question-answer pair
@@ -1813,6 +1828,75 @@ const AddCourse = () => {
                         onClick={addDocumentField}
                       >
                         {docsRequired.length > 0 ? 'Add Another' : 'Add Document'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/*Placement Documents Required Section */}
+        <section id="placementDocsRequired">
+          <div className="row">
+            <div className="col-xl-12 col-lg-12">
+              <div className="card">
+                <div className="card-header border border-top-0 border-left-0 border-right-0">
+                  <h4 className="card-title pb-1">Placement Documents Required</h4>
+                </div>
+                <div className="card-content">
+                  <div className="card-body">
+                    <div id="documentContainer">
+                      {placementDocsRequired.map((doc, index) => (
+                        <div className="row requiredDocsRow" key={index}>
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                            <label>Document Name</label>
+                            <input
+                              type="text"
+                              className="form-control docsName"
+                              value={doc.name}
+                              onChange={(e) => updatePlacementDocumentField(index, e.target.value,'name')}
+                            />
+                          </div>
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                            <label>Mandatory</label>
+                            <select name="mandatory-doc" className="form-control" value={String(!!doc.mandatory)} onChange={(e) => updatePlacementDocumentField(index, e.target.value,'mandatory')}>
+                              <option value="true">Yes</option>
+                              <option value="false">No</option>
+                            </select>
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1 d-flex align-items-end">
+                            <button
+                              type="button"
+                              onClick={() => removePlacementDocumentField(index)}
+                              style={{
+                                background: 'white',
+                                color: '#ef4444',
+                                border: '1.5px solid #ef4444',
+                                borderRadius: '8px',
+                                padding: '8px 14px',
+                                fontWeight: 600,
+                                fontSize: '13px',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              <i className="fa fa-trash" style={{ marginRight: '5px' }}></i>
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="col-xl-12 mb-1 px-0 text-right">
+                      <button
+                        type="button"
+                        className="btn btn-success text-white add-another-button"
+                        onClick={addPlacementDocumentField}
+                      >
+                        {placementDocsRequired.length > 0 ? 'Add Another' : 'Add Document'}
                       </button>
                     </div>
                   </div>
