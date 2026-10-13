@@ -2785,6 +2785,29 @@ const CRMDashboard = () => {
     });
   };
 
+  const buildProfilePlacementDocumentsList = (profile) => {
+    const requiredDocs = (profile?._course?.placementDocs || []).filter((doc) => doc && doc.status !== false);
+    const uploadedDocs = Array.isArray(profile?.placementUploadedDocs) ? profile.placementUploadedDocs : [];
+    const uploadsByDocId = new Map();
+    uploadedDocs.forEach((doc) => {
+      const key = String(doc.docsId || '');
+      if (!key) return;
+      if (!uploadsByDocId.has(key)) uploadsByDocId.set(key, []);
+      uploadsByDocId.get(key).push(doc);
+    });
+
+    return requiredDocs.map((reqDoc) => {
+      const matchingUploads = uploadsByDocId.get(String(reqDoc._id)) || [];
+      const latest = matchingUploads.length ? matchingUploads[matchingUploads.length - 1] : null;
+      return {
+        _id: reqDoc._id,
+        Name: reqDoc.Name || reqDoc.name || 'Document',
+        mandatory: reqDoc.mandatory === true,
+        status: latest?.status || 'Not Uploaded',
+      };
+    });
+  };
+
   const computeProfileDocCounts = (profile, combinedDocs) => {
     const requiredDocs = profile?._course?.docsRequired || [];
     const docsList = Array.isArray(combinedDocs) ? combinedDocs : buildProfileDocumentsList(profile);
@@ -3984,6 +4007,7 @@ const CRMDashboard = () => {
     'Job History',
     'Course History',
     'Documents',
+    'Placement Doc',
     'Pre Verification'
   ];
 
@@ -6311,7 +6335,7 @@ console.log('API Response:', response.data);
       [profileIndex]: tabIndex
     }));
 
-    if (tabIndex === 5 && profile?._id) {
+    if (tabIndex === 6 && profile?._id) {
       setCurrentPreVerificationProfile(profile);
       fetchQuestionAnswers(profile._id);
     }
@@ -22167,6 +22191,49 @@ useEffect(() => {
                                     )}
 
                                     {(activeTab[profileIndex] || 0) === 5 && (
+                                      <div className="tab-pane active" id="placementDocuments">
+                                        {(() => {
+                                          const placementDocs = buildProfilePlacementDocumentsList(profile);
+                                          if (!placementDocs.length) {
+                                            return (
+                                              <div className="col-12 text-center py-5">
+                                                <div className="text-muted">
+                                                  <i className="fas fa-file-check fa-3x mb-3 text-success"></i>
+                                                  <h5 className="text-success">No Placement Documents Required</h5>
+                                                  <p>This course does not require any placement document verification.</p>
+                                                </div>
+                                              </div>
+                                            );
+                                          }
+                                          return (
+                                            <div className="table-responsive p-3">
+                                              <table className="table table-hover table-bordered">
+                                                <thead className="table-light">
+                                                  <tr>
+                                                    <th>S.No</th>
+                                                    <th>Document</th>
+                                                    <th>Mandatory</th>
+                                                    <th>Status</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {placementDocs.map((doc, index) => (
+                                                    <tr key={doc._id || index}>
+                                                      <td>{index + 1}</td>
+                                                      <td>{doc.Name}</td>
+                                                      <td>{doc.mandatory ? 'Yes' : 'No'}</td>
+                                                      <td>{doc.status}</td>
+                                                    </tr>
+                                                  ))}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          );
+                                        })()}
+                                      </div>
+                                    )}
+
+                                    {(activeTab[profileIndex] || 0) === 6 && (
                                       <div className="tab-pane active" id="preverification">
                                         <div className="row">
                                           <div className="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12 mb-xl-0 mb-lg-0 mb-md-sm-0 mb-0 candidate-card">

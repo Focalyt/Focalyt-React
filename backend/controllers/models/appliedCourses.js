@@ -306,6 +306,17 @@ const appliedCoursesSchema = new Schema(
         uploadedAt: { type: Date, default: Date.now },
       },
     ],
+    placementUploadedDocs: [
+      {
+        docsId: { type: ObjectId, ref: "courses.placementDocs" },
+        fileUrl: String,
+        status: { type: String, enum: ["Pending", "Verified", "Rejected"], default: "Pending" },
+        reason: { type: String },
+        verifiedBy: { type: ObjectId, ref: "User" },
+        verifiedDate: { type: Date },
+        uploadedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   {
     timestamps: true,

@@ -2908,6 +2908,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					_id: doc._course._id || null,
 					name: doc._course.name || null,
 					docsRequired: doc._course.docsRequired || [],
+					placementDocs: (doc._course.placementDocs || []).filter((item) => item && item.status !== false),
 				} : null,
 				_center: doc._center ? {
 					_id: doc._center._id || null,
@@ -2948,6 +2949,7 @@ router.route("/appliedCandidates").get(isCollege, async (req, res) => {
 					uploadPercentage: docCounts.uploadPercentage,
 				},
 				uploadedDocs: doc.uploadedDocs || [],
+				placementUploadedDocs: doc.placementUploadedDocs || [],
 				kyc: doc.kyc === true,
 				kycDoneAt: doc.kycDoneAt || null,
 				kycDoneBy: doc.kycDoneBy || null,
@@ -4071,7 +4073,8 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, 
 							college: 1,
 							project: 1,
 							vertical: 1,
-							docsRequired: 1
+							docsRequired: 1,
+							placementDocs: 1
 						}
 					}
 				]
@@ -4196,6 +4199,7 @@ function buildSimplifiedPipeline({ teamMemberIds, college, filters, pagination, 
 			_aiLeadStatus: 1,
 			_aiLeadSubStatus: 1,
 			uploadedDocs: 1,
+			placementUploadedDocs: 1,
 			kyc: 1,
 			kycDoneAt: 1,
 			kycDoneBy: 1,
@@ -9140,11 +9144,15 @@ router.post('/add_batch', isCollege, async (req, res) => {
 });
 
 // GET API to fetch batches
-router.get('/get_batches', async (req, res) => {
+router.get('/get_batches', isCollege, async (req, res) => {
 	try {
 		const { centerId, courseId } = req.query;  // Get query params for filtering
 
 		let filter = {};
+
+		if (req.college?._id) {
+			filter.college = req.college._id;
+		}
 
 		if (centerId) {
 			filter.centerId = centerId;
@@ -9152,6 +9160,16 @@ router.get('/get_batches', async (req, res) => {
 
 		if (courseId) {
 			filter.courseId = courseId;
+		}
+
+		// Senior trainers and trainers only see batches they are assigned to.
+		// Admins and other staff keep seeing every batch for the college.
+		const customPermissions = req.user?.permissions?.custom_permissions || {};
+		const isAdminUser = req.user?.permissions?.permission_type === 'Admin';
+		const isTrainingStaff = customPermissions.can_be_senior_trainer === true
+			|| customPermissions.can_be_trainer === true;
+		if (!isAdminUser && isTrainingStaff) {
+			filter.trainers = req.user._id;
 		}
 
 		const batches = await Batch.find(filter)

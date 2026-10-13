@@ -904,7 +904,8 @@
   border: 1px solid #d7dee8;
   border-radius: 14px;
   flex-wrap: nowrap;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   min-width: 0;
 }
 
@@ -921,8 +922,8 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  min-width: 0;
-  flex: 0.9 1 150px;
+  min-width: 170px;
+  flex: 0 0 auto;
   align-self: stretch;
 }
 
@@ -942,8 +943,8 @@
 
 .lead-strip-v3__profile {
   position: relative;
-  flex: 1.15 1 200px;
-  min-width: 0;
+  flex: 0 1 260px;
+  min-width: 220px;
   max-width: 280px;
   align-self: stretch;
   display: flex;
@@ -1102,8 +1103,8 @@
 
 .lead-strip-v3__panel {
   position: relative;
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 1 1 160px;
+  min-width: 150px;
   align-self: stretch;
   background: #fff;
   border: 1px solid #d7dee8;
@@ -1344,7 +1345,7 @@
 
 .lead-card-kyc-dash__stat {
   flex: 1 1 0;
-  min-width: 52px;
+  min-width: 0;
   border-radius: 8px;
   padding: 5px 4px;
   display: flex;
@@ -1659,5 +1660,86 @@
 @media (max-width: 768px) {
   .bm-card-open__grid {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+/*
+ * HrLeads.css is imported globally and reuses these class names, and it loads
+ * after this file, so its rules win on equal specificity. Scope the card layout
+ * under .bm-page so the batch monitoring cards keep their own widths.
+ */
+.bm-page .lead-strip-v3 {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.bm-page .lead-strip-v3--actions-open {
+  overflow: visible;
+}
+
+.bm-page .lead-strip-v3__profile {
+  flex: 0 1 260px;
+  min-width: 220px;
+  max-width: 280px;
+}
+
+.bm-page .lead-strip-v3__pair {
+  flex: 0 0 auto;
+  min-width: 170px;
+}
+
+.bm-page .lead-strip-v3__panel {
+  flex: 1 1 160px;
+  min-width: 150px;
+}
+
+.bm-page .lead-strip-v3__panel--side {
+  flex: 0 0 176px;
+  width: 176px;
+  min-width: 176px;
+  max-width: 176px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.bm-page .lead-card-kyc-dash {
+  padding: 8px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.bm-page .lead-card-kyc-dash__stats {
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+.bm-page .lead-card-kyc-dash__stat {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 4px 2px;
+}
+
+.bm-page .lead-card-kyc-dash__stat-label {
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .bm-page .lead-strip-v3 {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .bm-page .lead-strip-v3__profile,
+  .bm-page .lead-strip-v3__pair,
+  .bm-page .lead-strip-v3__panel,
+  .bm-page .lead-strip-v3__panel--side {
+    flex: 1 1 100%;
+    width: auto;
+    min-width: 0;
+    max-width: none;
   }
 }

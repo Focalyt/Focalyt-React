@@ -74,6 +74,14 @@ const coursecopySchema = new Schema({
     }
   ],
 
+  placementDocs: [
+    {
+      Name: { type: String },
+      mandatory: { type: Boolean, default: false },
+      status: { type: Boolean, default: true }
+    }
+  ],
+
   classResourcesRequired: [
     {
       Name: { type: String },

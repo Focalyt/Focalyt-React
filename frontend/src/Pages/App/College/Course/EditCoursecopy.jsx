@@ -51,6 +51,7 @@ const EditCourse = () => {
   const [selectedBrochurePreview, setSelectedBrochurePreview] = useState(null);
   // Document requirements
   const [docsRequired, setDocsRequired] = useState([ ]);
+  const [placementDocsRequired, setPlacementDocsRequired] = useState([]);
 
   // FAQ questions and answers
   const [questionAnswers, setQuestionAnswers] = useState([
@@ -369,6 +370,14 @@ const EditCourse = () => {
         // Set docs required
         if (course.docsRequired && course.docsRequired.length > 0) {
           setDocsRequired(course.docsRequired.map(doc => ({
+            _id: doc._id,
+            name: doc.Name,
+            mandatory: doc.mandatory ? true : false
+          })));
+        }
+
+        if (course.placementDocs && course.placementDocs.length > 0) {
+          setPlacementDocsRequired(course.placementDocs.map(doc => ({
             _id: doc._id,
             name: doc.Name,
             mandatory: doc.mandatory ? true : false
@@ -1072,6 +1081,24 @@ const EditCourse = () => {
     setDocsRequired(updatedDocs);
   };
 
+  const addPlacementDocumentField = () => {
+    setPlacementDocsRequired([...placementDocsRequired, { name: '', mandatory: false }]);
+  };
+
+  const updatePlacementDocumentField = (index, value, field) => {
+    const updatedPlacementDocs = [...placementDocsRequired];
+    if (field === 'name') {
+      updatedPlacementDocs[index].name = value;
+    } else if (field === 'mandatory') {
+      updatedPlacementDocs[index].mandatory = value === 'true';
+    }
+    setPlacementDocsRequired(updatedPlacementDocs);
+  };
+
+  const removePlacementDocumentField = (index) => {
+    setPlacementDocsRequired(placementDocsRequired.filter((_, i) => i !== index));
+  };
+
   // Handle document disabling (server call)
   const disableDocument = async (docId) => {
     if (window.confirm('Are you sure you want to remove this document?')) {
@@ -1240,6 +1267,12 @@ const EditCourse = () => {
 
       // Append docs required
       form.append('docsRequired', JSON.stringify(docsRequired.map(doc => ({
+        _id: doc._id,
+        Name: doc.name,
+        mandatory: doc.mandatory
+      }))));
+
+      form.append('placementDocs', JSON.stringify(placementDocsRequired.map(doc => ({
         _id: doc._id,
         Name: doc.name,
         mandatory: doc.mandatory
@@ -1993,6 +2026,74 @@ const EditCourse = () => {
           </div>
         </section>
 
+        <section id="placementDocsRequired">
+          <div className="row">
+            <div className="col-xl-12 col-lg-12">
+              <div className="card">
+                <div className="card-header border border-top-0 border-left-0 border-right-0">
+                  <h4 className="card-title pb-1">Placement Documents Required</h4>
+                </div>
+                <div className="card-content">
+                  <div className="card-body">
+                    <div id="placementDocumentContainer">
+                      {placementDocsRequired.map((doc, index) => (
+                        <div className="row requiredDocsRow" key={doc._id || index}>
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                            <label>Document Name</label>
+                            <input
+                              type="text"
+                              className="form-control docsName"
+                              value={doc.name || ''}
+                              onChange={(e) => updatePlacementDocumentField(index, e.target.value, 'name')}
+                            />
+                          </div>
+                          <div className="col-xl-3 col-lg-3 col-md-6 col-sm-12 mb-1">
+                            <label>Mandatory</label>
+                            <select name="mandatory-placement-doc" className="form-control" value={String(!!doc.mandatory)} onChange={(e) => updatePlacementDocumentField(index, e.target.value, 'mandatory')}>
+                              <option value="true">Yes</option>
+                              <option value="false">No</option>
+                            </select>
+                          </div>
+                          <div className="col-xl-2 col-lg-2 col-md-4 col-sm-12 mb-1 d-flex align-items-end">
+                            <button
+                              type="button"
+                              onClick={() => removePlacementDocumentField(index)}
+                              style={{
+                                background: 'white',
+                                color: '#ef4444',
+                                border: '1.5px solid #ef4444',
+                                borderRadius: '8px',
+                                padding: '8px 14px',
+                                fontWeight: 600,
+                                fontSize: '13px',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              <i className="fa fa-trash" style={{ marginRight: '5px' }}></i>
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="col-xl-12 mb-1 px-0 text-right">
+                      <button
+                        type="button"
+                        className="btn btn-success text-white add-another-button"
+                        onClick={addPlacementDocumentField}
+                      >
+                        {placementDocsRequired.length > 0 ? 'Add Another' : 'Add Document'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Add Docs Section */}
         <section id="add-docs">
           <div className="row">
@@ -2627,6 +2728,7 @@ const EditCourse = () => {
         #course-info .card,
         #course-structure .card,
         #docsRequired .card,
+        #placementDocsRequired .card,
         #add-docs .card,
         #testimonial-videos .card,
         #extra-features .card,

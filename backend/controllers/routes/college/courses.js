@@ -442,6 +442,9 @@ router
 
 			// Parse JSON fields
 			body.docsRequired = JSON.parse(body.docsRequired || '[]');
+			if (body.placementDocs !== undefined) {
+				body.placementDocs = normalizePlacementDocs(body.placementDocs);
+			}
 			body.classResourcesRequired = JSON.parse(body.classResourcesRequired || '[]');
 			body.labResourcesRequired = JSON.parse(body.labResourcesRequired || '[]');
 			body.questionAnswers = JSON.parse(body.questionAnswers || '[]');
@@ -587,6 +590,9 @@ router
 
 			// Parse JSON fields
 			body.docsRequired = JSON.parse(body.docsRequired || '[]');
+			if (body.placementDocs !== undefined) {
+				body.placementDocs = normalizePlacementDocs(body.placementDocs);
+			}
 			body.classResourcesRequired = JSON.parse(body.classResourcesRequired || '[]');
 			body.labResourcesRequired = JSON.parse(body.labResourcesRequired || '[]');
 			body.questionAnswers = JSON.parse(body.questionAnswers || '[]');
@@ -850,6 +856,7 @@ router
 			})
 			course = await Courses.findById(id).populate('sectors').populate('center');
 			course.docsRequired = (course.docsRequired || []).filter(doc => doc.status === true);
+			course.placementDocs = (course.placementDocs || []).filter(doc => doc.status !== false);
 			course.classResourcesRequired = (course.classResourcesRequired || []).filter(doc => doc.status !== false);
 			course.labResourcesRequired = (course.labResourcesRequired || []).filter(doc => doc.status !== false);
 
@@ -907,6 +914,9 @@ router
 				body.docsRequired = typeof body.docsRequired === 'string'
 					? JSON.parse(body.docsRequired)
 					: body.docsRequired;
+			}
+			if (body.placementDocs !== undefined) {
+				body.placementDocs = normalizePlacementDocs(body.placementDocs);
 			}
 			if (body.classResourcesRequired) {
 				body.classResourcesRequired = typeof body.classResourcesRequired === 'string'
@@ -1063,6 +1073,7 @@ router
 
 			course = await Courses.findById(id).populate('sectors').populate('center');
 			course.docsRequired = course.docsRequired.filter(doc => doc.status === true);
+			course.placementDocs = (course.placementDocs || []).filter(doc => doc.status !== false);
 			const highestQualification = await Qualification.find({ status: true })
 
 
@@ -1088,6 +1099,31 @@ const extensionsForResourceType = (uploadType) => {
 	if (uploadType === 'PDF') return ['pdf'];
 	if (uploadType === 'Presentation') return ['ppt', 'pptx', 'pdf'];
 	return ['pdf', 'doc', 'docx', 'ppt', 'pptx'];
+};
+
+const normalizePlacementDocs = (value) => {
+	let items = value;
+	if (typeof value === 'string') {
+		try {
+			items = JSON.parse(value || '[]');
+		} catch (err) {
+			items = [];
+		}
+	}
+	if (!Array.isArray(items)) return [];
+	return items
+		.filter((item) => item && String(item.Name || item.name || '').trim())
+		.map((item) => {
+			const row = {
+				Name: String(item.Name || item.name).trim(),
+				mandatory: item.mandatory === true || item.mandatory === 'true',
+				status: item.status !== false && item.status !== 'false',
+			};
+			if (item._id && mongoose.Types.ObjectId.isValid(item._id)) {
+				row._id = item._id;
+			}
+			return row;
+		});
 };
 
 const parseResourceList = (value) => {
@@ -1190,6 +1226,33 @@ router.patch('/:courseId/required-resources', async (req, res) => {
 	}
 });
 
+router.put('/:courseId/placement-docs', async (req, res) => {
+	try {
+		const { courseId } = req.params;
+		if (!mongoose.Types.ObjectId.isValid(courseId)) {
+			return res.status(400).json({ status: false, message: 'Invalid course' });
+		}
+
+		const course = await Courses.findById(courseId);
+		if (!course) {
+			return res.status(404).json({ status: false, message: 'Course not found' });
+		}
+
+		const incoming = req.body?.placementDocs !== undefined ? req.body.placementDocs : req.body;
+		course.placementDocs = normalizePlacementDocs(incoming);
+		await course.save();
+
+		return res.json({
+			status: true,
+			message: 'Placement documents saved',
+			data: (course.placementDocs || []).filter((doc) => doc.status !== false),
+		});
+	} catch (err) {
+		console.error('Failed to save placement documents:', err);
+		return res.status(400).json({ status: false, message: err.message || 'Failed to save placement documents' });
+	}
+});
+
 router.patch('/:courseId/disable-doc/:docId', async (req, res) => {
 	const { courseId, docId } = req.params;
 
@@ -1232,7 +1295,8 @@ router
 				}
 			})
 			course = await Courses.findById(id).populate('sectors').populate('center');
-			course.docsRequired = course.docsRequired.filter(doc => doc.status === true);;
+			course.docsRequired = course.docsRequired.filter(doc => doc.status === true);
+			course.placementDocs = (course.placementDocs || []).filter(doc => doc.status !== false);
 
 			return res.json({
 				course,
@@ -1294,7 +1358,12 @@ router
 
 			// Parse JSON fields (if present in body)
 			if (body.docsRequired) {
-				body.docsRequired = JSON.parse(body.docsRequired);
+				body.docsRequired = typeof body.docsRequired === 'string'
+					? JSON.parse(body.docsRequired)
+					: body.docsRequired;
+			}
+			if (body.placementDocs !== undefined) {
+				body.placementDocs = normalizePlacementDocs(body.placementDocs);
 			}
 			if (body.questionAnswers) {
 				body.questionAnswers = JSON.parse(body.questionAnswers);
